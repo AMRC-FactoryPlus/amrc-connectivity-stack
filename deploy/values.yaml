@@ -451,7 +451,10 @@ grafana:
   deploymentStrategy:
     type: Recreate
   image:
-    tag: 10.0.1
+    # v13 migrates dashboards to a new schema ON FIRST USE and the migration
+    # is one-way — see "Grafana upgraded from v10 to v13" in the release
+    # notes before downgrading this on an existing installation.
+    tag: 13.1.0
   enabled: true
   persistence:
     enabled: true

@@ -1133,8 +1133,6 @@ export default {
         })
       }
 
-      toast.warning("Test message", { pauseOnHover: true })
-
       this.markDirty()
       this.groupRerenderTrigger = +new Date()
       this.rerenderTrigger = +new Date()

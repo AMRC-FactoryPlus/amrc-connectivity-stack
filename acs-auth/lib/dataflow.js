@@ -200,13 +200,20 @@ export class DataFlow {
         const principal$ = valid_uuid(input)
             ? rx.of(input)
             : this.track_kerberos(input);
+        /* switchMap, not mergeMap: mergeMap keeps every inner
+         * subscription alive, so each re-emission of the principal
+         * (one per identity write, via the identities refetch) added
+         * another permanent subscription to acl_for. Long-lived
+         * notify sessions accumulated these without bound and every
+         * subsequent emission fanned out through all of them. */
         return rxx.rx(
             principal$,
-            rx.mergeMap(p => p ? this.acl_for(p) : rx.of([])),
+            rx.switchMap(p => p ? this.acl_for(p) : rx.of([])),
             rx.map(acl => imm.Seq(acl)
                 .filter(e => e.permission == perm)
                 .map(e => e.target)
                 .toSet()),
+            rx.distinctUntilChanged(imm.is),
             rx.tap(ptd =>
                 this.log("Permitted %s for %s: %o", perm, input, ptd.toJS())));
     }
@@ -288,10 +295,15 @@ export class DataFlow {
     }
 
     track_kerberos (upn) {
+        /* The identities seq refetches the whole table on every
+         * identity write, so it re-emits equal content freely. Dedupe
+         * on the resolved UUID so downstream pipelines only see a
+         * change when the mapping actually changes. */
         return rxx.rx(
             this.identities,
             rx.map(ids => ids.filter(i => i.kind == "kerberos" && i.name == upn)),
-            rx.map(acc => acc[0]?.uuid));
+            rx.map(acc => acc[0]?.uuid),
+            rx.distinctUntilChanged());
     }
 
     find_kerberos (upn) {

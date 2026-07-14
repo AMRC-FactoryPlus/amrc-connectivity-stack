@@ -1,0 +1,27 @@
+#-REQUIRE: auth
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+
+  !u UUIDs.Class.Service:
+    !u Openmetadata.Service.Openmetadata:
+      name: "Openmetadata service"
+  
+  !u Auth.Class.ServiceRole:
+    !u Openmetadata.Requirement.ServiceRole:
+      name: "Openmetadata service role"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+
+
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Openmetadata.Requirement.ServiceRole:
+    !u UUIDs.Permission.Directory.AdvertiseService:
+      !u Openmetadata.Service.Openmetadata: false
+
+
+

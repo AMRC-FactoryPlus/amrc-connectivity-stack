@@ -11,11 +11,11 @@ dependencies:
 - name: cert-manager
   repository: https://charts.jetstack.io
   version: v1.14.4
-- name: opensearch
-  repository: https://opensearch-project.github.io/helm-charts/
-  version: 3.7.0
 - name: openmetadata
   repository: https://helm.open-metadata.org/
   version: 1.13.1
-digest: sha256:208e33dda0c94053090e0aec8fefd09a5a5346dca7e552a0ee7a51ab91df52fc
-generated: "2026-07-01T16:31:32.502328854+01:00"
+- name: openmetadata-dependencies
+  repository: https://helm.open-metadata.org/
+  version: 1.13.1
+digest: sha256:5e010aecb8456ec7a649b358f0765ce4cd3f5be99c5c19459f55f33aeff3f25b
+generated: "2026-07-14T14:49:46.672745982+01:00"

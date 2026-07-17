@@ -468,18 +468,40 @@ grafana:
       root_url: "$__file{/etc/acs-config/root_url}"
     auth:
       # Hide the local username/password form: F+ via Keycloak is the
-      # only intended login path. The default Grafana admin (seed in
-      # Secret grafana-admin-user) is reachable via the URL
-      # /login?disableLoginForm=false for emergency access if Keycloak
-      # is unreachable.
+      # only intended login path.
       #
-      # Operators that want the form back can override with:
+      # There is NO query-parameter escape hatch. With this set,
+      # registration.go does not register the form client at all, so no
+      # interactive or API password login exists -- the local admin in
+      # Secret grafana-admin-user cannot log in while this is true.
+      # To break glass (Keycloak down, no F+ login possible), override
+      # the value and restart the pod:
       #   grafana:
       #     grafana.ini:
       #       auth:
       #         disable_login_form: false
       disable_login_form: true
       oauth_auto_login: false
+      # Required for OAuth to be able to claim an existing Grafana
+      # user at all - without this flag, pkg/services/authn/clients/
+      # oauth.go leaves lookupParams.Email AND lookupParams.Login
+      # both nil, so lookupByOneOf finds nothing, Grafana drops into
+      # createUser, and the create collides with the existing row's
+      # email/login uniqueness check ("user already exists"). The
+      # "insecure" wording refers to providers that don't verify
+      # emails - ours is our own Keycloak federating F+ Auth, and
+      # the FactoryPlusUserAdapter already stamps email_verified=true
+      # because the email is derived from a kerberos-authoritative
+      # F+ Principal record.
+      #
+      # This MUST live under `auth`, not `auth.generic_oauth`: Grafana
+      # reads it with a hardcoded section literal --
+      #   KeyValue("auth", "oauth_allow_insecure_email_lookup")
+      # -- and the grafana subchart renders every top-level grafana.ini
+      # key as its own ini section, so nesting it under
+      # auth.generic_oauth emits [auth.generic_oauth] where the flag is
+      # silently ignored and defaults back to false.
+      oauth_allow_insecure_email_lookup: true
     auth.basic:
       enabled: false
     auth.generic_oauth:
@@ -511,18 +533,6 @@ grafana:
       # revoking Grafana.Perm.* in F+ downgrades on next login rather
       # than letting the 60s SPI cache staleness become permanent.
       role_attribute_strict: true
-      # Required for OAuth to be able to claim an existing Grafana
-      # user at all - without this flag, pkg/services/authn/clients/
-      # oauth.go leaves lookupParams.Email AND lookupParams.Login
-      # both nil, so lookupByOneOf finds nothing, Grafana drops into
-      # createUser, and the create collides with the existing row's
-      # email/login uniqueness check ("user already exists"). The
-      # "insecure" wording refers to providers that don't verify
-      # emails - ours is our own Keycloak federating F+ Auth, and
-      # the FactoryPlusUserAdapter already stamps email_verified=true
-      # because the email is derived from a kerberos-authoritative
-      # F+ Principal record.
-      oauth_allow_insecure_email_lookup: true
   extraConfigmapMounts:
     - name: acs-grafana-config
       mountPath: /etc/acs-config

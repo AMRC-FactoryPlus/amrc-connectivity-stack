@@ -80,8 +80,19 @@ database are all created automatically; there is no manual realm or
 client configuration to do.
 
 Setting `openid.enabled` to `false` will skip Keycloak, but Grafana then
-has no interactive login other than the local emergency admin account,
-which remains reachable at `/login?disableLoginForm=false`.
+has no interactive login at all. Hiding the login form does not leave a
+back door: Grafana does not register the password login client when
+`auth.disable_login_form` is set, so the local admin account cannot sign
+in interactively or over the API, and there is no query parameter that
+re-enables the form. To recover access, put the form back with a values
+override and restart the Grafana pod:
+
+```yaml
+grafana:
+  grafana.ini:
+    auth:
+      disable_login_form: false
+```
 
 ### Grafana upgraded from v10 to v13
 

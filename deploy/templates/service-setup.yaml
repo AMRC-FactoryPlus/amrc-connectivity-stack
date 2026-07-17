@@ -135,8 +135,14 @@ spec:
               #            SPI's cached JAAS Subject. Without a restart
               #            the SPI's outbound calls to F+ Auth time
               #            out until the pod is bounced manually.
+              # openid is gated: with openid.enabled=false the
+              # deployment does not exist, and an ungated restart would
+              # exit 1 on every run. The Job is restartPolicy OnFailure
+              # with backoffLimit 9999, so each retry would bounce mqtt
+              # again - restarting the broker every few minutes for
+              # weeks while helm upgrade reports success.
               NAMESPACE={{.Release.Namespace}}
-              for D in mqtt openid; do
+              for D in mqtt{{ if .Values.openid.enabled }} openid{{ end }}; do
                 echo "Restarting deployment: $D"
                 kubectl rollout restart "deployment/$D" -n "$NAMESPACE" || exit 1
                 kubectl rollout status "deployment/$D" -n "$NAMESPACE" --timeout=120s || exit 1

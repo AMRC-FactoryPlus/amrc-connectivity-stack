@@ -533,6 +533,25 @@ grafana:
       # revoking Grafana.Perm.* in F+ downgrades on next login rather
       # than letting the 60s SPI cache staleness become permanent.
       role_attribute_strict: true
+    # Grafana 13 runs a unified-storage data migration for playlists on
+    # boot, enabled by default (MigratedUnifiedResources in
+    # pkg/setting/setting_unified_storage.go). Its SQL selects
+    # playlist.created_at, but the sqlstore migration which adds that
+    # column existed only in 11.x/12.x: v13 deleted playlist_mig.go
+    # entirely, so a database created by Grafana 10.x and upgraded
+    # straight to 13.x never gains the column. Grafana then dies on boot
+    # with "no such column: p.created_at" - the SELECT fails at prepare,
+    # so having no playlists does not help.
+    #
+    # ACS v5.1.0 shipped Grafana 10.0.1, so every site upgrading with a
+    # kept Grafana PVC hits this. Fresh installs do not: v13 seeds the
+    # column from its schema snapshot, which is why CI stayed green.
+    #
+    # Skipping the migration leaves the legacy playlist table untouched
+    # and unified storage with no playlists. ACS does not use playlists.
+    # Drop this key and add the columns by hand if you ever need them.
+    unified_storage.playlists.playlist.grafana.app:
+      enableMigration: false
   extraConfigmapMounts:
     - name: acs-grafana-config
       mountPath: /etc/acs-config

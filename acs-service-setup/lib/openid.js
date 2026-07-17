@@ -294,6 +294,16 @@ class OpenIDSetup {
                 ...(spec.deviceAuthorizationFlowEnabled
                     ? { "oauth2.device.authorization.grant.enabled": "true" }
                     : {}),
+                // Per-client access-token lifespan override, in seconds.
+                // Keycloak's realm default (300s) is right for API tokens
+                // but wrong for an unattended display credential: a kiosk
+                // JWT (e.g. Grafana url_login) is re-presented on every
+                // request and the wall dies at exp, so a kiosk client
+                // wants a long lifespan (days) and a refresh-before-expiry
+                // on the consumer side. Omit for the realm default.
+                ...(spec.accessTokenLifespan
+                    ? { "access.token.lifespan": String(spec.accessTokenLifespan) }
+                    : {}),
             },
         };
         if (secret !== undefined) desired.secret = secret;

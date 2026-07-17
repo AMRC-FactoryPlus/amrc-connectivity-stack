@@ -27,5 +27,8 @@
     "async": "^3.2.4",
     "express": "^4.17.1",
     "express-openapi-validator": "^4.13.2"
+  },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
   }
 }

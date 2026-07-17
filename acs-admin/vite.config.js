@@ -78,6 +78,7 @@ export default defineConfig({
       'got': EMPTY,
       'got-fetch': EMPTY,
       'gssapi.js': EMPTY,
+      '@amrc-factoryplus/gssapi': EMPTY,
       'path': 'path-browserify',
       'buffer': 'buffer/',
     },

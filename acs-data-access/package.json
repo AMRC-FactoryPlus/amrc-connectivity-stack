@@ -25,6 +25,9 @@
     "stream-size": "^0.0.6",
     "uuid": "^11.0.5"
   },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
+  },
   "devDependencies": {
     "eslint": "^9.23.0",
     "vitest": "^4.1.8"

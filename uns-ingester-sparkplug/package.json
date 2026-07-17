@@ -32,6 +32,9 @@
     "pino": "^8.11.0",
     "pino-pretty": "^10.0.0"
   },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
+  },
   "devDependencies": {
     "cross-env": "^7.0.3",
     "dotenv": "^16.0.3",

@@ -13,5 +13,8 @@
     "dependencies": {
         "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
         "node-opcua": "^2.145.0"
+    },
+    "optionalDependencies": {
+        "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
     }
 }

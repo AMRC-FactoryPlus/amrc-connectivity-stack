@@ -13,5 +13,8 @@
   "dependencies": {
     "@amrc-factoryplus/service-client": "../lib/js-service-client",
     "isomorphic-git": "^1.32.2"
+  },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
   }
 }

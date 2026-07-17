@@ -32,5 +32,8 @@
     "http-errors": "^2.0.0",
     "timers-promises": "^1.0.1",
     "type-is": "^1.6.18"
+  },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
   }
 }

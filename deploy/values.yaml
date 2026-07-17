@@ -232,6 +232,13 @@ serviceSetup:
     #     name: Polyptic kiosk
     #     serviceAccountsEnabled: true
     #     standardFlowEnabled: false
+    #
+    # `accessTokenLifespan` (seconds) overrides the realm's access-token
+    # lifespan (default 300s) for one client. A kiosk JWT is re-presented
+    # on every request by the consuming app (e.g. Grafana url_login), so
+    # an unattended display dies at token expiry: give such clients a
+    # long lifespan (e.g. 2592000 = 30 days) and let the consumer refresh
+    # before expiry. Leave unset everywhere a human signs in.
     openidClients:
       grafana:
         enabled: true

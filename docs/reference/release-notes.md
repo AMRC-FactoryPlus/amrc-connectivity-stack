@@ -47,10 +47,17 @@ The detail is in the sections below; this is the order to work in.
    waits for Keycloak to become ready, and it retries until it succeeds,
    so a Job that has not yet completed is not necessarily failing. Wait
    for it to complete before relying on the upgrade.
-4. **After it completes**, sign in to Grafana and confirm your
-   dashboards and playlists are present (see the Grafana sections), and
-   run **Import from Devices** on the ISA-95 page if you have existing
-   hierarchy values.
+4. **After it completes**, confirm the Grafana migrations before you
+   rely on the install or upgrade the edge agents. A playlist that fails
+   to migrate is recorded as done and never retried, and the ones that
+   did migrate still render, so looking at the playlist list in the UI
+   will not tell you a playlist is missing. Instead check the Grafana
+   log for the `Count validation` line on `playlists.playlist.grafana.app`
+   and confirm `rejected=0` with `legacy_count` equal to `unified_count`.
+   If `rejected` is not zero, restore the Grafana volume snapshot, fix
+   the offending playlists, and upgrade again. Then sign in to confirm
+   your dashboards are present, and run **Import from Devices** on the
+   ISA-95 page if you have existing hierarchy values.
 5. **Upgrade the edge agents last**, once the central services are on
    v6 (see the timestamp section).
 
@@ -156,11 +163,10 @@ before the admin password was randomised, that account's password is
 Grafana's built-in default `admin`, not the random value a fresh v6
 install generates. Treat it as a live credential: it is the account you
 would use with the break-glass override above, and its password should
-be rotated. This local account also carries a placeholder email rather
-than the Kerberos UPN, so signing the admin principal in through SSO may
-not adopt it the way an ordinary user's account is adopted. Keep it as a
-local login reached through the break-glass override rather than relying
-on SSO to reclaim it.
+be rotated. Whether signing the admin principal in through SSO adopts
+this local account was not verified during the upgrade testing, so do
+not rely on SSO to reclaim it; keep it as a local login reached through
+the break-glass override.
 
 ### Grafana upgraded from v10 to v12
 
@@ -240,12 +246,13 @@ alone still expires at the realm default. Leaving `accessTokenLifespan`
 unset keeps the realm lifespan, so nothing changes for clients where a
 human signs in.
 
-If the consuming application reaches Keycloak's JWKS endpoint over plain
-HTTP - which happens on a cluster deployed with `acs.secure: false` -
-Grafana refuses to start unless it runs in development mode
-(`GF_DEFAULT_APP_MODE: development`), because it will not fetch signing
-keys over HTTP otherwise. A production deployment serves HTTPS and needs
-neither the override nor that concern.
+If such a client reaches Keycloak's JWKS endpoint over plain HTTP -
+which happens with Grafana's `auth.jwt` on a cluster deployed with
+`acs.secure: false` - Grafana will not fetch the signing keys over HTTP
+and exits at startup with `jwt_set_url must have https scheme`. Running
+it in development mode (`GF_DEFAULT_APP_MODE: development`) lifts that
+restriction. A production deployment serves HTTPS and needs neither the
+override nor that concern.
 
 These settings are off unless asked for, and existing clients are
 unaffected.

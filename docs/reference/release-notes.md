@@ -11,12 +11,48 @@ the next release.
 ## v6.0.0
 
 This is a major release. It changes the Sparkplug timestamp format, the
-way users log in to Grafana, and two ConfigDB permissions. None of these
-are backwards compatible. Please read this whole section before
-upgrading a production installation.
+way users log in to Grafana, the bundled Grafana version, and two
+ConfigDB permissions. None of these are backwards compatible, and
+several of the Grafana and Directory changes are one-way. Please read
+this whole section before upgrading a production installation.
 
 Note that v4 and v5 were not documented here; this section describes the
 changes from v5.1.0.
+
+### Upgrade procedure
+
+The detail is in the sections below; this is the order to work in.
+
+1. **Before you start**, add DNS records for the three new external
+   hosts (`openid`, `i3x`, `data-access`) and make sure your TLS
+   certificate covers them. If you issue certificates with the chart's
+   Let's Encrypt integration you must add them to
+   `acs.letsEncrypt.additionalDnsNames`, because the chart's own
+   certificate does not include them; a wildcard or externally-managed
+   certificate needs nothing.
+2. **Snapshot two persistent volumes.** The Grafana volume, because the
+   dashboard and playlist migrations are one-way and cannot be rolled
+   back. And the shared Postgres volume, because the Directory database
+   migrates to a new schema version on first start of a v6 Directory
+   pod, and a v5 Directory pod will not start against it - a rollback
+   without the snapshot leaves both Directory pods in CrashLoopBackOff.
+   (If you are caught in that state, the minimal repair is
+   `update version set version = 12;` in the `directory` database.)
+3. **Run `helm upgrade`, then watch the `service-setup` Job.** It is a
+   plain Kubernetes Job, not a Helm hook, so `helm upgrade` reports
+   success before the Job has done any work. The permission grants,
+   the Keycloak realm and client provisioning, and the service
+   registrations all happen inside it. On a cluster whose Keycloak is
+   starting for the first time the Job can take several minutes while it
+   waits for Keycloak to become ready, and it retries until it succeeds,
+   so a Job that has not yet completed is not necessarily failing. Wait
+   for it to complete before relying on the upgrade.
+4. **After it completes**, sign in to Grafana and confirm your
+   dashboards and playlists are present (see the Grafana sections), and
+   run **Import from Devices** on the ISA-95 page if you have existing
+   hierarchy values.
+5. **Upgrade the edge agents last**, once the central services are on
+   v6 (see the timestamp section).
 
 ### Nanosecond timestamps: upgrade central services before edge agents
 
@@ -29,9 +65,15 @@ rather than `2026-05-28T15:46:56.100Z`.
 Components from this release read a timestamp below 1e15 as milliseconds
 and convert it, so a v6 central service can consume data from a v5 edge
 agent. **The reverse is not true.** A v5 historian reading from a v6
-edge agent will interpret a nanosecond value as milliseconds and store
-points dated tens of millions of years in the future. Upgrade the
-central services first, then the edge agents.
+edge agent treats the nanosecond value as milliseconds; the number is
+far larger than any date the historian can represent, so it becomes an
+invalid time and those points are not stored rather than being written
+with a wrong timestamp. Either way the data is lost until both ends are
+on v6, so upgrade the central services first and the edge agents last.
+
+Edge agents are upgraded by the edge Helm charts, which you control, so
+the ordering is yours to enforce: do not roll an edge cluster to v6
+until its central services are on v6.
 
 Two further consequences:
 
@@ -59,19 +101,32 @@ other central services continue to authenticate exactly as they did.
 On upgrade you must:
 
 - Create a DNS record for the new `openid.<acs.baseUrl>` host and ensure
-  your TLS certificate covers it.
+  the certificate Grafana's browser is served covers it. As noted in the
+  upgrade procedure, Let's Encrypt users must add the host to
+  `acs.letsEncrypt.additionalDnsNames`. The Keycloak discovery endpoint
+  must also resolve and present a valid certificate *from inside the
+  cluster*, because the `service-setup` Job calls it there; a split-horizon
+  DNS setup that only answers externally will wedge the Job.
 - Grant Grafana roles through Factory+ permissions. Roles are no longer
-  held in Grafana. Add principals to the groups listed under
-  `serviceSetup.config.grafanaPermissions`; anyone without a grant
-  becomes a Viewer, and revoking a grant demotes the user at their next
-  login. The maximum role is now Admin, as Grafana Admin is no longer
-  assigned.
-- Check that your existing Grafana users can still reach their accounts.
-  Dashboards and the Grafana database are preserved across the upgrade,
-  but federated logins now arrive with the Kerberos UPN as their
-  username. Where that differs from the username a v5 proxy login
-  created, the user may be given a fresh Viewer account instead of
-  reclaiming the old one.
+  held in Grafana. The two roles are Factory+ permissions listed under
+  `serviceSetup.config.grafanaPermissions` (Grafana Admin and Grafana
+  Editor); grant one to a principal with the Factory+ ACL editor, using
+  the wildcard target, and it arrives in the `fp_permissions` claim on
+  the principal's next login. Anyone without a grant is a Viewer, and
+  revoking a grant demotes the user at their next login. The maximum role
+  is Admin; Grafana's server-admin (GrafanaAdmin) is no longer assigned.
+  Members of the **Administrator** group get Grafana Admin automatically
+  through the shipped ACLs, so an operator who is already an
+  Administrator needs no further action.
+- Existing Grafana accounts are reclaimed automatically. Federated logins
+  arrive with the Kerberos UPN as the username, which is the same string
+  the v5 proxy login used, and Grafana matches the returning user to
+  their existing account and keeps their dashboards and role. (This
+  relies on `oauth_allow_insecure_email_lookup`, which the chart sets;
+  the "insecure" here only means Grafana trusts the email the identity
+  provider asserts, and that provider is your own Keycloak backed by
+  Kerberos.) The one account that may not reclaim cleanly is the local
+  emergency admin: see below.
 
 The Keycloak deployment uses the custom `acs-keycloak` image, which has
 the Factory+ storage provider built in. Stock upstream Keycloak will not
@@ -94,6 +149,19 @@ grafana:
       disable_login_form: false
 ```
 
+On a cluster upgraded from v5, the `grafana-admin-user` Secret from your
+v5 installation is kept (it carries `helm.sh/resource-policy: keep`), so
+the local admin is still `admin@<REALM>`. On installations first seeded
+before the admin password was randomised, that account's password is
+Grafana's built-in default `admin`, not the random value a fresh v6
+install generates. Treat it as a live credential: it is the account you
+would use with the break-glass override above, and its password should
+be rotated. This local account also carries a placeholder email rather
+than the Kerberos UPN, so signing the admin principal in through SSO may
+not adopt it the way an ordinary user's account is adopted. Keep it as a
+local login reached through the break-glass override rather than relying
+on SSO to reclaim it.
+
 ### Grafana upgraded from v10 to v12
 
 The bundled Grafana image moves from 10.0.1 to 12.4.5. Grafana 10.x
@@ -113,16 +181,26 @@ move to 13 will then be safe.
 Three upstream Grafana changes are worth knowing about when upgrading
 an existing installation:
 
-- Dashboards are migrated to Grafana's new dashboard schema as they are
-  used, and the migration is one-way: once the new image has written to
-  the Grafana database you cannot return to the previous one without
-  losing dashboards. Snapshot the Grafana PersistentVolume before
-  upgrading if the dashboards matter.
-- Your playlists are migrated into Grafana's unified storage on first
-  boot. This is also one-way, and the same snapshot covers it. Check
-  after upgrading that the playlists you expect are all present before
-  you rely on the installation; the migration logs a warning rather
-  than failing if it rejects an individual playlist.
+- Your playlists and dashboards are migrated into Grafana's unified
+  storage on first boot, and the migration is one-way: once the new
+  image has written to the Grafana database you cannot return to the
+  previous one. This is why the upgrade procedure has you snapshot the
+  Grafana volume first. Check after upgrading that the playlists you
+  expect are all present before you rely on the installation. The
+  playlist migration logs a warning and carries on rather than failing
+  if it rejects an individual playlist, so a clean run is not enough on
+  its own - confirm the Grafana log shows a `Count validation` line for
+  `playlists.playlist.grafana.app` with `rejected=0` and
+  `legacy_count` equal to `unified_count`. A non-zero `rejected` means
+  some playlists did not migrate and, because the migration then records
+  itself as done, will not be retried; restore the volume snapshot,
+  correct the offending playlists, and upgrade again.
+- The chart keeps folders and dashboards on Grafana's legacy storage by
+  pinning `autoMigrationThreshold` to 1 for both. Grafana 12 otherwise
+  auto-migrates them into unified storage on any installation with fewer
+  than ten dashboards, so without the pin a small site would silently
+  take that one-way migration while a large one would not. There is no
+  action for you here unless you override those values; do not.
 - Support for AngularJS plugins has been removed (disabled by default
   in Grafana 11, gone entirely in 12). Grafana's built-in panels are
   unaffected and legacy Graph/Table panels are migrated automatically,
@@ -149,16 +227,62 @@ token without a human login. Such a client should normally also set
 Keycloak only supports service accounts on confidential clients, so the
 flag is ignored on a client marked `publicClient`.
 
-This is off unless asked for, and existing clients are unaffected.
+A client may also set `accessTokenLifespan` (in seconds) to override the
+realm's access-token lifespan, which defaults to 300 seconds, for that
+one client. This matters for an unattended display: a wall that signs a
+Grafana panel in with a token (Grafana's `auth.jwt` `url_login`) holds
+no session and re-presents the same token on every request, so it stops
+working the moment the token expires and drops to a login screen. Give
+such a client a long-lived token - for example `2592000` for thirty days
+- and let the consumer refresh it before expiry. A kiosk needs both
+`serviceAccountsEnabled` and `accessTokenLifespan`; the service account
+alone still expires at the realm default. Leaving `accessTokenLifespan`
+unset keeps the realm lifespan, so nothing changes for clients where a
+human signs in.
+
+If the consuming application reaches Keycloak's JWKS endpoint over plain
+HTTP - which happens on a cluster deployed with `acs.secure: false` -
+Grafana refuses to start unless it runs in development mode
+(`GF_DEFAULT_APP_MODE: development`), because it will not fetch signing
+keys over HTTP otherwise. A production deployment serves HTTPS and needs
+neither the override nor that concern.
+
+These settings are off unless asked for, and existing clients are
+unaffected.
 
 ### Two new services are exposed by default
 
 `i3x` and `data-access` are both enabled by default, and each publishes
 an external host: `i3x.<acs.baseUrl>` and `data-access.<acs.baseUrl>`.
-Add DNS records and extend your TLS certificate to cover them, or set
-`i3x.enabled` or `dataAccess.enabled` to `false`. The i3X service
-depends on Keycloak, so do not disable `openid` while leaving `i3x`
-enabled.
+Add DNS records and extend your TLS certificate to cover them (for
+Let's Encrypt, add them to `acs.letsEncrypt.additionalDnsNames` as
+above), or set `i3x.enabled` or `dataAccess.enabled` to `false`. These
+services use only cluster-internal URLs at runtime, so a missing DNS
+record or an uncovered host does not stop them running; it stops the
+Manager's Explorer page and the browser-facing API from reaching them.
+
+### i3X authenticates every request but does not authorize per object
+
+i3X is enabled by default and serves the entire Unified Namespace, live
+values and history, over `i3x.<acs.baseUrl>`. It authenticates every
+request - a call with no valid Factory+ credential is refused, apart
+from the public `/v1/info` endpoint - but it performs no per-object
+authorization. Any principal that can obtain a Factory+ token can read
+the whole namespace through i3X, and that includes every edge agent
+service account whose keytab sits on a shop-floor device. This is a
+wider audience than in v5, where the same data was gated per principal
+by the MQTT and InfluxDB ACLs. The same authentication-only gate covers
+the `/mcp` endpoint, which exposes the namespace to an MCP client.
+
+If that exposure is not acceptable for your site, set `i3x.enabled` to
+`false`. Doing so also withdraws i3X's advertisement from the Directory,
+which leaves the Explorer page and the live values in the Manager's
+Monitor view without a data source, since both read from i3X.
+
+i3X does not hard-depend on Keycloak. With `openid` disabled it still
+accepts Kerberos and the other Factory+ credential types and simply
+stops accepting OIDC bearer tokens, so disabling `openid` degrades i3X
+rather than breaking it.
 
 ### ConfigDB permission changes
 

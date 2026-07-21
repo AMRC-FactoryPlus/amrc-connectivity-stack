@@ -8,6 +8,18 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+### Service-account OIDC clients get Factory+ principals
+
+Each `serviceAccountsEnabled` OIDC client now gets an F+ Principal
+("Service account: <name>" in the ACL editor), and its
+client-credentials tokens carry `fp_principal_uuid`, so unattended
+consumers (visualiser walls, scheduled jobs) can be granted F+
+permissions like any other principal and can authenticate to the F+
+HTTP services and the MQTT broker. Previously such tokens were
+rejected by the HTTP services and received an empty MQTT ACL. A fresh
+service account holds no grants; grant its principal the permissions
+it needs (e.g. MQTT read for a wall) via the ACL editor.
+
 ## v6.1.0
 
 This release moves the visualiser onto the central Keycloak login and

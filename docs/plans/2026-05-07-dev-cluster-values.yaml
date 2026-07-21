@@ -1,0 +1,39 @@
+# Dev cluster overrides for testing the dn/oAuth branch on a real cluster.
+#
+# Usage:
+#   helm upgrade <release> deploy/ \
+#     --namespace <staging-namespace> \
+#     --reuse-values \
+#     -f docs/plans/2026-05-07-dev-cluster-values.yaml
+#
+# --reuse-values pulls everything else from the existing helm release
+# (cluster's domain, TLS, Postgres password etc.); this file only
+# overrides the three images that actually changed on this branch.
+#
+# Replace <your-gh-username> and <your-tag> with your values from
+# config.mk.
+
+auth:
+  image:
+    # acs-auth image with the new GET /v2/principal/:uuid/groups endpoint
+    registry: ghcr.io/<your-gh-username>
+    tag: <your-tag>
+    pullPolicy: Always   # pull every time during dev iteration
+
+openid:
+  image:
+    # Custom Keycloak image: keycloak:26.1.1 + the F+ User Storage SPI
+    # jar baked in. Replaces the upstream Keycloak image.
+    repository: acs-keycloak
+    registry: ghcr.io/<your-gh-username>
+    tag: <your-tag>
+    pullPolicy: Always
+
+serviceSetup:
+  image:
+    # service-setup with ensure_factoryplus_federation, the F+ claim
+    # mappers, and the Grafana group seeder. Helm runs this as a Job
+    # on every upgrade.
+    registry: ghcr.io/<your-gh-username>
+    tag: <your-tag>
+    pullPolicy: Always

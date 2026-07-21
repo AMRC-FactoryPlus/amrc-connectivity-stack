@@ -166,9 +166,28 @@ service in is a single-line include in its deployment template.
 
 The MQTT broker also accepts JWTs: present the JWT as the MQTT
 password (the username is ignored; identity comes from the verified
-token's `preferred_username`). The HiveMQ plugin validates against
-the same realm via `OIDC_DISCOVERY_URL` and runs the normal MQTT ACL
-lookup for that principal.
+token's `fp_principal_uuid`, falling back to `preferred_username`).
+The HiveMQ plugin validates against the same realm via
+`OIDC_DISCOVERY_URL` and runs the normal MQTT ACL lookup for that
+principal.
+
+## Service accounts (client-credentials) have F+ principals
+
+A Keycloak service account is a local Keycloak user, not one
+federated from F+ Auth, so the SPI's live claim mappers have nothing
+to serve for it. Instead, service-setup creates an F+ Principal for
+every `serviceAccountsEnabled` client and stamps its UUID as a user
+attribute on the service-account user; the claim mappers read the
+attribute and stamp `fp_principal_uuid` into its tokens like any
+other.
+
+The principal appears in the ACL editor as "Service account:
+<client name>" and starts with no grants. For an unattended
+visualiser wall, grant it the MQTT read permissions (and Directory /
+ConfigDB read for discovery and icons) before expecting the display
+to show anything. `fp_permissions` is not populated for service
+accounts; consumers that read it (Grafana's role mapping) see the
+Viewer fallback, which is right for a wall.
 
 ## The visualiser
 

@@ -8,6 +8,8 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.1.1
+
 ### Service-account OIDC clients get Factory+ principals
 
 Each `serviceAccountsEnabled` OIDC client now gets an F+ Principal

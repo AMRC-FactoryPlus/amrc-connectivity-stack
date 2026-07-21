@@ -226,7 +226,16 @@ serviceSetup:
     # human login. Such clients are necessarily confidential (ignored
     # if publicClient is set) and should also set
     # `standardFlowEnabled: false`: they have no browser flow, so no
-    # redirect URIs are ever exercised. Example:
+    # redirect URIs are ever exercised.
+    #
+    # service-setup automatically creates an F+ Principal for each
+    # service-account client ("Service account: <name>" in the ACL
+    # editor) and stamps its UUID into the client's tokens as
+    # fp_principal_uuid, so the account can be granted F+ permissions
+    # (e.g. MQTT read for a visualiser wall) like any other principal.
+    # A fresh service account holds NO grants: an unattended display
+    # will authenticate but see nothing until an admin grants its
+    # principal the relevant permissions. Example:
     #   polyptic-kiosk:
     #     enabled: true
     #     name: Polyptic kiosk

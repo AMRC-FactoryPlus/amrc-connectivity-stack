@@ -55,6 +55,10 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
     private static final UUID ADDR_UUID = UUID.fromString(
         "8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
 
+    private static final java.util.regex.Pattern UUID_SHAPE =
+        java.util.regex.Pattern.compile(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
+
     private FPServiceClient fplus;
     private FPJwtVerifier jwt;
 
@@ -120,7 +124,13 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
             }
         }
 
-        return fplus.auth().getACL(principal, PERMGRP_UUID)
+        /* Principals from JWT auth are F+ principal UUIDs; kerberos
+         * auth yields UPNs (which always contain '@', so the shapes
+         * never collide). The Auth service routes each form through
+         * the matching lookup. */
+        final boolean by_uuid = UUID_SHAPE.matcher(principal).matches();
+
+        return fplus.auth().getACL(principal, PERMGRP_UUID, by_uuid)
             .flatMapObservable(Observable::fromStream)
             .flatMapSingle(ace -> {
                 String perm = (String)ace.get("permission");

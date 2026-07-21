@@ -6,6 +6,8 @@
 import fs from "node:fs/promises";
 import timers from "node:timers/promises";
 
+import { UUIDs } from "@amrc-factoryplus/service-client";
+
 const SECRET_DIR = "/etc/secret";
 const READY_TIMEOUT_MS = 10 * 60 * 1000;
 const READY_POLL_MS = 5 * 1000;
@@ -14,6 +16,7 @@ const TOKEN_REFRESH_BUFFER_MS = 10 * 1000;
 class OpenIDSetup {
     constructor (ss) {
         const { fplus } = ss;
+        this.fplus = fplus;
         this.log = fplus.debug.bound("openid");
         this.config = ss.config;
         this.acs = ss.acs_config;
@@ -396,6 +399,56 @@ class OpenIDSetup {
         }
     }
 
+    /** Give a service-account client an F+ identity.
+     *
+     * The SPI's claim mappers read the fp_principal_uuid user
+     * attribute, which for federated users is served live from F+
+     * Auth. A Keycloak service account is a local user with no F+
+     * record, so without help its tokens carry no F+ identity: the
+     * HTTP services reject them outright and the MQTT broker finds an
+     * empty ACL. Here we create a Principal object in ConfigDB for
+     * the service account and stamp its UUID as a real user attribute
+     * on the Keycloak user; the mappers pick it up exactly as they
+     * do the federated attribute, and admins grant permissions to the
+     * principal through the standard ACL editor.
+     *
+     * The Keycloak attribute is the source of truth for the UUID, so
+     * re-runs are idempotent and the UUID survives redeploys; the
+     * ConfigDB objects are re-ensured each run in case a dump reload
+     * lost them. */
+    async ensure_service_account_principal (name, spec, clientUuid) {
+        const base = `/admin/realms/${encodeURIComponent(this.realm)}`;
+        const res = await this.api("GET",
+            `${base}/clients/${clientUuid}/service-account-user`);
+        const user = res.body;
+        if (!user?.id) {
+            this.log("No service-account user for client %s; skipping", name);
+            return;
+        }
+
+        const cdb = this.fplus.ConfigDB;
+        const attrs = user.attributes ?? {};
+        let uuid = attrs.fp_principal_uuid?.[0];
+
+        if (!uuid) {
+            uuid = await cdb.create_object(UUIDs.Class.Principal);
+            this.log("Created principal %s for service account %s",
+                uuid, name);
+        }
+        await cdb.create_object(UUIDs.Class.Principal, uuid);
+        await cdb.put_config(UUIDs.App.Info, uuid,
+            { name: `Service account: ${spec.name ?? name}` });
+
+        if (attrs.fp_principal_uuid?.[0] !== uuid) {
+            this.log("Stamping fp_principal_uuid on service account %s",
+                name);
+            await this.api("PUT", `${base}/users/${user.id}`, {
+                ...user,
+                attributes: { ...attrs, fp_principal_uuid: [uuid] },
+            });
+        }
+    }
+
     async run () {
         await this.wait_for_ready();
         await this.ensure_realm();
@@ -424,6 +477,13 @@ class OpenIDSetup {
             // consumers (Grafana, acs-i3x, future shims) read F+ data
             // directly from the token.
             await this.ensure_factoryplus_claim_mappers(clientUuid);
+
+            // Service-account clients get an F+ principal so their
+            // client-credentials tokens carry an fp_principal_uuid
+            // and can be granted ACLs like any other principal.
+            if (!spec.publicClient && spec.serviceAccountsEnabled)
+                await this.ensure_service_account_principal(
+                    name, spec, clientUuid);
         }
 
         this.log("OpenID setup complete");

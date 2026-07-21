@@ -30,6 +30,7 @@ import org.ietf.jgss.*;
 import org.json.*;
 
 import io.reactivex.rxjava3.core.*;
+import io.vavr.control.Option;
 
 import uk.co.amrc.factoryplus.client.*;
 import uk.co.amrc.factoryplus.gss.FPGssResult;
@@ -55,10 +56,12 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
         "8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
 
     private FPServiceClient fplus;
+    private FPJwtVerifier jwt;
 
     public FPKrbAuthProvider ()
     {
         fplus = new FPServiceClient();
+        jwt = new FPJwtVerifier(System.getenv("OIDC_DISCOVERY_URL"));
     }
 
     public FPKrbAuthProvider start ()
@@ -86,6 +89,21 @@ public class FPKrbAuthProvider implements EnhancedAuthenticatorProvider
          * pool. */
         return fplus.gss()
             .verifyPassword(user, passwd)
+            .subscribeOn(fplus.getScheduler());
+    }
+
+    public boolean jwtEnabled ()
+    {
+        return jwt.enabled();
+    }
+
+    public Single<FPGssResult> verifyJwt (String token)
+    {
+        /* Verification may fetch the OIDC discovery document and JWKS
+         * over the network; keep it off the HiveMQ threads. */
+        return Single
+            .fromCallable(() -> new FPGssResult(
+                jwt.verify(token), Option.none()))
             .subscribeOn(fplus.getScheduler());
     }
 

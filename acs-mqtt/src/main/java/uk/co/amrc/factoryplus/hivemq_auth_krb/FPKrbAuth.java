@@ -121,6 +121,15 @@ public class FPKrbAuth implements EnhancedAuthenticator {
         /* XXX should passwords be UTF-8? */
         var passwd_c = StandardCharsets.UTF_8.decode(passwd);
 
+        /* A Keycloak JWT may be presented as the password (browser
+         * clients logged in via OIDC). The username is ignored:
+         * identity comes from the verified token. */
+        String passwd_s = passwd_c.toString();
+        if (FPJwtVerifier.looksLikeJwt(passwd_s) && provider.jwtEnabled()) {
+            handleVerification(output, provider.verifyJwt(passwd_s));
+            return;
+        }
+
         var verify = provider.verifyPassword(user, passwd_c);
         handleVerification(output, verify);
     }

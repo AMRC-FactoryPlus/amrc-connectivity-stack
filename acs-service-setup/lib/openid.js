@@ -319,9 +319,18 @@ class OpenIDSetup {
         }
         else {
             this.log("Updating client %s", name);
+            // Don't echo protocolMappers back: they are managed
+            // separately (ensure_factoryplus_claim_mappers), and
+            // Keycloak's updateClientProtocolMappers throws
+            // IllegalStateException on duplicate mapper names, which
+            // bricks every full-client PUT once a duplicate exists
+            // (two service-setup jobs racing can double-create; POST
+            // does not enforce name uniqueness). Omitting the field
+            // leaves the client's mappers untouched.
+            const { protocolMappers, ...current } = client;
             await this.api("PUT",
                 `/admin/realms/${encodeURIComponent(this.realm)}/clients/${client.id}`,
-                { ...client, ...desired });
+                { ...current, ...desired });
         }
         return client;
     }
@@ -351,8 +360,24 @@ class OpenIDSetup {
               // like contains(fp_permissions[*], '<uuid>').
               multivalued: true },
         ];
-        const byName = new Map(
-            (list.body ?? []).map(m => [m.name, m]));
+
+        // Self-heal duplicate mappers of our names: Keycloak accepts
+        // same-name POSTs (ids are the only uniqueness), but a client
+        // holding duplicates fails every subsequent full-client PUT
+        // with "Duplicate key openid-connect%<name>". Keep the first
+        // of each, delete the rest.
+        const managed = new Set(mappers.map(m => m.name));
+        const byName = new Map();
+        for (const m of list.body ?? []) {
+            if (!byName.has(m.name)) {
+                byName.set(m.name, m);
+                continue;
+            }
+            if (!managed.has(m.name)) continue;
+            this.log("Deleting duplicate %s mapper %s on client %s",
+                m.name, m.id, clientUuid);
+            await this.api("DELETE", `${path}/${m.id}`);
+        }
         for (const m of mappers) {
             const config = {
                 "id.token.claim":       "true",

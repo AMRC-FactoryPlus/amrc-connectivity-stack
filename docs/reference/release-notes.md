@@ -8,6 +8,17 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.1.2
+
+### service-setup survives duplicate Keycloak protocol mappers
+
+A Keycloak client holding two same-name protocol mappers (possible
+when two service-setup jobs race, since Keycloak does not enforce
+name uniqueness on create) failed every subsequent client update
+with a 500, permanently bricking service-setup. Client updates no
+longer echo the mapper list, and duplicate F+ mappers are deleted
+automatically on the next run.
+
 ## v6.1.1
 
 ### Service-account OIDC clients get Factory+ principals

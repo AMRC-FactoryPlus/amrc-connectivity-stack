@@ -138,12 +138,31 @@ public class FPAuth {
      */
     public Single<Stream<java.util.Map>> getACL (String princ, UUID perms)
     {
+        return getACL(princ, perms, false);
+    }
+
+    /** Fetches an ACL over HTTP, optionally by principal UUID.
+     *
+     * As getACL, but when byUuid is true the principal is a Factory+
+     * principal UUID rather than a Kerberos name. Used for consumers
+     * authenticated by a JWT whose fp_principal_uuid claim is the only
+     * F+ identity (Keycloak service accounts have no Kerberos name).
+     *
+     * @param princ The principal to fetch permissions for.
+     * @param perms The permission group to fetch (ignored).
+     * @param byUuid Whether princ is a principal UUID.
+     * @return A stream of maps representing the granted permissions.
+     */
+    public Single<Stream<java.util.Map>> getACL (String princ, UUID perms,
+        boolean byUuid)
+    {
         //FPThreadUtil.logId("fetching acl");
         return fplus.http().request(SERVICE, "GET")
             .withURIBuilder(b -> b
                 .appendPath("authz/acl")
                 .setParameter("principal", princ)
-                .setParameter("permission", perms.toString()))
+                .setParameter("permission", perms.toString())
+                .setParameter("by-uuid", byUuid ? "true" : "false"))
             .fetch()
             .map(res -> res.ifOk()
                 .flatMap(r -> r.getBodyArray())

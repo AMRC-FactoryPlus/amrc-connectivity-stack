@@ -13,6 +13,17 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      # pg_dump runs as the image's non-root "node" user (uid 1000). On a
+      # block storage class that formats volumes root-owned (Ceph RBD, most
+      # CSI drivers), writing the dump to /backups fails with "Permission
+      # denied" and this pre-upgrade hook aborts the whole helm upgrade.
+      # local-path provisions its dirs world-writable, so the fault is
+      # invisible there - it only shows on real block storage. fsGroup 1000
+      # (matching the files service) makes the kubelet chown the backup
+      # volume group-writable and adds the process to that group.
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       volumes:
         - name: krb5-conf
           configMap:

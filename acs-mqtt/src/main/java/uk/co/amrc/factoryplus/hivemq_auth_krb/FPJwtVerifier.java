@@ -64,15 +64,27 @@ public class FPJwtVerifier
         return JWT_RX.matcher(creds).matches();
     }
 
-    /* Verify signature, expiry and issuer, and return the kerberos UPN
-     * from preferred_username (stamped by the F+ Keycloak SPI). Makes
+    /* Verify signature, expiry and issuer, and return the Factory+
+     * principal. Prefer the fp_principal_uuid claim: it is stamped on
+     * every token our realm issues (federated users live, service
+     * accounts via the attribute service-setup stamps) and is the only
+     * identity a service account has - its preferred_username is a
+     * Keycloak-local name F+ Auth has never heard of. Fall back to the
+     * kerberos UPN for tokens from before the mapper existed. Makes
      * network calls (discovery, JWKS); run on a worker thread. */
     public String verify (String token) throws Exception
     {
         JWTClaimsSet claims = processor().process(token, null);
+        String uuid = claims.getStringClaim("fp_principal_uuid");
         String upn = claims.getStringClaim("preferred_username");
+
+        if (uuid != null && !uuid.isBlank()) {
+            log.info("JWT verified for {} ({})", upn, uuid);
+            return uuid;
+        }
         if (upn == null || upn.isBlank())
-            throw new SecurityException("JWT has no preferred_username claim");
+            throw new SecurityException(
+                "JWT has neither fp_principal_uuid nor preferred_username");
         return upn;
     }
 
@@ -98,9 +110,12 @@ public class FPJwtVerifier
         var proc = new DefaultJWTProcessor<SecurityContext>();
         proc.setJWSKeySelector(
             new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, keys));
+        /* Identity claims (fp_principal_uuid / preferred_username) are
+         * checked in verify(): which are present varies by grant type
+         * (service-account tokens may lack preferred_username). */
         proc.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(
             new JWTClaimsSet.Builder().issuer(issuer).build(),
-            Set.of("exp", "preferred_username")));
+            Set.of("exp")));
 
         processor = proc;
         return processor;

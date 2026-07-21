@@ -7,6 +7,7 @@
 import MQTTClient from "./mqttclient.js";
 import Vis from "./vis.js";
 import Icons from "./icons.js";
+import { OidcClient } from "./oidc.js";
 import { FactoryPlus } from "./webpack.js";
 
 class FPlusVis {
@@ -45,11 +46,11 @@ class FPlusVis {
 
     async build_clients (opts, graph) {
         const directories = opts.directory.split(/\s+/);
-        const { username, password } = opts;
+        const { username, password, bearer_jwt } = opts;
 
-        return Promise.all(directories.map(async directory_url => { 
+        return Promise.all(directories.map(async directory_url => {
             const fplus = await new FactoryPlus.ServiceClient({
-                directory_url, username, password,
+                directory_url, username, password, bearer_jwt,
                 verbose:        "ALL",
                 browser:        true,
             }).init();
@@ -102,11 +103,8 @@ class FPlusVis {
             ["directory", "username", "password", "save", "login"]
                 .map(n => document.getElementById(n));
 
-        if (directory.value == "") {
-            const here = new URL(document.baseURI);
-            here.host = here.host.replace(/^[^.]*/, "directory");
-            directory.value = here.toString();
-        }
+        if (directory.value == "")
+            directory.value = this.default_directory();
 
         return new Promise((resolve, reject) => {
             login.addEventListener("click", () => {
@@ -127,12 +125,60 @@ class FPlusVis {
     async keydown (ev) {
         if (ev.key != "Escape") return;
 
+        if (this.oidc) {
+            await this.stop_vis();
+            this.oidc.logout();
+            return;
+        }
+
         this.clear_creds();
         await this.stop_vis();
         this.run();
     }
 
+    default_directory () {
+        const here = new URL(document.baseURI);
+        here.host = here.host.replace(/^[^.]*/, "directory");
+        return here.toString();
+    }
+
+    async fetch_config () {
+        try {
+            const res = await fetch("config.json");
+            if (!res.ok) return null;
+            return await res.json();
+        }
+        catch { return null; }
+    }
+
+    /* Log in via Keycloak. This may navigate away (to the Keycloak
+     * login page, or straight back if the SSO session is alive), and
+     * a `?auth_token=` JWT in our URL bypasses login entirely. */
+    async oidc_login (config) {
+        const oidc = await new OidcClient({
+            discovery_url:  config.oidc_discovery_url,
+            client_id:      config.oidc_client_id,
+        }).init();
+        await oidc.ensure_login();
+        this.oidc = oidc;
+        console.log("Logged in via OIDC as %s", oidc.username);
+
+        return {
+            directory:  config.directory_url ?? this.default_directory(),
+            bearer_jwt: bad => oidc.token(bad),
+        };
+    }
+
     async run () {
+        const config = await this.fetch_config();
+
+        if (config?.oidc_discovery_url) {
+            const creds = await this.oidc_login(config);
+            this.start_vis(creds);
+            return;
+        }
+
+        /* No OIDC configured (local dev): username/password form. */
         let creds = this.load_creds();
         if (!creds) {
             this.form.style.display = "";

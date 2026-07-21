@@ -164,6 +164,27 @@ The chart wires `OIDC_DISCOVERY_URL` into all eight services via the
 shared `amrc-connectivity-stack.oidc-env` helper, so opting a new
 service in is a single-line include in its deployment template.
 
+The MQTT broker also accepts JWTs: present the JWT as the MQTT
+password (the username is ignored; identity comes from the verified
+token's `preferred_username`). The HiveMQ plugin validates against
+the same realm via `OIDC_DISCOVERY_URL` and runs the normal MQTT ACL
+lookup for that principal.
+
+## The visualiser
+
+The visualiser is a browser SPA and logs in via the Keycloak login
+page (Authorization Code + PKCE, client `visualiser`), holding the
+JWT in the browser. It refreshes the token before expiry and uses it
+for the Directory, ConfigDB and the MQTT websocket connection.
+Pressing Escape logs out via Keycloak's end-session endpoint.
+
+For unattended kiosk displays it also supports Grafana-style URL
+login: `https://visualiser.<acs-base>/?auth_token=<JWT>` bypasses
+login entirely. The token is stripped from the address bar
+immediately. No refresh is possible in this mode, so mint the token
+from a service-account client with a long `accessTokenLifespan` (see
+`values.yaml` `serviceSetup.config.openidClients`).
+
 ## How services validate the JWT
 
 The auth middleware in `lib/js-service-api`:

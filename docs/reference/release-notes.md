@@ -25,11 +25,13 @@ The detail is in the sections below; this is the order to work in.
 
 1. **Before you start**, add DNS records for the three new external
    hosts (`openid`, `i3x`, `data-access`) and make sure your TLS
-   certificate covers them. If you issue certificates with the chart's
-   Let's Encrypt integration you must add them to
-   `acs.letsEncrypt.additionalDnsNames`, because the chart's own
-   certificate does not include them; a wildcard or externally-managed
-   certificate needs nothing.
+   certificate covers them. The chart's Let's Encrypt certificate
+   includes each of these hosts automatically while its service is
+   enabled, so create the DNS records **before** upgrading: a name on
+   the certificate that does not resolve fails the HTTP-01 challenge and
+   blocks issuance and renewal of the whole certificate. If you disable
+   a service, its host is left off the certificate and needs no record.
+   A wildcard or externally-managed certificate needs nothing.
 2. **Snapshot two persistent volumes.** The Grafana volume, because the
    dashboard and playlist migrations are one-way and cannot be rolled
    back. And the shared Postgres volume, because the Directory database
@@ -108,9 +110,10 @@ other central services continue to authenticate exactly as they did.
 On upgrade you must:
 
 - Create a DNS record for the new `openid.<acs.baseUrl>` host and ensure
-  the certificate Grafana's browser is served covers it. As noted in the
-  upgrade procedure, Let's Encrypt users must add the host to
-  `acs.letsEncrypt.additionalDnsNames`. The Keycloak discovery endpoint
+  the certificate Grafana's browser is served covers it. The chart's
+  Let's Encrypt certificate includes the host automatically while
+  `openid` is enabled, so the record must exist before the upgrade (see
+  the upgrade procedure). The Keycloak discovery endpoint
   must also resolve and present a valid certificate *from inside the
   cluster*, because the `service-setup` Job calls it there; a split-horizon
   DNS setup that only answers externally will wedge the Job.
@@ -261,12 +264,14 @@ unaffected.
 
 `i3x` and `data-access` are both enabled by default, and each publishes
 an external host: `i3x.<acs.baseUrl>` and `data-access.<acs.baseUrl>`.
-Add DNS records and extend your TLS certificate to cover them (for
-Let's Encrypt, add them to `acs.letsEncrypt.additionalDnsNames` as
-above), or set `i3x.enabled` or `dataAccess.enabled` to `false`. These
-services use only cluster-internal URLs at runtime, so a missing DNS
-record or an uncovered host does not stop them running; it stops the
-Manager's Explorer page and the browser-facing API from reaching them.
+Add DNS records and ensure your TLS certificate covers them, or set
+`i3x.enabled` or `dataAccess.enabled` to `false`. The chart's Let's
+Encrypt certificate includes each host automatically while its service
+is enabled, which is why the DNS records must exist before you upgrade;
+a disabled service's host is left off the certificate. These services
+use only cluster-internal URLs at runtime, so a missing DNS record or
+an uncovered host does not stop them running; it stops the Manager's
+Explorer page and the browser-facing API from reaching them.
 
 ### i3X authenticates every request but does not authorize per object
 

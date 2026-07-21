@@ -31,7 +31,11 @@ The detail is in the sections below; this is the order to work in.
    the certificate that does not resolve fails the HTTP-01 challenge and
    blocks issuance and renewal of the whole certificate. If you disable
    a service, its host is left off the certificate and needs no record.
-   A wildcard or externally-managed certificate needs nothing.
+   The certificate now also covers `files.<baseUrl>` and
+   `influxdb.<baseUrl>`, which were served in v5 but missing from the
+   certificate; a Let's Encrypt site without DNS records for those two
+   must add them before upgrading, for the same reason. A wildcard or
+   externally-managed certificate needs nothing.
 2. **Snapshot two persistent volumes.** The Grafana volume, because the
    dashboard and playlist migrations are one-way and cannot be rolled
    back. And the shared Postgres volume, because the Directory database

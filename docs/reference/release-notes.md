@@ -8,6 +8,47 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.1.0
+
+This release moves the visualiser onto the central Keycloak login and
+teaches the MQTT broker to accept JWTs. There are no breaking changes;
+upgrading from v6.0.x is a plain `helm upgrade`.
+
+### Visualiser logs in through Keycloak
+
+The visualiser no longer shows its own username/password form on
+cluster deployments. Opening it redirects to the Keycloak login page
+(sharing the SSO session with Grafana and anything else on the realm)
+and returns with a JWT, which is used for the Directory, ConfigDB and
+the MQTT websocket connection. Tokens are refreshed automatically
+before expiry, so a tab left open stays live. Pressing Escape logs out
+through Keycloak's end-session endpoint.
+
+The chart provisions a public `visualiser` OIDC client (PKCE S256)
+automatically via service-setup. The old form remains only as a
+fallback when `OIDC_DISCOVERY_URL` is not configured (local
+development).
+
+### Visualiser kiosk URL login
+
+For unattended displays the visualiser accepts
+`?auth_token=<JWT>` in the URL, matching Grafana's `url_login`, and
+strips the token from the address bar immediately. No refresh happens
+in this mode: mint kiosk tokens from a service-account
+(client-credentials) OIDC client with a long `accessTokenLifespan`
+(see `serviceSetup.config.openidClients` in values.yaml), the same
+pattern used for Grafana kiosk walls.
+
+### The MQTT broker accepts JWTs as passwords
+
+The HiveMQ auth plugin now recognises a Keycloak JWT presented as the
+MQTT password (any username; identity comes from the verified token's
+`preferred_username`). Verification uses the realm's JWKS via
+`OIDC_DISCOVERY_URL`, mirroring the HTTP services, and the normal MQTT
+ACL lookup runs on the token's principal. Kerberos passwords and
+GSSAPI are unaffected; the JWT path only engages when the password is
+shaped like a JWT and openid is enabled.
+
 ## v6.0.0
 
 This is a major release. It changes the Sparkplug timestamp format, the

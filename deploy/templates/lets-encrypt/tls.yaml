@@ -36,6 +36,18 @@ spec:
     - git.{{ .Values.acs.baseUrl}}
     - grafana.{{ .Values.acs.baseUrl}}
     - mqtt.{{ .Values.acs.baseUrl}}
+    {{- /* Hosts new in v6, included only when their service is deployed:
+         a SAN whose DNS record does not exist fails the http01 challenge
+         and wedges renewal of this whole certificate. */}}
+    {{- if .Values.openid.enabled }}
+    - openid.{{ .Values.acs.baseUrl}}
+    {{- end }}
+    {{- if .Values.i3x.enabled }}
+    - i3x.{{ .Values.acs.baseUrl}}
+    {{- end }}
+    {{- if .Values.dataAccess.enabled }}
+    - data-access.{{ .Values.acs.baseUrl}}
+    {{- end }}
     {{- range .Values.acs.letsEncrypt.additionalDnsNames }}
     - {{ . }}
     {{- end }}

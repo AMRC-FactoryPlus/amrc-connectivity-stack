@@ -181,6 +181,8 @@ public class Dataflow
             .withReplay()
             .build();
 
+    /* XXX This returns an empty Map for UUIDs which aren't Apps. This
+     * is incorrect, we should probably have an Option return type. */
     private Observable<Map<UUID, ConfigEntry.Value>> _buildAppValues (UUID app)
     {
         return appUpdates(app)

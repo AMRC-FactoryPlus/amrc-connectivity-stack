@@ -112,10 +112,14 @@ spec:
             - name: KC_HEALTH_ENABLED
               value: "true"
 
-            # Initial admin user (for bootstrapping the realm via service-setup)
-            - name: KEYCLOAK_ADMIN
+            # Initial admin user (for bootstrapping the realm via
+            # service-setup). KC_BOOTSTRAP_ADMIN_* replaced the
+            # deprecated KEYCLOAK_ADMIN vars in Keycloak 26; only
+            # consulted when the master realm has no admin yet, so this
+            # is inert on established installations.
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
               value: _bootstrap
-            - name: KEYCLOAK_ADMIN_PASSWORD
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: keycloak-clients

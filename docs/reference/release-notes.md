@@ -8,6 +8,27 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+### Keycloak upgraded from 26.1 to 26.6
+
+The bundled Keycloak moves to 26.6.3, primarily for its PostgreSQL
+JDBC driver (42.7.11): the 42.7.4 driver shipped with Keycloak 26.1
+has a bug (pgjdbc #3373) where the GSS-encrypted database stream is
+corrupted by partial TCP reads, crashing Keycloak with "Could not use
+AES128 Cipher - Checksum failed" under network conditions that split
+GSS tokens across reads. Seen in production; the trigger is
+environmental (TCP segmentation behaviour), so any site can hit it.
+
+Keycloak migrates its database schema one-way on first start of the
+new version; downgrading afterwards requires a database restore. The
+F+ SPI is rebuilt against 26.6 (no source changes needed) and the
+chart now uses the KC_BOOTSTRAP_ADMIN environment variables in place
+of the KEYCLOAK_ADMIN ones deprecated in Keycloak 26 (only consulted
+when the master realm has no admin, so inert on established sites).
+Keycloak 26.2-26.6 also tightens some token-endpoint behaviour
+(introspection audience checks, userinfo with lightweight tokens);
+none of it affects the flows ACS provisions, but sites with custom
+OIDC clients should skim the upstream migration notes.
+
 ## v6.1.3
 
 ### ACL editor shows identity-less principals

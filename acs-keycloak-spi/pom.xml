@@ -24,7 +24,7 @@
              the base assumes (lib/X), so acs.top must point at the repo root. -->
         <acs.top>..</acs.top>
 
-        <keycloak.version>26.1.1</keycloak.version>
+        <keycloak.version>26.6.3</keycloak.version>
         <!-- 5.18.0 supports inline-mocking on JDK 24/25; 5.11 throws
              "Could not modify all classes [interface
              org.keycloak.models.KeycloakSession]" on JDK 25. -->

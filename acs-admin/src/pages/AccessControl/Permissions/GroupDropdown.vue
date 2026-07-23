@@ -26,16 +26,19 @@ function copy(id: string) {
 }
 
 function handleDelete() {
+    const who = props.row.original.principal.kerberos
+        ?? props.row.original.principal.name
+        ?? props.row.original.principal.uuid
     useDialog({
         title: 'Remove from group?',
-        message: `Are you sure that you want to remove ${props.row.original.principal.kerberos} from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
+        message: `Are you sure that you want to remove ${who} from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
         confirmText: 'Remove from Group',
         onConfirm: () => {
             s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(() => {
-                toast.success(`${props.row.original.principal.kerberos} has been removed from the ${props.row.original.name} group`)
+                toast.success(`${who} has been removed from the ${props.row.original.name} group`)
             }).catch((err) => {
-                toast.error(`Unable to remove ${props.row.original.principal.kerberos} from ${props.row.original.name}`)
-                console.error(`Unable to remove ${props.row.original.principal.kerberos} from ${props.row.original.name}`, err)
+                toast.error(`Unable to remove ${who} from ${props.row.original.name}`)
+                console.error(`Unable to remove ${who} from ${props.row.original.name}`, err)
             })
         }
     });

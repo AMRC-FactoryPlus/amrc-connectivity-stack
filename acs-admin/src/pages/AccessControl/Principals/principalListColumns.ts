@@ -13,7 +13,7 @@ import {toast} from "vue-sonner";
 
 export interface PrincipalMapping {
     uuid: string
-    kerberos: string
+    kerberos: string | null
     name: string
     class: {
         uuid: string
@@ -56,7 +56,12 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
     }),
 
     cell: ({row}) => {
-        return h('span', {class: 'max-w-[500px] truncate font-medium'}, row.getValue('kerberos'))
+        const krb = row.getValue('kerberos')
+        // Identity-less principals (OIDC service accounts) have no
+        // kerberos name; show a muted placeholder rather than a blank.
+        return krb
+            ? h('span', {class: 'max-w-[500px] truncate font-medium'}, krb)
+            : h('span', {class: 'max-w-[500px] truncate italic text-gray-400'}, 'No identity')
     },
     filterFn: (row, id, value) => {
         return value.includes(row.getValue(id))

@@ -60,7 +60,7 @@ export default {
             value: p,
           }
         }),
-        principals: this.p.data.map((p) => p.kerberos).filter((v, i, a) => a.indexOf(v) === i).map((p) => {
+        principals: this.p.data.map((p) => p.kerberos).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).map((p) => {
           return {
             label: p,
             value: p,

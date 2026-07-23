@@ -51,11 +51,29 @@ export const usePrincipalStore = defineStore('principal', {
           this.loading = true;
           /* XXX This API needs fixing */
           fetch.cache = "reload";
-          const princs = await auth.list_principals();
-          const rv = Promise.all(princs.map(uuid =>
+          /* The Auth service only lists principals holding an
+           * identity (kerberos etc.). Principals can exist without
+           * one - service-setup creates identity-less principals for
+           * OIDC service accounts - so union in the members of the
+           * ConfigDB Principal class, or grants can never be edited
+           * for them here. */
+          const [princs, members] = await Promise.all([
+            auth.list_principals(),
+            client.ConfigDB.class_members(UUIDs.Class.Principal)
+              .catch(err => {
+                console.error("Principal class fetch failed: %o", err);
+                return [];
+              }),
+          ]);
+          const rv = await Promise.all(princs.map(uuid =>
             auth.get_identity(uuid, "kerberos")
               .catch(ServiceError.check(403, 404))
               .then(krb => [uuid, krb ?? "UNKNOWN"])));
+          const known = new Set(princs);
+          for (const uuid of members) {
+            if (!known.has(uuid))
+              rv.push([uuid, null]);
+          }
           fetch.cache = "default";
           return rv;
         }),

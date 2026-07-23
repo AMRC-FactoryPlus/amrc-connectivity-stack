@@ -7,7 +7,7 @@
     <SheetHeader>
       <SheetTitle title="Name">{{principal.name}}</SheetTitle>
       <SheetTitle title="Principal Class" class="text-gray-500">{{ principal.class.name ?? "Principal" }} - Principal</SheetTitle>
-      <SheetDescription>
+      <SheetDescription v-if="principal.kerberos">
         <Copyable :text="principal.kerberos">{{principal.kerberos}}</Copyable>
       </SheetDescription>
       <SheetDescription>

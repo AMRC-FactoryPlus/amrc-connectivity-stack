@@ -8,6 +8,17 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.1.3
+
+### ACL editor shows identity-less principals
+
+The admin UI's principal list now includes principals without a
+kerberos/sparkplug identity, shown with a "No identity" placeholder.
+In particular the F+ principals created for OIDC service accounts
+(v6.1.1) can now be granted permissions through the standard editor,
+so setting up an unattended visualiser wall no longer requires the
+Auth API directly.
+
 ## v6.1.2
 
 ### service-setup survives duplicate Keycloak protocol mappers

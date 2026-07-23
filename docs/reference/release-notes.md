@@ -8,6 +8,8 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.1.4
+
 ### Keycloak upgraded from 26.1 to 26.6
 
 The bundled Keycloak moves to 26.6.3, primarily for its PostgreSQL

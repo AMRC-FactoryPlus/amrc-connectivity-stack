@@ -11,14 +11,14 @@
         <slot name="action"></slot>
       </div>
     </div>
-    <Copyable v-if="value" :text="value">
-      <span class="flex items-center text-sm text-gray-700 hover:text-gray-950 bg-gray-50 h-6 hover:bg-gray-200 px-2 py-1 rounded-md text-nowrap truncate">{{value}}</span>
-    </Copyable>
-    <span v-else class="flex items-center text-sm text-gray-950 bg-gray-100 px-1.5 py-0.5 h-6 rounded-md opacity-60 hover:opacity-100 text-nowrap">-</span>
-    <div v-if="warning" class="flex items-start gap-1.5 text-xs text-amber-600">
-      <i class="fa-fw fa-solid fa-triangle-exclamation mt-0.5" style="font-size: 0.6rem"></i>
-      <span>{{warning}}</span>
+    <div class="flex items-center gap-2 flex-wrap">
+      <Copyable v-if="value" :text="value">
+        <span class="flex items-center text-sm text-gray-700 hover:text-gray-950 bg-gray-50 h-6 hover:bg-gray-200 px-2 py-1 rounded-md text-nowrap truncate">{{value}}</span>
+      </Copyable>
+      <span v-else class="flex items-center text-sm text-gray-950 bg-gray-100 px-1.5 py-0.5 h-6 rounded-md opacity-60 hover:opacity-100 text-nowrap">-</span>
+      <slot name="badge"></slot>
     </div>
+    <div v-if="warning" class="text-xs leading-relaxed text-amber-700">{{warning}}</div>
   </div>
 </template>
 

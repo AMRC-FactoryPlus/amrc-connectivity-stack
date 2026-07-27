@@ -2,6 +2,11 @@
  * Copyright (c) University of Sheffield AMRC 2026.
  */
 
+/** Shown wherever a deployment is pinned to a host the cluster has lost.
+ * States the consequence and the next action, in that order. */
+export const STALE_HOST_WARNING = "The cluster is not reporting this host, "
+    + "so nothing pinned to it can be scheduled. Move the node to a reported host.";
+
 /**
  * Is this hostname one the cluster is currently reporting?
  *
@@ -32,7 +37,5 @@ export function hostIsKnown (cluster, hostname) {
  * @returns {string|null}
  */
 export function staleHostWarning (cluster, hostname) {
-  return hostIsKnown(cluster, hostname)
-    ? null
-    : 'This host is not currently part of the cluster. Anything pinned to it cannot be scheduled.'
+  return hostIsKnown(cluster, hostname) ? null : STALE_HOST_WARNING
 }

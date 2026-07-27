@@ -8,6 +8,7 @@ import {h} from 'vue'
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import RebirthButton from '@/components/EdgeManager/RebirthButton.vue'
 import MoveHostButton from '@/components/EdgeManager/Nodes/MoveHostButton.vue'
+import StaleHostPill from '@/components/EdgeManager/Nodes/StaleHostPill.vue'
 
 export interface Host {
     uuid: string,
@@ -51,14 +52,9 @@ export const nodeColumns: ColumnDef<Host>[] = [
         cell: ({row}) => {
             const hostname = row.getValue('hostname') as string
             const floating = hostname == null || hostname === 'Floating'
-            return h('div', {class: 'flex items-center gap-1.5 max-w-[500px]'}, [
-                h('div', {class: `truncate ${floating ? 'text-gray-400' : ''}`}, hostname ?? "Floating"),
-                row.original._hostStale
-                    ? h('i', {
-                        class: 'fa-solid fa-triangle-exclamation text-amber-500',
-                        title: 'This host is not currently part of the cluster',
-                    })
-                    : null,
+            return h('div', {class: 'flex items-center gap-2 max-w-[500px]'}, [
+                h('div', {class: `truncate font-mono ${floating ? 'text-gray-400' : ''}`}, hostname ?? "Floating"),
+                row.original._hostStale ? h(StaleHostPill, {tooltip: true}) : null,
             ])
         },
         filterFn: (row, id, value) => {

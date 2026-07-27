@@ -123,29 +123,14 @@ a:hover {
     }
 }
 
+/* CardHeader in acs-admin is `flex flex-col p-6` with no `space-y-1.5`,
+   so its title and description sit flush against each other. Matching
+   that means no gap here. */
 .acs-card-header {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 1.5rem 1.5rem 0;
-}
-
-.acs-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    margin-bottom: 0.5rem;
-}
-
-.acs-brand img {
-    height: 1.5rem;
-    width: 1.5rem;
-}
-
-.acs-brand .acs-wordmark {
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    gap: 0;
+    padding: 1.5rem;            /* p-6 */
 }
 
 .acs-card-title {
@@ -153,17 +138,20 @@ a:hover {
     font-size: 1.5rem;          /* text-2xl */
     font-weight: 600;
     letter-spacing: -0.025em;   /* tracking-tight */
-    line-height: 1.1;
+    line-height: 1;             /* leading-none */
 }
 
 .acs-card-description {
     margin: 0;
     color: var(--muted);
     font-size: 0.875rem;        /* text-sm */
+    line-height: 1.25rem;
 }
 
+/* p-6 pt-0: the header's own bottom padding provides the gap. */
 .acs-card-content {
     padding: 1.5rem;
+    padding-top: 0;
 }
 
 .acs-form {
@@ -306,6 +294,29 @@ a:hover {
     width: 100%;
 }
 
+/* Submit feedback. acs-admin swaps the button label for a spinning
+   fa-circle-notch while logging in; we can't use Font Awesome here
+   because the pod must not depend on a CDN, so the same shape is drawn
+   as an inline SVG and spun with a CSS keyframe. */
+.acs-spinner {
+    display: none;
+    height: 1rem;
+    width: 1rem;
+}
+
+.acs-btn.acs-is-loading .acs-btn-label {
+    display: none;
+}
+
+.acs-btn.acs-is-loading .acs-spinner {
+    display: block;
+    animation: acs-spin 1s linear infinite;
+}
+
+@keyframes acs-spin {
+    to { transform: rotate(360deg); }
+}
+
 .acs-btn-link {
     background: transparent;
     color: var(--slate-900);
@@ -401,5 +412,10 @@ a:hover {
     .acs-btn:active,
     .acs-password-toggle:active {
         transform: none;
+    }
+    /* Keep the spinner visible as a "working" marker, just stop it
+       rotating. */
+    .acs-btn.acs-is-loading .acs-spinner {
+        animation: none;
     }
 }

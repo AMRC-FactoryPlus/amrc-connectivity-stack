@@ -29,11 +29,15 @@
     <div class="acs-page">
         <div class="acs-card">
             <div class="acs-card-header">
-                <div class="acs-brand">
-                    <img src="${url.resourcesPath}/img/favicon.svg" alt="ACS">
-                    <span class="acs-wordmark">ACS</span>
-                </div>
                 <h1 class="acs-card-title"><#nested "header"></h1>
+                <#-- Optional. Pages that don't define a "description"
+                     section (error.ftl, and any upstream keycloak.v2 FTL
+                     we inherit) render nothing at all here rather than an
+                     empty paragraph taking up a line of space. -->
+                <#local description><#nested "description"></#local>
+                <#if description?has_content>
+                    <p class="acs-card-description">${description}</p>
+                </#if>
             </div>
 
             <div class="acs-card-content">

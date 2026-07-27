@@ -154,6 +154,28 @@ openid:
   # keycloak.v2 theme, or set to a different name if you've baked a
   # custom theme into your own Keycloak image.
   loginTheme: factory-plus
+  # -- Kerberos realms trusted for cross-realm login. A user from a
+  # listed realm can sign in without an administrator hand-creating a
+  # Factory+ principal for them first: once their home KDC accepts the
+  # password, the SPI writes their Kerberos identity here and they
+  # appear in the ACL editor with no permissions until granted some.
+  #
+  # This requires cross-realm Kerberos trust to already exist - the
+  # realm and its KDC must be listed in krb5.conf on this cluster.
+  # Listing a realm here does not create that trust.
+  #
+  # `authUrl` is optional and names that realm's own Factory+ auth
+  # service. With it, the user keeps the same principal UUID they have
+  # at home, which matters when both clusters grant against the same
+  # identity; that lookup needs sv1openid@<THIS-REALM> to hold ReadKrb
+  # on the home cluster, which is a manual grant there and the
+  # revocation point for the whole trust. Without it, a fresh local
+  # UUID is minted and no outbound call is made.
+  #
+  # Default empty: no realm is trusted and the feature is inert.
+  trustedRealms: []
+  #  - realm: AMRC-FP.SHEF.AC.UK
+  #    authUrl: https://auth.amrc-fp.shef.ac.uk
   image:
     # -- Custom Keycloak image with the Factory+ User Storage SPI baked
     # in (built from acs-keycloak/Dockerfile). To run upstream Keycloak

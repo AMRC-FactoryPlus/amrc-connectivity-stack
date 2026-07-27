@@ -415,6 +415,11 @@ class FPAuthBackedUserStoreTest {
             assertThat(user.get().provisional())
                 .as("Nothing has been written locally yet")
                 .isTrue();
+            assertThat(user.get().uuid())
+                .as("The remote-resolve path adopts the home UUID; it must "
+                    + "NOT derive one, or the two clusters would disagree "
+                    + "about who this user is")
+                .isNotEqualTo(FPAuthBackedUserStore.mintedUuid(UPN_BOB));
         }
         finally {
             home.stop();
@@ -431,15 +436,106 @@ class FPAuthBackedUserStoreTest {
         assertThat(user).isPresent();
         assertThat(user.get().provisional()).isTrue();
         assertThat(user.get().username()).isEqualTo(UPN_BOB);
-        // The brief specified a null UUID here, minted in admit().
         // Keycloak derives the federated storage id from the UUID and
         // re-reads the user by that id later in the same login flow,
         // so a null would break the flow after admit had already
-        // written. We mint at lookup time instead; nothing is
+        // written. We derive at lookup time instead; nothing is
         // persisted until the KDC confirms the password.
         assertThat(user.get().uuid())
             .as("A provisional user still needs a usable storage id")
-            .isNotNull();
+            .isEqualTo(FPAuthBackedUserStore.mintedUuid(UPN_BOB));
+    }
+
+    // -- minted UUID derivation ------------------------------------------
+
+    @Test
+    void minted_uuid_matches_a_fixed_known_vector() {
+        // Pinned against the RFC 4122 reference implementation:
+        //   python3 -c "import uuid; print(uuid.uuid5(
+        //       uuid.UUID('cb3714c4-c85c-482a-987b-408293aa141e'),
+        //       'me1ago@AMRC-FP.SHEF.AC.UK'))"
+        // If a refactor changes this value it has silently orphaned
+        // every principal ever minted on the cross-realm path, so this
+        // assertion must never be "updated to match" - fix the code.
+        assertThat(FPAuthBackedUserStore.mintedUuid("me1ago@AMRC-FP.SHEF.AC.UK"))
+            .isEqualTo("12bb7b35-16c8-572d-af5f-c1f312ec4ae8");
+        assertThat(FPAuthBackedUserStore.mintedUuid(UPN_BOB))
+            .isEqualTo("5bd38a45-a07c-5606-b10a-b997b05f275b");
+    }
+
+    @Test
+    void the_namespace_constant_is_fixed() {
+        // Changing this orphans every minted principal. Pinned so the
+        // consequence has to be confronted deliberately.
+        assertThat(FPAuthBackedUserStore.ACS_PRINCIPAL_NAMESPACE)
+            .hasToString("cb3714c4-c85c-482a-987b-408293aa141e");
+    }
+
+    @Test
+    void minted_uuid_has_version_5_and_the_rfc_4122_variant() {
+        // Not UUID.nameUUIDFromBytes, which is MD5 and stamps version 3.
+        var uuid = java.util.UUID.fromString(FPAuthBackedUserStore.mintedUuid(UPN_BOB));
+        assertThat(uuid.version()).isEqualTo(5);
+        assertThat(uuid.variant())
+            .as("RFC 4122 variant, i.e. the two top bits of octet 8 are 10")
+            .isEqualTo(2);
+    }
+
+    @Test
+    void minted_uuid_is_identical_across_separate_store_instances() {
+        // The whole point: two clusters, no coordination, same answer.
+        var clusterA = trustingStore(null);
+        var clusterB = new FPAuthBackedUserStore(
+            URI.create("http://elsewhere.invalid"), Duration.ofSeconds(2),
+            null, "SOME.OTHER.DEFAULT",
+            Set.of("OTHER.REALM"), Map.of(), Duration.ofMillis(900));
+        stubLocalMissForBob();
+
+        String a = clusterA.findByUsername("bob@other.realm").orElseThrow().uuid();
+        String b = FPAuthBackedUserStore.mintedUuid(UPN_BOB);
+
+        assertThat(a).isEqualTo(b);
+        assertThat(clusterB).isNotNull();
+    }
+
+    @Test
+    void minted_uuid_is_stable_across_repeated_lookups() {
+        stubLocalMissForBob();
+        var trusting = trustingStore(null);
+
+        assertThat(trusting.findByUsername("bob@other.realm").orElseThrow().uuid())
+            .isEqualTo(trusting.findByUsername("bob@other.realm").orElseThrow().uuid());
+    }
+
+    @Test
+    void different_upns_derive_different_uuids() {
+        assertThat(FPAuthBackedUserStore.mintedUuid("alice@OTHER.REALM"))
+            .isNotEqualTo(FPAuthBackedUserStore.mintedUuid(UPN_BOB));
+    }
+
+    @Test
+    void minting_derives_from_the_canonicalised_upn_not_what_keycloak_typed() {
+        // Keycloak hands us bob@other.realm; the identity we write, and
+        // therefore the name we derive from, is bob@OTHER.REALM. An
+        // operator computing the UUID by hand uses the canonical form.
+        stubLocalMissForBob();
+
+        var user = trustingStore(null).findByUsername("bob@other.realm").orElseThrow();
+
+        assertThat(user.username()).isEqualTo(UPN_BOB);
+        assertThat(user.uuid()).isEqualTo(FPAuthBackedUserStore.mintedUuid(UPN_BOB));
+        assertThat(user.uuid())
+            .as("Deriving from the lower-cased form would break cross-cluster agreement")
+            .isNotEqualTo(FPAuthBackedUserStore.mintedUuid("bob@other.realm"));
+    }
+
+    @Test
+    void admit_with_no_uuid_derives_rather_than_randomising() {
+        wiremock.stubFor(put(urlPathMatching("/v2/principal/[^/]+/kerberos"))
+            .willReturn(aResponse().withStatus(204)));
+
+        assertThat(store.admit(UPN_BOB, null))
+            .isEqualTo(FPAuthBackedUserStore.mintedUuid(UPN_BOB));
     }
 
     @Test

@@ -57,6 +57,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -283,9 +286,10 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         FactoryPlusUserStore home = homeStores.get(realm);
         if (home == null) {
             /* Trusted realm with no auth URL: no outbound dependency at
-             * all, just mint an identity for them on first successful
-             * login. */
-            return Optional.of(provisional(freshUuid(), canonical));
+             * all. Derive their UUID from the UPN, so this cluster and
+             * every other cluster agree on it without coordinating,
+             * and so an admin can pre-grant before first login. */
+            return Optional.of(provisional(null, canonical));
         }
 
         /* A standing denial short-circuits before we make any call.
@@ -395,20 +399,96 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
      *  Keycloak derives the federated storage id from it and re-reads
      *  the user by that id later in the same login flow, so a null here
      *  would break the flow after {@link #admit} had already written.
-     *  Minting early is safe: the UUID is not persisted anywhere until
-     *  the KDC has confirmed the password. */
+     *  Deriving early is safe: the UUID is not persisted anywhere until
+     *  the KDC has confirmed the password.
+     *
+     *  <p>A UUID supplied by the caller (i.e. resolved from the home
+     *  cluster) is adopted unchanged. Only the mint path derives. */
     private static FactoryPlusUser provisional(String uuid, String upn) {
         return new FactoryPlusUser(
-            uuid == null ? freshUuid() : uuid, upn, null, true);
+            uuid == null ? mintedUuid(upn) : uuid, upn, null, true);
     }
 
-    private static String freshUuid() {
-        return UUID.randomUUID().toString();
+    /** Namespace for name-based principal UUIDs. Randomly generated
+     *  once, on 2026-07-27, and fixed forever after.
+     *
+     *  <p><b>This value must NEVER change.</b> Every principal ever
+     *  minted on the cross-realm path is derived from it, so changing
+     *  it silently orphans all of them: the same user would resolve to
+     *  a different UUID, their existing grants would attach to a
+     *  principal nothing looks up any more, and there is no migration
+     *  short of re-pointing every identity record by hand. */
+    static final UUID ACS_PRINCIPAL_NAMESPACE =
+        UUID.fromString("cb3714c4-c85c-482a-987b-408293aa141e");
+
+    /** Derive a principal UUID from a UPN, for the mint path only.
+     *
+     *  <p>UUIDv5 (RFC 4122 name-based, SHA-1) over
+     *  {@link #ACS_PRINCIPAL_NAMESPACE} and the canonicalised UPN. Two
+     *  properties fall out of this that random minting cannot give:
+     *
+     *  <ul>
+     *  <li>Every consuming cluster independently derives the SAME UUID
+     *  for a given foreign UPN, with no coordination and no outbound
+     *  calls. Clusters stood up years apart agree.
+     *  <li>An admin can <b>pre-grant</b>: compute the UUID and attach
+     *  permissions before the user has ever logged in, so their first
+     *  login lands with the access they need instead of with nothing.
+     *  </ul>
+     *
+     *  <p>The name input is exactly the canonicalised UPN - the same
+     *  string written into the F+ identity record: realm portion
+     *  upper-cased, user portion exactly as received from Keycloak
+     *  (which means lower-cased, since Keycloak folds it before we see
+     *  it). Nothing local feeds into it. That is deliberate and load
+     *  bearing: if the input varied with local configuration, two
+     *  clusters would derive different UUIDs and the whole property
+     *  would be lost. Do not "improve" this by mixing in the realm
+     *  list, the auth URL, or anything else.
+     *
+     *  <p>See the design doc for the one-liner that reproduces this by
+     *  hand, so operators can pre-grant. */
+    static String mintedUuid(String upn) {
+        return uuidV5(ACS_PRINCIPAL_NAMESPACE, upn).toString();
+    }
+
+    /** RFC 4122 section 4.3 name-based UUID, SHA-1 flavour (version 5).
+     *
+     *  <p>Hand-rolled because the JDK ships no v5 generator.
+     *  {@code UUID.nameUUIDFromBytes} is NOT a substitute: it is MD5
+     *  and stamps version 3. */
+    static UUID uuidV5(UUID namespace, String name) {
+        MessageDigest sha1;
+        try {
+            sha1 = MessageDigest.getInstance("SHA-1");
+        }
+        catch (NoSuchAlgorithmException e) {
+            /* SHA-1 is required of every conformant JRE. */
+            throw new FactoryPlusAuthException("SHA-1 unavailable", e);
+        }
+        /* Namespace goes in as its 16 raw bytes, big-endian, NOT as its
+         * printed form. */
+        ByteBuffer ns = ByteBuffer.allocate(16);
+        ns.putLong(namespace.getMostSignificantBits());
+        ns.putLong(namespace.getLeastSignificantBits());
+        sha1.update(ns.array());
+        sha1.update(name.getBytes(StandardCharsets.UTF_8));
+        byte[] hash = sha1.digest();
+
+        /* Truncate to 128 bits, then overwrite version and variant. */
+        hash[6] = (byte) ((hash[6] & 0x0f) | 0x50);          // version 5
+        hash[8] = (byte) ((hash[8] & 0x3f) | 0x80);          // RFC 4122 variant
+        ByteBuffer out = ByteBuffer.wrap(hash, 0, 16);
+        return new UUID(out.getLong(), out.getLong());
     }
 
     @Override
     public String admit(String upn, String uuid) {
-        String target = (uuid == null || uuid.isBlank()) ? freshUuid() : uuid;
+        /* A null uuid means the mint path: derive rather than
+         * randomise, so this cluster agrees with every other cluster
+         * about who this UPN is. */
+        String target = (uuid == null || uuid.isBlank())
+            ? mintedUuid(upn) : uuid;
         URI uri = baseUrl.resolve("/v2/principal/" + encode(target)
             + "/" + encode(IDENTITY_KIND_KERBEROS));
         /* acs-auth parses request bodies with express.json({strict:

@@ -84,11 +84,12 @@ affected: they follow the node.
 
 ![Reviewing what moves](../../assets/edge-clusters/move-host/03-move-step2-review.png)
 
-The node keeps its UUID, its Sparkplug Node-ID and everything defined
-under it. Its Edge Agent will go offline and rebirth as Kubernetes
-reschedules it onto the new host.
+Applying it closes the dialog and updates the Host detail. The node keeps
+its UUID, its Sparkplug Node-ID and everything defined under it; its Edge
+Agent will go offline and rebirth as Kubernetes reschedules it onto the
+new host.
 
-![The move completing](../../assets/edge-clusters/move-host/06-move-step3-done.png)
+![The host detail after the move](../../assets/edge-clusters/move-host/06-after-move-toast.png)
 
 Host paths can also be edited on their own, from the connection dialog.
 

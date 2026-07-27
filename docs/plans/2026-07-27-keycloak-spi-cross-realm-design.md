@@ -93,6 +93,9 @@ either way.
 Only when the local lookup has missed on every candidate **and** the
 realm portion is in `trusted.realms`:
 
+- **Realm has no auth URL (the recommended mode).** Return a provisional
+  user whose UUID is *derived* from the UPN. No outbound call on this
+  path at all. See "Derived principal UUIDs" below.
 - **Realm has an auth URL.** Resolve the principal UUID from that
   realm's own Factory+ Auth service. `FPAuthBackedUserStore` is reused
   as its own remote client - it already performs exactly the two GETs
@@ -101,9 +104,8 @@ realm portion is in `trusted.realms`:
   default realm. These remote stores are built once at construction,
   keyed by upper-cased realm, not per request. On success we return a
   **provisional** user carrying the home cluster's UUID and its own
-  spelling of the UPN.
-- **Realm has no auth URL.** Return a provisional user with a locally
-  minted UUID. No outbound call on this path at all.
+  spelling of the UPN. This UUID is adopted verbatim; nothing is derived
+  on this path.
 - **Realm not trusted.** Return empty, exactly as before this feature
   existed.
 
@@ -148,6 +150,79 @@ Leaving it would keep reporting the user as provisional for the full 60s
 TTL, and any negatively cached miss would keep masking the principal we
 just created. Invalidation therefore matches on the cached *value*
 (username case-insensitively, or UUID) as well as the exact key.
+
+### Derived principal UUIDs (the mint path)
+
+On the mint path the UUID is not random. It is a **UUIDv5** - the RFC
+4122 name-based, SHA-1 variant - derived from a fixed namespace and the
+user's canonicalised UPN.
+
+Two properties fall out of this that random minting cannot give:
+
+1. **Every cluster agrees.** Compass, Wales, and anything stood up in
+   five years' time all independently derive the same UUID for
+   `me1ago@AMRC-FP.SHEF.AC.UK`, with no coordination and no outbound
+   calls. The far cluster does not even have to exist.
+2. **Admins can pre-grant.** The UUID can be computed and permissions
+   attached *before* the user's first login, so they land with the
+   access they need. With random minting, first login always lands with
+   zero permissions and someone has to go and fix it afterwards. This
+   is the main reason for the change.
+
+#### The namespace
+
+```
+cb3714c4-c85c-482a-987b-408293aa141e
+```
+
+Randomly generated once, on 2026-07-27, and **fixed forever after**.
+Changing it silently orphans every principal ever minted from it: the
+same user would resolve to a different UUID, their existing grants would
+attach to a principal nothing looks up any more, and there is no
+migration short of re-pointing every identity record by hand. It is
+pinned by a unit test for that reason.
+
+#### The name input, exactly
+
+The name hashed is the **canonicalised UPN** - byte for byte the same
+string written into the F+ identity record:
+
+- **Realm portion: upper-cased.**
+- **User portion: exactly as received from Keycloak**, which in practice
+  means lower-cased, because Keycloak folds the whole username before
+  any provider sees it.
+- Encoded UTF-8. No trailing whitespace, no other transformation.
+
+So a user typing `Me1ago@amrc-fp.shef.ac.uk` is hashed as
+`me1ago@AMRC-FP.SHEF.AC.UK`.
+
+**Nothing local feeds into the input.** Not the default realm, not the
+auth URL, not the cluster name. That is deliberate and load bearing: if
+the input varied with local configuration, two clusters would derive
+different UUIDs and the entire property would be lost.
+
+#### Computing one by hand
+
+To pre-grant, or to check what the cluster will derive:
+
+```sh
+python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(
+  'cb3714c4-c85c-482a-987b-408293aa141e'), 'me1ago@AMRC-FP.SHEF.AC.UK'))"
+```
+
+```
+12bb7b35-16c8-572d-af5f-c1f312ec4ae8
+```
+
+That exact pair is pinned as a known-answer test in
+`FPAuthBackedUserStoreTest`, so the implementation cannot drift from
+what this command produces.
+
+Implementation note: the JDK ships no v5 generator, and
+`UUID.nameUUIDFromBytes` is **not** a substitute - it is MD5 and stamps
+version 3. `uuidV5` does SHA-1 over the namespace's 16 raw bytes
+followed by the UTF-8 name bytes, then sets the version nibble to 5 and
+the RFC 4122 variant bits.
 
 ### Deviation from the brief: provisional users carry a UUID from lookup
 
@@ -222,7 +297,8 @@ and are never granted anything. No reaper is planned.
 openid:
   trustedRealms: []
   #  - realm: AMRC-FP.SHEF.AC.UK
-  #    authUrl: https://auth.amrc-fp.shef.ac.uk
+  #  # - realm: PARTNER.EXAMPLE.ORG
+  #  #   authUrl: https://auth.partner.example.org
 ```
 
 The chart renders this flat into `OPENID_TRUSTED_REALMS` and
@@ -240,13 +316,62 @@ permission for the same reason: creating identities is its job.
 for this grant. That file declares `KerberosKey` CRs, not permission
 grants; the grants for `sv1openid` live in the service-accounts dump.)
 
+## Choosing a mode
+
+### Recommended: no `authUrl`, derived UUIDs
+
+List the realm and nothing else. This is the default recommendation:
+
+- Nothing to create or grant on the home cluster. No coordination with
+  whoever runs it.
+- No outbound call at login, so no dependency on the home cluster being
+  up, reachable, or still existing.
+- Every cluster derives the same UUID for the same person anyway, via
+  the UUIDv5 scheme above, so identity is consistent across the estate
+  without the far cluster being involved at all.
+- Admins can pre-grant before first login.
+
+The thing you give up is reusing the UUID the user already has *on their
+home cluster*. Their derived UUID is consistent everywhere else, but it
+is not the home cluster's one, so grants made on the home cluster do not
+follow them.
+
+### The alternative: `authUrl`, home-derived UUIDs
+
+Take this only when you specifically need this cluster to reuse the
+principal UUID the user already has at home - typically because the two
+clusters are administered together and grants are expected to correlate.
+
+The cost is not just configuration:
+
+- Someone must create a principal for **this** cluster's
+  `sv1openid@<CONSUMING-REALM>` on the **home** cluster.
+- That principal must be granted `ReadKrb`
+  (`e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c`) there, with the scope
+  consequences below.
+- Logins from that realm now depend on the home cluster being reachable
+  within the timeout budget.
+
+### Pick one and stay: this is close to a one-way door
+
+Switching modes later does not migrate anyone. If you start without an
+`authUrl` and add one afterwards, users who have already logged in keep
+their derived UUID while users logging in for the first time get
+home-derived ones. The estate ends up split by *when each person first
+signed in*, which is invisible until someone's permissions do not behave
+as expected.
+
+Converging afterwards means re-pointing identity records by hand. The
+same applies in reverse. Decide before the first login, not after.
+
 ## Manual steps this does not automate
 
 ### On the home cluster: `ReadKrb` for the consuming cluster
 
 Only needed for realms configured with an `authUrl`. The consuming
-cluster's `sv1openid@<CONSUMING-REALM>` must hold `ReadKrb`
-(`e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c`) on the **home** cluster.
+cluster's `sv1openid@<CONSUMING-REALM>` must exist as a principal on the
+**home** cluster and hold `ReadKrb`
+(`e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c`) there.
 
 Understand what this grant is before making it. `ReadKrb` is **not**
 scopeable to individual principals. It can only be granted on Wildcard,
@@ -282,8 +407,8 @@ each user happened to first log in.
 This is the most likely setup mistake in the feature, and the fix lives
 on a different cluster from the error, so the message names the missing
 permission and its UUID, the SPI principal that was denied, and the
-remote cluster that denied it. It also points at the mint-fresh escape
-hatch below.
+remote cluster that denied it. It also points at dropping the `authUrl`
+as the alternative.
 
 The denial is cached for 30 seconds, keyed by realm.
 `CachingFactoryPlusUserStore` deliberately never caches exceptions, so
@@ -295,26 +420,6 @@ anyone who can reach the login page could bounce one call off the remote
 cluster per attempt just by typing foreign usernames. The denial cache
 suppresses the outbound call without softening the failure: the login
 still fails, with the same message.
-
-### The alternative: mint-fresh, which needs no grant at all
-
-Listing a realm in `trusted.realms` with **no** entry in
-`trusted.realm.auth.urls` is a fully supported configuration, not a
-degraded fallback. On that path the consuming cluster:
-
-- makes no outbound call to the home cluster whatsoever,
-- needs no permission of any kind on the home cluster,
-- mints a fresh local principal UUID for the user on first successful
-  login.
-
-The cost is that the user's principal UUID is not shared across
-clusters: they are the same person to a human reading the ACL editor
-(same UPN) but a different UUID to each cluster's auth service, so
-grants do not correlate between them.
-
-If you are unwilling to grant blanket identity read across a cluster
-boundary - which is a reasonable position - this is the configuration to
-use.
 
 ### Cross-realm Kerberos trust itself
 

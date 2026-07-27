@@ -86,17 +86,62 @@ This is off by default and requires cross-realm Kerberos trust to
 already exist: the realm and its KDC must be in `krb5.conf` on this
 cluster. Listing a realm here does not create that trust.
 
-There are two supported modes, and the choice matters.
+There are two modes. Pick deliberately, and see the one-way-door warning
+at the end.
 
-### With an `authUrl`: shared principal UUID, blanket read on the home cluster
+### Recommended: no `authUrl`, derived UUIDs
+
+List the realm and nothing else. The principal UUID is derived from the
+user's UPN as a UUIDv5, which means:
+
+- No principal to create and no permission to obtain on the home
+  cluster. No coordination with whoever runs it.
+- No outbound call at login, so no dependency on the home cluster being
+  up, reachable, or still existing.
+- Every ACS cluster derives the *same* UUID for the same person, with no
+  coordination, so identity stays consistent across the estate anyway.
+- **Admins can pre-grant**: compute the UUID and attach permissions
+  before the user has ever logged in, so their first login works
+  properly instead of landing with nothing.
+
+What you give up is reusing the UUID the user has *on their home
+cluster*, so grants made there do not follow them here.
+
+#### Computing a UUID to pre-grant
+
+```sh
+python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(
+  'cb3714c4-c85c-482a-987b-408293aa141e'), 'me1ago@AMRC-FP.SHEF.AC.UK'))"
+```
+
+```
+12bb7b35-16c8-572d-af5f-c1f312ec4ae8
+```
+
+The name you hash is the **canonicalised UPN**: realm portion in
+CAPITALS, user portion exactly as the person types it into the login
+form (which Keycloak lower-cases, so in practice lower case). Nothing
+local feeds into it - not the default realm, not the cluster name - and
+that is what makes every cluster agree.
+
+The namespace `cb3714c4-c85c-482a-987b-408293aa141e` is fixed forever.
+Changing it would orphan every principal ever derived from it, so it is
+pinned by a unit test, along with the example above as a known-answer
+vector.
+
+### The alternative: `authUrl`, home-derived UUIDs
 
 Give the realm an entry in `trusted.realm.auth.urls` and the SPI
 resolves the user's principal UUID from their home cluster, so they keep
-one identity across both.
+that cluster's identity here. Take this only when you specifically need
+that - typically because the two clusters are administered together and
+grants are expected to correlate.
 
-This requires a manual grant **on the home cluster**: the consuming
-cluster's `sv1openid@<CONSUMING-REALM>` must hold `ReadKrb`
-(`e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c`).
+This requires manual setup **on the home cluster**: the consuming
+cluster's `sv1openid@<CONSUMING-REALM>` must exist as a principal there
+and hold `ReadKrb` (`e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c`). Logins from
+that realm then also depend on the home cluster being reachable within
+the timeout budget.
 
 Know what you are granting. `ReadKrb` cannot be scoped to individual
 principals - it can only be granted on Wildcard, and acs-auth treats it
@@ -111,30 +156,25 @@ relationship: remove it and the consuming cluster can no longer resolve
 home principals.
 
 Without the grant the home cluster returns 403 and the login **fails**.
-It does not quietly fall back to minting a local UUID - that would
-defeat revocation, and would leave you with some users on home-derived
-UUIDs and some on local ones depending on when they first logged in.
-The logged message names the missing permission, the principal that was
+It does not quietly fall back to deriving a UUID - that would defeat
+revocation, and would leave you with some users on home-derived UUIDs
+and some on derived ones depending on when they first logged in. The
+logged message names the missing permission, the principal that was
 denied and the cluster that denied it. A standing denial is cached for
 30 seconds so it costs one outbound call rather than one per login
 attempt; 5xx and timeouts stay uncached, since those are transient and
 recovery should be immediate.
 
-### Without an `authUrl`: no grant, no outbound call, per-cluster UUID
+### Pick one and stay: switching later is close to a one-way door
 
-Listing a realm in `trusted.realms` with no entry in
-`trusted.realm.auth.urls` is a fully supported configuration, not a
-degraded fallback. On this path the consuming cluster makes no outbound
-call to the home cluster at all and needs no permission there
-whatsoever; it mints a fresh local principal UUID on first successful
-login.
+Changing modes does not migrate anyone. Add an `authUrl` to a realm that
+has been running without one and users who already logged in keep their
+derived UUID, while first-time users get home-derived ones. The estate
+splits by *when each person first signed in*, which stays invisible
+until someone's permissions do not behave as expected. Converging
+afterwards means re-pointing identity records by hand.
 
-The cost is that the UUID is not shared: the user is recognisably the
-same person by UPN, but each cluster's auth service knows them by a
-different UUID, so grants do not correlate across clusters.
-
-If you are unwilling to grant blanket identity read across a cluster
-boundary, use this mode.
+Decide before the first login from that realm, not after.
 
 ### On this cluster
 

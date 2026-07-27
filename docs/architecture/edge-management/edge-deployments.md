@@ -52,6 +52,48 @@ the hostname by selecting a 'Floating' deployment in the Manager; this
 will deploy such that the container might end up running anywhere in the
 cluster, subject to 'specialised host' taints applied in Kubernetes.
 
+### Moving a deployment to a different host
+
+The host is chosen when the deployment is created, but it is not fixed.
+If the machine a deployment is pinned to is replaced, or the deployment
+simply needs to run somewhere else, use the `Move` action next to the
+Host detail on the node or bridge page, or the move button on a row in
+the cluster's Nodes and Deployments tables.
+
+![Host detail on the node page](../../assets/edge-clusters/move-host/01-node-host-detail.png)
+
+Anywhere a hostname is shown that the cluster is no longer reporting as
+one of its hosts, the Manager marks it. This is what you will see after
+a machine has been removed from the cluster: the deployment is still
+pinned to it and cannot be scheduled.
+
+![Stale host marked in the cluster node table](../../assets/edge-clusters/move-host/04-cluster-nodes-table.png)
+
+The move itself is two steps. First choose the target from the hosts the
+cluster is currently reporting, or Floating to let the deployment run
+anywhere.
+
+![Choosing the target host](../../assets/edge-clusters/move-host/02-move-step1-choose-host.png)
+
+Then review what moves with it. For an Edge Agent this is its
+connections, which carry a copy of the hostname, and any host paths
+those connections pass through from the machine. Host paths are carried
+over unchanged; ACS has no way to check whether `/dev/ttyUSB0` exists on
+the new machine, so confirm them yourself before moving. Devices are not
+affected: they follow the node.
+
+![Reviewing what moves](../../assets/edge-clusters/move-host/03-move-step2-review.png)
+
+The node keeps its UUID, its Sparkplug Node-ID and everything defined
+under it. Its Edge Agent will go offline and rebirth as Kubernetes
+reschedules it onto the new host.
+
+![The move completing](../../assets/edge-clusters/move-host/06-move-step3-done.png)
+
+Host paths can also be edited on their own, from the connection dialog.
+
+![Host paths on a connection](../../assets/edge-clusters/move-host/05-connection-host-paths.png)
+
 These deployment entries are picked up by the Edge Sync operator on the
 edge cluster. This operator picks out the entries applicable to its own
 cluster and uses the 'Helm chart template' entries to construct a set of

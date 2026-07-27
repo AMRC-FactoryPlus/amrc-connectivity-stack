@@ -12,9 +12,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.component.ComponentModel;
+import org.keycloak.credential.CredentialInput;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.models.credential.PasswordCredentialModel;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -24,6 +27,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -179,5 +185,110 @@ class FactoryPlusUserStorageProviderTest {
         var users = provider.getGroupMembersStream(realm, null, 0, 100).toList();
 
         assertThat(users).isEmpty();
+    }
+
+    // -- cross-realm admission ------------------------------------------
+    //
+    // The ordering here is the security property: a provisional user is
+    // one a trusted foreign realm vouches for, and nothing may be
+    // written for them until their home KDC has confirmed the password.
+    // Lookup runs for unauthenticated callers, so admitting any earlier
+    // would let anyone create principals on the cluster by guessing
+    // usernames.
+
+    private static final FactoryPlusUser BOB_PROVISIONAL = new FactoryPlusUser(
+        "00000000-0000-0000-0000-0000000000b0",
+        "bob@OTHER.REALM",
+        null,
+        true);
+
+    /** Stands in for the real Kerberos validator, whose {@code validate}
+     *  needs a KDC. Records whether it ran so the tests can assert that
+     *  the write never happens before the password check. */
+    private static final class StubValidator extends KerberosPasswordValidator {
+        boolean accept;
+        boolean called;
+
+        StubValidator(boolean accept) { this.accept = accept; }
+
+        @Override
+        public boolean validate(String upn, String password) {
+            called = true;
+            return accept;
+        }
+    }
+
+    private FactoryPlusUserStorageProvider providerWith(StubValidator validator) {
+        return new FactoryPlusUserStorageProvider(session, model, store, validator);
+    }
+
+    private UserModel provisionalUser() {
+        return new FactoryPlusUserAdapter(session, realm, model,
+            BOB_PROVISIONAL, store);
+    }
+
+    private static CredentialInput password(String value) {
+        return new UserCredentialModel(null, PasswordCredentialModel.TYPE, value);
+    }
+
+    @Test
+    void admit_is_called_after_a_successful_password_check() {
+        var validator = new StubValidator(true);
+
+        boolean valid = providerWith(validator)
+            .isValid(realm, provisionalUser(), password("hunter2"));
+
+        assertThat(valid).isTrue();
+        verify(store).admit(BOB_PROVISIONAL.username(), BOB_PROVISIONAL.uuid());
+    }
+
+    @Test
+    void admit_is_never_called_when_the_password_check_fails() {
+        var validator = new StubValidator(false);
+
+        boolean valid = providerWith(validator)
+            .isValid(realm, provisionalUser(), password("wrong"));
+
+        assertThat(valid).isFalse();
+        assertThat(validator.called)
+            .as("The password must actually have been tested")
+            .isTrue();
+        verify(store, never()).admit(any(), any());
+    }
+
+    @Test
+    void admit_is_not_called_for_an_ordinary_local_user() {
+        var validator = new StubValidator(true);
+        UserModel local = new FactoryPlusUserAdapter(session, realm, model,
+            ALICE, store);
+
+        assertThat(providerWith(validator).isValid(realm, local, password("ok")))
+            .isTrue();
+        verify(store, never()).admit(any(), any());
+    }
+
+    @Test
+    void is_valid_returns_false_when_admit_throws() {
+        // Never issue a session whose identity could not be persisted:
+        // the token would carry an fp_principal_uuid that nothing on
+        // the cluster recognises, so every F+ service would reject it.
+        var validator = new StubValidator(true);
+        when(store.admit(any(), any()))
+            .thenThrow(new FactoryPlusAuthException("write refused"));
+
+        assertThat(providerWith(validator)
+            .isValid(realm, provisionalUser(), password("hunter2")))
+            .isFalse();
+    }
+
+    @Test
+    void unsupported_credential_type_never_reaches_the_validator() {
+        var validator = new StubValidator(true);
+
+        assertThat(providerWith(validator).isValid(realm, provisionalUser(),
+            new UserCredentialModel(null, "otp", "123456")))
+            .isFalse();
+        assertThat(validator.called).isFalse();
+        verify(store, never()).admit(any(), any());
     }
 }

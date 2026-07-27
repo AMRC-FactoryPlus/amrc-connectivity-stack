@@ -34,8 +34,17 @@ public class KerberosPasswordValidator {
         if (upn == null || upn.isBlank() || password == null || password.isEmpty())
             return false;
 
-        // Same realm-uppercase canonicalisation as the user lookup;
-        // KDC rejects lowercase realm.
+        // Upper-case the realm before the AS-REQ; the KDC rejects a
+        // lowercase realm outright. The user lookup reaches the same
+        // form by retrying the realm-upper-cased UPN when the verbatim
+        // one misses (FPAuthBackedUserStore.candidateUpns), so by the
+        // time we get here the username may still carry whatever
+        // casing Keycloak folded it to.
+        //
+        // The realm in the principal name is also what routes the
+        // AS-REQ: no KDC is hardcoded and refreshKrb5Config picks up
+        // the realm's entry from krb5.conf, which is how cross-realm
+        // logins reach the foreign KDC.
         int at = upn.lastIndexOf('@');
         if (at >= 0) {
             upn = upn.substring(0, at) + "@" + upn.substring(at + 1).toUpperCase();

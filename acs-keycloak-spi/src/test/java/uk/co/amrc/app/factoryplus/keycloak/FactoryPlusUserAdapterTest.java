@@ -154,5 +154,6 @@ class FactoryPlusUserAdapterTest {
             lastUuid = uuid;
             return response;
         }
+        @Override public String admit(String upn, String uuid) { return uuid; }
     }
 }

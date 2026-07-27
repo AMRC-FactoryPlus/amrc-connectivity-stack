@@ -153,6 +153,69 @@ class CachingFactoryPlusUserStoreTest {
             .isEqualTo(2);
     }
 
+    // -- admit / cross-realm admission -----------------------------------
+
+    @Test
+    void admit_invalidates_the_cached_miss_for_that_username() {
+        // A cross-realm user is looked up (miss, negatively cached),
+        // then admitted after their password validates. Without
+        // invalidation the negative entry masks the principal we just
+        // created for the full 60s TTL and the very next lookup in the
+        // login flow fails.
+        counting.respondWith(Optional.empty());
+        assertThat(cache.findByUsername("bob@OTHER.REALM")).isEmpty();
+        assertThat(counting.usernameCalls).isEqualTo(1);
+
+        cache.admit("bob@OTHER.REALM", "bob-uuid");
+
+        counting.respondWith(Optional.of(
+            new FactoryPlusUser("bob-uuid", "bob@OTHER.REALM", null)));
+        assertThat(cache.findByUsername("bob@OTHER.REALM"))
+            .as("Cache must re-ask the delegate after admit")
+            .isPresent();
+        assertThat(counting.usernameCalls).isEqualTo(2);
+    }
+
+    @Test
+    void admit_invalidates_a_cached_provisional_user_under_any_key() {
+        // Keycloak lower-cases the username, so the cache key is
+        // whatever it passed in, NOT the canonical UPN we admit under.
+        // Invalidation has to match on the cached value too or the
+        // provisional user survives and gets re-admitted every login.
+        counting.respondWith(Optional.of(new FactoryPlusUser(
+            "bob-uuid", "bob@OTHER.REALM", null, true)));
+        cache.findByUsername("bob@other.realm");
+        assertThat(counting.usernameCalls).isEqualTo(1);
+
+        cache.admit("bob@OTHER.REALM", "bob-uuid");
+
+        cache.findByUsername("bob@other.realm");
+        assertThat(counting.usernameCalls)
+            .as("The entry cached under the lower-cased key must go too")
+            .isEqualTo(2);
+    }
+
+    @Test
+    void admit_invalidates_the_uuid_keyspace() {
+        counting.respondWith(Optional.empty());
+        cache.findByUuid("bob-uuid");
+        assertThat(counting.uuidCalls).isEqualTo(1);
+
+        cache.admit("bob@OTHER.REALM", "bob-uuid");
+
+        cache.findByUuid("bob-uuid");
+        assertThat(counting.uuidCalls).isEqualTo(2);
+    }
+
+    @Test
+    void admit_delegates_and_returns_the_uuid_used() {
+        assertThat(cache.admit("bob@OTHER.REALM", null))
+            .as("A null uuid means the delegate mints one; return it")
+            .isEqualTo("minted-uuid");
+        assertThat(counting.admitCalls).isEqualTo(1);
+        assertThat(counting.lastAdmittedUpn).isEqualTo("bob@OTHER.REALM");
+    }
+
     // -- helpers ---------------------------------------------------------
 
     /** Test double counting calls per lookup kind. */
@@ -161,6 +224,8 @@ class CachingFactoryPlusUserStoreTest {
         int usernameCalls;
         int emailCalls;
         int groupCalls;
+        int admitCalls;
+        String lastAdmittedUpn;
         Optional<FactoryPlusUser> response = Optional.empty();
         Set<String> groupResponse = Set.of();
         boolean throwOnNext = false;
@@ -193,6 +258,11 @@ class CachingFactoryPlusUserStoreTest {
         @Override public Set<String> findPermissionsForPrincipal(String uuid) {
             groupCalls++;
             return groupResponse;
+        }
+        @Override public String admit(String upn, String uuid) {
+            admitCalls++;
+            lastAdmittedUpn = upn;
+            return uuid == null ? "minted-uuid" : uuid;
         }
 
         private Optional<FactoryPlusUser> responseOrThrow() {

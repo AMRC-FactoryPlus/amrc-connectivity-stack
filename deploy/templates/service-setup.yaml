@@ -77,6 +77,15 @@ spec:
             # sv1openid via the keytab mounted in the openid pod.
             - name: AUTH_INTERNAL_URL
               value: http://auth.{{ .Release.Namespace }}.svc.cluster.local
+            # Cross-realm Kerberos trust for the SPI federation. Flat
+            # comma-separated encoding because Keycloak component config
+            # is a fixed set of declared keys - per-realm keys can't be
+            # declared by the provider factory. Both default to empty,
+            # which leaves cross-realm login switched off.
+            - name: OPENID_TRUSTED_REALMS
+              value: "{{ range $i, $r := .Values.openid.trustedRealms }}{{ if $i }},{{ end }}{{ $r.realm | required "openid.trustedRealms[].realm is required!" }}{{ end }}"
+            - name: OPENID_TRUSTED_REALM_AUTH_URLS
+              value: "{{ $first := true }}{{ range .Values.openid.trustedRealms }}{{ if .authUrl }}{{ if not $first }},{{ end }}{{ $first = false }}{{ .realm }}={{ .authUrl }}{{ end }}{{ end }}"
 {{- end }}
           volumeMounts:
             - mountPath: /data

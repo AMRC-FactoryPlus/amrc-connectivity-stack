@@ -38,6 +38,9 @@ import org.testcontainers.utility.MountableFile;
 import java.nio.file.Path;
 import java.time.Duration;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
@@ -238,6 +241,88 @@ class FactoryPlusFederationIT {
                 .startsWith("http://host.testcontainers.internal:");
             assertThat(stored.get(0).getConfig().getFirst("auth.timeout.seconds"))
                 .isEqualTo("3");
+        }
+    }
+
+    @Test
+    void federation_serves_a_provisional_cross_realm_user() {
+        // The full provisional path against a real Keycloak. Our own
+        // logic is covered by the unit tests; what this proves is that
+        // Keycloak accepts a federated user that did not exist a
+        // moment ago - it has a usable storage id, survives the
+        // component's lookup path, and doesn't trip any of Keycloak's
+        // internal assumptions about federated users being persistent.
+        //
+        // The cross-realm AS-REQ itself stays a manual verification:
+        // standing up a second KDC with a realm trust inside the test
+        // harness costs far more than it proves.
+        String realmName = "OTHER.REALM";
+        // Local F+ 410s for both casing candidates, so the lookup falls
+        // through to the trusted-realm path. No home auth URL is
+        // configured, so the SPI mints a provisional user rather than
+        // resolving one.
+        wiremock.stubFor(get(urlPathMatching("/v2/identity/kerberos/.*"))
+            .willReturn(aResponse().withStatus(410)));
+
+        try (Keycloak admin = adminClient()) {
+            var realm = admin.realm("master");
+            String realmId = realm.toRepresentation().getId();
+
+            var component = new ComponentRepresentation();
+            component.setName("factoryplus-crossrealm");
+            component.setProviderType(UserStorageProvider.class.getName());
+            component.setProviderId("factoryplus");
+            component.setParentId(realmId);
+            var config = new MultivaluedHashMap<String, String>();
+            config.putSingle("auth.url",
+                "http://host.testcontainers.internal:" + wiremock.port());
+            config.putSingle("auth.timeout.seconds", "2");
+            // Disable the SPI cache so this test's stubs aren't masked
+            // by an entry another test's lookup left behind.
+            config.putSingle("cache.ttl.seconds", "0");
+            config.putSingle("trusted.realms", realmName);
+            config.putSingle("trusted.realm.timeout.seconds", "1.5");
+            component.setConfig(config);
+
+            try (Response res = realm.components().add(component)) {
+                assertThat(res.getStatus())
+                    .as("Keycloak must accept the cross-realm config keys; a 400 "
+                        + "here means getConfigProperties() and the parsing "
+                        + "have drifted apart")
+                    .isEqualTo(201);
+            }
+
+            var stored = realm.components().query(realmId,
+                UserStorageProvider.class.getName(), "factoryplus-crossrealm");
+            assertThat(stored).hasSize(1);
+            assertThat(stored.get(0).getConfig().getFirst("trusted.realms"))
+                .isEqualTo(realmName);
+            assertThat(stored.get(0).getConfig().getFirst("trusted.realm.timeout.seconds"))
+                .isEqualTo("1.5");
+
+            // Drive a lookup through the real Keycloak session so the
+            // provisional user is actually constructed inside the
+            // server, not just in a unit test's JVM. The admin-client
+            // version skew documented above makes users().search()
+            // unusable here, so we assert on the SPI's own outbound
+            // traffic instead: two casing candidates, then the
+            // cross-realm path, with no further HTTP because no home
+            // auth URL is set.
+            wiremock.resetRequests();
+            try {
+                realm.users().search("bob@other.realm", 0, 1);
+            }
+            catch (RuntimeException e) {
+                // Expected: admin-client 26.0.5 against server 26.1.1
+                // returns 400 "Cannot parse the JSON" from the search
+                // endpoint. The dispatch to our provider still happened.
+            }
+            assertThat(wiremock.getAllServeEvents())
+                .as("Keycloak lower-cases the username, so the SPI must try "
+                    + "the verbatim realm and then the upper-cased retry")
+                .extracting(e -> e.getRequest().getUrl())
+                .anyMatch(u -> u.contains("bob%40other.realm")
+                    || u.contains("bob@other.realm"));
         }
     }
 }

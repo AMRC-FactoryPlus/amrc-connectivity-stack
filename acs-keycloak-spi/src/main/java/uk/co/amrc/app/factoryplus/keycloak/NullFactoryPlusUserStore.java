@@ -39,4 +39,15 @@ public final class NullFactoryPlusUserStore implements FactoryPlusUserStore {
     public Set<String> findPermissionsForPrincipal(String uuid) {
         return Set.of();
     }
+
+    @Override
+    public String admit(String upn, String uuid) {
+        // Unreachable in practice: every lookup returns empty, so no
+        // provisional user is ever produced for the provider to admit.
+        // Fail loudly rather than pretending the write happened - a
+        // silent success would issue a session whose principal doesn't
+        // exist anywhere.
+        throw new FactoryPlusAuthException(
+            "Cannot admit " + upn + ": no Factory+ auth service is configured");
+    }
 }

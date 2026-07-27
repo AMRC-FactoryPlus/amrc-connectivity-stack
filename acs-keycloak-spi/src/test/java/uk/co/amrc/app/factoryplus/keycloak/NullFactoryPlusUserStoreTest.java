@@ -11,6 +11,7 @@ package uk.co.amrc.app.factoryplus.keycloak;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NullFactoryPlusUserStoreTest {
 
@@ -35,6 +36,15 @@ class NullFactoryPlusUserStoreTest {
         assertThat(store.findByEmail("alice@example.invalid")).isEmpty();
         assertThat(store.findByEmail("")).isEmpty();
         assertThat(store.findByEmail(null)).isEmpty();
+    }
+
+    @Test
+    void admit_fails_loudly_rather_than_pretending_to_write() {
+        // Unreachable in practice (no lookup ever yields a provisional
+        // user), but a silent success here would issue a session for a
+        // principal that exists nowhere.
+        assertThatThrownBy(() -> store.admit("bob@OTHER.REALM", null))
+            .isInstanceOf(FactoryPlusAuthException.class);
     }
 
     @Test

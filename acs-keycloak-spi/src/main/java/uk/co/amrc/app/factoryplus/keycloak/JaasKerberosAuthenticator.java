@@ -36,13 +36,20 @@ import uk.co.amrc.factoryplus.gss.FPGssProvider;
 public class JaasKerberosAuthenticator implements KerberosAuthenticator {
 
     private final FPGssClient client;
+    private final String principal;
 
     public JaasKerberosAuthenticator(String principal, String keytabPath) {
         FPGssProvider provider = new FPGssProvider(null);
+        this.principal = principal;
         this.client = provider.clientWithKeytab(principal, keytabPath);
         /* Force the initial JAAS login to happen now so misconfiguration
          * surfaces at SPI bootstrap, not on the first user sign-in. */
         primeCredentials();
+    }
+
+    @Override
+    public String principalName() {
+        return principal;
     }
 
     @Override

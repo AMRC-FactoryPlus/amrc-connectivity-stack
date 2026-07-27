@@ -32,6 +32,12 @@ class OpenIDSetup {
         // SPI federation calls this URL for principal/group lookups.
         this.auth_internal_url = (process.env.AUTH_INTERNAL_URL ?? "")
             .replace(/\/+$/, "");
+        // Cross-realm trust, rendered flat by the Helm chart from
+        // values.openid.trustedRealms. Empty means no realm is trusted
+        // and the SPI's cross-realm path stays inert.
+        this.trusted_realms = process.env.OPENID_TRUSTED_REALMS ?? "";
+        this.trusted_realm_auth_urls =
+            process.env.OPENID_TRUSTED_REALM_AUTH_URLS ?? "";
 
         this.token = null;
         this.token_expires_at = 0;
@@ -214,6 +220,22 @@ class OpenIDSetup {
                 // has no @). Inputs that already contain @ pass
                 // through verbatim, preserving cross-realm logins.
                 "default.realm":    [this.kerberos_realm],
+                // Kerberos realms accepted for cross-realm login. A
+                // user from one of these can sign in with no local F+
+                // principal: the SPI writes their identity here once
+                // their home KDC has accepted the password. Empty
+                // (the default) turns the whole path off.
+                "trusted.realms":   [this.trusted_realms],
+                // REALM=url entries naming each trusted realm's own F+
+                // auth service, so the user keeps their home principal
+                // UUID. A trusted realm absent here gets a freshly
+                // minted local UUID and makes no outbound call.
+                "trusted.realm.auth.urls": [this.trusted_realm_auth_urls],
+                // The cross-realm resolve runs in series AFTER the
+                // local lookup misses, so this and auth.timeout.seconds
+                // share Keycloak's 3s hard limit. Don't raise either
+                // one without lowering the other.
+                "trusted.realm.timeout.seconds": ["1.5"],
             },
         };
 

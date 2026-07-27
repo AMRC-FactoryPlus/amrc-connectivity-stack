@@ -112,4 +112,59 @@ class FactoryConfigDrivenStoreTest {
 
         assertThat(provider.getStore()).isInstanceOf(CachingFactoryPlusUserStore.class);
     }
+
+    // -- cross-realm config parsing --------------------------------------
+
+    @Test
+    void trusted_realms_default_to_none() {
+        // Cross-realm support must be inert until an admin opts in.
+        assertThat(FactoryPlusUserStorageProviderFactory.parseList(null)).isEmpty();
+        assertThat(FactoryPlusUserStorageProviderFactory.parseList("")).isEmpty();
+        assertThat(FactoryPlusUserStorageProviderFactory.parseList("  ")).isEmpty();
+    }
+
+    @Test
+    void trusted_realms_parse_as_a_comma_separated_list() {
+        assertThat(FactoryPlusUserStorageProviderFactory.parseList(
+                "A.REALM, B.REALM ,,C.REALM"))
+            .containsExactlyInAnyOrder("A.REALM", "B.REALM", "C.REALM");
+    }
+
+    @Test
+    void trusted_realm_auth_urls_parse_as_flat_realm_equals_url_entries() {
+        // Flat encoding because Keycloak's component config is a fixed
+        // set of declared keys; per-realm keys can't be declared in
+        // getConfigProperties().
+        var urls = FactoryPlusUserStorageProviderFactory.parseRealmUrls(
+            "A.REALM=https://auth.a.example, B.REALM=http://auth.b.example");
+
+        assertThat(urls).containsOnlyKeys("A.REALM", "B.REALM");
+        assertThat(urls.get("A.REALM").getHost()).isEqualTo("auth.a.example");
+    }
+
+    @Test
+    void malformed_trusted_realm_url_entries_are_dropped_not_fatal() {
+        // A typo in one entry degrades that realm to the mint-fresh
+        // path rather than breaking the whole federation.
+        assertThat(FactoryPlusUserStorageProviderFactory.parseRealmUrls(
+                "no-equals-sign, =https://orphan.example, A.REALM=https://auth.a.example"))
+            .containsOnlyKeys("A.REALM");
+    }
+
+    @Test
+    void trusted_realm_timeout_accepts_a_fractional_value() {
+        assertThat(FactoryPlusUserStorageProviderFactory
+                .parseFractionalSeconds("1.5", "1.5"))
+            .isEqualTo(java.time.Duration.ofMillis(1500));
+    }
+
+    @Test
+    void trusted_realm_timeout_falls_back_on_junk() {
+        assertThat(FactoryPlusUserStorageProviderFactory
+                .parseFractionalSeconds("soon", "1.5"))
+            .isEqualTo(java.time.Duration.ofMillis(1500));
+        assertThat(FactoryPlusUserStorageProviderFactory
+                .parseFractionalSeconds(null, "1.5"))
+            .isEqualTo(java.time.Duration.ofMillis(1500));
+    }
 }

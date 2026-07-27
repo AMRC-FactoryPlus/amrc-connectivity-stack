@@ -154,6 +154,50 @@ openid:
   # keycloak.v2 theme, or set to a different name if you've baked a
   # custom theme into your own Keycloak image.
   loginTheme: factory-plus
+  # -- Kerberos realms trusted for cross-realm login. A user from a
+  # listed realm can sign in without an administrator hand-creating a
+  # Factory+ principal for them first: once their home KDC accepts the
+  # password, the SPI writes their Kerberos identity here and they
+  # appear in the ACL editor with no permissions until granted some.
+  #
+  # This requires cross-realm Kerberos trust to already exist - the
+  # realm and its KDC must be listed in krb5.conf on this cluster.
+  # Listing a realm here does not create that trust.
+  #
+  # RECOMMENDED: list the realm and nothing else, as shown below. The
+  # user's principal UUID is then derived from their UPN (UUIDv5), which
+  # means every cluster derives the same UUID for the same person with
+  # no coordination, no grant to obtain, no outbound call at login, and
+  # no dependency on the far cluster being reachable. It also lets an
+  # admin pre-grant: compute the UUID and attach permissions before the
+  # user has ever logged in, so their first login works properly instead
+  # of landing with nothing. To compute one:
+  #
+  #   python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(
+  #     'cb3714c4-c85c-482a-987b-408293aa141e'), 'me1ago@AMRC-FP.SHEF.AC.UK'))"
+  #
+  # (Realm in CAPITALS, username as the person types it, usually lower
+  # case. See the SPI README for the exact rule.)
+  #
+  # `authUrl` is the alternative, and only worth it when you specifically
+  # need this cluster to reuse the principal UUID the user already has on
+  # their home cluster. The cost is real: you must get a principal created
+  # for THIS cluster's sv1openid on the home cluster and have it granted
+  # ReadKrb there, which is Wildcard-only and confers blanket read and
+  # enumeration of the home cluster's entire identity table. Logins then
+  # also depend on that cluster being reachable.
+  #
+  # Pick one and stay: this is close to a one-way door. If you start
+  # without an authUrl and add one later, users who already logged in
+  # keep their derived UUID while new users get home-derived ones, split
+  # by when each first signed in. Converging afterwards means re-pointing
+  # identity records by hand.
+  #
+  # Default empty: no realm is trusted and the feature is inert.
+  trustedRealms: []
+  #  - realm: AMRC-FP.SHEF.AC.UK
+  #  # - realm: PARTNER.EXAMPLE.ORG
+  #  #   authUrl: https://auth.partner.example.org
   image:
     # -- Custom Keycloak image with the Factory+ User Storage SPI baked
     # in (built from acs-keycloak/Dockerfile). To run upstream Keycloak

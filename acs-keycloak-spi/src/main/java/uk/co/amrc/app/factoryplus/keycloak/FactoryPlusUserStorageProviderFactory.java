@@ -29,8 +29,12 @@ import org.keycloak.storage.UserStorageProviderFactory;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -56,6 +60,11 @@ public class FactoryPlusUserStorageProviderFactory
     static final String CONFIG_KRB_PRINCIPAL      = "auth.principal";
     static final String CONFIG_KRB_KEYTAB_PATH    = "auth.keytab.path";
     static final String CONFIG_DEFAULT_REALM      = "default.realm";
+    static final String CONFIG_TRUSTED_REALMS     = "trusted.realms";
+    static final String CONFIG_TRUSTED_REALM_AUTH_URLS =
+        "trusted.realm.auth.urls";
+    static final String CONFIG_TRUSTED_REALM_TIMEOUT =
+        "trusted.realm.timeout.seconds";
     /* Must stay below Keycloak's 3-second ServicesUtils.timeBoundOne
      * hard limit on user-storage lookups. With a longer value our own
      * timeout can never fire: Keycloak interrupts the thread first and
@@ -63,6 +72,13 @@ public class FactoryPlusUserStorageProviderFactory
      * timeout naming the F+ auth service. */
     static final String DEFAULT_TIMEOUT_SECONDS   = "2";
     static final String DEFAULT_CACHE_TTL_SECONDS = "60";
+    /* The cross-realm resolve runs in SERIES after the local lookup
+     * misses, so the two timeouts add up against the same 3-second
+     * budget: 2 + 1.5 already overshoots slightly in the worst case,
+     * and anything larger reliably surfaces as an opaque
+     * InterruptedException instead of a clean timeout. Do not raise
+     * either value without lowering the other. */
+    static final String DEFAULT_TRUSTED_REALM_TIMEOUT_SECONDS = "1.5";
 
     private static final List<ProviderConfigProperty> CONFIG_PROPERTIES =
         ProviderConfigurationBuilder.create()
@@ -124,6 +140,40 @@ public class FactoryPlusUserStorageProviderFactory
                     + "the affordance and require the full UPN.")
                 .type(ProviderConfigProperty.STRING_TYPE)
                 .add()
+            .property()
+                .name(CONFIG_TRUSTED_REALMS)
+                .label("Trusted Kerberos realms")
+                .helpText("Comma-separated Kerberos realms whose users may "
+                    + "log in without a pre-existing Factory+ principal on "
+                    + "this cluster (e.g. PARTNER.EXAMPLE.ORG). Requires "
+                    + "cross-realm trust already configured in krb5.conf. "
+                    + "Leave blank - the default - to accept only local "
+                    + "principals.")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .add()
+            .property()
+                .name(CONFIG_TRUSTED_REALM_AUTH_URLS)
+                .label("Trusted realm auth URLs")
+                .helpText("Comma-separated REALM=url entries naming each "
+                    + "trusted realm's own Factory+ auth service, used to "
+                    + "resolve that realm's principal UUID so the user keeps "
+                    + "one identity across clusters. A trusted realm with no "
+                    + "entry here gets a freshly minted local UUID instead. "
+                    + "Flat encoding because Keycloak component config is a "
+                    + "fixed set of declared keys.")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .add()
+            .property()
+                .name(CONFIG_TRUSTED_REALM_TIMEOUT)
+                .label("Trusted realm request timeout (seconds)")
+                .helpText("Per-request timeout for calls to a trusted realm's "
+                    + "Factory+ auth service. This resolve runs after the "
+                    + "local lookup misses, so it adds to the request timeout "
+                    + "above against Keycloak's 3-second hard limit. Keep it "
+                    + "tight.")
+                .type(ProviderConfigProperty.STRING_TYPE)
+                .defaultValue(DEFAULT_TRUSTED_REALM_TIMEOUT_SECONDS)
+                .add()
             .build();
 
     @Override
@@ -153,7 +203,9 @@ public class FactoryPlusUserStorageProviderFactory
         StringBuilder sb = new StringBuilder();
         for (String k : List.of(CONFIG_AUTH_URL, CONFIG_TIMEOUT_SECONDS,
                 CONFIG_CACHE_TTL_SECONDS, CONFIG_KRB_PRINCIPAL,
-                CONFIG_KRB_KEYTAB_PATH, CONFIG_DEFAULT_REALM)) {
+                CONFIG_KRB_KEYTAB_PATH, CONFIG_DEFAULT_REALM,
+                CONFIG_TRUSTED_REALMS, CONFIG_TRUSTED_REALM_AUTH_URLS,
+                CONFIG_TRUSTED_REALM_TIMEOUT)) {
             sb.append(k).append('=')
               .append(model.getConfig().getFirst(k)).append(';');
         }
@@ -171,8 +223,16 @@ public class FactoryPlusUserStorageProviderFactory
 
         KerberosAuthenticator auth = buildAuthenticator(model);
         String defaultRealm = model.getConfig().getFirst(CONFIG_DEFAULT_REALM);
+        Set<String> trusted = parseList(
+            model.getConfig().getFirst(CONFIG_TRUSTED_REALMS));
+        Map<String, URI> homeUrls = parseRealmUrls(
+            model.getConfig().getFirst(CONFIG_TRUSTED_REALM_AUTH_URLS));
+        Duration homeTimeout = parseFractionalSeconds(
+            model.getConfig().getFirst(CONFIG_TRUSTED_REALM_TIMEOUT),
+            DEFAULT_TRUSTED_REALM_TIMEOUT_SECONDS);
         FactoryPlusUserStore base = new FPAuthBackedUserStore(
-            URI.create(url), timeout, auth, defaultRealm);
+            URI.create(url), timeout, auth, defaultRealm,
+            trusted, homeUrls, homeTimeout);
 
         Duration cacheTtl = parseSeconds(
             model.getConfig().getFirst(CONFIG_CACHE_TTL_SECONDS),
@@ -195,6 +255,60 @@ public class FactoryPlusUserStorageProviderFactory
             return null;
         }
         return new JaasKerberosAuthenticator(principal, keytab);
+    }
+
+    /** Comma-separated list, blanks dropped. Absent or empty yields an
+     *  empty set, which is what keeps cross-realm support inert until
+     *  an admin opts in. */
+    static Set<String> parseList(String configured) {
+        if (configured == null || configured.isBlank()) return Set.of();
+        Set<String> out = new LinkedHashSet<>();
+        for (String part : configured.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) out.add(trimmed);
+        }
+        return Set.copyOf(out);
+    }
+
+    /** Comma-separated {@code REALM=url} entries. Malformed entries
+     *  (no {@code =}, blank realm, unparseable URL) are dropped rather
+     *  than failing the whole federation: the realm then falls back to
+     *  the mint-fresh path, which is degraded but working. */
+    static Map<String, URI> parseRealmUrls(String configured) {
+        if (configured == null || configured.isBlank()) return Map.of();
+        Map<String, URI> out = new LinkedHashMap<>();
+        for (String part : configured.split(",")) {
+            String entry = part.trim();
+            if (entry.isEmpty()) continue;
+            int eq = entry.indexOf('=');
+            if (eq <= 0) continue;
+            String realm = entry.substring(0, eq).trim();
+            String url = entry.substring(eq + 1).trim();
+            if (realm.isEmpty() || url.isEmpty()) continue;
+            try {
+                out.put(realm, URI.create(url));
+            }
+            catch (IllegalArgumentException e) {
+                /* Skip; the realm degrades to the mint-fresh path. */
+            }
+        }
+        return Map.copyOf(out);
+    }
+
+    /** Like {@link #parseSeconds} but accepts a fractional value, since
+     *  the cross-realm timeout default is 1.5s. */
+    static Duration parseFractionalSeconds(String configured, String fallback) {
+        double secs;
+        try {
+            secs = Double.parseDouble(configured == null || configured.isBlank()
+                ? fallback
+                : configured.trim());
+        }
+        catch (NumberFormatException e) {
+            secs = Double.parseDouble(fallback);
+        }
+        if (secs <= 0) secs = Double.parseDouble(fallback);
+        return Duration.ofMillis(Math.round(secs * 1000));
     }
 
     private static Duration parseSeconds(String configured, String fallback) {

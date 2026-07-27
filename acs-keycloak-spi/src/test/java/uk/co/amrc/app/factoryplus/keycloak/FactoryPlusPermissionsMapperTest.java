@@ -103,5 +103,6 @@ class FactoryPlusPermissionsMapperTest {
         @Override public Optional<FactoryPlusUser> findByUsername(String n) { return Optional.empty(); }
         @Override public Optional<FactoryPlusUser> findByEmail(String e) { return Optional.empty(); }
         @Override public Set<String> findPermissionsForPrincipal(String u) { return groups; }
+        @Override public String admit(String upn, String uuid) { return uuid; }
     }
 }

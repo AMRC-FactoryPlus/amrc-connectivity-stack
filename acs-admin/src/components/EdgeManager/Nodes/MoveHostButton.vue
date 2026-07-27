@@ -3,16 +3,29 @@
   -->
 
 <template>
-  <TooltipProvider>
+  <!-- Labelled, the button says what it does; a tooltip would only
+     - repeat it. Icon-only in a table row, it needs one. -->
+  <Button
+      v-if="labelled"
+      size="xs"
+      variant="outline"
+      class="flex items-center justify-center gap-1.5 hover:bg-gray-800 hover:text-white"
+      title="Move this node to another host"
+      @click.stop="move"
+  >
+    <i class="fa-solid fa-right-left text-xs"></i>
+    Move
+  </Button>
+  <TooltipProvider v-else>
     <Tooltip>
       <TooltipTrigger as-child>
         <Button
           size="xs"
           variant="outline"
-          class="flex items-center justify-center gap-1.5 hover:bg-gray-800 hover:text-white"
+          class="w-8 px-0 flex items-center justify-center hover:bg-gray-800 hover:text-white"
           @click.stop="move"
         >
-          <i class="fa-solid fa-right-left"></i>
+          <i class="fa-solid fa-right-left text-xs"></i>
         </Button>
       </TooltipTrigger>
       <TooltipContent>
@@ -38,6 +51,8 @@ export default {
      * have connections which carry a copy of the hostname. */
     kind: { type: String, default: 'deployment' },
     deployment: { type: Object, required: true },
+    /* Sidebars have room for the word; table rows do not. */
+    labelled: { type: Boolean, default: false },
   },
 
   methods: {

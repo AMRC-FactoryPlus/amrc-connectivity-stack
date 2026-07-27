@@ -123,9 +123,16 @@
               :warning="hostWarning"
           >
             <template #action>
-              <Button title="Move to another host" size="xs" class="flex gap-1" @click="moveHost" variant="ghost">
-                <i class="fa-solid fa-right-left text-gray-400"></i>
-              </Button>
+              <MoveHostButton
+                  labelled
+                  :uuid="node.uuid"
+                  :name="node.name"
+                  kind="node"
+                  :deployment="node.deployment"
+              />
+            </template>
+            <template #badge>
+              <StaleHostPill v-if="hostWarning"/>
             </template>
           </SidebarDetail>
 
@@ -157,6 +164,8 @@ import { deviceColumns } from './deviceColumns.ts'
 import { connectionColumns } from './connectionColumns.ts'
 import EmptyState from '@/components/EmptyState.vue'
 import SidebarDetail from '@/components/SidebarDetail.vue'
+import MoveHostButton from '@components/EdgeManager/Nodes/MoveHostButton.vue'
+import StaleHostPill from '@components/EdgeManager/Nodes/StaleHostPill.vue'
 import { staleHostWarning } from '@utils/hosts.js'
 import moment from 'moment'
 import { toast } from 'vue-sonner'
@@ -165,6 +174,8 @@ export default {
   components: {
     Tabs,
     SidebarDetail,
+    MoveHostButton,
+    StaleHostPill,
     DataTable,
     DetailCard,
     EdgePageSkeleton,
@@ -259,15 +270,6 @@ export default {
   methods: {
     newDevice () {
       window.events.emit('show-new-device-dialog-for-node', this.node)
-    },
-
-    moveHost () {
-      window.events.emit('show-move-host-dialog', {
-        uuid: this.node.uuid,
-        name: this.node.name,
-        kind: 'node',
-        deployment: this.node.deployment,
-      })
     },
 
     newConnection () {

@@ -84,9 +84,17 @@
             :warning="hostWarning"
           >
             <template #action>
-              <Button title="Move to another host" size="xs" class="flex gap-1" @click="moveHost" variant="ghost">
-                <i class="fa-solid fa-right-left text-gray-400"></i>
-              </Button>
+              <MoveHostButton
+                  v-if="selectedBridge.deployment"
+                  labelled
+                  :uuid="selectedBridge.uuid"
+                  :name="selectedBridge.name"
+                  kind="bridge"
+                  :deployment="selectedBridge.deployment"
+              />
+            </template>
+            <template #badge>
+              <StaleHostPill v-if="hostWarning"/>
             </template>
           </SidebarDetail>
           <SidebarDetail
@@ -115,6 +123,8 @@ import { useBridgeStore } from "@store/useBridgeStore";
 import { useEdgeClusterStore } from "@store/useEdgeClusterStore.js";
 import { staleHostWarning } from "@utils/hosts.js";
 import SidebarDetail from "@components/SidebarDetail.vue";
+import MoveHostButton from "@components/EdgeManager/Nodes/MoveHostButton.vue";
+import StaleHostPill from "@components/EdgeManager/Nodes/StaleHostPill.vue";
 import EmptyState from '@components/EmptyState.vue';
 import { ref } from "vue";
 import { useRouter } from "vue-router";
@@ -127,7 +137,7 @@ import { toast } from "vue-sonner";
 export default {
   emits: ['rowClick'],
   name: 'Bridges',
-  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState },
+  components: { SidebarDetail, MoveHostButton, StaleHostPill, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState },
 
   setup() {
     return {
@@ -192,15 +202,6 @@ export default {
           application: UUIDs.App.EdgeAgentDeployment,
           object: this.selectedBridge.uuid,
         },
-      })
-    },
-    moveHost() {
-      if (!this.selectedBridge?.uuid) return
-      window.events.emit('show-move-host-dialog', {
-        uuid: this.selectedBridge.uuid,
-        name: this.selectedBridge.name,
-        kind: 'bridge',
-        deployment: this.selectedBridge.deployment,
       })
     },
     editBridge() {

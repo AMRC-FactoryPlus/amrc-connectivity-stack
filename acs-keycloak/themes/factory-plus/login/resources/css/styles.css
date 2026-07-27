@@ -19,6 +19,7 @@
     --slate-950: #020617;
 
     --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
     --gray-400: #9ca3af;
 
     --red-500: #ef4444;
@@ -112,13 +113,15 @@ a:hover {
     }
 }
 
-/* Mirror the acs-admin login card hover ring. Gated to fine pointers
-   so touch devices don't get a sticky hover state on tap. */
+/* Mirror the acs-admin login card hover ring: a bare Tailwind `ring` is
+   3px wide, and `ring-offset-2` puts a 2px gray-100 gap inside it, so the
+   ring lands between 2px and 5px out. Gated to fine pointers so touch
+   devices don't get a sticky hover state on tap. */
 @media (hover: hover) and (pointer: fine) {
     .acs-card:hover {
         box-shadow:
             0 0 0 2px var(--gray-100),
-            0 0 0 4px rgb(156 163 175 / 0.3),
+            0 0 0 5px rgb(156 163 175 / 0.3),
             var(--card-shadow);
     }
 }
@@ -170,14 +173,25 @@ a:hover {
     line-height: 1;
 }
 
-/* Inputs - shadcn focus ring, slate-900 ring with white offset.
-   Specific transition targets (not `all`) so the focus ring snaps in
-   without re-rendering the rest of the input. */
+/* Inputs.
+ *
+ * The border is gray-200 and the focus ring is blue, not slate, and that
+ * is deliberate - do not "fix" it. acs-admin's Input.vue asks for
+ * `border-input`, `bg-background`, `ring-ring` and `ring-offset-background`,
+ * but its tailwind.config.js has `colors: {}` and its main.css defines only
+ * `--radius`, so none of those shadcn colour tokens exist. Those classes
+ * are no-ops there and the admin input actually renders with Tailwind's
+ * defaults: borderColor.DEFAULT (#e5e7eb, gray-200) and the default ring
+ * colour (blue-500 at 50%). We match what admin renders today, not what
+ * its source appears to intend.
+ *
+ * Specific transition targets (not `all`) so the focus ring snaps in
+ * without re-rendering the rest of the input. */
 .acs-input {
     display: flex;
     height: 2.5rem;
     width: 100%;
-    border: 1px solid var(--slate-200);
+    border: 1px solid var(--gray-200);
     background: #ffffff;
     color: var(--text);
     border-radius: var(--radius-md);
@@ -195,8 +209,7 @@ a:hover {
 }
 
 .acs-input:focus-visible {
-    border-color: var(--slate-950);
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--slate-950);
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgb(59 130 246 / 0.5);
 }
 
 .acs-input:disabled {

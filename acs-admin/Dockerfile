@@ -1,13 +1,19 @@
 # Stage 1: Build the application
-FROM oven/bun:1.2.0 AS builder
+#
+# Debian 12 (bookworm), glibc 2.36. The 1.2.0 image was Debian 11
+# (bullseye, glibc 2.31) and rollup's prebuilt Linux binary now needs
+# 2.34, so it failed to dlopen at build time.
+FROM oven/bun:1.2.23-debian AS builder
 ARG tag="(unknown version)"
 
 # Set working directory
 WORKDIR /app/acs-admin
 
-# Copy package.json and install dependencies
-COPY package.json bun.lock* ./
-RUN --mount=type=bind,from=lib,dst=/app/lib bun install --production
+# Copy package.json and install dependencies. The lockfile is copied
+# without a glob so a missing one fails here rather than silently
+# resolving the whole tree fresh from the registry on every build.
+COPY package.json bun.lock ./
+RUN --mount=type=bind,from=lib,dst=/app/lib bun install --production --frozen-lockfile
 
 # Copy the rest of the application code
 COPY . .

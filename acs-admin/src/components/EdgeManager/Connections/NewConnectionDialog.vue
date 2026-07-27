@@ -96,6 +96,16 @@
             required
           />
         </div>
+
+        <!-- Host paths - only for drivers deployed as their own container -->
+        <div v-if="selectedDriver?.definition?.image" class="flex flex-col gap-1">
+          <label class="text-sm font-medium">Host Paths</label>
+          <p class="text-xs text-gray-500">
+            Hardware on the host machine to pass through to the driver, such as a serial port.
+            These are paths on whichever host this node is running on.
+          </p>
+          <HostPathsEditor v-model="hostPaths"/>
+        </div>
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <div class="flex w-full items-center justify-between">
@@ -143,6 +153,7 @@
 
 <script>
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@components/ui/dialog'
+import HostPathsEditor from '@components/EdgeManager/Connections/HostPathsEditor.vue'
 import { Button } from '@components/ui/button'
 import { VisuallyHidden } from 'reka-ui'
 import { Input } from '@/components/ui/input'
@@ -212,7 +223,8 @@ export default {
     SelectLabel,
     SelectTrigger,
     SelectValue,
-    JSONFormElement
+    JSONFormElement,
+    HostPathsEditor
   },
 
   watch: {
@@ -249,6 +261,7 @@ export default {
           // Make sure we handle different possible structures for the payload format
           payloadFormat: existingConfig.source?.payloadFormat || "Defined by Protocol",
         }
+        this.hostPaths = (existingConfig.deployment?.hostPaths ?? []).map(p => ({ ...p }))
       }
 
       this.node = node
@@ -261,6 +274,10 @@ export default {
     },
     selectedDriver () {
       return this.dr.data.find(d => d.name === this.selectedDriverName)
+    },
+    /* Drop any rows the user started and left blank. */
+    cleanHostPaths () {
+      return this.hostPaths.filter(p => p.hostPath && p.mountPath)
     },
     // Removed isPolledDriver computed property to avoid recursive updates
     formSchema() {
@@ -539,6 +556,7 @@ export default {
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
+      this.hostPaths = []
       this.isSubmitting = false
       this.existingConnection = null
     },
@@ -579,6 +597,9 @@ export default {
             this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge', {
               config: configData,
               driver_uuid: this.selectedDriver.uuid,
+              deployment: {
+                hostPaths: this.cleanHostPaths.length ? this.cleanHostPaths : null,
+              },
               ...(this.selectedDriver?.definition?.polled === true ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
               source: {
                 payloadFormat: payloadFormat,
@@ -618,7 +639,7 @@ export default {
           const payload = {
             createdAt: new Date().toISOString(),
             config: configData,
-            deployment: {},
+            deployment: this.cleanHostPaths.length ? { hostPaths: this.cleanHostPaths } : {},
             driver: this.selectedDriver.uuid,
             edgeAgent: this.node.uuid,
             ...(this.selectedDriver?.definition?.polled === true ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
@@ -727,6 +748,7 @@ export default {
       node: null,
       name: null,
       selectedDriverName: null,
+      hostPaths: [],
       pollInt: 1000, // Default to 1000ms (1 second)
       formData: {
         payloadFormat: "Defined by Protocol"

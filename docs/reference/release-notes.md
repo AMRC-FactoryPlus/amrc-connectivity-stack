@@ -8,6 +8,76 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.3.0
+
+### Cross-realm Kerberos login
+
+Someone holding an account in a foreign Kerberos realm that this
+cluster already trusts can now sign in, without an administrator
+creating a Factory+ principal for them by hand. Previously this failed
+at the identity lookup, before the password was ever checked, and
+reported "Invalid username or password" whatever was typed. Cross-realm
+trust is an arrangement between KDCs and provisions nothing in
+Factory+, so there was no principal to find.
+
+Enter the full principal name, `alice@OTHER.REALM`, rather than a bare
+username; a bare username still means an account in this cluster's own
+realm. The password is verified by an AS-REQ against the named realm's
+own KDC, the only KDC that can verify it, so this cluster's `krb5.conf`
+must list that realm and be able to reach it. On success a principal is
+created here with the Kerberos identity attached, and it appears in the
+ACL editor like any other. It starts with no permissions.
+
+Trusted realms are opt-in and nothing is trusted by default:
+
+```yaml
+openid:
+  trustedRealms:
+    - realm: OTHER.REALM
+```
+
+Principal UUIDs are derived from the principal name (a UUIDv5 in a
+fixed namespace) rather than generated at random. Every cluster
+trusting a given realm therefore agrees on the same UUID for the same
+person, and permissions can be granted before that person has ever
+logged in. The `acs-keycloak-spi` README documents how to compute one.
+
+A realm entry may optionally carry an `authUrl` pointing at that
+realm's own Factory+ Auth service, in which case this cluster adopts
+the UUID the home cluster already holds instead of deriving one. That
+requires a principal for this cluster's `sv1openid` to exist on the
+home cluster, holding ReadKrb. Note that ReadKrb is a blanket
+permission: it confers read and enumeration of that cluster's entire
+identity table, and cannot be scoped to individual principals. Pick one
+mode and stay with it. Adding an `authUrl` later does not migrate
+anyone who has already signed in, so the estate divides according to
+when each person first logged in, and converging afterwards means
+re-pointing identity records by hand.
+
+### Fully qualified usernames now work
+
+Entering a username with its realm attached, `alice@THIS.REALM`,
+failed on every v6 cluster, including for local accounts, and presented
+as "Invalid username or password". Keycloak folds usernames to lower
+case before the Factory+ user store sees them, and Factory+ matches
+identity names exactly, so the realm portion never matched what was
+stored. The lookup now retries with the realm upper-cased. Bare
+usernames were never affected and behave as before.
+
+The part before the @ is still matched as Keycloak supplies it, which
+is to say lower-cased, so a Factory+ identity recorded with capitals
+there will still not match.
+
+### Login page matches the admin UI
+
+The Keycloak login page was rendering at 87.5% of its intended size,
+because the theme set a 14px root font size while every dimension in it
+was authored against the browser default of 16px. It now matches the
+acs-admin login card: same width, padding, control heights, title and
+description, and the same input and focus colours. The button shows a
+spinner while a login is in flight, which matters more now that a
+cross-realm login can involve a round trip to another realm's KDC.
+
 ## v6.1.4
 
 ### Keycloak upgraded from 26.1 to 26.6

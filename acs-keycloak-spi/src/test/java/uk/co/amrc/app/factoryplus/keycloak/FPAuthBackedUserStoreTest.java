@@ -283,6 +283,70 @@ class FPAuthBackedUserStoreTest {
         assertThat(blankRealm.findByUsername("alice")).isEmpty();
     }
 
+    // -- realm-case retry ------------------------------------------------
+
+    @Test
+    void first_candidate_hit_does_not_trigger_the_realm_case_retry() {
+        // The verbatim form is authoritative. If it resolves we must
+        // not spend a second round trip on the upper-cased realm -
+        // both timeouts come out of Keycloak's 3-second budget.
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/alice%40mixed.Realm"))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        assertThat(store.findByUsername("alice@mixed.Realm")).isPresent();
+
+        assertThat(wiremock.getAllServeEvents())
+            .as("Identity lookup + principal lookup, and nothing else")
+            .hasSize(2);
+    }
+
+    @Test
+    void miss_on_verbatim_realm_retries_with_the_realm_upper_cased() {
+        // Keycloak lower-cases the whole username before it reaches
+        // us, so a fully qualified login arrives as
+        // alice@factoryplus.local. F+ compares identity names with
+        // exact string equality, so the verbatim lookup 410s and only
+        // the upper-cased realm matches.
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/alice%40factoryplus.local"))
+            .willReturn(aResponse().withStatus(410)));
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/alice%40FACTORYPLUS.LOCAL"))
+            .willReturn(okJson("\"" + UUID_ALICE + "\"")));
+        wiremock.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_ALICE))
+            .willReturn(okJson(PRINCIPAL_JSON)));
+
+        Optional<FactoryPlusUser> user = store.findByUsername("alice@factoryplus.local");
+
+        assertThat(user).isPresent();
+        assertThat(user.get().username()).isEqualTo(UPN_ALICE);
+    }
+
+    @Test
+    void only_the_realm_portion_is_upper_cased_on_retry() {
+        // Documented limitation: Keycloak has already folded the user
+        // portion's case and the original is unrecoverable, so we
+        // never touch it. An F+ identity stored as "Alice@..." stays
+        // unreachable.
+        assertThat(FPAuthBackedUserStore.candidateUpns("alice@mixed.Realm"))
+            .containsExactly("alice@mixed.Realm", "alice@MIXED.REALM");
+    }
+
+    @Test
+    void no_retry_candidate_when_the_realm_is_already_upper_case() {
+        assertThat(FPAuthBackedUserStore.candidateUpns(UPN_ALICE))
+            .containsExactly(UPN_ALICE);
+    }
+
+    @Test
+    void short_name_with_no_realm_has_a_single_candidate() {
+        assertThat(FPAuthBackedUserStore.candidateUpns("alice"))
+            .containsExactly("alice");
+    }
+
     // -- find by email ---------------------------------------------------
 
     @Test

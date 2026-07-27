@@ -60,6 +60,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
@@ -105,6 +107,7 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
         this.authenticator = authenticator;
         this.defaultRealm = (defaultRealm == null || defaultRealm.isBlank())
             ? null : defaultRealm.trim();
+
         // Pin HTTP/1.1: Java's default tries an h2c upgrade on plaintext
         // connections (sends Upgrade: h2c + Connection: Upgrade). Node's
         // HTTP parser rejects that with 400 "Invalid Upgrade header".
@@ -121,24 +124,60 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
 
     @Override
     public Optional<FactoryPlusUser> findByUsername(String username) {
-        String upn = applyDefaultRealm(username);
-        return fetchUuidByIdentity(IDENTITY_KIND_KERBEROS, upn)
-            .flatMap(this::fetchPrincipal);
+        List<String> candidates = candidateUpns(applyDefaultRealm(username));
+        for (String upn : candidates) {
+            Optional<FactoryPlusUser> found =
+                fetchUuidByIdentity(IDENTITY_KIND_KERBEROS, upn)
+                    .flatMap(this::fetchPrincipal);
+            if (found.isPresent()) return found;
+        }
+        return Optional.empty();
     }
 
     /** Short names get {@code @<defaultRealm>} appended so local users
      *  can log in with just their username. Inputs that already
      *  contain {@code @} (and the default realm itself) are used
-     *  verbatim - the SPI does not force any case normalisation,
-     *  since while uppercase Kerberos realms are convention, not
-     *  every deployment follows it and case-folding inputs would
-     *  break lookups against F+ entries that don't match the forced
-     *  casing. */
+     *  verbatim here; the realm-case retry happens in
+     *  {@link #candidateUpns}. */
     private String applyDefaultRealm(String username) {
         if (username == null) return null;
         if (username.contains("@")) return username;
         if (defaultRealm == null) return username;
         return username + "@" + defaultRealm;
+    }
+
+    /** The UPNs to try against F+, in order.
+     *
+     *  <p>Keycloak lower-cases the whole username before it reaches the
+     *  provider, so a user typing {@code me1ago@AMRC-FP.SHEF.AC.UK}
+     *  arrives as {@code me1ago@amrc-fp.shef.ac.uk}. F+ Auth compares
+     *  identity names with exact string equality, so the lookup misses
+     *  even though the principal exists. We therefore retry with the
+     *  realm portion (everything after the LAST {@code @}) upper-cased.
+     *
+     *  <p>Retry rather than unconditional upper-casing: uppercase
+     *  Kerberos realms are convention, not a rule, and a deployment
+     *  whose realm genuinely is lower case must keep working. The
+     *  verbatim form is always tried first, so those deployments are
+     *  unaffected and pay no extra request.
+     *
+     *  <p>Known limitation: only the realm is touched. An F+ identity
+     *  stored with capitals in the user portion ({@code Me1ago@...})
+     *  will still not match, because Keycloak has already folded the
+     *  case and the original is unrecoverable. Store user portions in
+     *  lower case. */
+    static List<String> candidateUpns(String upn) {
+        if (upn == null) return List.of();
+        int at = upn.lastIndexOf('@');
+        if (at < 0) return List.of(upn);
+        String realm = upn.substring(at + 1);
+        String upper = canonical_realm(realm);
+        if (upper.equals(realm)) return List.of(upn);
+        return List.of(upn, upn.substring(0, at) + "@" + upper);
+    }
+
+    private static String canonical_realm(String realm) {
+        return realm.trim().toUpperCase(Locale.ROOT);
     }
 
     @Override

@@ -15,7 +15,6 @@ coverage
 *.local
 .env
 
-bun.lock
 
 /cypress/videos/
 /cypress/screenshots/

@@ -181,9 +181,9 @@ a:hover {
  * but its tailwind.config.js has `colors: {}` and its main.css defines only
  * `--radius`, so none of those shadcn colour tokens exist. Those classes
  * are no-ops there and the admin input actually renders with Tailwind's
- * defaults: borderColor.DEFAULT (#e5e7eb, gray-200) and the default ring
- * colour (blue-500 at 50%). We match what admin renders today, not what
- * its source appears to intend.
+ * defaults: borderColor.DEFAULT (#e5e7eb, gray-200), the default ring
+ * colour (blue-500 at 50%), and preflight's gray-400 placeholder. We match
+ * what admin renders today, not what its source appears to intend.
  *
  * Specific transition targets (not `all`) so the focus ring snaps in
  * without re-rendering the rest of the input. */
@@ -204,8 +204,15 @@ a:hover {
         box-shadow   150ms var(--ease-out);
 }
 
+/* Same reasoning as the border and the ring above. Not the browser's
+   default placeholder colour: acs-admin pulls in Tailwind's preflight via
+   `@tailwind base`, and preflight sets input::placeholder to gray-400 (and
+   opacity to 1, which only matters in Firefox). That preflight rule is what
+   admin renders, because `placeholder:text-muted-foreground` generates no
+   declaration at all. */
 .acs-input::placeholder {
-    color: var(--slate-400);
+    opacity: 1;
+    color: var(--gray-400);
 }
 
 .acs-input:focus-visible {

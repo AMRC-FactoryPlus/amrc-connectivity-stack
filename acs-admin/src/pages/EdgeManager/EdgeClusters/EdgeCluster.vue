@@ -184,6 +184,7 @@ import EmptyState from '@components/EmptyState.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import moment from 'moment'
 import { useDeploymentStore } from '@store/useDeploymentStore.js'
+import { hostIsKnown } from '@utils/hosts.js'
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 
 export default {
@@ -244,12 +245,17 @@ export default {
       const filtered = Array.isArray(this.n.data) ? this.n.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
       return filtered.map(n => ({
         ...n,
-        _canRebirth: this.canRebirthMap?.get(n.uuid) ?? false
+        _canRebirth: this.canRebirthMap?.get(n.uuid) ?? false,
+        _hostStale: !hostIsKnown(this.cluster, n.deployment?.hostname),
       }))
     },
 
     deployments () {
-      return Array.isArray(this.dp.data) ? this.dp.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
+      const filtered = Array.isArray(this.dp.data) ? this.dp.data.filter(e => e.deployment?.cluster === this.cluster.uuid) : []
+      return filtered.map(d => ({
+        ...d,
+        _hostStale: !hostIsKnown(this.cluster, d.deployment?.hostname),
+      }))
     },
 
     hosts () {

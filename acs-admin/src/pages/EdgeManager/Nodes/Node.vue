@@ -120,7 +120,14 @@
               icon="server"
               label="Host"
               :value="hostname"
-          />
+              :warning="hostWarning"
+          >
+            <template #action>
+              <Button title="Move to another host" size="xs" class="flex gap-1" @click="moveHost" variant="ghost">
+                <i class="fa-solid fa-right-left text-gray-400"></i>
+              </Button>
+            </template>
+          </SidebarDetail>
 
         </div>
       </div>
@@ -150,6 +157,7 @@ import { deviceColumns } from './deviceColumns.ts'
 import { connectionColumns } from './connectionColumns.ts'
 import EmptyState from '@/components/EmptyState.vue'
 import SidebarDetail from '@/components/SidebarDetail.vue'
+import { staleHostWarning } from '@utils/hosts.js'
 import moment from 'moment'
 import { toast } from 'vue-sonner'
 
@@ -208,8 +216,12 @@ export default {
       return !this.n.ready || this.n.loading || !this.node
     },
 
+    clusterObject () {
+      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)
+    },
+
     cluster() {
-      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)?.name
+      return this.clusterObject?.name
     },
 
     devices () {
@@ -232,6 +244,10 @@ export default {
       return this.node.deployment.hostname ?? 'Floating'
     },
 
+    hostWarning() {
+      return staleHostWarning(this.clusterObject, this.node.deployment?.hostname)
+    },
+
     initialNameSort () {
       return [{
         id: 'name',
@@ -243,6 +259,15 @@ export default {
   methods: {
     newDevice () {
       window.events.emit('show-new-device-dialog-for-node', this.node)
+    },
+
+    moveHost () {
+      window.events.emit('show-move-host-dialog', {
+        uuid: this.node.uuid,
+        name: this.node.name,
+        kind: 'node',
+        deployment: this.node.deployment,
+      })
     },
 
     newConnection () {

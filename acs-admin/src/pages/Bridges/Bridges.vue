@@ -81,7 +81,14 @@
             icon="server"
             label="Host"
             :value="selectedBridge.deployment?.hostname ?? 'Floating'"
-          />
+            :warning="hostWarning"
+          >
+            <template #action>
+              <Button title="Move to another host" size="xs" class="flex gap-1" @click="moveHost" variant="ghost">
+                <i class="fa-solid fa-right-left text-gray-400"></i>
+              </Button>
+            </template>
+          </SidebarDetail>
           <SidebarDetail
             v-if="selectedBridge.deployment?.createdAt"
             icon="clock"
@@ -105,6 +112,8 @@ import DataTableSearchable from "@components/ui/data-table-searchable/DataTableS
 import BridgesContainer from '@components/Containers/BridgesContainer.vue';
 import { bridgeColumns } from "./bridgeColumns.ts";
 import { useBridgeStore } from "@store/useBridgeStore";
+import { useEdgeClusterStore } from "@store/useEdgeClusterStore.js";
+import { staleHostWarning } from "@utils/hosts.js";
 import SidebarDetail from "@components/SidebarDetail.vue";
 import EmptyState from '@components/EmptyState.vue';
 import { ref } from "vue";
@@ -124,6 +133,7 @@ export default {
     return {
       selectedBridge: ref({}),
       bridge: useBridgeStore(),
+      c: useEdgeClusterStore(),
       columns: bridgeColumns,
       router: useRouter(),
       moment,
@@ -133,6 +143,7 @@ export default {
 
   async mounted() {
     await this.bridge.start();
+    await this.c.start();
   },
 
   computed: {
@@ -157,6 +168,12 @@ export default {
       const remote = this.selectedBridge.deployment?.values?.remote
       if (!remote?.host) return null
       return `${remote.host}:${remote.port || 8883}`
+    },
+    cluster() {
+      return this.c.data.find(e => e.uuid === this.selectedBridge.deployment?.cluster)
+    },
+    hostWarning() {
+      return staleHostWarning(this.cluster, this.selectedBridge.deployment?.hostname)
     }
   },
 
@@ -175,6 +192,15 @@ export default {
           application: UUIDs.App.EdgeAgentDeployment,
           object: this.selectedBridge.uuid,
         },
+      })
+    },
+    moveHost() {
+      if (!this.selectedBridge?.uuid) return
+      window.events.emit('show-move-host-dialog', {
+        uuid: this.selectedBridge.uuid,
+        name: this.selectedBridge.name,
+        kind: 'bridge',
+        deployment: this.selectedBridge.deployment,
       })
     },
     editBridge() {

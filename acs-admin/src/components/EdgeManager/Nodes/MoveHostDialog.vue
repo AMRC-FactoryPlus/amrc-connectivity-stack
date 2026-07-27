@@ -4,151 +4,163 @@
 
 <template>
   <Dialog :open="!!target" @update:open="handleOpen">
-    <DialogContent v-if="target" class="sm:max-w-[700px] max-h-[85vh]">
+    <DialogContent v-if="target" class="sm:max-w-[680px] max-h-[80vh]">
       <DialogHeader>
-        <DialogTitle>Move {{target.name}} to another host</DialogTitle>
-        <DialogDescription>
-          {{step === 3
-            ? 'The move is complete.'
-            : `Choose the host in ${cluster?.name ?? 'this cluster'} that should run this ${kindLabel}.`}}
-        </DialogDescription>
+        <div class="flex items-start justify-between gap-4 pr-8">
+          <div class="flex flex-col gap-1">
+            <DialogTitle>Move {{target.name}} to another host</DialogTitle>
+            <DialogDescription>{{stepDescription}}</DialogDescription>
+          </div>
+          <div class="flex flex-col items-end gap-1.5 flex-none">
+            <span class="text-[11px] text-gray-400 whitespace-nowrap">Step {{step}} of 2</span>
+            <div class="flex gap-1">
+              <span class="w-[22px] h-[3px] rounded-sm bg-slate-900"></span>
+              <span class="w-[22px] h-[3px] rounded-sm" :class="step === 2 ? 'bg-slate-900' : 'bg-slate-200'"></span>
+            </div>
+          </div>
+        </div>
       </DialogHeader>
 
       <!-- Step 1: choose the target host -->
-      <div v-if="step === 1" class="flex flex-col gap-3 overflow-auto max-h-[55vh] flex-1 fix-inset">
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium">Currently on</label>
-          <div class="flex items-center gap-2 text-sm">
-            <i class="fa-fw fa-solid fa-server text-gray-400"></i>
-            <span class="font-medium">{{currentHostname ?? 'Floating'}}</span>
-            <span v-if="currentHostStale" class="text-amber-600">
-              not currently a host in this cluster
-            </span>
-          </div>
+      <div v-if="step === 1" class="flex flex-col gap-4 overflow-y-auto max-h-[50vh] fix-inset">
+        <div class="flex items-center gap-2.5 flex-wrap rounded-md bg-gray-50 px-3 py-2.5">
+          <span class="text-[11px] uppercase tracking-wide text-gray-400">Currently on</span>
+          <span class="text-sm font-medium font-mono">{{currentHostname ?? 'Floating'}}</span>
+          <StaleHostPill v-if="currentHostStale"/>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium">Move to</label>
-          <div v-if="!hosts.length" class="text-sm text-gray-400">
-            This cluster is not reporting any hosts, so there is nowhere to move to.
+        <div v-if="!reportedHosts.length && !offerFloating" class="text-sm text-gray-400">
+          This cluster is not reporting any other hosts, so there is nowhere to move to.
+        </div>
+
+        <div v-if="reportedHosts.length" class="flex flex-col gap-2">
+          <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Hosts reported by this cluster
           </div>
-          <div v-else class="flex flex-col gap-1 max-h-64 overflow-auto">
-            <button
-                v-for="host in hosts"
-                :key="host.hostname ?? 'floating'"
-                type="button"
-                class="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm hover:bg-gray-50"
-                :class="isSelected(host) ? 'border-gray-950 bg-gray-50' : 'border-input'"
-                @click="selected = host"
-            >
-              <div class="flex flex-col">
-                <div class="font-medium">{{host.hostname ?? 'Floating'}}</div>
-                <div class="text-xs text-gray-400">
-                  {{host.hostname ? host.arch : 'Run on any host in the cluster'}}
-                </div>
-              </div>
-              <div class="flex items-center gap-3 text-xs text-gray-400">
-                <div v-if="host.hostname === currentHostname">current host</div>
-                <div v-else-if="host.hostname">{{occupancy(host.hostname)}}</div>
-              </div>
-            </button>
+          <button
+              v-for="host in reportedHosts"
+              :key="host.hostname"
+              type="button"
+              class="relative flex items-center gap-3 w-full text-left px-3.5 py-3 rounded-md bg-white ring-1 ring-inset ring-slate-200 hover:bg-gray-50"
+              :class="isSelected(host.hostname) ? 'ring-2 ring-slate-900' : ''"
+              @click="selected = host.hostname"
+          >
+            <span class="relative w-4 h-4 rounded-full flex-none ring-[1.5px] ring-inset ring-slate-300"
+                :class="isSelected(host.hostname) ? 'ring-[5px] ring-slate-900' : ''"></span>
+            <span class="flex flex-col gap-0.5 min-w-0 flex-1">
+              <span class="text-sm font-medium font-mono">{{host.hostname}}</span>
+              <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                <i class="fa-solid fa-microchip text-[10px]"></i>{{host.arch}}
+              </span>
+            </span>
+            <span class="text-xs text-gray-500 flex-none">{{occupancy(host.hostname)}}</span>
+          </button>
+        </div>
+
+        <div v-if="offerFloating" class="flex flex-col gap-2">
+          <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Or leave it to the scheduler
           </div>
+          <button
+              type="button"
+              class="relative flex items-center gap-3 w-full text-left px-3.5 py-3 rounded-md bg-white ring-1 ring-inset ring-slate-200 hover:bg-gray-50"
+              :class="isSelected(null) ? 'ring-2 ring-slate-900' : ''"
+              @click="selected = null; floatingChosen = true"
+          >
+            <span class="relative w-4 h-4 rounded-full flex-none ring-[1.5px] ring-inset ring-slate-300"
+                :class="isSelected(null) ? 'ring-[5px] ring-slate-900' : ''"></span>
+            <span class="flex flex-col gap-0.5 flex-1">
+              <span class="text-sm font-medium">Floating</span>
+              <span class="text-xs text-gray-400">Any host in the cluster. Host paths will not be guaranteed.</span>
+            </span>
+          </button>
         </div>
       </div>
 
       <!-- Step 2: review what comes with it -->
-      <div v-if="step === 2" class="flex flex-col gap-4 overflow-auto max-h-[55vh] flex-1 fix-inset">
-        <div class="flex items-center gap-2 text-sm">
-          <span class="font-medium">{{currentHostname ?? 'Floating'}}</span>
-          <i class="fa-solid fa-arrow-right text-gray-400"></i>
-          <span class="font-medium">{{selected?.hostname ?? 'Floating'}}</span>
+      <div v-if="step === 2" class="flex flex-col gap-4 overflow-y-auto max-h-[50vh] fix-inset">
+        <div class="flex items-center gap-3 rounded-md bg-gray-50 px-3 py-2.5">
+          <span class="text-sm text-gray-500 font-mono">{{currentHostname ?? 'Floating'}}</span>
+          <i class="fa-solid fa-arrow-right text-[11px] text-gray-400"></i>
+          <span class="text-sm font-semibold font-mono">{{targetLabel}}</span>
         </div>
 
         <div v-if="valuesOverrideHostname"
-            class="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
-          <div>
+            class="flex gap-2.5 rounded-md bg-amber-50 ring-1 ring-inset ring-amber-200 p-3">
+          <i class="fa-solid fa-triangle-exclamation text-xs text-amber-700 mt-0.5"></i>
+          <div class="text-xs leading-relaxed text-amber-800">
             This deployment sets <span class="font-mono">hostname</span> in its own Helm values,
             which is applied after the host selected here. The move will not take effect until
             that value is removed from the deployment's values.
           </div>
         </div>
 
-        <div v-if="isNode" class="flex flex-col gap-2">
-          <div class="text-sm font-medium">
-            {{connections.length}} connection{{connections.length === 1 ? '' : 's'}}
-          </div>
-          <div v-if="!connections.length" class="text-sm text-gray-400">
-            This node has no connections.
-          </div>
-          <div v-for="conn in connections" :key="conn.uuid" class="rounded-md border p-3 flex flex-col gap-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="font-medium text-sm">{{conn.name}}</div>
-              <div class="text-xs text-gray-400">{{conn.driverName ?? 'no driver'}}</div>
-            </div>
-            <HostPathsEditor v-model="hostPaths[conn.uuid]"/>
-          </div>
+        <template v-if="isNode">
           <div v-if="anyHostPaths"
-              class="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
-            <div>
-              Host paths have been carried over unchanged. ACS cannot check whether these
-              exist on {{selected?.hostname ?? 'the new host'}}. Confirm them against the new
-              machine before moving.
+              class="flex gap-2.5 rounded-md bg-amber-50 ring-1 ring-inset ring-amber-200 p-3">
+            <i class="fa-solid fa-triangle-exclamation text-xs text-amber-700 mt-0.5"></i>
+            <div class="text-xs leading-relaxed text-amber-800">
+              Host paths are copied across unchanged. ACS cannot inspect the filesystem of
+              <span class="font-semibold">{{targetLabel}}</span>, so check the hardware is
+              attached there before moving.
             </div>
           </div>
-        </div>
 
-        <div v-if="isNode" class="text-sm text-gray-400">
-          {{devices.length}} device{{devices.length === 1 ? '' : 's'}} unaffected, they follow the node.
-        </div>
+          <div class="flex flex-col gap-2.5">
+            <div class="flex items-baseline justify-between gap-3">
+              <div class="text-[13px] font-semibold">
+                Connections moving with this node
+                <span class="text-gray-400 font-medium">· {{connections.length}}</span>
+              </div>
+              <div class="text-xs text-gray-400">{{devicesUnaffected}}</div>
+            </div>
+
+            <div v-if="!connections.length" class="text-sm text-gray-400">
+              This node has no connections.
+            </div>
+
+            <div v-for="conn in connections" :key="conn.uuid"
+                class="rounded-md ring-1 ring-inset ring-slate-200 overflow-hidden">
+              <div class="flex items-center justify-between gap-3 px-3 py-2.5 bg-gray-50">
+                <span class="text-[13px] font-semibold">{{conn.name}}</span>
+                <span class="text-[11px] text-gray-500 px-1.5 py-0.5 rounded-full bg-white ring-1 ring-slate-200">
+                  {{conn.driverName ?? 'no driver'}}
+                </span>
+              </div>
+              <div class="px-3 py-2.5">
+                <HostPathsEditor v-model="hostPaths[conn.uuid]"/>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <div v-else class="text-sm text-gray-400">
           Nothing else references this host.
         </div>
       </div>
 
-      <!-- Step 3: done -->
-      <div v-if="step === 3" class="flex flex-col gap-3 overflow-auto flex-1 fix-inset">
-        <div class="flex items-center gap-2 text-sm">
-          <i class="fa-solid fa-circle-check text-green-600"></i>
-          <span>Moved to <span class="font-medium">{{selected?.hostname ?? 'Floating'}}</span>.</span>
-        </div>
-        <div class="text-sm text-gray-500">
-          The workload will be rescheduled onto the new host. A node will go offline and
-          rebirth as its edge agent restarts.
-        </div>
-        <div v-if="failed.length"
-            class="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-          <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
-          <div>
-            These connections could not be updated and still refer to the old host:
-            {{failed.join(', ')}}.
-          </div>
-        </div>
-      </div>
-
       <DialogFooter>
         <div class="flex w-full items-center justify-between">
-          <Button v-if="step === 2" variant="outline" :disabled="moving" @click="step = 1">Back</Button>
+          <Button v-if="step === 2" variant="ghost" class="gap-2" :disabled="moving" @click="step = 1">
+            <i class="fa-solid fa-arrow-left text-[11px]"></i>Back
+          </Button>
           <div v-else></div>
 
           <div class="flex items-center gap-2">
-            <Button v-if="step !== 3" variant="outline" :disabled="moving" @click="handleOpen(false)">Cancel</Button>
-            <Button v-if="step === 1" :disabled="!selected || isSelected({hostname: currentHostname})" @click="step = 2">
-              Next
+            <Button variant="outline" :disabled="moving" @click="handleOpen(false)">Cancel</Button>
+            <Button
+                v-if="step === 1"
+                class="gap-2"
+                :disabled="!hasTarget"
+                :title="hasTarget ? undefined : 'Select a host first'"
+                @click="step = 2"
+            >
+              Next<i class="fa-solid fa-arrow-right text-[11px]"></i>
             </Button>
-            <Button v-if="step === 2" :disabled="moving" @click="move">
-              <div class="flex items-center justify-center gap-2">
-                <i :class="{
-                  'fa-solid': true,
-                  'fa-right-left': !moving,
-                  'fa-circle-notch': moving,
-                  'animate-spin': moving,
-                }"></i>
-                <div>{{moving ? 'Moving...' : `Move to ${selected?.hostname ?? 'Floating'}`}}</div>
-              </div>
+            <Button v-else class="gap-2" :disabled="moving" @click="move">
+              <i :class="['fa-solid', moving ? 'fa-circle-notch animate-spin' : 'fa-right-left', 'text-[11px]']"></i>
+              {{moving ? 'Moving...' : `Move to ${targetLabel}`}}
             </Button>
-            <Button v-if="step === 3" @click="handleOpen(false)">Done</Button>
           </div>
         </div>
       </DialogFooter>
@@ -160,6 +172,7 @@
 import { Button } from '@components/ui/button/index.js'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@components/ui/dialog'
 import HostPathsEditor from '@components/EdgeManager/Connections/HostPathsEditor.vue'
+import StaleHostPill from '@components/EdgeManager/Nodes/StaleHostPill.vue'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useDeploymentStore } from '@store/useDeploymentStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
@@ -181,6 +194,7 @@ export default {
     DialogHeader,
     DialogTitle,
     HostPathsEditor,
+    StaleHostPill,
   },
 
   setup () {
@@ -197,11 +211,8 @@ export default {
     /* `target` is `{ uuid, name, kind, deployment }`, where deployment is
      * the Edge deployment config for the object. */
     window.events.on('show-move-host-dialog', target => {
+      this.reset()
       this.target = target
-      this.step = 1
-      this.selected = null
-      this.failed = []
-      this.hostPaths = {}
       this.cn.start()
       this.d.start()
       this.dp.start()
@@ -211,10 +222,6 @@ export default {
   computed: {
     isNode () {
       return this.target?.kind === 'node'
-    },
-
-    kindLabel () {
-      return this.isNode ? 'node' : 'deployment'
     },
 
     cluster () {
@@ -229,10 +236,30 @@ export default {
       return !hostIsKnown(this.cluster, this.currentHostname)
     },
 
-    hosts () {
+    /* The host it is already on is shown once above the list, so it is
+     * not offered as an option. */
+    reportedHosts () {
       const hosts = this.cluster?.status?.hosts
-      if (!Array.isArray(hosts) || !hosts.length) return []
-      return [...hosts, { hostname: null, arch: 'any' }]
+      if (!Array.isArray(hosts)) return []
+      return hosts.filter(h => h.hostname !== this.currentHostname)
+    },
+
+    offerFloating () {
+      return this.currentHostname !== null
+    },
+
+    hasTarget () {
+      return this.selected !== null || this.floatingChosen
+    },
+
+    targetLabel () {
+      return this.selected ?? 'Floating'
+    },
+
+    stepDescription () {
+      return this.step === 1
+        ? `Pick the host in ${this.cluster?.name ?? 'this cluster'} that should run this node.`
+        : 'Check what moves with it, then apply.'
     },
 
     valuesOverrideHostname () {
@@ -257,6 +284,11 @@ export default {
         .filter(e => e.deviceInformation?.node === this.target?.uuid)
     },
 
+    devicesUnaffected () {
+      const n = this.devices.length
+      return n === 1 ? '1 device is unaffected' : `${n} devices are unaffected`
+    },
+
     anyHostPaths () {
       return Object.values(this.hostPaths).some(p => p?.length)
     },
@@ -277,19 +309,21 @@ export default {
   },
 
   methods: {
-    handleOpen (open) {
-      if (open === false) {
-        this.target = null
-        this.step = 1
-        this.selected = null
-        this.failed = []
-        this.hostPaths = {}
-      }
+    reset () {
+      this.target = null
+      this.step = 1
+      this.selected = null
+      this.floatingChosen = false
+      this.hostPaths = {}
     },
 
-    isSelected (host) {
-      if (!this.selected) return false
-      return (this.selected.hostname ?? null) === (host.hostname ?? null)
+    handleOpen (open) {
+      if (open === false) this.reset()
+    },
+
+    isSelected (hostname) {
+      if (!this.hasTarget) return false
+      return this.selected === hostname
     },
 
     occupancy (hostname) {
@@ -297,7 +331,7 @@ export default {
         .filter(e => e.deployment?.cluster === this.cluster?.uuid
           && e.deployment?.hostname === hostname).length
       const count = on(this.n.data) + on(this.dp.data)
-      if (!count) return 'nothing deployed here'
+      if (!count) return 'Nothing deployed'
       return `${count} deployment${count === 1 ? '' : 's'}`
     },
 
@@ -319,26 +353,32 @@ export default {
 
     async move () {
       this.moving = true
+      const name = this.target.name
+      const to = this.targetLabel
       try {
         const { failed } = await moveHost({
           deploymentUuid: this.target.uuid,
-          hostname: this.selected.hostname ?? null,
+          hostname: this.selected,
           connections: this.changedConnections(),
         })
 
-        this.failed = failed
-        this.step = 3
+        this.reset()
 
         if (failed.length) {
-          toast.warning(`${this.target.name} was moved, but some connections could not be updated`)
+          toast.error(`${name} moved to ${to}, with problems`, {
+            description: `These connections still refer to the old host: ${failed.join(', ')}.`,
+          })
         }
         else {
-          toast.success(`${this.target.name} has been moved to ${this.selected.hostname ?? 'Floating'}`)
+          toast.success(`${name} moved to ${to}`, {
+            description: 'The edge agent is being rescheduled. The node will go '
+              + 'offline briefly and rebirth.',
+          })
         }
       }
       catch (err) {
         console.error(err)
-        toast.error(`Unable to move ${this.target?.name}`)
+        toast.error(`Unable to move ${name}`)
       }
       finally {
         this.moving = false
@@ -350,9 +390,11 @@ export default {
     return {
       target: null,
       step: 1,
+      /* The chosen hostname, or null for Floating. `floatingChosen`
+       * distinguishes "Floating was picked" from "nothing picked yet". */
       selected: null,
+      floatingChosen: false,
       moving: false,
-      failed: [],
       hostPaths: {},
     }
   },

@@ -9,22 +9,138 @@ consumers (Grafana, acs-i3x, future shims).
 See:
 - Pitch: `docs/plans/2026-05-07-keycloak-fp-user-storage-spi.md`
 - Implementation plan: `docs/plans/2026-05-07-keycloak-fp-spi-plan.md`
+- Cross-realm design: `docs/plans/2026-07-27-keycloak-spi-cross-realm-design.md`
 
 ## Status
 
-**Phase 1 of 12 — build skeleton + hello-world SPI.**
+In production since ACS v6. The plugin:
 
-The plugin currently:
-- Loads in Keycloak as the `factoryplus` user storage provider
-- Implements `UserLookupProvider` against an injectable `FactoryPlusUserStore`
-- Ships with a `NullFactoryPlusUserStore` default that returns no users
+- Loads in Keycloak as the `factoryplus` user storage provider, and is
+  provisioned as the realm's federation by `acs-service-setup`
+- Resolves users from the Factory+ auth service over its v2 identity API,
+  authenticating with SPNEGO as `sv1openid`
+- Validates passwords against the KDC via `Krb5LoginModule`
+- Stamps `fp_principal_uuid` and `fp_permissions` into issued tokens via
+  its two protocol mappers
+- Caches hits and misses for a configurable TTL
+- Accepts logins from configured foreign Kerberos realms (off by default;
+  see Cross-realm login below)
 
-It does NOT yet:
-- Talk to a real Factory+ auth service (Phase 2)
-- Implement group lookups, credential validation, or claim mappers
-- Replace Kerberos federation in the Helm deployment
+It does not:
+- Support email lookup (Factory+ has no email field)
+- Support free-text user search, arbitrary user attributes, or group
+  membership queries
+- Write to Factory+, other than mirroring a cross-realm user's Kerberos
+  identity after their password has validated
 
-Refer to the plan doc for the full phase map.
+## Configuration
+
+Set on the federation component. `acs-service-setup/lib/openid.js`
+populates all of these from the Helm chart, so on a normal ACS
+deployment you configure them through `values.yaml` rather than by hand.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `auth.url` | (blank) | Base URL of the Factory+ auth service. Blank disables F+ lookups entirely: the federation loads but returns no users. |
+| `auth.timeout.seconds` | `2` | Per-request timeout for F+ auth calls. **Must stay under 3s**, see below. |
+| `cache.ttl.seconds` | `60` | How long to cache lookups, including misses. `0` disables caching. |
+| `auth.principal` | (blank) | Principal the SPI authenticates as, e.g. `sv1openid@FACTORYPLUS.LOCAL`. Blank calls F+ unauthenticated, which is only useful against a stand-in server. |
+| `auth.keytab.path` | (blank) | Keytab holding credentials for that principal. Must be readable by Keycloak's process. |
+| `default.realm` | (blank) | Realm appended to usernames typed without an `@realm` suffix, so local users can log in with a short name. |
+| `trusted.realms` | (blank) | Comma-separated Kerberos realms accepted for cross-realm login. Blank means none. |
+| `trusted.realm.auth.urls` | (blank) | Comma-separated `REALM=url` entries naming each trusted realm's own F+ auth service. |
+| `trusted.realm.timeout.seconds` | `1.5` | Per-request timeout for calls to a trusted realm's auth service. |
+
+### The 3-second budget
+
+Keycloak hard-kills user storage lookups at 3 seconds, and overshooting
+surfaces as an opaque `InterruptedException` rather than a timeout
+naming the slow service. The cross-realm resolve runs **in series**
+after the local lookup misses, so `auth.timeout.seconds` and
+`trusted.realm.timeout.seconds` share that one budget. Do not raise
+either without lowering the other.
+
+### Username casing
+
+Keycloak lower-cases the username before it reaches the provider. The
+SPI tries the resulting UPN verbatim first, then retries with the realm
+portion (everything after the last `@`) upper-cased. That covers both
+the usual uppercase realms and deployments whose realm genuinely is
+lower case.
+
+Only the realm is touched. An F+ identity stored with capitals in the
+**user** portion (`Me1ago@REALM`) cannot be matched, because the
+original casing is gone by the time we see it. Store user portions in
+lower case.
+
+## Cross-realm login
+
+With `trusted.realms` set, a user from a listed realm can sign in with
+no pre-existing Factory+ principal on this cluster. Once their home KDC
+accepts the password, the SPI writes their Kerberos identity here and
+they appear in the ACL editor by their UPN, with no permissions until an
+admin grants some. Nothing is written before the KDC has confirmed the
+password.
+
+This is off by default and requires cross-realm Kerberos trust to
+already exist: the realm and its KDC must be in `krb5.conf` on this
+cluster. Listing a realm here does not create that trust.
+
+There are two supported modes, and the choice matters.
+
+### With an `authUrl`: shared principal UUID, blanket read on the home cluster
+
+Give the realm an entry in `trusted.realm.auth.urls` and the SPI
+resolves the user's principal UUID from their home cluster, so they keep
+one identity across both.
+
+This requires a manual grant **on the home cluster**: the consuming
+cluster's `sv1openid@<CONSUMING-REALM>` must hold `ReadKrb`
+(`e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c`).
+
+Know what you are granting. `ReadKrb` cannot be scoped to individual
+principals - it can only be granted on Wildcard, and acs-auth treats it
+as a blanket "read any identity" capability (see the comment at
+`acs-auth/lib/dataflow.js:273`). The grant lets the consuming cluster's
+Keycloak **read and enumerate every identity record in the home
+cluster's auth service**, as a standing capability, regardless of who
+actually logs in or whether anyone ever does.
+
+That grant is also the revocation point for the whole trust
+relationship: remove it and the consuming cluster can no longer resolve
+home principals.
+
+Without the grant the home cluster returns 403 and the login **fails**.
+It does not quietly fall back to minting a local UUID - that would
+defeat revocation, and would leave you with some users on home-derived
+UUIDs and some on local ones depending on when they first logged in.
+The logged message names the missing permission, the principal that was
+denied and the cluster that denied it. A standing denial is cached for
+30 seconds so it costs one outbound call rather than one per login
+attempt; 5xx and timeouts stay uncached, since those are transient and
+recovery should be immediate.
+
+### Without an `authUrl`: no grant, no outbound call, per-cluster UUID
+
+Listing a realm in `trusted.realms` with no entry in
+`trusted.realm.auth.urls` is a fully supported configuration, not a
+degraded fallback. On this path the consuming cluster makes no outbound
+call to the home cluster at all and needs no permission there
+whatsoever; it mints a fresh local principal UUID on first successful
+login.
+
+The cost is that the UUID is not shared: the user is recognisably the
+same person by UPN, but each cluster's auth service knows them by a
+different UUID, so grants do not correlate across clusters.
+
+If you are unwilling to grant blanket identity read across a cluster
+boundary, use this mode.
+
+### On this cluster
+
+`sv1openid` needs `WriteKrb` (`327c4cc8-9c46-4e1e-bb6b-257ace37b0f6`) on
+Wildcard to mirror the identity. The Helm chart grants this
+automatically via `acs-service-setup/dumps/service-accounts.yaml`.
 
 ## Build
 
@@ -44,9 +160,8 @@ mvn -B test       # unit tests (no Docker required)
 mvn -B verify     # unit + integration tests (Testcontainers, requires Docker)
 ```
 
-The current Phase 1 test count is 17 unit tests (5 classes) + 2
-integration tests in `FactoryPlusFederationIT` (real Keycloak via
-Testcontainers).
+Currently 115 unit tests across 10 classes, plus 4 integration tests in
+`FactoryPlusFederationIT` (real Keycloak via Testcontainers).
 
 ### Running integration tests locally
 

@@ -77,6 +77,33 @@ public class CachingFactoryPlusUserStore implements FactoryPlusUserStore {
         return fresh;
     }
 
+    /** Delegates the write, then drops every cache entry that could
+     *  still describe this user as absent or provisional.
+     *
+     *  <p>This is load-bearing, not hygiene. The lookup that produced
+     *  the provisional user cached it under whatever string Keycloak
+     *  passed in - typically a lower-cased short name, not the
+     *  canonical UPN we admit under. Leaving that entry in place means
+     *  the next lookup within the TTL keeps reporting the user as
+     *  provisional even though the principal now exists, and any
+     *  negatively cached miss keeps masking it for the full 60s. */
+    @Override
+    public String admit(String upn, String uuid) {
+        String admitted = delegate.admit(upn, uuid);
+        byUsername.remove(upn);
+        byUsername.entrySet().removeIf(e -> describes(e.getValue(), upn, admitted));
+        if (admitted != null) byUuid.remove(admitted);
+        if (uuid != null) byUuid.remove(uuid);
+        return admitted;
+    }
+
+    private static boolean describes(Entry entry, String upn, String uuid) {
+        if (entry == null || entry.result().isEmpty()) return false;
+        FactoryPlusUser user = entry.result().get();
+        if (upn != null && upn.equalsIgnoreCase(user.username())) return true;
+        return uuid != null && uuid.equals(user.uuid());
+    }
+
     private Optional<FactoryPlusUser> cached(ConcurrentMap<String, Entry> map,
                                              String key,
                                              Supplier<Optional<FactoryPlusUser>> fetch) {

@@ -90,6 +90,16 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
     }
 
     /**
+     * True when this user has no Factory+ principal on this cluster
+     * yet: a trusted foreign realm vouches for them but nothing has
+     * been written. The provider admits them (writes the identity)
+     * only after their password validates.
+     */
+    public boolean isProvisional() {
+        return user.provisional();
+    }
+
+    /**
      * The set of F+ permission UUIDs (target=Wildcard) held by this
      * user, used by the {@code fp_permissions} OIDC claim mapper.
      * Delegates to the store so results come from the cache layer.
@@ -106,6 +116,13 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
      *  survive that wrapping (and the cache itself). */
     public static final String ATTR_FP_UUID = "fp_principal_uuid";
     public static final String ATTR_FP_PERMISSIONS = "fp_permissions";
+    /** Set only on provisional (cross-realm, not yet admitted) users.
+     *  The provider reads it through the attribute API rather than
+     *  {@code instanceof} for the same reason as the two above: by the
+     *  time credential validation runs we may be behind one of
+     *  Keycloak's own wrappers. No protocol mapper exposes it, so it
+     *  never reaches a token. */
+    public static final String ATTR_FP_PROVISIONAL = "fp_provisional";
 
     @Override
     public Map<String, List<String>> getAttributes() {
@@ -117,6 +134,7 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
         Map<String, List<String>> base = super.getAttributes();
         if (base != null) attrs.putAll(base);
         attrs.add(ATTR_FP_UUID, user.uuid());
+        if (user.provisional()) attrs.add(ATTR_FP_PROVISIONAL, "true");
         for (String g : store.findPermissionsForPrincipal(user.uuid())) {
             attrs.add(ATTR_FP_PERMISSIONS, g);
         }
@@ -126,6 +144,8 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
     @Override
     public Stream<String> getAttributeStream(String name) {
         if (ATTR_FP_UUID.equals(name)) return Stream.of(user.uuid());
+        if (ATTR_FP_PROVISIONAL.equals(name))
+            return user.provisional() ? Stream.of("true") : Stream.empty();
         if (ATTR_FP_PERMISSIONS.equals(name))
             return store.findPermissionsForPrincipal(user.uuid()).stream();
         // Expose username/email through the per-name attribute API
@@ -150,6 +170,8 @@ public class FactoryPlusUserAdapter extends AbstractUserAdapter {
     @Override
     public String getFirstAttribute(String name) {
         if (ATTR_FP_UUID.equals(name)) return user.uuid();
+        if (ATTR_FP_PROVISIONAL.equals(name))
+            return user.provisional() ? "true" : null;
         if (ATTR_FP_PERMISSIONS.equals(name)) {
             return store.findPermissionsForPrincipal(user.uuid())
                 .stream().findFirst().orElse(null);

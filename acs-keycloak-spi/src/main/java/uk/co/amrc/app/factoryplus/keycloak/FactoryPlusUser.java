@@ -14,6 +14,21 @@ package uk.co.amrc.app.factoryplus.keycloak;
  *                 it as an identity key.
  * @param email    Email address from F+, or null if the principal has none
  *                 (service accounts often don't).
+ * @param provisional True when this user has no Factory+ principal on
+ *                 the local cluster yet. Provisional users come from
+ *                 the cross-realm path: a trusted foreign realm vouches
+ *                 for them (or will, once the KDC confirms the
+ *                 password), but nothing has been written to F+ Auth.
+ *                 The provider calls
+ *                 {@link FactoryPlusUserStore#admit(String, String)}
+ *                 to persist the identity, and only after the password
+ *                 has validated.
  */
-public record FactoryPlusUser(String uuid, String username, String email) {
+public record FactoryPlusUser(String uuid, String username, String email,
+                              boolean provisional) {
+
+    /** Ordinary (non-provisional) user; the common case. */
+    public FactoryPlusUser(String uuid, String username, String email) {
+        this(uuid, username, email, false);
+    }
 }

@@ -14,12 +14,16 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.put;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -323,6 +327,9 @@ class FPAuthBackedUserStoreTest {
 
         assertThat(user).isPresent();
         assertThat(user.get().username()).isEqualTo(UPN_ALICE);
+        assertThat(user.get().provisional())
+            .as("A local principal is not provisional")
+            .isFalse();
     }
 
     @Test
@@ -345,6 +352,341 @@ class FPAuthBackedUserStoreTest {
     void short_name_with_no_realm_has_a_single_candidate() {
         assertThat(FPAuthBackedUserStore.candidateUpns("alice"))
             .containsExactly("alice");
+    }
+
+    // -- cross-realm resolution ------------------------------------------
+
+    private static final String UUID_BOB = "00000000-0000-0000-0000-0000000000b0";
+    private static final String UPN_BOB  = "bob@OTHER.REALM";
+
+    /** Both casing candidates for bob@other.realm 410 locally. */
+    private void stubLocalMissForBob() {
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/bob%40other.realm"))
+            .willReturn(aResponse().withStatus(410)));
+        wiremock.stubFor(get(urlPathEqualTo(
+                "/v2/identity/kerberos/bob%40OTHER.REALM"))
+            .willReturn(aResponse().withStatus(410)));
+    }
+
+    /** Local store trusting OTHER.REALM, optionally with a home auth
+     *  URL. The "home cluster" is a second Wiremock instance. */
+    private FPAuthBackedUserStore trustingStore(URI homeUrl) {
+        return new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2), null, null,
+            Set.of("OTHER.REALM"),
+            homeUrl == null ? Map.of() : Map.of("other.realm", homeUrl),
+            Duration.ofMillis(1500));
+    }
+
+    @Test
+    void untrusted_realm_returns_empty_after_both_candidates_miss() {
+        // Existing behaviour must be unchanged for anything the admin
+        // hasn't explicitly trusted.
+        stubLocalMissForBob();
+
+        assertThat(store.findByUsername("bob@other.realm")).isEmpty();
+    }
+
+    @Test
+    void trusted_realm_with_auth_url_resolves_the_home_uuid() {
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathEqualTo(
+                    "/v2/identity/kerberos/bob%40OTHER.REALM"))
+                .willReturn(okJson("\"" + UUID_BOB + "\"")));
+            home.stubFor(get(urlPathEqualTo("/v2/principal/" + UUID_BOB))
+                .willReturn(okJson("""
+                    { "uuid": "%s", "kerberos": "%s" }
+                    """.formatted(UUID_BOB, UPN_BOB))));
+
+            Optional<FactoryPlusUser> user = trustingStore(URI.create(home.baseUrl()))
+                .findByUsername("bob@other.realm");
+
+            assertThat(user).isPresent();
+            assertThat(user.get().uuid())
+                .as("The user keeps their home cluster's principal UUID")
+                .isEqualTo(UUID_BOB);
+            assertThat(user.get().username())
+                .as("Home cluster's own spelling of the UPN wins")
+                .isEqualTo(UPN_BOB);
+            assertThat(user.get().provisional())
+                .as("Nothing has been written locally yet")
+                .isTrue();
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void trusted_realm_with_no_auth_url_mints_a_provisional_user() {
+        stubLocalMissForBob();
+
+        Optional<FactoryPlusUser> user = trustingStore(null)
+            .findByUsername("bob@other.realm");
+
+        assertThat(user).isPresent();
+        assertThat(user.get().provisional()).isTrue();
+        assertThat(user.get().username()).isEqualTo(UPN_BOB);
+        // The brief specified a null UUID here, minted in admit().
+        // Keycloak derives the federated storage id from the UUID and
+        // re-reads the user by that id later in the same login flow,
+        // so a null would break the flow after admit had already
+        // written. We mint at lookup time instead; nothing is
+        // persisted until the KDC confirms the password.
+        assertThat(user.get().uuid())
+            .as("A provisional user still needs a usable storage id")
+            .isNotNull();
+    }
+
+    @Test
+    void trusted_realm_home_410_returns_empty() {
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathEqualTo(
+                    "/v2/identity/kerberos/bob%40OTHER.REALM"))
+                .willReturn(aResponse().withStatus(410)));
+
+            assertThat(trustingStore(URI.create(home.baseUrl()))
+                .findByUsername("bob@other.realm"))
+                .as("The user genuinely doesn't exist at home either")
+                .isEmpty();
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void trusted_realm_home_5xx_throws_rather_than_returning_empty() {
+        // This distinction is the point. Empty means "no such user"
+        // and Keycloak reports user_not_found; the exception means
+        // "infrastructure failed" and Keycloak fails the login. A home
+        // cluster being down must never read as the user not existing.
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathEqualTo(
+                    "/v2/identity/kerberos/bob%40OTHER.REALM"))
+                .willReturn(aResponse().withStatus(503)));
+
+            var trusting = trustingStore(URI.create(home.baseUrl()));
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .isInstanceOf(FactoryPlusAuthException.class)
+                .hasMessageContaining("503");
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void trusted_realm_home_timeout_throws_rather_than_returning_empty() {
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathEqualTo(
+                    "/v2/identity/kerberos/bob%40OTHER.REALM"))
+                .willReturn(okJson("\"" + UUID_BOB + "\"").withFixedDelay(3000)));
+
+            var trusting = new FPAuthBackedUserStore(
+                URI.create(wiremock.baseUrl()), Duration.ofSeconds(2), null, null,
+                Set.of("OTHER.REALM"),
+                Map.of("OTHER.REALM", URI.create(home.baseUrl())),
+                Duration.ofMillis(300));
+
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .isInstanceOf(FactoryPlusAuthException.class);
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void trusted_realm_home_403_fails_the_login_and_never_mints() {
+        // 403 means the home cluster has not granted us ReadKrb.
+        // Falling back to minting a fresh local UUID would defeat
+        // revocation - the ReadKrb grant is the kill switch for the
+        // whole trust relationship - and would split the estate into
+        // home-derived and locally-minted principals depending on when
+        // each user first logged in. Keep it fatal.
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathMatching("/v2/identity/kerberos/.*"))
+                .willReturn(aResponse().withStatus(403)));
+
+            var trusting = trustingStore(URI.create(home.baseUrl()));
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .isInstanceOf(FactoryPlusAccessDeniedException.class)
+                .as("The message must lead an operator to the fix, which "
+                    + "lives on a different cluster from the error")
+                .hasMessageContaining("ReadKrb")
+                .hasMessageContaining("e8c9c0f7-0d54-4db2-b8d6-cd80c45f6a5c")
+                .hasMessageContaining("OTHER.REALM")
+                .hasMessageContaining(home.baseUrl());
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void trusted_realm_home_403_names_the_denied_principal() {
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathMatching("/v2/identity/kerberos/.*"))
+                .willReturn(aResponse().withStatus(403)));
+
+            var trusting = new FPAuthBackedUserStore(
+                URI.create(wiremock.baseUrl()), Duration.ofSeconds(2),
+                new StubAuthenticator("T", "sv1openid@LOCAL.REALM"), null,
+                Set.of("OTHER.REALM"),
+                Map.of("OTHER.REALM", URI.create(home.baseUrl())),
+                Duration.ofMillis(1500));
+
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .hasMessageContaining("sv1openid@LOCAL.REALM");
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void a_standing_403_is_cached_so_it_costs_one_call_not_one_per_attempt() {
+        // Lookup runs BEFORE password validation, so while
+        // misconfigured anyone reaching the login page could bounce a
+        // call off the remote cluster per attempt just by typing
+        // foreign usernames. 5xx and timeouts stay uncached (they're
+        // transient); a 403 is a standing configuration state.
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathMatching("/v2/identity/kerberos/.*"))
+                .willReturn(aResponse().withStatus(403)));
+
+            var trusting = trustingStore(URI.create(home.baseUrl()));
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .isInstanceOf(FactoryPlusAccessDeniedException.class);
+            int afterFirst = home.getAllServeEvents().size();
+            assertThat(afterFirst).isGreaterThan(0);
+
+            // A different user in the same realm, so no per-user cache
+            // could explain the suppression.
+            wiremock.stubFor(get(urlPathMatching("/v2/identity/kerberos/carol.*"))
+                .willReturn(aResponse().withStatus(410)));
+            assertThatThrownBy(() -> trusting.findByUsername("carol@other.realm"))
+                .as("Still fatal - suppressing the call must not soften the failure")
+                .isInstanceOf(FactoryPlusAccessDeniedException.class)
+                .hasMessageContaining("ReadKrb");
+
+            assertThat(home.getAllServeEvents())
+                .as("The denial is keyed by realm, so the second attempt "
+                    + "must not touch the home cluster at all")
+                .hasSize(afterFirst);
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void a_home_5xx_is_not_cached() {
+        // Contrast with the 403 above: a transient failure must not
+        // lock out lookups, so every attempt re-tries the home cluster.
+        var home = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        home.start();
+        try {
+            stubLocalMissForBob();
+            home.stubFor(get(urlPathMatching("/v2/identity/kerberos/.*"))
+                .willReturn(aResponse().withStatus(503)));
+
+            var trusting = trustingStore(URI.create(home.baseUrl()));
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .isInstanceOf(FactoryPlusAuthException.class);
+            int afterFirst = home.getAllServeEvents().size();
+
+            assertThatThrownBy(() -> trusting.findByUsername("bob@other.realm"))
+                .isInstanceOf(FactoryPlusAuthException.class);
+
+            assertThat(home.getAllServeEvents().size())
+                .as("5xx must stay uncached so recovery is immediate")
+                .isGreaterThan(afterFirst);
+        }
+        finally {
+            home.stop();
+        }
+    }
+
+    @Test
+    void trusted_realm_matching_is_case_insensitive() {
+        // The incoming realm is lower-cased by Keycloak and the
+        // configured list may be typed either way, so neither side can
+        // be assumed canonical.
+        stubLocalMissForBob();
+        var trusting = new FPAuthBackedUserStore(
+            URI.create(wiremock.baseUrl()), Duration.ofSeconds(2), null, null,
+            Set.of("other.realm"), Map.of(), Duration.ofMillis(1500));
+
+        assertThat(trusting.findByUsername("bob@other.realm")).isPresent();
+    }
+
+    // -- admit -----------------------------------------------------------
+
+    @Test
+    void admit_puts_the_upn_as_a_json_string_against_the_given_uuid() {
+        wiremock.stubFor(put(urlPathEqualTo(
+                "/v2/principal/" + UUID_BOB + "/kerberos"))
+            .willReturn(aResponse().withStatus(204)));
+
+        assertThat(store.admit(UPN_BOB, UUID_BOB)).isEqualTo(UUID_BOB);
+
+        var event = wiremock.getAllServeEvents().get(0);
+        assertThat(event.getRequest().getBodyAsString())
+            .as("acs-auth parses bodies with express.json, so the UPN "
+                + "goes over the wire as a JSON string literal")
+            .isEqualTo("\"" + UPN_BOB + "\"");
+        assertThat(event.getRequest().getHeader("Content-Type"))
+            .isEqualTo("application/json");
+    }
+
+    @Test
+    void admit_mints_a_uuid_when_given_none() {
+        wiremock.stubFor(put(urlPathMatching("/v2/principal/[^/]+/kerberos"))
+            .willReturn(aResponse().withStatus(204)));
+
+        String uuid = store.admit(UPN_BOB, null);
+
+        assertThat(uuid).isNotNull();
+        assertThat(wiremock.getAllServeEvents().get(0).getRequest().getUrl())
+            .contains(uuid);
+    }
+
+    @Test
+    void admit_throws_when_the_write_is_refused() {
+        // 403 means sv1openid lacks WriteKrb on the target. The login
+        // must fail rather than issue a token whose principal doesn't
+        // exist.
+        wiremock.stubFor(put(urlPathEqualTo(
+                "/v2/principal/" + UUID_BOB + "/kerberos"))
+            .willReturn(aResponse().withStatus(403)));
+
+        assertThatThrownBy(() -> store.admit(UPN_BOB, UUID_BOB))
+            .isInstanceOf(FactoryPlusAuthException.class)
+            .hasMessageContaining("403");
     }
 
     // -- find by email ---------------------------------------------------
@@ -481,10 +823,19 @@ class FPAuthBackedUserStoreTest {
     /** Captures call count + last target URL for assertion. */
     private static final class StubAuthenticator implements KerberosAuthenticator {
         final String token;
+        final String principal;
         int callCount;
         URI lastTarget;
 
-        StubAuthenticator(String token) { this.token = token; }
+        StubAuthenticator(String token) { this(token, null); }
+
+        StubAuthenticator(String token, String principal) {
+            this.token = token;
+            this.principal = principal;
+        }
+
+        @Override
+        public String principalName() { return principal; }
 
         @Override
         public String spnegoTokenFor(URI target) {

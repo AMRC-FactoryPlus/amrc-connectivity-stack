@@ -40,4 +40,17 @@ public interface KerberosAuthenticator {
      *     SPNEGO context initiation fails
      */
     String spnegoTokenFor(URI target);
+
+    /**
+     * The principal these credentials belong to, e.g.
+     * {@code sv1openid@FACTORYPLUS.LOCAL}, or null if unknown.
+     *
+     * <p>Diagnostics only. The cross-realm resolve names it when a home
+     * cluster returns 403, because the fix is a grant to this exact
+     * principal made on a different cluster from the one logging the
+     * error.
+     */
+    default String principalName() {
+        return null;
+    }
 }

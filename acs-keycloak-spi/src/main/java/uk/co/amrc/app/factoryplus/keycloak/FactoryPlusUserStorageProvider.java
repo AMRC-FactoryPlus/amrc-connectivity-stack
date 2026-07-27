@@ -13,6 +13,7 @@
 
 package uk.co.amrc.app.factoryplus.keycloak;
 
+import org.jboss.logging.Logger;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.CredentialInput;
 import org.keycloak.credential.CredentialInputValidator;
@@ -32,6 +33,9 @@ import java.util.stream.Stream;
 public class FactoryPlusUserStorageProvider
         implements UserStorageProvider, UserLookupProvider, UserQueryProvider,
                    CredentialInputValidator {
+
+    private static final Logger LOG =
+        Logger.getLogger(FactoryPlusUserStorageProvider.class);
 
     private final KeycloakSession session;
     private final ComponentModel model;
@@ -146,7 +150,47 @@ public class FactoryPlusUserStorageProvider
         if (!supportsCredentialType(input.getType())) return false;
         // The username Keycloak stored for this UserModel is the F+
         // kerberos UPN (set by FactoryPlusUserAdapter).
-        return passwordValidator.validate(user.getUsername(), input.getChallengeResponse());
+        if (!passwordValidator.validate(user.getUsername(), input.getChallengeResponse()))
+            return false;
+        // Password accepted by the KDC. Only now may we write anything:
+        // a provisional user is one a trusted foreign realm vouches for
+        // but that has no principal on this cluster yet. Admitting
+        // before this point would let anyone create principals here by
+        // guessing usernames.
+        return admit(user);
+    }
+
+    /** Persist a provisional user's Kerberos identity. Returns true for
+     *  ordinary (already-resolved) users, who need no write.
+     *
+     *  <p>A failed write fails the login. Issuing a session anyway
+     *  would hand out a token carrying an fp_principal_uuid that
+     *  nothing on the cluster recognises: every F+ service would reject
+     *  it, and the user would see a working login with no access and no
+     *  explanation. */
+    private boolean admit(UserModel user) {
+        if (!isProvisional(user)) return true;
+        String upn = user.getUsername();
+        String uuid = user.getFirstAttribute(FactoryPlusUserAdapter.ATTR_FP_UUID);
+        try {
+            store.admit(upn, uuid);
+            return true;
+        }
+        catch (RuntimeException e) {
+            LOG.error("Cannot admit cross-realm user " + upn
+                + " (uuid " + uuid + "); rejecting the login", e);
+            return false;
+        }
+    }
+
+    /** Prefer the direct type check, but fall back to the attribute:
+     *  by credential-validation time Keycloak may have wrapped our
+     *  adapter in one of its own UserModel implementations. */
+    private static boolean isProvisional(UserModel user) {
+        if (user instanceof FactoryPlusUserAdapter adapter)
+            return adapter.isProvisional();
+        return "true".equals(user.getFirstAttribute(
+            FactoryPlusUserAdapter.ATTR_FP_PROVISIONAL));
     }
 
     @Override

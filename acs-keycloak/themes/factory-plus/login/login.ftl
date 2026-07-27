@@ -2,9 +2,12 @@
 <@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password') displayInfo=realm.password && realm.registrationAllowed && !registrationDisabled??; section>
     <#if section = "header">
         ${msg("loginAccountTitle")}
+    <#elseif section = "description">
+        ${msg("loginAccountDescription")}
     <#elseif section = "form">
         <#if realm.password>
-            <form id="kc-form-login" class="acs-form" action="${url.loginAction}" method="post" onsubmit="login.disabled = true; return true;">
+            <form id="kc-form-login" class="acs-form" action="${url.loginAction}" method="post"
+                  onsubmit="var b = document.getElementById('kc-login'); b.classList.add('acs-is-loading'); b.disabled = true; return true;">
                 <#if !usernameHidden??>
                     <div class="acs-field">
                         <label for="username" class="acs-label">
@@ -12,6 +15,7 @@
                         </label>
                         <input tabindex="2" id="username" class="acs-input<#if messagesPerField.existsError('username','password')> acs-input-error</#if>"
                                name="username" value="${(login.username!'')}" type="text" autofocus autocomplete="username"
+                               placeholder="${msg('usernamePlaceholder')}"
                                aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"/>
                         <#if messagesPerField.existsError('username','password')>
                             <span id="input-error" class="acs-field-error" aria-live="polite">
@@ -54,8 +58,16 @@
 
                 <input type="hidden" id="id-hidden-input" name="credentialId" <#if auth.selectedCredential?has_content>value="${auth.selectedCredential}"</#if>/>
 
+                <#-- The spinner mirrors acs-admin's fa-circle-notch. It's
+                     inline SVG rather than an icon font because the pod
+                     must not depend on a CDN. -->
                 <button tabindex="7" class="acs-btn acs-btn-primary acs-btn-block" name="login" id="kc-login" type="submit">
-                    ${msg("doLogIn")}
+                    <span class="acs-btn-label">${msg("doLogIn")}</span>
+                    <svg class="acs-spinner" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                         aria-hidden="true" focusable="false">
+                        <circle cx="12" cy="12" r="9" stroke-dasharray="42 15"/>
+                    </svg>
                 </button>
 
                 <#if realm.resetPasswordAllowed>
@@ -93,8 +105,12 @@
                 <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem;">
                     <#list social.providers as p>
                         <li>
+                            <#-- Upstream renders p.iconClasses here as a
+                                 Font Awesome <i>. This theme loads no icon
+                                 font, so the markup would only ever be an
+                                 empty box; dropped in favour of the name
+                                 alone. -->
                             <a id="social-${p.alias}" href="${p.loginUrl}" class="acs-btn acs-btn-block" style="border: 1px solid var(--slate-200); background: #fff; color: var(--slate-900);">
-                                <#if p.iconClasses?has_content><i class="${properties.kcCommonLogoIdP!} ${p.iconClasses!}" aria-hidden="true"></i></#if>
                                 <span>${p.displayName!}</span>
                             </a>
                         </li>

@@ -19,6 +19,7 @@
     --slate-950: #020617;
 
     --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
     --gray-400: #9ca3af;
 
     --red-500: #ef4444;
@@ -48,6 +49,10 @@
     box-sizing: border-box;
 }
 
+/* No root font-size override here on purpose. Every dimension below is
+   authored in rem against the browser default 16px root, which is what
+   acs-admin runs at (it has no root font-size rule either). Setting
+   `font-size: 14px` here shrinks the entire page to 87.5%. */
 html, body {
     margin: 0;
     padding: 0;
@@ -56,7 +61,6 @@ html, body {
     color: var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
         "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-    font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -88,7 +92,7 @@ a:hover {
    throughout the animation. */
 .acs-card {
     width: 100%;
-    max-width: 26rem;
+    max-width: 24rem;         /* max-w-sm */
     background: var(--card-bg);
     color: var(--text);
     border: 1px solid var(--card-border);
@@ -109,40 +113,27 @@ a:hover {
     }
 }
 
-/* Mirror the acs-admin login card hover ring. Gated to fine pointers
-   so touch devices don't get a sticky hover state on tap. */
+/* Mirror the acs-admin login card hover ring: a bare Tailwind `ring` is
+   3px wide, and `ring-offset-2` puts a 2px gray-100 gap inside it, so the
+   ring lands between 2px and 5px out. Gated to fine pointers so touch
+   devices don't get a sticky hover state on tap. */
 @media (hover: hover) and (pointer: fine) {
     .acs-card:hover {
         box-shadow:
             0 0 0 2px var(--gray-100),
-            0 0 0 4px rgb(156 163 175 / 0.3),
+            0 0 0 5px rgb(156 163 175 / 0.3),
             var(--card-shadow);
     }
 }
 
+/* CardHeader in acs-admin is `flex flex-col p-6` with no `space-y-1.5`,
+   so its title and description sit flush against each other. Matching
+   that means no gap here. */
 .acs-card-header {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 1.75rem 1.75rem 0;
-}
-
-.acs-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    margin-bottom: 0.5rem;
-}
-
-.acs-brand img {
-    height: 1.5rem;
-    width: 1.5rem;
-}
-
-.acs-brand .acs-wordmark {
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    gap: 0;
+    padding: 1.5rem;            /* p-6 */
 }
 
 .acs-card-title {
@@ -150,17 +141,20 @@ a:hover {
     font-size: 1.5rem;          /* text-2xl */
     font-weight: 600;
     letter-spacing: -0.025em;   /* tracking-tight */
-    line-height: 1.1;
+    line-height: 1;             /* leading-none */
 }
 
 .acs-card-description {
     margin: 0;
     color: var(--muted);
     font-size: 0.875rem;        /* text-sm */
+    line-height: 1.25rem;
 }
 
+/* p-6 pt-0: the header's own bottom padding provides the gap. */
 .acs-card-content {
-    padding: 1.75rem;
+    padding: 1.5rem;
+    padding-top: 0;
 }
 
 .acs-form {
@@ -179,14 +173,25 @@ a:hover {
     line-height: 1;
 }
 
-/* Inputs - shadcn focus ring, slate-900 ring with white offset.
-   Specific transition targets (not `all`) so the focus ring snaps in
-   without re-rendering the rest of the input. */
+/* Inputs.
+ *
+ * The border is gray-200 and the focus ring is blue, not slate, and that
+ * is deliberate - do not "fix" it. acs-admin's Input.vue asks for
+ * `border-input`, `bg-background`, `ring-ring` and `ring-offset-background`,
+ * but its tailwind.config.js has `colors: {}` and its main.css defines only
+ * `--radius`, so none of those shadcn colour tokens exist. Those classes
+ * are no-ops there and the admin input actually renders with Tailwind's
+ * defaults: borderColor.DEFAULT (#e5e7eb, gray-200) and the default ring
+ * colour (blue-500 at 50%). We match what admin renders today, not what
+ * its source appears to intend.
+ *
+ * Specific transition targets (not `all`) so the focus ring snaps in
+ * without re-rendering the rest of the input. */
 .acs-input {
     display: flex;
     height: 2.5rem;
     width: 100%;
-    border: 1px solid var(--slate-200);
+    border: 1px solid var(--gray-200);
     background: #ffffff;
     color: var(--text);
     border-radius: var(--radius-md);
@@ -204,8 +209,7 @@ a:hover {
 }
 
 .acs-input:focus-visible {
-    border-color: var(--slate-950);
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--slate-950);
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgb(59 130 246 / 0.5);
 }
 
 .acs-input:disabled {
@@ -303,6 +307,29 @@ a:hover {
     width: 100%;
 }
 
+/* Submit feedback. acs-admin swaps the button label for a spinning
+   fa-circle-notch while logging in; we can't use Font Awesome here
+   because the pod must not depend on a CDN, so the same shape is drawn
+   as an inline SVG and spun with a CSS keyframe. */
+.acs-spinner {
+    display: none;
+    height: 1rem;
+    width: 1rem;
+}
+
+.acs-btn.acs-is-loading .acs-btn-label {
+    display: none;
+}
+
+.acs-btn.acs-is-loading .acs-spinner {
+    display: block;
+    animation: acs-spin 1s linear infinite;
+}
+
+@keyframes acs-spin {
+    to { transform: rotate(360deg); }
+}
+
 .acs-btn-link {
     background: transparent;
     color: var(--slate-900);
@@ -331,7 +358,7 @@ a:hover {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 0 1.75rem 1.75rem;
+    padding: 0 1.5rem 1.5rem;
 }
 
 /* Alerts */
@@ -398,5 +425,10 @@ a:hover {
     .acs-btn:active,
     .acs-password-toggle:active {
         transform: none;
+    }
+    /* Keep the spinner visible as a "working" marker, just stop it
+       rotating. */
+    .acs-btn.acs-is-loading .acs-spinner {
+        animation: none;
     }
 }

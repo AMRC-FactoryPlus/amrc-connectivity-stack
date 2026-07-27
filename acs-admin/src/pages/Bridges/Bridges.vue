@@ -81,7 +81,22 @@
             icon="server"
             label="Host"
             :value="selectedBridge.deployment?.hostname ?? 'Floating'"
-          />
+            :warning="hostWarning"
+          >
+            <template #action>
+              <MoveHostButton
+                  v-if="selectedBridge.deployment"
+                  labelled
+                  :uuid="selectedBridge.uuid"
+                  :name="selectedBridge.name"
+                  kind="bridge"
+                  :deployment="selectedBridge.deployment"
+              />
+            </template>
+            <template #badge>
+              <StaleHostPill v-if="hostWarning"/>
+            </template>
+          </SidebarDetail>
           <SidebarDetail
             v-if="selectedBridge.deployment?.createdAt"
             icon="clock"
@@ -105,7 +120,11 @@ import DataTableSearchable from "@components/ui/data-table-searchable/DataTableS
 import BridgesContainer from '@components/Containers/BridgesContainer.vue';
 import { bridgeColumns } from "./bridgeColumns.ts";
 import { useBridgeStore } from "@store/useBridgeStore";
+import { useEdgeClusterStore } from "@store/useEdgeClusterStore.js";
+import { staleHostWarning } from "@utils/hosts.js";
 import SidebarDetail from "@components/SidebarDetail.vue";
+import MoveHostButton from "@components/EdgeManager/Nodes/MoveHostButton.vue";
+import StaleHostPill from "@components/EdgeManager/Nodes/StaleHostPill.vue";
 import EmptyState from '@components/EmptyState.vue';
 import { ref } from "vue";
 import { useRouter } from "vue-router";
@@ -118,12 +137,13 @@ import { toast } from "vue-sonner";
 export default {
   emits: ['rowClick'],
   name: 'Bridges',
-  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState },
+  components: { SidebarDetail, MoveHostButton, StaleHostPill, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState },
 
   setup() {
     return {
       selectedBridge: ref({}),
       bridge: useBridgeStore(),
+      c: useEdgeClusterStore(),
       columns: bridgeColumns,
       router: useRouter(),
       moment,
@@ -133,6 +153,7 @@ export default {
 
   async mounted() {
     await this.bridge.start();
+    await this.c.start();
   },
 
   computed: {
@@ -157,6 +178,12 @@ export default {
       const remote = this.selectedBridge.deployment?.values?.remote
       if (!remote?.host) return null
       return `${remote.host}:${remote.port || 8883}`
+    },
+    cluster() {
+      return this.c.data.find(e => e.uuid === this.selectedBridge.deployment?.cluster)
+    },
+    hostWarning() {
+      return staleHostWarning(this.cluster, this.selectedBridge.deployment?.hostname)
     }
   },
 

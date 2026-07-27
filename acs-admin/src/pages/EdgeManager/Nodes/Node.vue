@@ -120,7 +120,21 @@
               icon="server"
               label="Host"
               :value="hostname"
-          />
+              :warning="hostWarning"
+          >
+            <template #action>
+              <MoveHostButton
+                  labelled
+                  :uuid="node.uuid"
+                  :name="node.name"
+                  kind="node"
+                  :deployment="node.deployment"
+              />
+            </template>
+            <template #badge>
+              <StaleHostPill v-if="hostWarning"/>
+            </template>
+          </SidebarDetail>
 
         </div>
       </div>
@@ -150,6 +164,9 @@ import { deviceColumns } from './deviceColumns.ts'
 import { connectionColumns } from './connectionColumns.ts'
 import EmptyState from '@/components/EmptyState.vue'
 import SidebarDetail from '@/components/SidebarDetail.vue'
+import MoveHostButton from '@components/EdgeManager/Nodes/MoveHostButton.vue'
+import StaleHostPill from '@components/EdgeManager/Nodes/StaleHostPill.vue'
+import { staleHostWarning } from '@utils/hosts.js'
 import moment from 'moment'
 import { toast } from 'vue-sonner'
 
@@ -157,6 +174,8 @@ export default {
   components: {
     Tabs,
     SidebarDetail,
+    MoveHostButton,
+    StaleHostPill,
     DataTable,
     DetailCard,
     EdgePageSkeleton,
@@ -208,8 +227,12 @@ export default {
       return !this.n.ready || this.n.loading || !this.node
     },
 
+    clusterObject () {
+      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)
+    },
+
     cluster() {
-      return this.c.data.find(e => e.uuid === this.node.deployment?.cluster)?.name
+      return this.clusterObject?.name
     },
 
     devices () {
@@ -230,6 +253,10 @@ export default {
 
     hostname() {
       return this.node.deployment.hostname ?? 'Floating'
+    },
+
+    hostWarning() {
+      return staleHostWarning(this.clusterObject, this.node.deployment?.hostname)
     },
 
     initialNameSort () {

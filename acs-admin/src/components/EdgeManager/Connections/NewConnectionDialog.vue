@@ -96,6 +96,18 @@
             required
           />
         </div>
+
+        <!-- Host paths - only for drivers deployed as their own container -->
+        <div v-if="selectedDriver?.definition?.image" class="flex flex-col gap-2.5 pt-3 border-t">
+          <div class="flex items-baseline justify-between gap-3">
+            <span class="text-[13px] font-semibold">Host Paths</span>
+            <span class="text-xs text-gray-400">Applies to whichever host runs this node</span>
+          </div>
+          <p class="text-xs leading-relaxed text-gray-500">
+            Hardware on the host machine passed through to the driver, such as a serial port.
+          </p>
+          <HostPathsEditor v-model="hostPaths"/>
+        </div>
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <div class="flex w-full items-center justify-between">
@@ -119,22 +131,24 @@
           <!-- Spacer when not editing -->
           <div v-else></div>
 
-          <!-- Existing save button -->
-          <Button
-            :disabled="v$.$invalid || isSubmitting"
-            @click="save"
-          >
-            <div class="flex items-center justify-center gap-2">
-              <i :class="{
-                'fa-solid': true,
-                'fa-pen': existingConnection && !isSubmitting,
-                'fa-plus': !existingConnection && !isSubmitting,
-                'fa-circle-notch': isSubmitting,
-                'animate-spin': isSubmitting
-              }"></i>
-              <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Update Connection' : 'Create Connection')}}</div>
-            </div>
-          </Button>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" :disabled="isSubmitting || isDeleting" @click="handleOpen(false)">Cancel</Button>
+            <Button
+              :disabled="v$.$invalid || isSubmitting"
+              @click="save"
+            >
+              <div class="flex items-center justify-center gap-2">
+                <i :class="{
+                  'fa-solid': true,
+                  'fa-pen': existingConnection && !isSubmitting,
+                  'fa-plus': !existingConnection && !isSubmitting,
+                  'fa-circle-notch': isSubmitting,
+                  'animate-spin': isSubmitting
+                }"></i>
+                <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Save Connection' : 'Create Connection')}}</div>
+              </div>
+            </Button>
+          </div>
         </div>
       </DialogFooter>
     </DialogContent>
@@ -143,6 +157,7 @@
 
 <script>
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@components/ui/dialog'
+import HostPathsEditor from '@components/EdgeManager/Connections/HostPathsEditor.vue'
 import { Button } from '@components/ui/button'
 import { VisuallyHidden } from 'reka-ui'
 import { Input } from '@/components/ui/input'
@@ -212,7 +227,8 @@ export default {
     SelectLabel,
     SelectTrigger,
     SelectValue,
-    JSONFormElement
+    JSONFormElement,
+    HostPathsEditor
   },
 
   watch: {
@@ -249,6 +265,7 @@ export default {
           // Make sure we handle different possible structures for the payload format
           payloadFormat: existingConfig.source?.payloadFormat || "Defined by Protocol",
         }
+        this.hostPaths = (existingConfig.deployment?.hostPaths ?? []).map(p => ({ ...p }))
       }
 
       this.node = node
@@ -261,6 +278,10 @@ export default {
     },
     selectedDriver () {
       return this.dr.data.find(d => d.name === this.selectedDriverName)
+    },
+    /* Drop any rows the user started and left blank. */
+    cleanHostPaths () {
+      return this.hostPaths.filter(p => p.hostPath && p.mountPath)
     },
     // Removed isPolledDriver computed property to avoid recursive updates
     formSchema() {
@@ -539,6 +560,7 @@ export default {
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
+      this.hostPaths = []
       this.isSubmitting = false
       this.existingConnection = null
     },
@@ -579,6 +601,9 @@ export default {
             this.s.client.ConfigDB.patch_config(UUIDs.App.ConnectionConfiguration, this.existingConnection.uuid, 'merge', {
               config: configData,
               driver_uuid: this.selectedDriver.uuid,
+              deployment: {
+                hostPaths: this.cleanHostPaths.length ? this.cleanHostPaths : null,
+              },
               ...(this.selectedDriver?.definition?.polled === true ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
               source: {
                 payloadFormat: payloadFormat,
@@ -618,7 +643,7 @@ export default {
           const payload = {
             createdAt: new Date().toISOString(),
             config: configData,
-            deployment: {},
+            deployment: this.cleanHostPaths.length ? { hostPaths: this.cleanHostPaths } : {},
             driver: this.selectedDriver.uuid,
             edgeAgent: this.node.uuid,
             ...(this.selectedDriver?.definition?.polled === true ? { pollInt: parseInt(this.pollInt) } : {}), // Add poll interval only for polled drivers
@@ -727,6 +752,7 @@ export default {
       node: null,
       name: null,
       selectedDriverName: null,
+      hostPaths: [],
       pollInt: 1000, // Default to 1000ms (1 second)
       formData: {
         payloadFormat: "Defined by Protocol"

@@ -4,41 +4,52 @@
 
 <template>
   <div class="flex flex-col gap-2">
-    <div v-if="paths.length" class="flex flex-col gap-2">
-      <div class="flex items-center gap-2 text-xs font-medium text-gray-500">
-        <div class="flex-1">Path on the host</div>
-        <div class="flex-1">Path in the container</div>
-        <div class="w-8"></div>
+    <div v-if="paths.length" class="flex flex-col gap-1.5">
+      <div class="grid grid-cols-[1fr_1fr_1.75rem] gap-2 text-[11px] text-gray-400">
+        <span>Path on the host</span>
+        <span>Path in the container</span>
+        <span></span>
       </div>
-      <div v-for="(path, index) in paths" :key="index" class="flex items-start gap-2">
-        <Input
-            placeholder="e.g. /dev/ttyUSB0"
-            :model-value="path.hostPath"
-            @update:model-value="update(index, 'hostPath', $event)"
+      <div v-for="(path, index) in paths" :key="index" class="grid grid-cols-[1fr_1fr_1.75rem] gap-2 items-center">
+        <!-- The shared Input is fixed at h-10 and cannot be restyled from
+           - outside: its <script setup> defineProps overwrites the options
+           - block's props, so class and className never reach the element.
+           - These match its appearance at the height the design calls for. -->
+        <input
+            :class="inputClass"
+            placeholder="/dev/ttyUSB0"
+            :value="path.hostPath"
+            @input="update(index, 'hostPath', $event.target.value)"
         />
-        <Input
-            placeholder="e.g. /dev/ttyUSB0"
-            :model-value="path.mountPath"
-            @update:model-value="update(index, 'mountPath', $event)"
+        <input
+            :class="inputClass"
+            placeholder="/dev/ttyUSB0"
+            :value="path.mountPath"
+            @input="update(index, 'mountPath', $event.target.value)"
         />
         <Button
-            class="w-8 shrink-0"
             variant="ghost"
-            size="icon"
-            title="Remove this host path"
+            size="plain"
+            class="h-8 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50"
+            title="Remove path"
             @click="remove(index)"
         >
-          <i class="fa-solid fa-trash text-red-400"></i>
+          <i class="fa-solid fa-xmark text-xs"></i>
         </Button>
       </div>
     </div>
-    <div v-else class="text-sm text-gray-400">
-      No host paths. This connection does not use any hardware attached to the host.
+    <div v-else class="text-xs text-gray-400">
+      No host paths. Nothing on the host machine is passed through to this driver.
     </div>
     <div>
-      <Button variant="outline" size="sm" class="gap-1.5" @click="add">
-        <i class="fa-solid fa-plus"></i>
-        Add Host Path
+      <Button
+          variant="ghost"
+          size="plain"
+          class="h-7 px-2 gap-1.5 text-xs text-slate-700"
+          @click="add"
+      >
+        <i class="fa-solid fa-plus text-[10px]"></i>
+        Add host path
       </Button>
     </div>
   </div>
@@ -46,14 +57,12 @@
 
 <script>
 import { Button } from '@components/ui/button/index.js'
-import { Input } from '@components/ui/input/index.js'
 
 export default {
   name: 'HostPathsEditor',
 
   components: {
     Button,
-    Input,
   },
 
   props: {
@@ -66,6 +75,16 @@ export default {
   },
 
   emits: ['update:modelValue'],
+
+  data () {
+    return {
+      inputClass: 'flex h-8 w-full rounded-md border border-input bg-background '
+        + 'px-2.5 py-1 text-[13px] font-mono ring-offset-background '
+        + 'placeholder:text-muted-foreground focus-visible:outline-none '
+        + 'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 '
+        + 'disabled:cursor-not-allowed disabled:opacity-50',
+    }
+  },
 
   computed: {
     paths () {

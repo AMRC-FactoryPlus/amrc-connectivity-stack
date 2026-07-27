@@ -98,11 +98,13 @@
         </div>
 
         <!-- Host paths - only for drivers deployed as their own container -->
-        <div v-if="selectedDriver?.definition?.image" class="flex flex-col gap-1">
-          <label class="text-sm font-medium">Host Paths</label>
-          <p class="text-xs text-gray-500">
-            Hardware on the host machine to pass through to the driver, such as a serial port.
-            These are paths on whichever host this node is running on.
+        <div v-if="selectedDriver?.definition?.image" class="flex flex-col gap-2.5 pt-3 border-t">
+          <div class="flex items-baseline justify-between gap-3">
+            <span class="text-[13px] font-semibold">Host Paths</span>
+            <span class="text-xs text-gray-400">Applies to whichever host runs this node</span>
+          </div>
+          <p class="text-xs leading-relaxed text-gray-500">
+            Hardware on the host machine passed through to the driver, such as a serial port.
           </p>
           <HostPathsEditor v-model="hostPaths"/>
         </div>
@@ -129,22 +131,24 @@
           <!-- Spacer when not editing -->
           <div v-else></div>
 
-          <!-- Existing save button -->
-          <Button
-            :disabled="v$.$invalid || isSubmitting"
-            @click="save"
-          >
-            <div class="flex items-center justify-center gap-2">
-              <i :class="{
-                'fa-solid': true,
-                'fa-pen': existingConnection && !isSubmitting,
-                'fa-plus': !existingConnection && !isSubmitting,
-                'fa-circle-notch': isSubmitting,
-                'animate-spin': isSubmitting
-              }"></i>
-              <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Update Connection' : 'Create Connection')}}</div>
-            </div>
-          </Button>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" :disabled="isSubmitting || isDeleting" @click="handleOpen(false)">Cancel</Button>
+            <Button
+              :disabled="v$.$invalid || isSubmitting"
+              @click="save"
+            >
+              <div class="flex items-center justify-center gap-2">
+                <i :class="{
+                  'fa-solid': true,
+                  'fa-pen': existingConnection && !isSubmitting,
+                  'fa-plus': !existingConnection && !isSubmitting,
+                  'fa-circle-notch': isSubmitting,
+                  'animate-spin': isSubmitting
+                }"></i>
+                <div>{{isSubmitting ? 'Saving...' : (existingConnection ? 'Save Connection' : 'Create Connection')}}</div>
+              </div>
+            </Button>
+          </div>
         </div>
       </DialogFooter>
     </DialogContent>

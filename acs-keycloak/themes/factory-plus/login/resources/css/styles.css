@@ -48,6 +48,10 @@
     box-sizing: border-box;
 }
 
+/* No root font-size override here on purpose. Every dimension below is
+   authored in rem against the browser default 16px root, which is what
+   acs-admin runs at (it has no root font-size rule either). Setting
+   `font-size: 14px` here shrinks the entire page to 87.5%. */
 html, body {
     margin: 0;
     padding: 0;
@@ -56,7 +60,6 @@ html, body {
     color: var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
         "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-    font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -88,7 +91,7 @@ a:hover {
    throughout the animation. */
 .acs-card {
     width: 100%;
-    max-width: 26rem;
+    max-width: 24rem;         /* max-w-sm */
     background: var(--card-bg);
     color: var(--text);
     border: 1px solid var(--card-border);
@@ -124,7 +127,7 @@ a:hover {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 1.75rem 1.75rem 0;
+    padding: 1.5rem 1.5rem 0;
 }
 
 .acs-brand {
@@ -160,7 +163,7 @@ a:hover {
 }
 
 .acs-card-content {
-    padding: 1.75rem;
+    padding: 1.5rem;
 }
 
 .acs-form {
@@ -331,7 +334,7 @@ a:hover {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 0 1.75rem 1.75rem;
+    padding: 0 1.5rem 1.5rem;
 }
 
 /* Alerts */

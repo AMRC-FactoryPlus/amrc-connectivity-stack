@@ -20,11 +20,52 @@
           <Input v-model="name" placeholder="e.g. Morning shift — Machine 3" />
         </div>
 
-        <!-- ─── Dataset components ─── -->
-        <div class="flex flex-col gap-2">
-          <label class="text-sm font-medium">Component Datasets</label>
-          <p class="text-xs text-gray-500">Add one or more datasets to include. Cannot be empty. Time limits may be
-            imposed, in which case a Session Dataset will be created.</p>
+        <!-- Tabs -->
+        <Tabs v-model="active_tab">
+          <TabsList class="grid w-full grid-cols-2">
+            <TabsTrigger value="sparkplug" :disabled="is_edit && active_tab !== 'sparkplug'">Sparkplug Source</TabsTrigger>
+            <TabsTrigger value="components" :disabled="is_edit && active_tab !== 'components'">Component Datasets</TabsTrigger>
+          </TabsList>
+
+          <!-- ─── Sparkplug Source Tab ─── -->
+          <TabsContent value="sparkplug" class="flex flex-col gap-2 mt-3">
+            <label class="text-sm font-medium">Sparkplug Device <span class="text-red-500">*</span></label>
+            <Popover v-model:open="sparkplug_source_open">
+              <PopoverTrigger as-child>
+                <Button variant="outline" role="combobox" :aria-expanded="!!sparkplug_source_open" class="w-full justify-between">
+                  {{ sparkplug_device_label }}
+                  <i class="fa-solid fa-chevron-down ml-2 h-4 w-4 shrink-0 opacity-50"></i>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-[--reka-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Search devices..." />
+                  <CommandList>
+                    <CommandEmpty>No devices found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        v-for="device in available_devices"
+                        :key="device.uuid"
+                        :value="device.name ? `${device.name} ${device.uuid}` : device.uuid"
+                        @select="select_sparkplug_source(device.uuid)"
+                      >
+                        <div class="flex flex-col">
+                          <span class="font-medium">{{ device.name ?? device.uuid }}</span>
+                          <span class="text-xs text-gray-400 font-mono">{{ device.uuid }}</span>
+                        </div>
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <p class="text-xs text-gray-500">The Sparkplug device whose data this dataset covers.</p>
+          </TabsContent>
+
+          <!-- ─── Component Datasets Tab ─── -->
+          <TabsContent value="components" class="flex flex-col gap-2 mt-3">
+            <p class="text-xs text-gray-500">Add one or more datasets to include. Cannot be empty. Time limits may be
+              imposed, in which case a Session Dataset will be created.</p>
           <div v-for="(comp, idx) in dataset_components" :key="idx" class="flex gap-2 border-r-2 items-center pb-2 mb-4 hover:bg-gray-50">
             <div class="flex-1 flex flex-col gap-2 border-l-2 p-2">
               <Popover v-model:open="dataset_components_source_open[idx]" class="flex-1">
@@ -146,7 +187,8 @@
           <Button variant="outline" class="w-full mt-1" @click="add_component">
             <i class="fa-solid fa-plus mr-2"></i> Add Component
           </Button>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <p v-if="error_message" class="text-sm text-red-500">{{ error_message }}</p>
       </div>
@@ -171,6 +213,7 @@ import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@components/ui/dialog'
 import { Button } from '@components/ui/button'
 import { Input } from '@components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -178,6 +221,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { getLocalTimeZone, today } from '@internationalized/date'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDataAccessStore } from '@store/useDataAccessStore.js'
+import { useDeviceStore } from '@store/useDeviceStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { toast } from 'vue-sonner'
 import { STRUCTURE_APPS, structure_label } from '@pages/DataAccess/datasetColumns.ts'
@@ -207,6 +251,7 @@ export default {
   components: {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
     Button, Input,
+    Tabs, TabsContent, TabsList, TabsTrigger,
     Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxList,
     Calendar,
     Popover, PopoverTrigger, PopoverContent,
@@ -217,6 +262,7 @@ export default {
     return {
       s: useServiceClientStore(),
       da: useDataAccessStore(),
+      d: useDeviceStore(),
       STRUCTURE_APPS,
       structure_label,
       cn
@@ -230,6 +276,11 @@ export default {
       edit_uuid: null,
 
       name: '',
+      active_tab: 'sparkplug',
+
+      // Sparkplug source fields
+      sparkplug_source: '',
+      sparkplug_source_open: false,
 
       // Dataset components
       dataset_components: [], // Each one is { source, from, to, from_date, from_time, to_date, to_time }
@@ -244,15 +295,27 @@ export default {
     }
   },
 
+  async mounted() {
+    await this.d.start()
+  },
+
+  unmounted() {
+    this.d.stop()
+  },
+
   computed: {
-    // This should come from a service call, as we may have permission to see datasets, but not use them in our own session
-    sparkplug_datasets() {
-      return this.da.structures
-        .filter(s => s.structure === STRUCTURE_APPS.SPARKPLUG)
-        .map(s => ({
-          uuid: s.uuid,
-          name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
-        }))
+    available_devices() {
+      return Array.isArray(this.d.data)
+        ? this.d.data
+            .map(dev => ({ uuid: dev.uuid, name: dev.name ?? null }))
+            .sort((a, b) => (a.name ?? a.uuid).localeCompare(b.name ?? b.uuid))
+        : []
+    },
+
+    sparkplug_device_label() {
+      if (!this.sparkplug_source) return 'Select a device…'
+      const match = this.available_devices.find(d => d.uuid === this.sparkplug_source)
+      return match ? (match.name ?? match.uuid) : this.sparkplug_source
     },
 
     // All datasets known to the ConfigDB, regardless of whether we are allowed to include them
@@ -266,53 +329,29 @@ export default {
       .sort((a, b) => (a.name ?? a.uuid).localeCompare(b.name ?? b.uuid))
     },
 
-    // The subset of all_datasets_for_union that the current principal is actually permitted to
-    // use as a component source: either embedded directly in a Union (INCLUDE_IN_UNION) or
-    // wrapped in a Session (USE_FOR_SESSION) before being embedded. These are distinct
-    // permissions from being able to read/edit a dataset, and are provided by the Data Access
-    // service (backed by the Auth service), not derived from ConfigDB visibility alone.
-    permitted_datasets_for_union() {
-      const allowed_uuids = new Set([...this.da.union_sources, ...this.da.session_sources])
-      return this.all_datasets_for_union.filter(ds => allowed_uuids.has(ds.uuid))
-    },
-
     can_submit() {
-      // Ensure we have a name
-      if (!this.name.trim()) {
-        console.log('cannot submit: name is empty')
-        return false
+      if (!this.name.trim()) return false
+
+      if (this.active_tab === 'sparkplug') {
+        return is_valid_uuid(this.sparkplug_source)
       }
-      // Ensure we have some components
-      if (!this.dataset_components.length) {
-        console.log('cannot submit: no dataset components')
-        return false
-      }
-      // Ensure that if we have a single component, it has valid from/to if specified, otherwise it is just copying an existing Dataset
-      if (this.dataset_components.length === 1 && (!is_valid_iso(this.dataset_components[0].from) || !is_valid_iso(this.dataset_components[0].to))) {
-        console.log('cannot submit: single component must have valid from and to timestamps')
-        return false
-      }
-      // Ensure all components have valid UUIDs
-      if (!this.dataset_components.every(c => is_valid_uuid(c.source))) {
-        console.log('cannot submit: one or more component sources are not valid UUIDs')
-        return false
-      }
-      // Ensure all components have valid from/to if specified
-      if (!this.dataset_components.every(c => (is_valid_iso(c.from) && is_valid_iso(c.to)) || (c.from == "" && c.to == ""))) {
-        console.log('cannot submit: one or more component date ranges are invalid')
-        return false
-      }
+
+      // components tab
+      if (!this.dataset_components.length) return false
+      if (this.dataset_components.length === 1 && (!is_valid_iso(this.dataset_components[0].from) || !is_valid_iso(this.dataset_components[0].to))) return false
+      if (!this.dataset_components.every(c => is_valid_uuid(c.source))) return false
+      if (!this.dataset_components.every(c => (is_valid_iso(c.from) && is_valid_iso(c.to)) || (c.from == "" && c.to == ""))) return false
       return true
     },
   },
 
   methods: {
     open(existingDataset) {
+      console.log("Opening NewDatasetDialogTest with existingDataset:", existingDataset)
       this.reset_form()
       if (existingDataset) {
         this.is_edit = true
         this.edit_uuid = existingDataset.uuid
-        this.structure_type = existingDataset.structure
         this.name = this.da.datasets.find(d => d.uuid === existingDataset.uuid)?.name ?? ''
         this.load_config(existingDataset)
       }
@@ -334,6 +373,9 @@ export default {
       this.is_edit = false
       this.edit_uuid = null
       this.name = ''
+      this.active_tab = 'sparkplug'
+      this.sparkplug_source = ''
+      this.sparkplug_source_open = false
       this.dataset_components = []
       this.dataset_components_source_open = []
       this.dataset_components_from_open = []
@@ -343,11 +385,15 @@ export default {
     },
 
     load_config(existingDataset) {
+      console.log("Loading config for existing dataset:", existingDataset.uuid, "structure:", existingDataset.structure)
       const config = existingDataset.config
+      console.log("Existing dataset config:", config)
       if (!config) return
       if (existingDataset.structure === STRUCTURE_APPS.SPARKPLUG) {
-        this.dataset_components = [{ source: config.source ?? '', from: '', to: '', from_date: null, from_time: null, to_date: null, to_time: null }]
+        this.active_tab = 'sparkplug'
+        this.sparkplug_source = config.source ?? ''
       } else if (existingDataset.structure === STRUCTURE_APPS.SESSION) {
+        this.active_tab = 'components'
         const from = config.from ?? ''
         const to = config.to ?? ''
         this.dataset_components = [{
@@ -359,16 +405,28 @@ export default {
           to_date: to ? to.slice(0, 10) : null,
           to_time: to ? to.slice(11, 19) : null,
         }]
+        this.dataset_components_source_open = [false]
+        this.dataset_components_from_open = [false]
+        this.dataset_components_to_open = [false]
       } else if (existingDataset.structure === STRUCTURE_APPS.UNION) {
+        this.active_tab = 'components'
         this.dataset_components = Array.isArray(config)
           ? config.map(c => ({ source: c, from: '', to: '', from_date: null, from_time: null, to_date: null, to_time: null }))
           : []
         this.dataset_components_source_open = this.dataset_components.map(() => false)
+        this.dataset_components_from_open = this.dataset_components.map(() => false)
+        this.dataset_components_to_open = this.dataset_components.map(() => false)
       }
+      console.log("Loaded config for existing dataset:", existingDataset.uuid, "components:", this.dataset_components)
+    },
+
+    select_sparkplug_source(uuid) {
+      this.sparkplug_source = uuid
+      this.sparkplug_source_open = false
     },
 
     filtered_datasets_for_component(idx) {
-      return this.permitted_datasets_for_union.filter(ds =>
+      return this.all_datasets_for_union.filter(ds =>
         !this.dataset_components.some((c, i) => i !== idx && c.source === ds.uuid && c.from == "" && c.to == ""))
     },
 
@@ -422,82 +480,61 @@ export default {
       this.error_message = ''
 
       try {
-        // The Dialog allows the user to build a Dataset which may contain multiple Datasets.
         let created_uuid = null
-        if (this.dataset_components.length > 1) {
-          // A Union Dataset is required to combine the components.
-          // This logic needs to assess the requirements and build each Dataset (if required).
-          // When all Datasets are built, the final Dataset is created or updated with the correct configuration.
-          const component_uuids = [];
-          for (const comp of this.dataset_components) {
-            // comp: { source: 'uuid', from?: 'iso', to?: 'iso' }
-            console.log("Processing component:", comp)
-            if (!this.da.datasets.some(d => d.uuid === comp.source) && !this.da.structures.some(s => s.uuid === comp.source)) {
-              this.error_message = `Component Dataset source ${comp.source} does not exist.`
-              throw new Error(this.error_message)
-            }
-            if (is_valid_iso(comp.from) && is_valid_iso(comp.to)) {
-              // Session to create
-              const config = {
-                source: comp.source,
-                from: comp.from,
-                to: comp.to,
-              }
-              const uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, config)
-              // We want to push the UUID of the newly created Session Dataset into the component_uuids array.
-              component_uuids.push(uuid)
 
-              console.log("Component Session Dataset [", component_uuids.length, "] saved with uuid:", uuid)
-              console.log("Awaiting put config...")
-              // Set the name via ConfigDB Info app
-              await this.s.client.ConfigDB.put_config(UUIDs.App.Info, uuid, {
-                  // Set the name of the component to "Name (Session Component N)".
-                  name: `${this.name.trim()} (Session Component ${component_uuids.length})`,
-              })
-            } else {
-              // Straight Dataset to embed
-              component_uuids.push(comp.source)
-              console.log("Component Dataset [", component_uuids.length, "] added with uuid:", comp.source)
-            }
+        if (this.active_tab === 'sparkplug') {
+          const config = { source: this.sparkplug_source }
+          if (this.is_edit) {
+            await this.s.client.DataAccess.update_dataset(this.edit_uuid, STRUCTURE_APPS.SPARKPLUG, config)
+            created_uuid = this.edit_uuid
+          } else {
+            created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SPARKPLUG, config)
           }
-
-          // All components are now ready, create the Union Dataset.
-          console.log("Creating Union Dataset with components:", component_uuids, STRUCTURE_APPS.UNION)
-          created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.UNION, component_uuids)
-
-          console.log("Union Dataset saved with uuid:", created_uuid)
-          console.log("Awaiting put config...")
-          // Set the name via ConfigDB Info app
           await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
-              name: this.name.trim(),
+            name: this.name.trim(),
           })
-        } else if (this.dataset_components.length === 1) {
-          // Only one component, no need for a Union Dataset.
-          const comp = this.dataset_components[0];
-          console.log("Processing only component:", comp)
-          if (is_valid_iso(comp.from) && is_valid_iso(comp.to)) {
-            // Session to create
-            const config = {
-              source: comp.source,
-              from: comp.from,
-              to: comp.to,
+        } else {
+          // Components tab — build SESSION or UNION as needed
+          if (this.dataset_components.length > 1) {
+            const component_uuids = []
+            for (const comp of this.dataset_components) {
+              if (!this.da.datasets.some(d => d.uuid === comp.source) && !this.da.structures.some(s => s.uuid === comp.source)) {
+                this.error_message = `Component Dataset source ${comp.source} does not exist.`
+                throw new Error(this.error_message)
+              }
+              if (is_valid_iso(comp.from) && is_valid_iso(comp.to)) {
+                const uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, {
+                  source: comp.source, from: comp.from, to: comp.to,
+                })
+                component_uuids.push(uuid)
+                await this.s.client.ConfigDB.put_config(UUIDs.App.Info, uuid, {
+                  name: `${this.name.trim()} (Session Component ${component_uuids.length})`,
+                })
+              } else {
+                component_uuids.push(comp.source)
+              }
             }
-            created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, config)
-
-            console.log("Session Dataset saved with uuid:", created_uuid)
-            console.log("Awaiting put config...")
-            // Set the name via ConfigDB Info app
+            created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.UNION, component_uuids)
             await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
               name: this.name.trim(),
             })
+          } else if (this.dataset_components.length === 1) {
+            const comp = this.dataset_components[0]
+            if (is_valid_iso(comp.from) && is_valid_iso(comp.to)) {
+              created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SESSION, {
+                source: comp.source, from: comp.from, to: comp.to,
+              })
+              await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
+                name: this.name.trim(),
+              })
+            } else {
+              this.error_message = "Single component must have valid 'from' and 'to' timestamps to create a Session Dataset."
+              throw new Error(this.error_message)
+            }
           } else {
-            // No need to make a new Dataset that is just a copy of an existing one.
-            this.error_message = "Single component must have valid 'from' and 'to' timestamps to create a Session Dataset."
+            this.error_message = 'No valid components to create a dataset.'
             throw new Error(this.error_message)
           }
-        } else {
-          this.error_message = 'No valid components to create a dataset.'
-          throw new Error(this.error_message)
         }
 
         toast.success(this.is_edit ? 'Dataset updated' : 'Dataset created')
@@ -506,7 +543,6 @@ export default {
       } catch (err) {
         console.error('Dataset save failed:', err)
         const status = err.status
-        console.error("HTTP status:", status, "error message:", err.message)
         if (status === 403) {
           this.error_message = 'You do not have permission to perform this action.'
         } else if (status === 409) {

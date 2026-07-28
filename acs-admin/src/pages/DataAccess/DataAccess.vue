@@ -170,7 +170,7 @@ import { useDataAccessStore } from '@store/useDataAccessStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDialog } from '@/composables/useDialog'
 import { toast } from 'vue-sonner'
-import { metadataColumns, structureColumns, structure_label } from './datasetColumns.ts'
+import { metadataColumns, structureColumns, structure_label, STRUCTURE_APPS } from './datasetColumns.ts'
 import NewDatasetDialog from '@components/DataAccess/NewDatasetDialog.vue'
 import NewDatasetDialogTest from '@components/DataAccess/NewDatasetDialogTest.vue'
 import streamSaver from 'streamsaver'
@@ -251,6 +251,31 @@ export default {
 
         delete_dataset (dataset) {
             const name = dataset.name ?? dataset.uuid
+
+            // Block deletion if this dataset is a component of any union datasets
+            const blocking_unions = this.da.structures
+                .filter(s =>
+                    s.structure === STRUCTURE_APPS.UNION &&
+                    Array.isArray(s.config) &&
+                    s.config.includes(dataset.uuid)
+                )
+                .map(s => ({
+                    uuid: s.uuid,
+                    name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
+                }))
+
+            if (blocking_unions.length > 0) {
+                const count = blocking_unions.length
+                useDialog({
+                    title: 'Cannot Delete Dataset',
+                    message: `"${name}" is used as a component in ${count} union dataset${count > 1 ? 's' : ''}. Delete ${count > 1 ? 'those datasets' : 'that dataset'} first, then delete this one.`,
+                    details: blocking_unions.map(u => u.name ? `${u.name} — ${u.uuid}` : u.uuid),
+                    confirmText: 'Close',
+                    hideCancel: true,
+                })
+                return
+            }
+
             useDialog({
                 title: 'Delete Dataset',
                 message: `Are you sure you want to delete the dataset "${name}"? This action cannot be undone.`,
@@ -259,7 +284,7 @@ export default {
                     try {
                         await this.s.client.DataAccess.delete_dataset(dataset.uuid)
                         toast.success('Dataset deleted')
-                        if (this.selectedStructure.uuid === structure.uuid) {
+                        if (this.selectedStructure.uuid === dataset.uuid) {
                             this.selectedStructure = {}
                         }
                     } catch (err) {

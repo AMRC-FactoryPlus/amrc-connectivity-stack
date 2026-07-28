@@ -83,6 +83,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "typescript": "^5.9.3"
   }
 }

@@ -84,9 +84,12 @@
                       <CommandGroup>
                         <CommandItem v-for="ds in filtered_datasets_for_component(idx)" :key="ds.uuid"
                           :value="ds.name ? `${ds.name} ${ds.uuid}` : ds.uuid" @select="select_component(idx, ds.uuid)">
-                          <div class="flex flex-col">
-                            <span class="font-medium">{{ ds.name ?? ds.uuid }}</span>
-                            <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
+                          <div class="flex items-start justify-between w-full gap-2">
+                            <div class="flex flex-col min-w-0">
+                              <span class="font-medium truncate">{{ ds.name ?? ds.uuid }}</span>
+                              <span class="text-xs text-gray-400 font-mono">{{ ds.uuid }}</span>
+                            </div>
+                            <span v-if="ds.structure" class="text-xs text-gray-500 whitespace-nowrap mt-0.5 shrink-0">{{ structure_label(ds.structure) }}</span>
                           </div>
                         </CommandItem>
                       </CommandGroup>
@@ -325,6 +328,7 @@ export default {
       return this.da.structures.map(s => ({
         uuid: s.uuid,
         name: this.da.datasets.find(d => d.uuid === s.uuid)?.name ?? null,
+        structure: s.structure ?? null,
       }))
       .sort((a, b) => (a.name ?? a.uuid).localeCompare(b.name ?? b.uuid))
     },

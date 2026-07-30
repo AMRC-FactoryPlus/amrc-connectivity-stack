@@ -46,7 +46,7 @@
             </td>
             <td class="py-2 pr-3">
               <div class="flex items-center gap-2">
-                <span class="truncate" :class="row.glyph.name">{{ row.name }}</span>
+                <span class="truncate font-medium">{{ row.name }}</span>
                 <Badge v-if="row.supersededBy" variant="secondary"
                     class="shrink-0 font-normal text-slate-500">Superseded</Badge>
                 <i v-if="row.uuid === modelValue"

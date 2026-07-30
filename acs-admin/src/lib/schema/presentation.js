@@ -154,22 +154,26 @@ export function lifecycleOf (row) {
 }
 
 /**
- * Origin glyph. Library rows are locked and their names sit muted, so
- * origin reads as ink weight before it reads as a badge.
+ * Origin glyph.
+ *
+ * The glyph carries origin; the name does not. The design had library
+ * names sit muted so that origin read as ink weight, but a real
+ * deployment is almost entirely library (139 of 141 here), so that
+ * greyed the whole table and made it hard to read. Names are full
+ * weight and full ink, the same as every other table in the app, and
+ * grey is kept for genuinely secondary data.
  */
 export function originOf (row) {
   if (row.origin === 'AMRC library') {
     return {
       icon: 'fa-lock',
-      colour: 'text-slate-300',
-      name: 'text-slate-500',
+      colour: 'text-slate-400',
       label: 'AMRC library',
     }
   }
   return {
     icon: 'fa-location-dot',
-    colour: row.supersededBy ? 'text-slate-400' : 'text-slate-700',
-    name: row.supersededBy ? 'text-slate-500' : 'text-slate-950',
+    colour: 'text-slate-700',
     label: 'Local',
   }
 }

@@ -34,8 +34,9 @@ const draftBadge = () =>
             + 'border-slate-200 px-2 py-0.5 text-xs font-normal whitespace-nowrap',
     }, [h('i', { class: 'fa-solid fa-pen text-[8px]' }), 'Draft'])
 
+/* Grey is for absence, not for small numbers. */
 const count = (n: number, isDraft: boolean) =>
-    h('div', { class: `text-right ${n && !isDraft ? '' : 'text-gray-400'}` },
+    h('div', { class: `text-right font-medium ${n && !isDraft ? '' : 'text-gray-400'}` },
         isDraft ? '-' : String(n))
 
 export const schemaColumns: ColumnDef<SchemaRow>[] = [
@@ -57,7 +58,7 @@ export const schemaColumns: ColumnDef<SchemaRow>[] = [
         accessorFn: (row) => row.name,
         header: ({ column }) => h(DataTableColumnHeader, { column, title: 'Name' }),
         cell: ({ row }) => h('div', { class: 'flex items-center' }, [
-            h('span', { class: `truncate ${originOf(row.original).name}` },
+            h('span', { class: 'max-w-[500px] truncate font-medium' },
                 row.original.name),
             row.original.isDraft
                 ? draftBadge()
@@ -71,15 +72,14 @@ export const schemaColumns: ColumnDef<SchemaRow>[] = [
         accessorKey: 'version',
         accessorFn: (row) => row.version,
         header: ({ column }) => h(DataTableColumnHeader, { column, title: 'Version' }),
-        cell: ({ row }) => h('div', {
-            class: `font-mono ${row.original.supersededBy ? 'text-slate-500' : ''}`,
-        }, row.original.isDraft ? '-' : String(row.original.version)),
+        cell: ({ row }) => h('div', { class: 'font-mono font-medium' },
+            row.original.isDraft ? '-' : String(row.original.version)),
     },
     {
         accessorKey: 'origin',
         accessorFn: (row) => row.origin,
         header: ({ column }) => h(DataTableColumnHeader, { column, title: 'Origin' }),
-        cell: ({ row }) => h('div', { class: 'text-gray-500' }, row.original.origin),
+        cell: ({ row }) => h('div', { class: 'truncate font-medium' }, row.original.origin),
         filterFn: (row, id, value) => value.includes(row.getValue(id)),
     },
     {

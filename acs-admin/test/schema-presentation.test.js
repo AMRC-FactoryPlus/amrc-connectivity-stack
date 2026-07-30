@@ -75,20 +75,19 @@ describe('lifecycle', () => {
 })
 
 describe('origin', () => {
-  it('locks library rows and mutes their names', () => {
-    const origin = originOf({ origin: 'AMRC library' })
-    expect(origin.icon).toEqual('fa-lock')
-    expect(origin.name).toEqual('text-slate-500')
+  it('marks library rows with a lock', () => {
+    expect(originOf({ origin: 'AMRC library' }).icon).toEqual('fa-lock')
   })
 
-  it('gives local rows full-weight ink', () => {
-    const origin = originOf({ origin: 'Local' })
-    expect(origin.icon).toEqual('fa-location-dot')
-    expect(origin.name).toEqual('text-slate-950')
+  it('marks local rows with a pin', () => {
+    expect(originOf({ origin: 'Local' }).icon).toEqual('fa-location-dot')
   })
 
-  it('mutes a superseded local row', () => {
-    expect(originOf({ origin: 'Local', supersededBy: 'x' }).name)
-      .toEqual('text-slate-500')
+  /* Origin is carried by the glyph alone. A deployment is almost all
+   * library, so tying it to name colour greyed the whole table. */
+  it('does not colour the name', () => {
+    expect(originOf({ origin: 'AMRC library' }).name).toBeUndefined()
+    expect(originOf({ origin: 'Local' }).name).toBeUndefined()
+    expect(originOf({ origin: 'Local', supersededBy: 'x' }).name).toBeUndefined()
   })
 })

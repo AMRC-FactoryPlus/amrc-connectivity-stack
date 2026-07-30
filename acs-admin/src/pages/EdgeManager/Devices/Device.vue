@@ -114,6 +114,13 @@
                 label="Schema Version"
                 :value="schema?.schemaInformation?.version"
             />
+            <!-- Lineage flag only. Moving a device between versions is a
+                 deliberate origin map edit, not something to offer here. -->
+            <RouterLink v-if="newerSchema" :to="`/schemas/${newerSchema.uuid}`"
+                class="flex items-center gap-2 text-xs text-amber-700 hover:underline">
+              <i class="fa-solid fa-circle-arrow-up"></i>
+              <span>v{{ newerSchemaVersion }} available</span>
+            </RouterLink>
           </div>
           <!-- Connection section -->
           <div class="flex items-center justify-between gap-2 p-4 border-b">
@@ -158,6 +165,7 @@ import SidebarDetail from '@/components/SidebarDetail.vue'
 import moment from 'moment'
 import EmptyState from '@components/EmptyState.vue'
 import { useSchemaStore } from '@store/useSchemaStore.js'
+import { newestVersion, versionOf } from '@/lib/schema/registry.js'
 import ChangeSchemaDialog from '@components/EdgeManager/Devices/ChangeSchemaDialog.vue'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import ChangeConnectionDialog from '@components/EdgeManager/Devices/ChangeConnectionDialog.vue'
@@ -234,6 +242,20 @@ export default {
       if (!schemaUuid) return null
 
       return this.sch.data.find(s => s.uuid === schemaUuid) || null
+    },
+
+    /* The newest schema in this one's lineage, when it is not this one.
+     * Follows the `replaces` chain written at publication. */
+    newerSchema() {
+      const schemaUuid = this.device?.deviceInformation?.schema
+      if (!schemaUuid) return null
+
+      const newest = newestVersion(this.sch.data, schemaUuid)
+      return newest && newest.uuid !== schemaUuid ? newest : null
+    },
+
+    newerSchemaVersion() {
+      return versionOf(this.newerSchema)
     },
 
     connection() {

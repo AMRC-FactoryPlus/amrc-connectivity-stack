@@ -34,6 +34,7 @@
    - [File Service](./services/file-service.md)
    - [Git Server](./services/git-server.md)
    - [Notify v2](./services/notify-v2.md)
+   - [Schema Editor](./services/schema-editor.md)
 - Authentication
    - [Overview](./auth/README.md)
    - [Connecting OAuth applications](./auth/oauth-clients.md)

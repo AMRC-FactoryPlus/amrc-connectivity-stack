@@ -13,16 +13,20 @@
 <template>
   <div class="flex h-[calc(100vh-4rem)] flex-col -m-4">
     <div class="flex min-h-0 flex-1">
-      <div class="flex min-w-0 flex-1 flex-col gap-3 p-4">
-        <div class="flex shrink-0 items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <div class="relative w-[260px]">
-              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center
-                           pl-3 text-xs text-gray-400">
-                <i class="fa-solid fa-search"></i>
-              </span>
-              <Input v-model="search" class="pl-8" placeholder="Search schemas..."/>
-            </div>
+      <div class="flex min-w-0 flex-1 flex-col p-4">
+        <Skeleton v-if="!ready" v-for="i in 10" class="mb-2 h-16 rounded-lg"/>
+
+        <DataTableSearchable v-else
+            :columns="columns"
+            :data="rows"
+            :filters="filters"
+            :limit-height="false"
+            :clickable="true"
+            :selected-objects="[]"
+            :default-sort="initialSort"
+            :search-key="null"
+            @row-click="e => selectedUuid = e.original.uuid">
+          <template #toolbar-left>
             <Tabs v-model="tab">
               <TabsList>
                 <TabsTrigger v-for="t in tabs" :key="t.value" :value="t.value">
@@ -31,109 +35,26 @@
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
-          <div class="flex items-center gap-2">
-            <Button variant="ghost" size="sm" class="text-slate-500"
+          </template>
+          <template #toolbar-right>
+            <Button variant="ghost" size="sm" class="text-slate-500 whitespace-nowrap"
                 @click="hideSuperseded = !hideSuperseded">
               <i class="fa-solid mr-2" :class="hideSuperseded ? 'fa-eye' : 'fa-eye-slash'"></i>
               {{ hideSuperseded ? 'Show superseded' : 'Hide superseded' }}
             </Button>
-            <Button size="sm" @click="newSchema">
+            <Button size="sm" class="whitespace-nowrap" @click="newSchema">
               <i class="fa-solid fa-plus mr-2"></i>New schema
             </Button>
-          </div>
-        </div>
-
-        <Skeleton v-if="!ready" class="h-96 rounded-md"/>
-
-        <template v-else-if="rows.length">
-          <div class="min-h-0 flex-1 overflow-y-auto rounded-md border border-slate-200">
-            <table class="w-full text-sm">
-              <thead class="sticky top-0 z-10 bg-white">
-                <tr class="border-b border-slate-200">
-                  <th class="w-[34px]"></th>
-                  <th class="h-12 px-4 text-left font-medium text-slate-500">Name</th>
-                  <th class="h-12 w-[78px] px-4 text-left font-medium text-slate-500">
-                    Version
-                  </th>
-                  <th class="h-12 w-[150px] px-4 text-left font-medium text-slate-500">
-                    Origin
-                  </th>
-                  <th class="h-12 w-[96px] px-4 text-right font-medium text-slate-500">
-                    Devices
-                  </th>
-                  <th class="h-12 w-[110px] px-4 text-right font-medium text-slate-500">
-                    Used by
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <template v-for="row in rows" :key="row.uuid ?? row.divider">
-                  <tr v-if="row.divider" class="border-y border-slate-200 bg-gray-50">
-                    <td colspan="6" class="px-4 py-1.5">
-                      <span class="text-xs font-semibold uppercase tracking-wide
-                                   text-slate-500">
-                        AMRC library
-                      </span>
-                      <span class="ml-2.5 text-xs text-gray-400">
-                        {{ row.count }} schemas. Read-only.
-                      </span>
-                    </td>
-                  </tr>
-                  <tr v-else
-                      class="cursor-pointer border-b border-slate-200 transition-colors
-                             hover:bg-slate-100/50"
-                      :class="row.uuid === selectedUuid ? 'bg-slate-100' : ''"
-                      @click="selectedUuid = row.uuid">
-                    <td class="py-2 pl-4 pr-0">
-                      <i class="fa-solid text-[10px]"
-                          :class="[originOf(row).icon, originOf(row).colour]"
-                          :title="originOf(row).label"></i>
-                    </td>
-                    <td class="px-4 py-2">
-                      <span :class="originOf(row).name">{{ row.name }}</span>
-                      <Badge v-if="row.isDraft" variant="outline"
-                          class="ml-2.5 gap-1.5 border-dashed font-normal">
-                        <i class="fa-solid fa-pen text-[8px]"></i>Draft
-                      </Badge>
-                      <Badge v-else-if="row.supersededBy" variant="secondary"
-                          class="ml-2.5 font-normal text-slate-500">
-                        Superseded
-                      </Badge>
-                    </td>
-                    <td class="px-4 py-2 font-mono"
-                        :class="row.supersededBy ? 'text-slate-500' : ''">
-                      {{ row.isDraft ? '-' : row.version }}
-                    </td>
-                    <td class="px-4 py-2 text-gray-500">{{ row.origin }}</td>
-                    <td class="px-4 py-2 text-right"
-                        :class="row.usedBy ? '' : 'text-gray-400'">
-                      {{ row.isDraft ? '-' : row.usedBy }}
-                    </td>
-                    <td class="px-4 py-2 text-right"
-                        :class="row.referencedBy ? '' : 'text-gray-400'">
-                      {{ row.isDraft ? '-' : row.referencedBy }}
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="flex shrink-0 justify-between text-xs text-gray-500">
-            <span>Showing {{ visibleCount }} of {{ allRows.length }}</span>
-            <span v-if="tab === 'all'">
-              Yours first, then the library. Superseded rows sit under their current version.
-            </span>
-          </div>
-        </template>
-
-        <EmptyState v-else
-            title="No schemas here"
-            :description="emptyDescription"
-            button-text="New schema"
-            button-icon="plus"
-            @button-click="newSchema"/>
+          </template>
+          <template #empty>
+            <EmptyState
+                title="No schemas here"
+                :description="emptyDescription"
+                button-text="New schema"
+                button-icon="plus"
+                @button-click="newSchema"/>
+          </template>
+        </DataTableSearchable>
       </div>
 
       <!-- Detail rail -->
@@ -220,13 +141,14 @@ import { toast } from 'vue-sonner'
 
 import { Badge } from '@components/ui/badge'
 import { Button } from '@components/ui/button'
-import { Input } from '@components/ui/input'
 import { Skeleton } from '@components/ui/skeleton/index.js'
 import { Tabs, TabsList, TabsTrigger } from '@components/ui/tabs'
+import DataTableSearchable from '@components/ui/data-table-searchable/DataTableSearchable.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import EmptyState from '@components/EmptyState.vue'
 import ForkDialog from '@components/Schemas/ForkDialog.vue'
 import LineageTimeline from '@components/Schemas/LineageTimeline.vue'
+import { schemaColumns } from './schemaColumns.ts'
 
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import { useSchemaDraftStore } from '@store/useSchemaDraftStore.js'
@@ -234,7 +156,7 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDialog } from '@/composables/useDialog.js'
 
-import { originOf } from '@/lib/schema/presentation.js'
+
 import {
   deleteDraft, derivedFromOf, isLibrarySchema, successorIndex, versionOf,
 } from '@/lib/schema/registry.js'
@@ -244,13 +166,14 @@ export default {
   name: 'Schemas',
 
   components: {
-    Badge, Button, EmptyState, ForkDialog, Input, LineageTimeline, SidebarDetail,
-    Skeleton, Tabs, TabsList, TabsTrigger,
+    Badge, Button, DataTableSearchable, EmptyState, ForkDialog, LineageTimeline,
+    SidebarDetail, Skeleton, Tabs, TabsList, TabsTrigger,
   },
 
   setup () {
     return {
       selectedUuid: ref(null),
+      columns: schemaColumns,
       sch: useSchemaStore(),
       drafts: useSchemaDraftStore(),
       dev: useDeviceStore(),
@@ -260,7 +183,6 @@ export default {
 
   data () {
     return {
-      search: '',
       tab: 'yours',
       hideSuperseded: false,
     }
@@ -331,41 +253,39 @@ export default {
       ]
     },
 
+    /* The tabs and the superseded toggle narrow the set. Text search,
+     * sorting and column visibility belong to the shared table, the same
+     * as every other list in the app. */
     filtered () {
-      const term = this.search.trim().toLowerCase()
       return this.allRows.filter((row) => {
         if (this.tab === 'yours' && row.isLibrary) return false
         if (this.tab === 'drafts' && !row.isDraft) return false
         if (this.tab === 'library' && !row.isLibrary) return false
         if (this.hideSuperseded && row.supersededBy) return false
-        if (!term) return true
-        return row.name.toLowerCase().includes(term)
-          || row.uuid.toLowerCase().includes(term)
+        return true
       })
     },
 
-    /* Yours first, then the library behind a divider. Within each, a
-     * superseded version sorts directly under the one that replaced it
-     * rather than alphabetically away from it. */
     rows () {
-      const byName = (a, b) => a.name.localeCompare(b.name) || a.version - b.version
-      const local = this.filtered.filter(r => !r.isLibrary).sort(byName)
-      const library = this.filtered.filter(r => r.isLibrary).sort(byName)
-
-      const out = [...local]
-      if (library.length) {
-        if (local.length) out.push({ divider: true, count: library.length })
-        out.push(...library)
-      }
-      return out
+      return this.filtered
     },
 
-    visibleCount () {
-      return this.rows.filter(r => !r.divider).length
+    /* Origin descending puts Local above AMRC library, so your own
+     * schemas lead without a section divider the shared table cannot
+     * render. The tabs do the heavier separation. */
+    initialSort () {
+      return [{ id: 'origin', desc: true }, { id: 'name', desc: false }]
+    },
+
+    filters () {
+      return [{
+        name: 'Origin',
+        property: 'origin',
+        options: ['Local', 'AMRC library'].map(o => ({ label: o, value: o })),
+      }]
     },
 
     emptyDescription () {
-      if (this.search) return `Nothing matches "${this.search}".`
       if (this.tab === 'drafts') return 'No schemas are being edited.'
       if (this.tab === 'yours')
         return 'Schemas describe what a machine measures. The AMRC library is loaded on '
@@ -451,8 +371,6 @@ export default {
   },
 
   methods: {
-    originOf,
-
     nameFor (uuid) {
       const entry = (this.sch.data ?? []).find(s => s.uuid === uuid)
       if (!entry) return uuid

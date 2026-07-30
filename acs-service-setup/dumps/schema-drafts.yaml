@@ -1,0 +1,61 @@
+# Schema drafts, for the schema editor in acs-admin.
+#
+# A draft is deliberately not a member of Class.Schema. The schema store,
+# the origin map editor, acs-i3x and the edge agent all enumerate schemas
+# by membership of that class, so a half-built schema held here is
+# invisible to every consumer until it is published.
+#-REQUIRE: schemas
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R1Class:
+    !u ACS.Class.SchemaDraft:
+      name: "Metric schema draft"
+      iri: schema/SchemaDraft
+
+  !u UUIDs.Class.App:
+    !u ACS.App.SchemaDraft:
+      name: "Schema draft"
+      iri: app/SchemaDraft
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+configs:
+  !u UUIDs.App.ConfigSchema:
+    !u ACS.App.SchemaDraft:
+      type: object
+      required:
+        - name
+        - schemaUuid
+        - body
+      properties:
+        name:
+          type: string
+          description: "The schema's name, without a version suffix"
+        schemaUuid:
+          type: string
+          format: uuid
+          description: >-
+            The Schema_UUID the draft will publish under. Minted when the
+            draft is created so the body stays self-consistent, since the
+            git loader rejects a schema whose $id and Schema_UUID differ.
+        version:
+          type: integer
+          minimum: 1
+          description: "The version this draft will publish as"
+        body:
+          type: object
+          description: "The JSON Schema being edited"
+        basedOn:
+          type: [string, "null"]
+          description: >-
+            The published schema this draft edits, or null when the draft
+            will publish as something new. Set for an in-place edit of a
+            locally authored schema; null for a new schema or a fork.
+        derivedFrom:
+          type: [string, "null"]
+          description: >-
+            The schema this draft was forked from, if any. Carried into
+            SchemaInformation on publication so a fork's ancestry stays
+            visible once the draft is gone.

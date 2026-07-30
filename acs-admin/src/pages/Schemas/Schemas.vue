@@ -11,7 +11,7 @@
   -->
 
 <template>
-  <div class="flex flex-1 flex-col min-h-0">
+  <div class="flex h-[calc(100vh-4rem)] flex-col -m-4">
     <div class="flex min-h-0 flex-1">
       <div class="flex min-w-0 flex-1 flex-col gap-3 p-4">
         <div class="flex shrink-0 items-center justify-between gap-2">
@@ -238,7 +238,7 @@ import { originOf } from '@/lib/schema/presentation.js'
 import {
   deleteDraft, derivedFromOf, isLibrarySchema, successorIndex, versionOf,
 } from '@/lib/schema/registry.js'
-import { devicesUsingSchema, schemasReferencing } from '@/lib/schema/usage.js'
+import { buildUsageIndex } from '@/lib/schema/usage.js'
 
 export default {
   name: 'Schemas',
@@ -279,6 +279,13 @@ export default {
       return successorIndex(this.sch.data)
     },
 
+    /* One pass over every schema and device, rather than one pass per
+     * row. Per-row was quadratic and cost about a second of blocked main
+     * thread on a real library. */
+    usage () {
+      return buildUsageIndex(this.sch.data, this.dev.data)
+    },
+
     allRows () {
       const published = (this.sch.data ?? []).map(entry => ({
         uuid: entry.uuid,
@@ -288,8 +295,8 @@ export default {
         origin: isLibrarySchema(entry) ? 'AMRC library' : 'Local',
         isLibrary: isLibrarySchema(entry),
         isDraft: false,
-        usedBy: devicesUsingSchema(this.dev.data, entry.uuid).length,
-        referencedBy: schemasReferencing(this.sch.data, entry.uuid).length,
+        usedBy: this.usage.devices.get(entry.uuid) ?? 0,
+        referencedBy: this.usage.referencedBy.get(entry.uuid) ?? 0,
         supersededBy: this.successors.get(entry.uuid)?.uuid ?? null,
         derivedFrom: derivedFromOf(entry),
       }))

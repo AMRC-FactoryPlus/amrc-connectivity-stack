@@ -3,7 +3,7 @@
   -->
 
 <template>
-  <div class="flex flex-1 flex-col min-h-0">
+  <div class="flex h-[calc(100vh-4rem)] flex-col -m-4">
     <Skeleton v-if="loading" class="m-3 h-full rounded-lg"/>
 
     <div v-else-if="loadError"
@@ -289,6 +289,18 @@ export default {
     await this.load()
   },
 
+  watch: {
+    /* Opening a component navigates from one schema to another, and
+     * both routes render this component. Vue reuses the instance rather
+     * than remounting, so without this the URL changed and nothing
+     * else did. */
+    '$route.fullPath' () {
+      if (!this.$route.path.startsWith('/schemas')) return
+      if (this.$route.path.endsWith('/publish')) return
+      this.load()
+    },
+  },
+
   computed: {
     isDraft () {
       return !!this.draftUuid
@@ -455,6 +467,18 @@ export default {
     async load () {
       this.loading = true
       this.loadError = null
+
+      /* Reset everything the previous schema left behind. This runs on
+       * navigation between schemas, not just on mount, so anything not
+       * cleared here leaks from one to the next. */
+      this.draftUuid = null
+      this.basedOn = null
+      this.derivedFrom = null
+      this.readonly = false
+      this.dirty = false
+      this.selectedId = null
+      this.filter = ''
+      this.doc = null
 
       try {
         const mode = this.$route.meta.schemaMode ?? 'schema'

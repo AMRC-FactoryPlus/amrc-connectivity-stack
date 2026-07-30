@@ -67,11 +67,85 @@ export function devicesUsingSchema (devices, schemaUuid) {
   })
 }
 
+const REF_RX = /^urn:uuid:([-0-9a-f]{36})$/i
+
+/**
+ * Every schema UUID a raw schema body references, at any depth.
+ *
+ * This walks the JSON directly rather than building a document model.
+ * Counting references does not need the typed tree, and parsing deep
+ * clones every node, so going through the model made this quadratic.
+ */
+export function refsInBody (body) {
+  const found = new Set()
+  const walk = (value) => {
+    if (value === null || typeof value !== 'object') return
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item)
+      return
+    }
+    if (typeof value.$ref === 'string') {
+      const m = value.$ref.match(REF_RX)
+      if (m) found.add(m[1].toLowerCase())
+    }
+    for (const inner of Object.values(value)) walk(inner)
+  }
+  walk(body)
+  return found
+}
+
+/**
+ * Count, in one pass, how many schemas reference each schema and how
+ * many devices use it.
+ *
+ * The list shows both figures for every row. Computing them per row
+ * meant re-reading every schema and every device once per row, which is
+ * quadratic: 139 schemas took about a second of blocked main thread
+ * before this existed. Build the index once and look rows up in it.
+ *
+ * @param {Array} schemas the schema store's data
+ * @param {Array} devices the device store's data
+ * @returns {{referencedBy: Map<string, number>, devices: Map<string, number>}}
+ */
+export function buildUsageIndex (schemas, devices) {
+  const referencedBy = new Map()
+  const deviceCounts = new Map()
+
+  const bump = (map, uuid) => map.set(uuid, (map.get(uuid) ?? 0) + 1)
+
+  for (const entry of schemas ?? []) {
+    if (!entry.schema) continue
+    let refs
+    try {
+      refs = refsInBody(entry.schema)
+    } catch {
+      /* A body we cannot read references nothing we can count. It is
+       * still listed, so it is not hidden. */
+      continue
+    }
+    for (const ref of refs) {
+      /* A schema referencing itself would inflate its own count. */
+      if (ref !== entry.uuid) bump(referencedBy, ref)
+    }
+  }
+
+  for (const device of devices ?? []) {
+    const map = device.deviceInformation?.originMap
+    if (!map) continue
+    for (const uuid of schemasInOriginMap(map)) bump(deviceCounts, uuid)
+  }
+
+  return { referencedBy, devices: deviceCounts }
+}
+
 /**
  * Schemas that reference a schema as a component, at any depth.
  *
  * Forking or changing a widely-referenced schema (Common/Metric, say)
  * reaches much further than its own device count suggests.
+ *
+ * For a whole list of rows use buildUsageIndex instead; this walks every
+ * schema and is meant for a single lookup.
  *
  * @param {Array} schemas the schema store's data
  * @param {string} schemaUuid
@@ -81,10 +155,8 @@ export function schemasReferencing (schemas, schemaUuid) {
   return (schemas ?? []).filter((entry) => {
     if (!entry.schema || entry.uuid === schemaUuid) return false
     try {
-      return referencedSchemas(parse(entry.schema)).has(schemaUuid)
+      return refsInBody(entry.schema).has(schemaUuid)
     } catch {
-      /* A schema body we cannot parse cannot be shown to reference
-       * anything. It is still listed elsewhere, so it is not hidden. */
       return false
     }
   })

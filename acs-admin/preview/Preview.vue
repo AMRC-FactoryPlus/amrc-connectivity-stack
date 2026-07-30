@@ -28,6 +28,15 @@
       <ComponentPickerDialog v-else-if="surface === 'component-picker'"
           :open="true" :candidates="candidates" :is-replacing="false"/>
 
+      <div v-else-if="surface === 'schema-picker'" class="p-8">
+        <div class="mx-auto max-w-[600px] rounded-lg border border-slate-200 p-5 shadow-sm">
+          <div class="mb-1 text-lg font-semibold tracking-tight">Select a schema</div>
+          <p class="mb-4 text-sm text-slate-500">Choose the data model for this device</p>
+          <SchemaPicker v-model="pickerValue" :schemas="schemas" :devices="devices"
+              latest-only/>
+        </div>
+      </div>
+
       <RawSchemaDialog v-else-if="surface === 'raw'"
           :open="true" :body="drafts[0].draft.body"/>
 
@@ -45,20 +54,21 @@ import Schemas from '@pages/Schemas/Schemas.vue'
 import SchemaEditor from '@pages/Schemas/SchemaEditor.vue'
 import PublishSchema from '@pages/Schemas/PublishSchema.vue'
 import ComponentPickerDialog from '@components/Schemas/ComponentPickerDialog.vue'
+import SchemaPicker from '@components/Schemas/SchemaPicker.vue'
 import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
 
-import { drafts, schemas } from './fixtures.js'
+import { devices, drafts, schemas } from './fixtures.js'
 
 export default {
   name: 'Preview',
 
   components: {
-    ComponentPickerDialog, PublishSchema, RawSchemaDialog, Schemas,
-    SchemaEditor, Toaster,
+    ComponentPickerDialog, PublishSchema, RawSchemaDialog, SchemaPicker,
+    Schemas, SchemaEditor, Toaster,
   },
 
   data () {
-    return { drafts }
+    return { drafts, schemas, devices, pickerValue: schemas[0]?.uuid ?? null }
   },
 
   computed: {

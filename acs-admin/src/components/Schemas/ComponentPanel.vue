@@ -36,12 +36,15 @@
       </p>
     </div>
 
-    <div v-if="isList" class="flex flex-col gap-1.5">
-      <label class="text-sm font-medium leading-none">Instance names</label>
-      <Input class="font-mono" :model-value="node.pattern" :disabled="readonly"
-          @update:model-value="setPattern"/>
-      <p class="text-xs text-gray-500">
-        A regular expression constraining what each entry may be called.
+    <!-- The naming pattern is not exposed. It is a regular expression,
+         which is beyond this audience, and the library's default covers
+         every real case. An existing pattern is still preserved exactly
+         and still classifies as breaking if a raw edit changes it. -->
+    <div v-if="isList" class="rounded-md border border-slate-200 p-4">
+      <div class="text-sm font-medium">There can be more than one</div>
+      <p class="mt-1 text-xs leading-relaxed text-gray-500">
+        Each one is named on the device that uses this schema, for example
+        Spindle_1 and Spindle_2. Letters, digits and underscores.
       </p>
     </div>
 
@@ -104,11 +107,5 @@ export default {
     },
   },
 
-  methods: {
-    setPattern (value) {
-      this.node.pattern = value
-      this.$emit('change')
-    },
-  },
 }
 </script>

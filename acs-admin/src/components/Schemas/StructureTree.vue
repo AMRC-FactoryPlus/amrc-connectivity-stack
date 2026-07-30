@@ -46,21 +46,25 @@
           {{ trailing(node) }}
         </span>
 
+        <!-- Always in the layout, revealed on hover. Showing and hiding
+             it changed the row height, so the tree jumped under the
+             pointer as you moved down it. -->
         <span v-if="!readonly && node.kind !== 'reserved'"
-            class="hidden group-hover:flex items-center shrink-0 -mr-1">
-          <button class="w-6 h-6 text-[10px] text-slate-300 hover:text-slate-700
+            class="flex items-center shrink-0 -mr-1 opacity-0 pointer-events-none
+                   group-hover:opacity-100 group-hover:pointer-events-auto">
+          <button class="h-5 w-5 text-[10px] leading-none text-slate-300 hover:text-slate-700
                          disabled:opacity-30 disabled:hover:text-slate-300"
               title="Move up" :disabled="index === 0"
               @click.stop="$emit('move', { node, delta: -1 })">
             <i class="fa-solid fa-arrow-up"></i>
           </button>
-          <button class="w-6 h-6 text-[10px] text-slate-300 hover:text-slate-700
+          <button class="h-5 w-5 text-[10px] leading-none text-slate-300 hover:text-slate-700
                          disabled:opacity-30 disabled:hover:text-slate-300"
               title="Move down" :disabled="index === nodes.length - 1"
               @click.stop="$emit('move', { node, delta: 1 })">
             <i class="fa-solid fa-arrow-down"></i>
           </button>
-          <button class="w-6 h-6 text-[10px] text-slate-300 hover:text-red-500"
+          <button class="h-5 w-5 text-[10px] leading-none text-slate-300 hover:text-red-500"
               title="Remove" @click.stop="$emit('remove', node)">
             <i class="fa-solid fa-trash"></i>
           </button>

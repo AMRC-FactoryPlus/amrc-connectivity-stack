@@ -20,6 +20,7 @@ import {
   schemasReferencing,
   devicesPublishingSchema,
   blastRadius,
+  buildUsageIndex,
 } from '../src/lib/schema/usage.js'
 import {
   isLibrarySchema,
@@ -276,5 +277,50 @@ describe('unresolved references', () => {
 
   it('treats an empty published list as resolving nothing', () => {
     expect(unresolvedReferences(new Set(['known-1']), [])).toEqual(['known-1'])
+  })
+})
+
+describe('usage index', () => {
+  const all = Object.entries(library).map(([path, schema]) => ({
+    uuid: schema.properties?.Schema_UUID?.const ?? path,
+    schema,
+  }))
+
+  it('counts references the same as the per-schema lookup', () => {
+    const index = buildUsageIndex(all, [])
+    for (const entry of all.slice(0, 25)) {
+      expect(index.referencedBy.get(entry.uuid) ?? 0)
+        .toEqual(schemasReferencing(all, entry.uuid).length)
+    }
+  })
+
+  it('counts devices the same as the per-schema lookup', () => {
+    const index = buildUsageIndex(all, devices)
+    for (const uuid of [CNC_SCHEMA, SPINDLE_SCHEMA, AXIS_SCHEMA]) {
+      expect(index.devices.get(uuid) ?? 0)
+        .toEqual(devicesUsingSchema(devices, uuid).length)
+    }
+  })
+
+  it('does not count a schema as referencing itself', () => {
+    const selfref = [{
+      uuid: 'aaaaaaaa-0000-0000-0000-000000000001',
+      schema: {
+        properties: {
+          Schema_UUID: { const: 'aaaaaaaa-0000-0000-0000-000000000001' },
+          Loop: { $ref: 'urn:uuid:aaaaaaaa-0000-0000-0000-000000000001' },
+        },
+      },
+    }]
+    expect(buildUsageIndex(selfref, []).referencedBy.size).toEqual(0)
+  })
+
+  it('builds the whole index in one pass over the library', () => {
+    /* Doing this per row was quadratic and cost about a second of
+     * blocked main thread on a real deployment. The bound is generous;
+     * it exists to catch a return to per-row work, not to benchmark. */
+    const started = performance.now()
+    buildUsageIndex(all, devices)
+    expect(performance.now() - started).toBeLessThan(150)
   })
 })

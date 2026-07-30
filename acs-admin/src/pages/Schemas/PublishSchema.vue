@@ -15,7 +15,7 @@
   -->
 
 <template>
-  <div class="flex flex-1 flex-col min-h-0">
+  <div class="flex h-[calc(100vh-4rem)] flex-col -m-4">
     <Skeleton v-if="loading" class="m-3 h-full rounded-lg"/>
 
     <div v-else-if="loadError"

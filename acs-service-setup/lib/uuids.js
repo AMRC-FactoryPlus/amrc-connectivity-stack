@@ -6,11 +6,13 @@ export const ACS = {
     Class: {
         Bridge:             "178506d2-af52-4c79-8e5d-4958ae7ddfa9",
         EdgeDeployment:     "e6f6a6e6-f6b2-422a-bc86-2dcb417a362a",
+        SchemaDraft:        "962cea2c-1b0c-4397-b01b-03d3eb863fc1",
     },
     App: {
         JsonSchema:         "b16e85fb-53c2-49f9-8d83-cdf6763304ba",
         SchemaMetadata:     "32093857-9d29-470e-a897-d2b56d5aa978",
         SchemaIcon:         "65c0ccba-151d-48d3-97b4-d0026a811900",
+        SchemaDraft:        "874ae1f3-7335-4a39-ad9e-d729b27a935b",
         MQTTPermTemplate:   "1266ddf1-156c-4266-9808-d6949418b185",
     },
     /* XXX These might really be Applications? For now they are

@@ -8,6 +8,65 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.4.0
+
+### Schemas can be authored in the admin UI
+
+A new **Schemas** section lets someone who knows what a machine measures
+build a metric schema for it, without writing YAML or opening a pull
+request against the AMRC schema library. Previously the only way to add
+a schema was to hand-write it and get it merged upstream, which put
+site-specific machine definitions in a shared repository and put days
+between describing a machine and reading data off it.
+
+Your deployment's ConfigDB is now the source of truth for its schemas.
+The `acs-schemas` library is still loaded on install and upgrade, but it
+is a starting point rather than the only source. Nothing in the editor
+writes to git.
+
+Library schemas are read-only, because the loader would overwrite any
+local change on the next pull. Editing one makes a local copy under a
+new name and its own version history, so a later AMRC release cannot
+collide with your fork.
+
+### Publishing tells you what a change breaks
+
+When a locally authored schema is published, the editor compares it
+against what is already published and classifies every difference.
+Adding a metric, or changing documentation, a unit or a range, updates
+the schema in place. Removing or renaming a metric, retyping one, or
+narrowing its allowed Sparkplug types creates a new version instead and
+leaves the old one exactly as it is, so nothing moves underneath a
+running device.
+
+Which of the two happens is decided by the comparison, not chosen. The
+publish screen states the outcome, lists the changes that produced it,
+and shows how many devices are configured to use the schema alongside
+how many are publishing it right now. Those two numbers mean different
+things and are reported separately; if the Directory cannot be reached
+the live figure reads as unknown rather than zero.
+
+A device using a superseded schema shows that a newer version exists.
+Moving it across is still a deliberate origin map edit.
+
+### Choosing a schema for a device
+
+The schema selector on a device is now a searchable list rather than a
+dropdown of several hundred names. It shows whether each schema is
+yours or from the library, its version, and how many devices already use
+it, and it is materially faster: the list previously did work
+proportional to the square of the number of schemas, which on a full
+library blocked the browser for about a second every time it rendered.
+
+### Upgrading
+
+A plain `helm upgrade`. `service-setup` registers the two new ConfigDB
+objects the editor needs (a class holding drafts and the application
+holding their working state); until it has run, the schema list works
+but creating a schema does not. Existing schemas, devices and origin
+maps are untouched, and nothing about how the edge agent consumes
+schemas has changed.
+
 ## v6.3.0
 
 ### Cross-realm Kerberos login

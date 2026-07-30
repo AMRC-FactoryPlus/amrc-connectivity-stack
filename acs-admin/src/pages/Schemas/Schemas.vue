@@ -61,7 +61,7 @@
       <div v-if="selected" class="w-96 shrink-0 overflow-y-auto border-l border-slate-200">
         <div class="flex items-center justify-between gap-1 border-b border-slate-200 p-4">
           <div class="flex min-w-0 items-center gap-2 text-xl font-semibold">
-            <i class="fa-solid fa-sitemap shrink-0 text-sm text-slate-500"></i>
+            <i class="fa-solid fa-shapes shrink-0 text-sm text-slate-500"></i>
             <span class="truncate">{{ selected.name }}</span>
           </div>
           <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0"

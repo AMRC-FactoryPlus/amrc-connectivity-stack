@@ -15,7 +15,7 @@
     <Toaster visible-toasts="3" rich-colors/>
 
     <header class="flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 px-4">
-      <i class="fa-solid fa-sitemap"></i>
+      <i class="fa-solid fa-shapes"></i>
       <h3 class="text-lg font-bold tracking-tight">Schemas</h3>
       <span class="ml-auto text-xs text-gray-400">Preview: {{ surface }}</span>
     </header>

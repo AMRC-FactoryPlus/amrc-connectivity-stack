@@ -24,7 +24,7 @@
               @click="leave">
             <i class="fa-solid fa-arrow-left"></i>
           </Button>
-          <i class="fa-solid fa-sitemap shrink-0 text-slate-500"></i>
+          <i class="fa-solid fa-shapes shrink-0 text-slate-500"></i>
           <input v-model="name" :disabled="readonly"
               class="min-w-0 border-b border-transparent bg-transparent text-lg font-bold
                      tracking-tight hover:border-slate-200 focus:border-slate-400

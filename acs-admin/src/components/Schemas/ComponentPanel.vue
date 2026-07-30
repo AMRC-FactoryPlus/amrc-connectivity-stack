@@ -48,8 +48,12 @@
       </p>
     </div>
 
-    <div v-if="targetUuid" class="flex gap-2">
-      <Button variant="outline" size="sm" @click="$emit('open', targetUuid)">
+    <!-- A real link, opened in a new tab. Following it in place would
+         discard whatever is being edited here, and an anchor also gives
+         middle-click and cmd-click for free. -->
+    <div v-if="targetUuid && targetHref" class="flex gap-2">
+      <Button as="a" variant="outline" size="sm" :href="targetHref"
+          target="_blank" rel="noopener">
         <i class="fa-solid fa-arrow-up-right-from-square mr-2"></i>
         Open {{ targetName }}
       </Button>
@@ -75,9 +79,12 @@ export default {
     schemaNames: { type: Object, default: () => ({}) },
     publishedUuids: { type: Object, default: () => new Set() },
     libraryUuids: { type: Object, default: () => new Set() },
+    /* Schema UUID to the draft object that will publish it, so an
+     * unpublished component can still be opened. */
+    draftUuids: { type: Object, default: () => ({}) },
   },
 
-  emits: ['rename', 'pick', 'change', 'open'],
+  emits: ['rename', 'pick', 'change'],
 
   computed: {
     isList () {
@@ -104,6 +111,19 @@ export default {
       if (this.targetIsDraft) return 'Draft'
       if (this.targetIsLibrary) return 'AMRC library'
       return 'Local'
+    },
+
+    /* A draft is addressed by its draft object, a published schema by
+     * its own UUID. Resolved through the router so hash history is
+     * handled for us. */
+    targetHref () {
+      if (!this.targetUuid) return null
+      const path = this.targetIsDraft
+        ? (this.draftUuids[this.targetUuid]
+            ? `/schemas/draft/${this.draftUuids[this.targetUuid]}`
+            : null)
+        : `/schemas/${this.targetUuid}`
+      return path ? this.$router.resolve(path).href : null
     },
   },
 

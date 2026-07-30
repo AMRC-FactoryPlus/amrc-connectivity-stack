@@ -174,9 +174,8 @@
               <ComponentPanel v-else-if="isComponentKind(selectedNode.kind)"
                   :node="selectedNode" :readonly="readonly" :key-error="keyError"
                   :schema-names="schemaNames" :published-uuids="publishedUuids"
-                  :library-uuids="libraryUuids"
-                  @rename="rename" @change="touch" @pick="openReplacePicker"
-                  @open="openSchema"/>
+                  :library-uuids="libraryUuids" :draft-uuids="draftUuids"
+                  @rename="rename" @change="touch" @pick="openReplacePicker"/>
               <GroupPanel v-else-if="selectedNode.kind === 'group'"
                   :node="selectedNode" :readonly="readonly" :key-error="keyError"
                   @rename="rename"/>
@@ -287,6 +286,19 @@ export default {
   async mounted () {
     await Promise.all([this.sch.start(), this.drafts.start()])
     await this.load()
+    /* Closing the tab or reloading is the browser's to warn about. */
+    window.addEventListener('beforeunload', this.warnIfDirty)
+  },
+
+  /* Navigating away inside the app never reaches beforeunload, so the
+   * router has to ask. beforeRouteUpdate covers moving between two
+   * schemas, which reuses this component and so is not a "leave". */
+  beforeRouteLeave (to, from, next) {
+    this.confirmDiscard(next)
+  },
+
+  beforeRouteUpdate (to, from, next) {
+    this.confirmDiscard(next)
   },
 
   watch: {
@@ -329,6 +341,15 @@ export default {
     libraryUuids () {
       return new Set((this.sch.data ?? [])
         .filter(isLibrarySchema).map(e => e.uuid))
+    },
+
+    /* Schema UUID to the draft object that will publish it, so an
+     * unpublished component can still be opened. */
+    draftUuids () {
+      const map = {}
+      for (const entry of this.drafts.data ?? [])
+        if (entry.draft) map[entry.draft.schemaUuid] = entry.uuid
+      return map
     },
 
     schemaNames () {
@@ -525,10 +546,6 @@ export default {
       this.selectedId = node.id
     },
 
-    openSchema (uuid) {
-      this.$router.push(`/schemas/${uuid}`)
-    },
-
     touch () {
       this.dirty = true
     },
@@ -677,21 +694,34 @@ export default {
       if (this.draftUuid) this.$router.push(`/schemas/draft/${this.draftUuid}/publish`)
     },
 
+    /* Fired by the browser on close, reload, or navigation out of the
+     * app. Setting returnValue is what triggers the native prompt; the
+     * wording is the browser's and cannot be set. */
+    warnIfDirty (event) {
+      if (!this.dirty) return
+      event.preventDefault()
+      event.returnValue = ''
+      return ''
+    },
+
+    /* Native confirm rather than the app dialog: a router guard has to
+     * decide synchronously, and the app dialog can be dismissed without
+     * answering, which would strand the navigation. */
+    confirmDiscard (next) {
+      if (!this.dirty) return next()
+      const ok = window.confirm(
+        `${this.name} has unsaved changes. Leave without saving?`)
+      next(ok)
+    },
+
     leave () {
-      if (!this.dirty) {
-        this.$router.push('/schemas')
-        return
-      }
-      useDialog({
-        title: 'Leave without saving?',
-        message: 'This draft has unsaved changes.',
-        confirmText: 'Discard',
-        onConfirm: () => this.$router.push('/schemas'),
-      })
+      /* The route guard asks about unsaved work. */
+      this.$router.push('/schemas')
     },
   },
 
   unmounted () {
+    window.removeEventListener('beforeunload', this.warnIfDirty)
     this.sch.stop()
     this.drafts.stop()
   },

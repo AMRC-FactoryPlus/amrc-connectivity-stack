@@ -3,11 +3,11 @@
   -->
 
 <template>
-  <div class="flex flex-col flex-1 min-h-0">
-    <Skeleton v-if="loading" class="h-full rounded-lg m-3"/>
+  <div class="flex flex-1 flex-col min-h-0">
+    <Skeleton v-if="loading" class="m-3 h-full rounded-lg"/>
 
     <div v-else-if="loadError"
-        class="flex flex-col items-center justify-center flex-1 gap-3 p-10">
+        class="flex flex-1 flex-col items-center justify-center gap-3 p-10">
       <i class="fa-solid fa-triangle-exclamation fa-2x text-amber-500"></i>
       <p class="text-sm text-gray-600">{{ loadError }}</p>
       <Button variant="outline" @click="$router.push('/schemas')">
@@ -17,111 +17,176 @@
 
     <template v-else>
       <!-- Header -->
-      <div class="flex items-center gap-3 px-4 py-3 border-b">
-        <Button variant="ghost" size="icon" title="Back"
-            @click="leave">
-          <i class="fa-solid fa-arrow-left"></i>
-        </Button>
-
-        <div class="flex flex-col min-w-0">
-          <div class="flex items-center gap-2">
-            <input v-model="name" :disabled="readonly"
-                class="font-semibold text-lg bg-transparent border-b border-transparent
-                       hover:border-gray-200 focus:border-gray-400 focus:outline-none"/>
-            <span v-if="readonly"
-                class="text-xs rounded bg-slate-100 text-slate-700 px-1.5 py-0.5">
-              AMRC library
-            </span>
-            <span v-else-if="isDraft"
-                class="text-xs rounded bg-blue-100 text-blue-800 px-1.5 py-0.5">
-              Draft
-            </span>
-            <span v-else class="text-xs rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5">
-              v{{ version }}
-            </span>
-          </div>
-          <p v-if="readonly" class="text-xs text-gray-500">
-            This schema comes from the AMRC library. Editing creates a local copy.
-          </p>
+      <div class="flex h-16 shrink-0 items-center justify-between gap-3 border-b
+                  border-slate-200 px-4">
+        <div class="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" class="h-8 w-8 shrink-0" title="Back"
+              @click="leave">
+            <i class="fa-solid fa-arrow-left"></i>
+          </Button>
+          <i class="fa-solid fa-sitemap shrink-0 text-slate-500"></i>
+          <input v-model="name" :disabled="readonly"
+              class="min-w-0 border-b border-transparent bg-transparent text-lg font-bold
+                     tracking-tight hover:border-slate-200 focus:border-slate-400
+                     focus:outline-none disabled:cursor-default"/>
+          <Badge v-if="isDraft" variant="outline"
+              class="shrink-0 gap-1.5 border-dashed font-normal">
+            <i class="fa-solid fa-pen text-[8px]"></i>Draft
+          </Badge>
+          <span class="shrink-0 truncate text-xs text-gray-500">{{ statusLine }}</span>
         </div>
 
-        <div class="flex items-center gap-2 ml-auto">
-          <Button variant="ghost" @click="rawOpen = true">
-            <i class="fa-solid fa-code mr-2"></i>Raw
+        <div class="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" size="sm" class="text-slate-500" @click="rawOpen = true">
+            <i class="fa-solid fa-code mr-2"></i>Raw JSON
           </Button>
-          <Button v-if="readonly" @click="fork">
-            <i class="fa-solid fa-code-fork mr-2"></i>Make a local copy
+          <div class="h-5 w-px bg-slate-200"></div>
+          <Button v-if="readonly" size="sm" @click="fork">
+            <i class="fa-solid fa-code-branch mr-2"></i>Make a local copy
           </Button>
           <template v-else>
-            <Button variant="outline" :disabled="saving || !dirty" @click="save">
-              <i v-if="saving" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
-              Save
+            <Button variant="outline" size="sm" :disabled="saving || !dirty" @click="save">
+              <i v-if="saving" class="fa-solid fa-circle-notch fa-spin mr-2"></i>Save
             </Button>
-            <Button @click="openPublish">
-              <i class="fa-solid fa-upload mr-2"></i>Publish
+            <Button size="sm" @click="openPublish">
+              <i class="fa-solid fa-rocket mr-2"></i>Publish
             </Button>
           </template>
         </div>
       </div>
 
+      <div v-if="readonly"
+          class="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-gray-50
+                 px-4 py-2 text-xs text-gray-600">
+        <i class="fa-solid fa-lock text-slate-400"></i>
+        This schema comes from the AMRC library. Editing creates a local copy.
+      </div>
+
       <!-- Body -->
-      <div class="flex flex-1 min-h-0">
-        <div class="w-[26rem] border-r flex flex-col min-h-0">
-          <div class="flex-1 overflow-y-auto p-3">
+      <div class="flex min-h-0 flex-1">
+        <div class="flex w-[400px] shrink-0 flex-col border-r border-slate-200">
+          <div class="flex shrink-0 items-center gap-2 border-b border-slate-200 p-3">
+            <div class="relative flex-1">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center
+                           pl-3 text-xs text-gray-400">
+                <i class="fa-solid fa-search"></i>
+              </span>
+              <Input v-model="filter" class="h-8 pl-8" placeholder="Filter nodes..."/>
+            </div>
+            <DropdownMenu v-if="!readonly">
+              <DropdownMenuTrigger as-child>
+                <Button variant="outline" size="sm" class="h-8 shrink-0">
+                  <i class="fa-solid fa-plus mr-2"></i>Add
+                  <i class="fa-solid fa-chevron-down ml-2 text-[9px] opacity-50"></i>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-56">
+                <DropdownMenuLabel class="text-xs font-normal text-gray-500">
+                  Adding into {{ targetLabel }}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator/>
+                <DropdownMenuItem @click="addMetric">
+                  <i class="fa-solid fa-gauge fa-fw mr-2 text-slate-400"></i>Metric
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="openPicker">
+                  <i class="fa-solid fa-cube fa-fw mr-2 text-slate-700"></i>Component
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="addGroup">
+                  <i class="fa-solid fa-folder fa-fw mr-2 text-amber-500"></i>Group
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <!-- Reserved properties live here rather than in the tree, so
+               everything in the tree is something the user can edit. -->
+          <div class="shrink-0 border-b border-slate-200 bg-gray-50 px-3 py-2.5">
+            <div class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.05em]
+                        text-gray-400">
+              Set by the platform
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <span v-for="node in reservedNodes" :key="node.id"
+                  class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5
+                         font-mono text-xs text-gray-500">
+                {{ node.key }}
+              </span>
+              <span v-if="!reservedNodes.length" class="text-xs text-gray-400">
+                None
+              </span>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-2">
             <StructureTree
-                :nodes="doc.children"
+                :nodes="visibleNodes"
                 :selected-id="selectedId"
                 :readonly="readonly"
                 :schema-names="schemaNames"
                 @select="select"
                 @remove="remove"
                 @move="move"/>
+            <p v-if="filter && !visibleNodes.length"
+                class="p-3 text-center text-xs text-gray-400">
+              Nothing matches "{{ filter }}".
+            </p>
           </div>
 
-          <div v-if="!readonly" class="border-t p-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" @click="addMetric">
-              <i class="fa-solid fa-gauge mr-2"></i>Metric
-            </Button>
-            <Button size="sm" variant="outline" @click="openPicker">
-              <i class="fa-solid fa-cube mr-2"></i>Component
-            </Button>
-            <Button size="sm" variant="outline" @click="addGroup">
-              <i class="fa-solid fa-folder mr-2"></i>Group
-            </Button>
+          <div class="flex shrink-0 items-center justify-between border-t border-slate-200
+                      px-3 py-2 text-[10px] text-gray-400">
+            <span>{{ nodeCount }} nodes</span>
+            <span v-if="filter">{{ visibleCount }} shown</span>
           </div>
-          <p v-if="!readonly" class="px-3 pb-3 text-xs text-gray-400">
-            Adding into {{ targetLabel }}.
-          </p>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex min-w-0 flex-1 flex-col">
           <template v-if="selectedNode">
-            <MetricPanel v-if="selectedNode.kind === 'metric'"
-                :node="selectedNode" :readonly="readonly" :key-error="keyError"
-                @rename="rename" @change="touch"/>
-            <ComponentPanel v-else-if="isComponentKind(selectedNode.kind)"
-                :node="selectedNode" :readonly="readonly" :key-error="keyError"
-                :schema-names="schemaNames" :published-uuids="publishedUuids"
-                @rename="rename" @change="touch" @pick="openReplacePicker"/>
-            <GroupPanel v-else-if="selectedNode.kind === 'group'"
-                :node="selectedNode" :readonly="readonly" :key-error="keyError"
-                @rename="rename"/>
-            <div v-else class="max-w-2xl flex flex-col gap-3">
-              <div class="text-sm font-medium">{{ selectedNode.key }}</div>
-              <p class="text-sm text-gray-500">
-                {{ selectedNode.kind === 'reserved'
-                  ? 'Set by Factory+ and not editable.'
-                  : 'This part of the schema is kept exactly as it is. Use the raw view to see it.' }}
-              </p>
-              <pre class="bg-gray-50 border rounded-md p-3 text-xs overflow-x-auto">{{
-                JSON.stringify(selectedNode.raw, null, 2)
-              }}</pre>
+            <div class="flex shrink-0 items-center justify-between border-b
+                        border-slate-200 px-5 py-3.5">
+              <div>
+                <div class="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                  <template v-for="(segment, i) in breadcrumb" :key="i">
+                    <span v-if="i" class="text-[10px] text-gray-400">
+                      <i class="fa-solid fa-chevron-right"></i>
+                    </span>
+                    <span :class="i === breadcrumb.length - 1
+                      ? 'text-slate-950 font-mono' : ''">{{ segment }}</span>
+                  </template>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-fw" :class="[selectedPresentation.icon,
+                    selectedPresentation.colour]"></i>
+                  <span class="text-xl font-semibold tracking-tight">
+                    {{ selectedPresentation.title }}
+                  </span>
+                </div>
+              </div>
+              <Button v-if="!readonly && selectedNode.kind !== 'reserved'"
+                  variant="destructiveGhost" size="sm" @click="remove(selectedNode)">
+                <i class="fa-solid fa-trash mr-2"></i>Delete
+              </Button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5">
+              <MetricPanel v-if="selectedNode.kind === 'metric'"
+                  :node="selectedNode" :readonly="readonly" :key-error="keyError"
+                  @rename="rename" @change="touch"/>
+              <ComponentPanel v-else-if="isComponentKind(selectedNode.kind)"
+                  :node="selectedNode" :readonly="readonly" :key-error="keyError"
+                  :schema-names="schemaNames" :published-uuids="publishedUuids"
+                  :library-uuids="libraryUuids"
+                  @rename="rename" @change="touch" @pick="openReplacePicker"
+                  @open="openSchema"/>
+              <GroupPanel v-else-if="selectedNode.kind === 'group'"
+                  :node="selectedNode" :readonly="readonly" :key-error="keyError"
+                  @rename="rename"/>
+              <OpaquePanel v-else :node="selectedNode"/>
             </div>
           </template>
 
-          <div v-else class="flex items-center justify-center h-full">
+          <div v-else class="flex flex-1 items-center justify-center">
             <div class="text-center">
-              <i class="fa-solid fa-gauge fa-2x text-gray-300"></i>
+              <i class="fa-solid fa-gauge fa-2x text-slate-300"></i>
               <h3 class="mt-3 text-sm font-medium text-gray-700">Nothing selected</h3>
               <p class="mt-1 text-sm text-gray-400">
                 Pick something on the left to edit it.
@@ -138,25 +203,7 @@
         :is-replacing="!!replacingId"
         @choose="chooseComponent"/>
 
-    <RawSchemaDialog
-        v-model:open="rawOpen"
-        :body="rawBody"
-        @apply="applyRaw"/>
-
-    <PublishDialog
-        v-model:open="publishOpen"
-        :name="name"
-        :version="version"
-        :based-on="basedOn"
-        :changes="classification.changes"
-        :breaking="classification.breaking"
-        :configured="reach.configured"
-        :publishing="reach.publishing"
-        :referenced-by="reach.referencedBy"
-        :unresolved="unresolved"
-        :schema-names="schemaNames"
-        :working="publishing"
-        @confirm="publish"/>
+    <RawSchemaDialog v-model:open="rawOpen" :body="rawBody" @apply="applyRaw"/>
   </div>
 </template>
 
@@ -165,62 +212,52 @@ import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { v4 as uuidv4 } from 'uuid'
 
+import { Badge } from '@components/ui/badge'
 import { Button } from '@components/ui/button'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@components/ui/dropdown-menu'
+import { Input } from '@components/ui/input'
 import { Skeleton } from '@components/ui/skeleton/index.js'
 
 import StructureTree from '@components/Schemas/StructureTree.vue'
 import MetricPanel from '@components/Schemas/MetricPanel.vue'
 import ComponentPanel from '@components/Schemas/ComponentPanel.vue'
 import GroupPanel from '@components/Schemas/GroupPanel.vue'
+import OpaquePanel from '@components/Schemas/OpaquePanel.vue'
 import ComponentPickerDialog from '@components/Schemas/ComponentPickerDialog.vue'
 import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
-import PublishDialog from '@components/Schemas/PublishDialog.vue'
 
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import { useSchemaDraftStore } from '@store/useSchemaDraftStore.js'
-import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDialog } from '@/composables/useDialog.js'
 
 import { NodeKind } from '@/lib/schema/constants.js'
+import { presentationFor } from '@/lib/schema/presentation.js'
 import {
-  findNode,
-  keyAvailable,
-  newComponent,
-  newComponentList,
-  newDocument,
-  newGroup,
-  newMetric,
-  parse,
-  referencedSchemas,
-  serialise,
+  findNode, keyAvailable, newComponent, newComponentList, newDocument, newGroup,
+  newMetric, parse, pathOf, serialise, walk,
 } from '@/lib/schema/document.js'
-import { classify } from '@/lib/schema/classify.js'
-import { blastRadius } from '@/lib/schema/usage.js'
 import {
-  createDraft,
-  deleteDraft,
-  isLibrarySchema,
-  publishInPlace,
-  publishNew,
-  saveDraft,
-  unresolvedReferences,
-  versionOf,
+  createDraft, isLibrarySchema, saveDraft, versionOf,
 } from '@/lib/schema/registry.js'
 
 export default {
   name: 'SchemaEditor',
 
   components: {
-    Button, ComponentPanel, ComponentPickerDialog, GroupPanel, MetricPanel,
-    PublishDialog, RawSchemaDialog, Skeleton, StructureTree,
+    Badge, Button, ComponentPanel, ComponentPickerDialog, DropdownMenu,
+    DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+    DropdownMenuTrigger, GroupPanel, Input, MetricPanel, OpaquePanel,
+    RawSchemaDialog, Skeleton, StructureTree,
   },
 
   setup () {
     return {
       sch: useSchemaStore(),
       drafts: useSchemaDraftStore(),
-      dev: useDeviceStore(),
       s: useServiceClientStore(),
       doc: ref(null),
     }
@@ -233,28 +270,22 @@ export default {
       name: '',
       version: 1,
       schemaUuid: null,
-      /* The published schema this edits, or null when it publishes as
-       * something new (a fresh schema, or any fork). */
       basedOn: null,
       derivedFrom: null,
       draftUuid: null,
       readonly: false,
       dirty: false,
       saving: false,
-      publishing: false,
       selectedId: null,
+      filter: '',
       pickerOpen: false,
       replacingId: null,
       rawOpen: false,
-      publishOpen: false,
-      classification: { changes: [], breaking: false, additive: false },
-      reach: { configured: [], publishing: null, referencedBy: [] },
-      unresolved: [],
     }
   },
 
   async mounted () {
-    await Promise.all([this.sch.start(), this.drafts.start(), this.dev.start()])
+    await Promise.all([this.sch.start(), this.drafts.start()])
     await this.load()
   },
 
@@ -263,29 +294,48 @@ export default {
       return !!this.draftUuid
     },
 
+    statusLine () {
+      if (this.readonly) return 'AMRC library'
+      if (!this.basedOn) return `Version ${this.version}, not yet published`
+      const published = this.publishedEntry
+      const devices = published ? '' : ''
+      return this.isDraft
+        ? `Version ${this.version} draft${devices}`
+        : `Version ${this.version}`
+    },
+
+    publishedEntry () {
+      return this.basedOn
+        ? (this.sch.data ?? []).find(e => e.uuid === this.basedOn)
+        : null
+    },
+
     publishedUuids () {
       return new Set((this.sch.data ?? []).map(e => e.uuid))
+    },
+
+    libraryUuids () {
+      return new Set((this.sch.data ?? [])
+        .filter(isLibrarySchema).map(e => e.uuid))
     },
 
     schemaNames () {
       const names = {}
       for (const entry of this.sch.data ?? [])
         names[entry.uuid] = `${entry.schemaInformation?.name ?? entry.name} `
-          + `(v${versionOf(entry)})`
+          + `v${versionOf(entry)}`
       for (const entry of this.drafts.data ?? [])
         if (entry.draft) names[entry.draft.schemaUuid] = `${entry.draft.name} (draft)`
       return names
     },
 
-    /* Everything that could be used as a component, minus this schema
-     * itself. Self-reference would make an infinite tree, and the ref
-     * resolver in the origin map editor would recurse until it died. */
     componentCandidates () {
       const published = (this.sch.data ?? [])
         .filter(e => e.uuid !== this.schemaUuid)
         .map(e => ({
           uuid: e.uuid,
-          label: `${e.schemaInformation?.name ?? e.name} (v${versionOf(e)})`,
+          label: `${e.schemaInformation?.name ?? e.name} v${versionOf(e)}`,
+          origin: isLibrarySchema(e) ? 'AMRC library' : 'Local',
           isDraft: false,
         }))
 
@@ -294,6 +344,7 @@ export default {
         .map(e => ({
           uuid: e.draft.schemaUuid,
           label: e.draft.name,
+          origin: 'Draft',
           isDraft: true,
         }))
 
@@ -301,13 +352,70 @@ export default {
         .sort((a, b) => a.label.localeCompare(b.label))
     },
 
+    /* Reserved properties are shown above the tree, not in it. */
+    reservedNodes () {
+      return (this.doc?.children ?? [])
+        .filter(n => n.kind === NodeKind.RESERVED)
+    },
+
+    editableNodes () {
+      return (this.doc?.children ?? [])
+        .filter(n => n.kind !== NodeKind.RESERVED)
+    },
+
+    visibleNodes () {
+      const term = this.filter.trim().toLowerCase()
+      if (!term) return this.editableNodes
+
+      /* A group survives the filter if it or any descendant matches, so
+       * filtering never hides the path to a hit. */
+      const prune = (nodes) => nodes.reduce((kept, node) => {
+        const hit = node.key.toLowerCase().includes(term)
+        if (node.kind === NodeKind.GROUP) {
+          const children = prune(node.children ?? [])
+          if (hit || children.length)
+            kept.push(hit ? node : { ...node, children })
+        } else if (hit) {
+          kept.push(node)
+        }
+        return kept
+      }, [])
+
+      return prune(this.editableNodes)
+    },
+
+    nodeCount () {
+      let n = 0
+      if (this.doc) walk(this.doc, () => n++)
+      return n
+    },
+
+    visibleCount () {
+      let n = 0
+      const count = (nodes) => {
+        for (const node of nodes) {
+          n++
+          if (node.kind === NodeKind.GROUP) count(node.children ?? [])
+        }
+      }
+      count(this.visibleNodes)
+      return n
+    },
+
     selectedNode () {
       if (!this.doc || !this.selectedId) return null
       return findNode(this.doc, this.selectedId)?.node ?? null
     },
 
-    /* Adding goes into the selected group, or into whichever group holds
-     * the selection, so adding after clicking a metric lands beside it. */
+    selectedPresentation () {
+      return presentationFor(this.selectedNode?.kind)
+    },
+
+    breadcrumb () {
+      if (!this.selectedNode) return []
+      return [this.name, ...(pathOf(this.doc, this.selectedId) ?? [])]
+    },
+
     targetContainer () {
       if (!this.doc) return null
       if (!this.selectedId) return this.doc
@@ -349,9 +457,8 @@ export default {
       this.loadError = null
 
       try {
-        const { mode, id } = this.$route.meta.schemaMode
-          ? { mode: this.$route.meta.schemaMode, id: this.$route.params.id }
-          : { mode: 'schema', id: this.$route.params.id }
+        const mode = this.$route.meta.schemaMode ?? 'schema'
+        const id = this.$route.params.id
 
         if (mode === 'new') {
           const uuid = uuidv4()
@@ -394,6 +501,10 @@ export default {
       this.selectedId = node.id
     },
 
+    openSchema (uuid) {
+      this.$router.push(`/schemas/${uuid}`)
+    },
+
     touch () {
       this.dirty = true
     },
@@ -406,8 +517,7 @@ export default {
     },
 
     addNode (node) {
-      const container = this.targetContainer
-      container.children.push(node)
+      this.targetContainer.children.push(node)
       this.selectedId = node.id
       this.touch()
     },
@@ -450,7 +560,8 @@ export default {
       }
 
       const label = (this.schemaNames[ref] ?? 'Component')
-        .replace(/\s*\(.*\)$/, '')
+        .replace(/\s+v\d+$/, '')
+        .replace(/\s*\(draft\)$/, '')
         .replace(/[^A-Za-z0-9_]+/g, '_')
       const key = this.uniqueKey(label || 'Component')
       this.addNode(asList ? newComponentList(key, ref) : newComponent(key, ref))
@@ -488,8 +599,6 @@ export default {
     applyRaw (body) {
       try {
         this.doc = parse(body)
-        /* The raw view can change the identity. Keep our copy in step so
-         * publishing writes the object the body claims to be. */
         if (this.doc.uuid) this.schemaUuid = this.doc.uuid
         this.selectedId = null
         this.touch()
@@ -507,26 +616,26 @@ export default {
       })
     },
 
+    draftPayload () {
+      return {
+        name: this.name,
+        schemaUuid: this.schemaUuid,
+        body: serialise(this.doc),
+        basedOn: this.basedOn,
+        derivedFrom: this.derivedFrom,
+        version: this.version,
+      }
+    },
+
     async save () {
       this.saving = true
       try {
-        const body = serialise(this.doc)
-        const draft = {
-          name: this.name,
-          schemaUuid: this.schemaUuid,
-          body,
-          basedOn: this.basedOn,
-          derivedFrom: this.derivedFrom,
-          version: this.version,
-        }
-
         if (this.draftUuid) {
-          await saveDraft(this.s.client, this.draftUuid, draft)
+          await saveDraft(this.s.client, this.draftUuid, this.draftPayload())
         } else {
-          this.draftUuid = await createDraft(this.s.client, draft)
+          this.draftUuid = await createDraft(this.s.client, this.draftPayload())
           this.$router.replace(`/schemas/draft/${this.draftUuid}`)
         }
-
         this.dirty = false
         toast.success('Draft saved')
       } catch (err) {
@@ -537,90 +646,11 @@ export default {
       }
     },
 
+    /* Publishing is a place of its own, not a dialog over the editor.
+     * It has a verdict to deliver and evidence to show for it. */
     async openPublish () {
-      const body = serialise(this.doc)
-
-      const published = this.basedOn
-        ? (this.sch.data ?? []).find(e => e.uuid === this.basedOn)
-        : null
-
-      this.classification = published?.schema
-        ? classify(published.schema, body)
-        : { changes: [], breaking: false, additive: false }
-
-      this.unresolved = unresolvedReferences(
-        referencedSchemas(this.doc), this.sch.data)
-
-      this.reach = await blastRadius({
-        client: this.s.client,
-        schemaUuid: this.basedOn ?? this.schemaUuid,
-        devices: this.dev.data,
-        schemas: this.sch.data,
-      })
-
-      this.publishOpen = true
-    },
-
-    async publish () {
-      this.publishing = true
-      try {
-        const body = serialise(this.doc)
-        const published = this.basedOn
-          ? (this.sch.data ?? []).find(e => e.uuid === this.basedOn)
-          : null
-
-        let target
-
-        if (this.basedOn && !this.classification.breaking) {
-          /* Every change is additive and the schema is locally authored,
-           * so nothing beneath a running device moves. */
-          target = await publishInPlace(this.s.client, {
-            schemaUuid: this.basedOn,
-            name: this.name,
-            version: this.version,
-            body,
-            existing: published?.schemaInformation,
-          })
-        } else {
-          /* A new schema, a fork, or a breaking edit. All three publish
-           * as a new object under a new UUID, leaving whatever came
-           * before untouched for the devices still on it. */
-          const isNewVersion = !!this.basedOn
-          const version = isNewVersion ? this.version + 1 : this.version
-
-          if (isNewVersion) {
-            /* A breaking edit forks. Mint the new identity here rather
-             * than reusing the draft's, which may still be the one the
-             * published schema occupies. */
-            const uuid = uuidv4()
-            this.doc.uuid = uuid
-            this.schemaUuid = uuid
-          }
-
-          target = await publishNew(this.s.client, {
-            name: this.name,
-            version,
-            body: serialise(this.doc),
-            replaces: isNewVersion ? this.basedOn : null,
-            derivedFrom: this.derivedFrom,
-          })
-        }
-
-        if (this.draftUuid) {
-          await deleteDraft(this.s.client, this.draftUuid)
-          this.draftUuid = null
-        }
-
-        this.publishOpen = false
-        this.dirty = false
-        toast.success(`${this.name} published`)
-        this.$router.push(`/schemas/${target}`)
-      } catch (err) {
-        console.error('Failed to publish schema', err)
-        toast.error('Could not publish', { description: err.message })
-      } finally {
-        this.publishing = false
-      }
+      if (this.dirty || !this.draftUuid) await this.save()
+      if (this.draftUuid) this.$router.push(`/schemas/draft/${this.draftUuid}/publish`)
     },
 
     leave () {
@@ -640,7 +670,6 @@ export default {
   unmounted () {
     this.sch.stop()
     this.drafts.stop()
-    this.dev.stop()
   },
 }
 </script>

@@ -73,10 +73,77 @@ const LOCAL_V2 = {
   },
 }
 
-export const schemas = [
+/* Every schema a seed references, transitively. Hand-listing them meant
+ * a schema referenced by CNC but absent from the fixtures showed up as
+ * an unpublished component, which is a real state and so looked like
+ * working behaviour rather than a gap in the fixtures. */
+function withReferences (seeds) {
+  const byUuid = new Map()
+  for (const [path, body] of Object.entries(library)) {
+    const uuid = uuidOf(body)
+    if (uuid) byUuid.set(uuid, { path, body })
+  }
+
+  const collect = (body, into) => {
+    const walk = (value) => {
+      if (value === null || typeof value !== 'object') return
+      if (Array.isArray(value)) return value.forEach(walk)
+      if (typeof value.$ref === 'string') {
+        const m = value.$ref.match(/^urn:uuid:([-0-9a-f]{36})$/i)
+        if (m) into.add(m[1].toLowerCase())
+      }
+      for (const inner of Object.values(value)) walk(inner)
+    }
+    walk(body)
+  }
+
+  const out = new Map(seeds.map(s => [s.uuid, s]))
+  const queue = seeds.map(s => s.schema)
+
+  while (queue.length) {
+    const refs = new Set()
+    collect(queue.pop(), refs)
+    for (const uuid of refs) {
+      if (out.has(uuid)) continue
+      const found = byUuid.get(uuid)
+      if (!found) continue
+      const name = found.path.replace(/^.*\//, '').replace(/-v\d+\.yaml$/, '')
+        .replace(/_/g, ' ')
+      const entry = libraryEntry(found.path, name)
+      out.set(uuid, entry)
+      queue.push(entry.schema)
+    }
+  }
+
+  return [...out.values()]
+}
+
+export const schemas = withReferences([
   CNC, SPINDLE, AXIS, CHANNEL, DEVINFO, METRIC, ROBOT, PRESS,
   LOCAL_V1, LOCAL_V2,
-]
+])
+
+/* A draft of the local CNC schema with a metric renamed and two added,
+ * so the publish page shows a real classification rather than a
+ * hand-written one. */
+function editedLocalBody (edit) {
+  const body = JSON.parse(JSON.stringify(LOCAL_V1.schema))
+  edit(body.properties)
+  return body
+}
+
+const metricProperty = (types, docs, unit) => ({
+  allOf: [
+    { $ref: 'urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769' },
+    {
+      properties: {
+        Sparkplug_Type: { enum: types },
+        Documentation: { default: docs },
+        ...(unit ? { Eng_Unit: { default: unit } } : {}),
+      },
+    },
+  ],
+})
 
 export const drafts = [
   {
@@ -89,6 +156,83 @@ export const drafts = [
       basedOn: null,
       derivedFrom: null,
       body: laserCutterBody(),
+    },
+  },
+  {
+    uuid: 'dddddddd-0000-4000-8000-000000000002',
+    name: 'CNC Sheffield (draft)',
+    draft: {
+      name: 'CNC Sheffield',
+      schemaUuid: LOCAL_V1_UUID,
+      version: 1,
+      basedOn: LOCAL_V1_UUID,
+      derivedFrom: CNC.uuid,
+      body: editedLocalBody((props) => {
+        /* Breaking: a rename and a removal. */
+        props.Spindle_Units = props.Spindles
+        delete props.Spindles
+        delete props.Channels
+        /* Additive: new metrics and a new group. */
+        props.Coolant_Temp = metricProperty(['DoubleLE'],
+          'Coolant temperature at the outflow manifold.', '°C')
+        props.Coolant_Flow = metricProperty(['DoubleLE'],
+          'Coolant flow rate.', 'L/min')
+        props.Tool_Number = metricProperty(['UInt32LE'],
+          'Active tool number in the carousel.')
+        props.Alarm_State = metricProperty(['String'], 'Current alarm state.')
+        props.Spindle_Hours = metricProperty(['DoubleLE'],
+          'Cumulative spindle running hours.', 'h')
+      }),
+    },
+  },
+  {
+    uuid: 'dddddddd-0000-4000-8000-000000000003',
+    name: 'Press Brake (draft)',
+    draft: {
+      name: 'Press Brake',
+      schemaUuid: LOCAL_V1_UUID,
+      version: 1,
+      basedOn: LOCAL_V1_UUID,
+      derivedFrom: CNC.uuid,
+      body: editedLocalBody((props) => {
+        /* Nothing removed or renamed, so this updates in place. */
+        props.Coolant_Flow = metricProperty(['DoubleLE'],
+          'Coolant flow rate.', 'L/min')
+        props.Tool_Number = metricProperty(['UInt32LE'],
+          'Active tool number in the carousel.')
+        props.Coolant_Pressure = metricProperty(['FloatLE'],
+          'Coolant line pressure.', 'bar')
+      }),
+    },
+  },
+  {
+    uuid: 'dddddddd-0000-4000-8000-000000000004',
+    name: 'Press Line (draft)',
+    draft: {
+      name: 'Press Line',
+      schemaUuid: 'aaaa0000-0000-4000-8000-00000000000a',
+      version: 1,
+      basedOn: null,
+      derivedFrom: null,
+      /* References the Laser Cutter draft, which is not published, so
+       * this one is blocked. */
+      body: {
+        $id: 'urn:uuid:aaaa0000-0000-4000-8000-00000000000a',
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        title: 'Press Line',
+        type: 'object',
+        properties: {
+          Schema_UUID: { const: 'aaaa0000-0000-4000-8000-00000000000a' },
+          Instance_UUID: {
+            description: 'The unique identifier for this object. (A UUID specified by RFC4122).',
+            type: 'string',
+            format: 'uuid',
+          },
+          Cutter: { $ref: 'urn:uuid:aaaa0000-0000-4000-8000-000000000009' },
+          Line_Speed: metricProperty(['DoubleLE'], 'Line throughput.', 'm/min'),
+        },
+        required: ['Schema_UUID', 'Instance_UUID'],
+      },
     },
   },
 ]

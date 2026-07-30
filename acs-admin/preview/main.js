@@ -43,6 +43,11 @@ const router = createRouter({
       meta: { name: 'Schemas', schemaMode: 'draft' },
     },
     {
+      path: '/schemas/draft/:id/publish',
+      component: Preview,
+      meta: { name: 'Schemas' },
+    },
+    {
       path: '/schemas/:id',
       component: Preview,
       meta: { name: 'Schemas', schemaMode: 'schema' },
@@ -72,10 +77,21 @@ const seed = () => {
   s.ready = true
   s.loaded = true
   s.username = 'preview'
+
   /* Reads only. Writing is not part of what the preview shows, and the
-   * Directory lookup is stubbed so the live figure is deterministic. */
+   * Directory lookup is stubbed so the live figure is deterministic.
+   * `?live=off` makes it fail, which is how the unknown-count state is
+   * reached without taking a service down. */
+  const live = new URL(window.location.hash.slice(1), window.location.origin)
+    .searchParams.get('live')
+
   s.client = {
-    Directory: { fetch: async () => [200, ['dev-a', 'dev-b']] },
+    Directory: {
+      fetch: async () => {
+        if (live === 'off') throw new Error('Directory unreachable (preview)')
+        return [200, devices.slice(0, 3).map(d => d.uuid)]
+      },
+    },
     ConfigDB: {},
   }
 }

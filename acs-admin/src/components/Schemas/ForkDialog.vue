@@ -6,7 +6,7 @@
   <Dialog :open="isOpen" @update:open="handleOpen">
     <DialogContent class="sm:max-w-[520px]">
       <DialogHeader>
-        <DialogTitle>Make a local copy</DialogTitle>
+        <DialogTitle>Fork {{ source?.name }}</DialogTitle>
         <DialogDescription v-if="source?.origin === 'AMRC library'">
           This schema comes from the AMRC library. Editing creates a local copy.
         </DialogDescription>
@@ -15,27 +15,29 @@
         </DialogDescription>
       </DialogHeader>
 
-      <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-2">
-          <label class="text-sm font-medium">
-            Name <span class="text-red-500">*</span>
-          </label>
-          <Input v-model="name" placeholder="e.g. CNC Sheffield"/>
-          <p class="text-xs text-gray-500">
-            Give the copy its own name. It starts at v1 with its own version
-            history, so a later AMRC release cannot collide with it.
-          </p>
-          <p v-if="nameTaken" class="text-xs text-red-500">
-            A schema with this name already exists.
-          </p>
-        </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-sm font-medium leading-none">New name</label>
+        <Input v-model="name" placeholder="e.g. Robot Arm (Cell C)"/>
+        <p v-if="nameTaken" class="text-xs text-red-500">
+          A schema with this name already exists.
+        </p>
+        <p v-else class="text-xs text-gray-500">
+          Starts at version 1 with its own history, so an AMRC version 2 cannot
+          collide with yours.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2.5 rounded-md bg-gray-50 px-3 py-2.5 text-xs
+                  text-gray-500">
+        <i class="fa-solid fa-code-branch text-slate-400"></i>
+        <span>Forked from {{ source?.name }} · {{ source?.origin }}</span>
       </div>
 
       <DialogFooter>
         <Button variant="outline" @click="handleOpen(false)">Cancel</Button>
         <Button :disabled="!canCreate || working" @click="create">
           <i v-if="working" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
-          Make a local copy
+          Create local copy
         </Button>
       </DialogFooter>
     </DialogContent>

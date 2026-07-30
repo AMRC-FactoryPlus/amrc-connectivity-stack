@@ -73,7 +73,7 @@ const sidebarNavItems: Item[] = [
   {
     title: 'Schemas',
     href: '/schemas',
-    icon: 'diagram-project',
+    icon: 'sitemap',
     auth: true
   }
 ]

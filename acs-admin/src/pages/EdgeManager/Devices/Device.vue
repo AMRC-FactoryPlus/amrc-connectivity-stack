@@ -115,11 +115,14 @@
                 :value="schema?.schemaInformation?.version"
             />
             <!-- Lineage flag only. Moving a device between versions is a
-                 deliberate origin map edit, not something to offer here. -->
+                 deliberate origin map edit, not something to offer here.
+                 A slate glyph and three words: worth knowing on a scan,
+                 not competing with device status. -->
             <RouterLink v-if="newerSchema" :to="`/schemas/${newerSchema.uuid}`"
-                class="flex items-center gap-2 text-xs text-amber-700 hover:underline">
-              <i class="fa-solid fa-circle-arrow-up"></i>
-              <span>v{{ newerSchemaVersion }} available</span>
+                class="inline-flex items-center gap-1.5 text-xs text-gray-500
+                       hover:text-slate-900">
+              <i class="fa-solid fa-circle-arrow-up text-[11px] text-slate-400"></i>
+              <span>Version {{ newerSchemaVersion }} exists</span>
             </RouterLink>
           </div>
           <!-- Connection section -->

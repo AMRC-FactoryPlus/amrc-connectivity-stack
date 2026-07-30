@@ -166,7 +166,7 @@ const routes = [
     component: () => import('@pages/Schemas/Schemas.vue'),
     meta: {
       name: 'Schemas',
-      icon: 'diagram-project'
+      icon: 'sitemap'
     }
   },
   {
@@ -174,7 +174,7 @@ const routes = [
     component: () => import('@pages/Schemas/SchemaEditor.vue'),
     meta: {
       name: 'Schemas',
-      icon: 'diagram-project',
+      icon: 'sitemap',
       schemaMode: 'new'
     }
   },
@@ -183,8 +183,16 @@ const routes = [
     component: () => import('@pages/Schemas/SchemaEditor.vue'),
     meta: {
       name: 'Schemas',
-      icon: 'diagram-project',
+      icon: 'sitemap',
       schemaMode: 'draft'
+    }
+  },
+  {
+    path: '/schemas/draft/:id/publish',
+    component: () => import('@pages/Schemas/PublishSchema.vue'),
+    meta: {
+      name: 'Schemas',
+      icon: 'sitemap'
     }
   },
   {
@@ -192,7 +200,7 @@ const routes = [
     component: () => import('@pages/Schemas/SchemaEditor.vue'),
     meta: {
       name: 'Schemas',
-      icon: 'diagram-project',
+      icon: 'sitemap',
       schemaMode: 'schema'
     }
   }

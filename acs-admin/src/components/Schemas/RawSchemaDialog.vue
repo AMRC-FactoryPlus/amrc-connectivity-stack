@@ -17,22 +17,28 @@
       <DialogHeader>
         <DialogTitle>Raw schema</DialogTitle>
         <DialogDescription>
-          The JSON Schema this composes to. Editing it replaces the whole
-          document.
+          {{ readOnly
+            ? 'The JSON Schema this publishes as.'
+            : 'The JSON Schema this composes to. Editing it replaces the whole document.' }}
         </DialogDescription>
       </DialogHeader>
 
       <textarea
           v-model="text"
           spellcheck="false"
-          class="flex-1 min-h-[420px] font-mono text-xs border rounded-md p-3
-                 focus:outline-none focus:ring-1 focus:ring-gray-400"></textarea>
+          :readonly="readOnly"
+          class="min-h-[420px] flex-1 rounded-md border border-slate-200 p-3 font-mono
+                 text-xs focus:outline-none focus:ring-2 focus:ring-slate-950
+                 focus:ring-offset-2"
+          :class="readOnly ? 'bg-gray-50 text-slate-600' : ''"></textarea>
 
       <p v-if="error" class="text-xs text-red-500">{{ error }}</p>
 
       <DialogFooter>
-        <Button variant="outline" @click="close(false)">Cancel</Button>
-        <Button :disabled="!changed" @click="apply">Apply</Button>
+        <Button variant="outline" @click="close(false)">
+          {{ readOnly ? 'Close' : 'Cancel' }}
+        </Button>
+        <Button v-if="!readOnly" :disabled="!changed" @click="apply">Apply</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -55,6 +61,9 @@ export default {
   props: {
     open: { type: Boolean, default: false },
     body: { type: Object, default: () => ({}) },
+    /* The publish page shows the same JSON, but there is nothing to
+     * apply it to from there. */
+    readOnly: { type: Boolean, default: false },
   },
 
   emits: ['update:open', 'apply'],

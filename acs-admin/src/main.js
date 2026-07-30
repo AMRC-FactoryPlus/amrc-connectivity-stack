@@ -160,6 +160,41 @@ const routes = [
       name: 'ISA-95',
       icon: 'sitemap'
     }
+  },
+  {
+    path: '/schemas',
+    component: () => import('@pages/Schemas/Schemas.vue'),
+    meta: {
+      name: 'Schemas',
+      icon: 'diagram-project'
+    }
+  },
+  {
+    path: '/schemas/new',
+    component: () => import('@pages/Schemas/SchemaEditor.vue'),
+    meta: {
+      name: 'Schemas',
+      icon: 'diagram-project',
+      schemaMode: 'new'
+    }
+  },
+  {
+    path: '/schemas/draft/:id',
+    component: () => import('@pages/Schemas/SchemaEditor.vue'),
+    meta: {
+      name: 'Schemas',
+      icon: 'diagram-project',
+      schemaMode: 'draft'
+    }
+  },
+  {
+    path: '/schemas/:id',
+    component: () => import('@pages/Schemas/SchemaEditor.vue'),
+    meta: {
+      name: 'Schemas',
+      icon: 'diagram-project',
+      schemaMode: 'schema'
+    }
   }
 ]
 

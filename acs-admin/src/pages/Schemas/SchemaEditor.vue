@@ -231,6 +231,7 @@ import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import { useSchemaDraftStore } from '@store/useSchemaDraftStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { storeReady } from '@store/useStoreReady.js'
 import { useDialog } from '@/composables/useDialog.js'
 
 import { NodeKind } from '@/lib/schema/constants.js'
@@ -285,6 +286,11 @@ export default {
 
   async mounted () {
     await Promise.all([this.sch.start(), this.drafts.start()])
+    /* start() resolves before the stores hold anything; the data
+     * arrives on a later tick. Opening the editor directly, as a new
+     * tab does, would otherwise look up a schema in an empty store and
+     * report it missing. */
+    await Promise.all([storeReady(this.sch), storeReady(this.drafts)])
     await this.load()
     /* Closing the tab or reloading is the browser's to warn about. */
     window.addEventListener('beforeunload', this.warnIfDirty)

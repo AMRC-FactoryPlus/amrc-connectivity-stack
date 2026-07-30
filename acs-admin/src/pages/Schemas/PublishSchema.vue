@@ -295,6 +295,7 @@ import { useSchemaStore } from '@store/useSchemaStore.js'
 import { useSchemaDraftStore } from '@store/useSchemaDraftStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { storeReady } from '@store/useStoreReady.js'
 
 import { classify } from '@/lib/schema/classify.js'
 import { parse, referencedSchemas, serialise } from '@/lib/schema/document.js'
@@ -342,6 +343,10 @@ export default {
 
   async mounted () {
     await Promise.all([this.sch.start(), this.drafts.start(), this.dev.start()])
+    /* start() resolves before the stores hold anything. */
+    await Promise.all([
+      storeReady(this.sch), storeReady(this.drafts), storeReady(this.dev),
+    ])
     await this.load()
   },
 

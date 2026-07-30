@@ -57,23 +57,26 @@ export const schemaColumns: ColumnDef<SchemaRow>[] = [
         accessorKey: 'name',
         accessorFn: (row) => row.name,
         header: ({ column }) => h(DataTableColumnHeader, { column, title: 'Name' }),
-        cell: ({ row }) => h('div', { class: 'flex items-center' }, [
-            h('span', { class: 'max-w-[500px] truncate font-medium' },
-                row.original.name),
-            row.original.isDraft
-                ? draftBadge()
-                : row.original.supersededBy
-                    ? badge('Superseded', 'bg-slate-100 text-slate-500')
-                    : null,
+        /* Name over version, the same stacked cell the other tables use
+         * for name over UUID. The version has no column of its own; two
+         * versions of one schema sort next to each other and the subline
+         * says which is which. */
+        cell: ({ row }) => h('div', { class: 'max-w-[500px] truncate' }, [
+            h('div', { class: 'flex items-center' }, [
+                h('span', { class: 'max-w-[500px] truncate font-medium' },
+                    row.original.name),
+                row.original.isDraft
+                    ? draftBadge()
+                    : row.original.supersededBy
+                        ? badge('Superseded', 'bg-slate-100 text-slate-500')
+                        : null,
+            ]),
+            h('div', { class: 'max-w-[500px] truncate text-gray-400' },
+                row.original.isDraft
+                    ? 'Not published'
+                    : `Version ${row.original.version}`),
         ]),
         filterFn: (row, id, value) => value.includes(row.getValue(id)),
-    },
-    {
-        accessorKey: 'version',
-        accessorFn: (row) => row.version,
-        header: ({ column }) => h(DataTableColumnHeader, { column, title: 'Version' }),
-        cell: ({ row }) => h('div', { class: 'font-mono font-medium' },
-            row.original.isDraft ? '-' : String(row.original.version)),
     },
     {
         accessorKey: 'origin',

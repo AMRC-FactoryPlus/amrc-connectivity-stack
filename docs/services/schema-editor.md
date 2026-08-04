@@ -75,6 +75,44 @@ It is displayed read-only and round-trips byte for byte. There is no
 schema that fails to load, and opening a hand-written schema cannot
 damage it. A raw JSON view is available as an escape hatch.
 
+## Top-level schemas
+
+A schema body may carry a `topLevel` boolean:
+
+```yaml
+$id: urn:uuid:4701e66e-0f77-42b0-8ddd-cef60db6ef4a
+$schema: https://json-schema.org/draft/2020-12/schema
+topLevel: true
+title: CNC Machine
+```
+
+`true` means a device can be built on this schema directly. `false`
+means it is a part used inside another schema, like an axis or a
+spindle, and it is hidden when choosing a schema for a device.
+
+The flag lives in the body so it travels with the file in the
+`acs-schemas` repo and reaches the ConfigDB through the existing loader.
+It is a non-standard keyword, which JSON Schema validators ignore, and
+nothing in ACS validates schema bodies.
+
+**Absent is not false.** A schema that says nothing is treated as still
+worth showing, and the filter is switched off entirely until at least
+one schema in the deployment carries the flag. A library that predates
+the flag therefore behaves exactly as it always did.
+
+Reference counting does not replace the flag. It gets most cases right,
+but `Robot` is referenced by `Cell` and is still a machine, while
+`Bean_Hopper` is referenced by nothing and is not.
+
+Changing the flag is an additive change: it says nothing about the data
+a device publishes, so it cannot invalidate a device already using the
+schema.
+
+The editor sets it in the schema panel, shown in the detail pane when
+nothing in the tree is selected. A newly authored schema starts marked
+`true`, since someone sitting down to write one is usually describing a
+machine.
+
 ## The change classifier
 
 When a local schema is published, its draft is compared against what is

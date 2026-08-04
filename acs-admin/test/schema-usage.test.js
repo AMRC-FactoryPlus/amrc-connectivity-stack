@@ -23,9 +23,11 @@ import {
   buildUsageIndex,
 } from '../src/lib/schema/usage.js'
 import {
+  anyTopLevelMarked,
   isLibrarySchema,
   newestVersion,
   successorIndex,
+  topLevelOf,
   unresolvedReferences,
   versionOf,
   LOCAL_SOURCE,
@@ -322,5 +324,39 @@ describe('usage index', () => {
     const started = performance.now()
     buildUsageIndex(all, devices)
     expect(performance.now() - started).toBeLessThan(150)
+  })
+})
+
+describe('top-level marking', () => {
+  const marked = (value) => ({
+    uuid: 'x', schema: value === undefined ? {} : { topLevel: value },
+  })
+
+  it('reads the flag off a schema record', () => {
+    expect(topLevelOf(marked(true))).toBe(true)
+    expect(topLevelOf(marked(false))).toBe(false)
+  })
+
+  /* Undefined means the schema predates the flag, which the picker
+   * treats differently from a schema declaring itself a component. */
+  it('is undefined when the schema says nothing', () => {
+    expect(topLevelOf(marked(undefined))).toBeUndefined()
+    expect(topLevelOf({ uuid: 'x' })).toBeUndefined()
+  })
+
+  it('reports when nothing in a deployment is marked', () => {
+    expect(anyTopLevelMarked([marked(undefined), marked(undefined)])).toBe(false)
+    expect(anyTopLevelMarked([])).toBe(false)
+  })
+
+  it('reports when something is marked, either way', () => {
+    expect(anyTopLevelMarked([marked(undefined), marked(true)])).toBe(true)
+    expect(anyTopLevelMarked([marked(false)])).toBe(true)
+  })
+
+  it('sees nothing marked in the current library', () => {
+    /* The whole reason the filter stays inert on upgrade. */
+    const all = Object.values(library).map(schema => ({ uuid: '', schema }))
+    expect(anyTopLevelMarked(all)).toBe(false)
   })
 })

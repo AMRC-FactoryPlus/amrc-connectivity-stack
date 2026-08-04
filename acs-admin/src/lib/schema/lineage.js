@@ -17,6 +17,32 @@
 /** The provenance marker this editor writes into SchemaInformation. */
 export const LOCAL_SOURCE = 'acs-admin'
 
+/** Key marking a schema as one a device can be built on directly. */
+const TOP_LEVEL_KEY = 'topLevel'
+
+/**
+ * Is this a schema a device can be built on, rather than a component
+ * used inside another schema?
+ *
+ * Undefined rather than false when the schema says nothing, so callers
+ * can tell "not a device schema" from "this library predates the flag".
+ */
+export function topLevelOf (entry) {
+  const body = entry?.schema
+  if (!body || !(TOP_LEVEL_KEY in body)) return undefined
+  return body[TOP_LEVEL_KEY] === true
+}
+
+/**
+ * Does any schema here carry the flag?
+ *
+ * Until the library ships marked schemas nothing does, and filtering by
+ * it would empty the list. In that case the filter stays inert.
+ */
+export function anyTopLevelMarked (schemas) {
+  return (schemas ?? []).some(e => topLevelOf(e) !== undefined)
+}
+
 /**
  * Is this schema part of the AMRC library rather than locally authored?
  *

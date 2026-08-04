@@ -315,3 +315,35 @@ describe('every library schema is stable against itself', () => {
     expect(classify(library[path], library[path]).changes).toEqual([])
   })
 })
+
+describe('top-level flag', () => {
+  const mark = (path, value) => {
+    const doc = parse(library[path])
+    doc.topLevel = value
+    return serialise(doc)
+  }
+
+  it('marking a schema top-level is additive', () => {
+    const result = classify(library[SPINDLE], mark(SPINDLE, true))
+    expect(result.breaking).toBe(false)
+    expect(summaries(result)).toEqual(['Marked as a top-level schema'])
+  })
+
+  it('unmarking is additive too', () => {
+    const before = mark(SPINDLE, true)
+    const after = mark(SPINDLE, false)
+    const result = classify(before, after)
+    expect(result.breaking).toBe(false)
+    expect(summaries(result)).toEqual(['No longer a top-level schema'])
+  })
+
+  /* It says nothing about the data a device publishes, so it cannot
+   * invalidate a device already using the schema. */
+  it('does not force a new version on its own', () => {
+    expect(classify(library[SPINDLE], mark(SPINDLE, true)).additive).toBe(true)
+  })
+
+  it('is noticed at all, so publishing is not refused as a no-op', () => {
+    expect(classify(library[SPINDLE], mark(SPINDLE, true)).changes).toHaveLength(1)
+  })
+})

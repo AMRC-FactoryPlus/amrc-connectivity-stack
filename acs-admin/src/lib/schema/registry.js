@@ -35,11 +35,13 @@ import { LOCAL_SOURCE } from './lineage.js'
 
 export {
   LOCAL_SOURCE,
+  anyTopLevelMarked,
   derivedFromOf,
   isLibrarySchema,
   newestVersion,
   replacesOf,
   successorIndex,
+  topLevelOf,
   unresolvedReferences,
   versionOf,
 } from './lineage.js'

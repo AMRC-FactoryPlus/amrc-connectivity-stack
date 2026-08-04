@@ -28,6 +28,7 @@ import {
   NodeKind,
   RESERVED_PROPERTIES,
   SCHEMA_DIALECT,
+  TOP_LEVEL_KEY,
   refToUuid,
   uuidToRef,
 } from './constants.js'
@@ -170,6 +171,9 @@ export function parse (body) {
     raw: clone(body),
     uuid: body.properties?.Schema_UUID?.const ?? refToUuid(body.$id) ?? null,
     title: typeof body.title === 'string' ? body.title : null,
+    /* Absent means unmarked, which is not the same as false: a
+     * deployment where nothing is marked behaves as it always did. */
+    topLevel: TOP_LEVEL_KEY in body ? body[TOP_LEVEL_KEY] === true : undefined,
     children: Object.entries(properties).map(([k, v]) => parseNode(k, v)),
   }
 }
@@ -305,6 +309,11 @@ export function serialise (doc) {
   if (doc.title) out.title = doc.title
   else delete out.title
 
+  /* Undefined means the schema says nothing about it, so the key is
+   * left off entirely rather than written as false. */
+  if (doc.topLevel === undefined) delete out[TOP_LEVEL_KEY]
+  else out[TOP_LEVEL_KEY] = doc.topLevel
+
   out.properties = serialiseChildren(doc.children ?? [])
 
   if (doc.uuid) {
@@ -326,6 +335,10 @@ export function newDocument (uuid, title) {
     $id: uuidToRef(uuid),
     $schema: SCHEMA_DIALECT,
     title,
+    /* A schema someone sits down to author is usually a machine rather
+     * than a part of one. Components are more often forked from the
+     * library, which carries its own marking. */
+    [TOP_LEVEL_KEY]: true,
     type: 'object',
     properties: {
       Schema_UUID: { const: uuid },

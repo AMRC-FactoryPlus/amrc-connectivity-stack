@@ -10,10 +10,17 @@ import library from '../test/fixtures/library-schemas.json'
 
 const uuidOf = body => body.properties?.Schema_UUID?.const
 
+const markedBody = (path) => {
+  const body = library[path]
+  if (TOP_LEVEL.has(path)) return { ...body, topLevel: true }
+  if (COMPONENT.has(path)) return { ...body, topLevel: false }
+  return body
+}
+
 const libraryEntry = (path, name) => ({
   uuid: uuidOf(library[path]),
   name,
-  schema: library[path],
+  schema: markedBody(path),
   schemaInformation: {
     name,
     version: 1,
@@ -22,6 +29,16 @@ const libraryEntry = (path, name) => ({
     modified: 1700000000,
   },
 })
+
+/* A few marked either way, so the preview can show the picker's
+ * top-level filter. The real marks land in the acs-schemas repo. */
+const TOP_LEVEL = new Set([
+  'CNC/CNC-v1.yaml', 'Robot/Robot-v1.yaml', 'Press/Press-v1.yaml',
+])
+const COMPONENT = new Set([
+  'CNC/Spindle-v1.yaml', 'CNC/Axis-v1.yaml', 'CNC/Channel-v1.yaml',
+  'Common/Metric-v1.yaml', 'Common/Device_Information-v1.yaml',
+])
 
 const CNC = libraryEntry('CNC/CNC-v1.yaml', 'CNC Machine')
 const SPINDLE = libraryEntry('CNC/Spindle-v1.yaml', 'CNC Spindle')

@@ -32,6 +32,15 @@
       </Tabs>
     </div>
 
+    <!-- Only offered once something in the deployment is marked.
+         Before then there is nothing to hide and the choice would be
+         meaningless. -->
+    <label v-if="canFilterTopLevel"
+        class="flex cursor-pointer items-center gap-2 text-xs text-gray-500">
+      <Checkbox :model-value="showAll" @update:model-value="v => showAll = v === true"/>
+      <span>Show schemas that are parts of a machine</span>
+    </label>
+
     <div class="h-80 overflow-y-auto rounded-md border border-slate-200">
       <table class="w-full text-sm">
         <tbody>
@@ -75,7 +84,10 @@
     </div>
 
     <div class="flex justify-between text-xs text-gray-500">
-      <span>Showing {{ rows.length }} of {{ allRows.length }}</span>
+      <span>
+        Showing {{ rows.length }} of {{ allRows.length }}<template
+            v-if="hiddenCount">, {{ hiddenCount }} hidden</template>
+      </span>
       <span v-if="newerAvailable" class="text-gray-500">
         <i class="fa-solid fa-circle-arrow-up mr-1.5 text-[11px] text-slate-400"></i>
         A newer version of this schema exists
@@ -86,17 +98,20 @@
 
 <script>
 import { Badge } from '@components/ui/badge'
+import { Checkbox } from '@components/ui/checkbox'
 import { Input } from '@components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@components/ui/tabs'
 
 import { originOf } from '@/lib/schema/presentation.js'
-import { isLibrarySchema, successorIndex, versionOf } from '@/lib/schema/registry.js'
+import {
+  anyTopLevelMarked, isLibrarySchema, successorIndex, topLevelOf, versionOf,
+} from '@/lib/schema/registry.js'
 import { buildUsageIndex } from '@/lib/schema/usage.js'
 
 export default {
   name: 'SchemaPicker',
 
-  components: { Badge, Input, Tabs, TabsList, TabsTrigger },
+  components: { Badge, Checkbox, Input, Tabs, TabsList, TabsTrigger },
 
   props: {
     modelValue: { type: String, default: null },
@@ -110,12 +125,18 @@ export default {
   emits: ['update:modelValue'],
 
   data () {
-    return { search: '', tab: 'all' }
+    return { search: '', tab: 'all', showAll: false }
   },
 
   computed: {
     successors () {
       return successorIndex(this.schemas)
+    },
+
+    /* Until the library ships marked schemas nothing carries the flag,
+     * and filtering on it would empty the list. */
+    canFilterTopLevel () {
+      return anyTopLevelMarked(this.schemas)
     },
 
     /* Built once over the whole store rather than once per row. */
@@ -133,6 +154,7 @@ export default {
           isLibrary: isLibrarySchema(entry),
           usedBy: this.usage.devices.get(entry.uuid) ?? 0,
           supersededBy: this.successors.get(entry.uuid)?.uuid ?? null,
+          topLevel: topLevelOf(entry),
         }
         row.glyph = originOf(row)
         return row
@@ -166,6 +188,11 @@ export default {
         .filter((row) => {
           if (this.tab === 'yours' && row.isLibrary) return false
           if (this.tab === 'library' && !row.isLibrary) return false
+          /* An unmarked schema is not hidden: it predates the flag
+           * rather than having been declared a component. The schema a
+           * device is already on is always shown. */
+          if (this.canFilterTopLevel && !this.showAll
+            && row.topLevel === false && row.uuid !== this.modelValue) return false
           if (!term) return true
           return row.name.toLowerCase().includes(term)
             || row.uuid.toLowerCase().includes(term)
@@ -176,6 +203,11 @@ export default {
           if (a.isLibrary !== b.isLibrary) return a.isLibrary ? 1 : -1
           return a.name.localeCompare(b.name) || a.version - b.version
         })
+    },
+
+    hiddenCount () {
+      if (!this.canFilterTopLevel || this.showAll) return 0
+      return this.allRows.filter(r => r.topLevel === false).length
     },
 
     newerAvailable () {

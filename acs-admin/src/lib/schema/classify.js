@@ -234,6 +234,16 @@ export function classify (publishedBody, draftBody) {
   if ((before.title ?? null) !== (after.title ?? null))
     changes.push(change(ChangeKind.MODIFIED, ['title'], 'Title changed', false))
 
+  /* Whether a schema is offered as a device's own schema says nothing
+   * about the data it describes, so it cannot invalidate a device that
+   * is already using it. */
+  if (before.topLevel !== after.topLevel)
+    changes.push(change(ChangeKind.MODIFIED, ['topLevel'],
+      after.topLevel
+        ? 'Marked as a top-level schema'
+        : 'No longer a top-level schema',
+      false))
+
   compareChildren(before, after, [], changes)
   compareRequired(before, after, changes)
 

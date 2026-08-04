@@ -297,3 +297,71 @@ describe('navigation helpers', () => {
     for (const ref of components) expect(all).toContain(ref)
   })
 })
+
+describe('top-level flag', () => {
+  const uuid = '99999999-9999-9999-9999-999999999999'
+
+  it('reads the flag when a schema sets it', () => {
+    const doc = parse({
+      $id: `urn:uuid:${uuid}`,
+      topLevel: true,
+      type: 'object',
+      properties: { Schema_UUID: { const: uuid } },
+    })
+    expect(doc.topLevel).toBe(true)
+  })
+
+  it('reads false when a schema declares itself a component', () => {
+    const doc = parse({
+      $id: `urn:uuid:${uuid}`,
+      topLevel: false,
+      type: 'object',
+      properties: { Schema_UUID: { const: uuid } },
+    })
+    expect(doc.topLevel).toBe(false)
+  })
+
+  /* Undefined is not false. A library that predates the flag says
+   * nothing, and the picker treats that differently from a schema that
+   * has declared itself a component. */
+  it('is undefined when the schema says nothing', () => {
+    expect(parse(library['CNC/CNC-v1.yaml']).topLevel).toBeUndefined()
+  })
+
+  it('leaves the key off entirely when undefined', () => {
+    const body = serialise(parse(library['CNC/CNC-v1.yaml']))
+    expect('topLevel' in body).toBe(false)
+  })
+
+  it('writes the key once set', () => {
+    const doc = parse(library['CNC/CNC-v1.yaml'])
+    doc.topLevel = true
+    expect(serialise(doc).topLevel).toBe(true)
+  })
+
+  it('writes false when a schema is marked as a component', () => {
+    const doc = parse(library['CNC/Axis-v1.yaml'])
+    doc.topLevel = false
+    expect(serialise(doc).topLevel).toBe(false)
+  })
+
+  it('round-trips a schema that already carries the flag', () => {
+    const body = {
+      $id: `urn:uuid:${uuid}`,
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      title: 'Marked',
+      topLevel: true,
+      type: 'object',
+      properties: { Schema_UUID: { const: uuid } },
+      required: ['Schema_UUID'],
+    }
+    expect(JSON.stringify(serialise(parse(body)), null, 2))
+      .toEqual(JSON.stringify(body, null, 2))
+  })
+
+  it('marks a newly authored schema as top-level', () => {
+    /* Someone sitting down to author a schema is usually describing a
+     * machine, not a part of one. */
+    expect(serialise(newDocument(uuid, 'New')).topLevel).toBe(true)
+  })
+})

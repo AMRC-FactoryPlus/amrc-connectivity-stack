@@ -183,15 +183,28 @@
             </div>
           </template>
 
-          <div v-else class="flex flex-1 items-center justify-center">
-            <div class="text-center">
-              <i class="fa-solid fa-gauge fa-2x text-slate-300"></i>
-              <h3 class="mt-3 text-sm font-medium text-gray-700">Nothing selected</h3>
-              <p class="mt-1 text-sm text-gray-400">
-                Pick something on the left to edit it.
-              </p>
+          <template v-else>
+            <div class="flex shrink-0 items-center justify-between border-b
+                        border-slate-200 px-5 py-3.5">
+              <div>
+                <div class="mb-1 text-xs text-slate-500">{{ name }}</div>
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-fw fa-shapes text-slate-500"></i>
+                  <span class="text-xl font-semibold tracking-tight">Schema</span>
+                </div>
+              </div>
             </div>
-          </div>
+            <div class="flex-1 overflow-y-auto p-5">
+              <SchemaPanel
+                  :name="name"
+                  :uuid="schemaUuid"
+                  :top-level="topLevel === true"
+                  :doc="doc"
+                  :readonly="readonly"
+                  @update:name="v => { name = v; touch() }"
+                  @update:top-level="setTopLevel"/>
+            </div>
+          </template>
         </div>
       </div>
     </template>
@@ -224,6 +237,7 @@ import StructureTree from '@components/Schemas/StructureTree.vue'
 import MetricPanel from '@components/Schemas/MetricPanel.vue'
 import ComponentPanel from '@components/Schemas/ComponentPanel.vue'
 import GroupPanel from '@components/Schemas/GroupPanel.vue'
+import SchemaPanel from '@components/Schemas/SchemaPanel.vue'
 import OpaquePanel from '@components/Schemas/OpaquePanel.vue'
 import ComponentPickerDialog from '@components/Schemas/ComponentPickerDialog.vue'
 import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
@@ -251,7 +265,7 @@ export default {
     Badge, Button, ComponentPanel, ComponentPickerDialog, DropdownMenu,
     DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
     DropdownMenuTrigger, GroupPanel, Input, MetricPanel, OpaquePanel,
-    RawSchemaDialog, Skeleton, StructureTree,
+    RawSchemaDialog, SchemaPanel, Skeleton, StructureTree,
   },
 
   setup () {
@@ -481,6 +495,10 @@ export default {
       return null
     },
 
+    topLevel () {
+      return this.doc?.topLevel
+    },
+
     rawBody () {
       return this.doc ? serialise(this.doc) : {}
     },
@@ -554,6 +572,12 @@ export default {
 
     touch () {
       this.dirty = true
+    },
+
+    setTopLevel (value) {
+      if (!this.doc) return
+      this.doc.topLevel = value === true
+      this.touch()
     },
 
     rename (value) {

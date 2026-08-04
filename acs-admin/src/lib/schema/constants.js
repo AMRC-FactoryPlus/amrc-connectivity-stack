@@ -99,6 +99,20 @@ export const SPARKPLUG_TYPES = [
   'DataSet', 'Bytes', 'File', 'Template',
 ]
 
+/**
+ * Marks a schema as one a device can be built on directly, rather than a
+ * component used inside another schema.
+ *
+ * A non-standard keyword, which JSON Schema validators ignore. It sits
+ * in the schema body so it travels with the file in the acs-schemas
+ * repo and reaches the ConfigDB through the existing loader.
+ *
+ * Reference counting cannot replace it: Robot is referenced by Cell and
+ * is still a device you would put on a machine, while Bean_Hopper is
+ * referenced by nothing and is not.
+ */
+export const TOP_LEVEL_KEY = 'topLevel'
+
 /** The JSON Schema dialect new schemas declare. */
 export const SCHEMA_DIALECT = 'https://json-schema.org/draft/2020-12/schema'
 

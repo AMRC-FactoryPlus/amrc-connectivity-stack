@@ -8,6 +8,47 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.5.0
+
+### Choosing a schema for a device offers only the ones that fit
+
+Setting a device's schema previously listed every schema in the
+deployment, including `Axis`, `Spindle` and `Metric`. Those are parts of
+a machine rather than things a machine is, and on a full library they
+buried the twenty or so schemas anyone actually picks.
+
+Schemas now declare whether a device can be built on them directly. The
+picker shows those by default, with a checkbox to show everything, and
+the schema editor has a toggle for it on locally authored schemas.
+
+The flag lives in the schema body as `topLevel`, so it travels with the
+file in the AMRC schema library. It is a non-standard JSON Schema
+keyword, which validators ignore, and nothing in ACS validates schema
+bodies, so it is inert for every other consumer.
+
+A schema that says nothing is still shown, and the filter is switched
+off entirely until at least one schema in the deployment carries the
+flag. Nothing disappears from anyone's list unless it has been
+explicitly marked as a component.
+
+### The AMRC schema library ships marked
+
+The bundled schema library moves to v1.6.0, in which all 139 schemas
+carry the flag: 32 are machines and systems a device can be built on,
+and the rest are parts used inside them.
+
+This reaches existing installations, not just fresh ones. The loader
+replaces a schema body whenever the stored `source` matches its own, so
+a `helm upgrade` brings the marked library with it. Locally authored
+schemas record a different source and are skipped, so anything you have
+written or forked is untouched.
+
+### Upgrading
+
+A plain `helm upgrade`. Sites that pin `acs.schemas.image.tag`
+themselves should move it to `v1.6.0` to pick up the marked library;
+until they do, the picker behaves exactly as it did in v6.4.0.
+
 ## v6.4.0
 
 ### Schemas can be authored in the admin UI

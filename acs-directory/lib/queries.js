@@ -28,7 +28,7 @@ function sym_diff(one, two) {
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
 export default class Queries {
-    static DBVersion = 13;
+    static DBVersion = 14;
 
     constructor(query) {
         this.query = query;
@@ -94,6 +94,7 @@ export default class Queries {
     async session_notification_info(id) {
         const dbr = await this.query(`
             select dev.uuid device,
+                   ses.device devid,
                    adr.group_id,
                    adr.node_id,
                    adr.device_id,
@@ -181,6 +182,51 @@ export default class Queries {
         `, [id]);
 
         return dbr.rows.map(r => r.uuid);
+    }
+
+    /* Prune session history for the device owning this session.
+     *
+     * Sessions are chained twice over, by next_for_device and by
+     * next_for_address, and both columns are foreign keys back into
+     * session. An address may be reused by a different device, so the
+     * two chains interleave and a session belonging to one device can
+     * be referenced by a session belonging to another. Deleting on the
+     * device chain alone therefore breaks referential integrity; this
+     * is what went wrong in #614.
+     *
+     * We keep, in each chain, the current session and the one directly
+     * before it. The predecessor is required: on_session_notify reads
+     * it to compute the Schema_Usage difference, and without it every
+     * birth would republish every schema. Nothing else reads history -
+     * the sessions() endpoint is disabled - so anything older goes.
+     *
+     * Only rows which nothing at all points at are deleted, which
+     * makes the delete safe whatever order the planner picks. That
+     * means we take the tail off each chain, so on an install with a
+     * long backlog this converges over several births rather than all
+     * at once; use sql/prune-sessions.sql to clear a backlog in bulk.
+     */
+    async prune_device_sessions(device) {
+        const dbr = await this.query(`
+            delete from session old
+            where old.device = $1
+              and old.next_for_device is not null
+              and old.next_for_address is not null
+              and not exists (
+                  select 1 from session cur
+                  where cur.id = old.next_for_device
+                    and cur.next_for_device is null)
+              and not exists (
+                  select 1 from session cur
+                  where cur.id = old.next_for_address
+                    and cur.next_for_address is null)
+              and not exists (
+                  select 1 from session ref
+                  where ref.next_for_device = old.id
+                     or ref.next_for_address = old.id)
+        `, [device]);
+
+        return dbr.rowCount;
     }
 
     async record_schema(session, schema) {

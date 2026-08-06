@@ -27,6 +27,11 @@ interface APIv1Opts {
      * clamped and the response is returned with HTTP 206.
      */
     maxDepthCap?: number;
+    /**
+     * The service-client Debug object. Used to build the module
+     * logger; omitted in tests, where logging is silenced.
+     */
+    debug?: any;
 }
 
 /**
@@ -68,6 +73,7 @@ export class APIv1 {
     private history: History;
     private subscriptions: SubscriptionManager;
     private maxDepthCap: number;
+    private log: (msg: string, ...args: any[]) => void;
 
     /**
      * Stores the collaborator services and builds both routers.
@@ -78,11 +84,26 @@ export class APIv1 {
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
         this.maxDepthCap = opts.maxDepthCap ?? 0;
+        this.log = opts.debug?.bound("api-v1") ?? (() => {});
 
         this.routes = Router();
         this.infoRoute = Router();
 
         this.setup_routes();
+    }
+
+    /**
+     * Logs a message against a request. WebAPI installs a buffered
+     * per-request logger on `req.log`, and that buffer is where the
+     * authenticated principal for the request is recorded, so we
+     * prefer it: messages logged this way are attributable. Falls
+     * back to the module logger when there is no request logger (the
+     * unit tests mount the routers on a bare Express app).
+     */
+    private log_req(req: Request, msg: string, ...args: any[]): void {
+        const rlog = (req as any).log;
+        if (rlog) rlog(msg, ...args);
+        else this.log(msg, ...args);
     }
 
     /**
@@ -311,19 +332,20 @@ export class APIv1 {
             // Try UNS cache first (real-time), fall back to InfluxDB last()
             const cached = this.valueCache.getValue(id);
             if (cached) {
-                console.log(`[VALUE] ${id.slice(0,16)} → UNS cache hit: value=${JSON.stringify(cached.value)} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
+                this.log_req(req, "value %s: UNS cache hit, age %dms",
+                    id, Date.now() - new Date(cached.timestamp).getTime());
                 return { success: true, elementId: id, result: cached };
             }
-            console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
+            this.log_req(req, "value %s: UNS cache miss, querying InfluxDB", id);
             const obj = this.objectTree.getObject(id);
             const item = obj?.isComposition
                 ? await this.history.getCompositionValue(id, effective)
                 : await this.history.getCurrentValue(id);
             if (item) {
-                console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
+                this.log_req(req, "value %s: InfluxDB hit, ts %s", id, item.timestamp);
                 return { success: true, elementId: id, result: item };
             }
-            console.log(`[VALUE] ${id.slice(0,16)} → no data`);
+            this.log_req(req, "value %s: no data", id);
             return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
         }));
         if (clamped) res.status(206);
@@ -390,18 +412,20 @@ export class APIv1 {
         // Try UNS cache first (real-time), fall back to InfluxDB last()
         const cached = this.valueCache.getValue(id);
         if (cached) {
-            console.log(`[VALUE] ${id} → UNS cache hit: value=${JSON.stringify(cached.value)} ts=${cached.timestamp} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
+            this.log_req(req, "value %s: UNS cache hit, ts %s, age %dms",
+                id, cached.timestamp,
+                Date.now() - new Date(cached.timestamp).getTime());
             res.json(cached);
             return;
         }
-        console.log(`[VALUE] ${id} → UNS cache miss, querying InfluxDB...`);
+        this.log_req(req, "value %s: UNS cache miss, querying InfluxDB", id);
         const result = obj?.isComposition
             ? await this.history.getCompositionValue(id)
             : await this.history.getCurrentValue(id);
         if (result) {
-            console.log(`[VALUE] ${id} → InfluxDB hit: value=${JSON.stringify(result.value)} ts=${result.timestamp}`);
+            this.log_req(req, "value %s: InfluxDB hit, ts %s", id, result.timestamp);
         } else {
-            console.log(`[VALUE] ${id} → InfluxDB miss: no data`);
+            this.log_req(req, "value %s: InfluxDB miss, no data", id);
         }
         if (!result) return next(notFound(`No value for ${id}`));
         res.json(result);

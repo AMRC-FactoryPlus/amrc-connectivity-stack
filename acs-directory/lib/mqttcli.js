@@ -74,6 +74,9 @@ export default class MQTTCli {
 
         this.seq = 0;
 
+        /* Keyed by Address.toString(). Address has no value semantics,
+         * so Sets and Maps must never be keyed on the object itself;
+         * they compare by reference and would never match. */
         this.online = new Set();
         this.rebirths = {
             pending: {},
@@ -446,7 +449,7 @@ export default class MQTTCli {
 
     async on_birth(address, payload) {
         this.log("device", `Registering BIRTH for ${address}`);
-        this.online.add(address);
+        this.online.add(address.toString());
 
         let tree;
         if (payload.uuid === UUIDs.FactoryPlus) {
@@ -478,8 +481,8 @@ export default class MQTTCli {
 
         this.log("device", `Registering DEATH for ${address}`);
 
-        this.alerts.delete(address);
-        this.online.delete(address);
+        this.alerts.delete(address.toString());
+        this.online.delete(address.toString());
         await this.model.death({address, time});
 
         this.log("device", `Finished DEATH for ${address}`);
@@ -546,7 +549,7 @@ export default class MQTTCli {
          * rebirth any device we haven't seen a birth for, even if the
          * database says it's online. This is important because we might
          * have the wrong schema information. */
-        if (this.online.has(addr) || pending[addr]) return false;
+        if (this.online.has(addr.toString()) || pending[addr]) return false;
 
         /* Mark that we're working on this device and wait 5-10s to see if
          * it rebirths on its own. */
@@ -555,7 +558,7 @@ export default class MQTTCli {
 
         /* Clear our marker first so we retry next time */
         delete (pending[addr]);
-        if (this.online.has(addr)) return false;
+        if (this.online.has(addr.toString())) return false;
 
         sent[addr] = Date.now();
         return true;

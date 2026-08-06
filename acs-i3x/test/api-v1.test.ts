@@ -49,24 +49,29 @@ function mockHistory() {
     };
 }
 
+/* The authenticated principal the test app presents. Subscription
+ * ownership is keyed on this, not on the clientId in the request
+ * body. */
+const TEST_PRINCIPAL = "test-principal@REALM";
+
 function mockSubscriptions() {
     return {
-        create: jest.fn<(clientId: string, displayName?: string) => I3xSubscription>()
+        create: jest.fn<(owner: string, clientId: string, displayName?: string) => I3xSubscription>()
             .mockReturnValue({
                 clientId: "c1",
                 subscriptionId: "sub-1",
                 displayName: "Test",
             }),
-        list: jest.fn<(clientId: string, ids: string[]) => I3xSubscription[]>()
+        list: jest.fn<(owner: string, ids: string[]) => I3xSubscription[]>()
             .mockReturnValue([]),
-        getOne: jest.fn<(clientId: string, id: string) => I3xSubscription>(),
-        deleteOne: jest.fn<(clientId: string, id: string) => void>(),
-        register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
-        registerOne: jest.fn<(clientId: string, subId: string, id: string, maxDepth?: number) => void>(),
-        unregister: jest.fn<(clientId: string, subId: string, ids: string[]) => void>(),
-        unregisterOne: jest.fn<(clientId: string, subId: string, id: string) => void>(),
-        stream: jest.fn<(clientId: string, subId: string, res: any) => void>(),
-        sync: jest.fn<(clientId: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
+        getOne: jest.fn<(owner: string, id: string) => I3xSubscription>(),
+        deleteOne: jest.fn<(owner: string, id: string) => void>(),
+        register: jest.fn<(owner: string, subId: string, ids: string[], maxDepth?: number) => void>(),
+        registerOne: jest.fn<(owner: string, subId: string, id: string, maxDepth?: number) => void>(),
+        unregister: jest.fn<(owner: string, subId: string, ids: string[]) => void>(),
+        unregisterOne: jest.fn<(owner: string, subId: string, id: string) => void>(),
+        stream: jest.fn<(owner: string, subId: string, res: any) => void>(),
+        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
             .mockReturnValue([]),
     };
 }
@@ -90,6 +95,9 @@ function createApp(opts: { maxDepthCap?: number } = {}) {
 
     const app = express();
     app.use(express.json());
+    /* Stand in for FplusHttpAuth, which sets req.auth to the verified
+     * principal on every non-public route. */
+    app.use((req, _res, next) => { (req as any).auth = TEST_PRINCIPAL; next(); });
     app.use("/", api.infoRoute);
     app.use("/", api.routes);
 
@@ -710,7 +718,7 @@ describe("APIv1", () => {
                 .send({ clientId: "c1", displayName: "Test" });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.create).toHaveBeenCalledWith("c1", "Test");
+            expect(subscriptions.create).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "Test");
             expect(res.body.result).toEqual({
                 clientId: "c1",
                 subscriptionId: "sub-1",
@@ -722,8 +730,8 @@ describe("APIv1", () => {
     describe("POST /subscriptions/list", () => {
         it("returns bulk envelope with monitoredObjects per subscription", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.getOne.mockImplementation((clientId: string, id: string) => ({
-                clientId,
+            subscriptions.getOne.mockImplementation((_owner: string, id: string) => ({
+                clientId: "c1",
                 subscriptionId: id,
                 displayName: `Sub ${id}`,
                 monitoredObjects: [{ elementId: "obj-1", maxDepth: 2 }],
@@ -734,8 +742,8 @@ describe("APIv1", () => {
                 .send({ clientId: "c1", subscriptionIds: ["sub-1", "sub-2"] });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.getOne).toHaveBeenCalledWith("c1", "sub-1");
-            expect(subscriptions.getOne).toHaveBeenCalledWith("c1", "sub-2");
+            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1");
+            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-2");
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -765,14 +773,14 @@ describe("APIv1", () => {
 
         it("reports missing subscriptions as 404 without aborting the batch", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.getOne.mockImplementation((clientId: string, id: string) => {
+            subscriptions.getOne.mockImplementation((_owner: string, id: string) => {
                 if (id === "missing") {
                     const err: any = new Error(`Subscription ${id} not found`);
                     err.status = 404;
                     throw err;
                 }
                 return {
-                    clientId,
+                    clientId: "c1",
                     subscriptionId: id,
                     displayName: `Sub ${id}`,
                     monitoredObjects: [],
@@ -804,11 +812,14 @@ describe("APIv1", () => {
             ]);
         });
 
-        it("reports wrong-client subscriptions as 403", async () => {
+        /* A subscription owned by a different principal is reported as
+         * 404, exactly like one that does not exist, so the pair cannot
+         * be used to discover which subscription ids are live. */
+        it("reports another principal's subscriptions as 404, not 403", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.getOne.mockImplementation((_clientId: string, _id: string) => {
-                const err: any = new Error("Subscription sub-1 does not belong to client c1");
-                err.status = 403;
+            subscriptions.getOne.mockImplementation((_owner: string, _id: string) => {
+                const err: any = new Error("Subscription sub-1 not found");
+                err.status = 404;
                 throw err;
             });
 
@@ -823,10 +834,28 @@ describe("APIv1", () => {
                     {
                         success: false,
                         subscriptionId: "sub-1",
-                        error: { code: 403, message: "Subscription sub-1 does not belong to client c1" },
+                        error: { code: 404, message: "Subscription sub-1 not found" },
                     },
                 ],
             });
+        });
+
+        /* The clientId in the body is echoed but never trusted: it does
+         * not decide which subscriptions the caller can reach. */
+        it("ignores the clientId in the body when resolving ownership", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.getOne.mockReturnValue({
+                clientId: "someone-else",
+                subscriptionId: "sub-1",
+                displayName: "Sub sub-1",
+            });
+
+            await request(app)
+                .post("/subscriptions/list")
+                .send({ clientId: "someone-else", subscriptionIds: ["sub-1"] });
+
+            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1");
+            expect(subscriptions.getOne).not.toHaveBeenCalledWith("someone-else", "sub-1");
         });
     });
 
@@ -849,8 +878,8 @@ describe("APIv1", () => {
                 });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.registerOne).toHaveBeenCalledWith("c1", "sub-1", "obj-1", 2);
-            expect(subscriptions.registerOne).toHaveBeenCalledWith("c1", "sub-1", "obj-2", 2);
+            expect(subscriptions.registerOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-1", 2);
+            expect(subscriptions.registerOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-2", 2);
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -888,7 +917,7 @@ describe("APIv1", () => {
                 { success: true, elementId: "obj-2", result: null },
             ]);
             expect(subscriptions.registerOne).not.toHaveBeenCalledWith(
-                "c1", "sub-1", "missing", expect.anything(),
+                TEST_PRINCIPAL, "sub-1", "missing", expect.anything(),
             );
         });
 
@@ -941,8 +970,8 @@ describe("APIv1", () => {
                 });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.unregisterOne).toHaveBeenCalledWith("c1", "sub-1", "obj-1");
-            expect(subscriptions.unregisterOne).toHaveBeenCalledWith("c1", "sub-1", "obj-2");
+            expect(subscriptions.unregisterOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-1");
+            expect(subscriptions.unregisterOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-2");
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -980,7 +1009,7 @@ describe("APIv1", () => {
                 { success: true, elementId: "obj-2", result: null },
             ]);
             expect(subscriptions.unregisterOne).not.toHaveBeenCalledWith(
-                "c1", "sub-1", "missing",
+                TEST_PRINCIPAL, "sub-1", "missing",
             );
         });
 
@@ -1085,8 +1114,8 @@ describe("APIv1", () => {
                 .send({ clientId: "c1", subscriptionIds: ["sub-1", "sub-2"] });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.deleteOne).toHaveBeenCalledWith("c1", "sub-1");
-            expect(subscriptions.deleteOne).toHaveBeenCalledWith("c1", "sub-2");
+            expect(subscriptions.deleteOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1");
+            expect(subscriptions.deleteOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-2");
             expect(res.body).toEqual({
                 success: true,
                 results: [

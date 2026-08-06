@@ -16,7 +16,8 @@
   "type": "module",
   "scripts": {
     "mqtt": "node bin/directory-mqtt",
-    "webapi": "node bin/directory-webapi"
+    "webapi": "node bin/directory-webapi",
+    "test": "node --test test/"
   },
   "dependencies": {
     "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",

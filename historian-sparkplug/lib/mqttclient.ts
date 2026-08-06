@@ -394,8 +394,19 @@ export default class MQTTClient {
         payload.metrics.forEach((metric) => {
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
 
+            /* We have DATA for a metric we have no birth for. That is
+             * expected while a device we have just asked to rebirth has
+             * not answered yet, and there is nothing useful we can write
+             * without the birth: it carries the name, the type and the
+             * transient flag. Skip the metric and wait.
+             *
+             * This used to fall through, and writeToInfluxDB would then
+             * read birth.transient off undefined and take the whole
+             * process down with an uncaught TypeError - dropping every
+             * other device's data along with it. */
             if (!birth) {
                 logger.error(`Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
+                return;
             }
 
             // Prefer nanosecond precision when available, falling back to the

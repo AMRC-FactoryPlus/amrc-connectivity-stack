@@ -8,6 +8,88 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+## v6.6.0
+
+### Upgrading: expect the Directory to be unavailable for several minutes
+
+This release prunes the Directory's session table, and on an
+installation which has been running for a long time there can be
+millions of rows to remove. The prune runs as part of the database
+migration, in the init container, so the Directory does not start until
+it has finished.
+
+On one installation with a 1.8GB session table this took **seven and a
+half minutes**. Everything which depends on the Directory - the
+Configuration Store, the historians, the command escalation service,
+the UNS ingester - will fail and restart while it runs, and will back
+off before recovering. They come back on their own once the Directory
+is up, but the cluster looks unhealthy in the meantime and the recovery
+is not instant, because Kubernetes backs off further on each restart.
+
+Plan a maintenance window, and take a backup of the Directory database
+first. The migration is a single transaction, so a failure rolls back
+cleanly and leaves the database as it was, but it cannot be undone once
+it has succeeded: the previous Directory will refuse to start against
+the migrated database.
+
+Installations which have not been running long have very little to
+prune and will migrate in seconds.
+
+### The Directory no longer asks devices to rebirth continuously
+
+The Directory tracks which devices it believes are online so that it
+does not ask a healthy device to re-send its birth certificate. That
+check never matched, so the Directory concluded it had never seen any
+device before and asked every device it heard from to rebirth, roughly
+every five minutes, indefinitely.
+
+Every one of those rebirths wrote a row to the session table, which is
+the cause of the growth described below. Devices still rebirth normally
+when they reconnect or when a consumer genuinely needs a birth
+certificate; only the continuous re-asking has stopped.
+
+### The Directory keeps only recent session history
+
+The Directory recorded a session for every device birth and never
+deleted any of them. On a long-running installation this accumulated
+millions of rows, along with several times as many schema records. One
+installation had a 5.6GB Directory database where every other database
+on the same server was around 10MB.
+
+The effect was that asking whether a device was online could take over
+a minute, which used up every database connection the Directory had.
+The visible symptoms were the admin interface hanging at login and
+dashboards showing no data, even though data was still being collected
+and stored normally throughout.
+
+The Directory now keeps the current session and the one before it, for
+each device and for each address, and prunes the rest as devices are
+born. Existing installations are cleaned up by the migration described
+above. No API exposes session history, and nothing that a dashboard or
+an operator can see is different.
+
+Two database indexes have also been restored. They were dropped in ACS
+v3 and never replaced, which meant that finding the current session for
+a device involved scanning the whole table - the single largest cost in
+every device query.
+
+### InfluxDB asks Kubernetes for the resources it needs
+
+InfluxDB was scheduled with no resource reservation, which made it the
+first thing the kernel would kill when a node ran short of memory,
+taking the historians down with it and interrupting data collection. It
+now requests CPU and memory. No limit is set, because InfluxDB's memory
+use depends on how many distinct series a site collects; add one for
+your deployment if you want a ceiling.
+
+### The Sparkplug historian no longer exits on data for an unknown device
+
+Receiving data for a device whose birth certificate had not arrived yet
+would crash the historian, which stopped collection for every other
+device as well. This could happen after a restart, or in the window
+after the historian asks a device to rebirth and before it answers. The
+metric is now skipped until the birth arrives.
+
 ## v6.5.0
 
 ### Choosing a schema for a device offers only the ones that fit

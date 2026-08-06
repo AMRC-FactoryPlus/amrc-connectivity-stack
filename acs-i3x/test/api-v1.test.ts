@@ -167,13 +167,16 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(res.body).toEqual({
-                specVersion: I3X_SPEC_VERSION,
-                serverName: "AMRC Connectivity Stack",
-                serverVersion: Version,
-                capabilities: {
-                    query: { history: true },
-                    update: { current: false, history: false },
-                    subscribe: { stream: true },
+                success: true,
+                result: {
+                    specVersion: I3X_SPEC_VERSION,
+                    serverName: "AMRC Connectivity Stack",
+                    serverVersion: Version,
+                    capabilities: {
+                        query: { history: true },
+                        update: { current: false, history: false },
+                        subscribe: { stream: true },
+                    },
                 },
             });
         });
@@ -183,7 +186,8 @@ describe("APIv1", () => {
             const res = await request(app).get("/info");
 
             expect(res.status).toBe(200);
-            expect(res.body.capabilities.query).toEqual({
+            expect(res.body.success).toBe(true);
+            expect(res.body.result.capabilities.query).toEqual({
                 history: true,
                 maxDepthCap: 5,
             });
@@ -193,7 +197,7 @@ describe("APIv1", () => {
             const { app } = createApp();
             const res = await request(app).get("/info");
 
-            expect(res.body.capabilities.query).not.toHaveProperty("maxDepthCap");
+            expect(res.body.result.capabilities.query).not.toHaveProperty("maxDepthCap");
         });
     });
 
@@ -217,6 +221,7 @@ describe("APIv1", () => {
             const res = await request(app).get("/info");
 
             expect(res.status).toBe(200);
+            expect(res.body.success).toBe(true);
         });
     });
 

@@ -127,7 +127,17 @@ export class APIv1 {
     setup_routes() {
         /* ---- /info router (unauthenticated) ---- */
 
-        this.infoRoute.get("/info", this.get_info.bind(this));
+        /* The i3X OpenAPI spec types the 200 response of GET /info as
+         * SuccessResponse_ServerInfo_, i.e. { success, result }, the
+         * same as every other non-bulk endpoint. Only the router is
+         * separate here (so /info can bypass auth and the readiness
+         * gate); the envelope still applies.
+         *
+         * The middleware is attached to the route rather than via
+         * `infoRoute.use()`: both routers are mounted on the same /v1
+         * path, so a router-level `use()` here would also run for every
+         * request destined for the main router and wrap it twice. */
+        this.infoRoute.get("/info", i3xEnvelope, this.get_info.bind(this));
 
         /* ---- Main router (authenticated) ---- */
 

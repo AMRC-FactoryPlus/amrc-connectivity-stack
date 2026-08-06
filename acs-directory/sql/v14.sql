@@ -15,7 +15,7 @@ call migrate_to(14, $migrate$
     -- outside world is concerned. It goes back on at the end, without
     -- the DELETE, because a notification naming a pruned session
     -- refers to a row which can no longer be looked up.
-    drop trigger mqtt_notify on session;
+    drop trigger if exists mqtt_notify on session;
 
     -- What to keep: for each device, and for each address, the current
     -- session and the one before it. The predecessor is load bearing -
@@ -87,8 +87,15 @@ call migrate_to(14, $migrate$
     --
     -- Built after the prune, so they are built against the pruned
     -- table rather than the full history.
-    create index on session (device);
-    create index on session (address);
+    --
+    -- Named explicitly and guarded, because an operator who noticed
+    -- device queries crawling may well have added one of these by
+    -- hand already. An unnamed CREATE INDEX picks the same name
+    -- Postgres would have generated, collides, and takes the whole
+    -- migration - prune included - down with it. IF NOT EXISTS needs
+    -- the name to have something to test, so the two go together.
+    create index if not exists session_device_idx  on session (device);
+    create index if not exists session_address_idx on session (address);
 
     create trigger mqtt_notify
         after insert or update on session

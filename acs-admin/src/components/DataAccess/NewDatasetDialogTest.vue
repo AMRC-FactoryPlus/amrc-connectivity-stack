@@ -6,7 +6,7 @@
   <Dialog :open="isOpen" @update:open="handle_open">
     <DialogContent class="sm:max-w-[640px] overflow-y-auto max-h-[90vh]">
       <DialogHeader>
-        <DialogTitle>{{ is_edit ? 'Edit Dataset' : 'Create a New Dataset Test' }}</DialogTitle>
+        <DialogTitle>{{ is_edit ? 'Edit Dataset' : 'Create a New Dataset Tests' }}</DialogTitle>
         <DialogDescription>
           {{ is_edit ? 'Update the structural definition of this dataset.' : 'Define a new dataset in the Data Access service.' }}
         </DialogDescription>
@@ -321,9 +321,10 @@ export default {
       return match ? (match.name ?? match.uuid) : this.sparkplug_source
     },
 
-    // All datasets known to the ConfigDB, regardless of whether we are allowed to include them
-    // in a Union. Used to resolve names for uuids we already hold (e.g. when editing an
-    // existing Union whose components we may no longer be permitted to add).
+    // All datasets known to the ConfigDB, regardless of whether we are allowed to embed them
+    // in a Union or use them as a Session source. Used only to resolve names/structure for
+    // uuids we already hold (e.g. when editing an existing dataset whose components we may
+    // no longer be permitted to add).
     all_datasets_for_union() {
       return this.da.structures.map(s => ({
         uuid: s.uuid,
@@ -331,6 +332,18 @@ export default {
         structure: s.structure ?? null,
       }))
       .sort((a, b) => (a.name ?? a.uuid).localeCompare(b.name ?? b.uuid))
+    },
+
+    // Datasets we're permitted to embed directly as a Union component (IncludeInUnion).
+    union_datasets() {
+      const allowed = new Set(this.da.union_sources)
+      return this.all_datasets_for_union.filter(ds => allowed.has(ds.uuid))
+    },
+
+    // Datasets we're permitted to use as the source of a Session (UseForSession).
+    session_datasets() {
+      const allowed = new Set(this.da.session_sources)
+      return this.all_datasets_for_union.filter(ds => allowed.has(ds.uuid))
     },
 
     can_submit() {
@@ -430,7 +443,15 @@ export default {
     },
 
     filtered_datasets_for_component(idx) {
-      return this.all_datasets_for_union.filter(ds =>
+      // A lone component always becomes a Session; within a multi-component Union, a
+      // component with dates set becomes a Session wrapping that source, while a bare
+      // component is embedded directly - each needs the matching permission.
+      const comp = this.dataset_components[idx]
+      const as_session = this.dataset_components.length === 1 ||
+        (is_valid_iso(comp?.from) && is_valid_iso(comp?.to))
+      const source_list = as_session ? this.session_datasets : this.union_datasets
+
+      return source_list.filter(ds =>
         !this.dataset_components.some((c, i) => i !== idx && c.source === ds.uuid && c.from == "" && c.to == ""))
     },
 

@@ -92,6 +92,7 @@ export class DataAccessNotify {
       rx.map(data => ({
         status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -170,8 +171,9 @@ export class DataAccessNotify {
     return this._metadata_resource_state(sess, uuid)
     .pipe(
       rx.map(data => ({
-        status: 200, 
+        status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -351,6 +353,7 @@ export class DataAccessNotify {
       rx.map(data => ({
         status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -385,7 +388,7 @@ export class DataAccessNotify {
     .pipe(
       rx.map(body => ({
         status: 200,
-        response: {body}
+        response: { status: 200, body }
       })),
     );
   }
@@ -441,19 +444,14 @@ export class DataAccessNotify {
 
   // WATCH
   union_sources_list(sess) {
-    this.log("XXX union_sources_list called for %s", sess.principal);
     return this.data.allowed_valid_dataset_uuids(
       sess.principal,
       Constants.Perm.IncludeInUnion
     ).pipe(
-      rx.tap({
-        next: data => this.log("XXX union_sources_list emitted %o", data),
-        error: e => this.log("XXX union_sources_list errored %s", e),
-        complete: () => this.log("XXX union_sources_list completed"),
-      }),
       rx.map(data => ({
         status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -462,19 +460,14 @@ export class DataAccessNotify {
 
   // WATCH
   session_sources_list(sess) {
-    this.log("XXX session_sources_list called for %s", sess.principal);
     return this.data.allowed_valid_dataset_uuids(
       sess.principal,
       Constants.Perm.UseForSession
     ).pipe(
-      rx.tap({
-        next: data => this.log("XXX session_sources_list emitted %o", data),
-        error: e => this.log("XXX session_sources_list errored %s", e),
-        complete: () => this.log("XXX session_sources_list completed"),
-      }),
       rx.map(data => ({
         status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))

@@ -3,17 +3,44 @@
   -->
 
 <template>
+  <!-- A driver may supply its own interface for the per-metric fields. It
+     - replaces this region only; the rest of the origin map editor is
+     - untouched. We fall back to the standard fields whenever the driver
+     - ships no UI, the operator asks for them, or the document misbehaves. -->
+  <DriverCustomUI
+      v-if="showCustomUI"
+      :key="customUIKey"
+      :document="driverUiDocument"
+      :config="driverConfig"
+      :config-schema="driverConfigSchema"
+      :metric="localModel"
+      :allowed-types="allowedTypeNames"
+      @propose="on_driver_propose"
+      @use-standard="useStandardFields = true"
+      @unavailable="on_ui_unavailable"
+  />
+  <template v-else>
   <div class="flex flex-col mb-3">
     <div class="flex items-end justify-between gap-2 w-full mb-2 h-6">
       <div class="flex items-center gap-2 text-gray-500">
         <i class="fa-solid fa-timeline text-xs"></i>
         <div class="text-xs font-bold uppercase tracking-wide">{{isStatic ? 'Value' : 'Origin Map'}}</div>
       </div>
-      <Button variant="outline" size="plain" class="px-2 text-gray-500 text-sm"
-          @click="toggleMode"
-      >
-        {{isStatic ? 'Use Origin Map' : 'Use static value'}}
-      </Button>
+      <div class="flex items-center gap-2">
+        <!-- Only offered when the driver has an interface we are not
+           - currently showing, so it never appears for drivers without one. -->
+        <Button v-if="driverUiSuppressed"
+            variant="outline" size="plain" class="px-2 text-gray-500 text-sm"
+            @click="restore_driver_ui"
+        >
+          Use the driver's interface
+        </Button>
+        <Button variant="outline" size="plain" class="px-2 text-gray-500 text-sm"
+            @click="toggleMode"
+        >
+          {{isStatic ? 'Use Origin Map' : 'Use static value'}}
+        </Button>
+      </div>
     </div>
     <div class="rounded-lg border border-gray-300 p-5 bg-gray-100">
       <div class="grid gap-3 2xl:grid-cols-3">
@@ -137,6 +164,7 @@
       </div>
     </div>
   </div>
+  </template>
 </template>
 
 <script>
@@ -158,6 +186,8 @@ import {
   Combobox, ComboboxAnchor, ComboboxEmpty,
   ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger,
 } from '@/components/ui/combobox'
+import DriverCustomUI from './DriverCustomUI.vue'
+import { ui_document, apply_proposal } from '@/lib/driver-ui/contract.js'
 
 export default {
   name: 'SparkplugMetric',
@@ -197,6 +227,7 @@ export default {
     TabsList,
     TabsTrigger,
     Button,
+    DriverCustomUI,
   },
 
   props: {
@@ -225,6 +256,11 @@ export default {
       localModel: {},
       activeTab: 'principals',
       isToggling: false,
+      /* Operator has asked for the standard fields on this metric. */
+      useStandardFields: false,
+      /* The driver's document failed to load or never completed its
+       * handshake. Distinct from the above because it is not a choice. */
+      uiUnavailable: false,
     }
   },
 
@@ -250,6 +286,52 @@ export default {
 
     driverInfo() {
       return this.connectionInfo?.configuration?.driver || null
+    },
+
+    /* The driver's own configuration values for this connection. Passed to
+     * a custom UI with secrets redacted; see lib/driver-ui/contract.js. */
+    driverConfig() {
+      return this.connectionInfo?.configuration?.config || {}
+    },
+
+    /* The driver's connection schema, which is what tells us which of those
+     * config values are secrets. */
+    driverConfigSchema() {
+      return this.driverInfo?.schema || null
+    },
+
+    /* The driver-supplied document, or null if this driver ships none or
+     * ships one written against a contract version we do not know. */
+    driverUiDocument() {
+      return ui_document(this.driverInfo)
+    },
+
+    allowedTypeNames() {
+      return this.selectedMetric?.schema?.Sparkplug_Type?.enum ?? []
+    },
+
+    /* Static values are the Manager's own concept, not the driver's, so a
+     * custom UI never takes over that mode. */
+    showCustomUI() {
+      return !this.isStatic
+        && !!this.driverUiDocument
+        && !this.useStandardFields
+        && !this.uiUnavailable
+    },
+
+    /* True when a driver interface exists but we are showing the standard
+     * fields instead, which is the only time offering a way back makes
+     * sense. */
+    driverUiSuppressed() {
+      return !this.isStatic
+        && !!this.driverUiDocument
+        && (this.useStandardFields || this.uiUnavailable)
+    },
+
+    /* Remount the frame when the operator selects a different metric, so
+     * the document gets a fresh init rather than stale state. */
+    customUIKey() {
+      return (this.selectedMetric?.path ?? []).join('/')
     },
 
     addressLabel() {
@@ -352,6 +434,10 @@ export default {
         this.localModel = val.model
         // Set isStatic to true if there's a Value, false if there's an Address/Path
         this.isStatic = 'Value' in val.model
+        /* Both of these are per-metric decisions. A driver UI that failed
+         * on one metric deserves a fresh attempt on the next. */
+        this.useStandardFields = false
+        this.uiUnavailable = false
       },
       immediate: true,
     },
@@ -387,6 +473,25 @@ export default {
   },
 
   methods: {
+    /* Values proposed by a driver's interface. They have already been
+     * validated against the allowlist and the metric schema by the host
+     * component; this only merges them into the model, which keeps the
+     * existing localModel watcher as the single path to $emit('input'). */
+    on_driver_propose (values) {
+      this.localModel = apply_proposal(this.localModel, values)
+    },
+
+    /* The document failed to load or never answered its init message. Fall
+     * back rather than leaving the operator with an empty panel. */
+    on_ui_unavailable () {
+      this.uiUnavailable = true
+    },
+
+    restore_driver_ui () {
+      this.useStandardFields = false
+      this.uiUnavailable = false
+    },
+
     toggleMode () {
       // Set the isToggling flag to prevent metric removal during mode switch
       this.isToggling = true;

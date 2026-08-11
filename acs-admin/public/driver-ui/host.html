@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+  Copyright (c) University of Sheffield AMRC 2026.
+
+  Shell page for driver-supplied configuration UIs.
+
+  This exists for one reason: Content-Security-Policy. An iframe using
+  `srcdoc` inherits the embedding page's policy, so hosting driver documents
+  that way would force the whole console to allow inline script. Serving the
+  frame from its own URL instead lets nginx give it a separate, much tighter
+  policy (see .docker/nginx.conf): inline script is permitted, but
+  `default-src 'none'` means the document cannot fetch, XHR, WebSocket or
+  load anything at all.
+
+  Combined with `sandbox="allow-scripts"` on the embedding iframe, which
+  denies the document an origin of its own, a driver UI can neither reach the
+  console nor reach the network. It can only talk to its embedder over
+  postMessage, which is exactly the contract.
+
+  The shell announces itself, receives the driver document, writes it into
+  place, and then gets out of the way.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Driver interface</title>
+</head>
+<body>
+<script>
+(function () {
+    "use strict";
+
+    var ENVELOPE = "fpDriverUi";
+    var VERSION  = 1;
+
+    function announce () {
+        var msg = { type: "host-ready" };
+        msg[ENVELOPE] = VERSION;
+        /* The embedder gave us an opaque origin, so "*" is the only target
+         * that can reach it. Nothing secret travels this way. */
+        parent.postMessage(msg, "*");
+    }
+
+    window.addEventListener("message", function (event) {
+        /* Only the embedder can reach us; a sandboxed opaque-origin frame is
+         * not addressable by anything else. */
+        if (event.source !== parent) return;
+
+        var data = event.data;
+        if (!data || typeof data !== "object") return;
+        if (data[ENVELOPE] !== VERSION) return;
+        if (data.type !== "document") return;
+        if (typeof data.document !== "string") return;
+
+        /* Replace this shell with the driver's document. Scripts written
+         * this way execute under the policy nginx served *this* URL with,
+         * which is what the whole arrangement is for. */
+        document.open();
+        document.write(data.document);
+        document.close();
+    });
+
+    announce();
+}());
+</script>
+</body>
+</html>

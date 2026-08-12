@@ -201,6 +201,13 @@ export function parse_message (data) {
   switch (data.type) {
     case 'host-ready':
       return { type: 'host-ready' }
+    case 'host-failed':
+      /* The shell could not write the driver's document. Fall back at once
+       * rather than making the operator wait out the handshake timeout. */
+      return {
+        type:   'host-failed',
+        reason: typeof data.reason === 'string' ? data.reason : 'unknown',
+      }
     case 'ready':
       return { type: 'ready' }
     case 'propose':

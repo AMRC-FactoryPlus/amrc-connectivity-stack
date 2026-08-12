@@ -33,12 +33,28 @@
     var ENVELOPE = "fpDriverUi";
     var VERSION  = 1;
 
+    /* Announcing once is not enough. This page starts loading the moment the
+     * iframe is inserted, and the embedder attaches its listener separately;
+     * if a deferred or module script gets there second, a single announcement
+     * is posted into the void and the operator sits looking at an empty panel
+     * until the handshake times out.
+     *
+     * So keep saying it until the document arrives. Cheap, bounded, and it
+     * removes the ordering assumption entirely. */
+    var RETRY_MS = 150;
+    var RETRIES  = 20;
+    var timer    = null;
+    var tries    = 0;
+
     function announce () {
         var msg = { type: "host-ready" };
         msg[ENVELOPE] = VERSION;
         /* The embedder gave us an opaque origin, so "*" is the only target
          * that can reach it. Nothing secret travels this way. */
         parent.postMessage(msg, "*");
+
+        if (++tries >= RETRIES) return;
+        timer = setTimeout(announce, RETRY_MS);
     }
 
     window.addEventListener("message", function (event) {
@@ -52,12 +68,26 @@
         if (data.type !== "document") return;
         if (typeof data.document !== "string") return;
 
+        /* Stop announcing; we have what we were waiting for. */
+        if (timer) clearTimeout(timer);
+        timer = null;
+
         /* Replace this shell with the driver's document. Scripts written
          * this way execute under the policy nginx served *this* URL with,
          * which is what the whole arrangement is for. */
-        document.open();
-        document.write(data.document);
-        document.close();
+        try {
+            document.open();
+            document.write(data.document);
+            document.close();
+        }
+        catch (err) {
+            /* Say so rather than leaving the embedder to time out. A driver
+             * whose document cannot even be written should drop the operator
+             * back to the standard fields immediately. */
+            var fail = { type: "host-failed", reason: String(err) };
+            fail[ENVELOPE] = VERSION;
+            parent.postMessage(fail, "*");
+        }
     });
 
     announce();

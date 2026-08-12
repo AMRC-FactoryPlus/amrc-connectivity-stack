@@ -141,6 +141,13 @@ export default {
           this.post(build_document_message(this.document))
           break
 
+        /* The shell could not write the document at all. No point waiting
+         * out the handshake timeout. */
+        case 'host-failed':
+          this.clear_timer()
+          this.$emit('unavailable', msg.reason)
+          break
+
         /* The driver's own document is now running and listening. Only now
          * is it safe to send init; sending earlier would race the document
          * attaching its listener. */

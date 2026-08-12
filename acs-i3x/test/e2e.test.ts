@@ -347,7 +347,8 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(200);
             expect(res.headers["content-type"]).toMatch(/application\/json/);
 
-            const info = res.body;
+            expect(res.body).toHaveProperty("success", true);
+            const info = res.body.result;
             expect(info).toHaveProperty("specVersion");
             expect(info).toHaveProperty("serverName");
             expect(info).toHaveProperty("serverVersion");
@@ -362,7 +363,7 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
             const res = await request(app).get("/v1/info");
 
-            const caps = res.body.capabilities;
+            const caps = res.body.result.capabilities;
             expect(caps.query.history).toBe(true);
             expect(caps.update.current).toBe(false);
             expect(caps.subscribe.stream).toBe(true);
@@ -372,8 +373,8 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
             const res = await request(app).get("/v1/info");
 
-            expect(res.body.specVersion).toBe(I3X_SPEC_VERSION);
-            expect(res.body.serverVersion).toBe(Version);
+            expect(res.body.result.specVersion).toBe(I3X_SPEC_VERSION);
+            expect(res.body.result.serverVersion).toBe(Version);
         });
     });
 
@@ -785,7 +786,8 @@ describe("E2E Compliance Tests", () => {
             const res = await request(app).get("/v1/info");
 
             expect(res.status).toBe(200);
-            expect(res.body.capabilities.query).toEqual({
+            expect(res.body.success).toBe(true);
+            expect(res.body.result.capabilities.query).toEqual({
                 history: true,
                 maxDepthCap: 4,
             });
@@ -1155,9 +1157,8 @@ describe("E2E Compliance Tests", () => {
         it("every success response has { success: true, result: ... }", async () => {
             const { app } = createE2eApp();
 
-            /* /v1/info is excluded: the info route does not use the
-               envelope middleware and returns raw data. */
             const responses = await Promise.all([
+                request(app).get("/v1/info"),
                 request(app).get("/v1/namespaces"),
                 request(app).get("/v1/objecttypes"),
                 request(app).get("/v1/objecttypes/type-cnc"),
@@ -1268,7 +1269,8 @@ describe("E2E Compliance Tests", () => {
 
             const res = await request(app).get("/v1/info");
             expect(res.status).toBe(200);
-            expect(res.body).toHaveProperty("specVersion");
+            expect(res.body).toHaveProperty("success", true);
+            expect(res.body.result).toHaveProperty("specVersion");
         });
     });
 

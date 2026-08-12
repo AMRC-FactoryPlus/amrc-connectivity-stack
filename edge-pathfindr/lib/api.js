@@ -189,7 +189,14 @@ export class PathfindrAPI {
         }
         catch (e) {
             if (e.kind == "auth") {
-                this.log("Authentication rejected: %s", e.message);
+                /* Name the likely cause. Pathfindr returns an empty 500 for
+                 * a wrong client id or secret rather than saying so, and the
+                 * secrets are long random strings where l and 1, O and 0 are
+                 * easy to transpose. Someone reading this line at 3am should
+                 * not have to already know that. */
+                this.log("Authentication rejected: %s. Pathfindr answers 500 "
+                    + "to a wrong client id or secret, so check those first: "
+                    + "watch for l/1 and O/0 in the secret.", e.message);
                 return "AUTH";
             }
             this.log("Cannot reach %s: %s", this.base, e.message);

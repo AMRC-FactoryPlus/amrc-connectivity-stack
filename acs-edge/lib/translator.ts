@@ -22,7 +22,7 @@ import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
 
 import { log } from "./helpers/log.js";
-import { sparkplugConfig, } from "./helpers/typeHandler.js";
+import { serialisationType, sparkplugConfig, } from "./helpers/typeHandler.js";
 
 import { RestConnection } from "./devices/REST.js";
 import { S7Connection } from "./devices/S7.js";
@@ -198,11 +198,39 @@ export class Translator extends EventEmitter {
             connection.name,
             this.broker);
 
+        this.checkPayloadFormats(connection);
+
         if (connection.scout?.scoutDetails?.isEnabled) {
             this.runScout(connection, newConn);
         }
         else {
             this.runDevices(connection, newConn);
+        }
+    }
+
+    /* Warn about a configuration that cannot ever produce data.
+     *
+     * An external driver publishes a payload for the Edge Agent to decode, so
+     * its devices must name a format. "Defined by Protocol" means the
+     * opposite: the connection has already decoded the value itself, which is
+     * true of the internal connections and never of a driver. Left on that
+     * setting the payload arrives, finds no parser, and is dropped, leaving
+     * every metric on the device empty with nothing logged.
+     *
+     * Checked here rather than per read, so it is said once at startup where
+     * someone will see it. */
+    checkPayloadFormats (connection: any) {
+        if (connection.connType !== "Driver") return;
+
+        for (const device of connection.devices ?? []) {
+            if (device.payloadFormat !== serialisationType.ignored) continue;
+
+            log(`Device ${device.deviceId} on driver connection `
+                + `${connection.name} has payload format `
+                + `"${serialisationType.ignored}". An external driver sends a `
+                + `payload for the Edge Agent to decode, so this device will `
+                + `produce no data. Set the device's payload format to the `
+                + `format the driver publishes, usually JSON.`);
         }
     }
 

@@ -553,8 +553,38 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
         case serialisationType.serialisedBuffer:
             break;
         default:
+            /* Nothing here knows how to read this payload, so the metric
+             * gets no value. Say so.
+             *
+             * This branch used to return undefined in silence, and the
+             * commonest way to reach it is a real misconfiguration: an
+             * external driver connection left on "Defined by Protocol".
+             * Such a driver hands over a raw Buffer expecting the Edge Agent
+             * to parse it, so the data arrives intact, is discarded here
+             * without a word, and the metric sits at null forever. There is
+             * nothing in the logs, nothing in the birth certificate, and no
+             * error anywhere to suggest the payload ever existed.
+             *
+             * Logged once per format so a per-metric, per-poll hot path
+             * cannot flood the log. */
+            warn_unparsed(payloadFormat);
             break;
     }
+}
+
+/* Payload formats already complained about; see the default branch above. */
+const unparsed_warned = new Set<string>();
+
+function warn_unparsed (payloadFormat: serialisationType | string) {
+    const key = String(payloadFormat);
+    if (unparsed_warned.has(key)) return;
+    unparsed_warned.add(key);
+
+    log(`Payload format "${key}" has no parser, so every metric using it `
+        + `will stay empty. If this connection uses an external driver, the `
+        + `driver sends a payload for the Edge Agent to decode and the format `
+        + `must name it, usually JSON. "Defined by Protocol" only suits `
+        + `connections that decode internally.`);
 }
 
 /**

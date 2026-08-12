@@ -52,6 +52,7 @@
     overflow-wrap: anywhere;
   }
   .warn { grid-column: 1 / -1; color: #b91c1c; font-size: 12px; }
+  .note { grid-column: 1 / -1; color: #92400e; font-size: 12px; }
   .hidden { display: none; }
 </style>
 </head>
@@ -84,6 +85,7 @@
   </dl>
 
   <div class="warn hidden" id="warn"></div>
+  <div class="note hidden" id="note"></div>
 </div>
 
 <script>
@@ -93,7 +95,10 @@
   var ENVELOPE = "fpDriverUi", VERSION = 1;
 
   /* Preference lists, not fixed types: the metric schema decides which
-     Sparkplug types are legal and we pick the first that is allowed. */
+     Sparkplug types are legal and we pick the first that is allowed. These
+     are written in the Edge Agent's plain spelling; pick_type also matches
+     the endian-suffixed forms schemas use, so Int32 here finds Int32LE
+     there. */
   var NUM  = ["Float", "Double", "Int32", "Int64"];
   var INT  = ["Int32", "Int64", "Float", "Double"];
   var STR  = ["String"];
@@ -245,6 +250,28 @@
     });
   }
 
+  /* Show the Sparkplug type each choice will produce, once the schema has
+     told us which types it permits.
+
+     It is appended to the label rather than set beside it in muted text,
+     because a native select renders its options through the OS and neither
+     styling nor alignment inside one is available. Replacing the select with
+     a custom listbox would buy the nicer look at the cost of a lot of code
+     and all the keyboard and screen reader behaviour that comes free here.
+
+     The type shown is the one actually resolved against this metric's
+     schema, so it reads Int32LE where the schema spells it that way rather
+     than a generic Int32 the metric would reject. */
+  function label_options () {
+    var sel = el("data");
+    CATALOGUE.forEach(function (item) {
+      var o = sel.querySelector('option[value="' + item.id + '"]');
+      if (!o) return;
+      var t = pick_type(item.types).type;
+      o.textContent = t ? item.label + "  (" + t + ")" : item.label;
+    });
+  }
+
   function current () {
     var id = el("data").value;
     for (var i = 0; i < CATALOGUE.length; i++)
@@ -253,11 +280,45 @@
   }
 
   /* Choose the first preferred type the metric schema actually permits. */
+  /* Two vocabularies are in play. The Edge Agent names its types plainly,
+     Int32, and schemas frequently name them with byte order, Int32LE. A
+     schema metric called "Int" offers Int8, Int16LE, Int16BE, Int32LE,
+     Int32BE, Int64LE, Int64BE and no plain Int32 at all.
+
+     Byte order is meaningless here anyway: this driver publishes JSON, and
+     endianness only matters when decoding a raw buffer. So match on the base
+     name and let the schema decide which spelling is legal. */
+  function base_type (t) {
+    return String(t).replace(/(LE|BE)$/, "");
+  }
+
+  /* Choose a Sparkplug type for the selected data. Returns the type and how
+     it was arrived at, so the caller can say when it settled for something
+     unnatural.
+
+     The permitted set is per-metric and chosen by whoever wrote the schema,
+     so it can be a single Int64, only unsigned types, or only String. When
+     nothing suitable is allowed, take whatever is, because a type the
+     operator can correct beats a panel that fills in nothing. */
   function pick_type (prefs) {
-    if (!allowed.length) return prefs[0];
-    for (var i = 0; i < prefs.length; i++)
-      if (allowed.indexOf(prefs[i]) !== -1) return prefs[i];
-    return null;
+    if (!allowed.length) return { type: prefs[0], exact: true };
+
+    var i, j;
+
+    for (i = 0; i < prefs.length; i++)
+      if (allowed.indexOf(prefs[i]) !== -1)
+        return { type: prefs[i], exact: true };
+
+    for (i = 0; i < prefs.length; i++)
+      for (j = 0; j < allowed.length; j++)
+        if (base_type(allowed[j]) === prefs[i])
+          return { type: allowed[j], exact: true };
+
+    /* The empty string is the schema's way of saying "None". */
+    for (j = 0; j < allowed.length; j++)
+      if (allowed[j]) return { type: allowed[j], exact: false };
+
+    return { type: null, exact: false };
   }
 
   function apply_theme (theme) {
@@ -285,9 +346,10 @@
     el("extraWrap").className = item.extra ? "" : "hidden";
     if (item.extra) el("extraLabel").textContent = item.extra;
 
-    var ident = el("ident").value.trim();
-    var extra = el("extra").value.trim();
-    var type  = pick_type(item.types);
+    var ident  = el("ident").value.trim();
+    var extra  = el("extra").value.trim();
+    var picked = pick_type(item.types);
+    var type   = picked.type;
 
     var problems = [];
     if (!ident) problems.push("Enter a " + (wantsId ? "Pathfindr ID" : "serial number") + ".");
@@ -296,11 +358,33 @@
     if (!wantsId && /[\/?#&]/.test(ident))
       problems.push("A serial number cannot contain / ? # or &.");
     if (item.extra && !extra) problems.push("Enter the attribute name.");
-    if (!type) problems.push("No suitable Sparkplug type is allowed for this metric.");
+    /* Only reachable when the schema permits no type at all, since pick_type
+     * otherwise falls back to whatever is allowed. Always name what was on
+     * offer: "no" without "here is what there is" leaves nowhere to go. */
+    if (!type) {
+      problems.push(allowed.length
+        ? "This metric allows no usable Sparkplug type. It allows: "
+          + allowed.join(", ") + "."
+        : "This metric's schema lists no Sparkplug types.");
+    }
 
     var warn = el("warn");
     warn.textContent = problems.join(" ");
     warn.className = problems.length ? "warn" : "warn hidden";
+
+    /* Not an error: a type was chosen and the metric will work. But it is not
+       one this data would naturally use, so say which was picked and what the
+       schema actually permits, rather than quietly setting something odd. */
+    var note = el("note");
+    if (!problems.length && type && !picked.exact) {
+      note.textContent = "Using " + type + ". This metric allows only: "
+        + allowed.filter(Boolean).join(", ") + ".";
+      note.className = "note";
+    }
+    else {
+      note.textContent = "";
+      note.className = "note hidden";
+    }
 
     if (problems.length) {
       el("oAddr").textContent = "-";
@@ -370,6 +454,7 @@
     initialised = true;
     allowed = (d.constraints && d.constraints.allowed_types) || [];
     apply_theme(d.theme);
+    label_options();
     restore(d.metric);
     render();
   });

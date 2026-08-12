@@ -43,6 +43,7 @@ async function fake_pathfindr (opts = {}) {
         per_page:   opts.per_page ?? 100,
         token_status: opts.token_status ?? 200,
         expire_first: opts.expire_first ?? false,
+        expires_in: opts.expires_in,
         used_token: null,
     };
 
@@ -59,11 +60,16 @@ async function fake_pathfindr (opts = {}) {
             state.tokens++;
             if (state.token_status !== 200)
                 return send(state.token_status, { errors: [{ status: "401" }] });
-            return send(200, {
+            const body = {
                 access_token: `token-${state.tokens}`,
                 token_type:   "Bearer",
-                expires_in:   63115200,
-            });
+            };
+            /* The real service issues 1200, not the 63115200 in the
+             * published example. "OMIT" drops the field entirely. */
+            if (state.expires_in !== "OMIT")
+                body.expires_in = state.expires_in === undefined
+                    ? 1200 : state.expires_in;
+            return send(200, body);
         }
 
         const auth = req.headers.authorization ?? "";
@@ -102,6 +108,47 @@ async function fake_pathfindr (opts = {}) {
                     attributes: { name: "Building One", floor: 0 },
                 },
             });
+        }
+
+        /* Mirrors the real enviro history endpoint: many pages, per_page
+         * forced to 1440 whatever the client asks for, newest first. */
+        if (url.pathname === "/api/client/v5/assets/envirohistory") {
+            const page = Number(url.searchParams.get("page") ?? 1);
+            return send(200, {
+                data: [{
+                    type: "envirohistory", id: String(10934162 - page),
+                    attributes: {
+                        temperature: 20.2, humidity: 58,
+                        minute_stamp: "2024-09-25 12:00:00",
+                    },
+                }],
+                meta: { current_page: page, last_page: 8, per_page: 1440,
+                    total: 11089 },
+            });
+        }
+
+        /* Single asset. Carries beacon_info, which the collection does not. */
+        if (url.pathname === "/api/client/v5/assets/3731") {
+            return send(200, {
+                data: {
+                    type: "assets", id: "3731",
+                    attributes: {
+                        serialno: "SN1",
+                        beacon_info: {
+                            serial: "EGRSX", battery: 78,
+                            last_heartbeat: "2024-09-25 11:59:25",
+                        },
+                    },
+                },
+            });
+        }
+
+        /* The runtime endpoints answer this for anything that is not a GPS
+         * tracker, so every plain BLE tag gets it. Routine, not a fault. */
+        if (url.pathname === "/api/client/v5/assets/3731/runtimedata") {
+            return send(422, { errors: [{ status: "422",
+                code: "invalid_gps_tracker",
+                title: "The current asset is not linked to a valid GPS tracker" }] });
         }
 
         if (url.pathname === "/api/client/v5/boom")
@@ -297,6 +344,50 @@ test("pagination reapplies filters to every page", async t => {
         `filters missing from a page: ${pages.join(" ")}`);
 });
 
+test("live: a history sweep stops after one page", async t => {
+    /* The real enviro endpoint reports 8 pages of 1440 records for a single
+     * tag. Walking them to read the current temperature would cost eight
+     * calls and eleven thousand records on every cache window. */
+    const fake = await fake_pathfindr();
+    t.after(() => fake.close());
+
+    const api = client(fake);
+    await api.login();
+
+    const out = await api.fetch({
+        key:       "assets/envirohistory?serial=SN1",
+        path:      "assets/envirohistory",
+        query:     { serial: "SN1" },
+        collection: true,
+        firstPage: true,
+    });
+
+    assert.equal(out.length, 1);
+    assert.equal(out[0].temperature, 20.2);
+
+    const calls = fake.calls.filter(c => c.includes("envirohistory"));
+    assert.equal(calls.length, 1,
+        `walked ${calls.length} pages of history; should have stopped at one`);
+});
+
+test("live: a 422 for a non-GPS asset is non-fatal", async t => {
+    /* Every plain BLE tag returns invalid_gps_tracker from the runtime
+     * endpoints. It must surface as a per-address http error, never as an
+     * auth or connection fault that would take the whole connection down. */
+    const fake = await fake_pathfindr();
+    t.after(() => fake.close());
+
+    const api = client(fake);
+    await api.login();
+
+    await assert.rejects(
+        () => api.fetch({
+            key: "assets/3731/runtimedata", path: "assets/3731/runtimedata",
+            query: {}, collection: false,
+        }),
+        e => e.kind === "http");
+});
+
 test("a truncated sweep is logged, never silently partial", async t => {
     const fake = await fake_pathfindr({ total: 500, per_page: 100 });
     t.after(() => fake.close());
@@ -368,6 +459,57 @@ test("cache expires once the window passes", async t => {
 
     const pages = fake.calls.filter(c => c.startsWith("/api/client/v5/assets"));
     assert.equal(pages.length, 2);
+});
+
+test("the token is refreshed before it expires, without waiting for a 401",
+async t => {
+    /* The live service issues 20 minute tokens, not the two years the
+     * published example suggests, so this path runs several times an hour on
+     * every connection rather than never. Refreshing proactively means a
+     * poll is not spent discovering the token has died. */
+    const fake = await fake_pathfindr({ total: 3, expires_in: 0.02 });
+    t.after(() => fake.close());
+
+    const api = client(fake, { cacheMs: 1 });
+    await api.login();
+    assert.equal(fake.tokens, 1);
+
+    const req = { key: "assets", path: "assets", query: {}, collection: true };
+    await api.fetch(req);
+    assert.equal(fake.tokens, 1, "no refresh while the token is fresh");
+
+    /* Past 90% of a 20ms life. */
+    await new Promise(r => setTimeout(r, 30));
+    await api.fetch(req);
+
+    assert.equal(fake.tokens, 2, "token should have been renewed proactively");
+    assert.equal(fake.used_token, "token-2");
+    /* Nothing 401'd; the refresh happened before the request went out. */
+});
+
+test("an absurd expires_in does not disable refreshing", async t => {
+    /* Defensive: if the field ever came back as the documented 63115200 we
+     * would simply refresh in two years, which is correct behaviour for a
+     * token that genuinely lasts that long. */
+    const fake = await fake_pathfindr({ expires_in: 63115200 });
+    t.after(() => fake.close());
+
+    const api = client(fake);
+    await api.login();
+    assert.ok(api.token.expires_at > Date.now());
+});
+
+test("a missing or nonsensical expires_in falls back to an hour", async t => {
+    for (const bad of ["OMIT", 0, -1, "soon"]) {
+        const fake = await fake_pathfindr({ expires_in: bad });
+        const api = client(fake);
+        await api.login();
+        const life = api.token.expires_at - Date.now();
+        /* One hour, discounted by the 0.9 refresh factor. */
+        assert.ok(life > 3000000 && life <= 3240000,
+            `expires_in ${bad} gave a ${life}ms life`);
+        await fake.close();
+    }
 });
 
 test("a 401 mid-session triggers one re-authentication", async t => {

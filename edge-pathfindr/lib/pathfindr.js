@@ -7,7 +7,7 @@
 import { BufferX } from "@amrc-factoryplus/edge-driver";
 
 import { PathfindrAPI } from "./api.js";
-import { parse_addr, select_value } from "./addr.js";
+import { parse_addr, select_value, resolve_id } from "./addr.js";
 
 export class PathfindrHandler {
     constructor (driver, conf) {
@@ -42,7 +42,24 @@ export class PathfindrHandler {
 
     async poll (spec) {
         try {
-            const body = await this.api.fetch(spec.req);
+            let body = await this.api.fetch(spec.req);
+
+            /* Some data only exists on the single-asset endpoint, notably
+             * beacon_info with its battery level. Getting there means
+             * turning the operator's serial into Pathfindr's internal id
+             * first, which the cached collection already knows. */
+            if (spec.resolve) {
+                const id = resolve_id(body, spec.resolve.ident);
+                if (id === undefined) {
+                    this.log("No asset with serial %s", spec.resolve.ident);
+                    return;
+                }
+                const path = `${spec.resolve.path}/${id}`;
+                body = await this.api.fetch({
+                    key: path, path, query: {}, collection: false,
+                });
+            }
+
             const value = select_value(body, spec.select);
 
             if (value === undefined) {
@@ -77,7 +94,14 @@ export class PathfindrHandler {
                 this.log("Rate limited on %s: %s", spec.addr, e.message);
                 return;
             default:
-                /* A 404 for one address must not take out the connection. */
+                /* A 404 for one address must not take out the connection.
+                 *
+                 * 422 is worth calling out because it is routine rather than
+                 * exceptional: the runtime endpoints answer
+                 * `invalid_gps_tracker` for anything that is not a GPS
+                 * tracker, so every plain BLE tag returns it. That is the
+                 * service telling us the asset has no such data, not a
+                 * fault. */
                 this.log("Poll failed for %s: %s", spec.addr, e?.message ?? e);
                 return;
         }

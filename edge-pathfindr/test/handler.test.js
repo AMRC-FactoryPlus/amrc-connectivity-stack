@@ -140,6 +140,36 @@ test("an unexpected error is contained", async () => {
     assert.deepEqual(driver.calls, []);
 });
 
+test("live: beacon resolves the serial then reads beacon_info", async () => {
+    /* Battery is the single most useful field on a BLE tag, and it lives
+     * only on the single-asset endpoint. Two fetches: the cached collection
+     * to turn the serial into an id, then the asset itself. */
+    const h = PathfindrHandler.create(fake_driver(), CONF);
+    const seen = [];
+    h.api.fetch = async req => {
+        seen.push(req.path);
+        if (req.path === "assets")
+            return [{ id: "3731", serialno: "Tag 1" }];
+        return { id: "3731", beacon_info: { battery: 78, serial: "EGRSX" } };
+    };
+
+    const buf = await h.poll(h.parseAddr("beacon/Tag 1"));
+
+    assert.deepEqual(seen, ["assets", "assets/3731"]);
+    assert.deepEqual(JSON.parse(buf.toString()),
+        { battery: 78, serial: "EGRSX" });
+});
+
+test("live: beacon for an unknown serial yields nothing, quietly", async () => {
+    const driver = fake_driver();
+    const h = PathfindrHandler.create(driver, CONF);
+    h.api.fetch = async () => ([{ id: "3731", serialno: "Tag 1" }]);
+
+    assert.equal(await h.poll(h.parseAddr("beacon/Nope")), undefined);
+    assert.deepEqual(driver.calls, [],
+        "an unknown serial is not a connection fault");
+});
+
 test("close releases the client", async () => {
     const h = PathfindrHandler.create(fake_driver(), CONF);
     h.api.cache.set("x", { at: Date.now(), value: 1 });

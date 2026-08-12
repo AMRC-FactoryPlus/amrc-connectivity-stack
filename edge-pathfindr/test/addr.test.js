@@ -9,7 +9,69 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parse_addr, select_value } from "../lib/addr.js";
+import { parse_addr, select_value, resolve_id } from "../lib/addr.js";
+
+/* The tests below marked "live" encode behaviour confirmed against
+ * portal.pathfindr.co.uk in August 2026, where the running service and the
+ * published documentation disagree. They are the regression guards for what
+ * that exercise found. */
+
+test("live: the asset collection asks for the attribute list", () => {
+    /* Without include=attributes the `attributes` key is absent from every
+     * record, so attrs/<serial> would silently always be empty. `enviro` is
+     * not a valid include; the service rejects it outright. */
+    const spec = parse_addr("assets");
+    assert.equal(spec.req.query.include, "attributes");
+    assert.equal(parse_addr("attrs/SN1").req.query.include, "attributes");
+});
+
+test("live: history addresses fetch only the first page", () => {
+    /* The enviro endpoint ignores per_page and forces 1440 records a page.
+     * One tag had 11,089 records over 8 pages, so walking them to read the
+     * current temperature would cost 8 calls and 11k records per poll. */
+    for (const addr of [
+        "envirohistory/SN1", "impacthistory/SN1",
+        "runtimehistory/SN1", "activityhistory/SN1",
+    ]) {
+        assert.equal(parse_addr(addr).req.firstPage, true, addr);
+    }
+});
+
+test("live: collections are not capped to the first page", () => {
+    /* The asset sweep genuinely does need every page. */
+    assert.equal(parse_addr("assets").req.firstPage, false);
+    assert.equal(parse_addr("runtime").req.firstPage, false);
+    assert.equal(parse_addr("buildings/83/cells").req.firstPage, false);
+});
+
+test("live: beacon resolves a serial to an id before fetching", () => {
+    /* beacon_info, which carries the battery level, appears only on the
+     * single-asset endpoint and never on the collection. */
+    const spec = parse_addr("beacon/Tag 1");
+    assert.ok(spec, "beacon/<serial> should parse");
+    assert.equal(spec.req.key, parse_addr("assets").req.key,
+        "resolution rides on the cached collection");
+    assert.deepEqual(spec.resolve, { ident: "Tag 1", path: "assets" });
+    assert.equal(spec.select.field, "beacon_info");
+    assert.equal(spec.select.ident, null);
+});
+
+test("resolve_id finds an asset id by serial", () => {
+    const body = [
+        { id: "3731", serialno: "Tag 1" },
+        { id: "4926", serialno: "Tag 2" },
+    ];
+    assert.equal(resolve_id(body, "Tag 2"), "4926");
+    assert.equal(resolve_id(body, "Nope"), undefined);
+    assert.equal(resolve_id([], "Tag 1"), undefined);
+});
+
+test("select_value with a null ident takes the record as given", () => {
+    /* After a resolve step the body is already the one asset we wanted. */
+    const body = { id: "3731", beacon_info: { battery: 78 } };
+    assert.deepEqual(select_value(body, { ident: null, field: "beacon_info" }),
+        { battery: 78 });
+});
 
 test("collections parse to a paginated request", () => {
     for (const [addr, path] of [

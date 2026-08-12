@@ -31,6 +31,13 @@ const Collections = new Map([
     ["runtime",     "assets/runtimedata"],
 ]);
 
+/* The asset collection omits the site-defined attribute list unless asked.
+ * Verified against portal.pathfindr.co.uk: without this the `attributes` key
+ * is absent from every record, so `attrs/<serial>` would always come back
+ * empty. `enviro` is NOT a valid include; the service rejects it with
+ * invalid_include_options. */
+const ASSET_INCLUDES = "attributes";
+
 /* Projections of a single asset record from the asset collection. These cost
  * nothing extra: the data is already in the sweep. */
 const Projections = new Map([
@@ -71,7 +78,21 @@ function request (path, opts) {
         key:        req_key(path, query),
         path, query,
         collection: opts?.collection ?? false,
+        /* Fetch page one and stop, however many pages the service claims.
+         * History endpoints return newest first and ignore per_page (the
+         * enviro endpoint forces 1440 records a page), so walking them would
+         * cost eight calls and eleven thousand records to read one current
+         * value. Backfilling history is explicitly not this driver's job. */
+        firstPage:  opts?.firstPage ?? false,
     };
+}
+
+/** The asset collection request, shared by every address served from it. */
+function asset_collection () {
+    return request("assets", {
+        query:      { include: ASSET_INCLUDES },
+        collection: true,
+    });
 }
 
 /** A Pathfindr numeric object id. */
@@ -105,11 +126,12 @@ export function parse_addr (addr) {
 
     /* A whole collection: "assets", "runtime", "activity". */
     if (parts.length == 1) {
-        const path = Collections.get(head);
-        if (!path) return;
+        if (!Collections.has(head)) return;
         return {
             addr,
-            req:    request(path, { collection: true }),
+            req:    head == "assets"
+                ? asset_collection()
+                : request(Collections.get(head), { collection: true }),
             select: null,
         };
     }
@@ -121,7 +143,9 @@ export function parse_addr (addr) {
             if (!valid_serial(second)) return;
             return {
                 addr,
-                req:    request(coll, { collection: true }),
+                req:    head == "assets"
+                    ? asset_collection()
+                    : request(coll, { collection: true }),
                 select: { ident: second, field: null },
             };
         }
@@ -133,12 +157,28 @@ export function parse_addr (addr) {
             if (!valid_serial(second)) return;
             return {
                 addr,
-                req:    request(Collections.get("assets"), { collection: true }),
+                req:    asset_collection(),
                 select: { ident: second, field },
             };
         }
 
-        /* A per-serial history endpoint. */
+        /* The beacon itself: battery and last heartbeat. This is the only
+         * address needing two calls. `beacon_info` appears on the single
+         * asset endpoint and nowhere else, not on the collection, so the
+         * serial has to be resolved to an id first. The collection is
+         * cached, so in practice this costs one extra call per asset. */
+        if (head == "beacon") {
+            if (!valid_serial(second)) return;
+            return {
+                addr,
+                req:     asset_collection(),
+                resolve: { ident: second, path: "assets" },
+                select:  { ident: null, field: "beacon_info" },
+            };
+        }
+
+        /* A per-serial history endpoint. Page one only: these return newest
+         * first, and we want the current value rather than the archive. */
         const hist = Histories.get(head);
         if (hist) {
             if (!valid_serial(second)) return;
@@ -147,6 +187,7 @@ export function parse_addr (addr) {
                 req:    request(hist, {
                     query:      { serial: second },
                     collection: true,
+                    firstPage:  true,
                 }),
                 select: null,
             };
@@ -188,6 +229,14 @@ export function parse_addr (addr) {
 export function select_value (body, select) {
     if (!select) return body;
 
+    /* A null ident means the body is already the record we want, which is
+     * the case after a resolve step has fetched one asset by id. */
+    if (select.ident == null) {
+        const rec = Array.isArray(body) ? body[0] : body;
+        if (rec == null) return;
+        return select.field ? rec[select.field] : rec;
+    }
+
     const list = Array.isArray(body) ? body : [body];
     /* Serials are compared as strings; Pathfindr returns them as strings but
      * an all-digits serial could plausibly arrive as a number. */
@@ -195,6 +244,22 @@ export function select_value (body, select) {
     if (!rec) return;
 
     return select.field ? rec[select.field] : rec;
+}
+
+/**
+ * Find an asset's internal id from a serial, using a fetched collection.
+ *
+ * Pathfindr mixes serials and numeric ids across its endpoints. Operators
+ * know serials, so the driver takes the id lookup on itself.
+ *
+ * @param {*} body A normalised asset collection.
+ * @param {string} serial The serial to look for.
+ * @returns {string|undefined} The asset id.
+ */
+export function resolve_id (body, serial) {
+    const list = Array.isArray(body) ? body : [body];
+    const rec = list.find(r => r != null && String(r.serialno) === String(serial));
+    return rec?.id == null ? undefined : String(rec.id);
 }
 
 /** Addresses the driver understands, for documentation and the UI panel. */

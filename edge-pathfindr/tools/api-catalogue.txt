@@ -1,0 +1,664 @@
+# Pathfindr API catalogue
+# base: https://portal.pathfindr.co.uk
+
+======================================================================
+## Assets (collection)
+   GET /assets?page=1
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets","per_page":100,"to":12,"total":12}
+--- attribute keys on first record ---
+["dispatched_at_utc","launched_at_utc","launched_by","location_data","original_launched_at_utc","part_type","partno","serialno","status"]
+--- first record ---
+{
+  "type": "assets",
+  "id": "3731",
+  "attributes": {
+    "partno": "001",
+    "serialno": "Tag 1",
+    "status": "complete",
+    "launched_at_utc": "2022-07-28 14:28:54",
+    "original_launched_at_utc": "2022-07-28 14:28:54",
+    "launched_by": "Alex Godbehere",
+    "dispatched_at_utc": null,
+    "part_type": "part",
+    "location_data": {
+      "location": {
+        "id": null,
+        "location": null,
+        "building": null,
+        "buildingid": 0,
+        "description": null,
+        "businessname": "AMRC Sheffield Factory 2050",
+        "gps": null,
+        "gps_address": null,
+        "detection_method": "bluetooth",
+        "zone_lat": null,
+        "zone_lng": null,
+        "update_user_id": 0,
+        "update_user_full_name": null
+      },
+      "location_method": "standard",
+      "last_seen_address": "-",
+      "timeat": "0",
+      "lastseen": "2024-09-25 12:02:56",
+      "location_2nd": null,
+      "zoneid_2nd": null,
+      "nodeid_2nd": null,
+      "is_multizone": false,
+      "visible": true,
+      "zoneid": null,
+      "confidence": 90,
+      "confidence_node": null,
+      "lastseen_type": "location",
+      "nodeid": null,
+      "time_at_location_calc": "5days 8hrs 26mins",
+      "beacon_id": 7545,
+      "gps": null,
+      "daysonsystem": 1476,
+      "pending_location": null
+    }
+  },
+  "relationships": {
+    "policies": {
+      "data": [],
+      "links": {
+        "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/relationships/policies",
+        "related": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/policies"
+      }
+    }
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731"
+  }
+}
+
+======================================================================
+## Assets with includes
+   GET /assets?page=1&include=attributes
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets","per_page":100,"to":12,"total":12}
+--- attribute keys on first record ---
+["attributes","dispatched_at_utc","launched_at_utc","launched_by","location_data","original_launched_at_utc","part_type","partno","serialno","status"]
+--- first record ---
+{
+  "type": "assets",
+  "id": "3731",
+  "attributes": {
+    "partno": "001",
+    "serialno": "Tag 1",
+    "status": "complete",
+    "launched_at_utc": "2022-07-28 14:28:54",
+    "original_launched_at_utc": "2022-07-28 14:28:54",
+    "launched_by": "Alex Godbehere",
+    "dispatched_at_utc": null,
+    "part_type": "part",
+    "location_data": {
+      "location": {
+        "id": null,
+        "location": null,
+        "building": null,
+        "buildingid": 0,
+        "description": null,
+        "businessname": "AMRC Sheffield Factory 2050",
+        "gps": null,
+        "gps_address": null,
+        "detection_method": "bluetooth",
+        "zone_lat": null,
+        "zone_lng": null,
+        "update_user_id": 0,
+        "update_user_full_name": null
+      },
+      "location_method": "standard",
+      "last_seen_address": "-",
+      "timeat": "0",
+      "lastseen": "2024-09-25 12:02:56",
+      "location_2nd": null,
+      "zoneid_2nd": null,
+      "nodeid_2nd": null,
+      "is_multizone": false,
+      "visible": true,
+      "zoneid": null,
+      "confidence": 90,
+      "confidence_node": null,
+      "lastseen_type": "location",
+      "nodeid": null,
+      "time_at_location_calc": "5days 8hrs 26mins",
+      "beacon_id": 7545,
+      "gps": null,
+      "daysonsystem": 1476,
+      "pending_location": null
+    },
+    "attributes": []
+  },
+  "relationships": {
+    "policies": {
+      "data": [],
+      "links": {
+        "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/relationships/policies",
+        "related": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/policies"
+      }
+    }
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731"
+  }
+}
+
+======================================================================
+## Runtime data (all)
+   GET /assets/runtimedata
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":null,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets/runtimedata","per_page":100,"to":null,"total":0}
+--- attribute keys on first record ---
+(not an object)
+--- first record ---
+null
+
+======================================================================
+## Activity data (all)
+   GET /assets/activitydata
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets/activitydata","per_page":100,"to":12,"total":12}
+--- attribute keys on first record ---
+["activity_duration_frame","activity_duration_seconds_frame","launched_at_utc","launched_by","partno","runtime_last_event","serialno","time_frame"]
+--- first record ---
+{
+  "type": "assetsactivitydata",
+  "id": "3731",
+  "attributes": {
+    "serialno": "Tag 1",
+    "partno": "001",
+    "launched_at_utc": "2022-07-28 14:28:54",
+    "launched_by": "Alex Godbehere",
+    "time_frame": {
+      "start": "1970-01-01 00:00:00",
+      "end": "2026-08-12 06:39:47"
+    },
+    "activity_duration_frame": 11577,
+    "activity_duration_seconds_frame": 694620,
+    "runtime_last_event": "2023-10-19T14:29:00.000000Z"
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/activitydata"
+  }
+}
+
+# Using asset id=3731 serial='Tag 1'
+
+======================================================================
+## Single asset
+   GET /assets/3731
+======================================================================
+HTTP 200
+--- meta ---
+"none"
+--- attribute keys on first record ---
+["beacon_info","dispatched_at_utc","launched_at_utc","launched_by","location_data","original_launched_at_utc","part_type","partno","serialno","status"]
+--- first record ---
+{
+  "type": "assets",
+  "id": "3731",
+  "attributes": {
+    "partno": "001",
+    "serialno": "Tag 1",
+    "status": "complete",
+    "launched_at_utc": "2022-07-28 14:28:54",
+    "original_launched_at_utc": "2022-07-28 14:28:54",
+    "launched_by": "Alex Godbehere",
+    "dispatched_at_utc": null,
+    "part_type": "part",
+    "location_data": {
+      "location": {
+        "id": null,
+        "location": null,
+        "building": null,
+        "buildingid": 0,
+        "description": null,
+        "businessname": "AMRC Sheffield Factory 2050",
+        "gps": null,
+        "gps_address": null,
+        "detection_method": "bluetooth",
+        "zone_lat": null,
+        "zone_lng": null,
+        "update_user_id": 0,
+        "update_user_full_name": null
+      },
+      "location_method": "standard",
+      "last_seen_address": "-",
+      "timeat": "0",
+      "lastseen": "2024-09-25 12:02:56",
+      "location_2nd": null,
+      "zoneid_2nd": null,
+      "nodeid_2nd": null,
+      "is_multizone": false,
+      "visible": true,
+      "zoneid": null,
+      "confidence": 90,
+      "confidence_node": null,
+      "lastseen_type": "location",
+      "nodeid": null,
+      "time_at_location_calc": "5days 8hrs 26mins",
+      "beacon_id": 7545,
+      "gps": null,
+      "daysonsystem": 1476,
+      "pending_location": null
+    },
+    "beacon_info": {
+      "serial": "EGRSX",
+      "battery": 78,
+      "last_heartbeat": "2024-09-25 11:59:25"
+    }
+  },
+  "relationships": {
+    "policies": {
+      "data": [],
+      "links": {
+        "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/relationships/policies",
+        "related": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/policies"
+      }
+    }
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731"
+  }
+}
+
+======================================================================
+## Single asset, all includes
+   GET /assets/3731?include=attributes,enviro_history,location_history,impact_history
+======================================================================
+HTTP 200
+--- meta ---
+"none"
+--- attribute keys on first record ---
+["attributes","beacon_info","dispatched_at_utc","enviro_history","impact_history","launched_at_utc","launched_by","location_data","location_history","original_launched_at_utc","part_type","partno","serialno","status"]
+--- first record ---
+{
+  "type": "assets",
+  "id": "3731",
+  "attributes": {
+    "partno": "001",
+    "serialno": "Tag 1",
+    "status": "complete",
+    "launched_at_utc": "2022-07-28 14:28:54",
+    "original_launched_at_utc": "2022-07-28 14:28:54",
+    "launched_by": "Alex Godbehere",
+    "dispatched_at_utc": null,
+    "part_type": "part",
+    "location_data": {
+      "location": {
+        "id": null,
+        "location": null,
+        "building": null,
+        "buildingid": 0,
+        "description": null,
+        "businessname": "AMRC Sheffield Factory 2050",
+        "gps": null,
+        "gps_address": null,
+        "detection_method": "bluetooth",
+        "zone_lat": null,
+        "zone_lng": null,
+        "update_user_id": 0,
+        "update_user_full_name": null
+      },
+      "location_method": "standard",
+      "last_seen_address": "-",
+      "timeat": "0",
+      "lastseen": "2024-09-25 12:02:56",
+      "location_2nd": null,
+      "zoneid_2nd": null,
+      "nodeid_2nd": null,
+      "is_multizone": false,
+      "visible": true,
+      "zoneid": null,
+      "confidence": 90,
+      "confidence_node": null,
+      "lastseen_type": "location",
+      "nodeid": null,
+      "time_at_location_calc": "5days 8hrs 26mins",
+      "beacon_id": 7545,
+      "gps": null,
+      "daysonsystem": 1476,
+      "pending_location": null
+    },
+    "attributes": [],
+    "location_history": [
+      {
+        "id": 5068495,
+        "zone": 270,
+        "zone_2nd": null,
+        "node": 877,
+        "node_2nd": null,
+        "part_id": 3731,
+        "beacon_id": 7545,
+        "serial": "Tag 1",
+        "state": "HISTORIC",
+        "confidence": 80,
+        "confidence_node": 80,
+        "created_at": "2023-11-07 15:14:08",
+        "updated_at": "2024-09-12 12:47:18",
+        "lastseen_at": "2024-09-12 12:47:18",
+        "mins_at": 10,
+        "hrs_at": 0,
+        "days_at": 0,
+        "time_at": "10mins",
+        "gps": null,
+        "gps_address": null,
+        "zone_desc": "AGV Area",
+        "location_desc": "Default Factory 2050 cell",
+        "building_desc": "Factory 2050 Mk1",
+        "business_desc": "AMRC Sheffield Factory 2050",
+        "zone_2nd_desc": null,
+        "location_2nd_desc": null,
+        "detection_method": "bluetooth",
+        "update_user_id": 0,
+        "is_virtual": 0,
+
+======================================================================
+## Runtime by id
+   GET /assets/3731/runtimedata
+======================================================================
+HTTP 422
+{"errors":[{"status":"422","code":"invalid_gps_tracker","title":"The current asset is not linked to a valid GPS tracker"}]}
+
+======================================================================
+## Activity by id
+   GET /assets/3731/activitydata
+======================================================================
+HTTP 200
+--- meta ---
+"none"
+--- attribute keys on first record ---
+["activity_duration_frame","activity_duration_seconds_frame","launched_at_utc","launched_by","partno","runtime_last_event","serialno","time_frame"]
+--- first record ---
+{
+  "type": "assetsactivitydata",
+  "id": "3731",
+  "attributes": {
+    "serialno": "TAG 1",
+    "partno": "001",
+    "launched_at_utc": "2022-07-28 14:28:54",
+    "launched_by": "Alex Godbehere",
+    "time_frame": {
+      "start": "1970-01-01 00:00:00",
+      "end": "2026-08-12 06:39:48"
+    },
+    "activity_duration_frame": 11577,
+    "activity_duration_seconds_frame": 694620,
+    "runtime_last_event": "2023-10-19T14:29:00.000000Z"
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/3731/activitydata"
+  }
+}
+
+======================================================================
+## Enviro history by id
+   GET /assets/3731/envirohistory
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":8,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets/3731/envirohistory","per_page":1440,"to":1440,"total":11089}
+--- attribute keys on first record ---
+["humidity","minute_stamp","temperature"]
+--- first record ---
+{
+  "type": "envirohistory",
+  "id": "10934162",
+  "attributes": {
+    "temperature": 20.2,
+    "humidity": 58,
+    "minute_stamp": "2024-09-25 12:00:00"
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/envirohistory/10934162"
+  }
+}
+
+======================================================================
+## Enviro history by serial
+   GET /assets/envirohistory?serial=Tag%201
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":8,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets/envirohistory","per_page":1440,"to":1440,"total":11089}
+--- attribute keys on first record ---
+["humidity","minute_stamp","temperature"]
+--- first record ---
+{
+  "type": "envirohistory",
+  "id": "10934162",
+  "attributes": {
+    "temperature": 20.2,
+    "humidity": 58,
+    "minute_stamp": "2024-09-25 12:00:00"
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/envirohistory/10934162"
+  }
+}
+
+======================================================================
+## Impact history by serial
+   GET /assets/impacthistory?serial=Tag%201
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":null,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets/impacthistory","per_page":100,"to":null,"total":0}
+--- attribute keys on first record ---
+(not an object)
+--- first record ---
+null
+
+======================================================================
+## Runtime history by serial
+   GET /assets/runtimehistory?serial=Tag%201
+======================================================================
+HTTP 422
+{"errors":[{"status":"422","code":"invalid_gps_tracker","title":"The current asset is not linked to a valid GPS tracker"}]}
+
+======================================================================
+## Activity history by serial
+   GET /assets/activitydatahistory?serial=Tag%201
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/assets/activitydatahistory","per_page":200,"to":27,"total":27}
+--- attribute keys on first record ---
+["duration_mins","duration_secs","start","stop"]
+--- first record ---
+{
+  "type": "activitydatahistory",
+  "attributes": {
+    "start": "2022-08-01T23:43:00.000000Z",
+    "stop": "2022-08-02T02:00:06.000000Z",
+    "duration_mins": 137,
+    "duration_secs": 8220
+  }
+}
+
+# Using building id=83
+
+======================================================================
+## Building
+   GET /buildings/83
+======================================================================
+HTTP 200
+--- meta ---
+"none"
+--- attribute keys on first record ---
+["business","created_at","deleted_at","floor","lat","lng","name","site","updated_at","width_metres"]
+--- first record ---
+{
+  "type": "buildings",
+  "id": "83",
+  "attributes": {
+    "name": "Factory 2050 Mk1",
+    "business": "AMRC Sheffield Factory 2050",
+    "site": "AMRC Wales",
+    "width_metres": 73,
+    "floor": 0,
+    "lat": 53.394426181146,
+    "lng": -1.3837636635938,
+    "created_at": "2022-07-20 15:02:43",
+    "updated_at": "2026-06-02 14:42:10",
+    "deleted_at": null
+  },
+  "relationships": {
+    "cells": {
+      "data": [
+        {
+          "type": "cells",
+          "id": "84"
+        }
+      ],
+      "links": {
+        "self": "https://portal.pathfindr.co.uk/api/client/v5/buildings/83/relationships/cells",
+        "related": "https://portal.pathfindr.co.uk/api/client/v5/buildings/83/cells"
+      }
+    }
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/buildings/83"
+  }
+}
+
+======================================================================
+## Building cells
+   GET /buildings/83/cells
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/buildings/83/cells","per_page":100,"to":1,"total":1}
+--- attribute keys on first record ---
+["created_at","deleted_at","lat","lng","name","updated_at"]
+--- first record ---
+{
+  "type": "cells",
+  "id": "84",
+  "attributes": {
+    "name": "Default Factory 2050 cell",
+    "lat": 53.3944280983488,
+    "lng": -1.383755808540561,
+    "created_at": "2022-07-20 15:09:57",
+    "updated_at": "2023-02-14 11:36:37",
+    "deleted_at": null
+  },
+  "relationships": {
+    "zones": {
+      "data": [
+        {
+          "type": "zones",
+          "id": "196"
+        },
+        {
+          "type": "zones",
+          "id": "197"
+        },
+        {
+          "type": "zones",
+          "id": "270"
+        },
+        {
+          "type": "zones",
+          "id": "504"
+        }
+      ],
+      "links": {
+        "self": "https://portal.pathfindr.co.uk/api/client/v5/cells/84/relationships/zones",
+        "related": "https://portal.pathfindr.co.uk/api/client/v5/cells/84/zones"
+      }
+    }
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/cells/84"
+  }
+}
+
+======================================================================
+## Building assets
+   GET /buildings/83/assets
+======================================================================
+HTTP 200
+--- meta ---
+{"current_page":1,"from":1,"last_page":1,"path":"https://portal.pathfindr.co.uk/api/client/v5/buildings/83/assets","per_page":100,"to":5,"total":5}
+--- attribute keys on first record ---
+["attributes","dispatched_at_utc","enviro","launched_at_utc","launched_by","location_data","original_launched_at_utc","part_type","partno","serialno","status"]
+--- first record ---
+{
+  "type": "assets",
+  "id": "4926",
+  "attributes": {
+    "partno": "SMR AMRC BLE DEMO",
+    "serialno": "Bluetooth Tracker N2P8V",
+    "status": null,
+    "launched_at_utc": "2024-08-23 16:10:38",
+    "original_launched_at_utc": null,
+    "launched_by": "Alan Childs",
+    "dispatched_at_utc": null,
+    "part_type": null,
+    "location_data": {
+      "location": {
+        "id": 197,
+        "location": "Default Factory 2050 cell",
+        "building": "Factory 2050 Mk1",
+        "buildingid": 83,
+        "description": "Rail Zone",
+        "businessname": "AMRC Sheffield Factory 2050",
+        "gps": null,
+        "gps_address": null,
+        "detection_method": "bluetooth",
+        "zone_lat": 53.394297265713,
+        "zone_lng": -1.3834737301569,
+        "update_user_id": 0,
+        "update_user_full_name": null
+      },
+      "location_method": "standard",
+      "last_seen_address": "-",
+      "timeat": "69days 21hrs 8mins",
+      "lastseen": "2026-08-12 06:37:30",
+      "location_2nd": null,
+      "zoneid_2nd": null,
+      "nodeid_2nd": null,
+      "is_multizone": false,
+      "visible": true,
+      "zoneid": 197,
+      "confidence": 99,
+      "confidence_node": 95,
+      "lastseen_type": "location",
+      "nodeid": 1455,
+      "time_at_location_calc": "-",
+      "beacon_id": 8570,
+      "gps": null,
+      "daysonsystem": 719,
+      "pending_location": null
+    },
+    "attributes": [],
+    "enviro": {
+      "latest_temperature": 23.5,
+      "latest_humidity": 47
+    }
+  },
+  "relationships": {
+    "policies": {
+      "data": [],
+      "links": {
+        "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/4926/relationships/policies",
+        "related": "https://portal.pathfindr.co.uk/api/client/v5/assets/4926/policies"
+      }
+    }
+  },
+  "links": {
+    "self": "https://portal.pathfindr.co.uk/api/client/v5/assets/4926"
+  }
+}
+
+# Done.

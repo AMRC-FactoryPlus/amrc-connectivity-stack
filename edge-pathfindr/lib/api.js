@@ -25,9 +25,15 @@ const DEFAULTS = {
     perPage:    null,
 };
 
-/* Refresh a token once it is this far through its stated life. The documented
- * example lifetime is two years, which is not a promise worth trusting, but
- * refreshing early costs nothing. */
+/* Refresh a token once it is this far through its stated life.
+ *
+ * The documented example shows `expires_in: 63115200`, which is two years.
+ * The real service does not do that: portal.pathfindr.co.uk issues JWTs with
+ * `expires_in: 1200`, so twenty minutes. Trust the field, never the example.
+ *
+ * That difference matters more than it looks. At two years this refresh path
+ * would never run in production and any bug in it would sit undiscovered; at
+ * twenty minutes it runs several times an hour on every connection. */
 const TOKEN_REFRESH_AT = 0.9;
 
 /* Cached entries are dropped once the map grows past this. Bounded so a
@@ -315,12 +321,18 @@ export class PathfindrAPI {
      * parameters, so `links.next` is never followed. Pages are constructed
      * here with our own parameters reapplied every time.
      */
-    async get_pages (path, query) {
+    async get_pages (path, query, first_page_only = false) {
         const base_query = { ...this.filters, ...query };
         if (this.per_page) base_query.per_page = this.per_page;
 
         const first = await this.get(path, { ...base_query, page: 1 });
         const last = Number(first?.meta?.last_page ?? 1);
+
+        /* History addresses want the newest record, not the archive. The
+         * enviro endpoint ignores per_page and forces 1440 rows a page, so
+         * walking its eight pages would spend eight calls and eleven
+         * thousand records to read one current temperature. */
+        if (first_page_only) return first;
 
         if (!Number.isFinite(last) || last <= 1) return first;
 
@@ -371,7 +383,7 @@ export class PathfindrAPI {
 
         const pending = (async () => {
             const body = req.collection
-                ? await this.get_pages(req.path, req.query)
+                ? await this.get_pages(req.path, req.query, req.firstPage)
                 : await this.get(req.path, { ...req.query });
             return normalise(body);
         })()

@@ -293,23 +293,32 @@ export function validate_proposal (values, { allowed_types } = {}) {
 }
 
 /**
- * Apply a validated proposal onto a metric model.
+ * Apply a validated proposal onto a metric model, in place.
  *
- * Returns a new object rather than mutating, so a rejected proposal leaves
- * the caller's model untouched. Keys proposed as null are removed, matching
- * how the editor treats cleared fields.
+ * Mutating rather than returning a copy is deliberate and load-bearing. The
+ * origin map editor identifies a metric by object identity: SparkplugMetric
+ * is handed a reference to the model inside the editor's own tree, and the
+ * editor's `@input` handler ignores its argument entirely and merely marks
+ * the form dirty. Replacing the reference therefore writes into a detached
+ * object, the save reports success, and nothing changes.
  *
- * @param {object} model The current metric model.
+ * That is not a theoretical hazard. The first version of this returned a new
+ * object, and every value a driver UI proposed was silently discarded.
+ *
+ * Keys proposed as null are removed, matching how the editor treats cleared
+ * fields.
+ *
+ * @param {object} model The metric model, mutated.
  * @param {object} values Validated values from `validate_proposal`.
- * @returns {object} The updated model.
+ * @returns {object} The same model, for convenience.
  */
 export function apply_proposal (model, values) {
-  const out = { ...(model ?? {}) }
+  if (model == null) return model
   for (const [key, value] of Object.entries(values ?? {})) {
     if (value === null)
-      delete out[key]
+      delete model[key]
     else
-      out[key] = value
+      model[key] = value
   }
-  return out
+  return model
 }

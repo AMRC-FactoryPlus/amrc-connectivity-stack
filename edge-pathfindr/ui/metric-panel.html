@@ -52,7 +52,10 @@
     overflow-wrap: anywhere;
   }
   .warn { grid-column: 1 / -1; color: #b91c1c; font-size: 12px; }
-  .note { grid-column: 1 / -1; color: #92400e; font-size: 12px; }
+  /* Muted, not amber. This is information, not a problem: a type was
+     chosen and the metric works. Sitting next to the red .warn, any
+     warm colour reads as a second error. */
+  .note { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
   .hidden { display: none; }
 </style>
 </head>

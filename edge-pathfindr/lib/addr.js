@@ -38,13 +38,31 @@ const Collections = new Map([
  * invalid_include_options. */
 const ASSET_INCLUDES = "attributes";
 
-/* Projections of a single asset record from the asset collection. These cost
- * nothing extra: the data is already in the sweep. */
+/* Projections served straight out of the asset collection. These cost nothing
+ * extra: the data is already in the sweep. */
 const Projections = new Map([
-    ["enviro",      "enviro"],
-    ["fluid",       "fluid_level_latest"],
     ["location",    "location_data"],
     ["attrs",       "attrs"],
+]);
+
+/* Projections that only exist on the single-asset endpoint.
+ *
+ * The collection carries `enviro` and `last_known_height_cm` as keys but
+ * leaves them null, and omits `beacon_info` entirely. Only /assets/{id}
+ * populates them, so reaching these means resolving the serial to an id and
+ * fetching that asset.
+ *
+ * They all share one request. /assets/{id} returns the lot in a single
+ * response, and the cache is keyed on the path, so battery, temperature,
+ * humidity and height for one asset cost one call between them rather than
+ * one call each. */
+const DetailProjections = new Map([
+    ["enviro",      "enviro"],
+    ["beacon",      "beacon_info"],
+    ["height",      "last_known_height_cm"],
+    /* Never seen populated on a live tenant, but it belongs with the other
+     * "latest" blocks, all of which are detail-only. */
+    ["fluid",       "fluid_level_latest"],
 ]);
 
 /* Per-serial history endpoints. These cannot be served from a collection, so
@@ -162,18 +180,18 @@ export function parse_addr (addr) {
             };
         }
 
-        /* The beacon itself: battery and last heartbeat. This is the only
-         * address needing two calls. `beacon_info` appears on the single
-         * asset endpoint and nowhere else, not on the collection, so the
-         * serial has to be resolved to an id first. The collection is
-         * cached, so in practice this costs one extra call per asset. */
-        if (head == "beacon") {
+        /* A projection that only the single-asset endpoint carries. Two
+         * calls: the cached collection to turn the serial into an id, then
+         * the asset itself. Every detail projection for the same asset
+         * shares that second call. */
+        const detail = DetailProjections.get(head);
+        if (detail) {
             if (!valid_serial(second)) return;
             return {
                 addr,
                 req:     asset_collection(),
                 resolve: { ident: second, path: "assets" },
-                select:  { ident: null, field: "beacon_info" },
+                select:  { ident: null, field: detail },
             };
         }
 
@@ -267,6 +285,7 @@ export const ADDRESS_FORMS = [
     ...[...Collections.keys()].map(k => k),
     ...[...Collections.keys()].map(k => `${k}/<serial>`),
     ...[...Projections.keys()].map(k => `${k}/<serial>`),
+    ...[...DetailProjections.keys()].map(k => `${k}/<serial>`),
     ...[...Histories.keys()].map(k => `${k}/<serial>`),
     "buildings/<id>",
     "buildings/<id>/cells",

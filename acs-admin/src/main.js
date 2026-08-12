@@ -4,6 +4,31 @@
 
 import './assets/main.css'
 
+/* Where Monaco finds its web workers.
+ *
+ * vite-plugin-monaco-editor-esm normally injects this as an inline script in
+ * index.html, which would force the console's CSP to allow 'unsafe-inline'.
+ * Setting it here instead puts it in the bundle, which is same-origin, and
+ * a small plugin in vite.config.js strips the injected copy. The plugin is
+ * still needed: it emits the worker bundles these paths point at.
+ *
+ * The plugin's version also carried a blob: fallback for workers served from
+ * another origin. These are all local, so that path was dead code and is not
+ * reproduced here.
+ */
+const MONACO_WORKERS = {
+  editorWorkerService: '/monacoeditorwork/editor.worker.bundle.js',
+  json:                '/monacoeditorwork/json.worker.bundle.js',
+  yaml:                '/monacoeditorwork/monaco-yaml.bundle.js',
+}
+
+self.MonacoEnvironment = {
+  globalAPI: true,
+  getWorkerUrl (moduleId, label) {
+    return MONACO_WORKERS[label] ?? MONACO_WORKERS.editorWorkerService
+  },
+}
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import piniaPersist from 'pinia-plugin-persist'

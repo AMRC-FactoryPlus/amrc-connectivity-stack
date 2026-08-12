@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <script>
-      globalThis.import_meta_env = JSON.parse('"import_meta_env_placeholder"')
-    </script>
+    <!-- Deployment environment. A separate file rather than an inline script
+       - so the console can run without 'unsafe-inline'; see public/env.js. -->
+    <script src="/env.js"></script>
     <link rel="icon" href="/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AMRC Connectivity Stack</title>

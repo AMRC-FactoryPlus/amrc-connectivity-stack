@@ -1070,7 +1070,10 @@ configs:
       schema:
         properties:
           baseURL:
-            description: "Your Pathfindr tenant, e.g. https://acme.pathfindr.co.uk"
+            description: "The Pathfindr host you log into, e.g.
+              https://portal.pathfindr.co.uk. The vendor docs write this as
+              [subdomain].pathfindr.co.uk, but there is no per-customer
+              wildcard: it is the same host as your portal."
             minLength: 1
             options:
               order: 1

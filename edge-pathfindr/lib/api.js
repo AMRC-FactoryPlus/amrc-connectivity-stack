@@ -38,6 +38,20 @@ const CACHE_MAX = 500;
  * Beyond this the poll gives up; the Edge Agent will ask again shortly. */
 const SLOT_WAIT_MS = 10000;
 
+/* Statuses from the token endpoint that mean the service is having a bad
+ * time rather than that our credentials are wrong.
+ *
+ * Everything else is treated as a credentials problem, which is not what
+ * the OAuth2 spec would suggest but is what Pathfindr actually does:
+ * observed against portal.pathfindr.co.uk in August 2026, a well-formed
+ * request carrying a bad client_id or client_secret returns
+ * `500 {"message":""}` rather than `401 invalid_client`.
+ *
+ * Getting this wrong is expensive in one direction in particular. Report a
+ * wrong secret as a connection failure and the operator goes hunting
+ * firewalls and DNS for something that is a typo in a config field. */
+const GATEWAY_STATUS = new Set([502, 503, 504]);
+
 export class PathfindrError extends Error {
     constructor (kind, message) {
         super(message);
@@ -200,10 +214,14 @@ export class PathfindrAPI {
             body,
         });
 
-        if (res.status == 400 || res.status == 401 || res.status == 403)
-            throw new PathfindrError("auth", `token endpoint returned ${res.status}`);
-        if (!res.ok)
-            throw new PathfindrError("conn", `token endpoint returned ${res.status}`);
+        if (!res.ok) {
+            /* See GATEWAY_STATUS: Pathfindr answers bad credentials with a
+             * 500, so anything that is not a gateway code is treated as an
+             * authentication problem. */
+            const kind = GATEWAY_STATUS.has(res.status) ? "conn" : "auth";
+            throw new PathfindrError(kind,
+                `token endpoint returned ${res.status}`);
+        }
 
         const json = await res.json().catch(() => null);
         const access = json?.access_token;

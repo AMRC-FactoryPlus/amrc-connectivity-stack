@@ -41,9 +41,27 @@ Two consequences worth knowing:
 
 ## Configuration
 
+### What to put in `baseURL`
+
+The vendor's documentation writes the host as `https://[subdomain].pathfindr.co.uk`,
+which reads as though every customer gets a dedicated subdomain. In practice
+there is no wildcard DNS on `pathfindr.co.uk`, and the API is served from the
+same host you log into. If you use the portal at
+`https://portal.pathfindr.co.uk/dashboard`, your `baseURL` is
+`https://portal.pathfindr.co.uk`.
+
+Confirm it in one call. A host that serves the API answers an unauthenticated
+request with a 401 rather than a 404:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' \
+  https://portal.pathfindr.co.uk/api/client/v5/assets
+# 401 means the API is here; 404 means it is not
+```
+
 | Property | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `baseURL` | string | Yes | - | Your tenant, e.g. `https://acme.pathfindr.co.uk` |
+| `baseURL` | string | Yes | - | The host you log into, e.g. `https://portal.pathfindr.co.uk` |
 | `clientId` | string | Yes | - | OAuth2 client id |
 | `clientSecret` | password | Yes | - | OAuth2 client secret |
 | `cacheMs` | number | No | `60000` | How long a sweep is reused |
@@ -65,6 +83,21 @@ skipped**. Assets beyond the cap will not report. It never silently presents
 a partial estate as a complete one. The fixes, in order of preference, are
 to scope the connection with `filterPartNo`, lengthen `cacheMs`, or raise
 `maxPages`.
+
+### A vendor quirk worth knowing
+
+Pathfindr answers bad credentials on the token endpoint with
+`500 {"message":""}`, not the `401 invalid_client` that OAuth2 specifies.
+Observed against `portal.pathfindr.co.uk` in August 2026 with a well-formed
+request and a wrong `client_id`.
+
+The driver therefore treats any non-gateway error from the token endpoint as
+an authentication failure, and reserves connection failures for 502, 503 and
+504. Without that, a mistyped client secret would surface in the Manager as a
+connection problem and send you looking at firewalls.
+
+If you are testing by hand, `500 {"message":""}` from `/oauth/token` almost
+certainly means your credentials are wrong, not that Pathfindr is broken.
 
 ## Addresses
 

@@ -214,6 +214,31 @@ test("login reports AUTH on rejected credentials", async t => {
     assert.equal(await client(fake).login(), "AUTH");
 });
 
+test("login reports AUTH when bad credentials come back as a 500", async t => {
+    /* Not hypothetical. Observed against portal.pathfindr.co.uk in August
+     * 2026: a well-formed token request carrying a wrong client_id or
+     * client_secret answers `500 {"message":""}`, not the 401
+     * invalid_client OAuth2 asks for.
+     *
+     * Reporting that as CONN would send an operator hunting network faults
+     * for what is a typo in a config field. */
+    const fake = await fake_pathfindr({ token_status: 500 });
+    t.after(() => fake.close());
+
+    assert.equal(await client(fake).login(), "AUTH");
+});
+
+test("login still reports CONN for gateway errors", async t => {
+    /* The other side of that trade: a real outage must not be reported as
+     * a credentials problem. */
+    for (const status of [502, 503, 504]) {
+        const fake = await fake_pathfindr({ token_status: status });
+        assert.equal(await client(fake).login(), "CONN",
+            `${status} should be a connection failure`);
+        await fake.close();
+    }
+});
+
 test("login reports CONF when the config is incomplete", async t => {
     const fake = await fake_pathfindr();
     t.after(() => fake.close());

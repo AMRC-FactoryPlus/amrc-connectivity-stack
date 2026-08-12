@@ -44,6 +44,45 @@ test("live: collections are not capped to the first page", () => {
     assert.equal(parse_addr("buildings/83/cells").req.firstPage, false);
 });
 
+test("live: detail projections all share one asset fetch", () => {
+    /* /assets/{id} returns enviro, beacon_info and last_known_height_cm in
+     * one response. Battery, temperature, humidity and height for the same
+     * asset must therefore resolve to the same request, so they cost one
+     * call between them rather than one call each. */
+    const specs = ["enviro/S6336-UWB", "beacon/S6336-UWB", "height/S6336-UWB"]
+        .map(parse_addr);
+
+    for (const s of specs) {
+        assert.ok(s, "should parse");
+        assert.deepEqual(s.resolve, { ident: "S6336-UWB", path: "assets" });
+        assert.equal(s.req.key, parse_addr("assets").req.key,
+            "resolution rides on the cached collection");
+    }
+
+    assert.deepEqual(specs.map(s => s.select.field),
+        ["enviro", "beacon_info", "last_known_height_cm"]);
+});
+
+test("live: enviro comes from the asset, not the collection", () => {
+    /* The collection carries an `enviro` key but leaves it null; only
+     * /assets/{id} fills it in. Serving it from the sweep would publish
+     * nulls forever. */
+    const spec = parse_addr("enviro/S6336-UWB");
+    assert.ok(spec.resolve, "enviro must resolve to the single asset");
+    assert.equal(spec.select.ident, null);
+});
+
+test("live: location and attrs stay on the cheap collection path", () => {
+    /* These are populated in the sweep, so they must not trigger a
+     * per-asset fetch. */
+    for (const addr of ["location/S6336-UWB", "attrs/S6336-UWB"]) {
+        const spec = parse_addr(addr);
+        assert.equal(spec.resolve, undefined,
+            `${addr} should not need a second call`);
+        assert.equal(spec.select.ident, "S6336-UWB");
+    }
+});
+
 test("live: beacon resolves a serial to an id before fetching", () => {
     /* beacon_info, which carries the battery level, appears only on the
      * single-asset endpoint and never on the collection. */
@@ -97,12 +136,13 @@ test("a per-asset address rides on the collection request", () => {
     assert.deepEqual(one.select, { ident: "SN123", field: null });
 });
 
-test("projections ride on the asset collection too", () => {
+test("collection projections cost nothing beyond the sweep", () => {
+    /* Only the fields the collection actually populates. `enviro` and
+     * `fluid_level_latest` were once here, but the collection leaves them
+     * null; see the detail-projection tests below. */
     const assets = parse_addr("assets").req.key;
 
     for (const [addr, field] of [
-        ["enviro/SN1",   "enviro"],
-        ["fluid/SN1",    "fluid_level_latest"],
         ["location/SN1", "location_data"],
         ["attrs/SN1",    "attrs"],
     ]) {

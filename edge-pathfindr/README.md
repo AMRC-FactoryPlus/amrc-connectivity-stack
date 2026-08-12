@@ -30,14 +30,22 @@ asset in one paginated sweep, and every configured metric is served out of
 the cached result. API cost is a function of estate size and cache window,
 and is independent of how many metrics you configure.
 
-Two consequences worth knowing:
+Addresses fall into three cost tiers:
 
-- Most addresses cost nothing beyond the sweep. `location/SN1`,
-  `enviro/SN1`, `attrs/SN1` and `assets/SN1` all read from the same cached
-  asset collection.
-- The history addresses do not. Pathfindr has no bulk history endpoint, so
-  each configured history metric is one API call per cache window. Use them
+- **Free.** `assets/SN1`, `location/SN1` and `attrs/SN1` read from the cached
+  collection. Any number of them cost nothing beyond the sweep.
+- **One call per asset.** `enviro/SN1`, `beacon/SN1`, `height/SN1` and
+  `fluid/SN1` come from `/assets/{id}`, because the collection carries those
+  fields as nulls and never fills them in. All of them for the *same* asset
+  share one call, so temperature, humidity, battery and height together cost
+  one request, not four.
+- **One call per metric.** The history addresses. Pathfindr has no bulk
+  history endpoint, so each is its own request every cache window. Use them
   sparingly on a large estate.
+
+For a current temperature, prefer `enviro/SN1` over `envirohistory/SN1`. It is
+cheaper, and it is fresher: the asset's `enviro` block is stamped to the
+minute, while the history endpoint buckets by the hour.
 
 ## Configuration
 
@@ -112,9 +120,11 @@ configuring by CSV or by hand.
 | `runtime`, `runtime/<serial>` | Runtime data: battery, runtime hours |
 | `activity`, `activity/<serial>` | Activity durations |
 | `location/<serial>` | The asset's `location_data` block |
-| `enviro/<serial>` | Latest temperature and humidity |
-| `fluid/<serial>` | Latest fluid level reading |
 | `attrs/<serial>` | Site-defined attributes, keyed by name |
+| `enviro/<serial>` | Latest temperature, humidity and when they were recorded |
+| `beacon/<serial>` | Beacon battery and last heartbeat |
+| `height/<serial>` | Last known height above the floor, in cm (UWB tags) |
+| `fluid/<serial>` | Latest fluid level reading |
 | `envirohistory/<serial>` | Environmental history (own API call) |
 | `impacthistory/<serial>` | Impact history (own API call) |
 | `runtimehistory/<serial>` | Runtime history (own API call) |

@@ -434,13 +434,36 @@ export default {
   },
 
   methods: {
+    /* A v4-shaped identifier for a secret placeholder.
+     *
+     * The Edge Agent finds these by pattern, so the shape matters. This used
+     * to return crypto.randomUUID() when available and 32 unhyphenated hex
+     * characters otherwise, and the Edge Agent only recognised the first
+     * form. crypto.randomUUID is restricted to secure contexts, so on a
+     * Manager served over plain HTTP every secret came out in a shape the
+     * Edge Agent silently ignored.
+     *
+     * The fallback now produces the same 8-4-4-4-12 layout, so both paths
+     * yield something recognisable. It also no longer relies on
+     * Uint8Array.prototype.toHex, which is recent enough to be missing from
+     * browsers that are otherwise perfectly current. */
     random() {
       if (crypto.randomUUID)
         return crypto.randomUUID();
 
       const buf = new Uint8Array(16);
       crypto.getRandomValues(buf);
-      return buf.toHex();
+
+      /* Set the version and variant bits, so this is a real v4 rather than
+       * something merely shaped like one. */
+      buf[6] = (buf[6] & 0x0f) | 0x40;
+      buf[8] = (buf[8] & 0x3f) | 0x80;
+
+      const hex = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+      return [
+        hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16),
+        hex.slice(16, 20), hex.slice(20),
+      ].join('-');
     },
 
     async encryptSensitiveInfo(value) {

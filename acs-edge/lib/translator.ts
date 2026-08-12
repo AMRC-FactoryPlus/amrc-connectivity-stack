@@ -357,7 +357,26 @@ export class Translator extends EventEmitter {
             // If the SECRETS_PATH is set in the environment, use that as the secret path, otherwise use the default
             const secretBasePath = process.env.SECRETS_PATH || '/etc/secrets';
 
-            const secretReplacedConfig = configString.replace(/__FPSI__[a-f0-9-]{36}/g, (match) => {
+            /* Two token shapes exist in the field, and both must resolve.
+             *
+             * The Manager mints these with crypto.randomUUID(), giving 36
+             * characters with hyphens. That API only exists in a secure
+             * context, so a Manager served over plain HTTP falls back to 32
+             * hex characters with none. This pattern only accepted the first,
+             * so on an HTTP deployment every secret passed through
+             * unsubstituted and the driver received the literal placeholder,
+             * which it then sent to the remote service as the credential.
+             *
+             * The failure was silent from here: nothing matched, so nothing
+             * was reported missing, and the error surfaced as an
+             * authentication rejection from a third party.
+             *
+             * The alternation is deliberate rather than a {32,36} range. A
+             * range is greedy and, next to a hyphenated token, could consume
+             * part of a neighbouring value. */
+            const FPSI = /__FPSI__(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{32})/g;
+
+            const secretReplacedConfig = configString.replace(FPSI, (match) => {
                 try {
                     // Attempt to get the secret contents from the file in /etc/secrets with the same name
                     const secretPath = `${secretBasePath}/${match}`;

@@ -318,22 +318,35 @@ describe('validate_proposal', () => {
 })
 
 describe('apply_proposal', () => {
-  it('merges values onto the model without mutating it', () => {
+  it('mutates the model in place rather than returning a copy', () => {
+    /* Load-bearing. The origin map editor holds the metric by reference and
+     * its @input handler ignores the emitted value, so only a mutation of
+     * that same object survives a save. An earlier version returned a new
+     * object and every proposed value was silently discarded. */
     const model = { Address: 'old', Sparkplug_Type: 'String' }
     const out = apply_proposal(model, { Address: 'new' })
 
-    expect(out).toEqual({ Address: 'new', Sparkplug_Type: 'String' })
-    expect(model.Address).toEqual('old')
+    expect(model.Address).toEqual('new')
+    expect(out).toBe(model)
+  })
+
+  it('keeps fields it was not asked to change', () => {
+    const model = { Address: 'old', Sparkplug_Type: 'String' }
+    apply_proposal(model, { Address: 'new' })
+    expect(model.Sparkplug_Type).toEqual('String')
   })
 
   it('removes keys proposed as null', () => {
-    const out = apply_proposal({ Address: 'a', Path: '$.x' }, { Path: null })
-    expect(out).toEqual({ Address: 'a' })
-    expect('Path' in out).toBe(false)
+    const model = { Address: 'a', Path: '$.x' }
+    apply_proposal(model, { Path: null })
+    expect(model).toEqual({ Address: 'a' })
+    expect('Path' in model).toBe(false)
   })
 
   it('tolerates empty input', () => {
-    expect(apply_proposal(null, null)).toEqual({})
-    expect(apply_proposal({ a: 1 }, {})).toEqual({ a: 1 })
+    expect(apply_proposal(null, null)).toBeNull()
+    const model = { a: 1 }
+    expect(apply_proposal(model, {})).toBe(model)
+    expect(model).toEqual({ a: 1 })
   })
 })

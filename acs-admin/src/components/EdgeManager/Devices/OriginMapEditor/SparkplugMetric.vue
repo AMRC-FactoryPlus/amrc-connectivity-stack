@@ -477,8 +477,14 @@ export default {
      * validated against the allowlist and the metric schema by the host
      * component; this only merges them into the model, which keeps the
      * existing localModel watcher as the single path to $emit('input'). */
+    /* Note the absence of an assignment. localModel is a reference to the
+     * model inside the editor's own tree, and the editor's @input handler
+     * ignores its argument and just marks the form dirty, so the only thing
+     * that actually persists is a mutation of that object. apply_proposal
+     * mutates for exactly this reason; reassigning here would write into a
+     * detached copy and the save would silently do nothing. */
     on_driver_propose (values) {
-      this.localModel = apply_proposal(this.localModel, values)
+      apply_proposal(this.localModel, values)
     },
 
     /* The document failed to load or never answered its init message. Fall

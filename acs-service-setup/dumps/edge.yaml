@@ -65,6 +65,7 @@ objects:
     !u ACS.Driver.External:         { name: "External driver" }
     !u ACS.Driver.ADS:              { name: "ADS" }
     !u ACS.Driver.RTDE:             { name: "RTDE" }
+    !u ACS.Driver.Pathfindr:        { name: "Pathfindr" }
 
 configs:
   # Driver Definition Configuration
@@ -683,6 +684,494 @@ configs:
           - host
           - port
         title: "RTDE Connection Details"
+        type: object
+
+    !u ACS.Driver.Pathfindr:
+      image:
+        repository: edge-pathfindr
+      polled: true
+      presentation:
+        address:
+          title: "Pathfindr Address"
+          description: "What to read, as <data>/<serial>. Examples:
+            location/SN12345, enviro/SN12345, runtime/SN12345,
+            attrs/SN12345, buildings/55/cells. The driver's own interface
+            builds these for you."
+          icon: "location-dot"
+          placeholder: "e.g. location/SN12345"
+        path:
+          title: "JSON Path"
+          description: "JSONPath into the response, e.g.
+            $.location.building or $.latest_temperature"
+          icon: "code"
+          placeholder: "e.g. $.location.building"
+      # Rendered by the Manager in place of the per-metric fields. Generated
+      # from edge-pathfindr/ui/metric-panel.html by
+      # edge-pathfindr/tools/inline-ui.js; edit that file, not this one.
+      # edge-pathfindr/test/ui-sync.test.js fails if the two diverge.
+      ui:
+        version: 1
+        # BEGIN metric-panel.html
+        document: |
+          <!doctype html>
+          <!-- ACS Pathfindr driver: per-metric configuration panel.
+               Copyright 2026 University of Sheffield AMRC
+
+               This document is embedded in the driver definition and rendered by the
+               ACS Manager in a sandboxed frame. It has no network access by design
+               (see acs-admin/.docker/nginx.conf), so it describes the Pathfindr API
+               rather than a particular tenant: the operator reads their asset serial
+               off the beacon or the portal and types it here.
+
+               Keep this in sync with the copy in acs-service-setup/dumps/edge.yaml.
+               test/ui-sync.test.js fails if they diverge. -->
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <title>Pathfindr metric</title>
+          <style>
+            :root {
+              --bg: #f3f4f6; --surface: #fff; --text: #111827; --muted: #6b7280;
+              --border: #d1d5db; --radius: 0.5rem;
+              --font: ui-sans-serif, system-ui, sans-serif; --size: 14px;
+            }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0; padding: 14px;
+              background: var(--bg); color: var(--text);
+              font-family: var(--font); font-size: var(--size);
+            }
+            .grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+            @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+            label { display: flex; flex-direction: column; gap: 4px; }
+            .lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+            select, input {
+              font: inherit; color: inherit; background: var(--surface);
+              border: 1px solid var(--border); border-radius: var(--radius);
+              padding: 8px 10px; width: 100%;
+            }
+            select:focus-visible, input:focus-visible {
+              outline: 2px solid var(--text); outline-offset: 1px;
+            }
+            .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+            .out {
+              grid-column: 1 / -1;
+              background: var(--surface); border: 1px solid var(--border);
+              border-radius: var(--radius); padding: 10px 12px;
+              display: grid; grid-template-columns: auto 1fr; gap: 3px 12px;
+              font-size: 12px;
+            }
+            .out dt { color: var(--muted); }
+            .out dd {
+              margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace;
+              overflow-wrap: anywhere;
+            }
+            .warn { grid-column: 1 / -1; color: #b91c1c; font-size: 12px; }
+            .hidden { display: none; }
+          </style>
+          </head>
+          <body>
+
+          <div class="grid">
+            <label>
+              <span class="lbl">Data</span>
+              <select id="data"></select>
+              <span class="hint" id="dataHint"></span>
+            </label>
+
+            <label id="identWrap">
+              <span class="lbl" id="identLabel">Serial number</span>
+              <input id="ident" autocomplete="off" placeholder="e.g. SN12345">
+              <span class="hint" id="identHint">As printed on the beacon, or shown in the Pathfindr portal</span>
+            </label>
+
+            <label id="extraWrap" class="hidden">
+              <span class="lbl" id="extraLabel">Attribute name</span>
+              <input id="extra" autocomplete="off" placeholder="e.g. SAP Order Number">
+              <span class="hint">Exactly as it appears in Pathfindr</span>
+            </label>
+
+            <dl class="out">
+              <dt>Address</dt><dd id="oAddr">-</dd>
+              <dt>Path</dt><dd id="oPath">-</dd>
+              <dt>Type</dt><dd id="oType">-</dd>
+              <dt>Unit</dt><dd id="oUnit">-</dd>
+            </dl>
+
+            <div class="warn hidden" id="warn"></div>
+          </div>
+
+          <script>
+          (function () {
+            "use strict";
+
+            var ENVELOPE = "fpDriverUi", VERSION = 1;
+
+            /* Preference lists, not fixed types: the metric schema decides which
+               Sparkplug types are legal and we pick the first that is allowed. */
+            var NUM  = ["Float", "Double", "Int32", "Int64"];
+            var INT  = ["Int32", "Int64", "Float", "Double"];
+            var STR  = ["String"];
+            var BOOL = ["Boolean", "Int32", "String"];
+
+            /* The Pathfindr API's shape. This is the same for every customer of the
+               vendor, which is why it can live in the driver definition. */
+            var CATALOGUE = [
+              { id: "loc.zone",    group: "Location", label: "Zone",
+                addr: function (s) { return "location/" + s },
+                path: "$.location.location", types: STR,
+                hint: "The zone the asset was last seen in." },
+              { id: "loc.building", group: "Location", label: "Building",
+                addr: function (s) { return "location/" + s },
+                path: "$.location.building", types: STR,
+                hint: "The building the asset was last seen in." },
+              { id: "loc.desc",    group: "Location", label: "Location description",
+                addr: function (s) { return "location/" + s },
+                path: "$.location.description", types: STR,
+                hint: "Pathfindr's description of the asset's last known location." },
+              { id: "loc.conf",    group: "Location", label: "Location confidence",
+                addr: function (s) { return "location/" + s },
+                path: "$.confidence", types: INT, unit: "%", low: 0, high: 100,
+                hint: "How confident Pathfindr is in the reported location, as a percentage." },
+              { id: "loc.seen",    group: "Location", label: "Last seen",
+                addr: function (s) { return "location/" + s },
+                path: "$.lastseen", types: STR,
+                hint: "When the asset was last detected." },
+              { id: "loc.timeat",  group: "Location", label: "Time at location",
+                addr: function (s) { return "location/" + s },
+                path: "$.time_at_location_calc", types: STR,
+                hint: "How long the asset has been at its current location." },
+              { id: "loc.business", group: "Location", label: "Business",
+                addr: function (s) { return "location/" + s },
+                path: "$.location.businessname", types: STR,
+                hint: "The business area the asset's location belongs to." },
+              { id: "bcn.battery", group: "Condition", label: "Beacon battery",
+                addr: function (s) { return "beacon/" + s },
+                path: "$.battery", types: INT, unit: "%", low: 0, high: 100,
+                hint: "The tag's current battery level, as a percentage." },
+              { id: "bcn.beat",    group: "Condition", label: "Beacon last heartbeat",
+                addr: function (s) { return "beacon/" + s },
+                path: "$.last_heartbeat", types: STR,
+                hint: "When the tag last reported in." },
+              { id: "env.temp",    group: "Condition", label: "Temperature",
+                addr: function (s) { return "envirohistory/" + s },
+                path: "$[0].temperature", types: NUM,
+                unit: "°C", low: -20, high: 60,
+                hint: "The most recent temperature reading from the tag's sensor." },
+              { id: "env.hum",     group: "Condition", label: "Humidity",
+                addr: function (s) { return "envirohistory/" + s },
+                path: "$[0].humidity", types: NUM, unit: "%", low: 0, high: 100,
+                hint: "The most recent humidity reading from the tag's sensor." },
+              { id: "impact.last", group: "Condition", label: "Latest impact",
+                addr: function (s) { return "impacthistory/" + s },
+                path: "$[0].impact", types: INT,
+                hint: "The size of the most recent impact detected by the tag." },
+              { id: "fluid.pct",   group: "Condition", label: "Fluid level",
+                addr: function (s) { return "fluid/" + s },
+                path: "$.reading_percent", types: NUM, unit: "%", low: 0, high: 100,
+                hint: "The most recent fluid level reading, as a percentage." },
+
+              { id: "act.mins",    group: "Runtime", label: "Activity duration",
+                addr: function (s) { return "activity/" + s },
+                path: "$.activity_duration_frame", types: INT, unit: "min", low: 0,
+                hint: "How long the asset has been active, in minutes." },
+              { id: "act.secs",    group: "Runtime", label: "Activity duration (seconds)",
+                addr: function (s) { return "activity/" + s },
+                path: "$.activity_duration_seconds_frame", types: INT, unit: "s", low: 0,
+                hint: "How long the asset has been active, in seconds." },
+              { id: "act.last",    group: "Runtime", label: "Last activity event",
+                addr: function (s) { return "activity/" + s },
+                path: "$.runtime_last_event", types: STR,
+                hint: "When the asset was last active." },
+              { id: "rt.total",    group: "Runtime", label: "Runtime hours (total)",
+                addr: function (s) { return "runtime/" + s },
+                path: "$.runtime_duration_total", types: STR,
+                hint: "Total running time, as HH:MM:SS. GPS trackers only." },
+              { id: "rt.batv",     group: "Runtime", label: "Tracker battery voltage",
+                addr: function (s) { return "runtime/" + s },
+                path: "$.battery_v", types: NUM, unit: "V", low: 0, high: 5,
+                hint: "The GPS tracker's battery voltage. BLE tags report Beacon battery instead." },
+
+              { id: "attr",        group: "Asset", label: "Custom attribute",
+                addr: function (s) { return "attrs/" + s },
+                path: null, types: STR, extra: "Attribute name",
+                hint: "A site-defined field from the asset's record in Pathfindr." },
+              { id: "asset.part",  group: "Asset", label: "Part number",
+                addr: function (s) { return "assets/" + s },
+                path: "$.partno", types: STR,
+                hint: "The part number the asset was launched with." },
+              { id: "asset.status", group: "Asset", label: "Status",
+                addr: function (s) { return "assets/" + s },
+                path: "$.status", types: STR,
+                hint: "The asset's lifecycle status in Pathfindr." },
+              { id: "bld.name",    group: "Site", label: "Building name",
+                ident: "id", addr: function (s) { return "buildings/" + s },
+                path: "$.name", types: STR,
+                hint: "The building's name in Pathfindr." },
+              { id: "bld.site",    group: "Site", label: "Building site",
+                ident: "id", addr: function (s) { return "buildings/" + s },
+                path: "$.site", types: STR,
+                hint: "The site the building belongs to." },
+              { id: "cell.zones",  group: "Site", label: "Zones in a cell",
+                ident: "id", addr: function (s) { return "cells/" + s + "/zones" },
+                path: "$", types: STR,
+                hint: "Every zone in the cell, as JSON." }
+            ];
+
+            var el = function (id) { return document.getElementById(id) };
+            var allowed = [];
+            var initialised = false;
+
+            function post (msg) {
+              msg[ENVELOPE] = VERSION;
+              parent.postMessage(msg, "*");
+            }
+
+            function report_height () {
+              /* Measure the body, not documentElement. documentElement.scrollHeight
+                 returns max(viewport, content), so once the embedder has sized the
+                 frame to our reported height we would just measure that height back
+                 and the panel could only ever grow. */
+              var h = document.body ? document.body.getBoundingClientRect().height : 0;
+              post({ type: "resize", height: Math.ceil(h) + 28 });
+            }
+
+            function build_options () {
+              var sel = el("data"), groups = {};
+              CATALOGUE.forEach(function (item) {
+                if (!groups[item.group]) {
+                  var g = document.createElement("optgroup");
+                  g.label = item.group;
+                  groups[item.group] = g;
+                  sel.appendChild(g);
+                }
+                var o = document.createElement("option");
+                o.value = item.id;
+                o.textContent = item.label;
+                groups[item.group].appendChild(o);
+              });
+            }
+
+            function current () {
+              var id = el("data").value;
+              for (var i = 0; i < CATALOGUE.length; i++)
+                if (CATALOGUE[i].id === id) return CATALOGUE[i];
+              return CATALOGUE[0];
+            }
+
+            /* Choose the first preferred type the metric schema actually permits. */
+            function pick_type (prefs) {
+              if (!allowed.length) return prefs[0];
+              for (var i = 0; i < prefs.length; i++)
+                if (allowed.indexOf(prefs[i]) !== -1) return prefs[i];
+              return null;
+            }
+
+            function apply_theme (theme) {
+              if (!theme) return;
+              var map = {
+                background: "--bg", surface: "--surface", text: "--text",
+                textMuted: "--muted", border: "--border", radius: "--radius",
+                fontFamily: "--font", fontSize: "--size"
+              };
+              Object.keys(map).forEach(function (k) {
+                if (theme[k]) document.documentElement.style.setProperty(map[k], theme[k]);
+              });
+            }
+
+            function render () {
+              var item = current();
+              var wantsId = item.ident === "id";
+
+              el("identLabel").textContent = wantsId ? "Pathfindr ID" : "Serial number";
+              el("identHint").textContent = wantsId
+                ? "The numeric id shown in the Pathfindr portal"
+                : "As printed on the beacon, or shown in the Pathfindr portal";
+              el("ident").placeholder = wantsId ? "e.g. 55" : "e.g. SN12345";
+              el("dataHint").textContent = item.hint || "";
+              el("extraWrap").className = item.extra ? "" : "hidden";
+              if (item.extra) el("extraLabel").textContent = item.extra;
+
+              var ident = el("ident").value.trim();
+              var extra = el("extra").value.trim();
+              var type  = pick_type(item.types);
+
+              var problems = [];
+              if (!ident) problems.push("Enter a " + (wantsId ? "Pathfindr ID" : "serial number") + ".");
+              if (wantsId && ident && !/^[0-9]+$/.test(ident))
+                problems.push("The Pathfindr ID must be a number.");
+              if (!wantsId && /[\/?#&]/.test(ident))
+                problems.push("A serial number cannot contain / ? # or &.");
+              if (item.extra && !extra) problems.push("Enter the attribute name.");
+              if (!type) problems.push("No suitable Sparkplug type is allowed for this metric.");
+
+              var warn = el("warn");
+              warn.textContent = problems.join(" ");
+              warn.className = problems.length ? "warn" : "warn hidden";
+
+              if (problems.length) {
+                el("oAddr").textContent = "-";
+                el("oPath").textContent = "-";
+                el("oType").textContent = "-";
+                el("oUnit").textContent = "-";
+                report_height();
+                return;
+              }
+
+              var address = item.addr(ident);
+              /* JSONPath bracket form, so attribute names with spaces work. */
+              var path = item.path !== null
+                ? item.path
+                : "$['" + extra.replace(/'/g, "\\'") + "']";
+
+              el("oAddr").textContent = address;
+              el("oPath").textContent = path;
+              el("oType").textContent = type;
+              el("oUnit").textContent = item.unit || "-";
+
+              var values = {
+                Address:        address,
+                Path:           path,
+                Sparkplug_Type: type,
+                Eng_Unit:       item.unit || null
+              };
+              if (typeof item.low  === "number") values.Eng_Low  = item.low;
+              if (typeof item.high === "number") values.Eng_High = item.high;
+
+              post({ type: "propose", values: values });
+              report_height();
+            }
+
+            /* Recover the panel's state from a metric that was configured earlier, so
+               reopening it does not silently reset what the operator already set. */
+            function restore (metric) {
+              if (!metric || !metric.Address) return;
+              var addr = String(metric.Address);
+              var slash = addr.indexOf("/");
+              if (slash < 0) return;
+
+              var head = addr.slice(0, slash);
+              var rest = addr.slice(slash + 1);
+              var ident = rest.indexOf("/") >= 0 ? rest.slice(0, rest.indexOf("/")) : rest;
+
+              for (var i = 0; i < CATALOGUE.length; i++) {
+                var item = CATALOGUE[i];
+                if (item.addr(ident) !== addr) continue;
+                if (item.path !== null && item.path !== metric.Path) continue;
+                el("data").value = item.id;
+                el("ident").value = ident;
+                if (item.path === null && metric.Path) {
+                  var m = /^\$\['(.*)'\]$/.exec(String(metric.Path));
+                  if (m) el("extra").value = m[1].replace(/\\'/g, "'");
+                }
+                return;
+              }
+            }
+
+            window.addEventListener("message", function (event) {
+              if (event.source !== parent) return;
+              var d = event.data;
+              if (!d || typeof d !== "object" || d[ENVELOPE] !== VERSION) return;
+              if (d.type !== "init" || initialised) return;
+
+              initialised = true;
+              allowed = (d.constraints && d.constraints.allowed_types) || [];
+              apply_theme(d.theme);
+              restore(d.metric);
+              render();
+            });
+
+            build_options();
+            el("data").addEventListener("change", render);
+            el("ident").addEventListener("input", render);
+            el("extra").addEventListener("input", render);
+            window.addEventListener("resize", report_height);
+
+            /* Announce only once listeners are attached, so init cannot race us. */
+            post({ type: "ready" });
+          }());
+          </script>
+          </body>
+          </html>
+        # END metric-panel.html
+      schema:
+        properties:
+          baseURL:
+            description: "The Pathfindr host you log into, e.g.
+              https://portal.pathfindr.co.uk. The vendor docs write this as
+              [subdomain].pathfindr.co.uk, but there is no per-customer
+              wildcard: it is the same host as your portal."
+            minLength: 1
+            options:
+              order: 1
+            title: "Base URL"
+            type: string
+          clientId:
+            minLength: 1
+            options:
+              order: 2
+            title: "Client ID"
+            type: string
+          clientSecret:
+            format: password
+            minLength: 1
+            options:
+              order: 3
+            title: "Client Secret"
+            type: string
+          cacheMs:
+            default: 60000
+            description: "How long a collection sweep is reused, in
+              milliseconds. Pathfindr allows 120 calls a minute across the
+              whole tenant, so shortening this on a large estate risks
+              exhausting the budget."
+            options:
+              order: 4
+            title: "Cache Window (ms)"
+            type: number
+          rateLimit:
+            default: 110
+            description: "Maximum API calls per minute. Kept below the
+              documented 120 so the driver throttles itself rather than
+              being throttled."
+            options:
+              order: 5
+            title: "Rate Limit (calls/min)"
+            type: number
+          maxPages:
+            default: 20
+            description: "Pages fetched per collection sweep, 100 assets a
+              page. A sweep that hits this cap is logged; assets beyond it
+              will not report."
+            options:
+              order: 6
+            title: "Maximum Pages"
+            type: number
+          timeout:
+            default: 15000
+            options:
+              order: 7
+            title: "Request Timeout (ms)"
+            type: number
+          filterPartNo:
+            description: "Optional. Restrict this connection to one part
+              number, to keep a large estate inside the rate limit."
+            options:
+              order: 8
+            title: "Filter by Part Number"
+            type: string
+          filterSerial:
+            description: "Optional. Restrict this connection to one serial
+              number."
+            options:
+              order: 9
+            title: "Filter by Serial Number"
+            type: string
+        required:
+          - baseURL
+          - clientId
+          - clientSecret
+        title: "Pathfindr Connection Details"
         type: object
 
     !u ACS.Driver.External:

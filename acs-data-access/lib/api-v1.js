@@ -396,17 +396,12 @@ export class APIv1 {
     if(!config) return fail(this.log, 422, `Config not provided in request body.`);
     this._getHandler(structure).validate_config(config);
 
-    this.log("XXX structure_create: req.auth=%o structure=%s CreateDataset=%s", req.auth, structure, Constants.Perm.CreateDataset);
-    const raw_acl = await this.auth.fetch_auth_acl(...this.auth.decode_principal(req.auth));
-    this.log("XXX structure_create: raw acl for principal=%o", raw_acl);
     const ok = await this.auth.check_acl(
       req.auth,
       Constants.Perm.CreateDataset,
       structure,
       true
     );
-    this.log("XXX structure_create: check_acl result=%o", ok);
-
     if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
     const dataset_uuid = await this._update_dataset_config(

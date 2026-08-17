@@ -54,6 +54,9 @@ spec:
     {{- if .Values.dataAccess.enabled }}
     - data-access.{{ .Values.acs.baseUrl}}
     {{- end }}
+    {{- if .Values.openmetadata.enabled }}
+    - openmetadata.{{ .Values.acs.baseUrl}}
+    {{- end }}
     {{- range .Values.acs.letsEncrypt.additionalDnsNames }}
     - {{ . }}
     {{- end }}

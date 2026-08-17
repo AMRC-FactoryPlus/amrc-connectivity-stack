@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir "apache-airflow-providers-fab==2.4.4"
 # patched 2.x release - log4j2's public API is stable across patch
 # versions, so this is a safe drop-in without needing to touch pyspark
 # itself or know whether the Spark profiling engine is actually used.
-ARG LOG4J_VERSION=2.25.4
+ARG LOG4J_VERSION=2.26.1
 RUN PYSPARK_JARS="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')" \
     && rm -f "${PYSPARK_JARS}"/log4j-core-*.jar "${PYSPARK_JARS}"/log4j-api-*.jar \
     && python -c "import urllib.request as r; r.urlretrieve('https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-core/${LOG4J_VERSION}/log4j-core-${LOG4J_VERSION}.jar', '${PYSPARK_JARS}/log4j-core-${LOG4J_VERSION}.jar')" \

@@ -8,5 +8,10 @@ repo?=openmetadata-ingestion
 version=1.13.3
 suffix?=-patched
 k8s.deployment?=openmetadata
+# Flatten after push: the Dockerfile removes the bundled pyspark log4j jars,
+# but a plain layered image only whiteouts them - the old bytes are still on
+# disk in the base image's layer. Flattening collapses that away. See
+# mk/acs.docker.mk and README.md.
+flatten=1
 
 include ${mk}/acs.docker.mk

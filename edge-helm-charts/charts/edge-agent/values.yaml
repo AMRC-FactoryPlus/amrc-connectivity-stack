@@ -11,6 +11,8 @@ image:
     repository: edge-bacnet
   modbus:
     repository: edge-modbus
+  sim:
+    repository: edge-sim
   test:
     repository: edge-test
   tplink-smartplug:

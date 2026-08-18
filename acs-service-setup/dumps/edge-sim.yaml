@@ -1,0 +1,72 @@
+# Simulator edge driver (edge-sim): cassette playback for demos and
+# testing. Registers the driver with the Manager, the Cassette storage
+# class and Application, and the cmdesc command definition for the
+# player transport. Deliberately grants nothing to anybody: principals
+# get the ControlPlayer permission and ConfigDB read on the Cassette
+# app bound to them per deployment.
+#-REQUIRE: acs-v2 edge
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R1Class:
+    !u EdgeSim.Class.Cassette:
+      name: "Cassette"
+
+  !u UUIDs.Class.App:
+    !u EdgeSim.App.Cassette:
+      name: "Cassette recording"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+  !u Edge.Class.Driver:
+    !u ACS.Driver.Sim: { name: "Simulator" }
+
+  !u ACS.PermGroup.CmdEsc:
+    !u EdgeSim.Perm.ControlPlayer: { name: "Control simulator player" }
+
+configs:
+  !u Edge.App.DriverDef:
+    !u ACS.Driver.Sim:
+      image:
+        repository: edge-sim
+      polled: false
+      presentation:
+        address:
+          title: "Channel or control address"
+          description: "A cassette channel path (the tag path from the
+            recording, e.g. Axes/X/Base_Axis/Load), or one of the
+            player addresses: player:load, player:eject, player:play,
+            player:pause, player:stop, player:seek, player:rate for
+            transport control (writable), and player:status,
+            player:cassette, player:position, player:rate_actual,
+            player:error for state (read-only)."
+          icon: "circle-play"
+          placeholder: "e.g. Axes/X/Base_Axis/Load or player:play"
+        path:
+          title: "JSON Path"
+          description: "JSONPath into the driver's payload. The driver
+            publishes { value, timestamp }, so this is normally
+            $.value."
+          icon: "code"
+          placeholder: "$.value"
+
+  # Command Escalation definition for the player transport. Metric
+  # names follow the CNC-style origin maps used with this driver; the
+  # addresses these map to are the player:* controls above.
+  !u CmdEsc.App.CmdDef:
+    !u EdgeSim.Perm.ControlPlayer:
+      - name: Player/Load
+        type: String
+      - name: Player/Eject
+        type: Boolean
+      - name: Player/Play
+        type: String
+      - name: Player/Pause
+        type: Boolean
+      - name: Player/Stop
+        type: Boolean
+      - name: Player/Seek
+        type: String
+      - name: Player/Rate
+        type: String

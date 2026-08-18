@@ -63,6 +63,7 @@ subdirs+= edge-bacnet
 subdirs+= edge-helm-charts
 subdirs+= edge-modbus
 subdirs+= edge-pathfindr
+subdirs+= edge-sim
 subdirs+= edge-test
 subdirs+= edge-tplink-smartplug
 subdirs+= historian-sparkplug

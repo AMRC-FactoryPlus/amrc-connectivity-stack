@@ -135,6 +135,11 @@ service-setup, and the broker's per-driver ACL admits only the
 `req`/`rsp` topics, so this does not open general ConfigDB access to
 drivers. Nothing needs provisioning per deployment.
 
+Cassettes are big for config entries (the demo CNC cassette is
+~830 KB) and the ConfigDB's request body limit defaults to 100 KB, so
+an ACS installation that stores cassettes needs `configdb.bodyLimit`
+raised (e.g. `2mb`) in its install values or the PUT returns 413.
+
 For development only, `CASSETTE_DIR` serves `<uuid>.json` files from a
 local directory so the driver can run without a cluster or an agent.
 It is checked before the agent when set.

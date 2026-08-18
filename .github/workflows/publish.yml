@@ -290,6 +290,7 @@ jobs:
           - edge-ads
           - edge-rtde
           - edge-pathfindr
+          - edge-sim
     permissions:
       contents: read
       packages: write
@@ -332,6 +333,7 @@ jobs:
           - edge-ads
           - edge-rtde
           - edge-pathfindr
+          - edge-sim
     permissions:
       contents: read
       packages: write
@@ -374,6 +376,7 @@ jobs:
           - edge-ads
           - edge-rtde
           - edge-pathfindr
+          - edge-sim
     permissions:
       contents: read
       packages: write

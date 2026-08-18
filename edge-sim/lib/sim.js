@@ -36,7 +36,7 @@ export class SimHandler {
 
         this.specs = new Map();     /* address string -> spec */
         this.store = new CassetteStore({
-            conf, env: process.env, log: this.log });
+            env: process.env, log: this.log });
         this.player = new Player({
             emit:       (path, value, stamp) =>
                 this.publish(path, value, stamp),

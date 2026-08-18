@@ -119,15 +119,18 @@ Factory+ alert route is the planned upgrade).
 Cassettes live in the ConfigDB as entries of the Cassette Application
 against objects of the Cassette class
 (`64139528-3dbf-4b34-afb5-3a71fc1c4f3b`), both registered by
-`acs-service-setup`. The driver resolves `player:load` in this order:
+`acs-service-setup`. The ConfigDB is the source of record and
+`player:load` is the only way a cassette reaches the player: switching
+cassettes by command is the point of this driver, so there is
+deliberately no inline-config route. The driver fetches the entry by
+HTTP GET from `CONFIGDB_URL`, sending `CONFIGDB_TOKEN` as a bearer
+token. Edge drivers have no Factory+ service identity today, so the
+token must be provisioned externally (the krb-keys route is the
+intended fix); this is on the critical path for deployment.
 
-1. Inline in the driver's connection config (`cassettes` map, keyed by
-   UUID) — no credentials needed, good for small cassettes.
-2. A local file `<uuid>.json` in `CASSETTE_DIR` — development.
-3. HTTP GET from `CONFIGDB_URL`, with `CONFIGDB_TOKEN` as a bearer
-   token if set. Edge drivers have no Factory+ service identity today,
-   so the token must be provisioned externally (the krb-keys route);
-   until then options 1 and 2 are the fallback.
+For development only, `CASSETTE_DIR` serves `<uuid>.json` files from a
+local directory so the driver can run without a cluster. It is checked
+before the ConfigDB when set.
 
 ## Timeline orchestration
 

@@ -23,8 +23,10 @@ The full format and transport reference is
   player" permission's command definition is registered by
   acs-service-setup; bind it to principals per deployment.
 - Cassettes are ConfigDB documents (Cassette Application) loaded by
-  UUID, with inline-config and local-directory fallbacks while the
-  driver identity story matures.
+  UUID with `player:load`; switching cassettes by command is the point,
+  so there is no inline-config route. `CASSETTE_DIR` is a
+  development-only local source. The driver needs a ConfigDB token
+  provisioned externally until drivers get service identities.
 
 ## Development
 

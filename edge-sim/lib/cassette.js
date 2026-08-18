@@ -68,19 +68,20 @@ export function validateCassette (doc) {
     };
 }
 
-/* Resolves a cassette UUID to a validated cassette. Sources, in order:
+/* Resolves a cassette UUID to a validated cassette. The source of
+ * record is the ConfigDB (App.Cassette entry for the object), fetched
+ * over HTTP from CONFIGDB_URL with CONFIGDB_TOKEN as a bearer token.
+ * Cassette switching by command is the point of this driver, so there
+ * is deliberately no inline-config route. Drivers have no Factory+
+ * service identity today, so the token (or a trusted in-cluster
+ * route) must be provided externally; this is the documented gap in
+ * the driver identity story.
  *
- * 1. Inline in the driver's connection config: conf.cassettes[uuid].
- * 2. A local directory (CASSETTE_DIR env), file <uuid>.json. Dev use.
- * 3. The ConfigDB over HTTP: CONFIGDB_URL env, App.Cassette entry for
- *    the object. Sent with CONFIGDB_TOKEN as a bearer token if set.
- *    Drivers have no Factory+ service identity today, so a token (or a
- *    trusted in-cluster route) must be provided externally; this is the
- *    documented gap in the driver identity story.
+ * CASSETTE_DIR (file <uuid>.json) is a development-only shortcut for
+ * running the driver without a cluster; it is checked first when set.
  */
 export class CassetteStore {
     constructor (opts) {
-        this.conf = opts.conf ?? {};
         this.env = opts.env ?? process.env;
         this.log = opts.log ?? (() => {});
     }
@@ -88,12 +89,6 @@ export class CassetteStore {
     async fetch (uuid) {
         if (!/^[0-9a-f]{8}-[0-9a-f-]{27}[0-9a-f]$/i.test(uuid))
             throw new Error(`Not a cassette UUID: ${uuid}`);
-
-        const inline = this.conf.cassettes?.[uuid];
-        if (inline) {
-            this.log("Cassette %s from connection config", uuid);
-            return validateCassette(inline);
-        }
 
         const dir = this.env.CASSETTE_DIR;
         if (dir) {
@@ -121,6 +116,6 @@ export class CassetteStore {
             return validateCassette(await rsp.json());
         }
 
-        throw new Error(`No source for cassette ${uuid}: not in config, and CASSETTE_DIR/CONFIGDB_URL unset`);
+        throw new Error(`No source for cassette ${uuid}: CONFIGDB_URL (or dev CASSETTE_DIR) unset`);
     }
 }

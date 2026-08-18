@@ -53,23 +53,24 @@ configs:
           placeholder: "$.value"
 
   # Command Escalation definition for the player transport. Metric
-  # names follow the CNC-style origin maps used with this driver; the
-  # addresses these map to are the player:* controls above.
+  # names match the Player_Controls schema as mounted in a device
+  # schema (folder name + metric name); the addresses these map to are
+  # the player:* controls above.
   !u CmdEsc.App.CmdDef:
     !u EdgeSim.Perm.ControlPlayer:
-      - name: Player/Load
+      - name: Player_Controls/Player/Load
         type: String
-      - name: Player/Eject
+      - name: Player_Controls/Player/Eject
         type: Boolean
-      - name: Player/Play
+      - name: Player_Controls/Player/Play
         type: String
-      - name: Player/Pause
+      - name: Player_Controls/Player/Pause
         type: Boolean
-      - name: Player/Stop
+      - name: Player_Controls/Player/Stop
         type: Boolean
-      - name: Player/Seek
+      - name: Player_Controls/Player/Seek
         type: String
-      - name: Player/Rate
+      - name: Player_Controls/Player/Rate
         type: String
 ---
 # The edge agent proxies cassette fetches for the simulator driver

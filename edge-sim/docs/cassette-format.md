@@ -94,9 +94,13 @@ exactly as live data would, with no edge agent changes.
 The player is driven entirely through writable metrics on the device,
 so every transport action is an authorised Factory+ command (NCMD to
 the Command Escalation service, DCMD to the edge agent, forwarded to
-the driver). Control addresses contain no slashes because the edge
-agent forwards a write on the MQTT topic `cmd/<address>` and only the
-first segment survives.
+the driver). The device-side metrics come from the `Player_Controls`
+schema mounted in the device schema, giving full metric names
+`Player_Controls/Player/Load` and so on (these are what the command
+definition registers); each maps to one of the driver addresses
+below. Control addresses contain no slashes because the edge agent
+forwards a write on the MQTT topic `cmd/<address>` and only the first
+segment survives.
 
 | Address | Write payload | Action |
 |---|---|---|

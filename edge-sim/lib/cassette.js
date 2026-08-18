@@ -7,8 +7,6 @@
 import fsp from "fs/promises";
 import path from "path";
 
-import * as UUIDs from "./uuids.js";
-
 /* Validate a parsed cassette document. Returns the cassette with
  * derived fields filled in, or throws with a useful message. See
  * docs/cassette-format.md for the format definition. */
@@ -69,13 +67,13 @@ export function validateCassette (doc) {
 }
 
 /* Resolves a cassette UUID to a validated cassette. The source of
- * record is the ConfigDB (App.Cassette entry for the object), fetched
- * over HTTP from CONFIGDB_URL with CONFIGDB_TOKEN as a bearer token.
+ * record is the ConfigDB (App.Cassette entry for the object), reached
+ * through the edge agent: the driver publishes a req/cassette message
+ * on its local driver-protocol connection and the agent, which holds
+ * the pod's Factory+ identity, performs the authenticated fetch and
+ * replies on rsp/cassette. The driver itself needs no credentials.
  * Cassette switching by command is the point of this driver, so there
- * is deliberately no inline-config route. Drivers have no Factory+
- * service identity today, so the token (or a trusted in-cluster
- * route) must be provided externally; this is the documented gap in
- * the driver identity story.
+ * is deliberately no inline-config route.
  *
  * CASSETTE_DIR (file <uuid>.json) is a development-only shortcut for
  * running the driver without a cluster; it is checked first when set.
@@ -84,10 +82,12 @@ export class CassetteStore {
     constructor (opts) {
         this.env = opts.env ?? process.env;
         this.log = opts.log ?? (() => {});
+        /* request(uuid) -> Promise of the raw cassette document */
+        this.request = opts.request;
     }
 
     async fetch (uuid) {
-        if (!/^[0-9a-f]{8}-[0-9a-f-]{27}[0-9a-f]$/i.test(uuid))
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid))
             throw new Error(`Not a cassette UUID: ${uuid}`);
 
         const dir = this.env.CASSETTE_DIR;
@@ -101,21 +101,12 @@ export class CassetteStore {
             }
         }
 
-        const cdb = this.env.CONFIGDB_URL;
-        if (cdb) {
-            const url = `${cdb.replace(/\/$/, "")}/v1/app/${UUIDs.App.Cassette}/object/${uuid}`;
-            const headers = {};
-            if (this.env.CONFIGDB_TOKEN)
-                headers.Authorization = `Bearer ${this.env.CONFIGDB_TOKEN}`;
-            const rsp = await fetch(url, { headers });
-            if (rsp.status == 404)
-                throw new Error(`Cassette ${uuid} not found in ConfigDB`);
-            if (!rsp.ok)
-                throw new Error(`ConfigDB fetch for ${uuid} failed: ${rsp.status}`);
-            this.log("Cassette %s from ConfigDB", uuid);
-            return validateCassette(await rsp.json());
+        if (this.request) {
+            const doc = await this.request(uuid);
+            this.log("Cassette %s from ConfigDB via the edge agent", uuid);
+            return validateCassette(doc);
         }
 
-        throw new Error(`No source for cassette ${uuid}: CONFIGDB_URL (or dev CASSETTE_DIR) unset`);
+        throw new Error(`No source for cassette ${uuid}: no edge agent connection (or dev CASSETTE_DIR)`);
     }
 }

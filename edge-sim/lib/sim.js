@@ -19,6 +19,9 @@ const CONTROLS = new Set(
 const STATES = new Set(
     ["status", "cassette", "position", "rate_actual", "error"]);
 
+/* How long to wait for the edge agent to answer a cassette request. */
+export const REQUEST_TIMEOUT = 10000;
+
 /* Accept an ISO-8601 string or a ms-epoch number. */
 function parseTime (t) {
     if (t == null) return null;
@@ -35,8 +38,18 @@ export class SimHandler {
         this.log = driver.debug.bound("sim");
 
         this.specs = new Map();     /* address string -> spec */
+        this.pending = new Map();   /* cassette uuid -> {resolve, reject, timer} */
         this.store = new CassetteStore({
-            env: process.env, log: this.log });
+            env:        process.env,
+            log:        this.log,
+            request:    uuid => this.requestCassette(uuid),
+        });
+
+        /* Cassette responses from the edge agent. Handlers are keyed
+         * by the first topic segment after the driver id, so this
+         * receives every rsp/<what> message. */
+        driver.message("rsp", (payload, data) =>
+            this.rsp(payload, data));
         this.player = new Player({
             emit:       (path, value, stamp) =>
                 this.publish(path, value, stamp),
@@ -50,7 +63,46 @@ export class SimHandler {
     }
 
     async connect () {
+        /* The base class only subscribes to the topics it knows about,
+         * so the rsp topic is ours to add. The MQTT connection is up
+         * by the time the handler exists (conf arrives over it). */
+        await this.driver.mqtt.subscribeAsync(
+            this.driver.topic("rsp", "cassette"));
         return "UP";
+    }
+
+    /* Ask the edge agent to fetch a cassette from the ConfigDB on our
+     * behalf (the agent holds the pod's Factory+ identity). */
+    requestCassette (uuid, timeout = REQUEST_TIMEOUT) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this.pending.delete(uuid);
+                reject(new Error("timed out waiting for the edge agent"));
+            }, timeout);
+            this.pending.set(uuid, { resolve, reject, timer });
+            this.driver.mqtt.publishAsync(
+                    this.driver.topic("req", "cassette"), uuid)
+                .catch(e => {
+                    clearTimeout(timer);
+                    this.pending.delete(uuid);
+                    reject(e);
+                });
+        });
+    }
+
+    rsp (payload, data) {
+        if (data != "cassette") return;
+        let body;
+        try { body = JSON.parse(payload.toString()); }
+        catch { return this.log("Bad rsp payload from agent"); }
+
+        const req = this.pending.get(body.uuid);
+        if (!req) return;
+        this.pending.delete(body.uuid);
+        clearTimeout(req.timer);
+
+        if (body.error) req.reject(new Error(body.error));
+        else req.resolve(body.cassette);
     }
 
     parseAddr (spec) {
@@ -168,6 +220,11 @@ export class SimHandler {
 
     async close () {
         if (this.poller) clearInterval(this.poller);
+        for (const req of this.pending.values()) {
+            clearTimeout(req.timer);
+            req.reject(new Error("driver closing"));
+        }
+        this.pending.clear();
         this.player.eject();
     }
 }

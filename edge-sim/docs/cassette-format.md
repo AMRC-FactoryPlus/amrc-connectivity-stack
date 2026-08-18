@@ -122,15 +122,22 @@ against objects of the Cassette class
 `acs-service-setup`. The ConfigDB is the source of record and
 `player:load` is the only way a cassette reaches the player: switching
 cassettes by command is the point of this driver, so there is
-deliberately no inline-config route. The driver fetches the entry by
-HTTP GET from `CONFIGDB_URL`, sending `CONFIGDB_TOKEN` as a bearer
-token. Edge drivers have no Factory+ service identity today, so the
-token must be provisioned externally (the krb-keys route is the
-intended fix); this is on the critical path for deployment.
+deliberately no inline-config route.
+
+The driver itself holds no credentials. It asks the edge agent to
+fetch on its behalf over the local driver-protocol connection: the
+driver publishes the UUID on `req/cassette`, and the agent, which
+holds the pod's Factory+ identity, reads the Cassette entry from the
+ConfigDB and replies on `rsp/cassette` with either
+`{ uuid, cassette }` or `{ uuid, error }`. The agent only proxies the
+Cassette application, its role is granted read on exactly that app by
+service-setup, and the broker's per-driver ACL admits only the
+`req`/`rsp` topics, so this does not open general ConfigDB access to
+drivers. Nothing needs provisioning per deployment.
 
 For development only, `CASSETTE_DIR` serves `<uuid>.json` files from a
-local directory so the driver can run without a cluster. It is checked
-before the ConfigDB when set.
+local directory so the driver can run without a cluster or an agent.
+It is checked before the agent when set.
 
 ## Timeline orchestration
 

@@ -77,6 +77,39 @@ export class Translator extends EventEmitter {
         this.devices = {};
     }
 
+    /* Serve driver req/<what> messages. Drivers have no Factory+
+     * identity of their own, so the agent proxies specific, known
+     * ConfigDB reads on their behalf. Currently only edge-sim
+     * cassettes (the Cassette application, by object UUID). */
+    async driverRequest({ id, msg, data, payload }) {
+        if (msg != "req") return;
+
+        const reply = (body: object) => this.broker.publish({
+            id, msg: "rsp", data,
+            payload: Buffer.from(JSON.stringify(body)),
+        }).catch(e => log(`Driver rsp publish failed: ${e}`));
+
+        if (data != "cassette")
+            return reply({ error: `Unknown request: ${data}` });
+
+        const uuid = payload.toString().trim();
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid))
+            return reply({ uuid, error: "Not a cassette UUID" });
+
+        try {
+            const doc = await this.fplus.ConfigDB.get_config(
+                UUIDs.App.Cassette, uuid);
+            if (!doc)
+                return reply({ uuid, error: "Cassette not found in ConfigDB" });
+            log(`Fetched cassette ${uuid} for driver ${id}`);
+            return reply({ uuid, cassette: doc });
+        }
+        catch (e: any) {
+            log(`Cassette fetch ${uuid} for driver ${id} failed: ${e.message}`);
+            return reply({ uuid, error: `ConfigDB fetch failed: ${e.message}` });
+        }
+    }
+
     /**
      * Start function instantiates all connections defined in the config file
      */
@@ -96,6 +129,7 @@ export class Translator extends EventEmitter {
             log("Starting driver broker...");
             //this.broker.on("message", msg => 
             //    log(util.format("Driver message: %O", msg)));
+            this.broker.on("message", m => this.driverRequest(m));
             await this.broker.start();
 
             // Create a new device connection for each type listed in config file

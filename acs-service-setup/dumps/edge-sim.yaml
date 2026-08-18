@@ -1,10 +1,11 @@
 # Simulator edge driver (edge-sim): cassette playback for demos and
 # testing. Registers the driver with the Manager, the Cassette storage
 # class and Application, and the cmdesc command definition for the
-# player transport. Deliberately grants nothing to anybody: principals
-# get the ControlPlayer permission and ConfigDB read on the Cassette
-# app bound to them per deployment.
-#-REQUIRE: acs-v2 edge
+# player transport. The only grant is ConfigDB read on the Cassette
+# app for the existing Edge Agent role (it proxies fetches for the
+# driver); no principals are bound to ControlPlayer here, that happens
+# per deployment.
+#-REQUIRE: acs-v2 edge helm
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -70,3 +71,14 @@ configs:
         type: String
       - name: Player/Rate
         type: String
+---
+# The edge agent proxies cassette fetches for the simulator driver
+# (drivers have no Factory+ identity of their own), so the agent role
+# needs to read the Cassette application. This is a grant to the
+# existing per-cluster Edge Agent role; no new principals.
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Local.Role.EdgeAgent:
+    !u ConfigDB.Perm.ReadConfig:
+      !u EdgeSim.App.Cassette: false

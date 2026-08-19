@@ -41,6 +41,12 @@ const sidebarNavItems: Item[] = [
         auth: true
     },
     {
+        title: 'Cassette Decks',
+        href: '/cassette-decks',
+        icon: 'tape',
+        auth: true
+    },
+    {
       title: 'Access Control',
       href: '/access-control',
       icon: 'user-shield',

@@ -16,7 +16,8 @@
     "mqtt": "^5.3.6",
     "optional-js": "^2.3.0",
     "semver": "^7.6.0",
-    "sparkplug-payload": "^1.0.3"
+    "sparkplug-payload": "^1.0.3",
+    "long": "^5.2.3"
   },
   "optionalDependencies": {
     "got-fetch": "^5.1.8",

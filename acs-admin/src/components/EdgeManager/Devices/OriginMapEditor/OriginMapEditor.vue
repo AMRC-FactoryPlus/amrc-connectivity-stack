@@ -1118,12 +1118,19 @@ export default {
       // Force model replacement to trigger Vue reactivity
       this.model = JSON.parse(JSON.stringify(this.model))
 
+      // The import may have created schema-array instances; materialise
+      // them into the schema tree or the sidebar cannot render them.
+      this.updateDynamicSchemaObjects()
+
       if (result.applied > 0) {
         toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`, { pauseOnHover: true })
       }
 
-      if (result.applied > 0) {
-        toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`)
+      if (result.placeholders > 0) {
+        toast.warning(`${result.placeholders} placeholder row${result.placeholders === 1 ? '' : 's'} skipped`, {
+          description: 'Rows under a "<new>" instance are templates. Create the instance first, re-export, and fill the real rows.',
+          pauseOnHover: true,
+        })
       }
 
       if (result.skipped > 0) {

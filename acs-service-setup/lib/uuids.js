@@ -134,6 +134,7 @@ export const ACS = {
         ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
         RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",
         Pathfindr:              "6f971ef5-c3d7-4222-9254-d8f02f91c1f7",
+        Sim:                    "da866ba6-cd0e-491b-a780-19466723b23f",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",
@@ -526,6 +527,20 @@ export const I3X = {
     },
     Requirement: {
         ServiceRole:    "0eb1f761-6b81-4757-a458-c0257c905a20",
+    },
+};
+
+/* Simulator edge driver (edge-sim): cassette playback. The App and
+ * Class UUIDs are duplicated in edge-sim/lib/uuids.js and must match. */
+export const EdgeSim = {
+    App: {
+        Cassette:       "844c9d80-97ab-4ffc-918c-f4e529411108",
+    },
+    Class: {
+        Cassette:       "64139528-3dbf-4b34-afb5-3a71fc1c4f3b",
+    },
+    Perm: {
+        ControlPlayer:  "d29ff0fc-a3b5-485d-aa58-cc77c6d39d7b",
     },
 };
 

@@ -89,6 +89,26 @@
                 label="Created"
                 :value="moment(device.createdAt).fromNow()"
             />
+            <!-- Device-level historian override. On by default. Off
+                 suppresses recording for every metric on this device
+                 regardless of the per-metric settings; the per-metric
+                 flags are kept, so switching back restores them. -->
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-1.5">
+                <div class="flex items-center text-xs font-medium">Allow historian writes</div>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm text-gray-500">
+                  {{ recordToHistorian ? 'On. Metrics record per their own settings.'
+                    : 'Off. Nothing from this device is recorded.' }}
+                </span>
+                <Switch
+                  :model-value="recordToHistorian"
+                  :disabled="historianToggleBusy"
+                  @update:model-value="setRecordToHistorian"
+                />
+              </div>
+            </div>
           </div>
           <!-- Schema section -->
           <div class="flex items-center justify-between gap-2 p-4 border-b">
@@ -170,6 +190,10 @@ import EmptyState from '@components/EmptyState.vue'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import { newestVersion, versionOf } from '@/lib/schema/registry.js'
 import ChangeSchemaDialog from '@components/EdgeManager/Devices/ChangeSchemaDialog.vue'
+import { Switch } from '@components/ui/switch/index.js'
+import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import ChangeConnectionDialog from '@components/EdgeManager/Devices/ChangeConnectionDialog.vue'
 import OriginMapEditor      from '@components/EdgeManager/Devices/OriginMapEditor/OriginMapEditor.vue'
@@ -192,6 +216,7 @@ export default {
     DetailCard,
     SidebarDetail,
     ChangeSchemaDialog,
+    Switch,
     ChangeConnectionDialog,
     ISA95HierarchyPanel,
   },
@@ -236,6 +261,9 @@ export default {
   },
 
   computed: {
+    recordToHistorian () {
+      return this.device?.deviceInformation?.recordToHistorian !== false
+    },
     device() {
       return this.d.data.find(e => e.uuid === this.$route.params.deviceuuid) || {}
     },
@@ -270,6 +298,26 @@ export default {
   },
 
   methods: {
+    setRecordToHistorian (value) {
+      this.applyRecordToHistorian(value)
+    },
+    async applyRecordToHistorian (value) {
+      this.historianToggleBusy = true
+      try {
+        await useServiceClientStore().client.ConfigDB.patch_config(
+          UUIDs.App.DeviceInformation, this.device.uuid, 'merge',
+          { recordToHistorian: !!value })
+        await updateEdgeAgentConfig({ deviceId: this.device.uuid })
+        toast.success(value
+          ? 'Historian recording enabled for this device'
+          : 'Historian recording suppressed for this device')
+      } catch (err) {
+        console.error(err)
+        toast.error('Unable to update historian recording')
+      } finally {
+        this.historianToggleBusy = false
+      }
+    },
     downloadConfig() {
       const blob = new Blob([JSON.stringify(this.device, null, 2)], { type: 'application/json' })
       const url = window.URL.createObjectURL(blob)
@@ -339,6 +387,7 @@ export default {
 
   data () {
     return {
+      historianToggleBusy: false,
       showSchemaDialog: false,
       showConnectionDialog: false,
       loadingDetails: true,

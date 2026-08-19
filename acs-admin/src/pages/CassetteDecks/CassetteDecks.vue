@@ -83,6 +83,7 @@ import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
+import { useSchemaStore } from '@store/useSchemaStore.js'
 import { useCassetteObjectStore, useCassetteMetaStore } from '@store/useCassetteStore.js'
 import { useCassetteDecks } from '@/composables/useCassetteDecks.js'
 
@@ -148,6 +149,7 @@ export default {
       useDeviceStore().start(),
       useConnectionStore().start(),
       useNodeStore().start(),
+      useSchemaStore().start(),
       this.cassettes.start(),
     ])
     await this.engine.start()
@@ -175,12 +177,36 @@ export default {
       if (!m) this.meta.fetchMeta(uuid)
       return m ?? null
     },
-    async onLoad (deck, cassetteUuid) {
+    async onLoad (deck, cassetteUuid, force = false) {
       const uuid = cassetteUuid ?? this.selectedCassette
       if (!uuid) return
       this.selectedCassette = null
+
+      /* A cassette records which schema it was made for. Loading it
+       * onto a device with a different schema is allowed (addresses
+       * the origin map does not know are silently ignored), but it is
+       * almost always a mistake, so say so first. */
+      const meta = this.meta.meta[uuid]
+      if (!force && meta?.deviceSchema && deck.schemaName
+          && !this.schemasMatch(meta.deviceSchema, deck.schemaName)) {
+        deck.rt.strip = {
+          kind: 'info',
+          text: `This recording was made for a "${meta.deviceSchema}" device; `
+            + `${deck.name} uses the "${deck.schemaName}" schema. Channels the `
+            + 'origin map does not know are silently ignored.',
+          action: 'load-anyway',
+          cassette: uuid,
+        }
+        return
+      }
+
       await this.engine.actions.load(deck, uuid)
       this.meta.fetchMeta(uuid)
+    },
+    schemasMatch (cassetteSchema, deviceSchema) {
+      const a = String(cassetteSchema).toLowerCase()
+      const b = String(deviceSchema).toLowerCase()
+      return a === b || a.includes(b) || b.includes(a)
     },
     onUploaded (uuid) {
       this.meta.fetchMeta(uuid)

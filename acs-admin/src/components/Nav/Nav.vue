@@ -41,9 +41,9 @@ const sidebarNavItems: Item[] = [
         auth: true
     },
     {
-        title: 'Cassette Decks',
+        title: 'Cassettes',
         href: '/cassette-decks',
-        icon: 'tape',
+        icon: 'cassette-tape',
         auth: true
     },
     {

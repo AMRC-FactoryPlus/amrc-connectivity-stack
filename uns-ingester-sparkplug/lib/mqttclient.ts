@@ -508,6 +508,15 @@ export default class MQTTClient {
              * loops on the first 64-bit metric it meets. */
             const json = JSON.stringify(payload, (_k, v) =>
                 typeof v === "bigint" ? Number(v) : v);
+            /* Simulated-data markers ride the data metric's Sparkplug
+             * properties; forward them as MQTT user properties so the
+             * UNS historian can tag the points. */
+            const simProps: Record<string, string> = {};
+            if (metricContainers[0]?.metric?.properties?.simulated?.value) {
+                simProps.Simulated = "true";
+                const run = metricContainers[0].metric.properties?.run_id?.value;
+                if (run) simProps.RunId = String(run);
+            }
             this.sparkplugBroker.publish(topic, json, {
                 properties: {
                     //     Assume that all metrics have the same custom properties
@@ -519,6 +528,7 @@ export default class MQTTClient {
                         Type: metricContainers[0].customProperties.Type ?? 'undefined',
                         InstanceUUIDPath: metricContainers[0].customProperties.InstanceUUIDPath ?? "",
                         SchemaUUIDPath: metricContainers[0].customProperties.SchemaUUIDPath ?? "",
+                        ...simProps,
                     }
                 }
             });

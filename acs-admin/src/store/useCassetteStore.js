@@ -45,6 +45,7 @@ export const useCassetteMetaStore = defineStore('cassette-meta', {
           duration_ms: doc.cassette.duration_ms ?? 0,
           channels: doc.channels?.length ?? 0,
           source: doc.cassette.source ?? 'unknown',
+          deviceSchema: doc.cassette.deviceSchema ?? null,
         }
       }
       catch (err) {
@@ -72,6 +73,7 @@ export const useCassetteMetaStore = defineStore('cassette-meta', {
           ?? doc.samples?.at(-1)?.[0] ?? 0,
         channels: doc.channels?.length ?? 0,
         source: doc.cassette.source ?? 'unknown',
+        deviceSchema: doc.cassette.deviceSchema ?? null,
       }
       return uuid
     },

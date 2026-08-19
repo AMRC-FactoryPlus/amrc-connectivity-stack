@@ -199,6 +199,9 @@ export interface sparkplugMetricProperties {
     endianness?: sparkplugMetricProperty,
     deadband?: sparkplugMetricProperty,
     deadbandMode?: sparkplugMetricProperty,
+    /* Simulated-data markers, set from simulator driver payloads */
+    simulated?: sparkplugMetricProperty,
+    run_id?: sparkplugMetricProperty,
 }
 
 export interface sparkplugMetricProperty {
@@ -673,6 +676,24 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
  * @param metric The metric being processed
  * @param payloadFormat Payload format string
  */
+/* Simulated-data markers: the simulator driver stamps every payload
+ * with simulated: true and a per-run UUID so the historians can tag
+ * the data. Only JSON payloads can carry them. */
+export function parseSimTagsFromPayload(msg: any, payloadFormat: serialisationType | string): { simulated?: boolean, run_id?: string } {
+    if (payloadFormat !== serialisationType.JSON) return {};
+    let payload: any;
+    try {
+        if (typeof msg == "string") payload = JSON.parse(msg);
+        else if (Buffer.isBuffer(msg)) payload = JSON.parse(msg.toString());
+        else payload = msg;
+    } catch { return {}; }
+    if (typeof payload !== "object" || payload === null) return {};
+    const out: { simulated?: boolean, run_id?: string } = {};
+    if (payload.simulated === true) out.simulated = true;
+    if (typeof payload.run_id === "string") out.run_id = payload.run_id;
+    return out;
+}
+
 export function parseNsTimestampFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string): bigint | undefined {
     if (payloadFormat !== serialisationType.JSON) return undefined;
 

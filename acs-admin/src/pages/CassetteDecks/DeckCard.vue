@@ -137,6 +137,15 @@
           @click="$emit('eject', deck)">
           <i class="fa-solid fa-eject mr-1.5 text-[11px]"></i>Eject
         </Button>
+        <Button size="sm" :variant="rt.loopSelected ? 'secondary' : 'ghost'"
+          :disabled="!controllable"
+          :title="rt.loopSelected
+            ? 'Looping: the cassette replays end to end with monotonic stamps'
+            : 'Loop the cassette on the next Play'"
+          @click="rt.loopSelected = !rt.loopSelected">
+          <i class="fa-solid fa-repeat text-[11px]"
+            :class="rt.loopSelected ? 'text-slate-950' : ''"></i>
+        </Button>
       </div>
       <div class="flex items-center overflow-hidden rounded-md border border-slate-200">
         <button v-for="r in rates" :key="r"
@@ -165,6 +174,12 @@
         </div>
         <Button v-if="rt.strip.action === 'reload'" size="xs" variant="outline"
           @click="$emit('reload', deck)">Reload</Button>
+        <template v-else-if="rt.strip.action === 'load-anyway'">
+          <Button size="xs" variant="outline"
+            @click="$emit('load', deck, rt.strip.cassette, true)">Load anyway</Button>
+          <Button size="xs" variant="ghost"
+            @click="$emit('dismiss', deck)">Cancel</Button>
+        </template>
         <Button v-else size="xs" variant="ghost"
           @click="$emit('dismiss', deck)">Dismiss</Button>
       </div>

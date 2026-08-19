@@ -106,7 +106,7 @@ segment survives.
 |---|---|---|
 | `player:load` | cassette UUID (string) | Fetch and load the cassette. |
 | `player:eject` | anything | Unload. |
-| `player:play` | empty, or `{"start_time": <ISO-8601 or ms>, "rate": <0-100>}` | Start or resume. `start_time` defaults to now; `rate` keeps its current value (initially 1). |
+| `player:play` | empty, or `{"start_time": <ISO-8601 or ms>, "rate": <0-100>, "loop": true}` | Start or resume. `start_time` defaults to now; `rate` keeps its current value (initially 1). With `loop`, the cassette replays end to end and the stamp anchor advances by the duration each pass, so stamps stay monotonic. |
 | `player:pause` | anything | Halt emission, keep position. |
 | `player:stop` | anything | Halt and rewind to 0. |
 | `player:seek` | position in ms, or `{"position_ms": n}` | Jump the position. Stamps stay `start_time + offset`, so seeking backwards re-emits earlier stamps (the historian overwrites same-series same-timestamp points). |

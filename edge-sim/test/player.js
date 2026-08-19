@@ -156,6 +156,25 @@ test("transport with no cassette loaded throws", () => {
     assert.throws(() => player.seek(0), /no cassette loaded/);
 });
 
+test("loop wraps seamlessly with monotonic stamps", () => {
+    const { player, emitted, advance } = harness();
+    player.load(CASSETTE);
+    player.play({ start_time: 100_000, rate: 100, loop: true });
+    /* 25 s of virtual time = 2.5 passes of a 10 s tape, in 100 ms
+     * ticks as the real interval timer would deliver them */
+    for (let i = 0; i < 25; i++) advance(10);
+    assert.strictEqual(player.status, Status.PLAYING);
+    /* First sample of each pass carries the advanced anchor */
+    const starts = emitted.filter(e => e[1] === "Running").map(e => e[2]);
+    assert.deepStrictEqual(starts, [100_000, 110_000, 120_000]);
+    /* Stamps never repeat or go backwards */
+    const stamps = emitted.map(e => e[2]);
+    for (let i = 1; i < stamps.length; i++)
+        assert.ok(stamps[i] >= stamps[i - 1], `stamp ${i} regressed`);
+    player.stop();
+    assert.strictEqual(player.status, Status.LOADED);
+});
+
 test("rates outside 0-100 are rejected", () => {
     const { player } = harness();
     player.load(CASSETTE);

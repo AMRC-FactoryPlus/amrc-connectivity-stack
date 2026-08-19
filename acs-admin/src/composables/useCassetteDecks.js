@@ -17,6 +17,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
+import { useSchemaStore } from '@store/useSchemaStore.js'
 import { EdgeSim, PlayerMetric } from '@/lib/edge-sim-uuids.js'
 
 const ACK_TIMEOUT = 5000
@@ -29,6 +30,7 @@ const freshRuntime = () => ({
   position: 0,           // ms into the cassette
   rateActual: 0,
   selectedRate: 1,       // rate the next Play will use
+  loopSelected: false,   // whether the next Play loops
   /* Virtual-clock estimate: wall time when the current playback's
    * stamps started. Stamps are start_time + position; Play without an
    * explicit start time stamps from the moment the driver receives
@@ -43,6 +45,7 @@ export function useCassetteDecks () {
   const devices = useDeviceStore()
   const connections = useConnectionStore()
   const nodes = useNodeStore()
+  const schemas = useSchemaStore()
 
   /* Per-device runtime state, keyed by device uuid. Populated lazily
    * so Vue reactivity picks the entries up. */
@@ -73,11 +76,14 @@ export function useCassetteDecks () {
       const address = addr
         ? `${addr.group_id}/${addr.node_id}/${d.deviceInformation.sparkplugName}`
         : null
+      const schema = schemas.data
+        .find(sc => sc.uuid === d.deviceInformation?.schema)
       return {
         uuid: d.uuid,
         name: d.name ?? d.deviceInformation?.sparkplugName ?? 'Device',
         address,
         nodeUuid: d.deviceInformation?.node,
+        schemaName: schema?.schemaInformation?.name ?? null,
         rt: rt(d.uuid),
       }
     })
@@ -232,10 +238,11 @@ export function useCassetteDecks () {
     },
     play (deck) {
       const state = rt(deck.uuid)
-      const args = state.selectedRate !== 1
-        ? JSON.stringify({ rate: state.selectedRate }) : '{}'
+      const args = {}
+      if (state.selectedRate !== 1) args.rate = state.selectedRate
+      if (state.loopSelected) args.loop = true
       return command(deck, 'play', PlayerMetric.Play,
-        'String', args, ['PLAYING'])
+        'String', JSON.stringify(args), ['PLAYING'])
     },
     pause: deck => command(deck, 'pause', PlayerMetric.Pause,
       'Boolean', true, ['PAUSED']),

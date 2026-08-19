@@ -11,6 +11,8 @@
  * the same cassette and start time always produce identical stamps.
  */
 
+import crypto from "crypto";
+
 export const MAX_RATE = 100;
 export const TICK_MS = 100;
 
@@ -45,6 +47,8 @@ export class Player {
         this.position = 0;      /* ms into the cassette timeline */
         this.cursor = 0;        /* index of next sample to emit */
         this.rate = 1;
+        this.loop = false;
+        this.runId = null;      /* one UUID per Play, tags the run */
         this.startTime = null;  /* stamp anchor, ms epoch */
         this.#stopTimer();
     }
@@ -93,7 +97,9 @@ export class Player {
     /* Play. start_time (ms epoch) is optional and defaults to the
      * current time on a fresh start; resuming from pause keeps the
      * original anchor unless a new one is given. rate is optional and
-     * keeps its current value. */
+     * keeps its current value. loop replays the cassette end to end,
+     * advancing the stamp anchor by the duration each pass so stamps
+     * stay monotonic. */
     play (opts = {}) {
         this.#require(null, "play");
 
@@ -108,9 +114,13 @@ export class Player {
             if (this.status == Status.ENDED)
                 this.position = this.cursor = 0;
             this.startTime = opts.start_time ?? this.now();
+            /* A fresh start is a new run; loop passes and resumes
+             * keep the run they belong to. */
+            this.runId = crypto.randomUUID();
         }
         if (opts.rate != null)
             this.rate = opts.rate;
+        this.loop = !!opts.loop && this.duration() > 0;
 
         this.status = Status.PLAYING;
         this.#anchor();
@@ -201,6 +211,17 @@ export class Player {
         }
 
         if (this.position >= this.duration()) {
+            if (this.loop) {
+                /* Wrap seamlessly: the next pass stamps from where
+                 * this one ended, so the recorded series never
+                 * repeats a timestamp. */
+                this.startTime += this.duration();
+                this.position = this.posRef = 0;
+                this.cursor = 0;
+                this.wallRef = wall;
+                this.#changed();
+                return;
+            }
             this.#stopTimer();
             this.status = Status.ENDED;
             this.#changed();

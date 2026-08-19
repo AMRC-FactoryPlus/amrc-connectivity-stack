@@ -52,7 +52,7 @@ export class SimHandler {
             this.rsp(payload, data));
         this.player = new Player({
             emit:       (path, value, stamp) =>
-                this.publish(path, value, stamp),
+                this.publish(path, value, stamp, this.player.runId),
             onState:    () => this.publishState(),
             log:        this.log,
         });
@@ -125,11 +125,16 @@ export class SimHandler {
     }
 
     /* Publish one value to a subscribed address. Addresses the current
-     * cassette has but the edge agent hasn't asked for are skipped. */
-    publish (addr, value, timestamp) {
+     * cassette has but the edge agent hasn't asked for are skipped.
+     * Every payload from this driver is marked simulated; replayed
+     * samples also carry the run id minted at Play, so the historians
+     * can tag the data and a mistaken run can be found and removed. */
+    publish (addr, value, timestamp, runId) {
         const spec = this.specs.get(addr);
         if (!spec) return;
-        const buf = Buffer.from(JSON.stringify({ value, timestamp }));
+        const payload = { value, timestamp, simulated: true };
+        if (runId) payload.run_id = runId;
+        const buf = Buffer.from(JSON.stringify(payload));
         this.driver.data(spec, buf);
     }
 
@@ -195,6 +200,7 @@ export class SimHandler {
             player.play({
                 start_time: parseTime(opts.start_time),
                 rate:       opts.rate ?? null,
+                loop:       !!opts.loop,
             });
             break;
         }

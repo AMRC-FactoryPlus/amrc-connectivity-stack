@@ -101,8 +101,8 @@ const routes = [
     path: '/cassette-decks',
     component: () => import('@pages/CassetteDecks/CassetteDecks.vue'),
     meta: {
-      name: 'Cassette Decks',
-      icon: 'tape',
+      name: 'Cassettes',
+      icon: 'cassette-tape',
     },
   }, {
     path: '/access-control/:tab?/:selected?',

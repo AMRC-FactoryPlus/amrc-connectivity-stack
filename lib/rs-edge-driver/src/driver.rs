@@ -585,7 +585,8 @@ impl<H: Handler + 'static> Driver<H> {
             return;
         }
 
-        let specs: Vec<H::Addr> = self.addrs.values().cloned().collect();
+        let specs: Vec<(String, H::Addr)> =
+            self.addrs.iter().map(|(t, a)| (t.clone(), a.clone())).collect();
 
         if let Some(handler) = self.handler.as_ref() {
             if !handler.lock().await.subscribe(&specs).await {

@@ -126,14 +126,18 @@ pub trait Handler: Send + Sized {
     /// **Async mode**: set up subscriptions for the given addresses.
     ///
     /// Called after [`connect`](Handler::connect) succeeds and
-    /// addresses have been configured. When data arrives, push it
-    /// back to the driver via [`DriverHandle::publish`].
+    /// addresses have been configured. Each entry pairs the edge
+    /// agent's assigned data topic name with the parsed address; when
+    /// data arrives, push it back to the driver via
+    /// [`DriverHandle::publish`] using that same topic name — the
+    /// edge agent only recognises data published on the topic name it
+    /// assigned, which is unrelated to the address's own contents.
     ///
     /// Return `true` if all subscriptions were set up successfully.
     ///
     /// The default implementation returns `true` (no-op). Override
     /// this for async/event-driven drivers.
-    async fn subscribe(&mut self, _addrs: &[Self::Addr]) -> bool {
+    async fn subscribe(&mut self, _addrs: &[(String, Self::Addr)]) -> bool {
         true
     }
 

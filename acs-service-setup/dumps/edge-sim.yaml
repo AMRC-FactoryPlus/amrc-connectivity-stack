@@ -58,19 +58,19 @@ configs:
   # the player:* controls above.
   !u CmdEsc.App.CmdDef:
     !u EdgeSim.Perm.ControlPlayer:
-      - name: Player_Controls/Player/Load
+      - name: Player_Controls/Load
         type: String
-      - name: Player_Controls/Player/Eject
+      - name: Player_Controls/Eject
         type: Boolean
-      - name: Player_Controls/Player/Play
+      - name: Player_Controls/Play
         type: String
-      - name: Player_Controls/Player/Pause
+      - name: Player_Controls/Pause
         type: Boolean
-      - name: Player_Controls/Player/Stop
+      - name: Player_Controls/Stop
         type: Boolean
-      - name: Player_Controls/Player/Seek
+      - name: Player_Controls/Seek
         type: String
-      - name: Player_Controls/Player/Rate
+      - name: Player_Controls/Rate
         type: String
 ---
 # The edge agent proxies cassette fetches for the simulator driver

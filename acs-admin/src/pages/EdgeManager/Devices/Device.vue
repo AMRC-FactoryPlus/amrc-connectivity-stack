@@ -89,23 +89,23 @@
                 label="Created"
                 :value="moment(device.createdAt).fromNow()"
             />
-            <!-- Device-level historian override. Off suppresses
-                 recording for every metric on this device regardless
-                 of the per-metric settings; the per-metric flags are
-                 kept, so switching back restores them. -->
+            <!-- Device-level historian override. On by default. Off
+                 suppresses recording for every metric on this device
+                 regardless of the per-metric settings; the per-metric
+                 flags are kept, so switching back restores them. -->
             <div class="flex flex-col gap-1">
               <div class="flex items-center gap-1.5">
-                <div class="flex items-center text-xs font-medium">Record to historian</div>
+                <div class="flex items-center text-xs font-medium">Allow historian writes</div>
               </div>
               <div class="flex items-center justify-between gap-2">
                 <span class="text-sm text-gray-500">
-                  {{ recordToHistorian ? 'Metrics record per their own settings'
-                    : 'Nothing from this device is recorded' }}
+                  {{ recordToHistorian ? 'On. Metrics record per their own settings.'
+                    : 'Off. Nothing from this device is recorded.' }}
                 </span>
                 <Switch
-                  :checked="recordToHistorian"
+                  :model-value="recordToHistorian"
                   :disabled="historianToggleBusy"
-                  @update:checked="setRecordToHistorian"
+                  @update:model-value="setRecordToHistorian"
                 />
               </div>
             </div>

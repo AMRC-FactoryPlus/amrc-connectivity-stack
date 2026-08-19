@@ -23,6 +23,9 @@ import { EdgeSim, PlayerMetric } from '@/lib/edge-sim-uuids.js'
 const ACK_TIMEOUT = 5000
 
 const freshRuntime = () => ({
+  /* False until the first Sparkplug packet arrives, so a fresh page
+   * shows "waiting" rather than wrongly asserting offline. */
+  seen: false,
   online: false,
   status: 'EMPTY',       // EMPTY | LOADED | LOADING | PLAYING | PAUSED | ENDED
   cassette: null,        // uuid of the loaded cassette
@@ -78,12 +81,20 @@ export function useCassetteDecks () {
         : null
       const schema = schemas.data
         .find(sc => sc.uuid === d.deviceInformation?.schema)
+      /* Every device on the same connection shares ONE driver and so
+       * ONE player: identical data on every device, and commands
+       * race. Surface it loudly on the deck. */
+      const housemates = devices.data
+        .filter(o => o.uuid !== d.uuid
+          && o.deviceInformation?.connection === d.deviceInformation.connection)
+        .map(o => o.name ?? o.deviceInformation?.sparkplugName)
       return {
         uuid: d.uuid,
         name: d.name ?? d.deviceInformation?.sparkplugName ?? 'Device',
         address,
         nodeUuid: d.deviceInformation?.node,
         schemaName: schema?.schemaInformation?.name ?? null,
+        sharedWith: housemates,
         rt: rt(d.uuid),
       }
     })
@@ -130,6 +141,7 @@ export function useCassetteDecks () {
     })
 
     const packetSub = dev.packets.subscribe(p => {
+      state.seen = true
       if (p.type === 'BIRTH') {
         state.online = true
         if (state.strip?.kind === 'offline') state.strip = null
@@ -152,6 +164,7 @@ export function useCassetteDecks () {
     const state = rt(deck.uuid)
     const previous = state.status
     state.status = status
+    state.seen = true
     state.online = true
 
     if (status === 'PLAYING' && previous !== 'PLAYING')

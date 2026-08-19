@@ -11,11 +11,12 @@
       <div class="flex min-w-0 flex-col gap-1">
         <div class="flex items-center gap-2">
           <span class="h-2 w-2 shrink-0 rounded-full"
-            :class="rt.online ? 'bg-green-500' : 'bg-slate-300'"></span>
+            :class="rt.online ? 'bg-green-500'
+              : rt.seen ? 'bg-red-400' : 'bg-slate-300 animate-pulse'"></span>
           <div class="truncate text-base font-semibold tracking-tight">{{ deck.name }}</div>
           <span class="text-[10px] font-semibold uppercase tracking-wide"
             :class="rt.online ? 'text-green-600' : 'text-slate-400'">
-            {{ rt.online ? 'Online' : 'Offline' }}
+            {{ rt.online ? 'Online' : rt.seen ? 'Offline' : 'Waiting for device' }}
           </span>
         </div>
         <div class="pl-4 font-mono text-xs text-gray-500">{{ addressLabel }}</div>
@@ -156,6 +157,21 @@
           :disabled="!controllable"
           @click="$emit('rate', deck, r)"
         >{{ r }}</button>
+      </div>
+    </div>
+
+    <!-- Shared-connection warning: one connection = one driver = one
+         player, so decks on a shared connection mirror each other and
+         fight over commands. Not dismissable; fix the topology. -->
+    <div v-if="deck.sharedWith?.length" class="border-t border-slate-200 bg-amber-50">
+      <div class="flex items-start gap-2.5 px-4 py-3">
+        <i class="fa-solid fa-triangle-exclamation mt-0.5 text-amber-500"></i>
+        <div class="min-w-0 flex-1 text-[13px] text-amber-800">
+          This deck shares one player with {{ deck.sharedWith.join(', ') }}.
+          Devices on the same connection receive identical data and race
+          for the transport commands. Give each simulated machine its own
+          connection using the Simulator driver.
+        </div>
       </div>
     </div>
 

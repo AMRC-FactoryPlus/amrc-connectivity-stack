@@ -155,7 +155,7 @@
     </TabsContent>
   </Tabs>
 
-  <NewDatasetDialogTest ref="newDatasetDialog" @saved="on_dataset_saved"/>
+  <NewDatasetDialog ref="newDatasetDialog" @saved="on_dataset_saved"/>
 </template>
 
 <script>
@@ -171,8 +171,8 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDialog } from '@/composables/useDialog'
 import { toast } from 'vue-sonner'
 import { metadataColumns, structureColumns, structure_label, STRUCTURE_APPS } from './datasetColumns.ts'
+// import NewDatasetDialog from '@components/DataAccess/NewDatasetDialog.vue'
 import NewDatasetDialog from '@components/DataAccess/NewDatasetDialog.vue'
-import NewDatasetDialogTest from '@components/DataAccess/NewDatasetDialogTest.vue'
 import streamSaver from 'streamsaver'
 
 function formatDate (dateStr) {
@@ -192,7 +192,6 @@ export default {
         Button, Skeleton,
         DataTableSearchable, SidebarDetail, EmptyState,
         NewDatasetDialog,
-        NewDatasetDialogTest
     },
 
     setup () {

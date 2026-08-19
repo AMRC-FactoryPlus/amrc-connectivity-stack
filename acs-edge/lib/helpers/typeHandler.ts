@@ -954,6 +954,13 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
                 if (endianness === byteOrder.bigEndian) len = buf.writeDoubleBE(metric.value as number); else len = buf.writeDoubleLE(metric.value as number);
                 break;
 
+            case sparkplugDataType.string:
+            case sparkplugDataType.text:
+            case sparkplugDataType.uuid:
+                /* Variable length: written as UTF-8, not into the
+                 * fixed 8-byte buffer. */
+                return Buffer.from(String(metric.value ?? ""), "utf8");
+
             default:
                 throw new Error(`Type ${metric.type} not supported for buffer parsing`);
         }

@@ -503,7 +503,12 @@ export default class MQTTClient {
                 return;
             }
 
-            this.sparkplugBroker.publish(topic, JSON.stringify(payload), {
+            /* Int64/UInt64 Sparkplug metrics decode to BigInt, which
+             * JSON.stringify rejects; without this the ingester crash
+             * loops on the first 64-bit metric it meets. */
+            const json = JSON.stringify(payload, (_k, v) =>
+                typeof v === "bigint" ? Number(v) : v);
+            this.sparkplugBroker.publish(topic, json, {
                 properties: {
                     //     Assume that all metrics have the same custom properties
                     userProperties: {

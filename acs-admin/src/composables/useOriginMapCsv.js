@@ -8,6 +8,17 @@ import { ISA95_HIERARCHY_KEY } from '@/store/useISA95Store.js';
 
 const RESERVED_KEYS = ['Schema_UUID', 'Instance_UUID', 'patternProperties', '$meta', 'required'];
 
+/* Mint a v4 UUID without depending on a crypto global being present
+ * (browser and node both provide one; some test sandboxes don't). */
+function mintUuid() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.floor(Math.random() * 16);
+        const v = c === 'x' ? r : (r % 4) + 8;
+        return v.toString(16);
+    });
+}
+
 /**
  * Read the value at a path of segments, without creating anything along the
  * way. Returns undefined if any segment is missing.
@@ -100,45 +111,61 @@ function collectMetricRows(schema, model, pathSegments = [], inPlaceholder = fal
  * @param {Object} model - The model to mutate
  * @param {Object} schema - The schema
  * @param {Function} setFn - (optional) function(path, value, obj, delimiter) to set nested properties reactively
- * @returns {{applied: number, skipped: number, ignored: number}} skipped counts
- *   rows whose path is absent from the schema; ignored counts ISA-95 hierarchy
- *   rows whose value the CSV tried to change.
+ * @returns {{applied: number, skipped: number, ignored: number, placeholders: number}}
+ *   skipped counts rows whose path is absent from the schema; ignored counts
+ *   ISA-95 hierarchy rows whose value the CSV tried to change; placeholders
+ *   counts '<new>' template rows that never represent a real instance.
  */
 export function applyCsvToModel(rows, model, schema, setFn) {
     let applied = 0;
     let skipped = 0;
     let ignored = 0;
+    let placeholders = 0;
 
-    function getMetricSchema(schema, segments) {
-        let currentSchema = schema;
-        for (let i = 0; i < segments.length; i++) {
-            const segment = segments[i];
-            if (!currentSchema) {
-                console.warn('getMetricSchema: schema is null at segment', segment, segments);
-                return null;
+    const setPath = (pathArr, value) => {
+        if (typeof setFn === 'function') {
+            setFn(pathArr.join('.'), value, model, '.');
+        } else {
+            let current = model;
+            for (let i = 0; i < pathArr.length - 1; i++) {
+                if (current[pathArr[i]] == null || typeof current[pathArr[i]] !== 'object')
+                    current[pathArr[i]] = {};
+                current = current[pathArr[i]];
             }
-            // Handle patternProperties (arrays)
-            if (currentSchema.patternProperties) {
-                const regexKey = Object.keys(currentSchema.patternProperties)[0];
-                currentSchema = currentSchema.patternProperties[regexKey];
-                continue;
-            }
-            if (!currentSchema.properties || !(segment in currentSchema.properties)) {
-                console.warn('getMetricSchema: segment not found in properties', segment, segments, currentSchema);
-                return null;
-            }
-            currentSchema = currentSchema.properties[segment];
+            current[pathArr[pathArr.length - 1]] = value;
         }
-        // If this is a metric, return the merged allOf properties
-        if (currentSchema && currentSchema.allOf) {
-            console.debug('getMetricSchema: found metric schema for', segments, currentSchema);
-            return {
-                ...currentSchema.allOf[0]?.properties,
-                ...currentSchema.allOf[1]?.properties,
-            };
+    };
+
+    /* Property keys may themselves contain '/' (the export joins path
+     * segments with '/', so a key like "Player/Load" is
+     * indistinguishable from nesting in the CSV). Resolve by longest
+     * prefix match against the schema's actual keys instead of
+     * assuming one segment per key. */
+    function matchProperty(props, segments, start) {
+        const rest = segments.slice(start).join('/');
+        let best = null;
+        for (const key of Object.keys(props)) {
+            if (RESERVED_KEYS.includes(key)) continue;
+            if (rest === key || rest.startsWith(key + '/')) {
+                if (!best || key.length > best.key.length)
+                    best = { key, consumed: key.split('/').length };
+            }
         }
-        console.warn('getMetricSchema: did not find allOf for', segments, currentSchema);
-        return null;
+        return best;
+    }
+
+    /* Every schema-instance level in the model needs its Schema_UUID
+     * (from the schema) and a minted Instance_UUID, or the editor
+     * cannot render it and the platform cannot type it. This mirrors
+     * what the editor's own metric-set path stamps. Heals levels that
+     * already exist without markers, too. */
+    function ensureMarkers(node, nodeSchema, pathArr) {
+        const su = nodeSchema?.properties?.Schema_UUID?.const;
+        if (!su) return;
+        if (node.Schema_UUID == null)
+            setPath([...pathArr, 'Schema_UUID'], su);
+        if (node.Instance_UUID == null)
+            setPath([...pathArr, 'Instance_UUID'], mintUuid());
     }
 
     for (const { tagPath, fields } of rows) {
@@ -156,73 +183,96 @@ export function applyCsvToModel(rows, model, schema, setFn) {
             continue;
         }
 
-        let current = model;
-        let found = true;
-        let pathSoFar = [];
-
-        // Traverse or create the path in the model
-
-        for (let i = 0; i < segments.length; i++) {
-            const segment = segments[i];
-            pathSoFar.push(segment);
-            if (current == null || typeof current !== 'object') {
-                found = false;
-                break;
-            }
-            if (!(segment in current)) {
-                // If not at the leaf, create the parent object
-                if (i < segments.length - 1) {
-                    if (typeof setFn === 'function') {
-                        setFn(pathSoFar.join('.'), {}, model, '.');
-                    } else {
-                        current[segment] = {};
-                    }
-                    // After creating, update current to point to the new parent object
-                    let temp = model;
-                    for (let j = 0; j <= i; j++) {
-                        temp = temp[segments[j]];
-                    }
-                    current = temp;
-                } else if (i === segments.length - 1 && schema) {
-                    // Only create the metric object at the leaf
-                    const metricSchema = getMetricSchema(schema, segments);
-                    if (metricSchema) {
-                        // Create the metric object with default values from schema
-                        const newMetric = {};
-                        Object.keys(metricSchema).forEach(key => {
-                            if ('default' in metricSchema[key]) {
-                                newMetric[key] = metricSchema[key].default;
-                            } else if ('enum' in metricSchema[key]) {
-                                newMetric[key] = metricSchema[key].enum[0];
-                            }
-                        });
-                        if (typeof setFn === 'function') {
-                            setFn(pathSoFar.join('.'), newMetric, model, '.');
-                        } else {
-                            current[segment] = newMetric;
-                        }
-                        // After creating, update current to point to the new metric object
-                        let temp = model;
-                        for (let j = 0; j <= i; j++) {
-                            temp = temp[segments[j]];
-                        }
-                        current = temp;
-                        console.debug('applyCsvToModel: created metric in model for', tagPath, newMetric);
-                    } else {
-                        found = false;
-                        console.warn('applyCsvToModel: could not find metric schema for', tagPath, segments);
-                        break;
-                    }
-                } else {
-                    found = false;
-                    break;
-                }
-            } else {
-                current = current[segment];
-            }
+        // '<new>' is the export's placeholder for a schema array with no
+        // instances. It is never a real instance name; importing it
+        // creates a phantom device object.
+        if (segments.includes('<new>')) {
+            placeholders++;
+            console.warn('applyCsvToModel: placeholder instance row skipped:', tagPath);
+            continue;
         }
 
-        if (!found || current == null || typeof current !== 'object') {
+        /* Walk schema and model together. */
+        let schemaNode = schema;
+        const modelPath = [];
+        let i = 0;
+        let ok = true;
+        let leaf = null;
+
+        while (i < segments.length) {
+            if (!schemaNode) { ok = false; break; }
+
+            // Schema array: the next segment is an instance name.
+            if (schemaNode.patternProperties) {
+                const regexKey = Object.keys(schemaNode.patternProperties)[0];
+                const itemSchema = schemaNode.patternProperties[regexKey];
+                const name = segments[i];
+                modelPath.push(name);
+                let inst = valueAt(model, modelPath);
+                if (inst == null || typeof inst !== 'object') {
+                    setPath(modelPath, {});
+                    inst = valueAt(model, modelPath);
+                }
+                ensureMarkers(inst, itemSchema, modelPath);
+                schemaNode = itemSchema;
+                i += 1;
+                continue;
+            }
+
+            if (!schemaNode.properties) { ok = false; break; }
+            const m = matchProperty(schemaNode.properties, segments, i);
+            if (!m) {
+                console.warn('applyCsvToModel: no schema property matches', segments.slice(i).join('/'), 'for', tagPath);
+                ok = false;
+                break;
+            }
+            const childSchema = schemaNode.properties[m.key];
+            modelPath.push(m.key);
+            const isLast = i + m.consumed >= segments.length;
+
+            if (isLast) {
+                // Leaf: must be a metric (allOf carries the metric schema).
+                if (!childSchema.allOf) {
+                    console.warn('applyCsvToModel: leaf is not a metric for', tagPath);
+                    ok = false;
+                    break;
+                }
+                let metric = valueAt(model, modelPath);
+                if (metric == null || typeof metric !== 'object') {
+                    const metricSchema = {
+                        ...childSchema.allOf[0]?.properties,
+                        ...childSchema.allOf[1]?.properties,
+                    };
+                    const newMetric = {};
+                    Object.keys(metricSchema).forEach(key => {
+                        if ('const' in metricSchema[key]) {
+                            newMetric[key] = metricSchema[key].const;
+                        } else if ('default' in metricSchema[key]) {
+                            newMetric[key] = metricSchema[key].default;
+                        } else if ('enum' in metricSchema[key]) {
+                            newMetric[key] = metricSchema[key].enum[0];
+                        }
+                    });
+                    setPath(modelPath, newMetric);
+                    metric = valueAt(model, modelPath);
+                }
+                leaf = metric;
+                i += m.consumed;
+                break;
+            }
+
+            // Intermediate group: create if missing, stamp markers.
+            let group = valueAt(model, modelPath);
+            if (group == null || typeof group !== 'object') {
+                setPath(modelPath, {});
+                group = valueAt(model, modelPath);
+            }
+            ensureMarkers(group, childSchema, modelPath);
+            schemaNode = childSchema;
+            i += m.consumed;
+        }
+
+        if (!ok || leaf == null || typeof leaf !== 'object') {
             skipped++;
             console.warn('applyCsvToModel: skipped row for', tagPath, segments);
             continue;
@@ -230,26 +280,25 @@ export function applyCsvToModel(rows, model, schema, setFn) {
 
         for (const [field, value] of Object.entries(fields)) {
             if (value === '' || value === null || value === undefined) {
-                delete current[field];
+                delete leaf[field];
             } else if (field === 'Record_To_Historian') {
-                current[field] = value.toLowerCase() === 'true';
+                leaf[field] = value.toLowerCase() === 'true';
             } else if (field === 'Eng_Low' || field === 'Eng_High' || field === 'Deadband') {
                 const num = Number(value);
                 if (!isNaN(num)) {
-                    current[field] = num;
+                    leaf[field] = num;
                 } else {
-                    current[field] = value.trim();
+                    leaf[field] = value.trim();
                 }
             } else {
-                current[field] = value.trim();
+                leaf[field] = value.trim();
             }
         }
 
         applied++;
     }
-    // ...existing code...
 
-    return { applied, skipped, ignored };
+    return { applied, skipped, ignored, placeholders };
 }
 
 /**

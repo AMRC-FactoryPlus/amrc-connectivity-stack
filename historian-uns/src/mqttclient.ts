@@ -200,7 +200,17 @@ export default class MQTTClient {
             ? this.parse_iso_ns(payload.timestamp)
             : BigInt(Date.now()) * 1_000_000n;
 
-        this.writeToInfluxDB(unsTopic, payload.value, payloadTimestamp, customProperties.Unit, customProperties.Type);
+        /* Simulated-data markers forwarded by the UNS ingester as
+         * MQTT user properties become Influx tags, so replayed data
+         * is recognisable and removable by run. */
+        const simTags: Record<string, string> = customProperties.Simulated === "true"
+            ? {
+                simulated: "true",
+                ...(customProperties.RunId
+                    ? { run_id: String(customProperties.RunId) } : {}),
+            }
+            : {};
+        this.writeToInfluxDB(unsTopic, payload.value, payloadTimestamp, customProperties.Unit, customProperties.Type, simTags);
 
         // Handle the batched metrics
         payload.batch?.forEach((metric) => {
@@ -208,7 +218,7 @@ export default class MQTTClient {
                 ? this.parse_iso_ns(metric.timestamp)
                 : payloadTimestamp;
             // Send each metric to InfluxDB
-            this.writeToInfluxDB(unsTopic, metric.value, metricTimestamp, customProperties.Unit, customProperties.Type);
+            this.writeToInfluxDB(unsTopic, metric.value, metricTimestamp, customProperties.Unit, customProperties.Type, simTags);
         });
     }
 
@@ -220,7 +230,7 @@ export default class MQTTClient {
      * @param unit The metric unit from the MQTTv5 custom properties.
      * @param type The Metric type from the MQTTv5 custom properties.
      */
-    writeToInfluxDB(topic: UnsTopic, value: string, timestamp: bigint, unit: string, type: string) {
+    writeToInfluxDB(topic: UnsTopic, value: any, timestamp: bigint, unit: string, type: string, extraTags: Record<string, string> = {}) {
         if (value === null) {
             return;
         }
@@ -242,7 +252,8 @@ export default class MQTTClient {
             workCenter: topic.GetISA95Schema().WorkCenter ?? "",
             workUnit: topic.GetISA95Schema().WorkUnit ?? "",
             path: topic.GetMetricPath(),
-            unit: unit
+            unit: unit,
+            ...extraTags,
         });
 
         let numVal = null;

@@ -413,8 +413,18 @@ export default class MQTTClient {
             // millisecond Date for sources that have not yet been updated.
             const metricTimestamp = metric.timestampNs ?? payload.timestampNs
                 ?? metric.timestamp ?? payload.timestamp;
+            // Simulated-data markers ride the data metric's
+            // properties (the one case where DDATA carries any) and
+            // become Influx tags, so replayed data is recognisable
+            // and a mistaken run can be removed by its run_id.
+            const simTags: Record<string, string> = {};
+            if (metric.properties?.simulated?.value) {
+                simTags.simulated = "true";
+                const run = metric.properties?.run_id?.value;
+                if (run) simTags.run_id = String(run);
+            }
             // Send each metric to InfluxDB
-            this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
+            this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp, simTags)
         });
     }
 
@@ -426,7 +436,7 @@ export default class MQTTClient {
      * @param timestamp Timestamp from the metric. Either a BigInt of
      *     nanoseconds since epoch, or a Date for ms-precision sources.
      */
-    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date | bigint) {
+    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date | bigint, extraTags: Record<string, string> = {}) {
         if (value === null) return;
         if (birth.transient) {
             logger.debug(`Metric ${birth.name} is transient, not writing to InfluxDB`);
@@ -456,7 +466,8 @@ export default class MQTTClient {
             node: topic.address.node,
             device: topic.address.device,
             path: path,
-            unit: birth.unit
+            unit: birth.unit,
+            ...extraTags,
         });
 
         let numVal = null;

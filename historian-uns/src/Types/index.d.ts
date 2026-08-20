@@ -17,7 +17,10 @@ interface UnsMetricCustomProperties {
     Unit: string,
     Type: string,
     InstanceUUIDPath: string,
-    SchemaUUIDPath: string
+    SchemaUUIDPath: string,
+    /* Simulated-data markers, present only on simulator payloads */
+    Simulated?: string,
+    RunId?: string
 }
 
 /**

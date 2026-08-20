@@ -7,7 +7,9 @@ import { SparkplugNode } from "./sparkplugNode.js";
 import {
     Metrics,
     parseNsTimestampFromPayload,
+    parseSimTagsFromPayload,
     parseTimeStampFromPayload,
+    sparkplugMetricProperties,
     parseValueFromPayload,
     processJSONBatchedPayload,
     serialisationType,
@@ -435,13 +437,35 @@ export class Device {
                                 );
 
                                 // Update the metric value and push it to the array of changed metrics
-                                changedMetrics.push({
+                                const updated = {
                                     ...(this._metrics.setValueByAddrPath(addr,
                                         path,
                                         newVal,
                                         timestamp,
                                         timestampNs))
-                                });
+                                };
+                                // Simulated-data markers ride each
+                                // payload and go out as metric
+                                // properties so the historians can
+                                // tag the points.
+                                const simTags = parseSimTagsFromPayload(
+                                    obj[addr], this._payloadFormat);
+                                if (simTags.simulated) {
+                                    updated.properties = {
+                                        ...(updated.properties ?? {}),
+                                        simulated: {
+                                            type: sparkplugDataType.boolean,
+                                            value: true,
+                                        },
+                                        ...(simTags.run_id ? {
+                                            run_id: {
+                                                type: sparkplugDataType.string,
+                                                value: simTags.run_id,
+                                            },
+                                        } : {}),
+                                    } as sparkplugMetricProperties;
+                                }
+                                changedMetrics.push(updated);
                             }
                         }
                     }

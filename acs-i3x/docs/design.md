@@ -168,6 +168,31 @@ Pure translation functions between Factory+ and i3X data shapes:
 - `wrapError(message)` → `{ success: false, error: { message } }`
 - `wrapBulkResponse(results)` → ordered bulk response with per-item success/error
 
+### datasets.ts
+
+Serves Data Access datasets as i3X objects (FPLUS-44). Datasets live in
+the ConfigDB (Dataset class membership plus one structure App entry per
+type: SparkplugSrc, SessionLimits or UnionComponents), so the store
+learns about them from three list calls and a class-members read,
+re-polled on a timer. Each dataset appears under a synthetic "Datasets"
+folder with a shared Dataset ObjectType and a real schema.
+
+A dataset's `/value` is a descriptor, not data: the dataset type, its
+structure (source device, coverage window, or union members), and a
+DCAT-shaped `content` block with the Data Access export href
+(`I3X_DATA_ACCESS_EXTERNAL_URL`; omitted when unset). Structure configs
+are read per request so a growing union is always current.
+
+`/related` with `HasComponent` walks the graph: union → members,
+session window → source dataset, device stream → the device object
+(resolved from the ObjectTree). `/history` on a dataset answers 404
+pointing at the content href — the i3X history shape cannot express a
+multi-metric dataset (TID L5).
+
+Deliberately separate from ObjectTree: the device pipeline (reactive
+refresh, UNS preservation, diffing) is untouched; APIv1 consults the
+store as a fallback on every object route.
+
 ### quality.ts
 
 Derives i3X quality from device/metric state:

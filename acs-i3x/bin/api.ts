@@ -9,6 +9,7 @@ import { WebAPI } from "@amrc-factoryplus/service-api";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { routes } from "../lib/routes.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { DatasetStore } from "../lib/datasets.js";
 import { ValueCache } from "../lib/value-cache.js";
 import { History } from "../lib/history.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
@@ -52,6 +53,16 @@ const subscriptions = new SubscriptionManager({
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
 });
 
+// Data Access datasets served as i3X objects. The external URL is the
+// public base consumers can reach; without it descriptors carry no
+// content block (the dataset graph still resolves).
+const datasets = await new DatasetStore({
+    fplus,
+    namespaceUri: env.I3X_NAMESPACE_URI || "https://example.com",
+    dataAccessUrl: env.I3X_DATA_ACCESS_EXTERNAL_URL,
+    resolve: id => objectTree.getObject(id),
+}).init();
+
 // Build RAG engine (graph + search index)
 const i3xRag = new I3xRag(objectTree, valueCache, history);
 i3xRag.init();
@@ -81,6 +92,7 @@ const api = await new WebAPI({
         valueCache,
         history,
         subscriptions,
+        datasets,
         mcpServer,
         maxDepthCap: parseInt(env.I3X_MAX_DEPTH_CAP || "0"),
     }),

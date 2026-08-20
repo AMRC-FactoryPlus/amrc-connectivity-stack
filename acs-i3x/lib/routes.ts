@@ -6,12 +6,14 @@ import type { ObjectTree } from "./object-tree.js";
 import type { ValueCache } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
+import type { DatasetStore } from "./datasets.js";
 
 export function routes(opts: {
     objectTree: ObjectTree;
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
+    datasets?: DatasetStore;
     mcpServer?: McpServer;
     maxDepthCap?: number;
 }) {

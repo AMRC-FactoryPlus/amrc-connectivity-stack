@@ -31,7 +31,7 @@ use crate::error::{ConnectError, HandlerError};
 /// use rs_edge_driver::*;
 ///
 /// struct ModbusHandler {
-///     handle: DriverHandle,
+///     handle: DriverHandle<ModbusAddr>,
 ///     host: String,
 ///     port: u16,
 ///     // ... client state
@@ -42,7 +42,7 @@ use crate::error::{ConnectError, HandlerError};
 ///     type Addr = ModbusAddr;
 ///
 ///     fn create(
-///         handle: DriverHandle,
+///         handle: DriverHandle<ModbusAddr>,
 ///         config: serde_json::Value,
 ///     ) -> Result<Self, HandlerError> {
 ///         let host = config["host"].as_str()
@@ -90,7 +90,10 @@ pub trait Handler: Send + Sized {
     ///
     /// The [`DriverHandle`] can be stored and used later to push
     /// async data back to the driver via [`DriverHandle::publish`].
-    fn create(handle: DriverHandle, config: serde_json::Value) -> Result<Self, HandlerError>;
+    fn create(
+        handle: DriverHandle<Self::Addr>,
+        config: serde_json::Value,
+    ) -> Result<Self, HandlerError>;
 
     /// Parse and validate a raw address string from the edge agent.
     ///
@@ -126,18 +129,17 @@ pub trait Handler: Send + Sized {
     /// **Async mode**: set up subscriptions for the given addresses.
     ///
     /// Called after [`connect`](Handler::connect) succeeds and
-    /// addresses have been configured. Each entry pairs the edge
-    /// agent's assigned data topic name with the parsed address; when
-    /// data arrives, push it back to the driver via
-    /// [`DriverHandle::publish`] using that same topic name — the
-    /// edge agent only recognises data published on the topic name it
-    /// assigned, which is unrelated to the address's own contents.
+    /// addresses have been configured. When data arrives, push it
+    /// back to the driver via [`DriverHandle::publish`], passing the
+    /// same address it came from — the driver resolves the address to
+    /// the data topic name the edge agent assigned, so the handler
+    /// never needs to track topic names itself.
     ///
     /// Return `true` if all subscriptions were set up successfully.
     ///
     /// The default implementation returns `true` (no-op). Override
     /// this for async/event-driven drivers.
-    async fn subscribe(&mut self, _addrs: &[(String, Self::Addr)]) -> bool {
+    async fn subscribe(&mut self, _addrs: &[Self::Addr]) -> bool {
         true
     }
 

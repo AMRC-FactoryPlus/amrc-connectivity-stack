@@ -22,6 +22,17 @@ export function csv_escape(value) {
 }
 
 
+// historian-sparkplug and historian-uns append ":i"/":u"/":d"/":b"/":s"
+// (int/uint/double/boolean/string) to every measurement name on write, per
+// the Sparkplug datatype switch in their mqttclient.ts. Strip it back off
+// for display.
+export function strip_metric_suffix(value) {
+    if (value == null) return value;
+
+    return String(value).replace(/:[iudbs]$/, "");
+}
+
+
 // const toTime = d => d ? new Date(d).getTime() : null;
 
 export function maxDate(a, b) {

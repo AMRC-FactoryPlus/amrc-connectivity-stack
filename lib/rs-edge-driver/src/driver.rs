@@ -545,6 +545,10 @@ impl<H: Handler + 'static> Driver<H> {
     /// keeping the MQTT event loop responsive. If the poll queue is
     /// full, the request is dropped (backpressure).
     fn on_poll(&self, poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>, payload: &[u8]) {
+        if !H::SUPPORTS_POLL {
+            return;
+        }
+
         let payload_str = match std::str::from_utf8(payload) {
             Ok(s) => s,
             Err(_) => return,

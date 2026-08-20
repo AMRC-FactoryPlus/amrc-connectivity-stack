@@ -82,6 +82,22 @@ pub trait Handler: Send + Sized {
     /// compile-time safety — no downcasting needed.
     type Addr: Send + Sync + Hash + Eq + Clone;
 
+    /// Whether this handler supports polled reads via [`poll`](Handler::poll).
+    ///
+    /// The edge agent sends explicit `poll` requests as a fallback
+    /// whenever it isn't otherwise seeing timely data for an address —
+    /// this happens regardless of whether the handler is async or
+    /// polled, since the edge agent has no way to know. A handler that
+    /// only implements [`subscribe`](Handler::subscribe) has nothing
+    /// useful `poll` could ever do with those requests, so set this to
+    /// `false` to have the driver discard them immediately instead of
+    /// queueing them (which would otherwise eventually log spurious
+    /// "poll queue full" warnings for a queue that was never going to
+    /// produce anything anyway).
+    ///
+    /// Defaults to `true`.
+    const SUPPORTS_POLL: bool = true;
+
     /// Construct a new handler from the configuration object sent
     /// by the edge agent.
     ///

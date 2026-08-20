@@ -31,7 +31,7 @@ use crate::error::{ConnectError, HandlerError};
 /// use rs_edge_driver::*;
 ///
 /// struct ModbusHandler {
-///     handle: DriverHandle,
+///     handle: DriverHandle<ModbusAddr>,
 ///     host: String,
 ///     port: u16,
 ///     // ... client state
@@ -42,7 +42,7 @@ use crate::error::{ConnectError, HandlerError};
 ///     type Addr = ModbusAddr;
 ///
 ///     fn create(
-///         handle: DriverHandle,
+///         handle: DriverHandle<ModbusAddr>,
 ///         config: serde_json::Value,
 ///     ) -> Result<Self, HandlerError> {
 ///         let host = config["host"].as_str()
@@ -82,6 +82,22 @@ pub trait Handler: Send + Sized {
     /// compile-time safety — no downcasting needed.
     type Addr: Send + Sync + Hash + Eq + Clone;
 
+    /// Whether this handler supports polled reads via [`poll`](Handler::poll).
+    ///
+    /// The edge agent sends explicit `poll` requests as a fallback
+    /// whenever it isn't otherwise seeing timely data for an address —
+    /// this happens regardless of whether the handler is async or
+    /// polled, since the edge agent has no way to know. A handler that
+    /// only implements [`subscribe`](Handler::subscribe) has nothing
+    /// useful `poll` could ever do with those requests, so set this to
+    /// `false` to have the driver discard them immediately instead of
+    /// queueing them (which would otherwise eventually log spurious
+    /// "poll queue full" warnings for a queue that was never going to
+    /// produce anything anyway).
+    ///
+    /// Defaults to `true`.
+    const SUPPORTS_POLL: bool = true;
+
     /// Construct a new handler from the configuration object sent
     /// by the edge agent.
     ///
@@ -90,7 +106,10 @@ pub trait Handler: Send + Sized {
     ///
     /// The [`DriverHandle`] can be stored and used later to push
     /// async data back to the driver via [`DriverHandle::publish`].
-    fn create(handle: DriverHandle, config: serde_json::Value) -> Result<Self, HandlerError>;
+    fn create(
+        handle: DriverHandle<Self::Addr>,
+        config: serde_json::Value,
+    ) -> Result<Self, HandlerError>;
 
     /// Parse and validate a raw address string from the edge agent.
     ///
@@ -127,7 +146,10 @@ pub trait Handler: Send + Sized {
     ///
     /// Called after [`connect`](Handler::connect) succeeds and
     /// addresses have been configured. When data arrives, push it
-    /// back to the driver via [`DriverHandle::publish`].
+    /// back to the driver via [`DriverHandle::publish`], passing the
+    /// same address it came from — the driver resolves the address to
+    /// the data topic name the edge agent assigned, so the handler
+    /// never needs to track topic names itself.
     ///
     /// Return `true` if all subscriptions were set up successfully.
     ///

@@ -10,7 +10,7 @@ import * as rx from "rxjs";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, valid_datetime } from "./validate.js";
-import { fail, csv_escape, maxDate, minDate } from './utils.js';
+import { fail, maxDate, minDate } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
@@ -266,20 +266,14 @@ export class APIv1 {
             `attachment; filename="${dataset_uuid}.csv"`
         );
 
-        const zipStream = this.influxReader.exportDevices(resolved_sources, meta);
+        const csvStream = this.influxReader.exportDevices(resolved_sources, meta);
 
+        csvStream.on("error", err => {
+            this.log(err);
+            res.destroy(err);
+        });
 
-        res.setHeader(
-          "Content-Type",
-          "application/zip"
-        );
-
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename=${dataset_uuid}.zip`
-        );
-
-        zipStream.pipe(res);
+        csvStream.pipe(res);
 
        }catch (err) {
         this.log(err);

@@ -303,7 +303,7 @@ export default {
                 const [st, stream, , headers] = await this.s.client.DataAccess.fetch({
                     url: `v1/data/${uuid}`,
                     method: 'POST',
-                    accept: 'application/zip',
+                    accept: 'text/csv',
                     response_type: 'stream',
                     body: {},
                 })
@@ -320,7 +320,7 @@ export default {
                 const disposition = headers?.get?.('Content-Disposition') ?? ''
                 const filename =
                     /filename\*?=(?:UTF-8'')?("?)([^";]+)\1/i.exec(disposition)?.[2]
-                    ?? `${uuid}.zip`
+                    ?? `${uuid}.csv`
 
                 const fileStream = streamSaver.createWriteStream(filename)
                 if (window.WritableStream && stream.pipeTo) {

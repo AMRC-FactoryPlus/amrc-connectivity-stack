@@ -69,6 +69,10 @@ spec:
             # them at all.
             - name: BODY_LIMIT
               value: "{{ .Values.files.bodyLimit }}"
+            # Node's default requestTimeout (5 minutes) aborts large,
+            # slow uploads mid-transfer. 0 disables it.
+            - name: REQUEST_TIMEOUT
+              value: "{{ .Values.files.requestTimeout }}"
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             # This is used for service discovery so it does not need to be externally resolvable.

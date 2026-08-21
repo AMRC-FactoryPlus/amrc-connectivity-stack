@@ -128,6 +128,9 @@ files:
   image:
     repository: acs-files
   bodyLimit: 500kb
+  # -- HTTP request timeout in milliseconds, applied only to the Files
+  # service. 0 disables it, allowing uploads of any size/duration.
+  requestTimeout: 0
   storage: 20Gi
 
 monitor:

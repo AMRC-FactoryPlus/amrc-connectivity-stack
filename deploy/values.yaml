@@ -127,7 +127,10 @@ files:
   enabled: true
   image:
     repository: acs-files
-  bodyLimit: 500kb
+  bodyLimit: 3gb
+  # -- HTTP request timeout in milliseconds, applied only to the Files
+  # service. 0 disables it, allowing uploads of any size/duration.
+  requestTimeout: 0
   storage: 20Gi
 
 monitor:
@@ -689,3 +692,156 @@ influxdb2:
 
 cert-manager:
   fullnameOverride: "cert-manager"
+
+openmetadata:
+  enabled: true
+  fullnameOverride: "openmetadata"
+  image:
+    # Patched to replace the bundled log4j-core/log4j-api 2.25.5 jars under
+    # /opt/openmetadata/libs - built from acs-openmetadata-server/Dockerfile.
+    # See acs-openmetadata-server/README.md.
+    repository: <registry>/openmetadata-server
+    tag: "1.13.3-patched"
+  openmetadata:
+    config:
+      elasticsearch:
+        auth:
+          enabled: true
+          username: "admin"
+          password:
+            secretRef: "elasticsearch-secrets"
+            secretKey: "openmetadata-elasticsearch-password"
+      database:
+        enabled: true
+        host: mysql
+        port: 3306
+        driverClass: com.mysql.cj.jdbc.Driver
+        dbScheme: mysql
+        databaseName: openmetadata_db
+        auth:
+          username: openmetadata_user
+          password:
+            secretRef: openmetadata-mysql-secrets
+            secretKey: mysql-password
+      pipelineServiceClientConfig:
+        airflow:
+          auth:
+            enabled: true
+            username: admin
+            password:
+              secretRef: airflow-secrets
+              secretKey: openmetadata-airflow-password
+
+openmetadata-dependencies:
+  enabled: true
+
+  mysql:
+    enabled: true
+    auth:
+      # Random root/user passwords generated once by
+      # deploy/templates/openmetadata/openmetadata-secrets.yaml and kept
+      # stable across upgrades - see the existingSecret contract in that
+      # file. This also creates openmetadata_user/openmetadata_db for us,
+      # so no custom initdb script is needed for that database.
+      existingSecret: openmetadata-mysql-secrets
+      database: openmetadata_db
+      username: openmetadata_user
+    primary:
+      extraEnvVars:
+        - name: AIRFLOW_MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airflow-mysql-secrets
+              key: airflow-mysql-password
+
+    initdbScripts:
+      # openmetadata-dependencies' own default values.yaml ships BOTH of
+      # these keys with hardcoded passwords baked in. Helm deep-merges map
+      # values rather than replacing them, so without explicitly nulling
+      # these out here, they'd survive alongside our own key below and
+      # mysql would try to run all of them - which is exactly what kept
+      # happening. null is Helm's "delete this key during merge" syntax,
+      # not an empty script.
+      init_openmetadata_db_scripts.sql: null
+      init_airflow_db_scripts.sql: null
+      # .sh (not .sql) so the container's own env vars - MYSQL_ROOT_PASSWORD
+      # (set by the chart from auth.existingSecret) and AIRFLOW_MYSQL_PASSWORD
+      # above - can be expanded into the script at runtime instead of being
+      # hardcoded here.
+      init_airflow_db_scripts.sh: |
+        #!/bin/bash
+        set -e
+        mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
+          CREATE DATABASE IF NOT EXISTS airflow_db
+            CHARACTER SET utf8mb4
+            COLLATE utf8mb4_unicode_ci;
+          CREATE USER IF NOT EXISTS 'airflow_user'@'%' IDENTIFIED BY '${AIRFLOW_MYSQL_PASSWORD}';
+          GRANT ALL PRIVILEGES ON airflow_db.* TO 'airflow_user'@'%';
+          FLUSH PRIVILEGES;
+        EOSQL
+
+  airflow:
+    images:
+      airflow:
+        repository: <registry>/openmetadata-ingestion
+        tag: 1.13.3-patched
+    data:
+      # The chart's own default (data.metadataConnection.pass: airflow_pass)
+      # is a hardcoded literal with no per-field secretRef - metadataSecretName
+      # is the only way to point it at a real password instead. Must contain
+      # a "connection" key with the full SQLAlchemy URI - see
+      # deploy/templates/openmetadata/openmetadata-secrets.yaml, which builds
+      # this from the same password airflow_user is actually created with.
+      metadataSecretName: airflow-metadata-db
+    env:
+      - name: _PIP_ADDITIONAL_REQUIREMENTS
+        value: "" # Empty string disables the fragile runtime pip installation step
+
+    executor: "LocalExecutor"
+    workers:
+      replicas: 0
+    airflow:
+      config:
+        AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
+
+    createUserJob:
+      # Reset the webserver admin user's password to the same random value
+      # openmetadata's pipelineServiceClientConfig.airflow.auth uses (secret
+      # airflow-secrets/openmetadata-airflow-password), so the two stay in
+      # sync without either side hardcoding it. $(OM_AIRFLOW_PASSWORD) is
+      # Kubernetes' own command/args env substitution, not Helm templating -
+      # it resolves at container start from the env var below.
+      env:
+        - name: OM_AIRFLOW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airflow-secrets
+              key: openmetadata-airflow-password
+      defaultUser:
+        password: "$(OM_AIRFLOW_PASSWORD)"
+
+    logs:
+      persistence:
+        enabled: true
+        existingClaim: "manual-airflow-logs"
+    dags:
+      persistence:
+        enabled: true
+        existingClaim: "manual-airflow-dags"
+
+  opensearch:
+    image:
+      # Patched to replace the bundled log4j-core/log4j-api 2.25.4 jars -
+      # built from acs-opensearch/Dockerfile. See acs-openmetadata/README.md
+      # for the equivalent log4j fix applied to the ingestion image.
+      repository: <registry>/opensearch
+      tag: "3.8.0-patched"
+    persistence:
+      accessModes:
+        - ReadWriteOnce
+    extraEnvs:
+      - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: elasticsearch-secrets
+            key: openmetadata-elasticsearch-password

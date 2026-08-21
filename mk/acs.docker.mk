@@ -22,6 +22,16 @@ all: build
 
 build: git.prepare
 	docker buildx build --push --platform "${platform}" -t "${image}" ${build_args} .
+ifdef flatten
+# `flatten` opts a service out of Docker's normal layer sharing: it
+# collapses the just-pushed image into a single layer via the registry
+# API, so a `rm` earlier in the Dockerfile actually removes the file's
+# bytes rather than just hiding them behind a whiteout. `crane` preserves
+# the image config (ENV/ENTRYPOINT/CMD/USER/etc.) unchanged - only the
+# filesystem layers are merged. Unset (the default) for every service that
+# doesn't need this.
+	crane flatten -t "${image}" "${image}"
+endif
 
 pull:
 	docker pull "${image}"

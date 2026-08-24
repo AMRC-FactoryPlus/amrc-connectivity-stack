@@ -74,8 +74,14 @@ export class UnionComponentsHandler extends BaseStructureHandler {
     }
   }
 
+  references(config, target_uuid) {
+    if(!Array.isArray(config)) return false;
+
+    return config.includes(target_uuid);
+  }
+
   async remove_subclass_relationships(dataset_uuid, config) {
-    if(config.length <= 0) return;
+    if(!Array.isArray(config) || config.length <= 0) return;
 
     for (const src of config){
       await this.cdb.class_remove_subclass(dataset_uuid, src);

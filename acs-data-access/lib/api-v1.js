@@ -79,23 +79,94 @@ export class APIv1 {
   }
 
 
+  /** Finds every dataset whose stored config points at the given dataset.
+   *
+   * Reads the structure apps straight from ConfigDB rather than using the
+   * derived dataset map, so datasets that are currently invalid are still
+   * checked. An invalid dataset keeps its config document, so it can still
+   * be left holding a dangling reference.
+   *
+   * @param dataset_uuid The dataset that is about to be deleted.
+   * @returns {Promise<Array<{dataset: string, structure: string}>>}
+   */
+  async find_referrers(dataset_uuid) {
+    const referrers = [];
+
+    for (const [structure, handler] of Object.entries(this.handlers)) {
+      const configs = await rx.firstValueFrom(this.cdb.search_app(structure));
+      if (!configs) continue;
+
+      for (const [uuid, config] of configs) {
+        if (uuid === dataset_uuid) continue;
+
+        if (handler.references(config, dataset_uuid))
+          referrers.push({ dataset: uuid, structure });
+      }
+    }
+
+    return referrers;
+  }
+
+  /** GET. Deletes a dataset.
+   *
+   * Refuses with 409 while another dataset still references this one, and
+   * returns the list of referrers so the caller can deal with them. See the
+   * comment below for why we refuse rather than rewrite the referrers.
+   */
   async delete_dataset(req, res){
     const dataset_uuid = req.params.uuid;
     if(!dataset_uuid) return fail(this.log, 422, `No req.params.uuid`);
     if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
-    
+
     const ok = await this.auth.check_acl(
       req.auth,
       Constants.Perm.DeleteDataset,
       dataset_uuid,
       true,
     );
-    
+
     if (!ok) return fail(this.log, 403, `You don't have DELETE permissions for ${dataset_uuid}`);
 
     this.log(`Delete dataset called by ${req.auth} for ${dataset_uuid}`);
 
-    // remove all subclass relationships before deleting
+    /* Refuse the delete while anything still points here.
+     *
+     * The alternative is to edit the referrers. We do not, for three
+     * reasons. The caller holds DeleteDataset on this dataset only, so
+     * editing other datasets would change data they may have no permission
+     * to touch. A UnionComponents list can lose one entry and still mean
+     * something, but a SessionLimits dataset is a time window over its
+     * source, so removing the source leaves a window over nothing and there
+     * is no sensible repair. And refusing writes nothing at all, so a failed
+     * delete cannot leave the graph half updated.
+     *
+     * Callers delete from the top down: remove the union or session first,
+     * then its components. */
+    const referrers = await this.find_referrers(dataset_uuid);
+
+    if (referrers.length > 0) {
+      this.log(`Refusing to delete ${dataset_uuid}: referenced by %o`, referrers);
+
+      return res.status(409).json({
+        error: "dataset_in_use",
+        dataset: dataset_uuid,
+        message: `Dataset ${dataset_uuid} is still referenced by ${referrers.length} other dataset(s). Delete or update them first.`,
+        referrers,
+      });
+    }
+
+    /* Remove the links this dataset owns. The handler knows which way round
+     * its links point: a union is the superclass of its components, a
+     * session is a subclass of its source. */
+    const datasets = await rx.firstValueFrom(this.data.datasets);
+    const dataset = datasets.get(dataset_uuid);
+
+    if (dataset?.config && this.handlers[dataset.structure]) {
+      await this.handlers[dataset.structure]
+        .remove_subclass_relationships(dataset_uuid, dataset.config);
+    }
+
+    // remove any remaining subclass relationships before deleting
     const subclasses = await this.cdb.class_direct_subclasses(dataset_uuid);
     if(subclasses){
       for(let s of subclasses){

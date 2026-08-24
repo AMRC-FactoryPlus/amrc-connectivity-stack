@@ -1,8 +1,5 @@
-import * as rx from "rxjs";
-
-import { retryBackoff } from "@amrc-factoryplus/rx-util";
-
 import {BaseStructureHandler} from './base-structure-handler.js';
+import { retry_cdb_write } from './retry.js';
 import { fail } from './utils.js';
 import { valid_uuid } from "./validate.js";
 import { DataAccess as Constants } from "./constants.js";
@@ -66,11 +63,12 @@ export class UnionComponentsHandler extends BaseStructureHandler {
 
   async create_subclass_relationships(datasetUuid, config) {
     for (const source of config) {
-      await rx.lastValueFrom(
-        rx.defer(() =>
-          this.cdb.class_add_subclass(datasetUuid, source)
-        ).pipe(retryBackoff(500, e => this.log(e)))
-      );
+      await retry_cdb_write({
+        log:      this.log,
+        dataset:  datasetUuid,
+        what:     `add subclass ${source} to ${datasetUuid}`,
+        op:       () => this.cdb.class_add_subclass(datasetUuid, source),
+      });
     }
   }
 
@@ -78,7 +76,12 @@ export class UnionComponentsHandler extends BaseStructureHandler {
     if(config.length <= 0) return;
 
     for (const src of config){
-      await this.cdb.class_remove_subclass(dataset_uuid, src);
+      await retry_cdb_write({
+        log:      this.log,
+        dataset:  dataset_uuid,
+        what:     `remove subclass ${src} from ${dataset_uuid}`,
+        op:       () => this.cdb.class_remove_subclass(dataset_uuid, src),
+      });
       this.log(`Removed ${dataset_uuid} from ${src} subclasses.`);
     }
   }

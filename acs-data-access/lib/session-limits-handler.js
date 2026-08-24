@@ -1,8 +1,5 @@
-import * as rx from "rxjs";
-
-import { retryBackoff } from "@amrc-factoryplus/rx-util";
-
 import {BaseStructureHandler} from './base-structure-handler.js';
+import { retry_cdb_write } from './retry.js';
 import { fail } from './utils.js';
 import { valid_uuid, valid_datetime } from "./validate.js";
 import { DataAccess as Constants } from "./constants.js";
@@ -70,15 +67,21 @@ export class SessionLimitsHandler extends BaseStructureHandler {
   }
 
   async create_subclass_relationships(dataset_uuid, config) {
-    await rx.lastValueFrom(
-      rx.defer(() =>
-        this.cdb.class_add_subclass(config.source, dataset_uuid)
-      ).pipe(retryBackoff(500, e => this.log(e)))
-    );
+    await retry_cdb_write({
+      log:      this.log,
+      dataset:  dataset_uuid,
+      what:     `add subclass ${dataset_uuid} to ${config.source}`,
+      op:       () => this.cdb.class_add_subclass(config.source, dataset_uuid),
+    });
   }
 
   async remove_subclass_relationships(dataset_uuid, config) {
-    await this.cdb.class_remove_subclass(config.source, dataset_uuid);
+    await retry_cdb_write({
+      log:      this.log,
+      dataset:  dataset_uuid,
+      what:     `remove subclass ${dataset_uuid} from ${config.source}`,
+      op:       () => this.cdb.class_remove_subclass(config.source, dataset_uuid),
+    });
     this.log(`Removed ${dataset_uuid} from ${config.source} subclasses.`)
   }
 }

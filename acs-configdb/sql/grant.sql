@@ -18,3 +18,8 @@ to :"role";
 grant usage on
     object_id_seq, config_id_seq
 to :"role";
+grant execute on function
+    is_class(integer),
+    class_subclasses(integer), class_members(integer),
+    class_has_subclass(integer, integer), class_has_member(integer, integer)
+to :"role";

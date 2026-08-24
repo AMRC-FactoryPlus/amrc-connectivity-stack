@@ -15,7 +15,7 @@ import { DB } from '@amrc-factoryplus/pg-client'
 import { App, Class, Perm, Service, SpecialObj } from './constants.js'
 import { SpecialApps } from './special.js'
 
-const DB_Version = 13;
+const DB_Version = 14;
 
 /* Well-known object IDs. This is cheating but it's stupid to keep
  * looking them up. */
@@ -219,15 +219,63 @@ export default class Model extends EventEmitter {
         `, [object]);
     }
 
-    _class_lookup (query, id, table) {
-        return _q_uuids(query, `
-            select distinct o.uuid
-            from ${table} k join object o on o.id = k.id
-            where k.class = $1
-        `, [id]);
+    /* The ids of a class and all its subclasses, as an array.
+     *
+     * Callers pass this to the database as an `integer[]` rather than
+     * as a subquery. A recursive CTE has no useful row estimate, so a
+     * subquery makes the planner hash the whole `membership` table; a
+     * literal array lets it use the (class, id) index. */
+    async _subclass_ids (query, id) {
+        const rows = await _q_set(query,
+            `select id from class_subclasses($1)`, [id]);
+        return rows.map(r => r.id);
     }
 
+    /* Look up one class relation for one class.
+     *
+     * The `all_*` views compute the whole class closure and cannot have
+     * a `where class = $1` predicate pushed into them, so reading them
+     * costs O(total objects) per call. The v14 functions walk the graph
+     * from the given class instead and return the same answers. See
+     * sql/v14.sql. */
+    async _class_lookup (query, id, table) {
+        switch (table) {
+        case "all_subclass":
+            return _q_uuids(query, `
+                select distinct o.uuid
+                from class_subclasses($1) k join object o on o.id = k.id
+            `, [id]);
+        case "all_membership": {
+            const classes = await this._subclass_ids(query, id);
+            if (!classes.length) return [];
+            return _q_uuids(query, `
+                select distinct o.uuid
+                from membership m join object o on o.id = m.id
+                where m.class = any($1::integer[])
+            `, [classes]);
+        }
+        default:
+            return _q_uuids(query, `
+                select distinct o.uuid
+                from ${table} k join object o on o.id = k.id
+                where k.class = $1
+            `, [id]);
+        }
+    }
+
+    /* Existence test for one class relation. For the `all_*` relations
+     * this walks up from the object rather than materialising the
+     * class's whole membership. */
     _class_has (query, klass, table, obj) {
+        const fn = {
+            all_subclass:   "class_has_subclass",
+            all_membership: "class_has_member",
+        }[table];
+
+        if (fn)
+            return query(`select ${fn}($1, $2) has`, [klass, obj])
+                .then(r => r.rows[0].has);
+
         return query(`
             select 1 from ${table} r
             where r.class = $1 and r.id = $2
@@ -544,15 +592,13 @@ export default class Model extends EventEmitter {
         });
     }
 
-    async class_has (klass, table, obj) {
-        const dbr = await this.db.query(`
-            select 1
-            from ${table} r
-                join object c on c.id = r.class
-                join object o on o.id = r.id
-            where c.uuid = $1 and o.uuid = $2
-        `, [klass, obj]);
-        return !!dbr.rows.length;
+    class_has (klass, table, obj) {
+        return this.db.txn({}, async query => {
+            const c_id = await this._class_id(query, klass);
+            const o_id = await this._obj_id(query, obj);
+            if (c_id == null || o_id == null) return false;
+            return this._class_has(query, c_id, table, o_id);
+        });
     }
 
     async _class_relation (klass, obj, perform) {
@@ -594,12 +640,13 @@ export default class Model extends EventEmitter {
                 throw "Individuals cannot be subclasses";
             if (c.rank != o.rank)
                 throw "Subclasses must match in rank";
+            /* Drop any superclass link on `obj` that `klass` already
+             * implies. Walking up from `klass` beats materialising
+             * `all_subclass`. */
             await q(`
                 delete from subclass r
-                using all_subclass s
-                where s.id = $1
-                    and s.class = r.class
-                    and r.id = $2
+                where r.id = $2
+                    and class_has_subclass(r.class, $1)
             `, [c.id, o.id]);
             await this._class_add(q, c.id, "subclass", o.id);
         });
@@ -638,15 +685,17 @@ export default class Model extends EventEmitter {
             if (app_id == null) return null;
             const class_id = await this._class_id(query, klass);
             if (class_id == null) return null;
+            const classes = await this._subclass_ids(query, class_id);
+            if (!classes.length) return [];
 
             return _q_uuids(query, `
                 select o.uuid
                 from config c
                     join object o on o.id = c.object
-                    join all_membership m on m.id = c.object
+                    join membership m on m.id = c.object
                 where c.app = $1
-                    and m.class = $2
-            `, [app_id, class_id]);
+                    and m.class = any($2::integer[])
+            `, [app_id, classes]);
         });
     }
 
@@ -855,15 +904,21 @@ export default class Model extends EventEmitter {
             if (a_id === undefined || c_id === undefined)
                 return [];
 
-            return await this._do_config_search(q, c_id, a_id, where, select);
+            /* Expand the class to its subclasses once, and pass the ids
+             * down as an array. See `_subclass_ids`. */
+            const c_ids = c_id == null
+                ? null : await this._subclass_ids(q, c_id);
+            if (c_ids && !c_ids.length) return [];
+
+            return await this._do_config_search(q, c_ids, a_id, where, select);
         });
     }
 
-    async _do_config_search(query, klass, app, where, select) {
-        const k_join = klass ? `join all_membership m on m.id = o.id` : "";
-        const k_whre = klass ? `and m.class = $4` : "";
+    async _do_config_search(query, classes, app, where, select) {
+        const k_join = classes ? `join membership m on m.id = o.id` : "";
+        const k_whre = classes ? `and m.class = any($4::integer[])` : "";
         const bind = [app, where, select];
-        if (klass) bind.push(klass);
+        if (classes) bind.push(classes);
 
         return _q_set(query, `
             with results as (

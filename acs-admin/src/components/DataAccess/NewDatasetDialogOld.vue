@@ -1,6 +1,6 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2026.
-  -->
+- Copyright (c) University of Sheffield AMRC 2026.
+-->
 
 <template>
   <Dialog :open="isOpen" @update:open="handle_open">

@@ -11,10 +11,10 @@ plus Docker, `kubectl`, and `helm`.
    ```sh
    devcontainer up --workspace-folder .
    ```
-2. First build runs `onCreateCommand` (installs Kerberos headers, build
-   tools, and a JDK/Maven via `apt-get`) and `postCreateCommand` (`npm
-   install` in `lib/`, which other subdirs depend on per the top-level
-   `Makefile`). Each individual service still needs its own `npm install`
+2. First build runs `onCreateCommand`, which installs Kerberos headers,
+   build tools, and a JDK/Maven via `apt-get`. Run `npm install` in `lib/`
+   yourself afterwards - other subdirs depend on it per the top-level
+   `Makefile`. Each individual service still needs its own `npm install`
    before you work on it - the container doesn't bootstrap every service.
 3. Optional: set up kubeconfig access (see below) if you want
    `kubectl`/`helm` in the container to reach your existing clusters.

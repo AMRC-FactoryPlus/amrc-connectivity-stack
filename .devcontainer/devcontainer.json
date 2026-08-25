@@ -42,21 +42,21 @@
   },
 
   "mounts": [
-    // Optionally shares a kubeconfig directory from your host into the
+    // Optionally shares a single kubeconfig file from your host into the
     // container, so `kubectl`/`helm` can talk to your existing clusters.
     // Set KUBE_HOST_DIR in .devcontainer/devcontainer.env (gitignored,
-    // not checked in - see devcontainer.env.example) to the .kube
-    // directory (or a curated subset of it) you want mounted.
+    // not checked in - see devcontainer.env.example) to the absolute path
+    // of the kubeconfig yaml file you want mounted.
     //
-    // If KUBE_HOST_DIR isn't set, this falls back to /tmp: devcontainer.json
-    // variable substitution doesn't support a *dynamic* default (nesting
-    // another ${...} inside the default value breaks - verified against
-    // @devcontainers/cli, it mis-parses at the inner closing brace), so we
-    // can't fall back to "your real ~/.kube" automatically. /tmp always
-    // exists, so this is a harmless no-op mount rather than a build
-    // failure - kubectl/helm simply won't find a config and behave as if
-    // none was mounted.
-    "source=${localEnv:KUBE_HOST_DIR:/tmp},target=/home/node/.kube,type=bind"
+    // If KUBE_HOST_DIR isn't set, this falls back to /dev/null:
+    // devcontainer.json variable substitution doesn't support a *dynamic*
+    // default (nesting another ${...} inside the default value breaks -
+    // verified against @devcontainers/cli, it mis-parses at the inner
+    // closing brace), so we can't fall back to "your real ~/.kube/config"
+    // automatically. /dev/null always exists, so this is a harmless no-op
+    // mount rather than a build failure - kubectl/helm see an empty config
+    // file and behave as if none was mounted.
+    "source=${localEnv:KUBE_HOST_DIR:/dev/null},target=/home/node/.kube/config,type=bind"
   ],
   "containerEnv": {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"

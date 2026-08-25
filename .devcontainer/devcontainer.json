@@ -1,0 +1,86 @@
+{
+  "name": "amrc-connectivity-stack",
+
+  // Node/TS/Vue is the dominant language mix, so use the Node dev container
+  // image as the base and layer on everything else as features.
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
+
+  "features": {
+    // Lets you `docker build` the component images and run `make` targets
+    // that shell out to Docker from inside the container.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
+
+    // ACS ships as a Helm chart onto Kubernetes; this gives you kubectl
+    // and helm. Minikube is skipped - see the kubeconfig mount below for
+    // connecting to a real cluster instead.
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    },
+
+    // Some tooling/scripts in the repo are Python.
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+
+    // lib/rs-edge-driver is a Rust crate (edition 2024).
+    "ghcr.io/devcontainers/features/rust:1": {},
+
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true
+    },
+
+    // Installs the Claude Code CLI (and the VS Code extension, when opened
+    // in VS Code). This version tag pins the installer script, not the
+    // Claude Code release — it always installs latest and auto-updates.
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  "mounts": [
+    // Optionally shares a kubeconfig directory from your host into the
+    // container, so `kubectl`/`helm` can talk to your existing clusters.
+    // Set KUBE_HOST_DIR in .devcontainer/devcontainer.env (gitignored,
+    // not checked in - see devcontainer.env.example) to the .kube
+    // directory (or a curated subset of it) you want mounted.
+    //
+    // If KUBE_HOST_DIR isn't set, this falls back to /tmp: devcontainer.json
+    // variable substitution doesn't support a *dynamic* default (nesting
+    // another ${...} inside the default value breaks - verified against
+    // @devcontainers/cli, it mis-parses at the inner closing brace), so we
+    // can't fall back to "your real ~/.kube" automatically. /tmp always
+    // exists, so this is a harmless no-op mount rather than a build
+    // failure - kubectl/helm simply won't find a config and behave as if
+    // none was mounted.
+    "source=${localEnv:KUBE_HOST_DIR:/tmp},target=/home/node/.kube,type=bind"
+  ],
+  "containerEnv": {
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+
+  // Several @amrc-factoryplus packages have native (node-gyp) dependencies
+  // that need Kerberos headers to build, plus GSSAPI tooling used at
+  // runtime by the service clients.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends libkrb5-dev krb5-user build-essential openjdk-17-jdk-headless maven",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [],
+      "settings": {
+        "files.eol": "\n"
+      }
+    }
+  },
+
+  // Handy inside-container ports if you're running any of the ACS services
+  // or their web UIs locally for development. 5173 is acs-admin's Vite
+  // dev server (default port, unconfigured in vite.config.js); 3000 is
+  // the common default for the Node service APIs.
+  "forwardPorts": [3000, 5173],
+
+  "remoteUser": "node"
+}

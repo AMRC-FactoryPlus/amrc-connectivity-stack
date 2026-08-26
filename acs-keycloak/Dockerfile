@@ -8,14 +8,6 @@
 #   * lib  -> ../lib (provides java-base-pom and the in-tree mvn repo)
 #   * spi  -> ../acs-keycloak-spi (the SPI source tree)
 
-# 26.6.3: first line we ship with pgjdbc >= 42.7.5, fixing the
-# GSSInputStream partial-read bug (pgjdbc #3373) that corrupts GSS
-# encrypted Postgres streams under unlucky TCP segmentation, seen as
-# "Could not use AES128 Cipher - Checksum failed" crash loops on
-# amrc-fp. Also covers pgjdbc CVE-2025-49146.
-# 26.7.2: fixes CVE-2026-18963, a critical (CVSS 9.1) auth bypass in
-# the reset-credentials flow that lets an unauthenticated attacker set
-# a new password on any account without completing email verification.
 ARG keycloak_version=26.7.2
 ARG maven_image=docker.io/library/maven:3.9-eclipse-temurin-21
 ARG revision=unknown

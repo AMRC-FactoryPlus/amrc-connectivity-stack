@@ -14,6 +14,7 @@ import type { ObjectTree } from "./object-tree.js";
 import type { ValueCache } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
+import type { DatasetStore } from "./datasets.js";
 import validator from 'validator';
 
 interface APIv1Opts {
@@ -21,6 +22,8 @@ interface APIv1Opts {
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
+    /** Data Access datasets served as i3X objects (optional). */
+    datasets?: DatasetStore;
     /**
      * Server-imposed cap on composition `maxDepth`. 0 means no cap
      * (default). When set, requests for a deeper traversal are
@@ -67,6 +70,7 @@ export class APIv1 {
     private valueCache: ValueCache;
     private history: History;
     private subscriptions: SubscriptionManager;
+    private datasets: DatasetStore | null;
     private maxDepthCap: number;
 
     /**
@@ -77,6 +81,7 @@ export class APIv1 {
         this.valueCache = opts.valueCache;
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
+        this.datasets = opts.datasets ?? null;
         this.maxDepthCap = opts.maxDepthCap ?? 0;
 
         this.routes = Router();
@@ -135,11 +140,11 @@ export class APIv1 {
         api.post("/objects/list", this.list_objects.bind(this));
         api.post("/objects/value", asyncHandler(this.value_objects.bind(this)));
         api.post("/objects/history", asyncHandler(this.history_objects.bind(this)));
-        api.post("/objects/related", this.related_objects.bind(this));
+        api.post("/objects/related", asyncHandler(this.related_objects.bind(this)));
 
         api.get("/objects/:elementId/value", asyncHandler(this.get_object_value.bind(this)));
         api.get("/objects/:elementId/history", asyncHandler(this.get_object_history.bind(this)));
-        api.get("/objects/:elementId/related", this.get_object_related.bind(this));
+        api.get("/objects/:elementId/related", asyncHandler(this.get_object_related.bind(this)));
         api.get("/objects/:elementId", this.get_object.bind(this));
 
         /* ---- Subscriptions ---- */
@@ -199,14 +204,33 @@ export class APIv1 {
      **/
     get_object_types(req: Request, res: Response): void {
         const ns = req.query.namespaceUri as string | undefined;
-        res.json(this.objectTree.getObjectTypes(ns));
+        const types = this.objectTree.getObjectTypes(ns);
+        if (this.datasets) {
+            const dt = this.datasets.getObjectType();
+            if (ns === undefined || dt.namespaceUri === ns) types.push(dt);
+        }
+        res.json(types);
+    }
+
+    /** ObjectType lookup across the device tree and the dataset store. */
+    private lookupObjectType(elementId: string) {
+        const t = this.objectTree.getObjectType(elementId);
+        if (t) return t;
+        const dt = this.datasets?.getObjectType();
+        return dt?.elementId === elementId ? dt : undefined;
+    }
+
+    /** Object lookup across the device tree and the dataset store. */
+    private lookupObject(elementId: string) {
+        return this.objectTree.getObject(elementId)
+            ?? this.datasets?.getObject(elementId);
     }
 
     /**
      * GET /objecttypes/:elementId — returns one object type, or 404 if unknown.
      **/
     get_object_type(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getObjectType(req.params.elementId);
+        const result = this.lookupObjectType(req.params.elementId);
         if (!result) return next(notFound(`Object type ${req.params.elementId} not found`));
         res.json(result);
     }
@@ -221,7 +245,7 @@ export class APIv1 {
     query_object_types(req: Request, res: Response): void {
         const { elementIds } = req.body;
         const results = (elementIds as string[]).map(id => {
-            const item = this.objectTree.getObjectType(id);
+            const item = this.lookupObjectType(id);
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
@@ -270,11 +294,16 @@ export class APIv1 {
      * GET /objects — lists objects with optional `typeElementId`, `root`, and `includeMetadata` filters.
      **/
     get_objects(req: Request, res: Response): void {
-        res.json(this.objectTree.getObjects({
+        const filter = {
             typeElementId: req.query.typeElementId as string | undefined,
             root: req.query.root === "true",
+        };
+        const objects = this.objectTree.getObjects({
+            ...filter,
             includeMetadata: req.query.includeMetadata === "true",
-        }));
+        });
+        if (this.datasets) objects.push(...this.datasets.getObjects(filter));
+        res.json(objects);
     }
 
     /**
@@ -285,7 +314,7 @@ export class APIv1 {
     list_objects(req: Request, res: Response): void {
         const { elementIds, includeMetadata } = req.body;
         const results = (elementIds as string[]).map(id => {
-            const item = this.objectTree.getObject(id);
+            const item = this.lookupObject(id);
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
@@ -308,6 +337,12 @@ export class APIv1 {
         const { elementIds, maxDepth } = req.body;
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
         const results = await Promise.all((elementIds as string[]).map(async (id) => {
+            // Datasets: the value is a descriptor built from the ConfigDB
+            if (this.datasets?.has(id)) {
+                const item = await this.datasets.getValue(id);
+                if (item) return { success: true, elementId: id, result: item };
+                return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
+            }
             // Try UNS cache first (real-time), fall back to InfluxDB last()
             const cached = this.valueCache.getValue(id);
             if (cached) {
@@ -348,6 +383,12 @@ export class APIv1 {
         const results = await Promise.all(
             (elementIds as string[]).map(async id => {
                 try {
+                    if (this.datasets?.has(id)) {
+                        throw Object.assign(new Error(
+                            "Dataset contents are not served over history; "
+                            + "fetch the content href from the dataset's value"),
+                            { status: 404 });
+                    }
                     const values = await this.history.queryHistory(id, startTime, endTime, maxDepth);
                     return { success: true, elementId: id, result: { elementId: id, values } };
                 } catch (err: any) {
@@ -364,16 +405,20 @@ export class APIv1 {
      * filtered by `relationshiptype`. Per-id success/error envelope:
      * missing ids are reported as failures.
      */
-    related_objects(req: Request, res: Response): void {
+    async related_objects(req: Request, res: Response): Promise<void> {
         const { elementIds, relationshiptype } = req.body;
-        const results = (elementIds as string[]).map(id => {
+        const results = await Promise.all((elementIds as string[]).map(async id => {
+            if (this.datasets?.has(id)) {
+                const related = await this.datasets.getRelated(id, relationshiptype);
+                return { success: true, elementId: id, result: related ?? [] };
+            }
             const obj = this.objectTree.getObject(id);
             if (!obj) {
                 return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
             }
             const related = this.objectTree.getRelated(id, relationshiptype);
             return { success: true, elementId: id, result: related };
-        });
+        }));
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
     }
@@ -386,6 +431,13 @@ export class APIv1 {
      */
     async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
         const id = req.params.elementId;
+        // Datasets: the value is a descriptor built from the ConfigDB
+        if (this.datasets?.has(id)) {
+            const result = await this.datasets.getValue(id);
+            if (!result) return next(notFound(`No value for ${id}`));
+            res.json(result);
+            return;
+        }
         const obj = this.objectTree.getObject(id);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
         const cached = this.valueCache.getValue(id);
@@ -415,6 +467,11 @@ export class APIv1 {
         if (!startTime || !endTime) {
             return next(badRequest("startTime and endTime query parameters are required"));
         }
+        if (this.datasets?.has(req.params.elementId)) {
+            return next(notFound(
+                "Dataset contents are not served over history; "
+                + "fetch the content href from the dataset's value"));
+        }
         const values = await this.history.queryHistory(req.params.elementId, startTime, endTime);
         res.json({ elementId: req.params.elementId, values });
     }
@@ -422,18 +479,23 @@ export class APIv1 {
     /**
      * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
      **/
-    get_object_related(req: Request, res: Response, next: NextFunction): void {
-        const obj = this.objectTree.getObject(req.params.elementId);
-        if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
+    async get_object_related(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const id = req.params.elementId;
         const rt = req.query.relationshiptype as string | undefined;
-        res.json(this.objectTree.getRelated(req.params.elementId, rt));
+        if (this.datasets?.has(id)) {
+            res.json(await this.datasets.getRelated(id, rt) ?? []);
+            return;
+        }
+        const obj = this.objectTree.getObject(id);
+        if (!obj) return next(notFound(`Object ${id} not found`));
+        res.json(this.objectTree.getRelated(id, rt));
     }
 
     /**
      * GET /objects/:elementId — returns one object, or 404 if unknown.
      **/
     get_object(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getObject(req.params.elementId);
+        const result = this.lookupObject(req.params.elementId);
         if (!result) return next(notFound(`Object ${req.params.elementId} not found`));
         res.json(result);
     }

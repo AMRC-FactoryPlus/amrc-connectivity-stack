@@ -10,7 +10,7 @@ import * as rx from "rxjs";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, valid_datetime } from "./validate.js";
-import { fail, csv_escape, maxDate, minDate } from './utils.js';
+import { fail, maxDate, minDate } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
@@ -55,6 +55,12 @@ export class APIv1 {
     api.route("/structure/:uuid")
       .get(this.structure_uuid.bind(this))
       .put(this.structure_update.bind(this));
+
+    api.route("/union-sources")
+      .get(this.union_sources_list.bind(this));
+
+    api.route("/session-sources")
+      .get(this.session_sources_list.bind(this));
 
     api.route("/delete/:uuid")
       .get(this.delete_dataset.bind(this));
@@ -260,20 +266,14 @@ export class APIv1 {
             `attachment; filename="${dataset_uuid}.csv"`
         );
 
-        const zipStream = this.influxReader.exportDevices(resolved_sources, meta);
+        const csvStream = this.influxReader.exportDevices(resolved_sources, meta);
 
+        csvStream.on("error", err => {
+            this.log(err);
+            res.destroy(err);
+        });
 
-        res.setHeader(
-          "Content-Type",
-          "application/zip"
-        );
-
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename=${dataset_uuid}.zip`
-        );
-
-        zipStream.pipe(res);
+        csvStream.pipe(res);
 
        }catch (err) {
         this.log(err);
@@ -291,6 +291,26 @@ export class APIv1 {
    */
   async structure_list(req, res){
     const uuids = await rx.firstValueFrom(this.data.allowed_all_dataset_uuids(req.auth, Constants.Perm.EditDataset));
+    return res.status(200).json(uuids);
+  }
+
+  /** GET. Returns a list of valid Dataset UUIDs the client has INCLUDE_IN_UNION
+   * access to, i.e. those datasets the client is permitted to embed as a
+   * component of a Union dataset. This is a distinct permission from
+   * READ_DATASET/EDIT_DATASET visibility.
+   */
+  async union_sources_list(req, res){
+    const uuids = await rx.firstValueFrom(this.data.allowed_valid_dataset_uuids(req.auth, Constants.Perm.IncludeInUnion));
+    return res.status(200).json(uuids);
+  }
+
+  /** GET. Returns a list of valid Dataset UUIDs the client has USE_FOR_SESSION
+   * access to, i.e. those datasets the client is permitted to use as the
+   * source of a Session dataset. This is a distinct permission from
+   * READ_DATASET/EDIT_DATASET visibility.
+   */
+  async session_sources_list(req, res){
+    const uuids = await rx.firstValueFrom(this.data.allowed_valid_dataset_uuids(req.auth, Constants.Perm.UseForSession));
     return res.status(200).json(uuids);
   }
 
@@ -376,7 +396,6 @@ export class APIv1 {
       structure,
       true
     );
-
     if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
     const dataset_uuid = await this._update_dataset_config(

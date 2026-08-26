@@ -53,6 +53,7 @@ import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 import Files from "@pages/Files/Files.vue";
 import Bridges from "@pages/Bridges/Bridges.vue";
 import ISA95 from "@pages/ISA95/ISA95.vue";
+import DataAccess from '@pages/DataAccess/DataAccess.vue';
 
 // Create an event bus
 window.events = mitt()
@@ -234,6 +235,14 @@ const routes = [
       name: 'Schemas',
       icon: 'shapes',
       schemaMode: 'schema'
+    }
+  },
+  {
+    path: '/data-access',
+    component: DataAccess,
+    meta: {
+      name: 'Data Access',
+      icon: 'database'
     }
   }
 ]

@@ -11,9 +11,12 @@
         <AlertDialogDescription>
           {{message}}
         </AlertDialogDescription>
+        <ul v-if="details && details.length" class="mt-2 space-y-1 text-sm list-disc list-inside text-left">
+          <li v-for="(item, i) in details" :key="i">{{ item }}</li>
+        </ul>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel @click="cancel">{{cancelText}}</AlertDialogCancel>
+        <AlertDialogCancel v-if="!hideCancel" @click="cancel">{{cancelText}}</AlertDialogCancel>
         <AlertDialogAction @click="confirm">{{confirmText}}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -54,6 +57,14 @@ export default {
     cancelText: {
       type: String,
       default: 'Cancel',
+    },
+    details: {
+      type: Array,
+      default: () => [],
+    },
+    hideCancel: {
+      type: Boolean,
+      default: false,
     },
     onConfirm: {
       type: Function,

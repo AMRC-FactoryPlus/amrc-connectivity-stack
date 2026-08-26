@@ -1,7 +1,10 @@
-import { ZipArchive } from "archiver";
 import { PassThrough } from "stream";
 import { once } from "events";
 import pLimit from "p-limit";
+
+import { csv_escape, strip_metric_suffix } from "./utils.js";
+
+const CSV_HEADER = "device,metric,timestamp,value,unit";
 
 export class InfluxReader {
     constructor(opts) {
@@ -18,57 +21,44 @@ export class InfluxReader {
         this.limit = pLimit(4);
     }
 
+    /** Combines the resolved device sources of a dataset into a single CSV
+     * stream with columns device, metric, timestamp, value, unit - see the
+     * @returns doc on APIv1#dataset_data.
+     */
     exportDevices(deviceSources, meta = {}) {
-        const archive = new ZipArchive({
-            zlib: {
-                level: 0,
-            },
+        const csvStream = new PassThrough({
+            highWaterMark: 1024 * 1024,
         });
 
-        archive.on("warning", err => {
-            this.log("archive warning", err);
+        csvStream.on("error", err => {
+            this.log("csv export error", err);
         });
 
-        archive.on("error", err => {
-            this.log("archive error", err);
-            archive.destroy(err);
-        });
-
-        this.#appendDevices(
-            archive,
+        this.#writeDevices(
+            csvStream,
             deviceSources,
             meta
         ).catch(err => {
-            archive.destroy(err);
+            csvStream.destroy(err);
         });
 
-        return archive;
+        return csvStream;
     }
 
-    async #appendDevices(archive, deviceSources, meta) {
-        for (const source of deviceSources) {
-            await this.limit(() =>
-                new Promise((resolve, reject) => {
-                    const csvStream = new PassThrough({
-                        highWaterMark: 1024 * 1024,
-                    });
+    async #writeDevices(writable, deviceSources, meta) {
+        await this.#write(writable, CSV_HEADER + "\n");
 
-                    archive.append(csvStream, {
-                        name: `${source.device_uuid}.csv`,
-                    });
+        await Promise.all(
+            deviceSources.map(source =>
+                this.limit(() =>
+                    this.#streamDevice(source, writable, meta)
+                )
+            )
+        );
 
-                    this.#streamDevice(source, csvStream, meta)
-                        .then(resolve)
-                        .catch(reject);
-                })
-            );
-        }
+        writable.end();
 
-        await new Promise((resolve, reject) => {
-            archive.once("error", reject);
-            archive.once("close", resolve);
-            archive.finalize();
-        });
+        await once(writable, "finish");
     }
 
     async #streamDevice(
@@ -90,32 +80,26 @@ export class InfluxReader {
         const response =
             this.influx_query_api.response(query);
 
-        try {
-            for await (
-                const chunk of response.iterateLines()
-            ) {
-                if (
-                    !writable.write(
-                        chunk + "\n"
-                    )
-                ) {
-                    await once(
-                        writable,
-                        "drain"
-                    );
-                }
-            }
+        for await (
+            const row of response.iterateRows()
+        ) {
+            const o = row.tableMeta.toObject(row.values);
 
-            writable.end();
+            const line = [
+                csv_escape(o.device),
+                csv_escape(strip_metric_suffix(o._measurement)),
+                csv_escape(o._time),
+                csv_escape(o._value),
+                csv_escape(o.unit),
+            ].join(",");
 
-            await once(
-                writable,
-                "finish"
-            );
+            await this.#write(writable, line + "\n");
         }
-        catch (err) {
-            writable.destroy(err);
-            throw err;
+    }
+
+    async #write(writable, chunk) {
+        if (!writable.write(chunk)) {
+            await once(writable, "drain");
         }
     }
 

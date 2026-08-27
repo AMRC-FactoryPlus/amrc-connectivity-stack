@@ -203,14 +203,33 @@ the structural app the way `POST` does.
 ### `GET v1/delete/:uuid`
 
 Deletes a dataset. Note this is a `GET`, not a `DELETE`, request.
-Requires `Delete dataset` on `:uuid`. Before deleting the ConfigDB
-object, it removes every direct subclass relationship in which this
-dataset is the *superclass* (e.g. session/union children recorded
-against it). It does **not** clean up relationships in which this
-dataset is itself a subclass — e.g. a session's link to its source, or
-a union's link to its members — so other structural configs can be left
-referencing a UUID that no longer exists. Returns the deleted UUID as a
-JSON string, or an empty string if the dataset didn't exist.
+Requires `Delete dataset` on `:uuid`.
+
+The delete is refused with `409 Conflict` while any other dataset still
+points at this one, that is while a `Union components` list contains it
+or a `Session limits` config names it as its `source`. The response body
+lists the referrers:
+
+```json
+{
+  "error": "dataset_in_use",
+  "dataset": "<uuid>",
+  "message": "...",
+  "referrers": [ { "dataset": "<uuid>", "structure": "<app uuid>" } ]
+}
+```
+
+Nothing is written when the delete is refused. Delete from the top of
+the graph down: remove the union or session first, then its components.
+Invalid datasets are checked too, because they keep their config
+documents.
+
+When there are no referrers, the service removes the subclass
+relationships this dataset owns in both directions. That covers the
+links where the dataset is the superclass (a union's members) and the
+links where it is the subclass (a session's link to its source). It then
+deletes the ConfigDB object. Returns the deleted UUID as a JSON string,
+or an empty string if the dataset didn't exist.
 
 ## Permissions
 

@@ -384,10 +384,10 @@ export class Metrics {
  * This function expects an array of objects and uses the metric's path to extract values
  * @param payload The JSON array payload to process
  * @param metric The metric to use for processing (including path configuration)
- * @returns An array of objects with value and timestamp properties
+ * @returns An array of objects with value, timestamp and timestampNs properties
  */
-export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number }[] {
-    const results: { value: any, timestamp?: number }[] = [];
+export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetric): { value: any, timestamp?: number, timestampNs?: bigint }[] {
+    const results: { value: any, timestamp?: number, timestampNs?: bigint }[] = [];
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
 
     // Validate that payload is an array
@@ -447,7 +447,19 @@ export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetri
             }
         }
 
-        results.push({ value, timestamp });
+        // Extract a nanosecond-precision timestamp if available. As with
+        // parseNsTimestampFromPayload, this must be a numeric string (not a
+        // number) to avoid float64 precision loss.
+        let timestampNs: bigint | undefined;
+        if (item.timestampNs != null) {
+            try {
+                timestampNs = BigInt(item.timestampNs);
+            } catch {
+                log(`JSON (Batched) payload item ${index} has invalid timestampNs: ${item.timestampNs}`);
+            }
+        }
+
+        results.push({ value, timestamp, timestampNs });
     });
 
     return results;

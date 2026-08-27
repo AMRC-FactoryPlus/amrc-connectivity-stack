@@ -376,7 +376,7 @@ export class Device {
 
                             // Create a metric for each item in the batch
                             batchResults.forEach(result => {
-                                const { value, timestamp } = result;
+                                const { value, timestamp, timestampNs } = result;
 
                                 // Test if the value is a bigint and convert it to a Long
                                 let processedValue = value;
@@ -386,9 +386,11 @@ export class Device {
 
                                 // If it has a sensible value and is different from the current value
                                 if ((processedValue || processedValue === 0) && (metric.value !== processedValue)) {
-                                    // Create a copy of the metric with the new value and timestamp
+                                    // Create a copy of the metric with the new value and timestamp.
+                                    // timestampNs takes precedence for sub-ms precision, same as
+                                    // the non-batched JSON path.
                                     const updatedMetric = {
-                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue, timestamp || Date.now())
+                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue, timestamp || Date.now(), timestampNs)
                                     };
 
                                     // Add to the list of changed metrics

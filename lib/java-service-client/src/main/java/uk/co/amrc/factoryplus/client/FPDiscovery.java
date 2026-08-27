@@ -6,6 +6,7 @@
 package uk.co.amrc.factoryplus.client;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -21,12 +22,14 @@ import io.reactivex.rxjava3.core.*;
 
 import uk.co.amrc.factoryplus.http.*;
 
-/* XXX The JS client performs a (cached) fetch every time, with a Map of
- * overrides. This client caches the responses from the Directory
- * indefinitely, which is definitely incorrect. However, we perform
- * not-entirely-trivial processing on the response, so even if there
- * will be no network activity I would like to know that I got a 304 and
- * can reuse the existing derived value... */
+/* Responses from the Directory are cached for a limited time, after
+ * which they are refetched on the next request. If the refetch fails
+ * the stale value is used, so a Directory outage does not break
+ * services which already know where to go. Empty responses and errors
+ * are never cached; previously a failed lookup was cached as an empty
+ * set indefinitely, which left long-running services (notably the MQTT
+ * broker auth plugin) permanently broken if they started up while the
+ * Directory was unavailable. */
 
 /** Service discovery.
  *
@@ -36,12 +39,15 @@ import uk.co.amrc.factoryplus.http.*;
 public class FPDiscovery {
     private static final Logger log = LoggerFactory.getLogger(FPDiscovery.class);
 
+    private static final Duration CACHE_EXPIRY = Duration.ofMinutes(5);
+
     private RequestCache<UUID, Set<URI>> cache;
 
     public FPDiscovery (FPServiceClient fplus)
     {
         var dir = fplus.directory();
-        this.cache = new RequestCache<UUID, Set<URI>>(dir::getServiceURLs);
+        this.cache = new RequestCache<UUID, Set<URI>>(dir::getServiceURLs,
+            CACHE_EXPIRY, urls -> !urls.isEmpty());
 
         var url = fplus.getUriConf("directory_url");
         log.info("Using Directory {}", url);

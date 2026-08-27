@@ -74,6 +74,9 @@ export default class MQTTCli {
 
         this.seq = 0;
 
+        /* Keyed by Address.toString(). Address has no value semantics,
+         * so Sets and Maps must never be keyed on the object itself;
+         * they compare by reference and would never match. */
         this.online = new Set();
         this.rebirths = {
             pending: {},
@@ -296,6 +299,10 @@ export default class MQTTCli {
 
     async on_session_notify(id) {
         const session = await this.model.session_notification_info(id);
+        /* The session may have been pruned between the notification
+         * being queued and us getting to it. Nothing to announce. */
+        if (session == null) return;
+
         const schemas = await this.model.session_schemas(id);
 
         const notify = [];
@@ -321,6 +328,18 @@ export default class MQTTCli {
 
         if (notify.length)
             this.publish_changed(notify);
+
+        /* Now the change-notify is out, and we have read the schemas of
+         * the session this one replaced, the history for this device is
+         * no longer needed. Only prune from the current session, so we
+         * do this once per birth rather than once per notification. */
+        if (session.next_for_device == null) {
+            const pruned = await this.model
+                .prune_device_sessions(session.devid);
+            if (pruned)
+                this.log("device",
+                    `Pruned ${pruned} old session(s) for ${session.device}`);
+        }
     }
 
     async on_service_notify(id) {
@@ -446,7 +465,7 @@ export default class MQTTCli {
 
     async on_birth(address, payload) {
         this.log("device", `Registering BIRTH for ${address}`);
-        this.online.add(address);
+        this.online.add(address.toString());
 
         let tree;
         if (payload.uuid === UUIDs.FactoryPlus) {
@@ -478,8 +497,8 @@ export default class MQTTCli {
 
         this.log("device", `Registering DEATH for ${address}`);
 
-        this.alerts.delete(address);
-        this.online.delete(address);
+        this.alerts.delete(address.toString());
+        this.online.delete(address.toString());
         await this.model.death({address, time});
 
         this.log("device", `Finished DEATH for ${address}`);
@@ -546,7 +565,7 @@ export default class MQTTCli {
          * rebirth any device we haven't seen a birth for, even if the
          * database says it's online. This is important because we might
          * have the wrong schema information. */
-        if (this.online.has(addr) || pending[addr]) return false;
+        if (this.online.has(addr.toString()) || pending[addr]) return false;
 
         /* Mark that we're working on this device and wait 5-10s to see if
          * it rebirths on its own. */
@@ -555,7 +574,7 @@ export default class MQTTCli {
 
         /* Clear our marker first so we retry next time */
         delete (pending[addr]);
-        if (this.online.has(addr)) return false;
+        if (this.online.has(addr.toString())) return false;
 
         sent[addr] = Date.now();
         return true;

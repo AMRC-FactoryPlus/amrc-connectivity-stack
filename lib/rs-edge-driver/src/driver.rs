@@ -28,29 +28,33 @@ const POLL_TIMEOUT: Duration = Duration::from_secs(30);
 /// [`publish`](DriverHandle::publish) whenever new data arrives
 /// from the device.
 #[derive(Clone)]
-pub struct DriverHandle {
-    tx: mpsc::UnboundedSender<DriverEvent>,
+pub struct DriverHandle<A> {
+    tx: mpsc::UnboundedSender<DriverEvent<A>>,
 }
 
 /// Internal events sent from the handler back to the driver loop.
-pub(crate) enum DriverEvent {
+pub(crate) enum DriverEvent<A> {
     /// Handler is publishing data for an address.
-    Data { topic: String, payload: Bytes },
+    Data { addr: A, payload: Bytes },
 }
 
-impl DriverHandle {
-    pub(crate) fn new(tx: mpsc::UnboundedSender<DriverEvent>) -> Self {
+impl<A> DriverHandle<A> {
+    pub(crate) fn new(tx: mpsc::UnboundedSender<DriverEvent<A>>) -> Self {
         Self { tx }
     }
 
-    /// Publish data for a topic back to the edge agent.
+    /// Publish data for an address back to the edge agent.
     ///
     /// Used by async handlers from within their [`subscribe`](crate::Handler::subscribe)
-    /// callbacks. The topic should match one of the address topics
-    /// configured by the edge agent.
-    pub fn publish(&self, topic: impl Into<String>, data: Bytes) {
+    /// callbacks. Pass the same address (as returned from
+    /// [`parse_addr`](crate::Handler::parse_addr)) that the data came
+    /// from — the driver resolves it to the data topic name the edge
+    /// agent assigned. Data for an address the edge agent isn't
+    /// currently interested in (e.g. after reconfiguration) is
+    /// silently dropped.
+    pub fn publish(&self, addr: A, data: Bytes) {
         let _ = self.tx.send(DriverEvent::Data {
-            topic: topic.into(),
+            addr,
             payload: data,
         });
     }
@@ -138,14 +142,14 @@ impl<H: Handler + 'static> Driver<H> {
             "driver starting"
         );
 
-        let (tx, mut rx) = mpsc::unbounded_channel::<DriverEvent>();
+        let (tx, mut rx) = mpsc::unbounded_channel::<DriverEvent<H::Addr>>();
         self.run_loop(&tx, &mut rx).await
     }
 
     async fn run_loop(
         &mut self,
-        tx: &mpsc::UnboundedSender<DriverEvent>,
-        rx: &mut mpsc::UnboundedReceiver<DriverEvent>,
+        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
+        rx: &mut mpsc::UnboundedReceiver<DriverEvent<H::Addr>>,
     ) -> Result<(), Error> {
         loop {
             tracing::info!("connecting to MQTT broker");
@@ -174,8 +178,8 @@ impl<H: Handler + 'static> Driver<H> {
     /// Run a single MQTT session. Returns when the connection is lost.
     async fn mqtt_session(
         &mut self,
-        tx: &mpsc::UnboundedSender<DriverEvent>,
-        rx: &mut mpsc::UnboundedReceiver<DriverEvent>,
+        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
+        rx: &mut mpsc::UnboundedReceiver<DriverEvent<H::Addr>>,
     ) -> Result<(), Error> {
         let (client, mut eventloop) = self.connect_mqtt()?;
 
@@ -355,7 +359,7 @@ impl<H: Handler + 'static> Driver<H> {
     async fn handle_incoming(
         &mut self,
         client: &AsyncClient,
-        tx: &mpsc::UnboundedSender<DriverEvent>,
+        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
         poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>,
         poll_handler: &Arc<Mutex<Option<Arc<Mutex<H>>>>>,
         incoming: Incoming,
@@ -415,7 +419,7 @@ impl<H: Handler + 'static> Driver<H> {
     async fn on_conf(
         &mut self,
         client: &AsyncClient,
-        tx: &mpsc::UnboundedSender<DriverEvent>,
+        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
         poll_handler: &Arc<Mutex<Option<Arc<Mutex<H>>>>>,
         payload: &[u8],
     ) {
@@ -541,6 +545,10 @@ impl<H: Handler + 'static> Driver<H> {
     /// keeping the MQTT event loop responsive. If the poll queue is
     /// full, the request is dropped (backpressure).
     fn on_poll(&self, poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>, payload: &[u8]) {
+        if !H::SUPPORTS_POLL {
+            return;
+        }
+
         let payload_str = match std::str::from_utf8(payload) {
             Ok(s) => s,
             Err(_) => return,
@@ -595,10 +603,18 @@ impl<H: Handler + 'static> Driver<H> {
     }
 
     /// Handle a DriverEvent from the handler channel (async data publish).
-    async fn handle_driver_event(&self, client: &AsyncClient, event: DriverEvent) {
+    async fn handle_driver_event(&self, client: &AsyncClient, event: DriverEvent<H::Addr>) {
         match event {
-            DriverEvent::Data { topic, payload } => {
-                let mtopic = self.topic_with("data", &topic);
+            DriverEvent::Data { addr, payload } => {
+                // The edge agent only recognises data published on the topic
+                // name it assigned (see `self.topics`); an address it no
+                // longer knows about (e.g. after reconfiguration) has
+                // nowhere to go and is dropped, matching the JS/Python
+                // drivers' behaviour.
+                let Some(topic) = self.topics.get(&addr) else {
+                    return;
+                };
+                let mtopic = self.topic_with("data", topic);
                 if let Err(e) = client
                     .publish(&mtopic, QoS::AtMostOnce, false, payload)
                     .await

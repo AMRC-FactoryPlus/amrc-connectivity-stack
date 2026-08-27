@@ -658,6 +658,22 @@ grafana:
 
 influxdb2:
   enabled: true
+  # InfluxDB holds the historian data and is on the critical path for
+  # every dashboard. With no resource requests at all it is BestEffort,
+  # which puts it first in line for the kernel OOM killer and first to
+  # be evicted when a node comes under memory pressure - and when it
+  # goes, the historians exit on the failed write and take a while to
+  # come back. Requesting resources moves it to Burstable so it is not
+  # the first thing sacrificed.
+  #
+  # Requests only. InfluxDB's memory use scales with series cardinality,
+  # so a limit that is comfortable on one site will OOM another; set
+  # limits per site if you want a ceiling, but note that a limit which
+  # is too low turns node pressure into a guaranteed restart loop.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
   adminUser:
     organization: default
     existingSecret: influxdb-auth

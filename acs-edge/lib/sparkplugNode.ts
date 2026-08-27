@@ -236,6 +236,18 @@ export class SparkplugNode extends (
                         type: metric.type,
                         isTransient: metric.isTransient ?? false,
                     };
+                    // Simulated-data markers are the one exception to
+                    // the no-properties-on-data rule: they are small,
+                    // only present on simulator payloads, and the
+                    // historians tag points from them.
+                    if (!birth && metric.properties?.simulated) {
+                        newMetric.properties = {
+                            simulated: metric.properties.simulated,
+                            ...(metric.properties.run_id
+                                ? { run_id: metric.properties.run_id }
+                                : {}),
+                        } as unknown as typeof metric.properties;
+                    }
                     // If this is a birth certificate, we need to define the name, properties and alias
                     // If a data payload, only alias is used to save space.
                     if (birth) {

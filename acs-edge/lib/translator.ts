@@ -22,7 +22,7 @@ import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
 
 import { log } from "./helpers/log.js";
-import { sparkplugConfig, } from "./helpers/typeHandler.js";
+import { serialisationType, sparkplugConfig, } from "./helpers/typeHandler.js";
 
 import { RestConnection } from "./devices/REST.js";
 import { S7Connection } from "./devices/S7.js";
@@ -77,6 +77,39 @@ export class Translator extends EventEmitter {
         this.devices = {};
     }
 
+    /* Serve driver req/<what> messages. Drivers have no Factory+
+     * identity of their own, so the agent proxies specific, known
+     * ConfigDB reads on their behalf. Currently only edge-sim
+     * cassettes (the Cassette application, by object UUID). */
+    async driverRequest({ id, msg, data, payload }) {
+        if (msg != "req") return;
+
+        const reply = (body: object) => this.broker.publish({
+            id, msg: "rsp", data,
+            payload: Buffer.from(JSON.stringify(body)),
+        }).catch(e => log(`Driver rsp publish failed: ${e}`));
+
+        if (data != "cassette")
+            return reply({ error: `Unknown request: ${data}` });
+
+        const uuid = payload.toString().trim();
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid))
+            return reply({ uuid, error: "Not a cassette UUID" });
+
+        try {
+            const doc = await this.fplus.ConfigDB.get_config(
+                UUIDs.App.Cassette, uuid);
+            if (!doc)
+                return reply({ uuid, error: "Cassette not found in ConfigDB" });
+            log(`Fetched cassette ${uuid} for driver ${id}`);
+            return reply({ uuid, cassette: doc });
+        }
+        catch (e: any) {
+            log(`Cassette fetch ${uuid} for driver ${id} failed: ${e.message}`);
+            return reply({ uuid, error: `ConfigDB fetch failed: ${e.message}` });
+        }
+    }
+
     /**
      * Start function instantiates all connections defined in the config file
      */
@@ -96,6 +129,7 @@ export class Translator extends EventEmitter {
             log("Starting driver broker...");
             //this.broker.on("message", msg => 
             //    log(util.format("Driver message: %O", msg)));
+            this.broker.on("message", m => this.driverRequest(m));
             await this.broker.start();
 
             // Create a new device connection for each type listed in config file
@@ -198,11 +232,39 @@ export class Translator extends EventEmitter {
             connection.name,
             this.broker);
 
+        this.checkPayloadFormats(connection);
+
         if (connection.scout?.scoutDetails?.isEnabled) {
             this.runScout(connection, newConn);
         }
         else {
             this.runDevices(connection, newConn);
+        }
+    }
+
+    /* Warn about a configuration that cannot ever produce data.
+     *
+     * An external driver publishes a payload for the Edge Agent to decode, so
+     * its devices must name a format. "Defined by Protocol" means the
+     * opposite: the connection has already decoded the value itself, which is
+     * true of the internal connections and never of a driver. Left on that
+     * setting the payload arrives, finds no parser, and is dropped, leaving
+     * every metric on the device empty with nothing logged.
+     *
+     * Checked here rather than per read, so it is said once at startup where
+     * someone will see it. */
+    checkPayloadFormats (connection: any) {
+        if (connection.connType !== "Driver") return;
+
+        for (const device of connection.devices ?? []) {
+            if (device.payloadFormat !== serialisationType.ignored) continue;
+
+            log(`Device ${device.deviceId} on driver connection `
+                + `${connection.name} has payload format `
+                + `"${serialisationType.ignored}". An external driver sends a `
+                + `payload for the Edge Agent to decode, so this device will `
+                + `produce no data. Set the device's payload format to the `
+                + `format the driver publishes, usually JSON.`);
         }
     }
 
@@ -357,7 +419,26 @@ export class Translator extends EventEmitter {
             // If the SECRETS_PATH is set in the environment, use that as the secret path, otherwise use the default
             const secretBasePath = process.env.SECRETS_PATH || '/etc/secrets';
 
-            const secretReplacedConfig = configString.replace(/__FPSI__[a-f0-9-]{36}/g, (match) => {
+            /* Two token shapes exist in the field, and both must resolve.
+             *
+             * The Manager mints these with crypto.randomUUID(), giving 36
+             * characters with hyphens. That API only exists in a secure
+             * context, so a Manager served over plain HTTP falls back to 32
+             * hex characters with none. This pattern only accepted the first,
+             * so on an HTTP deployment every secret passed through
+             * unsubstituted and the driver received the literal placeholder,
+             * which it then sent to the remote service as the credential.
+             *
+             * The failure was silent from here: nothing matched, so nothing
+             * was reported missing, and the error surfaced as an
+             * authentication rejection from a third party.
+             *
+             * The alternation is deliberate rather than a {32,36} range. A
+             * range is greedy and, next to a hyphenated token, could consume
+             * part of a neighbouring value. */
+            const FPSI = /__FPSI__(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{32})/g;
+
+            const secretReplacedConfig = configString.replace(FPSI, (match) => {
                 try {
                     // Attempt to get the secret contents from the file in /etc/secrets with the same name
                     const secretPath = `${secretBasePath}/${match}`;

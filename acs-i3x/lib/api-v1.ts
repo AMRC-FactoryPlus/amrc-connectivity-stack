@@ -431,6 +431,9 @@ export class APIv1 {
         if (!startTime || !endTime) {
             return next(badRequest("startTime and endTime query parameters are required"));
         }
+        if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
+            return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
+        }
         const values = await this.history.queryHistory(req.params.elementId, startTime, endTime);
         res.json({ elementId: req.params.elementId, values });
     }

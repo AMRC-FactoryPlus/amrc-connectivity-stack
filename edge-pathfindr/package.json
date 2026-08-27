@@ -1,0 +1,16 @@
+{
+  "name": "edge-pathfindr",
+  "version": "1.0.0",
+  "description": "ACS Edge Agent driver for the Pathfindr v5 asset tracking API",
+  "main": "bin/driver.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/edge-driver": "^0.1.0"
+  }
+}

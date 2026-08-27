@@ -41,4 +41,7 @@ COPY .docker/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
 
 # Start Nginx
-CMD ["sh", "-c", "./import-meta-env-alpine -x .env -p /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
+# Substitute into env.js, not index.html. The environment lives in its own
+# file so the console needs no inline script and can run under a CSP with no
+# 'unsafe-inline'; see public/env.js and .docker/nginx.conf.
+CMD ["sh", "-c", "./import-meta-env-alpine -x .env -p /usr/share/nginx/html/env.js && nginx -g 'daemon off;'"]

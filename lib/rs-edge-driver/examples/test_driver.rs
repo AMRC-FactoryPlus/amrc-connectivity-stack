@@ -60,7 +60,10 @@ struct TestHandler {
 impl Handler for TestHandler {
     type Addr = WaveSpec;
 
-    fn create(_handle: DriverHandle, _config: serde_json::Value) -> Result<Self, HandlerError> {
+    fn create(
+        _handle: DriverHandle<WaveSpec>,
+        _config: serde_json::Value,
+    ) -> Result<Self, HandlerError> {
         Ok(Self {
             start: Instant::now(),
         })

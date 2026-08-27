@@ -459,7 +459,10 @@ export async function updateEdgeAgentConfig({
           templates: [],
           tags: tags,
           pubInterval: device.pub_interval || 0,
-          payloadFormat: connectionConfiguration.source?.payloadFormat || 'Defined by Protocol'
+          payloadFormat: connectionConfiguration.source?.payloadFormat || 'Defined by Protocol',
+          /* Device-level historian override: false suppresses
+           * recording for every metric on this device. */
+          recordToHistorian: device.deviceInformation.recordToHistorian !== false,
         }
 
         if (deviceIndex >= 0) {

@@ -17,3 +17,4 @@ node_modules/
 /.claude/scheduled_tasks.lock
 /.env.worktree
 .grepai/
+/.devcontainer/devcontainer.env

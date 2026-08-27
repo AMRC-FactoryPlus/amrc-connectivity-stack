@@ -48,11 +48,26 @@
 </template>
 
 <script>
+import { v4 as uuidv4 } from 'uuid'
+
 import { ISA95_LEVELS, useISA95Store } from '@/store/useISA95Store.js'
 import {
     Combobox, ComboboxAnchor, ComboboxEmpty,
     ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger,
 } from '@/components/ui/combobox'
+
+/* Schemas for the objects this panel writes into.
+ *
+ * An object in an origin map is only recognisable downstream if it carries
+ * the Schema_UUID of the schema it instantiates. The Edge Agent config
+ * generator emits a `<path>/Schema_UUID` tag only where the origin map has
+ * one, and the UNS ingester finds the ISA-95 values by looking for exactly
+ * the Hierarchy schema's UUID and then reading its siblings. Without these
+ * the objects are anonymous: their values reach the birth certificate as
+ * loose metrics that nothing downstream can interpret. */
+const DEVICE_INFORMATION_SCHEMA = '2dd093e9-1450-44c5-be8c-c0d78e48219b'
+const HIERARCHY_SCHEMA          = '84ac3397-f3a2-440a-99e5-5bb9f6a75091'
+const METRIC_SCHEMA             = 'b16275f1-e443-4c41-a482-fcbdfbd20769'
 
 export default {
     name: 'ISA95HierarchyPanel',
@@ -108,6 +123,14 @@ export default {
     },
 
     methods: {
+        /* Give an origin map object its schema identity, once. Existing
+         * values are left alone so re-selecting a level cannot churn an
+         * Instance_UUID that downstream consumers may already have seen. */
+        stamp (obj, schema_uuid) {
+            if (!obj.Schema_UUID) obj.Schema_UUID = schema_uuid
+            if (!obj.Instance_UUID) obj.Instance_UUID = uuidv4()
+        },
+
         get_value (level) {
             return this.hierarchy[level]?.Value ?? null
         },
@@ -146,11 +169,27 @@ export default {
                 if (!origin_map.Device_Information.ISA95_Hierarchy)
                     origin_map.Device_Information.ISA95_Hierarchy = {}
 
+                /* Stamp the schema on each object we create. The metric
+                 * editor does this for objects reached by selecting a metric
+                 * (see OriginMapEditor's stamping of the ancestor chain), but
+                 * this panel writes straight into the model and bypasses that
+                 * path, so it has to do the same job itself. Missing these,
+                 * the values are published as loose metrics and the UNS
+                 * ingester never recognises the hierarchy at all. */
+                this.stamp(origin_map.Device_Information,
+                    DEVICE_INFORMATION_SCHEMA)
+                this.stamp(origin_map.Device_Information.ISA95_Hierarchy,
+                    HIERARCHY_SCHEMA)
+
                 const hierarchy = origin_map.Device_Information.ISA95_Hierarchy
                 if (!hierarchy[level]) hierarchy[level] = {}
                 hierarchy[level].Value = new_value
                 if (!hierarchy[level].Sparkplug_Type)
                     hierarchy[level].Sparkplug_Type = 'String'
+                /* Metrics carry a Schema_UUID but no Instance_UUID, matching
+                 * how the metric editor stamps them. */
+                if (!hierarchy[level].Schema_UUID)
+                    hierarchy[level].Schema_UUID = METRIC_SCHEMA
                 for (const lower of ISA95_LEVELS.slice(level_index + 1)) {
                     if (hierarchy[lower]?.Value !== undefined)
                         hierarchy[lower].Value = null

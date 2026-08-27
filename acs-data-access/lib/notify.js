@@ -64,6 +64,16 @@ export class DataAccessNotify {
       this.structure_search.bind(this)
     );
 
+    notify.watch(
+      "v2/union-sources/",
+      this.union_sources_list.bind(this)
+    );
+
+    notify.watch(
+      "v2/session-sources/",
+      this.session_sources_list.bind(this)
+    );
+
     return notify;
   }
 
@@ -82,6 +92,7 @@ export class DataAccessNotify {
       rx.map(data => ({
         status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -160,8 +171,9 @@ export class DataAccessNotify {
     return this._metadata_resource_state(sess, uuid)
     .pipe(
       rx.map(data => ({
-        status: 200, 
+        status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -341,6 +353,7 @@ export class DataAccessNotify {
       rx.map(data => ({
         status: 200,
         response: {
+          status: 200,
           body: data
         }
       }))
@@ -375,7 +388,7 @@ export class DataAccessNotify {
     .pipe(
       rx.map(body => ({
         status: 200,
-        response: {body}
+        response: { status: 200, body }
       })),
     );
   }
@@ -417,5 +430,48 @@ export class DataAccessNotify {
   }
 
 
+
+  /*
+  * =========================================================
+  * UNION / SESSION SOURCES
+  * =========================================================
+  * Simple UUID lists (like metadata_list/structure_list above) of the
+  * valid datasets the principal is permitted to use as a source in a
+  * particular capacity. These are distinct from READ_DATASET/EDIT_DATASET
+  * visibility: a principal may be able to see a dataset but not be
+  * permitted to embed it in a Union or use it as a Session source.
+  */
+
+  // WATCH
+  union_sources_list(sess) {
+    return this.data.allowed_valid_dataset_uuids(
+      sess.principal,
+      Constants.Perm.IncludeInUnion
+    ).pipe(
+      rx.map(data => ({
+        status: 200,
+        response: {
+          status: 200,
+          body: data
+        }
+      }))
+    );
+  }
+
+  // WATCH
+  session_sources_list(sess) {
+    return this.data.allowed_valid_dataset_uuids(
+      sess.principal,
+      Constants.Perm.UseForSession
+    ).pipe(
+      rx.map(data => ({
+        status: 200,
+        response: {
+          status: 200,
+          body: data
+        }
+      }))
+    );
+  }
 
 }

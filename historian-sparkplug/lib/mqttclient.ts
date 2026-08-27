@@ -394,16 +394,37 @@ export default class MQTTClient {
         payload.metrics.forEach((metric) => {
             let birth = this.aliasResolver?.[topic.address.group]?.[topic.address.node]?.[topic.address.device]?.[metric.alias];
 
+            /* We have DATA for a metric we have no birth for. That is
+             * expected while a device we have just asked to rebirth has
+             * not answered yet, and there is nothing useful we can write
+             * without the birth: it carries the name, the type and the
+             * transient flag. Skip the metric and wait.
+             *
+             * This used to fall through, and writeToInfluxDB would then
+             * read birth.transient off undefined and take the whole
+             * process down with an uncaught TypeError - dropping every
+             * other device's data along with it. */
             if (!birth) {
                 logger.error(`Metric ${metric.alias} is unknown for ${topic.address.group}/${topic.address.node}/${topic.address.device}`);
+                return;
             }
 
             // Prefer nanosecond precision when available, falling back to the
             // millisecond Date for sources that have not yet been updated.
             const metricTimestamp = metric.timestampNs ?? payload.timestampNs
                 ?? metric.timestamp ?? payload.timestamp;
+            // Simulated-data markers ride the data metric's
+            // properties (the one case where DDATA carries any) and
+            // become Influx tags, so replayed data is recognisable
+            // and a mistaken run can be removed by its run_id.
+            const simTags: Record<string, string> = {};
+            if (metric.properties?.simulated?.value) {
+                simTags.simulated = "true";
+                const run = metric.properties?.run_id?.value;
+                if (run) simTags.run_id = String(run);
+            }
             // Send each metric to InfluxDB
-            this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp)
+            this.writeToInfluxDB(birth, topic, metric.value, metricTimestamp, simTags)
         });
     }
 
@@ -415,7 +436,7 @@ export default class MQTTClient {
      * @param timestamp Timestamp from the metric. Either a BigInt of
      *     nanoseconds since epoch, or a Date for ms-precision sources.
      */
-    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date | bigint) {
+    writeToInfluxDB(birth, topic: Topic, value, timestamp: Date | bigint, extraTags: Record<string, string> = {}) {
         if (value === null) return;
         if (birth.transient) {
             logger.debug(`Metric ${birth.name} is transient, not writing to InfluxDB`);
@@ -445,7 +466,8 @@ export default class MQTTClient {
             node: topic.address.node,
             device: topic.address.device,
             path: path,
-            unit: birth.unit
+            unit: birth.unit,
+            ...extraTags,
         });
 
         let numVal = null;

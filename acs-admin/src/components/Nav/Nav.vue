@@ -41,6 +41,12 @@ const sidebarNavItems: Item[] = [
         auth: true
     },
     {
+        title: 'Cassettes',
+        href: '/cassette-decks',
+        icon: 'cassette-tape',
+        auth: true
+    },
+    {
       title: 'Access Control',
       href: '/access-control',
       icon: 'user-shield',
@@ -74,6 +80,12 @@ const sidebarNavItems: Item[] = [
     title: 'Schemas',
     href: '/schemas',
     icon: 'shapes',
+    auth: true
+  },
+  {
+    title: 'Data Access',
+    href: '/data-access',
+    icon: 'database',
     auth: true
   }
 ]

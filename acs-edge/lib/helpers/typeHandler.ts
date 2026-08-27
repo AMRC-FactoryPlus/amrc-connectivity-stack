@@ -199,6 +199,9 @@ export interface sparkplugMetricProperties {
     endianness?: sparkplugMetricProperty,
     deadband?: sparkplugMetricProperty,
     deadbandMode?: sparkplugMetricProperty,
+    /* Simulated-data markers, set from simulator driver payloads */
+    simulated?: sparkplugMetricProperty,
+    run_id?: sparkplugMetricProperty,
 }
 
 export interface sparkplugMetricProperty {
@@ -553,8 +556,38 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
         case serialisationType.serialisedBuffer:
             break;
         default:
+            /* Nothing here knows how to read this payload, so the metric
+             * gets no value. Say so.
+             *
+             * This branch used to return undefined in silence, and the
+             * commonest way to reach it is a real misconfiguration: an
+             * external driver connection left on "Defined by Protocol".
+             * Such a driver hands over a raw Buffer expecting the Edge Agent
+             * to parse it, so the data arrives intact, is discarded here
+             * without a word, and the metric sits at null forever. There is
+             * nothing in the logs, nothing in the birth certificate, and no
+             * error anywhere to suggest the payload ever existed.
+             *
+             * Logged once per format so a per-metric, per-poll hot path
+             * cannot flood the log. */
+            warn_unparsed(payloadFormat);
             break;
     }
+}
+
+/* Payload formats already complained about; see the default branch above. */
+const unparsed_warned = new Set<string>();
+
+function warn_unparsed (payloadFormat: serialisationType | string) {
+    const key = String(payloadFormat);
+    if (unparsed_warned.has(key)) return;
+    unparsed_warned.add(key);
+
+    log(`Payload format "${key}" has no parser, so every metric using it `
+        + `will stay empty. If this connection uses an external driver, the `
+        + `driver sends a payload for the Edge Agent to decode and the format `
+        + `must name it, usually JSON. "Defined by Protocol" only suits `
+        + `connections that decode internally.`);
 }
 
 /**
@@ -643,6 +676,24 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
  * @param metric The metric being processed
  * @param payloadFormat Payload format string
  */
+/* Simulated-data markers: the simulator driver stamps every payload
+ * with simulated: true and a per-run UUID so the historians can tag
+ * the data. Only JSON payloads can carry them. */
+export function parseSimTagsFromPayload(msg: any, payloadFormat: serialisationType | string): { simulated?: boolean, run_id?: string } {
+    if (payloadFormat !== serialisationType.JSON) return {};
+    let payload: any;
+    try {
+        if (typeof msg == "string") payload = JSON.parse(msg);
+        else if (Buffer.isBuffer(msg)) payload = JSON.parse(msg.toString());
+        else payload = msg;
+    } catch { return {}; }
+    if (typeof payload !== "object" || payload === null) return {};
+    const out: { simulated?: boolean, run_id?: string } = {};
+    if (payload.simulated === true) out.simulated = true;
+    if (typeof payload.run_id === "string") out.run_id = payload.run_id;
+    return out;
+}
+
 export function parseNsTimestampFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string): bigint | undefined {
     if (payloadFormat !== serialisationType.JSON) return undefined;
 
@@ -923,6 +974,13 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
             case sparkplugDataType.double:
                 if (endianness === byteOrder.bigEndian) len = buf.writeDoubleBE(metric.value as number); else len = buf.writeDoubleLE(metric.value as number);
                 break;
+
+            case sparkplugDataType.string:
+            case sparkplugDataType.text:
+            case sparkplugDataType.uuid:
+                /* Variable length: written as UTF-8, not into the
+                 * fixed 8-byte buffer. */
+                return Buffer.from(String(metric.value ?? ""), "utf8");
 
             default:
                 throw new Error(`Type ${metric.type} not supported for buffer parsing`);

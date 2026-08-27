@@ -12,8 +12,14 @@ export function reHashConf(conf: any) {
             dev.payloadFormat = devConn.payloadFormat;
             dev.delimiter = devConn.delimiter;
             conf.deviceConnections[i].devices[j].metrics = [];
+            /* Device-level historian override: when the device is
+             * marked not to record (the default for simulated
+             * devices' operators to choose), every metric goes out
+             * transient regardless of its own Record_To_Historian. */
+            const suppressHistorian = dev.recordToHistorian === false;
             dev.tags?.forEach((tag: schemaMetric) => {
-                conf.deviceConnections[i].devices[j].metrics.push(buildTagObject(tag));
+                conf.deviceConnections[i].devices[j].metrics.push(
+                    buildTagObject(tag, suppressHistorian));
             })
             delete conf.deviceConnections[i].devices[j].tags;
         })
@@ -21,7 +27,7 @@ export function reHashConf(conf: any) {
     return conf;
 }
 
-function buildTagObject(tag: schemaMetric|any): sparkplugMetric {
+function buildTagObject(tag: schemaMetric|any, suppressHistorian = false): sparkplugMetric {
 
     // Store the endianness of the tag, if it has one
     const endianness = (tag.type.endsWith("BE") ? 4321 : tag.type.endsWith("LE") ? 1234 : null);
@@ -33,7 +39,7 @@ function buildTagObject(tag: schemaMetric|any): sparkplugMetric {
         name: tag.Name,
         value: tag.value,
         type: tag.type,
-        isTransient: !tag.recordToDB,
+        isTransient: suppressHistorian || !tag.recordToDB,
         properties: {
             method: { value: tag.method, type: sparkplugDataType.string },
             address: { value: tag.address, type: sparkplugDataType.string },

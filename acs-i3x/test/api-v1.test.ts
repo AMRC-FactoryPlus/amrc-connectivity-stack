@@ -671,6 +671,45 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(400);
         });
+
+        it("returns 400 for a non-RFC3339 startTime", async () => {
+            const { app, history } = createApp();
+
+            const res = await request(app)
+                .get("/objects/obj-1/history")
+                .query({ startTime: "-30d)", endTime: "2026-04-01T00:00:00Z" });
+
+            expect(res.status).toBe(400);
+            expect(res.body.success).toBe(false);
+            expect(history.queryHistory).not.toHaveBeenCalled();
+        });
+
+        it("returns 400 for a non-RFC3339 endTime", async () => {
+            const { app, history } = createApp();
+
+            const res = await request(app)
+                .get("/objects/obj-1/history")
+                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "now()" });
+
+            expect(res.status).toBe(400);
+            expect(history.queryHistory).not.toHaveBeenCalled();
+        });
+
+        it("accepts valid RFC 3339 bounds and passes them through", async () => {
+            const { app, history } = createApp();
+            history.queryHistory.mockResolvedValue([sampleVqt]);
+
+            const res = await request(app)
+                .get("/objects/obj-1/history")
+                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00+01:00" });
+
+            expect(res.status).toBe(200);
+            expect(history.queryHistory).toHaveBeenCalledWith(
+                "obj-1",
+                "2026-01-01T00:00:00Z",
+                "2026-04-01T00:00:00+01:00",
+            );
+        });
     });
 
     describe("POST /objects/history", () => {

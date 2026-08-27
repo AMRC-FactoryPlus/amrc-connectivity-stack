@@ -104,9 +104,9 @@ export class DriverBroker extends EventEmitter {
 
         this.acl.set(id, {
             publish: new RegExp(
-                `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+)$`),
+                `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+|req/\\w+)$`),
             subscribe: new RegExp(
-                `^${prefix}/${id}/(?:active|conf|addr|cmd/#|poll)$`),
+                `^${prefix}/${id}/(?:active|conf|addr|cmd/#|poll|rsp/\\w+)$`),
         });
 
         callback(null, true);

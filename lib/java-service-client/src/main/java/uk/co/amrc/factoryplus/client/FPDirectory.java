@@ -51,14 +51,16 @@ public class FPDirectory {
                 .appendPath(service.toString())
             )
             .fetch()
-            .map(res -> res.ifOk()
-                .flatMap(r -> r.getBody())
+            .flatMap(res -> res.ifOk()
+                .flatMap(r -> r.getBodyArray())
+                .map(Single::just)
                 .orElseGet(() -> {
                     log.error("Can't find {} via the Directory: {}",
                         service, res.getCode());
-                    return new JSONArray();
+                    return Single.error(new Exception(
+                        "Directory lookup of %s failed: %s"
+                            .formatted(service, res.getCode())));
                 }))
-            .cast(JSONArray.class)
             .flatMapObservable(Observable::fromIterable)
             .doOnNext(o -> log.info("Service URL: {}", o))
             .cast(JSONObject.class)

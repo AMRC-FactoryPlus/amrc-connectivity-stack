@@ -255,6 +255,9 @@ grants:
   !u Local.Role.EdgeAgent:
     !u ConfigDB.Perm.ReadConfig:
       !u Edge.App.AgentConfig: false
+      # The agent proxies cassette fetches for the edge-sim driver
+      # (drivers hold no credentials of their own).
+      !u EdgeSim.App.Cassette: false
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
       !u Clusters.App.K8sTemplate: false

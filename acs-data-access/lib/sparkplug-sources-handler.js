@@ -48,6 +48,12 @@ export class SparkplugSourcesHandler extends BaseStructureHandler {
       }];
   }
 
+  /* A SparkplugSrc points at a device, not at another dataset, so it can
+   * never hold a dangling dataset reference. */
+  references() {
+    return false;
+  }
+
   async create_subclass_relationships() {
     return;
   }

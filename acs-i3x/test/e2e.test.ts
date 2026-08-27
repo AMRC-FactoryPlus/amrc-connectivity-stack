@@ -187,6 +187,12 @@ const relationships = new Map<string, Map<string | undefined, I3xObject[]>>([
 
 let readyFlag = true;
 
+/* The authenticated principal the e2e app presents, and the clientId
+ * the requests carry. They are deliberately different strings: the
+ * principal owns the subscription, the clientId is only echoed. */
+const TEST_PRINCIPAL = "test-principal@REALM";
+const TEST_CLIENT_ID = "test-client";
+
 function createPreloadedMocks() {
     readyFlag = true;
 
@@ -253,29 +259,29 @@ function createPreloadedMocks() {
     };
 
     const subscriptions = {
-        create: jest.fn<(clientId: string, displayName?: string) => I3xSubscription>()
-            .mockImplementation((clientId: string, displayName?: string) => ({
+        create: jest.fn<(owner: string, clientId: string, displayName?: string) => I3xSubscription>()
+            .mockImplementation((_owner: string, clientId: string, displayName?: string) => ({
                 clientId,
                 subscriptionId: "sub-generated-1",
                 displayName: displayName ?? "Default",
             })),
-        list: jest.fn<(clientId: string, ids: string[]) => I3xSubscription[]>()
-            .mockImplementation((clientId: string, ids: string[]) =>
+        list: jest.fn<(owner: string, ids: string[]) => I3xSubscription[]>()
+            .mockImplementation((_owner: string, ids: string[]) =>
                 ids.map(id => ({
-                    clientId,
+                    clientId: TEST_CLIENT_ID,
                     subscriptionId: id,
                     displayName: "Sub " + id,
                 })),
             ),
-        getOne: jest.fn<(clientId: string, id: string) => I3xSubscription>()
-            .mockImplementation((clientId: string, id: string) => {
+        getOne: jest.fn<(owner: string, id: string) => I3xSubscription>()
+            .mockImplementation((_owner: string, id: string) => {
                 if (id === "does-not-exist") {
                     const err: any = new Error(`Subscription ${id} not found`);
                     err.status = 404;
                     throw err;
                 }
                 return {
-                    clientId,
+                    clientId: TEST_CLIENT_ID,
                     subscriptionId: id,
                     displayName: "Sub " + id,
                     monitoredObjects: [
@@ -283,20 +289,20 @@ function createPreloadedMocks() {
                     ],
                 };
             }),
-        deleteOne: jest.fn<(clientId: string, id: string) => void>()
-            .mockImplementation((_clientId: string, id: string) => {
+        deleteOne: jest.fn<(owner: string, id: string) => void>()
+            .mockImplementation((_owner: string, id: string) => {
                 if (id === "does-not-exist") {
                     const err: any = new Error(`Subscription ${id} not found`);
                     err.status = 404;
                     throw err;
                 }
             }),
-        register: jest.fn<(clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
-        registerOne: jest.fn<(clientId: string, subId: string, id: string, maxDepth?: number) => void>(),
-        unregister: jest.fn<(clientId: string, subId: string, ids: string[]) => void>(),
-        unregisterOne: jest.fn<(clientId: string, subId: string, id: string) => void>(),
-        stream: jest.fn<(clientId: string, subId: string, res: any) => void>(),
-        sync: jest.fn<(clientId: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
+        register: jest.fn<(owner: string, subId: string, ids: string[], maxDepth?: number) => void>(),
+        registerOne: jest.fn<(owner: string, subId: string, id: string, maxDepth?: number) => void>(),
+        unregister: jest.fn<(owner: string, subId: string, ids: string[]) => void>(),
+        unregisterOne: jest.fn<(owner: string, subId: string, id: string) => void>(),
+        stream: jest.fn<(owner: string, subId: string, res: any) => void>(),
+        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
             .mockReturnValue([
                 { sequenceNumber: 1, elementId: "obj-cnc-1", ...vqtCnc1 },
                 { sequenceNumber: 2, elementId: "obj-robot-1", ...vqtRobot },
@@ -323,6 +329,10 @@ function createE2eApp(opts: { maxDepthCap?: number } = {}) {
 
     const app = express();
     app.use(express.json());
+
+    /* Stand in for FplusHttpAuth, which sets req.auth on every
+     * non-public route in the deployed service. */
+    app.use((req, _res, next) => { (req as any).auth = TEST_PRINCIPAL; next(); });
 
     /* Mount exactly as the real routes.ts does */
     app.use("/v1", api.infoRoute);

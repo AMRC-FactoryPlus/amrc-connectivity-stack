@@ -123,40 +123,34 @@ export class History {
 
     /**
      * Build a Flux query for historical data of a leaf metric.
+     *
+     * Returns null when the elementId has no MetricMeta. Without meta we
+     * have no measurement name and no topLevelInstance to filter on, so
+     * there is no safe query to build: the caller-supplied elementId must
+     * never be used as a tag value itself.
      */
     buildFluxQuery(
         elementId: string,
         startTime: string,
         endTime: string,
-    ): string {
+    ): string | null {
         const meta = this.objectTree.getMetricMeta(elementId);
+        if (!meta) return null;
 
-        if (meta) {
-            // Leaf metric with metadata — precise query
-            const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-            const pathFilter = meta.metricPath
-                ? `  |> filter(fn: (r) => r["path"] == "${meta.metricPath}")`
-                : "";
+        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
+        const pathFilter = meta.metricPath
+            ? `  |> filter(fn: (r) => r["path"] == "${meta.metricPath}")`
+            : "";
 
-            return [
-                `from(bucket: "${this.bucket}")`,
-                `  |> range(start: ${startTime}, stop: ${endTime})`,
-                `  |> filter(fn: (r) => r["_measurement"] == "${measurement}")`,
-                `  |> filter(fn: (r) => r["topLevelInstance"] == "${meta.topLevelInstanceUuid}")`,
-                pathFilter,
-                `  |> filter(fn: (r) => r["_field"] == "value")`,
-                `  |> sort(columns: ["_time"])`,
-            ].filter(Boolean).join("\n");
-        }
-
-        // Fallback: use the elementId directly as topLevelInstance UUID
         return [
             `from(bucket: "${this.bucket}")`,
             `  |> range(start: ${startTime}, stop: ${endTime})`,
-            `  |> filter(fn: (r) => r["topLevelInstance"] == "${elementId}")`,
+            `  |> filter(fn: (r) => r["_measurement"] == "${measurement}")`,
+            `  |> filter(fn: (r) => r["topLevelInstance"] == "${meta.topLevelInstanceUuid}")`,
+            pathFilter,
             `  |> filter(fn: (r) => r["_field"] == "value")`,
             `  |> sort(columns: ["_time"])`,
-        ].join("\n");
+        ].filter(Boolean).join("\n");
     }
 
     /**
@@ -174,7 +168,11 @@ export class History {
         const obj = this.objectTree.getObject(elementId);
         if (obj?.isComposition) return [];
 
+        // No MetricMeta means we cannot identify a metric series for this
+        // elementId. Return no data rather than guessing at a filter: a
+        // leaf with no meta is indistinguishable from an unknown element.
         const query = this.buildFluxQuery(elementId, startTime, endTime);
+        if (query === null) return [];
 
         const rows: Array<{ _value: unknown; _time: string }> =
             await this.queryApi.collectRows(query);

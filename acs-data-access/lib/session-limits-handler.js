@@ -77,7 +77,13 @@ export class SessionLimitsHandler extends BaseStructureHandler {
     );
   }
 
+  references(config, target_uuid) {
+    return config?.source === target_uuid;
+  }
+
   async remove_subclass_relationships(dataset_uuid, config) {
+    if(!config?.source) return;
+
     await this.cdb.class_remove_subclass(config.source, dataset_uuid);
     this.log(`Removed ${dataset_uuid} from ${config.source} subclasses.`)
   }

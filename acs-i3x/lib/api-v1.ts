@@ -59,6 +59,22 @@ function badRequest(message: string): Error & { status: number } {
     return err;
 }
 
+/**
+ * Returns the authenticated principal which owns any subscription
+ * created or accessed by this request.
+ *
+ * `req.auth` is set by the shared FplusHttpAuth middleware in
+ * @amrc-factoryplus/service-api. Every subscription route sits behind
+ * it — only `/v1/info` is public, and that route never touches
+ * subscriptions — so this should always be a principal. If it is not,
+ * we return undefined and SubscriptionManager fails closed with 404,
+ * rather than letting an unauthenticated request own or reach
+ * anything.
+ */
+function subscription_owner(req: Request): string {
+    return (req as any).auth;
+}
+
 export class APIv1 {
     public routes: Router;
     public infoRoute: Router;
@@ -442,18 +458,19 @@ export class APIv1 {
     }
 
     /**
-     * POST /subscriptions/list — looks up subscriptions by id for a
-     * client. Per-id success/error envelope: missing ids surface as
-     * 404 and ids owned by a different client as 403, rather than
-     * being silently dropped. Each success entry includes a
-     * `monitoredObjects: [{ elementId, maxDepth }]` array built from
-     * the subscription's registered elements.
+     * POST /subscriptions/list — looks up subscriptions by id for the
+     * authenticated principal. Per-id success/error envelope: ids that
+     * do not exist, and ids owned by another principal, both surface
+     * as 404 rather than being silently dropped.  Each success entry
+     * includes a `monitoredObjects: [{ elementId, maxDepth }]` array
+     * built from the subscription's registered elements.
      */
     list_subscriptions(req: Request, res: Response): void {
-        const { clientId, subscriptionIds } = req.body;
+        const owner = subscription_owner(req);
+        const { subscriptionIds } = req.body;
         const results = (subscriptionIds as string[]).map(id => {
             try {
-                const sub = this.subscriptions.getOne(clientId, id);
+                const sub = this.subscriptions.getOne(owner, id);
                 return { success: true, subscriptionId: id, result: sub };
             } catch (err: any) {
                 return {
@@ -469,14 +486,16 @@ export class APIv1 {
 
     /**
      * POST /subscriptions/delete — deletes the listed subscriptions for
-     * a client. Per-id success/error envelope: missing or wrong-client
-     * ids are reported as failures rather than aborting the batch.
+     * the authenticated principal. Per-id success/error envelope: ids
+     * which do not exist, or belong to another principal, are reported
+     * as 404 failures rather than aborting the batch.
      */
     delete_subscriptions(req: Request, res: Response): void {
-        const { clientId, subscriptionIds } = req.body;
+        const owner = subscription_owner(req);
+        const { subscriptionIds } = req.body;
         const results = (subscriptionIds as string[]).map(id => {
             try {
-                this.subscriptions.deleteOne(clientId, id);
+                this.subscriptions.deleteOne(owner, id);
                 return { success: true, subscriptionId: id, result: null };
             } catch (err: any) {
                 return {
@@ -494,17 +513,18 @@ export class APIv1 {
      * POST /subscriptions/register — adds element ids to an existing
      * subscription, with optional composition `maxDepth`. Per-id
      * success/error envelope: unknown ids are reported as 404, sub-level
-     * errors (missing sub / wrong client) surface from `registerOne` as
-     * 404/403 per-id rather than aborting the batch.
+     * errors (missing sub, or one owned by another principal) surface
+     * from `registerOne` as 404 per-id rather than aborting the batch.
      */
     register_subscriptions(req: Request, res: Response): void {
-        const { clientId, subscriptionId, elementIds, maxDepth } = req.body;
+        const owner = subscription_owner(req);
+        const { subscriptionId, elementIds, maxDepth } = req.body;
         const results = (elementIds as string[]).map(id => {
             if (!this.objectTree.getObject(id)) {
                 return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
             }
             try {
-                this.subscriptions.registerOne(clientId, subscriptionId, id, maxDepth);
+                this.subscriptions.registerOne(owner, subscriptionId, id, maxDepth);
                 return { success: true, elementId: id, result: null };
             } catch (err: any) {
                 return {
@@ -521,18 +541,19 @@ export class APIv1 {
     /**
      * POST /subscriptions/unregister — removes element ids from an
      * existing subscription. Per-id success/error envelope: unknown
-     * ids are reported as 404, sub-level errors (missing sub / wrong
-     * client) surface from `unregisterOne` as 404/403 per-id rather
-     * than aborting the batch.
+     * ids are reported as 404, sub-level errors (missing sub, or one
+     * owned by another principal) surface from `unregisterOne` as 404
+     * per-id rather than aborting the batch.
      */
     unregister_subscriptions(req: Request, res: Response): void {
-        const { clientId, subscriptionId, elementIds } = req.body;
+        const owner = subscription_owner(req);
+        const { subscriptionId, elementIds } = req.body;
         const results = (elementIds as string[]).map(id => {
             if (!this.objectTree.getObject(id)) {
                 return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
             }
             try {
-                this.subscriptions.unregisterOne(clientId, subscriptionId, id);
+                this.subscriptions.unregisterOne(owner, subscriptionId, id);
                 return { success: true, elementId: id, result: null };
             } catch (err: any) {
                 return {
@@ -553,23 +574,28 @@ export class APIv1 {
      * do NOT call `res.json` here.
      */
     async stream_subscription(req: Request, res: Response, _next: NextFunction): Promise<void> {
-        const { clientId, subscriptionId } = req.body;
-        this.subscriptions.stream(clientId, subscriptionId, res);
+        const { subscriptionId } = req.body;
+        this.subscriptions.stream(subscription_owner(req), subscriptionId, res);
     }
 
     /**
      * POST /subscriptions/sync — replays missed updates after `lastSequenceNumber`.
      **/
     sync_subscription(req: Request, res: Response): void {
-        const { clientId, subscriptionId, lastSequenceNumber } = req.body;
-        res.json(this.subscriptions.sync(clientId, subscriptionId, lastSequenceNumber));
+        const { subscriptionId, lastSequenceNumber } = req.body;
+        res.json(this.subscriptions.sync(
+            subscription_owner(req), subscriptionId, lastSequenceNumber));
     }
 
     /**
-     * POST /subscriptions — creates a new subscription for the given client.
+     * POST /subscriptions — creates a new subscription owned by the
+     * authenticated principal. The client-supplied `clientId` is
+     * stored and echoed back because it is part of the i3X wire shape,
+     * but ownership is the principal, not the clientId.
      **/
     create_subscription(req: Request, res: Response): void {
         const { clientId, displayName } = req.body;
-        res.json(this.subscriptions.create(clientId, displayName));
+        res.json(this.subscriptions.create(
+            subscription_owner(req), clientId, displayName));
     }
 }

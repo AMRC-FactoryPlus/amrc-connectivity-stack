@@ -17,6 +17,12 @@ interface SubscriptionManagerOpts {
 }
 
 interface Subscription {
+    /* The authenticated Factory+ principal which created the
+     * subscription. This is what ownership is checked against; it is
+     * never supplied by the client and is never sent on the wire. */
+    owner: string;
+    /* The client's own handle for itself. Part of the i3X wire shape,
+     * so we store and echo it, but it protects nothing. */
     clientId: string;
     subscriptionId: string;
     displayName: string;
@@ -41,9 +47,13 @@ export class SubscriptionManager {
         this.valueCache.onValueChange(this.boundOnValueChange);
     }
 
-    create(clientId: string, displayName?: string): I3xSubscription {
+    /* `owner` is the authenticated principal (`req.auth`); `clientId`
+     * is the client-supplied i3X handle. Only `owner` grants access to
+     * the subscription afterwards. */
+    create(owner: string, clientId: string, displayName?: string): I3xSubscription {
         const subscriptionId = randomUUID();
         const sub: Subscription = {
+            owner,
             clientId,
             subscriptionId,
             displayName: displayName ?? "",
@@ -64,11 +74,11 @@ export class SubscriptionManager {
         };
     }
 
-    list(clientId: string, subscriptionIds: string[]): I3xSubscription[] {
+    list(owner: string, subscriptionIds: string[]): I3xSubscription[] {
         const results: I3xSubscription[] = [];
         for (const id of subscriptionIds) {
             const sub = this.subscriptions.get(id);
-            if (sub && sub.clientId === clientId) {
+            if (sub && owner && sub.owner === owner) {
                 results.push({
                     clientId: sub.clientId,
                     subscriptionId: sub.subscriptionId,
@@ -79,8 +89,8 @@ export class SubscriptionManager {
         return results;
     }
 
-    getOne(clientId: string, subscriptionId: string): I3xSubscription {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    getOne(owner: string, subscriptionId: string): I3xSubscription {
+        const sub = this.getAndVerify(owner, subscriptionId);
 
         const monitoredObjects = [...sub.registeredElements.entries()]
             .map(([elementId, maxDepth]) => ({ elementId, maxDepth }));
@@ -95,8 +105,8 @@ export class SubscriptionManager {
         };
     }
 
-    deleteOne(clientId: string, subscriptionId: string): void {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    deleteOne(owner: string, subscriptionId: string): void {
+        const sub = this.getAndVerify(owner, subscriptionId);
 
         clearTimeout(sub.ttlTimer);
         if (sub.activeStream) {
@@ -106,8 +116,8 @@ export class SubscriptionManager {
         this.subscriptions.delete(subscriptionId);
     }
 
-    register(clientId: string, subscriptionId: string, elementIds: string[], maxDepth: number = 1): void {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    register(owner: string, subscriptionId: string, elementIds: string[], maxDepth: number = 1): void {
+        const sub = this.getAndVerify(owner, subscriptionId);
 
         for (const elementId of elementIds) {
             sub.registeredElements.set(elementId, maxDepth);
@@ -117,15 +127,15 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
-    registerOne(clientId: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    registerOne(owner: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
+        const sub = this.getAndVerify(owner, subscriptionId);
         sub.registeredElements.set(elementId, maxDepth);
         console.log(`[SUB] register: sub=${subscriptionId.slice(0,8)} element=${elementId} maxDepth=${maxDepth}`);
         this.resetTtl(sub);
     }
 
-    unregister(clientId: string, subscriptionId: string, elementIds: string[]): void {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    unregister(owner: string, subscriptionId: string, elementIds: string[]): void {
+        const sub = this.getAndVerify(owner, subscriptionId);
 
         for (const elementId of elementIds) {
             sub.registeredElements.delete(elementId);
@@ -134,14 +144,14 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
-    unregisterOne(clientId: string, subscriptionId: string, elementId: string): void {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    unregisterOne(owner: string, subscriptionId: string, elementId: string): void {
+        const sub = this.getAndVerify(owner, subscriptionId);
         sub.registeredElements.delete(elementId);
         this.resetTtl(sub);
     }
 
-    sync(clientId: string, subscriptionId: string, lastSequenceNumber?: number): I3xSyncItem[] {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    sync(owner: string, subscriptionId: string, lastSequenceNumber?: number): I3xSyncItem[] {
+        const sub = this.getAndVerify(owner, subscriptionId);
 
         if (lastSequenceNumber !== undefined) {
             sub.queue = sub.queue.filter(item => item.sequenceNumber > lastSequenceNumber);
@@ -151,8 +161,8 @@ export class SubscriptionManager {
         return [...sub.queue];
     }
 
-    stream(clientId: string, subscriptionId: string, res: any): void {
-        const sub = this.getAndVerify(clientId, subscriptionId);
+    stream(owner: string, subscriptionId: string, res: any): void {
+        const sub = this.getAndVerify(owner, subscriptionId);
 
         if (sub.activeStream) {
             throw new Error(`Subscription ${subscriptionId} already has an active stream`);
@@ -234,16 +244,22 @@ export class SubscriptionManager {
         }
     }
 
-    private getAndVerify(clientId: string, subscriptionId: string): Subscription {
+    /* Ownership is checked against the authenticated principal, not
+     * against the client-supplied clientId. A subscription owned by
+     * someone else reports 404, identically to one that does not
+     * exist, so that the pair cannot be used to probe which
+     * subscription ids are live. acs-directory does the same thing for
+     * alerts, deliberately, for the same reason.
+     *
+     * A falsy `owner` means the request reached us unauthenticated.
+     * That should be impossible — every subscription route sits behind
+     * FplusHttpAuth — but it fails closed here rather than matching a
+     * subscription stored with a falsy owner. */
+    private getAndVerify(owner: string, subscriptionId: string): Subscription {
         const sub = this.subscriptions.get(subscriptionId);
-        if (!sub) {
+        if (!sub || !owner || sub.owner !== owner) {
             const err: any = new Error(`Subscription ${subscriptionId} not found`);
             err.status = 404;
-            throw err;
-        }
-        if (sub.clientId !== clientId) {
-            const err: any = new Error(`Subscription ${subscriptionId} does not belong to client ${clientId}`);
-            err.status = 403;
             throw err;
         }
         return sub;

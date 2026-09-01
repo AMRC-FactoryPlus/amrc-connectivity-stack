@@ -257,17 +257,43 @@ Use this when authorization is dynamic, fine-grained, or per-object
 
 1. Reads `fp_principal_uuid` from the JWT.
 2. Calls the F+ auth service (e.g. `GET /authz/acl`) on behalf of
-   the user. Either:
-   - mint a service-to-service token and ask "what can principal
-     `<uuid>` do?" - acs-i3x is taking this approach, or
-   - support the OAuth2 token-exchange flow once the i3x shim work
-     lands (planned, not yet shipped).
+   the user, by minting a service-to-service token and asking "what
+   can principal `<uuid>` do?".
 3. Caches the answer for whatever TTL fits the app's freshness
    needs.
+
+OAuth2 token exchange is not supported by the F+ auth service today,
+so a service-to-service call is the only option for Option B.
 
 Either option avoids the duplicate-source-of-truth problem that
 existed before this branch (where Keycloak roles and F+ ACLs had to
 be administered separately).
+
+#### What acs-i3x does today
+
+`acs-i3x` is **not** an example of either option. It authenticates
+callers and then serves them the whole object tree.
+
+Authentication is the shared `FplusHttpAuth` middleware from
+`@amrc-factoryplus/service-api`, so it accepts:
+
+- Kerberos, via `Negotiate` or via `Basic` with a UPN and password;
+- an opaque bearer token obtained from `POST /token`;
+- a Keycloak-issued JWT carrying `fp_principal_uuid`.
+
+`GET /v1/info` is public; every other endpoint requires one of the
+above.
+
+There is currently **no authorization**. `acs-i3x` performs no ACL
+check and does not consult the F+ auth service about the calling
+principal, so any principal that authenticates can read every object,
+value, history series and subscription the service exposes. Per-object
+access control is not yet implemented.
+
+The practical consequence: a credential handed to an acs-i3x consumer
+is not scoped by Factory+ ACLs. Treat it as granting read access to
+the whole tree, and scope it by deciding who gets the credential at
+all.
 
 ## Worked example: minimal Express + openid-client
 

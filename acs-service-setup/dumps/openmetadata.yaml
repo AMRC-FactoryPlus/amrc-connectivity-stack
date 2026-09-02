@@ -17,11 +17,3 @@ objects:
       name: "Openmetadata permission"
       subclassOf:
         - !u Auth.Class.Permission
-
-# ---
-# service: !u UUIDs.Service.Authentication
-# version: 2
-# grants:
-#   !u Openmetadata.Requirement.ServiceRole:
-#     !u UUIDs.Permission.Directory.AdvertiseService:
-#       !u Openmetadata.Service.Openmetadata: false

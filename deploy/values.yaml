@@ -127,7 +127,8 @@ files:
   enabled: true
   image:
     repository: acs-files
-  bodyLimit: 500kb
+  bodyLimit: 3gb
+  requestTimeout: 0 # 0 disables HTTP request timeout, allowing uploads of any size/duration
   storage: 20Gi
 
 monitor:

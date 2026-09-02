@@ -34,6 +34,7 @@ const api = await new WebAPI({
   keytab: env.SERVER_KEYTAB,
   http_port: env.PORT,
   max_age: env.CACHE_MAX_AGE,
+  request_timeout: env.REQUEST_TIMEOUT ? Number(env.REQUEST_TIMEOUT) : undefined,
   routes: routes({
     fplus,
     uploadPath: uploadPath,

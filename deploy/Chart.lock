@@ -11,5 +11,11 @@ dependencies:
 - name: cert-manager
   repository: https://charts.jetstack.io
   version: v1.14.4
-digest: sha256:0c6fd4a51ef2b5a1ce99e72ade9a967d91793fa52d7f1969ef6cb7e5fbb4e143
-generated: "2026-04-13T11:01:47.894885542+01:00"
+- name: openmetadata
+  repository: https://helm.open-metadata.org/
+  version: 1.13.3
+- name: openmetadata-dependencies
+  repository: https://helm.open-metadata.org/
+  version: 1.13.3
+digest: sha256:04c0c0923d51e2c6656cdd8fdc4f561e25001db34c8dbc2147728604bc35e5a7
+generated: "2026-08-03T10:59:27.447561316+01:00"

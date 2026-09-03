@@ -559,3 +559,14 @@ export const UNS = {
     },
 };
 
+export const Openmetadata = {
+  Requirement: {
+    ServiceRole: "449166c8-68eb-4381-bd98-af20ed12c5f2",
+  },
+  Service: {
+    Openmetadata: "c4660c38-0e10-444a-b5f2-bdab1e417a1e",
+  },
+  Perm: {
+    All: "aed3139d-ec43-47bf-bd73-586308fa88a7",
+  },
+};

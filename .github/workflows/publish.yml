@@ -1,7 +1,7 @@
 name: Build & Release ACS
 
 env:
-  BASE_JS_VERSION: v4.0.0
+  BASE_JS_VERSION: v4.1.0
 
 on:
   workflow_call: {}

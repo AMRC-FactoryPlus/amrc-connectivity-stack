@@ -1,7 +1,8 @@
 # ACS base image for running JS services.
 # This includes the krb5 libraries and k5start.
 
-FROM node:lts-alpine
+# Pinned to match Dockerfile.js-build - see the note there.
+FROM node:22-alpine
 
 # Install system packages we need for runtime.
 RUN apk add libedit krb5-libs kstart \

@@ -1,0 +1,26 @@
+{
+  "name": "acs-file-summariser",
+  "version": "1.0.0",
+  "description": "Central service which watches ConfigDB for registered file types and writes downsampled summaries of large files into InfluxDB",
+  "main": "bin/summariser.js",
+  "type": "module",
+  "scripts": {
+    "start": "node bin/summariser.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@amrc-factoryplus/rx-util": "file:../lib/js-rx-util",
+    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+    "@influxdata/influxdb-client": "^1.33.2",
+    "rxjs": "^7.8.1"
+  },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
+  },
+  "devDependencies": {
+    "eslint": "^9.23.0"
+  }
+}

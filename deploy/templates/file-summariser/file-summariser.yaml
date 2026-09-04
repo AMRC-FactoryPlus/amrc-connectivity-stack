@@ -1,0 +1,79 @@
+{{ if .Values.fileSummariser.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-summariser
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: file-summariser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: file-summariser
+  template:
+    metadata:
+      labels:
+        component: file-summariser
+        factory-plus.service: file-summariser
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: file-summariser-keytabs
+        - name: scratch
+          emptyDir:
+            sizeLimit: {{ .Values.fileSummariser.scratchSize }}
+
+      containers:
+        - name: file-summariser
+{{ include "amrc-connectivity-stack.image" (list . .Values.fileSummariser) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: [ "node", "bin/summariser.js" ]
+          resources:
+            {{- toYaml .Values.fileSummariser.resources | nindent 12 }}
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: VERBOSE
+              value: {{ .Values.fileSummariser.verbosity | required "values.fileSummariser.verbosity" }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_ORG
+              value: default
+            - name: INFLUX_BUCKET
+              value: 'default'
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
+            - name: BATCH_SIZE
+              value: {{ .Values.fileSummariser.batchSize | quote | required "values.fileSummariser.batchSize" }}
+            - name: FLUSH_INTERVAL
+              value: {{ .Values.fileSummariser.flushInterval | quote | required "values.fileSummariser.flushInterval" }}
+            - name: SCRATCH_DIR
+              value: /scratch
+            - name: MAX_CONCURRENT_JOBS
+              value: {{ .Values.fileSummariser.maxConcurrentJobs | quote | required "values.fileSummariser.maxConcurrentJobs" }}
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size={{ .Values.fileSummariser.nodeMaxOldSpaceSizeMb }}"
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+            - mountPath: /scratch
+              name: scratch
+{{- end -}}

@@ -130,6 +130,33 @@ files:
   bodyLimit: 3gb
   storage: 20Gi
 
+fileSummariser:
+  # -- Whether or not to enable the File Summariser component
+  enabled: true
+  image:
+    repository: acs-file-summariser
+  # -- Number of files to summarise concurrently. Each file is downloaded
+  # to local scratch storage and parsed by a worker process, so this
+  # directly bounds worst-case memory/CPU/disk use - keep it low.
+  maxConcurrentJobs: 1
+  # -- The number of summary points to batch together before sending to InfluxDB
+  batchSize: 5000
+  # -- Send all buffered points after this amount of time has elapsed if the batch is not full (in milliseconds)
+  flushInterval: 10000
+  # -- Size limit of the scratch volume used to hold a file while it is being summarised
+  scratchSize: 20Gi
+  # -- Node.js heap size limit in MB. Should be comfortably below resources.limits.memory
+  nodeMaxOldSpaceSizeMb: 512
+  # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
+  verbosity: "ALL,!service,!token"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+
 monitor:
   enabled: true
   image:

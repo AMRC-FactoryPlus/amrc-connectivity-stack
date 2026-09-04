@@ -402,6 +402,8 @@ export const Fixup = {
 export const Files = {
   App: {
     Config: '731cb924-71bb-49fa-8cb8-1584bd1ebad3',
+    Summary: 'd34ff2d4-61ce-4488-b74c-81b1bbb7abac',
+    SummaryState: '439444d4-b0a5-45f8-ab0f-9bc41574ffa3',
   },
   Class: {
     File: 'b8fae5ab-678e-4d35-802f-2dd8ee3b5b02',
@@ -426,6 +428,7 @@ export const Files = {
   },
   Requirement: {
     ServiceAccount: '1356e8b9-c953-42ac-9ffc-ae26edb88e42',
+    SummariserServiceAccount: '228366d4-d95c-4d87-86ef-7edba5e065b4',
   },
 };
 

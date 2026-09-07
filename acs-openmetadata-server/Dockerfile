@@ -1,4 +1,4 @@
-FROM docker.getcollate.io/openmetadata/server:1.13.3
+FROM docker.getcollate.io/openmetadata/server:2.0.0
 
 # The upstream image bundles log4j-core/log4j-api 2.25.5 under
 # /opt/openmetadata/libs. Swap in a patched 2.x release - log4j2's public API

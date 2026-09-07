@@ -14,7 +14,7 @@ directly, the same way `acs-opensearch/Dockerfile` patches OpenSearch's
 bundled log4j:
 
 ```dockerfile
-FROM docker.getcollate.io/openmetadata/server:1.13.3
+FROM docker.getcollate.io/openmetadata/server:2.0.0
 
 ARG LOG4J_VERSION=2.26.1
 
@@ -49,7 +49,7 @@ make build
 ```
 
 `make build` (via `mk/acs.docker.mk`) runs
-`docker buildx build --push --platform linux/amd64 -t <registry>/openmetadata-server:1.13.3-patched .`,
+`docker buildx build --push --platform linux/amd64 -t <registry>/openmetadata-server:2.0.0-patched .`,
 then flattens the pushed image with `crane flatten`. `rm`-ing a file in a
 Dockerfile only hides it behind a whiteout - the bytes are still present in
 the upstream base image's layer underneath, which file-level vulnerability
@@ -62,7 +62,7 @@ unchanged - only the filesystem layers are affected. This is opted into via
 ACS service's `make build`, since `mk/acs.docker.mk` only runs it when
 `flatten` is set.
 
-The `version` in the `Makefile` is pinned to `1.13.3` on purpose (not the
+The `version` in the `Makefile` is pinned to `2.0.0` on purpose (not the
 usual `?=` override) - it tracks the upstream `openmetadata/server` version
 this Dockerfile patches, not ACS's own release version. The resulting tag is
 what `deploy/values.yaml` references:
@@ -71,7 +71,7 @@ what `deploy/values.yaml` references:
 openmetadata:
   image:
     repository: <registry>/openmetadata-server
-    tag: "1.13.3-patched"
+    tag: "2.0.0-patched"
 ```
 
 When upstream OpenMetadata ships a new release, bump the `FROM` tag here

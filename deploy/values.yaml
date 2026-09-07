@@ -698,7 +698,7 @@ openmetadata:
     # /opt/openmetadata/libs - built from acs-openmetadata-server/Dockerfile.
     # See acs-openmetadata-server/README.md.
     repository: <registry>/openmetadata-server
-    tag: "1.13.3-patched"
+    tag: "2.0.0-patched"
   openmetadata:
     config:
       elasticsearch:
@@ -744,6 +744,12 @@ openmetadata-dependencies:
       database: openmetadata_db
       username: openmetadata_user
     primary:
+      # OpenMetadata 2.0's DB migration needs a larger sort_buffer_size than
+      # MySQL's 256K default, or the run-db-migrations init container can
+      # fail partway through. See openmetadata upgrade notes. extraFlags (not
+      # primary.configuration) is used so the chart's own default my.cnf
+      # (datadir, socket, skip-name-resolve, etc.) isn't clobbered.
+      extraFlags: "--sort_buffer_size=20M"
       extraEnvVars:
         - name: AIRFLOW_MYSQL_PASSWORD
           valueFrom:
@@ -781,7 +787,7 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: <registry>/openmetadata-ingestion
-        tag: 1.13.3-patched
+        tag: 2.0.0-patched
     data:
       # The chart's own default (data.metadataConnection.pass: airflow_pass)
       # is a hardcoded literal with no per-field secretRef - metadataSecretName

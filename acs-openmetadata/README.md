@@ -23,7 +23,7 @@ moving parts. What's actually running in the cluster:
 | **MySQL**                                           | `openmetadata-dependencies` → `mysql` (Bitnami)      | OpenMetadata's own relational store, holding both the `openmetadata_db` (catalogue metadata) and `airflow_db` (ingestion pipeline scheduling state) databases.                                                                                                                                                                                                                                                                                             |
 | **OpenSearch**                                      | `openmetadata-dependencies` → `opensearch`           | Search/index backend behind OpenMetadata's search UI and discovery features. The upstream chart calls this dependency "elasticsearch" throughout (config keys, secret names) for historical reasons, but the image actually deployed is OpenSearch - a drop-in, license-compatible fork. Don't be misled by the naming when reading `values.yaml`. Runs a log4j-patched image built from `acs-opensearch` (see [its README](../acs-opensearch/README.md)). |
 | **Airflow**                                         | `openmetadata-dependencies` → `airflow`              | Runs OpenMetadata's ingestion pipelines (metadata/profiler/lineage extraction jobs) on a schedule. OpenMetadata talks to it over its "pipeline service client" API rather than the user interacting with Airflow directly.                                                                                                                                                                                                                                 |
-| **Ingestion image** (`acs-openmetadata/Dockerfile`) | `{{registry}}/openmetadata-ingestion:1.13.3-patched` | The image Airflow's workers actually run. Built here from upstream's `openmetadata/ingestion` image with two fixes baked in - see [Troubleshooting](#troubleshooting).                                                                                                                                                                                                                                                                                     |
+| **Ingestion image** (`acs-openmetadata/Dockerfile`) | `{{registry}}/openmetadata-ingestion:2.0.0-patched` | The image Airflow's workers actually run. Built here from upstream's `openmetadata/ingestion` image with two fixes baked in - see [Troubleshooting](#troubleshooting).                                                                                                                                                                                                                                                                                     |
 
 An already-deployed ACS PostgreSQL database was **not** reused for
 OpenMetadata's own storage. ACS's shared Postgres is only reachable via
@@ -46,11 +46,11 @@ The two charts were then added as dependencies in `/deploy/Chart.yaml`:
 
 ```yaml
 - name: openmetadata
-  version: 1.13.3
+  version: 2.0.0
   repository: https://helm.open-metadata.org/
   condition: openmetadata.enabled
 - name: openmetadata-dependencies
-  version: 1.13.3
+  version: 2.0.0
   repository: https://helm.open-metadata.org/
   condition: openmetadata-dependencies.enabled
 ```
@@ -112,7 +112,7 @@ transient PyPI/network hiccup fails the pod). Instead, `acs-openmetadata/Dockerf
 pre-installs the same package at **build time**:
 
 ```dockerfile
-FROM openmetadata/ingestion:1.13.3
+FROM openmetadata/ingestion:2.0.0
 RUN pip install --no-cache-dir "apache-airflow-providers-fab==2.4.4"
 ```
 
@@ -163,7 +163,7 @@ make build
 ```
 
 `make build` (via `mk/acs.docker.mk`) runs
-`docker buildx build --push --platform linux/amd64 -t <registry>/openmetadata-ingestion:1.13.3-patched .`,
+`docker buildx build --push --platform linux/amd64 -t <registry>/openmetadata-ingestion:2.0.0-patched .`,
 then flattens the pushed image with `crane flatten`. `rm`-ing a file in a
 Dockerfile only hides it behind a whiteout - the bytes are still present in
 the upstream base image's layer underneath, which file-level vulnerability
@@ -176,7 +176,7 @@ unchanged - only the filesystem layers are affected. This is opted into via
 ACS service's `make build`, since `mk/acs.docker.mk` only runs it when
 `flatten` is set.
 
-The `version` in the `Makefile` is pinned to `1.13.3` on purpose (not the
+The `version` in the `Makefile` is pinned to `2.0.0` on purpose (not the
 usual `?=` override) - it tracks the upstream `openmetadata/ingestion`
 version this Dockerfile patches, not ACS's own release version, so it must
 not follow `config.mk`'s `version=` override for ACS's own services. The
@@ -188,7 +188,7 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: <registry>/openmetadata-ingestion
-        tag: 1.13.3-patched
+        tag: 2.0.0-patched
 ```
 
 ### Fix: init DB scripts

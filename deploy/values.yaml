@@ -131,7 +131,6 @@ files:
   storage: 20Gi
 
 fileSummariser:
-  # -- Whether or not to enable the File Summariser component
   enabled: true
   image:
     repository: acs-file-summariser

@@ -80,6 +80,8 @@ service: !u UUIDs.Service.Authentication
 version: 2
 grants:
   !u Files.Requirement.ServiceAccount:
+    !u Directory.Perm.AdvertiseService:
+      !u Files.Service.Files: false
     !u Auth.Perm.ReadACL:
       !u Files.Perm.All: true
     !u ConfigDB.Perm.ReadConfig:

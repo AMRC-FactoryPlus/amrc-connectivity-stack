@@ -2,8 +2,16 @@
 #
 # ACS File Summariser
 # Streams a downsampled summary of a TDMS file to stdout as NDJSON.
-# Reads the source file in bounded chunks so memory use stays roughly
-# constant regardless of file or channel size.
+#
+# Reads via TdmsFile.data_chunks(), which decodes each on-disk chunk
+# exactly once and shares it across every channel in the group. This
+# matters for interleaved TDMS data (common for synchronised multi-channel
+# DAQ writes): nptdms can only decode an interleaved chunk as a whole, so
+# reading channel-by-channel (each channel calling read_data() over the
+# same offset range) re-decodes the same bytes once per channel - peak
+# memory and CPU scale with the number of channels in the group. Reading
+# chunk-by-chunk instead decodes once and slices out each channel's data
+# from that single decode.
 #
 # Copyright 2026 University of Sheffield
 
@@ -12,10 +20,6 @@ import json
 
 import numpy as np
 from nptdms import TdmsFile
-
-# Samples read from disk at a time, per channel. Bounds peak memory
-# independently of channel length; only 1-in-`step` of these are kept.
-CHUNK_SAMPLES = 1_000_000
 
 
 def channel_timing(channel):
@@ -46,43 +50,6 @@ def jsonable(value):
     return value
 
 
-def summarise_channel(group_name, channel, step, emit):
-    num_samples = len(channel)
-    if num_samples == 0:
-        return
-
-    timing = channel_timing(channel)
-
-    offset = 0
-    while offset < num_samples:
-        length = min(CHUNK_SAMPLES, num_samples - offset)
-        window = channel.read_data(offset, length)
-
-        # First local index in this window that lands on the global
-        # step grid (global index = offset + local_idx).
-        local_start = (-offset) % step
-
-        for local_idx in range(local_start, length, step):
-            abs_idx = offset + local_idx
-            if timing is not None:
-                start_ns, increment_ns = timing
-                timestamp_ns = start_ns + abs_idx * increment_ns
-            else:
-                timestamp_ns = abs_idx
-
-            row = {
-                "group": group_name,
-                "channel": channel.name,
-                "value": jsonable(window[local_idx]),
-                # Emitted as a string: nanosecond epoch timestamps exceed
-                # what a JSON/JS float can represent exactly.
-                "timestamp_ns": str(timestamp_ns),
-            }
-            emit(row)
-
-        offset += length
-
-
 def summarise(file_path, step):
     def emit(row):
         sys.stdout.write(json.dumps(row))
@@ -90,9 +57,47 @@ def summarise(file_path, step):
         sys.stdout.flush()
 
     with TdmsFile.open(file_path) as tdms_file:
-        for group in tdms_file.groups():
-            for channel in group.channels():
-                summarise_channel(group.name, channel, step, emit)
+        timings = {
+            (group.name, channel.name): channel_timing(channel)
+            for group in tdms_file.groups()
+            for channel in group.channels()
+        }
+
+        for data_chunk in tdms_file.data_chunks():
+            for group_chunk in data_chunk.groups():
+                for channel_chunk in group_chunk.channels():
+                    length = len(channel_chunk)
+                    if length == 0:
+                        continue
+
+                    offset = channel_chunk.offset
+
+                    # First local index in this chunk that lands on the
+                    # global step grid (global index = offset + local_idx).
+                    local_start = (-offset) % step
+                    if local_start >= length:
+                        continue
+
+                    timing = timings[(group_chunk.name, channel_chunk.name)]
+                    values = channel_chunk[:]
+
+                    for local_idx in range(local_start, length, step):
+                        abs_idx = offset + local_idx
+                        if timing is not None:
+                            start_ns, increment_ns = timing
+                            timestamp_ns = start_ns + abs_idx * increment_ns
+                        else:
+                            timestamp_ns = abs_idx
+
+                        row = {
+                            "group": group_chunk.name,
+                            "channel": channel_chunk.name,
+                            "value": jsonable(values[local_idx]),
+                            # Emitted as a string: nanosecond epoch timestamps
+                            # exceed what a JSON/JS float can represent exactly.
+                            "timestamp_ns": str(timestamp_ns),
+                        }
+                        emit(row)
 
 
 if __name__ == "__main__":

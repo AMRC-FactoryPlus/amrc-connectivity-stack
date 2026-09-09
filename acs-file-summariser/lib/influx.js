@@ -35,6 +35,8 @@ export class Influx {
             flushInterval:  opts.flush_interval,
             maxBufferLines: 30_000,
             maxRetries:     0,
+            writeFailed:    (error, lines, attempt, expires) =>
+                this.log("Failed to write %d point(s) to InfluxDB: %s", lines.length, error),
         });
     }
 

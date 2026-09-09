@@ -21,6 +21,9 @@ RUN sh -ex <<'SHELL'
     npm install --save=false --omit=dev --install-links
 SHELL
 COPY --chown=node . .
+RUN sh -ex <<'SHELL'
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
+SHELL
 
 
 FROM ${base_prefix}-js-run:${base_version} AS run

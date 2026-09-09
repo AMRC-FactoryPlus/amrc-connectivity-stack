@@ -13,6 +13,7 @@ import { Queue }        from "../lib/queue.js";
 import { State }        from "../lib/state.js";
 import { Influx }       from "../lib/influx.js";
 import { Job }          from "../lib/job.js";
+import { GIT_VERSION }  from "../lib/git-version.js";
 
 const { env } = process;
 
@@ -49,5 +50,5 @@ const dispatcher = await new Dispatcher({
 
 process.on("exit", () => influx.close());
 
-log("Starting File Summariser");
+log("Starting File Summariser, revision %s", GIT_VERSION);
 dispatcher.run();

@@ -5,6 +5,7 @@ import { WebAPI } from '@amrc-factoryplus/service-api';
 import { routes } from '../lib/routes.js';
 import { Version, Service } from '../lib/constants.js';
 import {clean_up} from "../lib/startup.js";
+import { GIT_VERSION } from '../lib/git-version.js';
 
 const { env } = process;
 
@@ -26,6 +27,7 @@ const api = await new WebAPI({
     software: {
       vendor: 'AMRC',
       application: 'acs-files',
+      revision: GIT_VERSION,
     },
   },
   debug: fplus.debug,

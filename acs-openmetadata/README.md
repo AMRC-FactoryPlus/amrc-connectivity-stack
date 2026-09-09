@@ -10,7 +10,9 @@ works around two problems in the upstream image (see
 [Troubleshooting](#troubleshooting) below). The OpenSearch image gets a
 similar log4j patch, but lives in its own `acs-opensearch` directory since
 it isn't part of the ingestion image - see
-[acs-opensearch/README.md](../acs-opensearch/README.md).
+[acs-opensearch/README.md](../acs-opensearch/README.md). The OpenMetadata
+**server** image needs no such patch - see the note at the end of
+[Troubleshooting](#troubleshooting).
 
 ## Components
 
@@ -19,11 +21,11 @@ moving parts. What's actually running in the cluster:
 
 | Component                                           | Chart / image                                        | Function                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | --------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **OpenMetadata server**                             | `openmetadata` chart                                 | The metadata catalogue itself - the web UI and API that stores and serves schema/lineage/ownership metadata for data assets. Runs a log4j-patched image built from `acs-openmetadata-server` (see [its README](../acs-openmetadata-server/README.md)). |
+| **OpenMetadata server**                             | `openmetadata` chart                                 | The metadata catalogue itself - the web UI and API that stores and serves schema/lineage/ownership metadata for data assets. Runs the stock upstream `docker.getcollate.io/openmetadata/server` image unpatched - its bundled log4j is already at a fixed version, see [Troubleshooting](#troubleshooting). |
 | **MySQL**                                           | `openmetadata-dependencies` → `mysql` (Bitnami)      | OpenMetadata's own relational store, holding both the `openmetadata_db` (catalogue metadata) and `airflow_db` (ingestion pipeline scheduling state) databases.                                                                                                                                                                                                                                                                                             |
 | **OpenSearch**                                      | `openmetadata-dependencies` → `opensearch`           | Search/index backend behind OpenMetadata's search UI and discovery features. The upstream chart calls this dependency "elasticsearch" throughout (config keys, secret names) for historical reasons, but the image actually deployed is OpenSearch - a drop-in, license-compatible fork. Don't be misled by the naming when reading `values.yaml`. Runs a log4j-patched image built from `acs-opensearch` (see [its README](../acs-opensearch/README.md)). |
 | **Airflow**                                         | `openmetadata-dependencies` → `airflow`              | Runs OpenMetadata's ingestion pipelines (metadata/profiler/lineage extraction jobs) on a schedule. OpenMetadata talks to it over its "pipeline service client" API rather than the user interacting with Airflow directly.                                                                                                                                                                                                                                 |
-| **Ingestion image** (`acs-openmetadata/Dockerfile`) | `{{registry}}/openmetadata-ingestion:2.0.0-patched` | The image Airflow's workers actually run. Built here from upstream's `openmetadata/ingestion` image with two fixes baked in - see [Troubleshooting](#troubleshooting).                                                                                                                                                                                                                                                                                     |
+| **Ingestion image** (`acs-openmetadata/Dockerfile`) | `{{registry}}/openmetadata-ingestion:2.0.1-patched` | The image Airflow's workers actually run. Built here from upstream's `openmetadata/ingestion` image with two fixes baked in - see [Troubleshooting](#troubleshooting).                                                                                                                                                                                                                                                                                     |
 
 An already-deployed ACS PostgreSQL database was **not** reused for
 OpenMetadata's own storage. ACS's shared Postgres is only reachable via
@@ -46,11 +48,11 @@ The two charts were then added as dependencies in `/deploy/Chart.yaml`:
 
 ```yaml
 - name: openmetadata
-  version: 2.0.0
+  version: 2.0.1
   repository: https://helm.open-metadata.org/
   condition: openmetadata.enabled
 - name: openmetadata-dependencies
-  version: 2.0.0
+  version: 2.0.1
   repository: https://helm.open-metadata.org/
   condition: openmetadata-dependencies.enabled
 ```
@@ -146,11 +148,18 @@ log4j2's public API is stable across patch versions, so this is a safe
 drop-in swap that doesn't require touching PySpark itself or knowing whether
 the Spark profiling engine is actually exercised.
 
-This is a separate fix from the OpenMetadata **server** image's own bundled
-log4j (`/opt/openmetadata/libs`) - that's a different upstream image
-(`docker.getcollate.io/openmetadata/server`, not `openmetadata/ingestion`),
-patched independently. See
-[acs-openmetadata-server/README.md](../acs-openmetadata-server/README.md).
+This is a PySpark-specific problem, not an OpenMetadata one - the
+OpenMetadata **server** image (`docker.getcollate.io/openmetadata/server`,
+a different upstream image from `openmetadata/ingestion`) bundles its own
+copy of log4j under `/opt/openmetadata/libs`, and as of upstream `2.0.0`/
+`2.0.1` that copy is already log4j-core/log4j-api `2.25.5` - past the
+`2.25.4` fix version for the outstanding log4j2 CVEs (CVE-2025-68161,
+CVE-2026-34477 through CVE-2026-34480). There used to be an
+`acs-openmetadata-server` image that patched those jars too, but it was
+removed once this was confirmed - `values.yaml` now points the `openmetadata`
+chart at the stock server image with no patch needed. If a future upstream
+release regresses to an older log4j, re-add that patch rather than assuming
+it's still fixed.
 
 ### Building and pushing the patched image
 
@@ -163,7 +172,7 @@ make build
 ```
 
 `make build` (via `mk/acs.docker.mk`) runs
-`docker buildx build --push --platform linux/amd64 -t <registry>/openmetadata-ingestion:2.0.0-patched .`,
+`docker buildx build --push --platform linux/amd64 -t <registry>/openmetadata-ingestion:2.0.1-patched .`,
 then flattens the pushed image with `crane flatten`. `rm`-ing a file in a
 Dockerfile only hides it behind a whiteout - the bytes are still present in
 the upstream base image's layer underneath, which file-level vulnerability
@@ -176,7 +185,7 @@ unchanged - only the filesystem layers are affected. This is opted into via
 ACS service's `make build`, since `mk/acs.docker.mk` only runs it when
 `flatten` is set.
 
-The `version` in the `Makefile` is pinned to `2.0.0` on purpose (not the
+The `version` in the `Makefile` is pinned to `2.0.1` on purpose (not the
 usual `?=` override) - it tracks the upstream `openmetadata/ingestion`
 version this Dockerfile patches, not ACS's own release version, so it must
 not follow `config.mk`'s `version=` override for ACS's own services. The
@@ -188,7 +197,7 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: <registry>/openmetadata-ingestion
-        tag: 2.0.0-patched
+        tag: 2.0.1-patched
 ```
 
 ### Fix: init DB scripts

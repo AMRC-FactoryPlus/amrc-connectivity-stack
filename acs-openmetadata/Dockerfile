@@ -1,4 +1,4 @@
-FROM openmetadata/ingestion:2.0.0
+FROM openmetadata/ingestion:2.0.1
 
 # Pre-install the package during image build time
 RUN pip install --no-cache-dir "apache-airflow-providers-fab==2.4.4"

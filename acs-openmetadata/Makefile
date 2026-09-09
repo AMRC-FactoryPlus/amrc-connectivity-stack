@@ -5,7 +5,7 @@ repo?=openmetadata-ingestion
 # Hard-set (not ?=): this tracks the upstream openmetadata/ingestion
 # version this Dockerfile patches, not ACS's own release version, so it
 # must not follow config.mk's version= override for ACS's own services.
-version=2.0.0
+version=2.0.1
 suffix?=-patched
 k8s.deployment?=openmetadata
 # Flatten after push: the Dockerfile removes the bundled pyspark log4j jars,

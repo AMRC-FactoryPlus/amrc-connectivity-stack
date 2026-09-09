@@ -13,9 +13,9 @@ dependencies:
   version: v1.14.4
 - name: openmetadata
   repository: https://helm.open-metadata.org/
-  version: 2.0.0
+  version: 2.0.1
 - name: openmetadata-dependencies
   repository: https://helm.open-metadata.org/
-  version: 2.0.0
-digest: sha256:4ade62fa8cf83a37e1d4d9c4c42d6cf89edc76f6b9457edfba097bd4292e5e37
-generated: "2026-09-04T13:26:00.051886242Z"
+  version: 2.0.1
+digest: sha256:8424dbef616ea01da345d1586abcd1671a71ae8a85b3aae32a6d7d2fc848b018
+generated: "2026-09-09T13:02:29.079596086Z"

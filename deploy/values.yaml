@@ -719,12 +719,6 @@ cert-manager:
 openmetadata:
   enabled: true
   fullnameOverride: "openmetadata"
-  image:
-    # Patched to replace the bundled log4j-core/log4j-api 2.25.5 jars under
-    # /opt/openmetadata/libs - built from acs-openmetadata-server/Dockerfile.
-    # See acs-openmetadata-server/README.md.
-    repository: <registry>/openmetadata-server
-    tag: "2.0.0-patched"
   openmetadata:
     config:
       elasticsearch:
@@ -813,7 +807,12 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: <registry>/openmetadata-ingestion
-        tag: 2.0.0-patched
+        tag: 2.0.1-patched
+    # The chart's own fernet-key Secret is a pre-install-only Helm hook, so
+    # it never gets created when openmetadata is enabled on an existing acs
+    # release (an upgrade, not a fresh install). Point at our own instead -
+    # see deploy/templates/openmetadata/openmetadata-secrets.yaml.
+    fernetKeySecretName: airflow-fernet-key
     data:
       # The chart's own default (data.metadataConnection.pass: airflow_pass)
       # is a hardcoded literal with no per-field secretRef - metadataSecretName

@@ -84,7 +84,8 @@ export class OPCUAConnection extends DeviceConnection {
             keepSessionAlive: true,
             connectionStrategy: {
                 initialDelay: 1000,
-                maxDelay: 20000
+                maxDelay: 20000,
+                maxRetry: -1 // node-opcua uses -1 for unlimited retries
             },
             securityMode: getOpcSecurityMode(connDetails.securityMode),
             securityPolicy: getOpcSecurityPolicy(connDetails.securityPolicy),

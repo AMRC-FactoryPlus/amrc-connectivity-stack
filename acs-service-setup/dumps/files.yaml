@@ -95,6 +95,7 @@ grants:
     !u Auth.Perm.ReadACL:
       !u Files.Perm.All: true
     !u ConfigDB.Perm.ReadConfig:
+      !u Files.App.Config: false
       !u Files.App.Summary: false
       !u Files.App.SummaryState: false
     !u ConfigDB.Perm.WriteConfig:

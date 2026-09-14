@@ -29,6 +29,8 @@ export class Job {
 
         try {
             const config = await this.fplus.ConfigDB.get_config(App.Summary, file_uuid);
+            const file_config = await this.fplus.ConfigDB.get_config(App.Config, file_uuid);
+            const device_uuid = file_config?.device_uuid;
 
             await this.fplus.Files.save_file(file_uuid, scratch_path);
 
@@ -36,7 +38,11 @@ export class Job {
             for await (const row of plugin.summarise(scratch_path, config)) {
                 this.influx.write({
                     ...row,
-                    tags: { ...row.tags, file: file_uuid },
+                    tags: {
+                        ...row.tags,
+                        file: file_uuid,
+                        ...(device_uuid ? { topLevelInstance: device_uuid } : {}),
+                    },
                 });
                 count++;
             }

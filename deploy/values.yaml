@@ -806,7 +806,7 @@ openmetadata-dependencies:
   airflow:
     images:
       airflow:
-        repository: <registry>/openmetadata-ingestion
+        repository: ghcr.io/amrc-factoryplus/openmetadata-ingestion
         tag: 2.0.1-patched
     # The chart's own fernet-key Secret is a pre-install-only Helm hook, so
     # it never gets created when openmetadata is enabled on an existing acs
@@ -862,7 +862,7 @@ openmetadata-dependencies:
       # Patched to replace the bundled log4j-core/log4j-api 2.25.4 jars -
       # built from acs-opensearch/Dockerfile. See acs-openmetadata/README.md
       # for the equivalent log4j fix applied to the ingestion image.
-      repository: <registry>/opensearch
+      repository: ghcr.io/amrc-factoryplus/opensearch
       tag: "3.8.0-patched"
     persistence:
       accessModes:

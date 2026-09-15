@@ -196,7 +196,7 @@ openmetadata-dependencies:
   airflow:
     images:
       airflow:
-        repository: <registry>/openmetadata-ingestion
+        repository: ghcr.io/amrc-factoryplus/openmetadata-ingestion
         tag: 2.0.1-patched
 ```
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import { UUIDs } from '@amrc-factoryplus/service-client';
 import { App, Class, Perm, Special } from './constants.js';
 import fs from 'node:fs/promises'
 import path from 'path';
@@ -117,6 +118,18 @@ export class APIv1 {
       return res.status(404).json({ message: 'FAILED: File object not found.' });
     }
 
+    // Check the device uuid, if given, is a valid, registered Device.
+    const device_uuid = req.headers['device-uuid'] || null;
+    if (device_uuid) {
+      if (!Valid.uuid.test(device_uuid)) {
+        return res.status(400).json({ message: 'FAILED: Device Uuid is invalid' });
+      }
+      const deviceExists = await this.configDb.class_has_member(UUIDs.Class.Device, device_uuid);
+      if (!deviceExists) {
+        return res.status(404).json({ message: 'FAILED: Device object not found.' });
+      }
+    }
+
     const file_path = path.resolve(this.uploadPath, file_uuid);
     // Temporary path to use while writing to disk.
     const temp_path = path.resolve(this.uploadPath, `${file_uuid}.temp`);
@@ -168,6 +181,7 @@ export class APIv1 {
       user_who_uploaded: req.auth,
       file_size: stats.size,
       original_file_name: original_file_name,
+      device_uuid: device_uuid,
     };
 
     try{

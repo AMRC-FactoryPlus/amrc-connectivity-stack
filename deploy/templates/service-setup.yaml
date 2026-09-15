@@ -269,4 +269,8 @@ data:
       - service: !u UUIDs.Service.i3x
         url: !acs "http://i3x.${namespace}.svc.${k8sdomain}"
 {{ end }}
+{{ if .Values.openmetadata.enabled }}
+      - service: !u Openmetadata.Service.Openmetadata
+        url: !acs "http${secure}://openmetadata.${domain}"
+{{ end }}
 {{ end }}

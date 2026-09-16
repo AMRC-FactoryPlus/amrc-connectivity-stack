@@ -5,8 +5,6 @@ config.mk
 
 */.npm_install_done
 .vscode/
-.claude/
-.devcontainer/
 .DS_Store
 /edge-ads/node_modules
 spirit-schemas/

@@ -1,0 +1,27 @@
+name: JS import check
+
+# The shared libraries are installed into every service image and
+# published to npm, so an import they don't declare breaks the whole
+# stack at runtime rather than at install time (see issue #745).
+
+on:
+  pull_request:
+    branches:
+      - main
+      - testing/v4
+
+jobs:
+  check-imports:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Check library imports are declared
+        run: node mk/tools/check-imports.mjs lib/js-*

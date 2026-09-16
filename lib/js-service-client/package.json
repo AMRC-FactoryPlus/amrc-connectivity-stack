@@ -1,6 +1,6 @@
 {
   "name": "@amrc-factoryplus/service-client",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "",
   "main": "lib/index.js",
   "type": "module",
@@ -12,6 +12,8 @@
   "license": "ISC",
   "dependencies": {
     "content-type": "^1.0.5",
+    "got": "^12.6.1",
+    "got-fetch": "^5.1.8",
     "isomorphic-ws": "^5.0.0",
     "mqtt": "^5.3.6",
     "optional-js": "^2.3.0",
@@ -20,7 +22,6 @@
     "long": "^5.2.3"
   },
   "optionalDependencies": {
-    "got-fetch": "^5.1.8",
     "gssapi.js": "^2.0.1"
   },
   "devDependencies": {

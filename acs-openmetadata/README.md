@@ -237,6 +237,53 @@ The `openmetadata_db` database/user don't need a custom script at all -
 `openmetadata-mysql-secrets` used everywhere else) make the Bitnami chart
 create them itself.
 
+### Fix: `PASSWORDS ERROR` enabling OpenMetadata on an existing ACS release
+
+Turning `openmetadata.enabled`/`openmetadata-dependencies.enabled` on via
+`helm upgrade` against an ACS release that's already installed (rather than
+a fresh `helm install`) fails with:
+
+```
+Error: UPGRADE FAILED: execution error at (amrc-connectivity-stack/charts/openmetadata-dependencies/charts/mysql/templates/secrets.yaml:9:17):
+PASSWORDS ERROR: You must provide your current passwords when upgrading the release.
+```
+
+This isn't a real "you changed the password" problem - it's a chicken-and-egg
+gap in the secret handling described in [Secrets](#secrets) above. Helm
+renders every template in the release, top-level chart and subcharts alike,
+in a single pass against the cluster state as it is *before* anything in
+this release gets applied. `openmetadata-secrets.yaml`'s
+`{{- if not (lookup ...) }}` guard and the Bitnami `mysql` subchart's own
+`secrets.yaml` (which `auth.existingSecret: openmetadata-mysql-secrets`
+points at) both run their `lookup` in that same pass, so on the very first
+upgrade that turns OpenMetadata on, neither one can see a secret the other
+is about to create. The `mysql` subchart then falls back to its own
+password-validation logic, sees `.Release.IsUpgrade == true` (true for the
+ACS release as a whole, even though OpenMetadata itself is being installed
+for the first time), and refuses to invent a random password. A plain
+`helm install` never hits this, because `IsUpgrade` is false there and the
+check is skipped entirely.
+
+The fix is to pre-create the secret by hand, once, with the same keys the
+template would have generated, before running the upgrade:
+
+```sh
+kubectl create secret generic openmetadata-mysql-secrets \
+  --namespace factory-plus \
+  --from-literal=mysql-root-password="$(openssl rand -base64 24)" \
+  --from-literal=mysql-password="$(openssl rand -base64 24)" \
+  --from-literal=mysql-replication-password="$(openssl rand -base64 24)"
+
+kubectl annotate secret openmetadata-mysql-secrets -n factory-plus helm.sh/resource-policy=keep
+```
+
+Re-run the same `helm upgrade --install` afterwards. Both `lookup` calls now
+find the secret already present, so `openmetadata-secrets.yaml` skips
+creating it and the `mysql` chart reads `mysql-password`/`mysql-root-password`
+straight from it. The `helm.sh/resource-policy: keep` annotation matches
+every other secret this chart manages, so it survives future upgrades the
+same way.
+
 ### Fix: `ReadWriteMany` not available
 
 Airflow's chart defaults to `CeleryExecutor`, which needs its DAGs and logs

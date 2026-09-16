@@ -717,7 +717,7 @@ cert-manager:
   fullnameOverride: "cert-manager"
 
 openmetadata:
-  enabled: true
+  enabled: false
   fullnameOverride: "openmetadata"
   openmetadata:
     config:
@@ -750,7 +750,7 @@ openmetadata:
               secretKey: openmetadata-airflow-password
 
 openmetadata-dependencies:
-  enabled: true
+  enabled: false
 
   mysql:
     enabled: true

@@ -9,6 +9,7 @@ import { ServiceClient } from "@amrc-factoryplus/service-client";
 import { GIT_VERSION } from "../lib/git-version.js";
 import { CentralMonitor } from "../lib/central.js";
 import { SparkplugNode } from "../lib/sparkplug/node.js";
+import { ignore_unhandled_rejections } from "../lib/util.js";
 
 console.log("Starting ACS central monitor, revision %s", GIT_VERSION);
 
@@ -17,6 +18,8 @@ const fplus = await new ServiceClient({
 }).init();
 /* XXX This is global. I need a better interface to the cache. */
 fplus.Fetch.cache = "reload";
+
+ignore_unhandled_rejections(fplus);
 
 const sparkplug = await new SparkplugNode({
     fplus,

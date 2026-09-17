@@ -2,6 +2,11 @@
   "name": "@amrc-factoryplus/service-client",
   "version": "1.6.1",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git",
+    "directory": "lib/js-service-client"
+  },
   "main": "lib/index.js",
   "type": "module",
   "scripts": {

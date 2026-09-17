@@ -2,6 +2,11 @@
   "name": "@amrc-factoryplus/pg-client",
   "version": "0.0.1",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git",
+    "directory": "lib/js-pg-client"
+  },
   "main": "./lib/index.js",
   "type": "module",
   "scripts": {

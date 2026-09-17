@@ -49,9 +49,11 @@ jobs:
     needs: choose-type
     if: ${{ needs.choose-type.outputs.type == 'js' }}
     uses: ./.github/workflows/js-lib.yaml
+    permissions:
+      contents: read
+      id-token: write
     with:
       libdir: "lib/js-${{ needs.choose-type.outputs.library }}"
       version: "${{ needs.choose-type.outputs.version }}"
-    secrets: inherit
 
 

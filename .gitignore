@@ -4,7 +4,7 @@ config.mk
 .env
 
 */.npm_install_done
-.vscode
+.vscode/
 .DS_Store
 /edge-ads/node_modules
 spirit-schemas/

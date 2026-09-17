@@ -32,3 +32,11 @@ dependencies:
     repository: https://charts.jetstack.io
     version: v1.14.4
     condition: acs.letsEncrypt.enabled
+  - name: openmetadata
+    version: 2.0.1
+    repository: https://helm.open-metadata.org/
+    condition: openmetadata.enabled
+  - name: openmetadata-dependencies
+    version: 2.0.1
+    repository: https://helm.open-metadata.org/
+    condition: openmetadata-dependencies.enabled

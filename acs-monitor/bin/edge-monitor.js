@@ -9,12 +9,15 @@ import { ServiceClient } from "@amrc-factoryplus/service-client";
 import { GIT_VERSION } from "../lib/git-version.js";
 import { EdgeMonitor } from "../lib/edge.js";
 import { SparkplugNode } from "../lib/sparkplug/node.js";
+import { ignore_unhandled_rejections } from "../lib/util.js";
 
 console.log("Starting ACS edge monitor, revision %s", GIT_VERSION);
 
 const fplus = await new ServiceClient({
     env: process.env,
 }).init();
+
+ignore_unhandled_rejections(fplus);
 
 const sparkplug = await new SparkplugNode({
     fplus,

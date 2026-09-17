@@ -11,22 +11,29 @@ on:
         description: "Version to publish as"
         required: true
         type: string
-    secrets:
-      NPM_TOKEN:
-        description: "NPM access token"
-        required: true
-          
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # npm trusted publishing: npm exchanges the GitHub OIDC token for a
+    # short-lived publish credential. The trusted publisher is
+    # configured per package on npmjs.com against release.yaml.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '22.x'
+
+      # Trusted publishing needs npm 11.5.1 or later. Pin to the same
+      # npm as the JS base image; npm 12 blocks install scripts.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
 
       - name: Publish package
         working-directory: ${{ inputs.libdir }}
@@ -38,6 +45,4 @@ jobs:
           mv package.json.tmp package.json
 
           npm install --verbose
-
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
           npm publish --access=public

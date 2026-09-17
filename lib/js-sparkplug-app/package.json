@@ -2,6 +2,11 @@
   "name": "@amrc-factoryplus/sparkplug-app",
   "version": "0.0.6",
   "description": "A Javascript library providing Sparkplug Application functionality",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git",
+    "directory": "lib/js-sparkplug-app"
+  },
   "main": "lib/index.js",
   "type": "module",
   "scripts": {

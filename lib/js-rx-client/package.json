@@ -2,6 +2,11 @@
   "name": "@amrc-factoryplus/rx-client",
   "version": "v0.0.1-bmz.1",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git",
+    "directory": "lib/js-rx-client"
+  },
   "main": "./lib/index.js",
   "type": "module",
   "scripts": {

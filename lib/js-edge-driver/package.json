@@ -2,6 +2,11 @@
   "name": "@amrc-factoryplus/edge-driver",
   "version": "0.0.5",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git",
+    "directory": "lib/js-edge-driver"
+  },
   "main": "lib/index.js",
   "type": "module",
   "scripts": {

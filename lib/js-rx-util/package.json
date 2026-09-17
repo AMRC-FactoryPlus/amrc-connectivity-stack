@@ -2,6 +2,11 @@
   "name": "@amrc-factoryplus/rx-util",
   "version": "0.0.3",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git",
+    "directory": "lib/js-rx-util"
+  },
   "main": "lib/index.js",
   "type": "module",
   "scripts": {

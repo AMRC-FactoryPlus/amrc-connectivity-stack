@@ -46,7 +46,6 @@ subdirs+= acs-data-access
 subdirs+= acs-directory
 subdirs+= acs-edge
 subdirs+= acs-edge-sync
-subdirs+= acs-file-summariser
 subdirs+= acs-files
 subdirs+= acs-git
 subdirs+= acs-identity

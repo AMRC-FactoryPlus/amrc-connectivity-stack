@@ -240,7 +240,6 @@ jobs:
           - uns-ingester-sparkplug
           - acs-opcua-server-edge
           - acs-i3x
-          - acs-file-summariser
     permissions:
       contents: read
       packages: write

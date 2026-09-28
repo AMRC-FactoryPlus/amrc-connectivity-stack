@@ -45,6 +45,8 @@ spec:
             name: directory-json-dumps
 
       initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
         - name: db-init
 {{ include "amrc-connectivity-stack.image" (list . .Values.directory) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]
@@ -106,6 +108,8 @@ spec:
               name: krb5-conf
             - mountPath: /keytabs
               name: krb5-keytabs
+
+{{ include "amrc-connectivity-stack.service-probes" (list . 8080) | indent 10 }}
 ---
 apiVersion: v1
 kind: Service

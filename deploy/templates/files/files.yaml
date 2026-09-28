@@ -39,6 +39,9 @@ spec:
           persistentVolumeClaim:
             claimName: files-storage
               
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
       containers:
         - name: webapi
 {{ include "amrc-connectivity-stack.image" (list . .Values.files) | indent 10 }}
@@ -86,6 +89,8 @@ spec:
               name: krb5-keytabs
             - mountPath: /data
               name: files-storage
+
+{{ include "amrc-connectivity-stack.service-probes" (list . 8080) | indent 10 }}
 ---
 apiVersion: v1
 kind: Service

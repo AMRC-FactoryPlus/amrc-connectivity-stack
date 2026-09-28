@@ -8,10 +8,6 @@ objects:
       name: "Files Service Server"
       subclassOf:
         - !u Auth.Class.CentralService
-    !u Files.Requirement.SummariserServiceAccount:
-      name: "File Summariser Service"
-      subclassOf:
-        - !u Auth.Class.CentralService
 
   !u Auth.Class.ServicePerms:
     !u Files.Perm.All:
@@ -25,14 +21,6 @@ objects:
   !u UUIDs.Class.App:
     !u Files.App.Config:
       name: "Files Configuration"
-      subclassOf:
-        - !u MetaDB.Class.ConfigEntry
-    !u Files.App.Summary:
-      name: "File Summary Configuration"
-      subclassOf:
-        - !u MetaDB.Class.ConfigEntry
-    !u Files.App.SummaryState:
-      name: "File Summary State"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
 
@@ -70,10 +58,6 @@ objects:
       name: "TXT"
       subclassOf:
         - !u Files.Class.File
-    !u Files.FileType.TDMS:
-      name: "TDMS"
-      subclassOf:
-        - !u Files.Class.File
 
 ---
 service: !u UUIDs.Service.Authentication
@@ -91,18 +75,4 @@ grants:
     !u ConfigDB.Perm.ReadMembers:
       !u Files.Class.File: false
       !u UUIDs.Class.Device: false
-
-  !u Files.Requirement.SummariserServiceAccount:
-    !u Auth.Perm.ReadACL:
-      !u Files.Perm.All: true
-    !u ConfigDB.Perm.ReadConfig:
-      !u Files.App.Config: false
-      !u Files.App.Summary: false
-      !u Files.App.SummaryState: false
-    !u ConfigDB.Perm.WriteConfig:
-      !u Files.App.SummaryState: false
-    !u ConfigDB.Perm.ReadMembers:
-      !u Files.FileType.TDMS: false
-    !u Files.Perm.Download:
-      !u Files.Class.File: true
 

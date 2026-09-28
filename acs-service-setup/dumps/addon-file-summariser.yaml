@@ -1,0 +1,44 @@
+#-REQUIRE: auth files
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u Files.Requirement.SummariserServiceAccount:
+      name: "File Summariser Service"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+  !u UUIDs.Class.App:
+    !u Files.App.Summary:
+      name: "File Summary Configuration"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u Files.App.SummaryState:
+      name: "File Summary State"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+  !u Files.Class.FileType:
+    !u Files.FileType.TDMS:
+      name: "TDMS"
+      subclassOf:
+        - !u Files.Class.File
+
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Files.Requirement.SummariserServiceAccount:
+    !u Auth.Perm.ReadACL:
+      !u Files.Perm.All: true
+    !u ConfigDB.Perm.ReadConfig:
+      !u Files.App.Config: false
+      !u Files.App.Summary: false
+      !u Files.App.SummaryState: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u Files.App.SummaryState: false
+    !u ConfigDB.Perm.ReadMembers:
+      !u Files.FileType.TDMS: false
+    !u Files.Perm.Download:
+      !u Files.Class.File: true

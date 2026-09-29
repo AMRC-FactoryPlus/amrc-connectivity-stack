@@ -49,6 +49,7 @@ subdirs+= acs-edge-sync
 subdirs+= acs-files
 subdirs+= acs-git
 subdirs+= acs-identity
+subdirs+= acs-i3x
 subdirs+= acs-keycloak
 subdirs+= acs-krb-keys-operator
 subdirs+= acs-krb-utils

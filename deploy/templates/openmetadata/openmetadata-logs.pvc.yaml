@@ -1,4 +1,5 @@
 {{ if .Values.openmetadata.enabled }}
+{{- $storage := .Values.openmetadataStorage }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -6,23 +7,13 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    - {{ $storage.accessMode }}
+  {{- with $storage.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   resources:
     requests:
-      storage: 1Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: acs-dags
-  namespace: {{ .Release.Namespace }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+      storage: {{ $storage.dagsSize }}
 
 ---
 apiVersion: v1
@@ -32,8 +23,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    - {{ $storage.accessMode }}
+  {{- with $storage.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   resources:
     requests:
-      storage: 10Gi
+      storage: {{ $storage.logsSize }}
 {{- end -}}

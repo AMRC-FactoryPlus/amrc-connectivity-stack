@@ -38,15 +38,29 @@ function mockValueCache() {
     };
 }
 
-function mockHistory() {
-    return {
+function mockHistory(objectTree: { getObject: (id: string) => any }) {
+    const history = {
         getCurrentValue: jest.fn<(id: string) => Promise<I3xValueResponse | null>>()
             .mockResolvedValue(null),
         getCompositionValue: jest.fn<(id: string, maxDepth?: number) => Promise<I3xValueResponse | null>>()
             .mockResolvedValue(null),
+        /* Batch read used by POST /objects/value. Delegates to the
+         * per-id mocks above, choosing between them the way the real
+         * History does, so tests can keep stubbing per-id results. */
+        getValues: jest.fn<(ids: string[], maxDepth?: number) => Promise<Map<string, I3xValueResponse | null>>>()
+            .mockImplementation(async (ids: string[], maxDepth?: number) => {
+                const out = new Map<string, I3xValueResponse | null>();
+                for (const id of ids) {
+                    out.set(id, objectTree.getObject(id)?.isComposition
+                        ? await history.getCompositionValue(id, maxDepth)
+                        : await history.getCurrentValue(id));
+                }
+                return out;
+            }),
         queryHistory: jest.fn<(id: string, start: string, end: string, maxDepth?: number) => Promise<I3xVqt[]>>()
             .mockResolvedValue([]),
     };
+    return history;
 }
 
 /* The authenticated principal the test app presents. Subscription
@@ -82,7 +96,7 @@ const NS_URI = "urn:test:namespace";
 function createApp(opts: { maxDepthCap?: number } = {}) {
     const objectTree = mockObjectTree();
     const valueCache = mockValueCache();
-    const history = mockHistory();
+    const history = mockHistory(objectTree);
     const subscriptions = mockSubscriptions();
 
     const api = new APIv1({
@@ -632,6 +646,72 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(history.getCompositionValue).toHaveBeenCalledWith("obj-1", 999);
+        });
+
+        it("reads all cache misses from InfluxDB in one batch, in request order", async () => {
+            const { app, history, valueCache } = createApp();
+            const cached: I3xValueResponse = { ...sampleValueResponse, elementId: "hit", value: "from-uns" };
+            valueCache.getValue.mockImplementation((id: string) => id === "hit" ? cached : null);
+            history.getCurrentValue.mockImplementation(async (id: string) =>
+                id === "miss-1" || id === "miss-2"
+                    ? { ...sampleValueResponse, elementId: id, value: `influx-${id}` }
+                    : null);
+
+            const res = await request(app)
+                .post("/objects/value")
+                .send({ elementIds: ["miss-1", "hit", "none", "miss-2", "miss-1"], maxDepth: 2 });
+
+            expect(res.status).toBe(200);
+            expect(history.getValues).toHaveBeenCalledTimes(1);
+            expect(history.getValues).toHaveBeenCalledWith(["miss-1", "none", "miss-2"], 2);
+            expect(res.body.success).toBe(false);
+            expect(res.body.results.map((r: any) => [r.elementId, r.success, r.result?.value ?? r.error?.code]))
+                .toEqual([
+                    ["miss-1", true, "influx-miss-1"],
+                    ["hit", true, "from-uns"],
+                    ["none", false, 404],
+                    ["miss-2", true, "influx-miss-2"],
+                    ["miss-1", true, "influx-miss-1"],
+                ]);
+            expect(res.body.results[2].error.message).toBe("No value for none");
+        });
+
+        it("serves a UNS cache hit even when InfluxDB has a value, and does not query for it", async () => {
+            const { app, history, valueCache } = createApp();
+            const cached: I3xValueResponse = { ...sampleValueResponse, elementId: "obj-1", value: "newer-uns" };
+            valueCache.getValue.mockReturnValue(cached);
+            history.getCurrentValue.mockResolvedValue({ ...sampleValueResponse, value: "older-influx" });
+
+            const res = await request(app).post("/objects/value").send({ elementIds: ["obj-1"] });
+
+            expect(res.body.results[0].result).toEqual(cached);
+            expect(history.getValues).not.toHaveBeenCalled();
+        });
+
+        it("fails the request when the InfluxDB read fails, as before", async () => {
+            const { app, history } = createApp();
+            history.getValues.mockRejectedValue(new Error("Request timed out"));
+
+            const res = await request(app).post("/objects/value").send({ elementIds: ["obj-1"] });
+
+            expect(res.status).toBe(500);
+            expect(res.body.error.message).toBe("Request timed out");
+        });
+
+        it("does not write per-element logs to stdout", async () => {
+            const { app, history, valueCache } = createApp();
+            valueCache.getValue.mockImplementation((id: string) =>
+                id === "hit" ? { ...sampleValueResponse, elementId: "hit" } : null);
+            history.getCurrentValue.mockResolvedValue(sampleValueResponse);
+            const spy = jest.spyOn(console, "log").mockImplementation(() => {});
+            try {
+                await request(app).post("/objects/value").send({ elementIds: ["hit", "a", "b"] });
+                await request(app).get("/objects/a/value");
+                await request(app).get("/objects/hit/value");
+                expect(spy).not.toHaveBeenCalled();
+            } finally {
+                spy.mockRestore();
+            }
         });
     });
 

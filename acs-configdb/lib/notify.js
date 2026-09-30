@@ -75,10 +75,13 @@ export class CDBNotify {
             rx.share());
 
         /* Lookups triggered by class updates, one per (relation,
-         * class) however many clients are watching it. */
+         * class) however many clients are watching it. Nothing is
+         * replayed to new watchers, so stop as soon as the last watcher
+         * leaves rather than running lookups nobody receives. */
         this.lookup_seq = 0;
         this.shared_lookups = rxx.cacheSeq({
             factory: key => this.shared_lookup(...JSON.parse(key)),
+            timeout: 0,
         });
 
         this.notify = this.build_notify(opts.api);

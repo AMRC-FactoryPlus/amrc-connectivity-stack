@@ -54,9 +54,32 @@ export class DriverBroker extends EventEmitter {
         br.authorizePublish = this.authPub.bind(this);
         br.authorizeSubscribe = this.authSub.bind(this);
 
+        /* Never call back from inside a callback. The callback
+         * releases this message's slot in Aedes' mqemitter, and when
+         * messages are queued it dispatches the next one to us before
+         * it returns. Calling back straight away therefore drains the
+         * whole queue recursively, one set of stack frames per
+         * message, and a few thousand queued driver messages overflow
+         * the stack. Instead, a call made during a callback only
+         * handles its message and leaves its callback for the
+         * outermost call to make, in a loop. The stack stays flat,
+         * messages are handled in queue order, and nothing waits for
+         * a later tick. */
+        const callbacks: Array<() => void> = [];
+        let releasing = false;
         br.subscribe(`${prefix}/#`, (packet, callback) => {
-            callback();
+            callbacks.push(callback);
             this.message(packet.topic, packet.payload);
+            if (releasing) return;
+            releasing = true;
+            try {
+                let cb;
+                while ((cb = callbacks.shift()))
+                    cb();
+            }
+            finally {
+                releasing = false;
+            }
         }, () => {});
     }
 

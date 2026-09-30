@@ -5,9 +5,9 @@
 <template>
   <EdgeContainer>
     <EdgePageSkeleton v-if="nodeLoading"/>
-    <div v-else class="flex h-full">
+    <div v-else class="flex h-full min-h-0">
       <!-- Main content -->
-      <div class="flex-1 flex flex-col gap-4 pr-4">
+      <div class="flex-1 min-w-0 flex flex-col gap-4 pr-4 -my-4 py-4 overflow-y-auto">
         <div class="flex-1">
           <Tabs default-value="devices" class="flex flex-col flex-1 h-full">
             <TabsContent value="devices" class="flex-1">
@@ -85,7 +85,7 @@
       </div>
 
       <!-- Sidebar -->
-      <div class="w-96 border-l border-border -my-4 -mr-4">
+      <div class="w-96 shrink-0 border-l border-border -my-4 -mr-4 overflow-y-auto">
         <div class="flex items-center justify-start gap-2 p-4 border-b">
           <i :class="`fa-fw fa-solid fa-cube`"></i>
           <div class="font-semibold text-xl">{{ node.name }}</div>

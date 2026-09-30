@@ -8,7 +8,10 @@
       <EdgeBreadcrumbs/>
       <slot name="header"></slot>
     </div>
-    <div class="flex-1 overflow-hidden" :class="[padding]">
+    <!-- The container has a fixed height, so this area must scroll
+       - vertically or long pages (a node with thousands of devices) are
+       - clipped with no way to reach the rest. -->
+    <div class="flex-1 overflow-x-hidden overflow-y-auto" :class="[padding]">
       <slot></slot>
     </div>
   </div>

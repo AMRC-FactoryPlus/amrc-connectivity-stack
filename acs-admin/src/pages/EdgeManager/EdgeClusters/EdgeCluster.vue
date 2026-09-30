@@ -5,8 +5,8 @@
 <template>
   <EdgeContainer>
     <EdgePageSkeleton v-if="clusterLoading"/>
-    <div v-else class="flex h-full">
-      <div class="flex-1 flex flex-col gap-4 pr-4">
+    <div v-else class="flex h-full min-h-0">
+      <div class="flex-1 min-w-0 flex flex-col gap-4 pr-4 -my-4 py-4 overflow-y-auto">
         <EmptyState
             v-if="!bootstrapped"
             :title="`Bootstrap Required for ${cluster.name}`"
@@ -124,7 +124,7 @@
         </Tabs>
       </div>
 
-      <div class="w-96 border-l border-border -my-4 -mr-4">
+      <div class="w-96 shrink-0 border-l border-border -my-4 -mr-4 overflow-y-auto">
         <div class="flex items-center justify-between gap-2 w-full p-4 border-b">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-fw fa-solid fa-circle-nodes"></i>

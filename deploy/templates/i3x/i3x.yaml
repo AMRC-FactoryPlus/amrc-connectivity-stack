@@ -40,7 +40,7 @@ spec:
             - name: CLIENT_KEYTAB
               value: /keytabs/client
             - name: VERBOSE
-              value: ALL
+              value: {{.Values.i3x.verbosity | quote | required "values.i3x.verbosity is required!"}}
             - name: SERVER_KEYTAB
               value: /keytabs/server
             - name: HOSTNAME

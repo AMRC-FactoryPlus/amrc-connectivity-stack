@@ -31,6 +31,8 @@ spec:
           secret:
             secretName: historian-uns-keytabs
       initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
         - name: create-bucket
           image: "{{.Values.influxdb2.image.repository}}:{{.Values.influxdb2.image.tag}}"
           env:

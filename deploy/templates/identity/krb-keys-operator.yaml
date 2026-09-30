@@ -34,6 +34,9 @@ spec:
                 key: op1krbkeys
         - name: krb5-ccache
           emptyDir:
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
       containers:
         - name: operator
 {{ include "amrc-connectivity-stack.image" (list . .Values.identity.krbKeysOperator) | indent 10 }}

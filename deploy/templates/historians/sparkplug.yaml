@@ -32,6 +32,9 @@ spec:
               - key: sv1warehouse
                 path: client
 
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
       containers:
         - name: historian-sparkplug
 {{ include "amrc-connectivity-stack.image" (list . .Values.historians.sparkplug) | indent 10 }}

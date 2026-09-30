@@ -30,6 +30,9 @@ spec:
           secret:
             secretName: monitor-keytabs
 
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
       containers:
         - name: monitor
 {{ include "amrc-connectivity-stack.image" (list . .Values.monitor) | indent 10 }}

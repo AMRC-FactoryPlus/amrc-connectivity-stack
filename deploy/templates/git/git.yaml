@@ -45,6 +45,8 @@ spec:
         {{- end }}
 
       initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
         # Do as little work as possible as root... We need to chown the storage
         # as the default permissions will not be correct.
         - name: chown-storage
@@ -123,6 +125,8 @@ spec:
             - mountPath: /git-secrets
               name: git-credentials
             {{- end }}
+
+{{ include "amrc-connectivity-stack.service-probes" (list . 8080) | indent 10 }}
 ---
 apiVersion: v1
 kind: Service

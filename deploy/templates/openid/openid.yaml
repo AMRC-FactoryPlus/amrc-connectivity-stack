@@ -56,6 +56,8 @@ spec:
             name: openid-jaas
 
       initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
         - name: db-init
 {{ include "amrc-connectivity-stack.image" (list . .Values.auth) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/dbadmin", "/usr/local/bin/psql" ]

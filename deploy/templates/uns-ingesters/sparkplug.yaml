@@ -29,6 +29,9 @@ spec:
           secret:
             secretName: uns-ingester-sparkplug-keytabs
 
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
       containers:
         - name: uns-ingester-sparkplug
 {{ include "amrc-connectivity-stack.image" (list . .Values.unsIngesters.sparkplug) | indent 10 }}

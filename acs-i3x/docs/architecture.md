@@ -108,6 +108,26 @@ flowchart TD
 | ValueCache (UNS MQTT) | Real-time (sub-second) | Only devices publishing to UNS (requires ISA-95 config) |
 | InfluxDB last() | ~10s delayed (historian flush interval) | All devices with any historical data |
 
+`POST /objects/value` checks the ValueCache for every id first. It then
+reads all the misses from InfluxDB in one batch (`History.getValues`).
+The batch reads every leaf it needs, including every descendant leaf
+of a composition, with one Flux query per 100 devices
+(`topLevelInstance`), and runs at most 4 of those queries at once:
+
+```
+from(bucket: "default")
+  |> range(start: -30d)
+  |> filter(fn: (r) => r["topLevelInstance"] == "<device 1>" or ...)
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> last()
+```
+
+Each leaf takes the first returned row whose measurement, device and
+path match. When a leaf has more than one series (for example after a
+device rename changes the `device` tag), that is the same row the
+single-leaf query returns. `GET /objects/:id/value` on a composition
+uses the same batch read for its leaves.
+
 ## On Request: History
 
 ```mermaid

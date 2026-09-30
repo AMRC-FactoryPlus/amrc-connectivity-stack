@@ -29,6 +29,8 @@ export class DriverBroker extends EventEmitter {
     acl:        Map<string, ACL>
     hostname:   string
     port:       number
+    server?:    net.Server
+    sockets:    Set<net.Socket> = new Set()
 
     constructor (env) {
         super();
@@ -84,7 +86,11 @@ export class DriverBroker extends EventEmitter {
     }
 
     start () {
-        const srv = net.createServer(this.broker.handle);
+        const srv = this.server = net.createServer(this.broker.handle);
+        srv.on("connection", sock => {
+            this.sockets.add(sock);
+            sock.once("close", () => this.sockets.delete(sock));
+        });
         return new Promise<void>(resolve => {
             srv.once("listening", () => {
                 log("Listening: %o", srv.address());
@@ -94,9 +100,23 @@ export class DriverBroker extends EventEmitter {
         });
     }
 
-    stop () {
-        return new Promise<void>(resolve => 
-            this.broker.close(resolve));
+    /* Release the port as well as the broker. The agent restarts
+     * in-process to reload its config and starts a new broker on the
+     * same port, so the listening socket and every driver connection
+     * must be closed before this resolves. */
+    async stop () {
+        await new Promise<void>(resolve => this.broker.close(() => resolve()));
+
+        const srv = this.server;
+        if (!srv) return;
+        this.server = undefined;
+
+        for (const sock of this.sockets)
+            sock.destroy();
+        this.sockets.clear();
+
+        await new Promise<void>(resolve => srv.close(() => resolve()));
+        log("Stopped listening");
     }
 
     async auth (client, username, password, callback) {

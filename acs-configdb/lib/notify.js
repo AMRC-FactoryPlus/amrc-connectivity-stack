@@ -224,10 +224,16 @@ export class CDBNotify {
              * the shared lookups. We use a result only if its lookup
              * started after the last one we used. This is the ordering
              * the per-watcher switchMap used to give: an older lookup
-             * never replaces a newer one. */
-            let latest = 0;
+             * never replaces a newer one.
+             *
+             * Start the initial lookup first and start `latest` from
+             * its seq (class_lookup takes the seq before it awaits). A
+             * shared lookup already running when we subscribed started
+             * before the WATCH, so it must not become our 201. */
+            const initial = this.class_lookup(rel, klass);
+            let latest = this.lookup_seq;
             return rxx.rx(
-                rx.merge(shared, rx.defer(() => this.class_lookup(rel, klass))),
+                rx.merge(shared, rx.from(initial)),
                 rx.filter(r => {
                     if (r.seq < latest) return false;
                     latest = r.seq;

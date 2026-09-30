@@ -82,3 +82,45 @@ test("shared lookups stop when the last watcher leaves", async () => {
     assert.equal(model.lookups.length, 2,
         "no lookups for the relation after the last watcher leaves");
 });
+
+test("a new watcher's first message is not older than its WATCH", async () => {
+    const model = fake_model();
+    const notify = cdb_notify(model);
+
+    model.members = ["a"];
+    const a = watch(notify);
+    await ticks(2);
+    model.lookups[0]();
+    await ticks(2);
+
+    /* A class update starts a shared lookup, which sees only "a". */
+    model.class_update();
+    await ticks(2);
+    assert.equal(model.lookups.length, 2);
+
+    /* "z" is committed, then b subscribes while the shared lookup is
+     * still running. b's own initial lookup sees "z". */
+    model.members = ["a", "z"];
+    model.class_update();
+    const b = watch(notify);
+    await ticks(2);
+    assert.equal(model.lookups.length, 3);
+
+    /* The older shared lookup finishes first. */
+    model.lookups[1]();
+    await ticks(2);
+    model.lookups[2]();
+    await ticks(2);
+    /* The trailing shared lookup for the second update. */
+    model.lookups[3]?.();
+    await ticks(2);
+
+    assert.deepEqual(b.out[0], { status: 201, body: ["a", "z"] },
+        `first message ${JSON.stringify(b.out[0])}`);
+    assert.ok(b.out.slice(1).every(u => u.status == 200));
+    assert.deepEqual(b.out.at(-1).body, ["a", "z"]);
+    assert.deepEqual(a.out.at(-1).body, ["a", "z"]);
+
+    a.sub.unsubscribe();
+    b.sub.unsubscribe();
+});

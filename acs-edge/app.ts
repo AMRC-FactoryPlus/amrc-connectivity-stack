@@ -16,6 +16,17 @@ import { Translator } from "./lib/translator.js";
 sourceMapSupport.install()
 dotenv.config({ path: '../.env' });
 
+/* run() is called again for every in-process restart, so process-wide
+ * handlers are registered once, here, and act on the current
+ * translator. */
+let transApp: Translator | undefined;
+let terminating = false;
+process.once('SIGTERM', () => {
+    log('🔪️SIGTERM RECEIVED');
+    terminating = true;
+    transApp?.stop(true);
+})
+
 run()
 
 async function run() {
@@ -26,16 +37,12 @@ async function run() {
     const broker = new DriverBroker(process.env);
 
     // Once a configuration has been loaded then start up the translator
-    let transApp = new Translator(fplus, pollInt, broker);
-    process.once('SIGTERM', () => {
-        log('🔪️SIGTERM RECEIVED');
-        transApp.stop(true);
-    })
+    transApp = new Translator(fplus, pollInt, broker);
 
     // This restarts the application without killing the container. Mainly used to reload config without the container
     // Entering a backoff reboot loop in K8s
-    transApp.on('stopped', (kill) => {
-        if (!kill) {
+    transApp.once('stopped', (kill) => {
+        if (!kill && !terminating) {
             run()
         }
     })

@@ -82,9 +82,38 @@ export class AgentMonitor extends NodeMonitor {
             /* The ConfigDB's current config revision */
             config: this.config,
         }).pipe(
-            /* If they match, we don't care */
+            /* If they match, we don't care. Otherwise check the
+             * ConfigDB's live revision before reporting a change. Our
+             * cached revision only moves when we see a Last_Changed
+             * notification; if we miss one it stays wrong until we
+             * restart, and every birth from the EA would look like a
+             * config change. switchMap drops a pending check when a
+             * new pair of values arrives. */
+            rx.switchMap(up => up.device == up.config
+                ? rx.EMPTY
+                : this._check_config(up)),
             rx.filter(up => up.device != up.config),
         );
+    }
+
+    /* Fetch the live revision from the ConfigDB and feed it back into
+     * this.config, so a stale cached revision is corrected. If the
+     * ConfigDB can't be reached, fall back to the cached revision. */
+    _check_config (up) {
+        return rx.defer(() => this._get_config_etag()).pipe(
+            rx.tap(config => this._config_checked.next(config)),
+            rx.map(config => ({ ...up, config })),
+            rx.catchError(e => {
+                this.log("Can't check config revision for %s: %s",
+                    this.node, e);
+                return rx.of(up);
+            }),
+        );
+    }
+
+    _get_config_etag () {
+        return this.fplus.ConfigDB
+            .get_config_etag(App.AgentConfig, this.node);
     }
 
     /* Track the current revision of our EA config in the ConfigDB. */
@@ -93,9 +122,11 @@ export class AgentMonitor extends NodeMonitor {
      * means we have to check our node's config every time any config
      * changes. */
     _init_config () {
-        const cdb = this.fplus.ConfigDB;
+        /* Revisions fetched by _check_config */
+        this._config_checked = new rx.Subject();
+
         /* Watch for changes to configs for the AgentConfig Application */
-        return this.cdb_watch.application(App.AgentConfig).pipe(
+        const notified = this.cdb_watch.application(App.AgentConfig).pipe(
             /* Add an extra notification at the start so we get the
              * current value when we start up */
             rx.startWith(undefined),
@@ -104,7 +135,10 @@ export class AgentMonitor extends NodeMonitor {
              * just gets the revision UUID. switchMap says 'if a new
              * notification comes in before request is answered, abandon
              * the current request and start a new one'. */
-            rx.switchMap(() => cdb.get_config_etag(App.AgentConfig, this.node)),
+            rx.switchMap(() => this._get_config_etag()),
+        );
+
+        return rx.merge(notified, this._config_checked).pipe(
             /* Skip notifications that don't change our revision UUID */
             rx.distinctUntilChanged(),
         );

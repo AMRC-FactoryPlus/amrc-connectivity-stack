@@ -228,6 +228,65 @@ test("rapid changes with an abandoned slow HEAD converge", async t => {
     assert.equal(h.reloads.length, 1, "no reloads once in sync");
 });
 
+/* This is the loop seen on fpd-ago. The ConfigDB does not answer the
+ * monitor's rebirth request, so the monitor's ConfigDB device never
+ * sees a BIRTH. SparkplugDevice drops every DATA packet until it has
+ * seen a BIRTH, so every Last_Changed/Application notification is
+ * lost and the monitor's idea of the current revision is frozen at the
+ * value it fetched on startup. Once the agent loads a newer config (it
+ * restarted, or something else reloaded it) every agent birth looks
+ * like a config change. */
+test("a missed ConfigDB birth does not cause a reload loop", async t => {
+    const h = await new Harness({ cdb_rebirths: false }).start();
+    t.after(() => h.stop());
+
+    /* The config is rewritten. The notification is dropped. */
+    h.change_config(ETAG_NEW);
+    await tick(50);
+
+    /* The agent restarts and loads the current config */
+    h.agent_reload();
+    await tick(100);
+    assert.equal(h.agent_rev, h.etag,
+        "agent is on the ConfigDB's current revision");
+    assert.equal(h.reloads.length, 0,
+        "no reload when the agent is up to date");
+
+    /* Each reload would make the agent rebirth with the same revision;
+     * wait for the throttle to show whether this loops. */
+    await tick(5500);
+    assert.equal(h.reloads.length, 0, "no reload loop");
+    assert.equal(h.config_logs(), 0, "no spurious 'Config changed'");
+
+    /* The monitor has converged on the current revision, so later
+     * births don't need to ask the ConfigDB again */
+    const heads = h.heads;
+    for (let i = 0; i < 3; i++) {
+        h.agent_birth();
+        await tick(20);
+    }
+    assert.equal(h.heads, heads, "no HEAD requests once converged");
+});
+
+test("if the ConfigDB can't be checked, the cached revision is used", async t => {
+    const h = await new Harness({ cdb_rebirths: false }).start();
+    t.after(() => h.stop());
+
+    h.change_config(ETAG_NEW);
+    await tick(50);
+
+    /* The agent loads the new config, then the ConfigDB fails */
+    h.fplus.ConfigDB.get_config_etag = async () => {
+        throw new Error("ConfigDB unavailable");
+    };
+    h.agent_reload();
+    await tick(100);
+
+    /* We behave as before: the cached revision differs, so reload */
+    assert.equal(h.reloads.length, 1);
+    assert.ok(h.logs.some(l => /Can't check config revision/.test(l)));
+});
+
 test("other applications' changes do not cause reloads", async t => {
     const h = await new Harness().start();
     t.after(() => h.stop());

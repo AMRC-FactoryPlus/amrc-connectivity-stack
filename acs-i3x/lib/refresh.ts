@@ -13,6 +13,8 @@
  * is wrapped in rxx.cacheSeq so duplicate subscribers to the same (app,
  * obj) URL share one underlying WATCH (kept stable across switchMap
  * restarts).
+ *
+ * Bursts are coalesced before the O(N) stages; see `run()`.
  */
 
 import * as rx                  from "rxjs";
@@ -38,18 +40,25 @@ export interface RefreshOpts {
     fplus: any;
     objectTree: ObjectTree;
     i3xRag: I3xRag;
+    /** Burst coalescing interval in ms (default 1000). A config change
+     * reaches the tree and RAG index within one interval, or two for a
+     * device added or removed, plus the time one update takes. A lone
+     * change after a quiet interval is applied at once. */
+    interval?: number;
 }
 
 export class ObjectTreeRefresh {
     private fplus: any;
     private objectTree: ObjectTree;
     private i3xRag: I3xRag;
+    private interval: number;
     private log: (msg: string, ...args: any[]) => void;
 
     constructor (opts: RefreshOpts) {
         this.fplus = opts.fplus;
         this.objectTree = opts.objectTree;
         this.i3xRag = opts.i3xRag;
+        this.interval = opts.interval ?? 1000;
         this.log = opts.fplus.debug.bound("refresh");
     }
 
@@ -80,8 +89,26 @@ export class ObjectTreeRefresh {
 
         type DeviceMap = Map<string, { devInfo: any; info: any }>;
 
+        // Coalesce bursts. A bulk import makes about three ConfigDB
+        // writes per device, and without this each write costs O(N): a
+        // new device set restarts the watch on all N devices, and each
+        // emission of stage 1 is a Map of all N devices that is then
+        // scanned, diffed and indexed again in full (the RAG rebuild).
+        // An import of N devices then costs O(N^2).
+        //
+        // throttleTime with leading + trailing passes a lone change
+        // through at once. During a burst it passes at most one value
+        // per interval, and the trailing edge always passes the latest
+        // value, so the last change of a burst is not lost.
+        // debounceTime would not do: it never fires while writes keep
+        // arriving. The interval starts after synchronous downstream
+        // work finishes, so it also caps the CPU share of that work.
+        const coalesce = <T>() => rx.throttleTime<T>(this.interval,
+            rx.asyncScheduler, { leading: true, trailing: true });
+
         // Stage 1: device set → per-device configs
         const devices$: rx.Observable<DeviceMap> = (cdb.watch_members(DEVICE_CLASS_UUID) as rx.Observable<ImmSetLike<string>>).pipe(
+            coalesce(),
             rx.switchMap((uuids: ImmSetLike<string>) => {
                 if (uuids.isEmpty()) return rx.of(new Map() as DeviceMap);
                 const arr = [...uuids].map(watch_device);
@@ -89,6 +116,7 @@ export class ObjectTreeRefresh {
                     rx.map(devs => new Map(devs.map(d =>
                         [d.uuid, { devInfo: d.devInfo, info: d.info }])) as DeviceMap));
             }),
+            coalesce(),
         );
 
         // Stage 2: collect referenced schemas → per-schema configs

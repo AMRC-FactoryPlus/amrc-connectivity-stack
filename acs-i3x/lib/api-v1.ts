@@ -27,6 +27,11 @@ interface APIv1Opts {
      * clamped and the response is returned with HTTP 206.
      */
     maxDepthCap?: number;
+    /**
+     * The service-client Debug object. Used to build the module
+     * logger; omitted in tests, where logging is silenced.
+     */
+    debug?: any;
 }
 
 /**
@@ -84,6 +89,7 @@ export class APIv1 {
     private history: History;
     private subscriptions: SubscriptionManager;
     private maxDepthCap: number;
+    private log: (msg: string, ...args: any[]) => void;
 
     /**
      * Stores the collaborator services and builds both routers.
@@ -94,6 +100,7 @@ export class APIv1 {
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
         this.maxDepthCap = opts.maxDepthCap ?? 0;
+        this.log = opts.debug?.bound("api-v1") ?? (() => {});
 
         this.routes = Router();
         this.infoRoute = Router();
@@ -313,35 +320,45 @@ export class APIv1 {
 
     /**
      * POST /objects/value — bulk current-value lookup. For each id,
-     * tries the real-time UNS `valueCache` first, then falls back to
-     * InfluxDB via `history.getCurrentValue` (or `getCompositionValue`
-     * for composition objects). `maxDepth` controls composition
-     * recursion; defaults to 1 for compositions. If the server's
-     * `maxDepthCap` clamped any request, the response is returned
-     * with HTTP 206 to indicate a partial result.
+     * tries the real-time UNS `valueCache` first. Every id the cache
+     * cannot answer is then read from InfluxDB in one batch via
+     * `history.getValues`, which reads leaves and compositions with a
+     * small, bounded number of Flux queries. `maxDepth` controls
+     * composition recursion; defaults to 1 for compositions. If the
+     * server's `maxDepthCap` clamped any request, the response is
+     * returned with HTTP 206 to indicate a partial result.
      */
     async value_objects(req: Request, res: Response): Promise<void> {
+        const started = Date.now();
         const { elementIds, maxDepth } = req.body;
+        const ids = elementIds as string[];
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
-        const results = await Promise.all((elementIds as string[]).map(async (id) => {
-            // Try UNS cache first (real-time), fall back to InfluxDB last()
-            const cached = this.valueCache.getValue(id);
-            if (cached) {
-                console.log(`[VALUE] ${id.slice(0,16)} → UNS cache hit: value=${JSON.stringify(cached.value)} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
-                return { success: true, elementId: id, result: cached };
+
+        // Try UNS cache first (real-time), fall back to InfluxDB last()
+        const cached = ids.map(id => this.valueCache.getValue(id));
+        const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
+        const fromInflux = misses.length > 0
+            ? await this.history.getValues(misses, effective)
+            : new Map();
+
+        let influxHits = 0;
+        const results = ids.map((id, i) => {
+            const hit = cached[i];
+            if (hit) {
+                return { success: true, elementId: id, result: hit };
             }
-            console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
-            const obj = this.objectTree.getObject(id);
-            const item = obj?.isComposition
-                ? await this.history.getCompositionValue(id, effective)
-                : await this.history.getCurrentValue(id);
+            const item = fromInflux.get(id);
             if (item) {
-                console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
+                influxHits++;
                 return { success: true, elementId: id, result: item };
             }
-            console.log(`[VALUE] ${id.slice(0,16)} → no data`);
             return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
-        }));
+        });
+        this.log("POST /objects/value: %d ids, %d UNS cache hits, %d InfluxDB hits, %d no data, %dms",
+            ids.length, ids.length - misses.length, influxHits,
+            results.length - results.filter(r => r.success).length,
+            Date.now() - started);
+
         if (clamped) res.status(206);
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -406,19 +423,15 @@ export class APIv1 {
         // Try UNS cache first (real-time), fall back to InfluxDB last()
         const cached = this.valueCache.getValue(id);
         if (cached) {
-            console.log(`[VALUE] ${id} → UNS cache hit: value=${JSON.stringify(cached.value)} ts=${cached.timestamp} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
+            this.log("GET /objects/%s/value: UNS cache hit", id);
             res.json(cached);
             return;
         }
-        console.log(`[VALUE] ${id} → UNS cache miss, querying InfluxDB...`);
         const result = obj?.isComposition
             ? await this.history.getCompositionValue(id)
             : await this.history.getCurrentValue(id);
-        if (result) {
-            console.log(`[VALUE] ${id} → InfluxDB hit: value=${JSON.stringify(result.value)} ts=${result.timestamp}`);
-        } else {
-            console.log(`[VALUE] ${id} → InfluxDB miss: no data`);
-        }
+        this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
+            id, result ? "hit" : "no data");
         if (!result) return next(notFound(`No value for ${id}`));
         res.json(result);
     }

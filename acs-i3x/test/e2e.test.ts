@@ -251,6 +251,18 @@ function createPreloadedMocks() {
             .mockImplementation(async (id: string) => valuesById.get(id) ?? null),
         getCompositionValue: jest.fn<(id: string, maxDepth?: number) => Promise<I3xValueResponse | null>>()
             .mockImplementation(async (id: string) => valuesById.get(id) ?? null),
+        /* Batch read used by POST /objects/value; delegates to the
+         * per-id mocks the way the real History chooses between them. */
+        getValues: jest.fn<(ids: string[], maxDepth?: number) => Promise<Map<string, I3xValueResponse | null>>>()
+            .mockImplementation(async (ids: string[], maxDepth?: number) => {
+                const out = new Map<string, I3xValueResponse | null>();
+                for (const id of ids) {
+                    out.set(id, objectTree.getObject(id)?.isComposition
+                        ? await history.getCompositionValue(id, maxDepth)
+                        : await history.getCurrentValue(id));
+                }
+                return out;
+            }),
         queryHistory: jest.fn<(id: string, start: string, end: string, maxDepth?: number) => Promise<I3xVqt[]>>()
             .mockImplementation(async (id: string) => {
                 if (id === "obj-cnc-1") return historyCnc1;

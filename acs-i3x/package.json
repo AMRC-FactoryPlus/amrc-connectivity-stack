@@ -21,6 +21,7 @@
     "start:shell": "k5start -Uf $CLIENT_KEYTAB npm run start",
     "dev": "npm run build && npm run start",
     "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
+    "bench": "npm run build && node bench/run.mjs",
     "lint": "eslint --ignore-path .gitignore --ext .ts lib/",
     "lint:fix": "npm run lint -- --fix"
   },

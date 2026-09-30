@@ -71,3 +71,54 @@ describe('EdgeContainer', () => {
     expect(static_classes(content_area(template_root()))).toContain('flex-1')
   })
 })
+
+/*
+ * Two-pane edge pages.
+ *
+ * The node and edge cluster pages put a main column (the device or node
+ * tables) beside a details sidebar. Each pane scrolls on its own, so the
+ * sidebar stays in place while a long table scrolls. If either pane
+ * lost its own scrolling, the page would fall back to scrolling the
+ * EdgeContainer as a whole and the sidebar would scroll away.
+ */
+const PANE_PAGES = {
+  Node: '../src/pages/EdgeManager/Nodes/Node.vue',
+  EdgeCluster: '../src/pages/EdgeManager/EdgeClusters/EdgeCluster.vue',
+}
+
+function find_all (node, pred, out = []) {
+  if (node.type === 1 && pred(node)) out.push(node)
+  for (const c of node.children ?? []) find_all(c, pred, out)
+  return out
+}
+
+function page_panes (file) {
+  const { descriptor, errors } = parse(readFileSync(new URL(file, import.meta.url), 'utf-8'))
+  expect(errors).toEqual([])
+  const root = find_all(descriptor.template.ast, n =>
+    n.props.some(p => p.type === 7 && p.name === 'else')
+    && static_classes(n).includes('flex')
+    && static_classes(n).includes('h-full'))[0]
+  expect(root).toBeDefined()
+  const [main, sidebar] = elements(root)
+  return { root, main, sidebar }
+}
+
+describe.each(Object.entries(PANE_PAGES))('%s page panes', (_, file) => {
+  it('bounds the pane row to the container height', () => {
+    expect(static_classes(page_panes(file).root)).toContain('min-h-0')
+  })
+
+  it('scrolls the main column on its own', () => {
+    const classes = static_classes(page_panes(file).main)
+    expect(classes).toContain('flex-1')
+    expect(classes).toContain('overflow-y-auto')
+  })
+
+  it('scrolls the details sidebar on its own', () => {
+    const classes = static_classes(page_panes(file).sidebar)
+    expect(classes).toContain('w-96')
+    expect(classes).toContain('overflow-y-auto')
+    expect(classes).toContain('shrink-0')
+  })
+})

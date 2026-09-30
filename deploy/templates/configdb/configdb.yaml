@@ -122,7 +122,7 @@ spec:
             - name: PGDATABASE
               value: configdb
             - name: VERBOSE
-              value: "1"
+              value: {{.Values.configdb.verbosity | quote | required "values.configdb.verbosity is required!"}}
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             - name: BODY_LIMIT
               value: "{{ .Values.configdb.bodyLimit }}"

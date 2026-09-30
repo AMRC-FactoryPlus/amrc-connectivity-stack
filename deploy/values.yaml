@@ -104,6 +104,18 @@ directory:
   image:
     # -- The repository of the Directory component
     repository: acs-directory
+  # -- Debug log tags for the Directory web API and MQTT components,
+  # passed to them as the VERBOSE environment variable.
+  # This is a comma-separated list of tags (the word printed at the
+  # start of each log line). "ALL" or "1" turns on every tag, "!tag"
+  # turns one off again, and "" turns off all debug logging. The default
+  # turns off the tags that dump a payload on every operation: "query"
+  # (every SQL statement with its parameters), "acl" (the full ACL on
+  # every permission check) and "notify-msg" (every notify request and
+  # update, with the full body). Errors and warnings do not use these
+  # tags, so they still appear. Set this to "1" to log everything, for
+  # example while debugging.
+  verbosity: "ALL,!query,!acl,!notify-msg"
 
 configdb:
   # -- Whether or not to enable the Configuration Store component
@@ -111,6 +123,18 @@ configdb:
   image:
     # -- The repository of the Configuration Store component
     repository: acs-configdb
+  # -- Debug log tags for the ConfigDB web API, passed to it as the
+  # VERBOSE environment variable.
+  # This is a comma-separated list of tags (the word printed at the
+  # start of each log line). "ALL" or "1" turns on every tag, "!tag"
+  # turns one off again, and "" turns off all debug logging. The default
+  # turns off the tags that dump a payload on every operation: "query"
+  # (every SQL statement with its parameters), "acl" (the full ACL on
+  # every permission check) and "notify-msg" (every notify request and
+  # update, with the full body). Errors and warnings do not use these
+  # tags, so they still appear. Set this to "1" to log everything, for
+  # example while debugging.
+  verbosity: "ALL,!query,!acl,!notify-msg"
   bodyLimit: 100kb
   backup:
     # -- Whether to run a pg_dump of the ConfigDB before every helm upgrade
@@ -418,8 +442,21 @@ i3x:
   image:
     # -- The repository of the i3X service
     repository: acs-i3x
-  # -- The minimum log level for the i3X service
+  # -- Passed to the service as LOG_LEVEL. The current i3X code does not
+  # read it; use `verbosity` below to control the i3X logs.
   logLevel: info
+  # -- Debug log tags for the i3X service, passed to it as the VERBOSE
+  # environment variable.
+  # This is a comma-separated list of tags (the word printed at the
+  # start of each log line). "ALL" or "1" turns on every tag, "!tag"
+  # turns one off again, and "" turns off all debug logging. The default
+  # turns off the tags that dump a payload on every operation: "query"
+  # (every SQL statement with its parameters), "acl" (the full ACL on
+  # every permission check) and "notify-msg" (every notify request and
+  # update, with the full body). Errors and warnings do not use these
+  # tags, so they still appear. Set this to "1" to log everything, for
+  # example while debugging.
+  verbosity: "ALL,!query,!acl,!notify-msg"
   # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
   # namespaceUri: https://example.com/i3x
 

@@ -93,7 +93,7 @@ spec:
             - name: PGDATABASE
               value: directory
             - name: VERBOSE
-              value: "1"
+              value: {{.Values.directory.verbosity | quote | required "values.directory.verbosity is required!"}}
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "directory") | indent 12 }}
             # If this is set it names a principal which overrides all ACLs. This should be turned off in production.
             - name: ROOT_PRINCIPAL

@@ -15,7 +15,8 @@
   ],
   "scripts": {
     "start": "k5start -Uf ${CLIENT_KEYTAB} node bin/api.js",
-    "load-dump": "node bin/load-dump.js"
+    "load-dump": "node bin/load-dump.js",
+    "test": "node --test 'test/*.test.js'"
   },
   "type": "module",
   "dependencies": {

@@ -64,6 +64,11 @@ export class CDBNotify {
             this.model.updates,
             rx.filter(u => u.type == "config"),
             rx.share());
+        /* Config updates for one (app, object). Most watchers watch a
+         * single config, so we don't filter every update past every
+         * watcher. */
+        this.object_updates = rxu.keyed(this.config_updates,
+            u => JSON.stringify([u.app, u.object]));
         this.class_updates = rxx.rx(
             this.model.updates,
             rx.filter(u => u.type == "class"),
@@ -132,9 +137,7 @@ export class CDBNotify {
         return rxx.rx(
             rx.concat(
                 model.config_get({ app, object }),
-                rxx.rx(
-                    this.config_updates,
-                    rx.filter(u => u.app == app && u.object == object))),
+                this.object_updates(JSON.stringify([app, object]))),
             rx.map(entry_response),
             rx.map(mk_res),
             ck_acl);

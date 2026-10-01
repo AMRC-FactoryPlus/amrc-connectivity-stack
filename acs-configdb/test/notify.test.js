@@ -44,7 +44,10 @@ const admin = new HttpClient(base, "admin");
 async function start_server () {
     const script = url.fileURLToPath(new URL("../bench/server.js", import.meta.url));
     server = spawn(process.execPath, [script], {
-        env: { ...process.env, PORT: port, BENCH_PORT: port + 1, VERBOSE: "" },
+        /* These tests check each change's messages after a short
+         * settle, so they turn the class lookup throttle off. */
+        env: { ...process.env, PORT: port, BENCH_PORT: port + 1, VERBOSE: "",
+            CLASS_LOOKUP_INTERVAL: "0" },
         stdio: ["ignore", "ignore", "inherit"],
     });
     for (let i = 0; i < 100; i++) {

@@ -71,6 +71,17 @@ node bench/run.mjs --docker-network i3xbulk-net \
   --sizes 1,100,500,1000,2000 --runs 5 --warm 0,1 --out bench-results.json
 ```
 
+To measure a request for a few fields of wide devices, seed a
+separate bucket with `--wide` extra tags per device and request the
+first `--fields` leaves of each device:
+
+```sh
+node bench/seed.mjs --bucket wide --devices 200 --points 4 --wide 1000
+node bench/run.mjs --bucket wide --devices 200 --wide 1000 --fields 1 \
+  --build before=/tmp/i3x-before/acs-i3x/dist --build after=./dist \
+  --sizes 1,10,100,200 --runs 5 --warm 0
+```
+
 Compare responses byte for byte:
 
 ```sh

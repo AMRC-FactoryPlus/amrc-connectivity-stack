@@ -20,6 +20,9 @@
  *   - worst latency of GET /v1/namespaces, polled every 100 ms while
  *     the bulk request runs, and the server's max event-loop delay
  * Requests ask for the first N devices with maxDepth 0 (every leaf).
+ * With --fields K they ask instead for the first K leaves of each of
+ * the first N devices; pair it with --wide to model a request for a
+ * few fields of devices with many tags.
  */
 
 import { spawn, execFileSync } from "node:child_process";
@@ -42,6 +45,8 @@ const { values: a } = parseArgs({
         container: { type: "string", default: "i3xbulk-influx" },
         port: { type: "string", default: "58110" },
         maxDepth: { type: "string", default: "0" },
+        fields: { type: "string" },
+        wide: { type: "string", default: "0" },
         cooldown: { type: "string", default: "35" },
         timeout: { type: "string", default: "120" },
         out: { type: "string", default: "bench-results.json" },
@@ -83,7 +88,7 @@ async function startServer(label, dist, warm, extra = []) {
     const log = path.join(a.logs, `${label}-warm${warm}.log`);
     const fd = openSync(log, "w");
     const args = ["--dist", dist, "--port", String(port), "--devices", a.devices,
-        "--bucket", a.bucket, "--warm", String(warm), ...extra];
+        "--bucket", a.bucket, "--warm", String(warm), "--wide", a.wide, ...extra];
     let child;
     if (a["docker-network"]) {
         try { execFileSync("docker", ["rm", "-f", SERVER_CONTAINER], { stdio: "ignore" }); } catch {}
@@ -107,7 +112,9 @@ async function startServer(label, dist, warm, extra = []) {
 }
 
 async function oneRun(n) {
-    const ids = Array.from({ length: n }, (_, i) => deviceUuid(i));
+    const ids = a.fields
+        ? await (await fetch(`${base}/bench/leaves?devices=${n}&fields=${a.fields}`)).json()
+        : Array.from({ length: n }, (_, i) => deviceUuid(i));
     const body = JSON.stringify({ elementIds: ids, maxDepth: Number(a.maxDepth) });
 
     await stats();

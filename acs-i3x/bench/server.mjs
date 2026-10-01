@@ -11,11 +11,13 @@
  *
  *   node bench/server.mjs --dist ./dist --port 58100 --devices 2000 \
  *       --influx http://localhost:58086 --bucket default [--warm 1.0] \
- *       [--uns-time 2026-09-30T16:00:00.000Z]
+ *       [--uns-time 2026-09-30T16:00:00.000Z] [--wide 1000]
  *
  * Extra endpoints for the benchmark driver:
  *   GET  /bench/stats  process CPU, Flux query count, event-loop delay
  *   POST /bench/reset  reset the event-loop delay histogram
+ *   GET  /bench/leaves?devices=N&fields=K
+ *                      the first K leaf ids of each of the first N devices
  */
 
 import express from "express";
@@ -35,6 +37,8 @@ const { values: a } = parseArgs({
         org: { type: "string", default: "default" },
         bucket: { type: "string", default: "default" },
         warm: { type: "string", default: "0" },
+        /* Extra top-level metrics per device; must match seed.mjs. */
+        wide: { type: "string", default: "0" },
         /* Timestamp for warm UNS values. Give two servers the same one
          * when comparing their responses. */
         "uns-time": { type: "string" },
@@ -61,7 +65,7 @@ const n = Number(a.devices);
 const objectTree = new ObjectTree({ fplus, namespaceName: "AMRC", namespaceUri: "https://example.com/i3x" });
 objectTree.buildNamespace();
 objectTree.buildRelationshipTypes();
-objectTree.refreshFromSnapshot(pipelineSnapshot(n));
+objectTree.refreshFromSnapshot(pipelineSnapshot(n, Number(a.wide)));
 objectTree.ready = true;
 
 const valueCache = new ValueCache({ objectTree, staleThreshold: 300000 });
@@ -71,7 +75,7 @@ const valueCache = new ValueCache({ objectTree, staleThreshold: 300000 });
 const warmCount = Math.round(Number(a.warm) * n);
 const unsNow = a["uns-time"] ?? new Date().toISOString();
 for (let i = 0; i < warmCount; i++) {
-    const d = device(i);
+    const d = device(i, Number(a.wide));
     for (const [key, val] of Object.entries(d.originMap)) {
         if (val?.Sparkplug_Type) publish(d, [key], [d.uuid]);
         else if (val && typeof val === "object" && val.Instance_UUID && key !== "Address") {
@@ -118,6 +122,15 @@ app.get("/bench/stats", (_req, res) => {
     });
 });
 app.post("/bench/reset", (_req, res) => { eld.reset(); res.json({ ok: true }); });
+app.get("/bench/leaves", (req, res) => {
+    const ids = [];
+    for (let i = 0; i < Number(req.query.devices); i++) {
+        const leaves = objectTree.getChildElementIds(device(i).uuid)
+            .filter((c) => !objectTree.getObject(c)?.isComposition);
+        ids.push(...leaves.slice(0, Number(req.query.fields)));
+    }
+    res.json(ids);
+});
 /* Same body parsing as WebAPI (service-api: 100kb limit). */
 app.use(express.json({ limit: "100kb", strict: false }));
 app.use((req, _res, next) => { req.auth = "bench@REALM"; next(); });

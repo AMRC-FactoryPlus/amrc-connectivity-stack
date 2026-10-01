@@ -62,11 +62,15 @@ export class DriverConnection extends DeviceConnection {
 
 
     readMetrics(metrics: Metrics, payloadFormat?: string, delimiter?: string) {
-        this.#flush_addrs();
         const poll = metrics.addresses
             .filter(a => this.topics.has(a))
             .map(a => this.topics.get(a))
             .join("\n");
+        /* An empty poll asks the driver to read nothing. Do not send
+         * it. A pending address map can wait: it is only needed ahead
+         * of a poll that is actually sent. */
+        if (poll == "") return;
+        this.#flush_addrs();
         this.broker.publish({
             id:         this.id,
             msg:        "poll",
@@ -131,6 +135,13 @@ export class DriverConnection extends DeviceConnection {
 
         if (this.status != "DOWN")
             this.#queue_addrs();
+
+        /* A device with no addresses has nothing to poll, so do not
+         * start a timer that only sends empty polls. */
+        if (addrs.length == 0) {
+            subscriptionStartCallback();
+            return;
+        }
 
         super.startSubscription(metrics, payloadFormat, delimiter, interval,
             deviceId, subscriptionStartCallback);

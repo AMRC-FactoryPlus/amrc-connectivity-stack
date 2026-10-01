@@ -206,8 +206,9 @@ export class ObjectTree {
         // it in `old` that aren't already in `next`. We must enqueue any
         // newly-copied UNS nodes so we pick up nested UNS subtrees.
         const queue: string[] = [...next.objects.keys()];
-        while (queue.length > 0) {
-            const parentId = queue.shift()!;
+        // Walk by index: queue.shift() is O(n) on a large array.
+        for (let i = 0; i < queue.length; i++) {
+            const parentId = queue[i];
             const oldChildren = old.children.get(parentId);
             if (!oldChildren) continue;
             for (const childId of oldChildren) {

@@ -93,7 +93,7 @@ function mockSubscriptions() {
 const NS_NAME = "TestNamespace";
 const NS_URI = "urn:test:namespace";
 
-function createApp(opts: { maxDepthCap?: number } = {}) {
+function createApp(opts: { maxDepthCap?: number; debug?: any } = {}) {
     const objectTree = mockObjectTree();
     const valueCache = mockValueCache();
     const history = mockHistory(objectTree);
@@ -105,6 +105,7 @@ function createApp(opts: { maxDepthCap?: number } = {}) {
         history: history as any,
         subscriptions: subscriptions as any,
         maxDepthCap: opts.maxDepthCap,
+        debug: opts.debug,
     });
 
     const app = express();
@@ -696,6 +697,22 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(500);
             expect(res.body.error.message).toBe("Request timed out");
+        });
+
+        it("logs one summary line, counting repeated ids once per occurrence", async () => {
+            const log = jest.fn();
+            const { app, history, valueCache } = createApp({ debug: { bound: () => log } });
+            valueCache.getValue.mockImplementation((id: string) =>
+                id === "hit" ? { ...sampleValueResponse, elementId: "hit" } : null);
+            history.getCurrentValue.mockImplementation(async (id: string) =>
+                id === "miss" ? { ...sampleValueResponse, elementId: id } : null);
+
+            await request(app).post("/objects/value")
+                .send({ elementIds: ["hit", "miss", "miss", "none", "none", "hit"] });
+
+            expect(log).toHaveBeenCalledTimes(1);
+            // 6 ids: 2 UNS cache hits, 2 InfluxDB hits, 2 with no data.
+            expect(log.mock.calls[0].slice(1, 5)).toEqual([6, 2, 2, 2]);
         });
 
         it("does not write per-element logs to stdout", async () => {

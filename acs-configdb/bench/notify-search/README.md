@@ -59,7 +59,19 @@ RUNS=3 bench/notify-search/matrix.sh <variant-name>
 
 # Stream correctness (exits non-zero on any difference):
 DRIVER=verify.js bench/notify-search/run.sh verify
+
+# A slow client: the i3X session also watches the Device members, stops
+# reading once its watches are open, and reads again 20 s after the
+# import ends:
+bench/notify-search/run.sh slow --devices 1000 --i3x-members --pause-i3x --hold 20
 ```
+
+The slow-client run samples server memory and the bytes waiting in the
+notify send buffers every second into `samples` in the result JSON,
+with the phase times in `marks`. `i3x_check` says whether the i3X
+session caught up with the database after it read again. On macOS, RSS
+drops when the OS compresses idle pages, so compare `heap_mb` and
+`buffered_mb`.
 
 Results, logs and `.cpuprofile` files go to `bench/notify-search/out/`.
 

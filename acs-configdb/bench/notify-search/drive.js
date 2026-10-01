@@ -16,6 +16,16 @@
  *   --watch-existing W i3X-like WATCHes on Info + DeviceInformation for
  *                      W existing devices (default 2400)
  *   --no-follow        do not WATCH each newly created device
+ *   --i3x-members      the i3X session also WATCHes the members of
+ *                      Device, as acs-i3x does
+ *   --pause-i3x        the i3X session stops reading once its WATCHes
+ *                      are open, as a busy client does
+ *   --hold S           with --pause-i3x, stay paused for S seconds after
+ *                      the server settles, then read again and check
+ *                      the i3X session catches up with the database
+ *
+ * Server memory and send-buffer bytes are sampled every --sample-ms
+ * (default 1000) from the first write to the end, into `samples`.
  *
  * One device = POST /v2/object (class Device), PUT Info, PUT
  * DeviceInformation. DeviceInformation bodies are real ones copied from
@@ -37,6 +47,10 @@ const { values: opt } = parseArgs({ options: {
     "watch-existing":   { type: "string", default: "2400" },
     "no-follow":        { type: "boolean", default: false },
     "settle-timeout":   { type: "string", default: "900" },
+    "i3x-members":      { type: "boolean", default: false },
+    "pause-i3x":        { type: "boolean", default: false },
+    hold:               { type: "string", default: "0" },
+    "sample-ms":        { type: "string", default: "1000" },
     out:                { type: "string" },
 }});
 
@@ -46,6 +60,8 @@ const RATE = Number(opt.rate);
 const REOPEN = Number(opt["reopen-every"]);
 const WATCH_EXISTING = Number(opt["watch-existing"]);
 const FOLLOW = !opt["no-follow"];
+const PAUSE = opt["pause-i3x"];
+const HOLD = Number(opt.hold);
 
 const App = {
     Info:                       "64a8bfa9-7772-45c4-9d1a-9e6290690957",
@@ -240,7 +256,15 @@ async function main () {
         i3x_ready.push(i3x.watch(`v2/app/${App.Info}/object/${o}`).ready);
         i3x_ready.push(i3x.watch(`v2/app/${App.DeviceInformation}/object/${o}`).ready);
     }
+    let members_sub;
+    if (opt["i3x-members"]) {
+        const m = i3x.watch(`v2/class/${DeviceClass}/member/`);
+        members_sub = m.sub;
+        i3x_ready.push(m.ready);
+    }
     await Promise.all(i3x_ready);
+    /* Stop reading: the server's sends to this socket now back up. */
+    if (PAUSE) i3x.ws._socket.pause();
 
     let admin = await open_admin("admin-0");
     await admin.all_ready;
@@ -248,6 +272,19 @@ async function main () {
 
     await http("POST", "/bench/reset");
     const t_start = now();
+
+    /* Memory over time. */
+    const samples = [];
+    const marks = {};
+    const mark = name => marks[name] = +((now() - t_start) / 1000).toFixed(1);
+    const MB = b => +(b / 1048576).toFixed(1);
+    const sample = async () => {
+        const st = await http("GET", "/bench/stats");
+        samples.push({ t: +((now() - t_start) / 1000).toFixed(1),
+            rss_mb: MB(st.rss), heap_mb: MB(st.heap),
+            external_mb: MB(st.external), buffered_mb: MB(st.buffered) });
+    };
+    const sampler = setInterval(sample, Number(opt["sample-ms"]));
 
     let next = 0, done = 0, requests = 0;
     const lat = [];
@@ -299,6 +336,7 @@ async function main () {
         await Promise.all(Array.from({ length: CONC }, worker));
     }
     const t_writes = now();
+    mark("writes_done");
 
     /* End-of-burst delivery: the final admin session must see the
      * last device's DeviceInformation. */
@@ -322,6 +360,45 @@ async function main () {
         if (now() > settle_deadline) { prev.settle_timeout = true; break; }
     }
     const server = prev;
+    mark("settled");
+
+    /* The paused i3X session reads again. It must end with the
+     * database's state. */
+    let i3x_check;
+    if (PAUSE) {
+        await sleep(HOLD * 1000);
+        await http("POST", "/bench/gc");
+        await sample();
+        mark("resume");
+        const t_resume = now();
+        i3x.ws._socket.resume();
+
+        const want_members = (await http("GET", `/v2/class/${DeviceClass}/member`)).sort();
+        const di_url = `v2/app/${App.DeviceInformation}/object/${last.uuid}`;
+        const di_sub = [...i3x.subs.values()].find(s => s.req.request?.url == di_url);
+        const members_ok = () => !members_sub || JSON.stringify(
+            [...(members_sub.value?.body ?? [])].sort()) == JSON.stringify(want_members);
+        const di_ok = () => !FOLLOW || JSON.stringify(di_sub?.value?.body)
+            == JSON.stringify(last.body);
+        const deadline = now() + Number(opt["settle-timeout"]) * 1000;
+        while (!(members_ok() && di_ok()) && now() < deadline)
+            await sleep(20);
+        mark("caught_up");
+        i3x_check = {
+            catch_up_ms:    now() - t_resume,
+            members_ok:     members_ok(),
+            last_device_ok: di_ok(),
+            members_msgs:   members_sub?.count,
+        };
+        await sleep(5000);
+    }
+    await sample();
+    i3x.close();
+    mark("i3x_closed");
+    await sleep(3000);
+    await http("POST", "/bench/gc");
+    await sample();
+    clearInterval(sampler);
 
     /* Correctness under load: the final admin session's SEARCH map for
      * DeviceInformation must match the database. */
@@ -334,7 +411,8 @@ async function main () {
 
     const sorted = lat.slice().sort((a, b) => a - b);
     const result = {
-        args: { N, CONC, RATE, REOPEN, WATCH_EXISTING, FOLLOW },
+        args: { N, CONC, RATE, REOPEN, WATCH_EXISTING, FOLLOW, PAUSE, HOLD,
+            I3X_MEMBERS: opt["i3x-members"] },
         requests,
         write_ms:           t_writes - t_start,
         writes_per_s:       requests / ((t_writes - t_start) / 1000),
@@ -349,6 +427,9 @@ async function main () {
         client_bytes:       admins.reduce((a, s) => a + s.bytes, 0) + i3x.bytes,
         client_full_msgs:   admins.reduce((a, s) => a + s.fulls, 0),
         final_map_matches_db: map_ok,
+        i3x_check,
+        marks,
+        samples,
         conn_resets,
         server,
         cpu_ms_per_request: server.cpu_ms / requests,
@@ -359,7 +440,6 @@ async function main () {
         fs.writeFileSync(opt.out, JSON.stringify(result, null, 2));
     }
     for (const a of admins) a.close();
-    i3x.close();
 }
 
 await main();

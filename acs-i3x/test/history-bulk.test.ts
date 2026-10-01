@@ -318,6 +318,21 @@ describe("History bulk current values", () => {
         });
     });
 
+    describe("InfluxDB client", () => {
+        it("sets an explicit 10 s query timeout, or the one given", () => {
+            const timeout = (queryTimeout?: number) => {
+                const history = new History({
+                    influxUrl: "http://influx:8086", influxToken: "t", influxOrg: "o",
+                    influxBucket: "default", objectTree: makeTree(), queryTimeout,
+                });
+                // The client keeps its connection options on the transport.
+                return (history as any).queryApi.transport.defaultOptions.timeout;
+            };
+            expect(timeout()).toBe(10_000);
+            expect(timeout(2_500)).toBe(2_500);
+        });
+    });
+
     describe("getCompositionValue", () => {
         it("uses one query for the whole composition and defaults maxDepth to 1", async () => {
             const tree = makeTree();

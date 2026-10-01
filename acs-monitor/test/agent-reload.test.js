@@ -47,6 +47,8 @@ class Harness {
         this.heads = 0;
         /* If set, HEAD requests wait for this before answering */
         this.hold_heads = null;
+        /* If set, HEAD requests take this many ms */
+        this.head_delay = 0;
 
         this.topics = new Map();
 
@@ -69,6 +71,7 @@ class Harness {
                      * the server, as the real ConfigDB does. */
                     const etag = harness.etag;
                     if (harness.hold_heads) await harness.hold_heads;
+                    if (harness.head_delay) await tick(harness.head_delay);
                     return etag;
                 },
             },
@@ -100,6 +103,11 @@ class Harness {
 
         /* The agent's in-use revision */
         this.agent_rev = this.etag;
+
+        /* The SealedSecrets the edge monitor watches, and the ones
+         * this agent uses */
+        this.secrets = opts.secrets ?? rx.NEVER;
+        this.secret_names = imm.Set(opts.secret_names ?? []);
     }
 
     topic (addr) {
@@ -153,12 +161,12 @@ class Harness {
         const op = {
             fplus:      this.fplus,
             cdb_watch:  new ConfigDBWatcher(this.fplus.ConfigDB, cdb_dev),
-            secrets:    rx.NEVER,
+            secrets:    this.secrets,
         };
         const spec = {
             uuid:       NODE,
             interval:   "3m",
-            secrets:    imm.Set(),
+            secrets:    this.secret_names,
         };
 
         this.monitor = await new AgentMonitor(op, spec).init();
@@ -297,4 +305,141 @@ test("other applications' changes do not cause reloads", async t => {
     h.agent_birth();
     await tick(50);
     assert.equal(h.reloads.length, 0);
+});
+
+/* The agent reloads while a check is pending. The pending check must
+ * be dropped: its answer was asked for an older pair, and acting on it
+ * would send a reload the agent doesn't need. */
+test("a check is dropped when the agent's revision changes", async t => {
+    const h = await new Harness({ cdb_rebirths: false }).start();
+    t.after(() => h.stop());
+
+    /* The config changes; the notification is lost */
+    h.change_config(ETAG_NEW);
+    await tick(50);
+
+    /* The agent births on some other revision while the ConfigDB is
+     * slow, so a check is pending */
+    let release;
+    h.hold_heads = new Promise(r => release = r);
+    h.agent_rev = ETAG_NEW2;
+    h.agent_birth();
+    await tick(20);
+
+    /* Then it restarts on the current config */
+    h.agent_reload();
+    await tick(20);
+    h.hold_heads = null;
+    release();
+    await tick(100);
+
+    assert.equal(h.agent_rev, ETAG_NEW);
+    assert.equal(h.reloads.length, 0, "no reload for the dropped check");
+});
+
+test("a mismatched birth makes one HEAD request", async t => {
+    const h = await new Harness({ cdb_rebirths: false }).start();
+    t.after(() => h.stop());
+
+    h.change_config(ETAG_NEW);
+    await tick(50);
+    const heads = h.heads;
+
+    h.agent_reload();
+    await tick(100);
+    assert.equal(h.heads, heads + 1);
+    assert.equal(h.reloads.length, 0);
+});
+
+test("repeated births do not hold off a genuine reload", async t => {
+    const h = await new Harness().start();
+    t.after(() => h.stop());
+
+    /* A slow ConfigDB, and an agent that keeps rebirthing faster than
+     * it answers */
+    h.head_delay = 100;
+    h.change_config(ETAG_NEW);
+    for (let i = 0; i < 15 && !h.reloads.length; i++) {
+        h.agent_birth();
+        await tick(30);
+    }
+    assert.equal(h.reloads.length, 1, "reload sent while births continue");
+});
+
+test("a ConfigDB that doesn't answer falls back to the cached revision", async t => {
+    const h = await new Harness({ cdb_rebirths: false }).start();
+    t.after(() => h.stop());
+    h.monitor.revision_timeout = 100;
+
+    h.change_config(ETAG_NEW);
+    await tick(50);
+
+    /* The agent loads the new config, then the ConfigDB hangs */
+    h.hold_heads = new Promise(() => {});
+    h.agent_reload();
+    await tick(50);
+    assert.equal(h.reloads.length, 0, "still waiting for the ConfigDB");
+    await tick(150);
+
+    assert.equal(h.reloads.length, 1, "fallback after the timeout");
+    assert.ok(h.logs.some(l =>
+        /Can't check config revision for \S+: No answer in 100 ms$/.test(l)));
+});
+
+/* A check's answer must not replace a newer one. Here a check is
+ * pending when the config is reverted, so the revert's notification
+ * fetches a revision equal to the cached one. The check's older answer
+ * must not then become the cached revision. */
+test("a check's older answer does not replace a newer revision", async t => {
+    const h = await new Harness().start();
+    t.after(() => h.stop());
+
+    /* The config changes and the notification is lost */
+    h.etag = ETAG_NEW;
+    /* The agent restarts on it while the ConfigDB is slow */
+    let release;
+    h.hold_heads = new Promise(r => release = r);
+    h.agent_reload();
+    await tick(20);
+
+    /* The config is reverted, with a notification */
+    h.hold_heads = null;
+    h.change_config(ETAG_OLD);
+    await tick(20);
+    release();
+    await tick(100);
+
+    assert.equal(h.reloads.length, 1, "the agent is told to reload");
+    assert.equal(h.agent_rev, ETAG_OLD, "the agent has the reverted config");
+});
+
+/* The status the edge monitor keeps for each SealedSecret */
+const SecretStatus = imm.Record({ synced: false, observed: 0, generation: 0 });
+
+test("a Secret change sends a reload and is logged once", async t => {
+    const secrets = new rx.Subject();
+    const h = await new Harness({ secrets, secret_names: ["ea-secret"] }).start();
+    t.after(() => h.stop());
+
+    const secret_logs = () =>
+        h.logs.filter(l => /Secret changed/.test(l)).length;
+    const status = generation => imm.Map({
+        "ea-secret": SecretStatus({ synced: true, observed: generation, generation }),
+        "other": SecretStatus({ synced: true, observed: 1, generation: 1 }),
+    });
+
+    secrets.next(status(1));
+    await tick(50);
+    assert.equal(secret_logs(), 1);
+    assert.equal(h.reloads.length, 1);
+
+    /* Not yet synced, then synced; after the throttle window */
+    await tick(5500);
+    secrets.next(imm.Map({ "ea-secret": SecretStatus({ synced: true, observed: 1, generation: 2 }) }));
+    await tick(50);
+    assert.equal(secret_logs(), 1, "unsynced update ignored");
+    secrets.next(status(2));
+    await tick(50);
+    assert.equal(secret_logs(), 2);
+    assert.equal(h.reloads.length, 2);
 });

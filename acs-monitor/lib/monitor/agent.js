@@ -14,9 +14,12 @@ import { NodeMonitor }      from "./node.js";
 
 /* How long to wait for the ConfigDB to answer a revision request */
 const REVISION_TIMEOUT = 10000;
+/* How long to wait before repeating a failed notification request */
+const REVISION_RETRY = 5000;
 
 export class AgentMonitor extends NodeMonitor {
     revision_timeout = REVISION_TIMEOUT;
+    revision_retry = REVISION_RETRY;
 
     async init () {
         await super.init();
@@ -161,9 +164,11 @@ export class AgentMonitor extends NodeMonitor {
          * through one switchMap, which says 'if a new request comes in
          * before the last is answered, abandon it and start the new
          * one'; so an older answer can never replace a newer one. A
-         * failed notification request errors the sequence, which the
-         * check restarts after a delay. A failed check request is
-         * passed on for _check_config to handle. */
+         * failed notification request is repeated here until it
+         * succeeds or a newer request replaces it. Letting it error the
+         * sequence would restart the whole check, and the restart would
+         * replay our Secrets and send a reload. A failed check request
+         * is passed on for _check_config to handle. */
         this._revisions = rx.merge(
             notified,
             this._check_requests.pipe(rx.map(() => true)),
@@ -175,10 +180,13 @@ export class AgentMonitor extends NodeMonitor {
                         `No answer in ${this.revision_timeout} ms`)),
                 }),
                 rx.map(etag => ({ etag })),
-                rx.catchError(error => {
-                    if (check) return rx.of({ error });
-                    throw error;
-                }),
+                check
+                    ? rx.catchError(error => rx.of({ error }))
+                    : rx.retry({ delay: error => {
+                        this.log("Can't fetch config revision for %s: %s",
+                            this.node, error?.message ?? error);
+                        return rx.timer(this.revision_retry);
+                    } }),
             )),
             rx.share(),
         );

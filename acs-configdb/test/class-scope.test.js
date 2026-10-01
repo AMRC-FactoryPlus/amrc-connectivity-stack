@@ -220,9 +220,15 @@ async function run_seed (model, seed, opts = {}) {
     const ref = notifier(model, true);
     const tgt = notifier(model, false);
 
+    /* Shared classes (Class, Individual, Device) are watched only if
+     * GLOBAL is set. node --test runs test files in parallel, and
+     * writes from another process send no class updates here, so the
+     * reference would pick them up and the targeted side would not. */
     const klasses = [
         ...st.r1, ...st.r2, ...st.ind.slice(0, 3), ...st.pool,
-        Class.Class, Class.R2Class, Class.Individual, Class.Device,
+        ...(process.env.GLOBAL
+            ? [Class.Class, Class.R2Class, Class.Individual, Class.Device]
+            : []),
         crypto.randomUUID(),
         /* Postgres accepts other spellings of a UUID. */
         st.r1[0].toUpperCase(),

@@ -25,6 +25,11 @@ interface HistoryOpts {
     bulkChunkSize?: number;
     /** Bulk last-value queries allowed in flight at once. */
     bulkConcurrency?: number;
+    /**
+     * Most distinct measurements a bulk query filters on. A chunk
+     * that needs more reads every series of its devices instead.
+     */
+    bulkMeasurementFilterMax?: number;
 }
 
 /** One row of the bulk last-value query. */
@@ -83,12 +88,14 @@ export class History {
     private queryApi: QueryApi;
     private bulkChunkSize: number;
     private bulkConcurrency: number;
+    private bulkMeasurementFilterMax: number;
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
         this.objectTree = opts.objectTree;
         this.bulkChunkSize = opts.bulkChunkSize ?? 100;
         this.bulkConcurrency = opts.bulkConcurrency ?? 4;
+        this.bulkMeasurementFilterMax = opts.bulkMeasurementFilterMax ?? 50;
 
         const influx = new InfluxDB({
             url: opts.influxUrl,
@@ -231,12 +238,20 @@ export class History {
      * rows[0] when a leaf has more than one series (for example after
      * a device rename changes the `device` tag).
      *
+     * When a chunk's leaves need at most `bulkMeasurementFilterMax`
+     * distinct measurements, the query also filters on those
+     * measurements. Without that, a request for a few fields of
+     * devices with thousands of tags would read every one of those
+     * series. The filter only drops series no leaf in the chunk can
+     * match, so the rows each leaf sees, and their order, are the same.
+     *
      * Leaves without MetricMeta, or with no data in the window, are
      * absent from the returned map.
      */
     async getCurrentValues(leafIds: string[]): Promise<Map<string, I3xValueResponse>> {
         const wanted: Array<{ leafId: string; key: string }> = [];
-        const devices = new Set<string>();
+        // Measurements each device's leaves need.
+        const devices = new Map<string, Set<string>>();
         for (const leafId of leafIds) {
             const meta = this.objectTree.getMetricMeta(leafId);
             if (!meta) continue;
@@ -248,7 +263,9 @@ export class History {
                 ? seriesKey(measurement, meta.topLevelInstanceUuid, meta.metricPath)
                 : seriesKey(measurement, meta.topLevelInstanceUuid);
             wanted.push({ leafId, key });
-            devices.add(meta.topLevelInstanceUuid);
+            let measurements = devices.get(meta.topLevelInstanceUuid);
+            if (!measurements) devices.set(meta.topLevelInstanceUuid, measurements = new Set());
+            measurements.add(measurement);
         }
 
         const out = new Map<string, I3xValueResponse>();
@@ -257,9 +274,16 @@ export class History {
         // First row seen per key. Both the path-qualified and the
         // path-less key are recorded for every row.
         const first = new Map<string, { _value: unknown; _time: string }>();
-        const chunks = chunk([...devices], this.bulkChunkSize);
+        const chunks = chunk([...devices.keys()], this.bulkChunkSize);
         await mapLimit(chunks, this.bulkConcurrency, async (tlis) => {
-            const rows = await this.queryApi.collectRows<LastRow>(this.buildBulkLastQuery(tlis));
+            const measurements = new Set<string>();
+            for (const tli of tlis) {
+                for (const m of devices.get(tli)!) measurements.add(m);
+            }
+            const filter = measurements.size <= this.bulkMeasurementFilterMax
+                ? [...measurements]
+                : undefined;
+            const rows = await this.queryApi.collectRows<LastRow>(this.buildBulkLastQuery(tlis, filter));
             for (const row of rows) {
                 const path = row.path ?? "";
                 const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
@@ -284,21 +308,26 @@ export class History {
     }
 
     /**
-     * Build the bulk last-value query for a chunk of devices. Uses an
-     * `or` chain of equality tests because InfluxDB pushes those down
-     * to the storage index.
+     * Build the bulk last-value query for a chunk of devices, and
+     * optionally only those measurements. Uses `or` chains of equality
+     * tests, directly after range(), because InfluxDB pushes those
+     * down to the storage index.
      */
-    buildBulkLastQuery(topLevelInstances: string[]): string {
-        const tliFilter = topLevelInstances
-            .map((tli) => `r["topLevelInstance"] == ${fluxString(tli)}`)
+    buildBulkLastQuery(topLevelInstances: string[], measurements?: string[]): string {
+        const anyOf = (tag: string, values: string[]) => values
+            .map((v) => `r[${fluxString(tag)}] == ${fluxString(v)}`)
             .join(" or ");
+        const measurementFilter = measurements
+            ? `  |> filter(fn: (r) => ${anyOf("_measurement", measurements)})`
+            : "";
         return [
             `from(bucket: ${fluxString(this.bucket)})`,
             `  |> range(start: -30d)`,
-            `  |> filter(fn: (r) => ${tliFilter})`,
+            measurementFilter,
+            `  |> filter(fn: (r) => ${anyOf("topLevelInstance", topLevelInstances)})`,
             `  |> filter(fn: (r) => r["_field"] == "value")`,
             `  |> last()`,
-        ].join("\n");
+        ].filter(Boolean).join("\n");
     }
 
     /**

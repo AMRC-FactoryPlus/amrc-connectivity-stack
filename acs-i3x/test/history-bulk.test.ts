@@ -216,6 +216,51 @@ describe("History bulk current values", () => {
             expect(q).toContain(`from(bucket: "b\\"k")`);
             expect(q).toContain(`r["topLevelInstance"] == "we\\"ird\\\\\\\${x}"`);
         });
+
+        it("filters on the chunk's measurements, directly after range()", async () => {
+            const { history, collectRows } = makeHistory([]);
+            await history.getCurrentValues(["a-temp", "a-status-rpm", "b-temp"]);
+            expect(collectRows.mock.calls[0][0].split("\n").slice(1, 4)).toEqual([
+                `  |> range(start: -30d)`,
+                `  |> filter(fn: (r) => r["_measurement"] == "Temp:d" or r["_measurement"] == "RPM:d")`,
+                `  |> filter(fn: (r) => r["topLevelInstance"] == "tli-A" or r["topLevelInstance"] == "tli-B")`,
+            ]);
+        });
+
+        it("filters each chunk only on the measurements its own devices need", async () => {
+            const { history, collectRows } = makeHistory([], { bulkChunkSize: 1 });
+            await history.getCurrentValues(["a-status-rpm", "b-temp"]);
+            const queries = collectRows.mock.calls.map((c) => c[0]);
+            expect(queries[0]).toContain(`r["_measurement"] == "RPM:d")`);
+            expect(queries[0]).not.toContain(`Temp:d`);
+            expect(queries[1]).toContain(`r["_measurement"] == "Temp:d")`);
+            expect(queries[1]).not.toContain(`RPM:d`);
+        });
+
+        it("drops the measurement filter above bulkMeasurementFilterMax", async () => {
+            const leaves = Array.from({ length: 51 }, (_, i) => `m${i}`);
+            const tree = {
+                getObject: () => ({ isComposition: false }),
+                getMetricMeta: (id: string) => meta("tli-A", id),
+                getDescendantLeafIds: () => [],
+            } as unknown as ObjectTree;
+            const { history, collectRows } = makeHistory([], { tree });
+
+            await history.getCurrentValues(leaves.slice(0, 50));
+            expect(collectRows.mock.calls[0][0]).toContain(`r["_measurement"] == "m49:d")`);
+
+            await history.getCurrentValues(leaves);
+            expect(collectRows.mock.calls[1][0]).not.toContain(`_measurement`);
+            expect(collectRows.mock.calls[1][0]).toBe(history.buildBulkLastQuery(["tli-A"]));
+        });
+
+        it("quotes measurement names as Flux string literals", () => {
+            const { history } = makeHistory([]);
+            const q = history.buildBulkLastQuery(["tli-A"], [`a"b:s`, `c\\d:s`, `e${"$"}{f}:s`]);
+            expect(q).toContain(
+                `filter(fn: (r) => r["_measurement"] == "a\\"b:s" or r["_measurement"] == "c\\\\d:s"`
+                + ` or r["_measurement"] == "e\\${"$"}{f}:s")`);
+        });
     });
 
     describe("getValues", () => {

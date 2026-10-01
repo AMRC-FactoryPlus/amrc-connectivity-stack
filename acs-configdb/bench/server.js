@@ -133,6 +133,7 @@ model.class_lookup = (...a) => { counts.class_lookup++; return class_lookup(...a
 const notify = new CDBNotify({
     auth, api, model,
     debug:  fplus.debug,
+    lookup_interval:    env.CLASS_LOOKUP_INTERVAL,
 });
 
 notify.run();

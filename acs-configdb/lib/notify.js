@@ -68,6 +68,9 @@ export class CDBNotify {
         this.auth   = opts.auth;
         this.model  = opts.model;
         this.log    = opts.debug.bound("notify");
+        /* Minimum ms between the lookups that class updates trigger
+         * for one (relation, class). 0 turns the throttle off. */
+        this.lookup_interval = Number(opts.lookup_interval ?? 1000);
 
         this.config_updates = rxx.rx(
             this.model.updates,
@@ -223,10 +226,22 @@ export class CDBNotify {
     /* Re-run the lookup on every class update that can change it. This
      * seq is shared by all watchers of the same relation, and runs at
      * most one lookup at a time: updates that arrive during a lookup
-     * are handled by one more lookup once it finishes. */
+     * are handled by one more lookup once it finishes.
+     *
+     * During a burst of updates (a bulk import) this would still run
+     * every watched relation once per update. So we also start at most
+     * one lookup per lookup_interval. The first update in a quiet
+     * period goes through at once, and the last update of a burst
+     * always gets a lookup at the end of its interval. The RxJS
+     * default (trailing: false) would drop the end of a burst. */
     shared_lookup (rel, klass) {
+        const interval = this.lookup_interval;
         return rxx.rx(
             this.class_updates_for(klass),
+            interval > 0
+                ? rx.throttleTime(interval, rx.asyncScheduler,
+                    { leading: true, trailing: true })
+                : rx.identity,
             rxu.coalesce(() => this.class_lookup(rel, klass)));
     }
 

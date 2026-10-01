@@ -117,10 +117,16 @@ of a composition, with one Flux query per 100 devices
 ```
 from(bucket: "default")
   |> range(start: -30d)
+  |> filter(fn: (r) => r["_measurement"] == "<measurement 1>" or ...)
   |> filter(fn: (r) => r["topLevelInstance"] == "<device 1>" or ...)
   |> filter(fn: (r) => r["_field"] == "value")
   |> last()
 ```
+
+The `_measurement` filter lists the measurements the chunk's leaves
+need. It is left out when a chunk needs more than 50, and the query
+then reads every series of its devices. The InfluxDB client timeout
+is 10 s.
 
 Each leaf takes the first returned row whose measurement, device and
 path match. When a leaf has more than one series (for example after a

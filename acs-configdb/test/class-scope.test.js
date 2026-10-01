@@ -82,6 +82,8 @@ function notifier (model, all) {
         auth:   { check_acl: async () => true },
         debug,
         api:    {},
+        /* Compare every update, not one per throttle window. */
+        lookup_interval:    0,
     });
     return n;
 }

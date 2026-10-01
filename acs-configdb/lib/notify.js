@@ -63,6 +63,21 @@ function pg_uuid (str) {
     return m && /^[0-9a-f]*$/.test(hex) ? m.slice(1).join("-") : null;
 }
 
+/* Read the class lookup interval in ms. Only a whole number from 0 to
+ * 2^31-1 is accepted (larger values overflow Node's timers). Anything
+ * else, including an empty string, falls back to 1000 ms, so a
+ * mistyped setting cannot turn the throttle off without a warning. */
+export function lookup_interval (value, log = () => {}) {
+    const DEFAULT = 1000;
+    if (value === undefined || value === null) return DEFAULT;
+    const n = typeof value == "number" ? value
+        : /^\s*\d+\s*$/.test(String(value)) ? Number(value) : NaN;
+    if (Number.isSafeInteger(n) && n >= 0 && n <= 2 ** 31 - 1)
+        return n;
+    log("Ignoring class lookup interval %o: using %d ms", value, DEFAULT);
+    return DEFAULT;
+}
+
 export class CDBNotify {
     constructor (opts) {
         this.auth   = opts.auth;
@@ -70,7 +85,7 @@ export class CDBNotify {
         this.log    = opts.debug.bound("notify");
         /* Minimum ms between the lookups that class updates trigger
          * for one (relation, class). 0 turns the throttle off. */
-        this.lookup_interval = Number(opts.lookup_interval ?? 1000);
+        this.lookup_interval = lookup_interval(opts.lookup_interval, this.log);
 
         this.config_updates = rxx.rx(
             this.model.updates,

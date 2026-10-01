@@ -282,3 +282,19 @@ test("throttled shared lookups never replace a newer result", async () => {
     a.sub.unsubscribe();
     b.sub.unsubscribe();
 });
+
+test("the class lookup interval falls back to 1000 ms for bad values", async () => {
+    const { lookup_interval } = await import("../lib/notify.js");
+    const logged = [];
+    const log = (...a) => logged.push(a);
+    assert.equal(lookup_interval(undefined, log), 1000);
+    assert.equal(lookup_interval(null, log), 1000);
+    assert.equal(lookup_interval(0, log), 0);
+    assert.equal(lookup_interval("0", log), 0);
+    assert.equal(lookup_interval("250", log), 250);
+    assert.equal(lookup_interval(250, log), 250);
+    assert.equal(logged.length, 0);
+    for (const bad of ["", "abc", "-5", "1.5", "1e3", "8s", -1, 1.5, NaN, 2 ** 31])
+        assert.equal(lookup_interval(bad, log), 1000, `value ${bad}`);
+    assert.equal(logged.length, 10);
+});

@@ -7,7 +7,9 @@
   "directories": {},
   "scripts": {
     "authn": "k5start -Uf ${CLIENT_KEYTAB} node bin/authn.js",
-    "load-dump": "node bin/load-dump.js"
+    "load-dump": "node bin/load-dump.js",
+    "test": "node --test test/*.test.js",
+    "bench": "node bench/registration-update.js"
   },
   "keywords": [
     "amrc",

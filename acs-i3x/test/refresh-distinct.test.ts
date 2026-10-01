@@ -132,7 +132,7 @@ function seed (cdb: FakeConfigDB) {
 }
 
 /** Starts the pipeline over a seeded ConfigDB, with counters. */
-function mk_stack (ragDirtyDelay = 20) {
+function mk_stack () {
     const cdb = new FakeConfigDB();
     seed(cdb);
     const fplus = mk_fplus(cdb);
@@ -142,14 +142,21 @@ function mk_stack (ragDirtyDelay = 20) {
     rag.init();
 
     const rebuild = jest.spyOn(rag, "rebuild");
+    const dirty = jest.spyOn(rag, "markDirty");
     const pass = jest.spyOn(ObjectTreeRefresh.prototype as any, "collectAllSchemaUuids");
 
     /* Typed loosely so this file also compiles against older code. */
-    const opts: any = { fplus, objectTree: tree, i3xRag: rag, valueCache, ragDirtyDelay };
+    const opts: any = { fplus, objectTree: tree, i3xRag: rag, valueCache };
     new ObjectTreeRefresh(opts).run();
     cdb.set_members(DEVICES);
 
-    return { cdb, tree, rag, valueCache, rebuild, pass };
+    /* Bring the index up to date, then count from here. */
+    rag.search("Device");
+    rebuild.mockClear();
+    dirty.mockClear();
+    pass.mockClear();
+
+    return { cdb, tree, rag, valueCache, rebuild, dirty, pass };
 }
 
 /** Everything the tree and the RAG index expose, in a stable order. */
@@ -195,27 +202,22 @@ function uns (vc: ValueCache, metric: string[], isa95 = ["Plant"]) {
         } } });
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
 afterEach(() => jest.restoreAllMocks());
 
 describe("ObjectTreeRefresh with repeated config deliveries", () => {
     it("does no work when every config is delivered again unchanged", () => {
-        const { cdb, rebuild, pass } = mk_stack();
-        expect(rebuild).toHaveBeenCalledTimes(1);
-        rebuild.mockClear();
-        pass.mockClear();
+        const { cdb, rag, rebuild, dirty, pass } = mk_stack();
 
         for (let i = 0; i < 50; i++) cdb.redeliver_all();
 
         expect(pass).toHaveBeenCalledTimes(0);
+        expect(dirty).toHaveBeenCalledTimes(0);
+        rag.search("Device");
         expect(rebuild).toHaveBeenCalledTimes(0);
     });
 
     it("applies a real change once, with the same result as a full build", () => {
-        const { cdb, tree, rag, rebuild, pass } = mk_stack();
-        rebuild.mockClear();
-        pass.mockClear();
+        const { cdb, tree, rag, rebuild, dirty, pass } = mk_stack();
 
         cdb.redeliver_all();
         cdb.put(DEVICE_INFORMATION_APP_UUID, "dev-2", devInfo("dev-2", 1));
@@ -226,13 +228,14 @@ describe("ObjectTreeRefresh with repeated config deliveries", () => {
         cdb.put(INFO_APP_UUID, SUB_SCHEMA, { name: "Motor v2" });
         cdb.redeliver_all();
 
-        /* One rebuild per real change (the schema change is two
+        /* One emission per real change (the schema change is two
          * writes), and none for repeats. Stage 2 restarts only for the
          * two device changes. */
-        expect(rebuild).toHaveBeenCalledTimes(4);
+        expect(dirty).toHaveBeenCalledTimes(4);
         expect(pass).toHaveBeenCalledTimes(2);
 
         const fp = fingerprint(tree, rag);
+        expect(rebuild).toHaveBeenCalledTimes(1);
         expect(fp).toEqual(reference(cdb));
         expect(tree.getObject("dev-2-torque-1")?.displayName).toBe("Torque");
         expect(tree.getObject("dev-3")?.displayName).toBe("Renamed");
@@ -240,31 +243,28 @@ describe("ObjectTreeRefresh with repeated config deliveries", () => {
     });
 
     it("still applies a change back to an earlier value", () => {
-        const { cdb, tree, rebuild } = mk_stack();
-        rebuild.mockClear();
+        const { cdb, tree, dirty } = mk_stack();
 
         cdb.put(INFO_APP_UUID, "dev-1", { name: "B" });
         cdb.put(INFO_APP_UUID, "dev-1", { name: `Device dev-1` });
 
-        expect(rebuild).toHaveBeenCalledTimes(2);
+        expect(dirty).toHaveBeenCalledTimes(2);
         expect(tree.getObject("dev-1")?.displayName).toBe("Device dev-1");
     });
 });
 
 describe("UNS-discovered nodes and the RAG index", () => {
     it("reach RAG and MCP search without a config delivery", async () => {
-        const { cdb, rag, valueCache, rebuild } = mk_stack();
-        rebuild.mockClear();
+        const { cdb, rag, valueCache, rebuild, dirty } = mk_stack();
 
         uns(valueCache, ["Motor", "Vibration"]);
-        expect(rag.search("Vibration")).toEqual([]);
+        expect(dirty).toHaveBeenCalledTimes(1);
+        expect(rebuild).not.toHaveBeenCalled();
 
-        await sleep(60);
-
-        expect(rebuild).toHaveBeenCalledTimes(1);
         const hits = rag.search("Vibration");
         expect(hits.map(h => h.displayName)).toEqual(["Vibration"]);
         expect(rag.search("Plant").map(h => h.displayName)).toEqual(["Plant"]);
+        expect(rebuild).toHaveBeenCalledTimes(1);
 
         const server = new McpServer({ name: "t", version: "0.0.1" });
         registerRagTools(server, rag);
@@ -276,53 +276,51 @@ describe("UNS-discovered nodes and the RAG index", () => {
         const parsed = JSON.parse(res.content[0].text);
         expect(parsed.map((h: any) => h.elementId)).toEqual([hits[0].elementId]);
         await client.close();
+        expect(rebuild).toHaveBeenCalledTimes(1);
 
         /* A later unchanged delivery does nothing more. */
-        rebuild.mockClear();
+        dirty.mockClear();
         cdb.redeliver_all();
-        expect(rebuild).not.toHaveBeenCalled();
+        expect(dirty).not.toHaveBeenCalled();
     });
 
-    it("share one rebuild for a burst of new nodes", async () => {
-        const { rag, valueCache, rebuild } = mk_stack();
-        rebuild.mockClear();
+    it("need one rebuild for a burst of new nodes", () => {
+        const { rag, valueCache, rebuild, dirty } = mk_stack();
 
         for (let i = 0; i < 100; i++) uns(valueCache, ["Motor", `Extra_${i}`]);
-        await sleep(60);
+        expect(dirty).toHaveBeenCalledTimes(100);
 
-        expect(rebuild).toHaveBeenCalledTimes(1);
         expect(rag.search("Extra_42", 200).map(h => h.displayName)).toContain("Extra_42");
+        expect(rag.search("Extra_7", 200).map(h => h.displayName)).toContain("Extra_7");
+        expect(rebuild).toHaveBeenCalledTimes(1);
     });
 
-    it("do not rebuild for messages that add nothing", async () => {
-        const { valueCache, rebuild } = mk_stack();
+    it("do not mark the index dirty for messages that add nothing", () => {
+        const { valueCache, dirty } = mk_stack();
         uns(valueCache, ["Motor", "Vibration"]);
-        await sleep(60);
-        rebuild.mockClear();
+        dirty.mockClear();
 
         uns(valueCache, ["Motor", "Vibration"]);
         uns(valueCache, ["Temperature"]);
-        await sleep(60);
 
-        expect(rebuild).not.toHaveBeenCalled();
+        expect(dirty).not.toHaveBeenCalled();
     });
 
-    it("reach RAG again when their device is removed and comes back", async () => {
+    it("reach RAG again when their device is removed and comes back", () => {
         const { cdb, rag, valueCache } = mk_stack();
         uns(valueCache, ["Motor", "Vibration"]);
-        await sleep(60);
         expect(rag.search("Vibration")).toHaveLength(1);
 
         cdb.set_members(["dev-2", "dev-3"]);
         expect(rag.search("Vibration")).toEqual([]);
         cdb.set_members(DEVICES);
+        expect(rag.search("Vibration")).toEqual([]);
 
         uns(valueCache, ["Motor", "Vibration"]);
-        await sleep(60);
         expect(rag.search("Vibration").map(h => h.displayName)).toEqual(["Vibration"]);
     });
 
-    it("are searchable at once after a config change", () => {
+    it("are searchable after a config change", () => {
         const { cdb, rag, valueCache } = mk_stack();
 
         uns(valueCache, ["Motor", "Vibration"]);

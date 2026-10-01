@@ -43,10 +43,6 @@ export interface RefreshOpts {
     /** Source of UNS messages. Nodes they add to the tree are folded
      * into the RAG index. */
     valueCache?: Pick<ValueCache, "onValueChange">;
-    /** Delay in ms before UNS-discovered nodes are folded into the RAG
-     * index (default 5000). Nodes found during the delay share one
-     * rebuild. */
-    ragDirtyDelay?: number;
 }
 
 export class ObjectTreeRefresh {
@@ -54,8 +50,6 @@ export class ObjectTreeRefresh {
     private objectTree: ObjectTree;
     private i3xRag: I3xRag;
     private valueCache?: Pick<ValueCache, "onValueChange">;
-    private ragDirtyDelay: number;
-    private ragDirtyTimer: ReturnType<typeof setTimeout> | null = null;
     private log: (msg: string, ...args: any[]) => void;
 
     constructor (opts: RefreshOpts) {
@@ -63,7 +57,6 @@ export class ObjectTreeRefresh {
         this.objectTree = opts.objectTree;
         this.i3xRag = opts.i3xRag;
         this.valueCache = opts.valueCache;
-        this.ragDirtyDelay = opts.ragDirtyDelay ?? 5000;
         this.log = opts.fplus.debug.bound("refresh");
     }
 
@@ -80,7 +73,7 @@ export class ObjectTreeRefresh {
             const obj = this.objectTree.getObject(elementId);
             if (!obj || unsSeen.has(obj)) return;
             unsSeen.add(obj);
-            this.markRagDirty();
+            this.i3xRag.markDirty();
         });
 
         // Cached per-config watch. Keyed by `${app}:${obj}` so identical
@@ -88,8 +81,8 @@ export class ObjectTreeRefresh {
         //
         // notify-v2 can deliver a config again without a change, for
         // example every WATCH is answered again after a reconnect. Each
-        // delivery would cost a full O(N) pass and a RAG rebuild, so
-        // drop repeats here. configEqual is the comparison applyDiff
+        // delivery would cost a full O(N) pass and dirty the RAG index,
+        // so drop repeats here. configEqual is the comparison applyDiff
         // uses, so a dropped repeat is one applyDiff would ignore.
         const watch_config = rxx.cacheSeq({
             factory: (key: string) => {
@@ -181,23 +174,6 @@ export class ObjectTreeRefresh {
         });
 
         this.log("ConfigDB pipeline active");
-    }
-
-    /** Schedule one RAG rebuild for nodes the UNS added to the tree.
-     * Nodes found before it runs share it. Once I3xRag has a dirty
-     * flag (#771), this should call i3xRag.markDirty() instead. */
-    private markRagDirty () {
-        if (this.ragDirtyTimer) return;
-        this.ragDirtyTimer = setTimeout(() => {
-            this.ragDirtyTimer = null;
-            try {
-                this.i3xRag.rebuild();
-                this.log("RAG rebuilt for UNS nodes: nodes=%d",
-                    this.i3xRag.nodeCount());
-            } catch (err) {
-                console.error("RAG rebuild for UNS nodes failed:", err);
-            }
-        }, this.ragDirtyDelay);
     }
 
     private collectAllSchemaUuids (devices: Map<string, any>): Set<string> {

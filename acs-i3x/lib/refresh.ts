@@ -26,7 +26,9 @@ import {
 } from "./constants.js";
 import { ObjectTree, PipelineSnapshot } from "./object-tree.js";
 import { I3xRag } from "./rag/i3x-rag.js";
-import { applyDiff } from "./diff.js";
+import type { ValueCache } from "./value-cache.js";
+import type { I3xObject } from "./types/i3x.js";
+import { applyDiff, configEqual } from "./diff.js";
 
 /** Minimal duck-typed shape we need from an immutable.js Set. */
 interface ImmSetLike<T> {
@@ -38,30 +40,55 @@ export interface RefreshOpts {
     fplus: any;
     objectTree: ObjectTree;
     i3xRag: I3xRag;
+    /** Source of UNS messages. Nodes they add to the tree are folded
+     * into the RAG index. */
+    valueCache?: Pick<ValueCache, "onValueChange">;
 }
 
 export class ObjectTreeRefresh {
     private fplus: any;
     private objectTree: ObjectTree;
     private i3xRag: I3xRag;
+    private valueCache?: Pick<ValueCache, "onValueChange">;
     private log: (msg: string, ...args: any[]) => void;
 
     constructor (opts: RefreshOpts) {
         this.fplus = opts.fplus;
         this.objectTree = opts.objectTree;
         this.i3xRag = opts.i3xRag;
+        this.valueCache = opts.valueCache;
         this.log = opts.fplus.debug.bound("refresh");
     }
 
     async run () {
         const cdb = this.fplus.ConfigDB;
 
+        // UNS messages add nodes to the tree outside this pipeline, so
+        // config emissions do not cover them. Mark the RAG index dirty
+        // the first time each UNS node is seen. The set holds the node
+        // objects, so a node removed and then found again counts as new.
+        const unsSeen = new WeakSet<I3xObject>();
+        this.valueCache?.onValueChange((elementId: string) => {
+            if (this.objectTree.getNodeSource(elementId) !== "uns") return;
+            const obj = this.objectTree.getObject(elementId);
+            if (!obj || unsSeen.has(obj)) return;
+            unsSeen.add(obj);
+            this.i3xRag.markDirty();
+        });
+
         // Cached per-config watch. Keyed by `${app}:${obj}` so identical
         // URLs share one WATCH request and survive switchMap restarts.
+        //
+        // notify-v2 can deliver a config again without a change, for
+        // example every WATCH is answered again after a reconnect. Each
+        // delivery would cost a full O(N) pass and dirty the RAG index,
+        // so drop repeats here. configEqual is the comparison applyDiff
+        // uses, so a dropped repeat is one applyDiff would ignore.
         const watch_config = rxx.cacheSeq({
             factory: (key: string) => {
                 const [app, obj] = key.split(":");
-                return cdb.watch_config(app, obj);
+                return cdb.watch_config(app, obj).pipe(
+                    rx.distinctUntilChanged(configEqual));
             },
             replay: true,
         });

@@ -35,6 +35,34 @@ import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
 import { DriverConnection } from "./devices/driver.js";
 import { Scout, ScoutResult } from "./scout.js";
 
+/* Does this parsed config contain a secret placeholder anywhere, in a
+ * key or in a string value? Uses an explicit stack, as a config can be
+ * tens of MB and deeply nested. The test is the "__FPSI__" prefix alone,
+ * which is looser than the full token pattern in fetchConfig. A false
+ * positive only costs the string round trip. A false negative would leak
+ * a placeholder, and none is possible: JSON.stringify escapes none of
+ * the characters in the prefix or the token, so any token in the
+ * stringified config is also in a key or value here. */
+export function hasSecretPlaceholder (root: unknown): boolean {
+    const stack: unknown[] = [root];
+    while (stack.length) {
+        const node = stack.pop();
+        if (typeof node === "string") {
+            if (node.includes("__FPSI__")) return true;
+        }
+        else if (Array.isArray(node)) {
+            for (const v of node) stack.push(v);
+        }
+        else if (node !== null && typeof node === "object") {
+            for (const k of Object.keys(node)) {
+                if (k.includes("__FPSI__")) return true;
+                stack.push((node as any)[k]);
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Translator class basically turns config file into instantiated classes
  * for device protocol translation and Sparkplug communication
@@ -454,7 +482,9 @@ export class Translator extends EventEmitter {
         log(`Fetched config with etag [${etag}]`);
 
         let valid = true;
-        if (config) {
+        /* Skip the string round trip when there is nothing to fill. For
+         * a large config it costs a transient of over 100 MiB. */
+        if (config && hasSecretPlaceholder(config)) {
             // Replace all occurrences of __FPSI_<v4UUID> with the actual
             // secret of the same name from /etc/secrets
 

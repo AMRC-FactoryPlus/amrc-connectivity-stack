@@ -26,7 +26,9 @@ import {
 } from "./constants.js";
 import { ObjectTree, PipelineSnapshot } from "./object-tree.js";
 import { I3xRag } from "./rag/i3x-rag.js";
-import { applyDiff } from "./diff.js";
+import type { ValueCache } from "./value-cache.js";
+import type { I3xObject } from "./types/i3x.js";
+import { applyDiff, configEqual } from "./diff.js";
 
 /** Minimal duck-typed shape we need from an immutable.js Set. */
 interface ImmSetLike<T> {
@@ -38,30 +40,62 @@ export interface RefreshOpts {
     fplus: any;
     objectTree: ObjectTree;
     i3xRag: I3xRag;
+    /** Source of UNS messages. Nodes they add to the tree are folded
+     * into the RAG index. */
+    valueCache?: Pick<ValueCache, "onValueChange">;
+    /** Delay in ms before UNS-discovered nodes are folded into the RAG
+     * index (default 5000). Nodes found during the delay share one
+     * rebuild. */
+    ragDirtyDelay?: number;
 }
 
 export class ObjectTreeRefresh {
     private fplus: any;
     private objectTree: ObjectTree;
     private i3xRag: I3xRag;
+    private valueCache?: Pick<ValueCache, "onValueChange">;
+    private ragDirtyDelay: number;
+    private ragDirtyTimer: ReturnType<typeof setTimeout> | null = null;
     private log: (msg: string, ...args: any[]) => void;
 
     constructor (opts: RefreshOpts) {
         this.fplus = opts.fplus;
         this.objectTree = opts.objectTree;
         this.i3xRag = opts.i3xRag;
+        this.valueCache = opts.valueCache;
+        this.ragDirtyDelay = opts.ragDirtyDelay ?? 5000;
         this.log = opts.fplus.debug.bound("refresh");
     }
 
     async run () {
         const cdb = this.fplus.ConfigDB;
 
+        // UNS messages add nodes to the tree outside this pipeline, so
+        // config emissions do not cover them. Mark the RAG index dirty
+        // the first time each UNS node is seen. The set holds the node
+        // objects, so a node removed and then found again counts as new.
+        const unsSeen = new WeakSet<I3xObject>();
+        this.valueCache?.onValueChange((elementId: string) => {
+            if (this.objectTree.getNodeSource(elementId) !== "uns") return;
+            const obj = this.objectTree.getObject(elementId);
+            if (!obj || unsSeen.has(obj)) return;
+            unsSeen.add(obj);
+            this.markRagDirty();
+        });
+
         // Cached per-config watch. Keyed by `${app}:${obj}` so identical
         // URLs share one WATCH request and survive switchMap restarts.
+        //
+        // notify-v2 can deliver a config again without a change, for
+        // example every WATCH is answered again after a reconnect. Each
+        // delivery would cost a full O(N) pass and a RAG rebuild, so
+        // drop repeats here. configEqual is the comparison applyDiff
+        // uses, so a dropped repeat is one applyDiff would ignore.
         const watch_config = rxx.cacheSeq({
             factory: (key: string) => {
                 const [app, obj] = key.split(":");
-                return cdb.watch_config(app, obj);
+                return cdb.watch_config(app, obj).pipe(
+                    rx.distinctUntilChanged(configEqual));
             },
             replay: true,
         });
@@ -147,6 +181,23 @@ export class ObjectTreeRefresh {
         });
 
         this.log("ConfigDB pipeline active");
+    }
+
+    /** Schedule one RAG rebuild for nodes the UNS added to the tree.
+     * Nodes found before it runs share it. Once I3xRag has a dirty
+     * flag (#771), this should call i3xRag.markDirty() instead. */
+    private markRagDirty () {
+        if (this.ragDirtyTimer) return;
+        this.ragDirtyTimer = setTimeout(() => {
+            this.ragDirtyTimer = null;
+            try {
+                this.i3xRag.rebuild();
+                this.log("RAG rebuilt for UNS nodes: nodes=%d",
+                    this.i3xRag.nodeCount());
+            } catch (err) {
+                console.error("RAG rebuild for UNS nodes failed:", err);
+            }
+        }, this.ragDirtyDelay);
     }
 
     private collectAllSchemaUuids (devices: Map<string, any>): Set<string> {

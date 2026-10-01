@@ -88,4 +88,4 @@ const api = await new WebAPI({
 }).init();
 
 api.run();
-new ObjectTreeRefresh({fplus, objectTree, i3xRag}).run()
+new ObjectTreeRefresh({fplus, objectTree, i3xRag, valueCache}).run()

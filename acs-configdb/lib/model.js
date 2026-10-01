@@ -252,10 +252,15 @@ export default class Model extends EventEmitter {
         case "all_membership": {
             const classes = await this._subclass_ids(query, id);
             if (!classes.length) return [];
+            /* An object can be a member of several of these classes.
+             * A semi-join returns each object once without the cost of
+             * a `distinct` over the whole result. */
             return _q_uuids(query, `
-                select distinct o.uuid
-                from membership m join object o on o.id = m.id
-                where m.class = any($1::integer[])
+                select o.uuid
+                from object o
+                where o.id in (
+                    select m.id from membership m
+                    where m.class = any($1::integer[]))
             `, [classes]);
         }
         default:

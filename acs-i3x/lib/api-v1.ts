@@ -355,7 +355,7 @@ export class APIv1 {
             return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
         });
         this.log("POST /objects/value: %d ids, %d UNS cache hits, %d InfluxDB hits, %d no data, %dms",
-            ids.length, ids.length - misses.length, influxHits,
+            ids.length, cached.filter(Boolean).length, influxHits,
             results.length - results.filter(r => r.success).length,
             Date.now() - started);
 

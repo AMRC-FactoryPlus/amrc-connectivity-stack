@@ -54,6 +54,15 @@ function same_set (a, b) {
     return true;
 }
 
+/* The form of a UUID that the database returns, or null if this
+ * cannot be a UUID. A class watch URL can use any form Postgres
+ * accepts. */
+function pg_uuid (str) {
+    const hex = str.toLowerCase().replace(/[{}-]/g, "");
+    const m = /^(.{8})(.{4})(.{4})(.{4})(.{12})$/.exec(hex);
+    return m && /^[0-9a-f]*$/.test(hex) ? m.slice(1).join("-") : null;
+}
+
 export class CDBNotify {
     constructor (opts) {
         this.auth   = opts.auth;
@@ -200,14 +209,24 @@ export class CDBNotify {
         return { seq, set: list && new Set(list) };
     }
 
-    /* Re-run the lookup on every class update. Class updates carry no
-     * detail, so every watched relation must be looked up again. This
+    /* The class updates that can change the lookups of `klass`. A
+     * class update lists the classes it can affect, or none if it can
+     * affect any. */
+    class_updates_for (klass) {
+        const uuid = pg_uuid(klass);
+        if (!uuid) return this.class_updates;
+        return rxx.rx(
+            this.class_updates,
+            rx.filter(u => !u.classes || u.classes.has(uuid)));
+    }
+
+    /* Re-run the lookup on every class update that can change it. This
      * seq is shared by all watchers of the same relation, and runs at
      * most one lookup at a time: updates that arrive during a lookup
      * are handled by one more lookup once it finishes. */
     shared_lookup (rel, klass) {
         return rxx.rx(
-            this.class_updates,
+            this.class_updates_for(klass),
             rxu.coalesce(() => this.class_lookup(rel, klass)));
     }
 

@@ -19,6 +19,7 @@
  *   - notify/v2 messages and bytes written to WebSockets.
  *   - Event-loop delay (perf_hooks.monitorEventLoopDelay).
  *   - Peak RSS and heap, sampled every 50 ms.
+ *   - Bytes waiting in the notify WebSockets' send buffers.
  *
  * Environment: PGHOST, PGPORT, PGUSER, PGDATABASE as for libpq;
  * PORT (default 8710); BENCH_TOKEN (default "benchtoken").
@@ -69,6 +70,7 @@ function reset () {
         full_msg_bytes: 0,
         peak_rss:       0,
         peak_heap:      0,
+        peak_buffered:  0,
     });
     cpu0 = process.cpuUsage();
     t0 = process.hrtime.bigint();
@@ -77,10 +79,15 @@ function reset () {
 }
 reset();
 
+/* Open notify WebSockets, to read their send buffers. */
+const sockets = new Set();
+const buffered = () => [...sockets].reduce((a, ws) => a + ws.bufferedAmount, 0);
+
 setInterval(() => {
     const m = process.memoryUsage();
     stats.peak_rss = Math.max(stats.peak_rss, m.rss);
     stats.peak_heap = Math.max(stats.peak_heap, m.heapUsed);
+    stats.peak_buffered = Math.max(stats.peak_buffered, buffered());
 }, 50).unref();
 
 function snapshot () {
@@ -93,6 +100,9 @@ function snapshot () {
         eld_p99_ms: eld.percentile(99) / 1e6,
         eld_mean_ms: eld.mean / 1e6,
         rss:        process.memoryUsage().rss,
+        heap:       process.memoryUsage().heapUsed,
+        external:   process.memoryUsage().external,
+        buffered:   buffered(),
     };
 }
 
@@ -109,6 +119,8 @@ const model = await new Model({ auth, debug }).init();
 const bench_routes = app => {
     app.get("/bench/stats", (req, res) => res.json(snapshot()));
     app.post("/bench/reset", (req, res) => { reset(); res.status(204).end(); });
+    /* Collect garbage, so heap samples show what is still held. */
+    app.post("/bench/gc", (req, res) => { global.gc?.(); res.status(204).end(); });
     app.post("/bench/acl", (req, res) => {
         const { app: target, allow } = req.body;
         if (allow) denied.delete(target);
@@ -134,6 +146,8 @@ notify.run();
  * the Notify one, synchronously in the same emit, so it wraps send()
  * before the session can send anything. */
 notify.notify.wss.on("connection", ws => {
+    sockets.add(ws);
+    ws.on("close", () => sockets.delete(ws));
     const send = ws.send.bind(ws);
     ws.send = (data, ...rest) => {
         stats.msgs++;

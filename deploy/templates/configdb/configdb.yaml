@@ -128,6 +128,8 @@ spec:
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             - name: BODY_LIMIT
               value: "{{ .Values.configdb.bodyLimit }}"
+            - name: CLASS_LOOKUP_INTERVAL
+              value: "{{ .Values.configdb.classLookupInterval }}"
             - name: BOOTSTRAP_ACL
               value: |
                 sv1auth:Perm.ReadApp:App.Registration

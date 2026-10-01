@@ -161,6 +161,12 @@ configdb:
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
   bodyLimit: 100kb
+  # -- Minimum time in ms between the class member and subclass lookups
+  # that ConfigDB runs for notify watchers when classes change. During a
+  # bulk import this stops every watched class being looked up again on
+  # every object create. A change can reach watchers up to this long
+  # after it is made. 0 looks up again on every change.
+  classLookupInterval: 1000
   backup:
     # -- Whether to run a pg_dump of the ConfigDB before every helm upgrade
     enabled: true

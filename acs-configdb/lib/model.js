@@ -83,7 +83,9 @@ export default class Model extends EventEmitter {
 
         /* type field gives type of update.
          * "config" updates have {app, object, config}.
-         * "class" updates have no props.
+         * "class" updates may have `classes`, a Set of the UUIDs of
+         * the classes whose class lookups this change can affect.
+         * Without it the change can affect any class lookup.
          */
         this.updates = new rx.Subject();
     }
@@ -185,7 +187,7 @@ export default class Model extends EventEmitter {
             select $1, c.id, c.rank - 1, $3
                 from object c
                 where c.id = $2
-            returning id, uuid
+            returning id, uuid, rank
         `, [uuid, klass, owner]);
     }
 
@@ -200,7 +202,7 @@ export default class Model extends EventEmitter {
                     from object c
                     where c.id = $1
                 on conflict (uuid) do nothing
-                returning id, uuid
+                returning id, uuid, rank
             `, [klass, owner]);
             if (obj.rowCount)
                 return obj.rows[0];
@@ -305,6 +307,36 @@ export default class Model extends EventEmitter {
             delete from ${table}
             where class = $1 and id = $2
         `, [klass, obj]);
+    }
+
+    /* The class update for a change which added or removed
+     * memberships of the classes `ids` and nothing else in the class
+     * graph. `objs` are the UUIDs of objects created or deleted.
+     *
+     * Such a change can only alter the lookups of those classes, of
+     * their superclasses (whose `all_membership` includes them) and of
+     * the objects themselves (which go from 404 to found or back).
+     *
+     * This runs after the change has committed. If the subclass graph
+     * changed between our commit and this query, that change sent its
+     * own class update, which re-runs every lookup after our commit.
+     * So we cannot miss a superclass the change affected. If we can't
+     * find the superclasses, every lookup re-runs. */
+    async _class_scope (ids, objs) {
+        if (!ids) return { type: "class" };
+        try {
+            const sup = await _q_uuids(this.db.query.bind(this.db), `
+                with recursive up as (
+                    select unnest($1::integer[]) id
+                    union select s.class from up u join subclass s on s.id = u.id)
+                select o.uuid from up join object o on o.id = up.id
+            `, [ids]);
+            return { type: "class", classes: new Set([...sup, ...objs]) };
+        }
+        catch (e) {
+            this.log("Class scope lookup failed: %s", e);
+            return { type: "class" };
+        }
     }
 
     /* XXX This is to create a new rank. This must be the parent of the
@@ -475,25 +507,26 @@ export default class Model extends EventEmitter {
         /* Setting rank via object_create is forbidden */
         if (spec.rank) return [422];
 
-        const [st, config] = await this.db.txn({}, async q => {
-            const [st, id] = await this._object_create(q, spec);
+        const [st, config, scope] = await this.db.txn({}, async q => {
+            const [st, id, scope] = await this._object_create(q, spec);
             if (st > 299) return [st];
 
             await q(`call update_registration($1)`, [id]);
             const info = await this._config_get(q, ObjID.Registration, id)
                 .then(r => r?.json);
 
-            return [st, info];
+            return [st, info, scope];
         });
 
         if (st < 299) {
+            const update = await this._class_scope(scope, [config.uuid]);
             this.updates.next({
                 type:   "config",
                 app:    App.Registration,
                 object: config.uuid,
                 config,
             });
-            this.updates.next({ type: "class" });
+            this.updates.next(update);
         }
         return [st, config];
     }
@@ -527,7 +560,9 @@ export default class Model extends EventEmitter {
 
         await this._class_add(q, c_id, "membership", obj.id);
         await this._add_rank_superclass(q, obj.id);
-        return [201, obj.id];
+        /* A new individual is a member of one class and changes
+         * nothing else. A new class also changes the subclass graph. */
+        return [201, obj.id, obj.rank == 0 ? [c_id] : null];
     }
 
     /* Delete an object. Deletes configs associated with this object,
@@ -535,11 +570,16 @@ export default class Model extends EventEmitter {
      * belonging to an app. Returns [st, body?].
      */
     async object_delete(object) {
-        const [st, body] = await this.db.txn({}, async query => {
+        const [st, body, scope] = await this.db.txn({}, async query => {
             if (Immutable.has(object)) return [405];
 
-            const id = await this._obj_id(query, object);
-            if (id == null) return [404];
+            /* Lock the object, so nobody can add it to a class until we
+             * have deleted it. */
+            const obj = await _q_row(query, `
+                select id, rank from object where uuid = $1 for update
+            `, [object]);
+            if (obj == null) return [404];
+            const { id } = obj;
 
             const members = await _q_uuids(query, `
                 select o.uuid 
@@ -571,18 +611,27 @@ export default class Model extends EventEmitter {
                 where a.id = c.app and c.object = $1
                 returning a.uuid
             `, [id]);
+            /* An individual leaves only its classes. A class also
+             * leaves the subclass graph. */
+            const scope = obj.rank == 0
+                ? await _q_set(query,
+                    `select class from membership where id = $1`, [id])
+                    .then(rs => rs.map(r => r.class))
+                : null;
+
             /* Delete the object. */
             await query(`delete from object where id = $1`, [id]);
-            return [204, confs];
+            return [204, confs, scope];
         });
 
         if (st != 204)
             return [st, body];
 
+        const update = await this._class_scope(scope, [object]);
         for (const app of body)
             this.updates.next({ type: "config", app, object });
         this.updates.next({ type: "config", app: App.Registration, object });
-        this.updates.next({ type: "class" });
+        this.updates.next(update);
         return [st];
     }
 
@@ -610,12 +659,16 @@ export default class Model extends EventEmitter {
         });
     }
 
-    async _class_relation (klass, obj, perform) {
+    /* `members` is true if `perform` changes only memberships of
+     * `klass`. Otherwise it may change the subclass graph. */
+    async _class_relation (klass, obj, perform, members) {
+        let scope = null;
         const st = await this.db.txn({}, async query => {
             const c = await this._obj_info(query, klass);
             const o = await this._obj_info(query, obj);
             if (c == null || o == null)
                 return 404;
+            scope = members ? [c.id] : null;
             return perform(query, c, o);
         }).catch(e => {
             this.log("Class update failed: %s", e);
@@ -625,7 +678,7 @@ export default class Model extends EventEmitter {
         /* We send a single notification for all updates. The watcher
          * needs to look up the current state each time. */
         if (st < 300)
-            this.updates.next({ type: "class" });
+            this.updates.next(await this._class_scope(scope, []));
         return st;
     }
 
@@ -634,14 +687,14 @@ export default class Model extends EventEmitter {
             if (c.rank != o.rank + 1)
                 throw "Class must be one rank above member";
             await this._class_add(q, c.id, "membership", o.id);
-        });
+        }, true);
     }
     class_remove_member (klass, obj) {
         return this._class_relation(klass, obj, async (q, c, o) => {
             await this._class_remove(q, c.id, "membership", o.id);
             if (!await this._class_has(q, o.class, "all_membership", o.id))
                 throw "Cannot remove object from primary class";
-        });
+        }, true);
     }
     class_add_subclass (klass, obj) {
         return this._class_relation(klass, obj, async (q, c, o) => {
@@ -988,6 +1041,10 @@ export default class Model extends EventEmitter {
             v == 2 ? this._dump_load_obj_v2(dump)
             : 422);
         if (st > 299) return st;
+        /* load_dump changes the class graph behind our back. Before
+         * class updates were targeted the next update of any kind
+         * re-ran every lookup; now only an untargeted one does. */
+        this.updates.next({ type: "class" });
 
         for (const [app, objs] of Object.entries(dump.configs ?? {})) {
             for (const [object, conf] of Object.entries(objs)) {

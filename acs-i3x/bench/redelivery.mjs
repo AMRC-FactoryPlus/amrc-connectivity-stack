@@ -17,7 +17,11 @@
  * After the first snapshot, the script re-delivers --redeliveries
  * unchanged configs at --rate per second, and measures for --window
  * seconds from the start of the storm. A child process polls
- * GET /v1/objecttypes every 100 ms.
+ * GET /v1/objecttypes every 100 ms. The RAG index rebuilds lazily, on
+ * the first query after the tree is marked dirty, so the script also
+ * runs one RAG search every --query-interval ms, as an MCP client
+ * would. It counts markDirty() calls and the rebuilds those queries
+ * trigger.
  *
  * With --uns D, it then sends UNS messages for the first D devices
  * (every config leaf, plus one metric per device that is not in the
@@ -42,6 +46,7 @@ const { values: a } = parseArgs({ options: {
     redeliveries:   { type: "string", default: "2000" },
     rate:           { type: "string", default: "100" },
     window:         { type: "string", default: "60" },
+    "query-interval": { type: "string", default: "1000" },
     uns:            { type: "string", default: "0" },
     "uns-rate":     { type: "string", default: "2000" },
     "uns-wait":     { type: "string", default: "30" },
@@ -130,8 +135,12 @@ const subscriptions = new SubscriptionManager({ valueCache, ttl: 300000 });
 const rag = new I3xRag(objectTree, valueCache, history);
 rag.init();
 
-/* Count rebuilds by wrapping the instance method. */
-const m = { rebuilds: 0, rebuild_ms: 0, rebuild_max_ms: 0 };
+/* Count rebuilds and dirty marks by wrapping the instance methods. */
+const m = { rebuilds: 0, rebuild_ms: 0, rebuild_max_ms: 0, dirty: 0, queries: 0 };
+const reset = () => Object.assign(m,
+    { rebuilds: 0, rebuild_ms: 0, rebuild_max_ms: 0, dirty: 0, queries: 0 });
+const markDirty = rag.markDirty.bind(rag);
+rag.markDirty = () => { m.dirty++; markDirty(); };
 const rebuild = rag.rebuild.bind(rag);
 rag.rebuild = () => {
     const t = performance.now();
@@ -149,10 +158,19 @@ const server = app.listen(Number(a.port));
 const t_start = performance.now();
 new ObjectTreeRefresh({ fplus, objectTree, i3xRag: rag, valueCache }).run();
 cdb.members.next(new MemberSet([...snap.devices.keys()]));
-while (m.rebuilds === 0) await sleep(5);
+while (m.dirty === 0) await sleep(5);
+rag.search("Signal", 5);
 const first_snapshot_ms = performance.now() - t_start;
 await sleep(500);
-Object.assign(m, { rebuilds: 0, rebuild_ms: 0, rebuild_max_ms: 0 });
+reset();
+
+/* A RAG query every --query-interval ms, as an MCP client would make. */
+let query_timer = null;
+const start_queries = () => {
+    query_timer = setInterval(() => { m.queries++; rag.search("Signal", 5); },
+        Number(a["query-interval"]));
+};
+const stop_queries = () => clearInterval(query_timer);
 
 /* Poller in a child process, so its timing is not held up by this
  * process's event loop. */
@@ -189,6 +207,7 @@ const eld = monitorEventLoopDelay({ resolution: 10 });
 eld.enable();
 const cpu0 = process.cpuUsage();
 const t0 = performance.now();
+start_queries();
 let k = 0;
 await new Promise(resolve => {
     const tick = () => {
@@ -200,6 +219,7 @@ await new Promise(resolve => {
     tick();
 });
 while (performance.now() - t0 < WINDOW_MS) await sleep(50);
+stop_queries();
 const wall_s = (performance.now() - t0) / 1000;
 const cpu = process.cpuUsage(cpu0);
 eld.disable();
@@ -240,12 +260,13 @@ if (U > 0) {
         ["UNS", "v1", ...isa, "Edge", name, ...segs].join("/"), payload,
         { properties: { userProperties: { InstanceUUIDPath: uuid, SchemaUUIDPath: "" } } });
 
-    Object.assign(m, { rebuilds: 0, rebuild_ms: 0, rebuild_max_ms: 0 });
+    reset();
     const nodes0 = objectTree.getObjects().length;
     const eld2 = monitorEventLoopDelay({ resolution: 10 });
     eld2.enable();
     const URATE = Number(a["uns-rate"]);
     const u0 = performance.now();
+    start_queries();
     let j = 0;
     await new Promise(resolve => {
         const tick = () => {
@@ -257,6 +278,7 @@ if (U > 0) {
         tick();
     });
     const sent = performance.now();
+    stop_queries();
     const found = () => rag.search("Extra_UNS_Metric", Infinity).length;
     let found_ms = null;
     while (performance.now() - sent < Number(a["uns-wait"]) * 1000) {
@@ -269,6 +291,8 @@ if (U > 0) {
         uns_messages: msgs.length,
         uns_new_nodes: objectTree.getObjects().length - nodes0,
         uns_send_s: +((sent - u0) / 1000).toFixed(1),
+        uns_dirty_marks: m.dirty,
+        uns_queries: m.queries,
         uns_rebuilds: m.rebuilds,
         uns_rebuild_max_ms: +m.rebuild_max_ms.toFixed(0),
         uns_in_rag: found(),
@@ -286,6 +310,8 @@ console.log(JSON.stringify({
     redeliveries: R,
     rate: RATE,
     window_s: +wall_s.toFixed(1),
+    dirty_marks: storm.dirty,
+    rag_queries: storm.queries,
     rebuilds: storm.rebuilds,
     rebuild_mean_ms: storm.rebuilds ? +(storm.rebuild_ms / storm.rebuilds).toFixed(0) : 0,
     rebuild_max_ms: +storm.rebuild_max_ms.toFixed(0),

@@ -42,6 +42,18 @@ function set_contents (lookup) {
         rx.map(mk_res));
 }
 
+/* Compare two class lookup results. Each is a Set of UUIDs, or
+ * undefined if the class does not exist. This gives the same answer as
+ * deep_equal for these values, at a fraction of the cost. */
+function same_set (a, b) {
+    if (a === b) return true;
+    if (!a || !b) return !a && !b;
+    if (a.size != b.size) return false;
+    for (const x of a)
+        if (!b.has(x)) return false;
+    return true;
+}
+
 export class CDBNotify {
     constructor (opts) {
         this.auth   = opts.auth;
@@ -52,6 +64,25 @@ export class CDBNotify {
             this.model.updates,
             rx.filter(u => u.type == "config"),
             rx.share());
+        /* Config updates for one (app, object). Most watchers watch a
+         * single config, so we don't filter every update past every
+         * watcher. */
+        this.object_updates = rxu.keyed(this.config_updates,
+            u => JSON.stringify([u.app, u.object]));
+        this.class_updates = rxx.rx(
+            this.model.updates,
+            rx.filter(u => u.type == "class"),
+            rx.share());
+
+        /* Lookups triggered by class updates, one per (relation,
+         * class) however many clients are watching it. Nothing is
+         * replayed to new watchers, so stop as soon as the last watcher
+         * leaves rather than running lookups nobody receives. */
+        this.lookup_seq = 0;
+        this.shared_lookups = rxx.cacheSeq({
+            factory: key => this.shared_lookup(...JSON.parse(key)),
+            timeout: 0,
+        });
 
         this.notify = this.build_notify(opts.api);
     }
@@ -109,9 +140,7 @@ export class CDBNotify {
         return rxx.rx(
             rx.concat(
                 model.config_get({ app, object }),
-                rxx.rx(
-                    this.config_updates,
-                    rx.filter(u => u.app == app && u.object == object))),
+                this.object_updates(JSON.stringify([app, object]))),
             rx.map(entry_response),
             rx.map(mk_res),
             ck_acl);
@@ -163,23 +192,58 @@ export class CDBNotify {
         return { acl, full, updates };
     }
 
+    /* Look up one class relation. The result is tagged with the order
+     * the lookup started in. */
+    async class_lookup (rel, klass) {
+        const seq = ++this.lookup_seq;
+        const list = await this.model.class_lookup(klass, rel);
+        return { seq, set: list && new Set(list) };
+    }
+
+    /* Re-run the lookup on every class update. Class updates carry no
+     * detail, so every watched relation must be looked up again. This
+     * seq is shared by all watchers of the same relation, and runs at
+     * most one lookup at a time: updates that arrive during a lookup
+     * are handled by one more lookup once it finishes. */
+    shared_lookup (rel, klass) {
+        return rxx.rx(
+            this.class_updates,
+            rxu.coalesce(() => this.class_lookup(rel, klass)));
+    }
+
     /* XXX This is not ideal. There is a race between the update and the
      * lookup meaning we might miss notifications. It would be better to
      * pass the update in the sequence but I think that would mean caching
      * the whole class structure js-side. */
     class_watch (rel, perm, session, klass) {
-        const { model } = this;
-
         const ck_acl = this.acl_checker(session, perm, klass, true);
+        const shared = this.shared_lookups(JSON.stringify([rel, klass]));
 
-        return rxx.rx(
-            this.model.updates,
-            rx.filter(u => u.type == "class"),
-            /* This line opens a txn per update per watcher. This is not
-             * good. Perhaps have a shared seq querying the full
-             * relation set on every update? Or just track changes
-             * properly... */
-            set_contents(() => model.class_lookup(klass, rel)),
-            ck_acl);
+        return rx.defer(() => {
+            /* Each watcher does its own initial lookup, then follows
+             * the shared lookups. We use a result only if its lookup
+             * started after the last one we used. This is the ordering
+             * the per-watcher switchMap used to give: an older lookup
+             * never replaces a newer one.
+             *
+             * Start the initial lookup first and start `latest` from
+             * its seq (class_lookup takes the seq before it awaits). A
+             * shared lookup already running when we subscribed started
+             * before the WATCH, so it must not become our 201. */
+            const initial = this.class_lookup(rel, klass);
+            let latest = this.lookup_seq;
+            return rxx.rx(
+                rx.merge(shared, rx.from(initial)),
+                rx.filter(r => {
+                    if (r.seq < latest) return false;
+                    latest = r.seq;
+                    return true;
+                }),
+                rx.map(r => r.set),
+                rx.distinctUntilChanged(same_set),
+                rx.map(list_response),
+                rx.map(mk_res),
+                ck_acl);
+        });
     }
 }

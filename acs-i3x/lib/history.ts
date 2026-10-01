@@ -30,6 +30,12 @@ interface HistoryOpts {
      * that needs more reads every series of its devices instead.
      */
     bulkMeasurementFilterMax?: number;
+    /**
+     * InfluxDB query timeout in ms. Defaults to 10 s, the client's
+     * own default, set explicitly so the bulk queries' time budget
+     * does not depend on the client library version.
+     */
+    queryTimeout?: number;
 }
 
 /** One row of the bulk last-value query. */
@@ -100,6 +106,7 @@ export class History {
         const influx = new InfluxDB({
             url: opts.influxUrl,
             token: opts.influxToken,
+            timeout: opts.queryTimeout ?? 10_000,
         });
         this.queryApi = influx.getQueryApi(opts.influxOrg);
     }

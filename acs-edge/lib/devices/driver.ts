@@ -49,10 +49,7 @@ export class DriverConnection extends DeviceConnection {
     }
 
     close () {
-        if (this.#addrsPending) {
-            clearImmediate(this.#addrsPending);
-            this.#addrsPending = null;
-        }
+        this.#cancel_addrs();
         this.broker.publish({
             id:         this.id,
             msg:        "active",
@@ -65,6 +62,7 @@ export class DriverConnection extends DeviceConnection {
 
 
     readMetrics(metrics: Metrics, payloadFormat?: string, delimiter?: string) {
+        this.#flush_addrs();
         const poll = metrics.addresses
             .filter(a => this.topics.has(a))
             .map(a => this.topics.get(a))
@@ -77,6 +75,7 @@ export class DriverConnection extends DeviceConnection {
     }
 
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat: serialisationType, delimiter?: string) {
+        this.#flush_addrs();
         let err;
 
         metrics.array.forEach(m => {
@@ -186,7 +185,10 @@ export class DriverConnection extends DeviceConnection {
                 msg: "conf",
                 payload: Buffer.from(JSON.stringify(this.conf)),
             });
-            this.#queue_addrs();
+            /* The driver clears its map on conf, so send the map
+             * straight after it, as before. */
+            this.#cancel_addrs();
+            this.#send_addrs();
             break;
         case "UP":
             if (ost != "UP")
@@ -216,6 +218,21 @@ export class DriverConnection extends DeviceConnection {
             if (this.status != "DOWN")
                 this.#send_addrs();
         });
+    }
+
+    /* A poll or a cmd must reach the driver after the map it depends
+     * on, so send any pending map first. */
+    #flush_addrs () {
+        if (!this.#addrsPending) return;
+        this.#cancel_addrs();
+        if (this.status != "DOWN")
+            this.#send_addrs();
+    }
+
+    #cancel_addrs () {
+        if (!this.#addrsPending) return;
+        clearImmediate(this.#addrsPending);
+        this.#addrsPending = null;
     }
 
     #send_addrs () {

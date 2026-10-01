@@ -58,6 +58,7 @@ const api = await new WebAPI({
 const notify = new CDBNotify({
     auth, api, model,
     debug:  fplus.debug,
+    lookup_interval:    env.CLASS_LOOKUP_INTERVAL,
 });
 
 mqtt?.run();

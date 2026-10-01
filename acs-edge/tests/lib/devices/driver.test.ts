@@ -209,6 +209,15 @@ describe("DriverConnection polls", () => {
         expect(broker.of("poll")).toHaveLength(0);
     });
 
+    it("starts no poll timer for a device with no addresses", async () => {
+        const timers = jest.spyOn(global, "setInterval");
+        await start("empty", []);
+        expect(timers).not.toHaveBeenCalled();
+        await start("full", ["a"]);
+        expect(timers).toHaveBeenCalledTimes(1);
+        timers.mockRestore();
+    });
+
     it("sends no poll from readMetrics with no addresses", () => {
         conn.readMetrics({ addresses: [] } as any);
         expect(broker.of("poll")).toHaveLength(0);

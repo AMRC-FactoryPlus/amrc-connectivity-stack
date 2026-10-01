@@ -110,14 +110,49 @@ describe("DriverConnection address map", () => {
         broker.status("READY");
         await subscribe(3);
         await tick();
-        expect(broker.of("addr").length).toBe(1);
+        /* One with READY's conf, one for the burst. */
+        expect(broker.of("addr").length).toBe(2);
 
         broker.status("READY");
         await tick();
         expect(broker.of("conf").length).toBe(2);
-        expect(broker.of("addr").length).toBe(2);
+        expect(broker.of("addr").length).toBe(3);
         expect(broker.sent.slice(-2).map(p => p.msg))
             .toEqual(["conf", "addr"]);
+    });
+
+    it("sends the map on READY without waiting a turn", () => {
+        broker.status("READY");
+        expect(broker.sent.map(p => p.msg)).toEqual(["active", "conf", "addr"]);
+    });
+
+    it("sends a pending map before a poll", async () => {
+        broker.status("READY");
+        broker.status("UP");
+        await subscribe(3);
+        const before = broker.of("addr").length;
+
+        conn.readMetrics({ addresses: ["dev0/tag0"] } as any);
+        const msgs = broker.sent.slice(-2).map(p => p.msg);
+        expect(msgs).toEqual(["addr", "poll"]);
+        expect(broker.of("addr").length).toBe(before + 1);
+        expect(JSON.parse(broker.of("addr").at(-1).payload.toString()))
+            .toEqual(expectedAddrs(conn));
+
+        /* The flush replaced the pending send. */
+        await tick();
+        expect(broker.of("addr").length).toBe(before + 1);
+    });
+
+    it("sends a pending map before a cmd", async () => {
+        broker.status("READY");
+        broker.status("UP");
+        await subscribe(1);
+        const before = broker.of("addr").length;
+
+        conn.writeMetrics({ array: [] } as any, () => {}, "JSON" as any);
+        expect(broker.of("addr").length).toBe(before + 1);
+        expect(broker.sent.at(-1).msg).toBe("addr");
     });
 
     it("drops a pending map if the driver goes DOWN", async () => {

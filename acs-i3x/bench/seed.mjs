@@ -5,7 +5,7 @@
  * Seed an InfluxDB 2.x bucket with the synthetic fleet in dataset.mjs.
  *
  *   node bench/seed.mjs --url http://localhost:58086 --token bench-token \
- *       --org default --bucket default --devices 2000 --points 24
+ *       --org default --bucket default --devices 2000 --points 24 [--wide 1000]
  *
  * Creates the bucket if it does not exist. Writes a `seeded_at` marker
  * so later runs use the same "now" as the data.
@@ -23,6 +23,8 @@ const { values: a } = parseArgs({
         bucket: { type: "string", default: "default" },
         devices: { type: "string", default: "2000" },
         points: { type: "string", default: "24" },
+        /* Extra top-level metrics per device (see dataset.mjs). */
+        wide: { type: "string", default: "0" },
         batch: { type: "string", default: "20000" },
         parallel: { type: "string", default: "4" },
         out: { type: "string" },
@@ -69,6 +71,7 @@ await ensureBucket();
 const now = Date.now();
 const n = Number(a.devices);
 const points = Number(a.points);
+const wide = Number(a.wide);
 const batch = Number(a.batch);
 const parallel = Number(a.parallel);
 
@@ -88,7 +91,7 @@ async function flush() {
 }
 
 for (let i = 0; i < n; i++) {
-    for (const line of lines(i, now, points)) {
+    for (const line of lines(i, now, points, wide)) {
         buf.push(line);
         if (buf.length >= batch) await flush();
     }
@@ -97,6 +100,6 @@ for (let i = 0; i < n; i++) {
 await flush();
 await Promise.all(inflight);
 
-const meta = { bucket: a.bucket, devices: n, points, lines: total, seededAt: new Date(now).toISOString(), seconds: (Date.now() - started) / 1000 };
+const meta = { bucket: a.bucket, devices: n, points, wide, lines: total, seededAt: new Date(now).toISOString(), seconds: (Date.now() - started) / 1000 };
 console.log(JSON.stringify(meta));
 if (a.out) writeFileSync(a.out, JSON.stringify(meta, null, 2));

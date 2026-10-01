@@ -18,7 +18,9 @@
  * devices, path collisions, simulated series, data across shard
  * groups, data outside the 30-day window and devices with no data),
  * builds a real ObjectTree for it, and checks that the bulk path
- * returns exactly what the old per-leaf path returns.
+ * returns exactly what the old per-leaf path returns. A second bucket
+ * holds a few devices with 1,000 extra tags each, to check the
+ * measurement filter on requests for a few fields of wide devices.
  */
 
 import { ObjectTree } from "../lib/object-tree.js";
@@ -36,6 +38,33 @@ const describeInflux = URL ? describe : describe.skip;
 const headers = { Authorization: `Token ${TOKEN}` };
 const bucket = `i3x-equivalence-${Date.now()}`;
 let bucketId = "";
+
+/** Create a bucket and write line protocol into it; returns the bucket id. */
+async function seedBucket(name: string, all: string[]): Promise<string> {
+    const orgs = await (await fetch(`${URL}/api/v2/orgs?org=${ORG}`, { headers })).json() as any;
+    const created = await (await fetch(`${URL}/api/v2/buckets`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ orgID: orgs.orgs[0].id, name, retentionRules: [] }),
+    })).json() as any;
+    for (let i = 0; i < all.length; i += 20000) {
+        const res = await fetch(`${URL}/api/v2/write?org=${ORG}&bucket=${name}&precision=ms`, {
+            method: "POST", headers, body: all.slice(i, i + 20000).join("\n"),
+        });
+        if (!res.ok) throw new Error(`seed failed: ${res.status} ${await res.text()}`);
+    }
+    return created.id;
+}
+
+/** A real ObjectTree built from the synthetic fleet. */
+function buildTree(devices: number, wide = 0): ObjectTree {
+    const fplus = { debug: { bound: () => () => {} } };
+    const tree = new ObjectTree({ fplus, namespaceName: "AMRC", namespaceUri: "urn:test" });
+    (tree as any).buildNamespace();
+    (tree as any).buildRelationshipTypes();
+    tree.refreshFromSnapshot(pipelineSnapshot(devices, wide));
+    return tree;
+}
 
 /**
  * Old per-leaf read, memoised per History instance. The seeded data
@@ -103,36 +132,21 @@ describeInflux("History bulk path against real InfluxDB", () => {
     const histories: Record<string, History> = {};
 
     beforeAll(async () => {
-        const orgs = await (await fetch(`${URL}/api/v2/orgs?org=${ORG}`, { headers })).json() as any;
-        const created = await (await fetch(`${URL}/api/v2/buckets`, {
-            method: "POST",
-            headers: { ...headers, "Content-Type": "application/json" },
-            body: JSON.stringify({ orgID: orgs.orgs[0].id, name: bucket, retentionRules: [] }),
-        })).json() as any;
-        bucketId = created.id;
-
         const now = Date.now();
         const all: string[] = [];
         for (let i = 0; i < DEVICES; i++) for (const l of lines(i, now, 6)) all.push(l);
-        for (let i = 0; i < all.length; i += 20000) {
-            const res = await fetch(`${URL}/api/v2/write?org=${ORG}&bucket=${bucket}&precision=ms`, {
-                method: "POST", headers, body: all.slice(i, i + 20000).join("\n"),
-            });
-            if (!res.ok) throw new Error(`seed failed: ${res.status} ${await res.text()}`);
-        }
+        bucketId = await seedBucket(bucket, all);
+        tree = buildTree(DEVICES);
 
-        const fplus = { debug: { bound: () => () => {} } };
-        tree = new ObjectTree({ fplus, namespaceName: "AMRC", namespaceUri: "urn:test" });
-        (tree as any).buildNamespace();
-        (tree as any).buildRelationshipTypes();
-        tree.refreshFromSnapshot(pipelineSnapshot(DEVICES));
-
-        const mk = (bulkChunkSize?: number) => new History({
+        const mk = (bulkChunkSize?: number, bulkMeasurementFilterMax?: number) => new History({
             influxUrl: URL!, influxToken: TOKEN, influxOrg: ORG, influxBucket: bucket, objectTree: tree,
-            bulkChunkSize,
+            bulkChunkSize, bulkMeasurementFilterMax,
         });
         histories.defaultChunks = mk();
         histories.chunksOf7 = mk(7);
+        // A fleet chunk needs fewer than 50 measurements, so the two
+        // above always filter on measurement. This one never does.
+        histories.noMeasurementFilter = mk(undefined, 0);
     }, 120_000);
 
     afterAll(async () => {
@@ -161,7 +175,7 @@ describeInflux("History bulk path against real InfluxDB", () => {
         expect((await h.getCurrentValues([leaf])).get(leaf)).toEqual(perLeaf);
     }, 120_000);
 
-    for (const name of ["defaultChunks", "chunksOf7"]) {
+    for (const name of ["defaultChunks", "chunksOf7", "noMeasurementFilter"]) {
         it(`every leaf: bulk equals per-leaf (${name})`, async () => {
             const h = histories[name];
             const ids = leaves();
@@ -195,6 +209,77 @@ describeInflux("History bulk path against real InfluxDB", () => {
                 .toBe(JSON.stringify(await referenceComposition(h, tree, id)));
         }
     }, 120_000);
+});
+
+describeInflux("History bulk path against real InfluxDB: wide devices", () => {
+    const WIDE_DEVICES = 2;
+    const WIDTH = 1000;
+    const wideBucket = `i3x-equivalence-wide-${Date.now()}`;
+    let wideBucketId = "";
+    let tree: ObjectTree;
+    let h: History;
+    let queries: string[];
+
+    beforeAll(async () => {
+        const now = Date.now();
+        const all: string[] = [];
+        for (let i = 0; i < WIDE_DEVICES; i++) for (const l of lines(i, now, 2, WIDTH)) all.push(l);
+        wideBucketId = await seedBucket(wideBucket, all);
+        tree = buildTree(WIDE_DEVICES, WIDTH);
+        h = new History({
+            influxUrl: URL!, influxToken: TOKEN, influxOrg: ORG, influxBucket: wideBucket, objectTree: tree,
+        });
+        // Record every bulk query, to check which ones filter.
+        const qa = (h as any).queryApi;
+        const collect = qa.collectRows.bind(qa);
+        queries = [];
+        qa.collectRows = (q: string) => { queries.push(q); return collect(q); };
+    }, 120_000);
+
+    afterAll(async () => {
+        if (wideBucketId) await fetch(`${URL}/api/v2/buckets/${wideBucketId}`, { method: "DELETE", headers });
+    });
+
+    /* Leaf children of each device, in tree order. Device 1 is a
+     * renamed device, so each of its leaves has two series. */
+    const deviceLeaves = (i: number) => tree.getChildElementIds(deviceUuid(i))
+        .filter((c) => !tree.getObject(c)?.isComposition);
+
+    async function expectSameAsPerLeaf(ids: string[]) {
+        const ref = await limited(ids, 50, (id) => refLeaf(h, id));
+        queries.length = 0;
+        const bulk = await h.getCurrentValues(ids);
+        const bulkQueries = [...queries];
+        for (let i = 0; i < ids.length; i++) {
+            expect([ids[i], bulk.get(ids[i]) ?? null]).toEqual([ids[i], ref[i]]);
+        }
+        expect(ref.filter(Boolean).length).toBe(ids.length);
+        return bulkQueries;
+    }
+
+    it("has more than 1,000 leaves per device", () => {
+        for (let i = 0; i < WIDE_DEVICES; i++) expect(deviceLeaves(i).length).toBeGreaterThan(WIDTH);
+    });
+
+    for (const [label, pick] of [
+        ["one static field each", (ls: string[]) => ls.slice(0, 1)],
+        ["one wide field each", (ls: string[]) => ls.slice(-1)],
+        ["five fields each", (ls: string[]) => [ls[0], ls[3], ls[200], ls[700], ls[ls.length - 1]]],
+    ] as Array<[string, (ls: string[]) => string[]]>) {
+        it(`${label}: filters on measurement and equals per-leaf`, async () => {
+            const ids = Array.from({ length: WIDE_DEVICES }, (_, i) => pick(deviceLeaves(i))).flat();
+            const qs = await expectSameAsPerLeaf(ids);
+            expect(qs).toHaveLength(1);
+            expect(qs[0]).toContain(`r["_measurement"] ==`);
+        }, 120_000);
+    }
+
+    it("every leaf: no measurement filter and equals per-leaf", async () => {
+        const ids = Array.from({ length: WIDE_DEVICES }, (_, i) => deviceLeaves(i)).flat();
+        const qs = await expectSameAsPerLeaf(ids);
+        expect(qs).toHaveLength(1);
+        expect(qs[0]).not.toContain(`_measurement`);
+    }, 300_000);
 });
 
 /** Newest timestamp across all series of a device, ignoring series order. */

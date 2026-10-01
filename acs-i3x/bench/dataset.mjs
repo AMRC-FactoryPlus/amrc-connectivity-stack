@@ -22,6 +22,10 @@
  *   i % 25 == 11 extra simulated series (simulated/run_id tags).
  *   i % 50 == 7  in config, no data at all.
  *   i % 50 == 8  data only 45 days old (outside range(start: -30d)).
+ *
+ * A non-zero `wide` adds that many extra live top-level Double metrics
+ * (Wide_0000, Wide_0001, ...) to every device, to model devices with
+ * a thousand or more tags.
  */
 
 import { v5 as uuidv5 } from "uuid";
@@ -126,8 +130,9 @@ function valueFor(type, seed) {
 /**
  * Describe device i: its ConfigDB DeviceInformation originMap, its
  * Info name, and the series historian-sparkplug would have written.
+ * `wide` adds that many extra top-level metrics.
  */
-export function device(i) {
+export function device(i, wide = 0) {
     const uuid = deviceUuid(i);
     const name = `Traffic Signal ${i}`;
     const inst = (sub) => id(`inst:${i}:${sub}`);
@@ -137,6 +142,7 @@ export function device(i) {
 
     const top = [...TOP];
     if (i % 10 === 3) top.push(["Model", "String", "static"]);
+    for (let k = 0; k < wide; k++) top.push([`Wide_${String(k).padStart(4, "0")}`, "Double", "live"]);
     for (const [m, t, kind] of top) {
         originMap[m] = { Sparkplug_Type: configType(t) };
         series.push({ measurement: `${m}:${suffix(t)}`, path: "", type: t, kind });
@@ -178,10 +184,10 @@ export function device(i) {
 }
 
 /** PipelineSnapshot input for ObjectTree.refreshFromSnapshot(). */
-export function pipelineSnapshot(n) {
+export function pipelineSnapshot(n, wide = 0) {
     const devices = new Map();
     for (let i = 0; i < n; i++) {
-        const d = device(i);
+        const d = device(i, wide);
         devices.set(d.uuid, { devInfo: { schema: SCHEMA.top, sparkplugName: d.name, originMap: d.originMap }, info: d.info });
     }
     const schemas = new Map(Object.values(SCHEMA).map((s) => [s, { schema: null, info: { name: s } }]));
@@ -206,10 +212,11 @@ function field(type, v) {
 
 /**
  * Line-protocol lines for device i. `now` is ms since epoch; `points`
- * is points per series. Timestamps are ms precision.
+ * is points per series; `wide` is as for device(). Timestamps are ms
+ * precision.
  */
-export function* lines(i, now, points) {
-    const d = device(i);
+export function* lines(i, now, points, wide = 0) {
+    const d = device(i, wide);
     if (d.noData) return;
     const DAY = 86_400_000;
 

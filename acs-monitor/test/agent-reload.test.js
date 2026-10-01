@@ -443,3 +443,43 @@ test("a Secret change sends a reload and is logged once", async t => {
     assert.equal(secret_logs(), 2);
     assert.equal(h.reloads.length, 2);
 });
+
+/* The edge monitor's SealedSecret watch replays the current Secrets to
+ * each new subscriber. If a failed ConfigDB request restarted the
+ * check, the restart would replay them and send a reload each time. */
+for (const [name, fail] of [
+    ["fails", () => async () => { throw new Error("ConfigDB unavailable"); }],
+    ["hangs", () => () => new Promise(() => {})],
+]) {
+    test(`a ConfigDB that ${name} does not cause Secret reloads`, async t => {
+        const secrets = new rx.BehaviorSubject(imm.Map({
+            "ea-secret": SecretStatus({ synced: true, observed: 1, generation: 1 }),
+        }));
+        const h = await new Harness({ secrets, secret_names: ["ea-secret"] }).start();
+        t.after(() => h.stop());
+        h.monitor.revision_timeout = 50;
+        h.monitor.revision_retry = 50;
+
+        /* Reloads so far. The Secrets' first value arrives before the
+         * agent's address is known, so on main and here it sends none. */
+        await tick(50);
+        const base = h.reloads.length;
+
+        /* The ConfigDB goes wrong, and a notification arrives */
+        const working = h.fplus.ConfigDB.get_config_etag;
+        h.fplus.ConfigDB.get_config_etag = fail();
+        h.change_config(ETAG_NEW);
+        await tick(1000);
+        assert.equal(h.reloads.length, base, "no reloads while the ConfigDB is down");
+        assert.ok(h.logs.filter(l => /Can't fetch config revision/.test(l)).length > 3,
+            "the request is repeated");
+
+        /* It recovers: the change is picked up and sent once */
+        h.fplus.ConfigDB.get_config_etag = working;
+        await tick(200);
+        assert.equal(h.reloads.length, base + 1, "one reload for the change");
+        assert.equal(h.agent_rev, ETAG_NEW);
+        await tick(5500);
+        assert.equal(h.reloads.length, base + 1, "and no more");
+    });
+}

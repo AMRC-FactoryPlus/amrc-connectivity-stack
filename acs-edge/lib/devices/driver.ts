@@ -21,6 +21,7 @@ export class DriverConnection extends DeviceConnection {
     addrs:      Map<string, string>
     topics:     Map<string, string>
     groups:     Map<string, addrGroup>
+    #addrsPending: NodeJS.Immediate | null = null
 
     constructor(type: string, details: any, name: string, broker: DriverBroker) {
         // Call constructor of parent class
@@ -48,6 +49,10 @@ export class DriverConnection extends DeviceConnection {
     }
 
     close () {
+        if (this.#addrsPending) {
+            clearImmediate(this.#addrsPending);
+            this.#addrsPending = null;
+        }
         this.broker.publish({
             id:         this.id,
             msg:        "active",
@@ -126,7 +131,7 @@ export class DriverConnection extends DeviceConnection {
         });
 
         if (this.status != "DOWN")
-            this.#send_addrs();
+            this.#queue_addrs();
 
         super.startSubscription(metrics, payloadFormat, delimiter, interval,
             deviceId, subscriptionStartCallback);
@@ -181,7 +186,7 @@ export class DriverConnection extends DeviceConnection {
                 msg: "conf",
                 payload: Buffer.from(JSON.stringify(this.conf)),
             });
-            this.#send_addrs();
+            this.#queue_addrs();
             break;
         case "UP":
             if (ost != "UP")
@@ -196,6 +201,21 @@ export class DriverConnection extends DeviceConnection {
                 this.emit("close");
             break;
         }
+    }
+
+    /* Send the address map once the current burst of changes is done.
+     * Each device calls startSubscription from its own ready timer, and
+     * the map is sent whole, so sending it every time is quadratic in
+     * the number of devices. The driver replaces its map on each addr
+     * message, so only the last one matters. setImmediate sends once
+     * per turn of the event loop, after the timers due in that turn. */
+    #queue_addrs () {
+        if (this.#addrsPending) return;
+        this.#addrsPending = setImmediate(() => {
+            this.#addrsPending = null;
+            if (this.status != "DOWN")
+                this.#send_addrs();
+        });
     }
 
     #send_addrs () {

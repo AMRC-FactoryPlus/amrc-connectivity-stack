@@ -33,6 +33,31 @@ acs:
   # The default pullPolicy.
   defaultPullPolicy: IfNotPresent
 
+  # -- How long Kerberos clients wait for the KDC before giving up and
+  # letting Kubernetes restart them. The KDC runs three initContainers
+  # and attaches an RWO volume before it listens, so on a cold boot
+  # every service in the stack races it. attempts * interval is the
+  # total grace period; the default is five minutes.
+  kdcWait:
+    attempts: 60
+    interval: 5
+
+  # -- tcpSocket probes for services that listen on a port. The startup
+  # grace (failureThreshold * periodSeconds) has to cover the slowest
+  # legitimate start in the stack, which is a ConfigDB schema migration,
+  # or the liveness probe will restart a service that was going to come
+  # up on its own.
+  probes:
+    startup:
+      periodSeconds: 10
+      failureThreshold: 30
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 3
+    liveness:
+      periodSeconds: 20
+      failureThreshold: 3
+
   # -- Configure which schemas are loaded into the ConfigDB
   schemas:
     load: true

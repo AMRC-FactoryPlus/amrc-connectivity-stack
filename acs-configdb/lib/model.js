@@ -223,8 +223,8 @@ export default class Model extends EventEmitter {
      *
      * Callers pass this to the database as an `integer[]` rather than
      * as a subquery. A recursive CTE has no useful row estimate, so a
-     * subquery makes the planner hash the whole `membership` table; a
-     * literal array lets it use the (class, id) index. */
+     * subquery makes the planner hash the whole `membership` or
+     * `object` table; a literal array lets it use their indexes. */
     async _subclass_ids (query, id) {
         const rows = await _q_set(query,
             `select id from class_subclasses($1)`, [id]);
@@ -240,11 +240,15 @@ export default class Model extends EventEmitter {
      * sql/v14.sql. */
     async _class_lookup (query, id, table) {
         switch (table) {
-        case "all_subclass":
+        case "all_subclass": {
+            const classes = await this._subclass_ids(query, id);
+            if (!classes.length) return [];
             return _q_uuids(query, `
                 select distinct o.uuid
-                from class_subclasses($1) k join object o on o.id = k.id
-            `, [id]);
+                from object o
+                where o.id = any($1::integer[])
+            `, [classes]);
+        }
         case "all_membership": {
             const classes = await this._subclass_ids(query, id);
             if (!classes.length) return [];

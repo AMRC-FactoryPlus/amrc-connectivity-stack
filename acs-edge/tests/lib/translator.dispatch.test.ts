@@ -164,6 +164,16 @@ async function runCase (seed: number, nDevices: number, nMessages: number) {
     return { oldCalls: oldCalls.length, newCalls: newCalls.length, out: newLog.length };
 }
 
+/* Each Device starts a ready timer that only stops once it connects.
+ * These devices never connect, so unref the timers to let jest exit. */
+const realSetInterval = global.setInterval;
+beforeAll(() => {
+    jest.spyOn(global, "setInterval").mockImplementation(
+        ((fn: any, ms?: number, ...args: any[]) =>
+            realSetInterval(fn, ms, ...args).unref()) as any);
+});
+afterAll(() => jest.restoreAllMocks());
+
 describe("translator data dispatch", () => {
     it.each([1, 2, 3, 4, 5, 6, 7, 8])(
         "matches the old dispatch for random messages (seed %i)",

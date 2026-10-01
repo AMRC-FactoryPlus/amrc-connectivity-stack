@@ -174,3 +174,93 @@ describe("DriverConnection address map", () => {
         expect(broker.sent[broker.sent.length - 1].msg).toBe("active");
     });
 });
+
+/* A device with no addresses has nothing to read. Each device runs its
+ * own poll timer, so 7,302 such devices sent about 7,300 empty polls a
+ * second through the in-process broker. */
+describe("DriverConnection polls", () => {
+    let broker: FakeBroker;
+    let conn: DriverConnection;
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        broker = new FakeBroker();
+        conn = new DriverConnection("Driver", { a: 1 }, ID,
+            broker as unknown as DriverBroker);
+        conn.open();
+        broker.status("READY");
+        broker.status("UP");
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    async function start (device: string, addresses: string[]) {
+        const started = jest.fn();
+        await conn.startSubscription({ addresses } as any, "JSON" as any,
+            "", 1000, device, started);
+        return started;
+    }
+
+    it("sends no poll for a device with no addresses", async () => {
+        await start("empty", []);
+        jest.advanceTimersByTime(5000);
+        expect(broker.of("poll")).toHaveLength(0);
+    });
+
+    it("sends no poll from readMetrics with no addresses", () => {
+        conn.readMetrics({ addresses: [] } as any);
+        expect(broker.of("poll")).toHaveLength(0);
+    });
+
+    it("leaves the pending map to its own timer on an empty poll", async () => {
+        await start("empty", []);
+        const before = broker.of("addr").length;
+        conn.readMetrics({ addresses: [] } as any);
+        expect(broker.of("addr").length).toBe(before);
+        jest.advanceTimersByTime(1);
+        expect(broker.of("addr").length).toBe(before + 1);
+    });
+
+    it("polls a device with addresses on every interval", async () => {
+        await start("full", ["a", "b"]);
+        jest.advanceTimersByTime(3000);
+        const polls = broker.of("poll");
+        expect(polls).toHaveLength(3);
+        const topics = [...conn.topics.values()].join("\n");
+        for (const p of polls)
+            expect(p.payload.toString()).toBe(topics);
+    });
+
+    it("polls only the devices that have addresses", async () => {
+        await start("empty", []);
+        await start("full", ["a"]);
+        jest.advanceTimersByTime(2000);
+        expect(broker.of("poll")).toHaveLength(2);
+    });
+
+    it("calls the start callback for both", async () => {
+        const e = await start("empty", []);
+        const f = await start("full", ["a"]);
+        expect(e).toHaveBeenCalledTimes(1);
+        expect(f).toHaveBeenCalledTimes(1);
+    });
+
+    it("still registers an empty device in the address map", async () => {
+        await start("empty", []);
+        expect(conn.groups.get("empty")).toEqual({ poll: 1000, addrs: new Set() });
+    });
+
+    it("stops both kinds of subscription", async () => {
+        await start("empty", []);
+        await start("full", ["a"]);
+        const e = jest.fn(), f = jest.fn();
+        await conn.stopSubscription("empty", e);
+        await conn.stopSubscription("full", f);
+        expect(e).toHaveBeenCalledTimes(1);
+        expect(f).toHaveBeenCalledTimes(1);
+        jest.advanceTimersByTime(5000);
+        expect(broker.of("poll")).toHaveLength(0);
+    });
+});

@@ -202,6 +202,17 @@ describe("notify/v2", { skip }, () => {
         stream(s, [{ status: 201, response: { status: 404 } }]);
     });
 
+    test("a member of a class and its subclass is listed once", async () => {
+        const K = await mkclass();
+        const K2 = await mkclass();
+        await ok(admin.put(`/v2/class/${K}/direct/subclass/${K2}`));
+        const o = await mkobj(K);
+        await ok(admin.put(`/v2/class/${K2}/direct/member/${o}`));
+
+        const r = await ok(admin.get(`/${rel(K, "member")}`));
+        assert.deepEqual(r.body, [o]);
+    });
+
     test("search", async () => {
         const auth = await client("auth");
         const obj = await mkobj(Class.Device);

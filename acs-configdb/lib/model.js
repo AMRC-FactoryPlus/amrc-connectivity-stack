@@ -519,14 +519,15 @@ export default class Model extends EventEmitter {
         });
 
         if (st < 299) {
-            const update = await this._class_scope(scope, [config.uuid]);
+            /* Send the config update straight after the commit, as
+             * before; the class update waits for the superclass walk. */
             this.updates.next({
                 type:   "config",
                 app:    App.Registration,
                 object: config.uuid,
                 config,
             });
-            this.updates.next(update);
+            this.updates.next(await this._class_scope(scope, [config.uuid]));
         }
         return [st, config];
     }
@@ -627,11 +628,10 @@ export default class Model extends EventEmitter {
         if (st != 204)
             return [st, body];
 
-        const update = await this._class_scope(scope, [object]);
         for (const app of body)
             this.updates.next({ type: "config", app, object });
         this.updates.next({ type: "config", app: App.Registration, object });
-        this.updates.next(update);
+        this.updates.next(await this._class_scope(scope, [object]));
         return [st];
     }
 

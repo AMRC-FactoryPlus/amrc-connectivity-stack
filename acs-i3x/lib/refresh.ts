@@ -123,9 +123,11 @@ export class ObjectTreeRefresh {
                     } else {
                         applyDiff(prev, emission, this.objectTree);
                     }
-                    this.i3xRag.rebuild();
+                    // The RAG rebuilds on its next query. Rebuilding it
+                    // here took seconds per emission on large trees.
+                    this.i3xRag.markDirty();
                     this.log("object tree refreshed: nodes=%d",
-                        this.i3xRag.nodeCount());
+                        this.objectTree.getObjects().length);
                     prev = emission;
                 } catch (err) {
                     console.error(
@@ -133,7 +135,7 @@ export class ObjectTreeRefresh {
                         err);
                     try {
                         this.objectTree.refreshFromSnapshot(emission);
-                        this.i3xRag.rebuild();
+                        this.i3xRag.markDirty();
                         prev = emission;
                     } catch (err2) {
                         console.error("Full-rebuild fallback also failed:", err2);

@@ -7,6 +7,11 @@
  *
  * Mirrors all I3xObjects into a graphology undirected graph (parent-child edges)
  * and a MiniSearch full-text index for fast lookup by displayName / typeElementId.
+ *
+ * The graph and index are rebuilt lazily. Callers mark them dirty when
+ * the object tree changes, and the next query rebuilds them. A full
+ * rebuild is expensive (seconds on a large tree), so this keeps it off
+ * the ConfigDB refresh path.
  */
 
 import Graph from "graphology";
@@ -132,6 +137,7 @@ export class I3xRag {
 
     private graph: Graph<NodeAttributes>;
     private index: MiniSearch<I3xObject>;
+    private dirty: boolean = true;
 
     constructor(
         objectTree: ObjectTreeLike,
@@ -149,23 +155,50 @@ export class I3xRag {
 
     /** Populate the graph and search index from the current object tree. */
     init(): void {
-        this.populate();
+        this.rebuild();
     }
 
-    /** Clear both graph and search index, then re-populate from scratch. */
+    /**
+     * Build a new graph and search index from the current object tree,
+     * then swap them in. If the build throws, the old ones stay in place.
+     */
     rebuild(): void {
-        this.graph.clear();
-        this.index = this.createIndex();
-        this.populate();
+        const graph = new Graph<NodeAttributes>({ type: "undirected" });
+        const index = this.createIndex();
+        this.populate(graph, index);
+        this.graph = graph;
+        this.index = index;
+        this.dirty = false;
+    }
+
+    /**
+     * Record that the object tree has changed. The next query rebuilds
+     * the graph and index. Call this instead of rebuild() on hot paths.
+     */
+    markDirty(): void {
+        this.dirty = true;
+    }
+
+    /** Rebuild if the tree changed since the last build. On failure,
+     *  keep serving the last good graph and index, and retry next time. */
+    private ensureFresh(): void {
+        if (!this.dirty) return;
+        try {
+            this.rebuild();
+        } catch (err) {
+            console.error("I3xRag rebuild failed, serving previous index:", err);
+        }
     }
 
     /* -- accessors ------------------------------------------------- */
 
     nodeCount(): number {
+        this.ensureFresh();
         return this.graph.order;
     }
 
     edgeCount(): number {
+        this.ensureFresh();
         return this.graph.size;
     }
 
@@ -173,6 +206,7 @@ export class I3xRag {
 
     /** Full-text search across displayName and typeElementId. */
     search(query: string, limit: number = 20): SearchResult[] {
+        this.ensureFresh();
         const raw = this.index.search(query, { prefix: true, fuzzy: 0.2 });
         return raw.slice(0, limit).map(r => ({
             elementId: r.id as string,
@@ -184,6 +218,7 @@ export class I3xRag {
 
     /** Search filtered to a specific typeElementId. */
     searchByType(typeElementId: string, query: string, limit: number = 20): SearchResult[] {
+        this.ensureFresh();
         const raw = this.index.search(query, {
             prefix: true,
             fuzzy: 0.2,
@@ -199,6 +234,7 @@ export class I3xRag {
 
     /** Search with related neighbours attached to each result. */
     searchRelated(query: string, hops: number = 1, limit: number = 20): SearchRelatedResult[] {
+        this.ensureFresh();
         const results = this.search(query, limit);
         return results.map(r => ({
             ...r,
@@ -210,6 +246,7 @@ export class I3xRag {
 
     /** BFS from a node, collecting visited nodes up to N hops. Does NOT include the source. */
     traverse(elementId: string, hops: number = 1): TraversalNode[] {
+        this.ensureFresh();
         if (!this.graph.hasNode(elementId)) return [];
 
         const result: TraversalNode[] = [];
@@ -228,11 +265,13 @@ export class I3xRag {
 
     /** Return neighbours within `hops` of a node. Delegates to traverse(). */
     neighborhood(elementId: string, hops: number = 2): TraversalNode[] {
+        this.ensureFresh();
         return this.traverse(elementId, hops);
     }
 
     /** Shortest path between two nodes. Returns null if either doesn't exist or no path. */
     findPath(fromId: string, toId: string): string[] | null {
+        this.ensureFresh();
         if (!this.graph.hasNode(fromId) || !this.graph.hasNode(toId)) return null;
         if (fromId === toId) return [fromId];
         return bidirectional(this.graph, fromId, toId);
@@ -240,6 +279,7 @@ export class I3xRag {
 
     /** Build a nested composition tree starting from a node. */
     compositionTree(elementId: string, maxDepth: number = 0): CompositionTreeNode | null {
+        this.ensureFresh();
         if (!this.graph.hasNode(elementId)) return null;
         return this.buildCompositionNode(elementId, 0, maxDepth);
     }
@@ -248,6 +288,7 @@ export class I3xRag {
 
     /** Build a type-level adjacency map: counts of edges grouped by fromType → toType. */
     relationshipMap(): RelationshipMapEntry[] {
+        this.ensureFresh();
         const counts = new Map<string, number>();
 
         this.graph.forEachEdge((_edge, _attrs, source, target) => {
@@ -267,6 +308,7 @@ export class I3xRag {
 
     /** Find all instances of a type and count their children grouped by child type. */
     typeSchema(typeElementId: string): TypeSchemaResult | null {
+        this.ensureFresh();
         const instances: string[] = [];
         this.graph.forEachNode((node, attrs) => {
             if (attrs.typeElementId === typeElementId) {
@@ -301,6 +343,7 @@ export class I3xRag {
         maxValue?: number;
         missing?: boolean;
     } = {}): ValueFilterResult[] {
+        this.ensureFresh();
         const results: ValueFilterResult[] = [];
 
         this.graph.forEachNode((node, attrs) => {
@@ -342,6 +385,7 @@ export class I3xRag {
 
     /** Return leaf objects whose cached value timestamp is older than thresholdSeconds. */
     staleValues(thresholdSeconds: number = 300): ValueFilterResult[] {
+        this.ensureFresh();
         const results: ValueFilterResult[] = [];
         const cutoff = Date.now() - thresholdSeconds * 1000;
 
@@ -366,17 +410,19 @@ export class I3xRag {
         return results;
     }
 
-    /** Delegate to history service. */
+    /** Delegate to history service. Does not read the graph, so no rebuild. */
     async getHistory(elementId: string, startTime: string, endTime: string): Promise<I3xVqt[]> {
         return this.history.queryHistory(elementId, startTime, endTime);
     }
 
     /** Get current values for multiple elements, trying cache first then InfluxDB. */
     async getValues(elementIds: string[]): Promise<CurrentValueResult[]> {
+        this.ensureFresh();
+        const graph = this.graph;
         const results: CurrentValueResult[] = [];
 
         for (const elementId of elementIds) {
-            const attrs = this.graph.getNodeAttributes(elementId);
+            const attrs = graph.getNodeAttributes(elementId);
             if (!attrs) {
                 results.push({
                     elementId,
@@ -478,12 +524,12 @@ export class I3xRag {
         });
     }
 
-    private populate(): void {
+    private populate(graph: Graph<NodeAttributes>, index: MiniSearch<I3xObject>): void {
         const objects = this.objectTree.getObjects();
 
         /* Add nodes */
         for (const obj of objects) {
-            this.graph.addNode(obj.elementId, {
+            graph.addNode(obj.elementId, {
                 displayName: obj.displayName,
                 typeElementId: obj.typeElementId,
                 isComposition: obj.isComposition,
@@ -494,8 +540,8 @@ export class I3xRag {
         /* Add parent-child edges */
         for (const obj of objects) {
             if (obj.parentId != null && obj.parentId !== "/") {
-                if (this.graph.hasNode(obj.parentId)) {
-                    this.graph.addEdge(obj.parentId, obj.elementId, {
+                if (graph.hasNode(obj.parentId)) {
+                    graph.addEdge(obj.parentId, obj.elementId, {
                         label: "parent-child",
                     });
                 }
@@ -503,6 +549,6 @@ export class I3xRag {
         }
 
         /* Build search index */
-        this.index.addAll(objects);
+        index.addAll(objects);
     }
 }

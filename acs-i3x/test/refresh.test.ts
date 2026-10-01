@@ -10,9 +10,18 @@
  */
 
 import { jest } from "@jest/globals";
+import * as rx from "rxjs";
 import { applyDiff } from "../lib/diff.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { ObjectTreeRefresh } from "../lib/refresh.js";
+import { I3xRag } from "../lib/rag/i3x-rag.js";
+import {
+    DEVICE_CLASS_UUID,
+    DEVICE_INFORMATION_APP_UUID,
+    INFO_APP_UUID,
+} from "../lib/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
+import { createMockValueCache, createMockHistory } from "./helpers/mock-rag.js";
 
 const SCHEMA_UUID = "schema-diff-1";
 
@@ -170,5 +179,61 @@ describe("applyDiff", () => {
         const schIdx = calls.indexOf("removeObjectType:sch-X");
         expect(devIdx).toBeGreaterThanOrEqual(0);
         expect(schIdx).toBeGreaterThan(devIdx);
+    });
+});
+
+describe("ObjectTreeRefresh and the RAG", () => {
+    /* A ConfigDB stand-in: one BehaviorSubject per (app, obj) config and
+     * one for the Device class members. */
+    function makePipeline (uuids: string[]) {
+        const configs = new Map<string, rx.BehaviorSubject<any>>();
+        const config = (app: string, obj: string) => {
+            const key = `${app}:${obj}`;
+            if (!configs.has(key)) configs.set(key, new rx.BehaviorSubject<any>(null));
+            return configs.get(key)!;
+        };
+        for (const uuid of uuids) {
+            config(DEVICE_INFORMATION_APP_UUID, uuid).next(devInfo(uuid));
+            config(INFO_APP_UUID, uuid).next({ name: `Device ${uuid}` });
+        }
+        const members = new rx.BehaviorSubject({
+            isEmpty: () => uuids.length === 0,
+            [Symbol.iterator]: () => uuids[Symbol.iterator](),
+        });
+
+        const fplus: any = createMockFplus();
+        fplus.ConfigDB.watch_members = (cls: string) => {
+            expect(cls).toBe(DEVICE_CLASS_UUID);
+            return members;
+        };
+        fplus.ConfigDB.watch_config = (app: string, obj: string) => config(app, obj);
+
+        const objectTree = new ObjectTree({ fplus, namespaceName: "NS", namespaceUri: "urn:ns" });
+        const i3xRag = new I3xRag(objectTree, createMockValueCache(), createMockHistory());
+        i3xRag.init();
+        return { fplus, objectTree, i3xRag, config };
+    }
+
+    it("does not rebuild the RAG on emissions, only on the next query", async () => {
+        const uuids = ["dev-A", "dev-B", "dev-C"];
+        const { fplus, objectTree, i3xRag, config } = makePipeline(uuids);
+        const rebuild = jest.spyOn(i3xRag, "rebuild");
+
+        await new ObjectTreeRefresh({ fplus, objectTree, i3xRag }).run();
+        for (let k = 0; k < 20; k++) {
+            config(INFO_APP_UUID, "dev-B").next({ name: `Renamed ${k}` });
+        }
+
+        expect(objectTree.getObject("dev-B")?.displayName).toBe("Renamed 19");
+        expect(rebuild).not.toHaveBeenCalled();
+
+        const hits = i3xRag.search("Renamed");
+        expect(rebuild).toHaveBeenCalledTimes(1);
+        expect(hits.map(h => [h.elementId, h.displayName]))
+            .toEqual([["dev-B", "Renamed 19"]]);
+
+        i3xRag.search("Device");
+        i3xRag.nodeCount();
+        expect(rebuild).toHaveBeenCalledTimes(1);
     });
 });

@@ -14,6 +14,7 @@ export function routes(opts: {
     subscriptions: SubscriptionManager;
     mcpServer?: McpServer;
     maxDepthCap?: number;
+    debug?: any;
 }) {
     const api = new APIv1(opts);
 

@@ -312,21 +312,24 @@ export default class MQTTCli {
          * new current session and don't want to publish twice.
          *
          * A rebirth creates a new session even when nothing about the
-         * device has changed. Don't announce those: a Directory restart
-         * rebirths every device, and announcing each one floods MQTT
-         * with notices nothing needs to act on. So for a session which
-         * is still open (a BIRTH), announce the device only if it has
-         * moved address, and the address only if a different device
-         * now uses it. A session which has closed (a DEATH) is still
-         * announced as before. */
+         * device has changed. Don't announce those: a rebirth request
+         * makes every device under a node rebirth, and announcing each
+         * one floods MQTT with notices nothing needs to act on. So for
+         * a session which is still open (a BIRTH) and which replaced a
+         * session that was open until then, announce the device only
+         * if it has moved address, and the address only if a different
+         * device now uses it. A BIRTH after a DEATH changes the online
+         * state, so it is announced, as is the DEATH itself. */
         const open = session.online;
 
         if (session.next_for_device == null
-            && !(open && session.prev_device_addrid == session.addrid))
+            && !(open && session.prev_open
+                && session.prev_device_addrid == session.addrid))
             notify.push(["Device_UUID", session.device]);
 
         if (session.next_for_address == null
-            && !(open && session.prev_address_devid == session.devid)) {
+            && !(open && session.prev_adr_open
+                && session.prev_address_devid == session.devid)) {
             const addr = new Address(
                 session.group_id, session.node_id, session.device_id);
             notify.push(["Device_Address", addr.toString(), "String"]);

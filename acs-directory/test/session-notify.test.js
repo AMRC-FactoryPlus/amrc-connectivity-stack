@@ -16,7 +16,7 @@ const SCH_B     = "a1b2c3d4-0000-4000-8000-000000000002";
 /* A session row as session_notification_info returns it. By default
  * this is a rebirth: an open session for device 1 at address 10,
  * replacing an earlier session for the same device at the same
- * address. */
+ * address which was open until this one started. */
 function mk_session (over = {}) {
     return {
         device:             DEV,
@@ -31,6 +31,8 @@ function mk_session (over = {}) {
         prev_for_device:    100,
         prev_device_addrid: 10,
         prev_address_devid: 1,
+        prev_open:          true,
+        prev_adr_open:      true,
         ...over,
     };
 }
@@ -63,6 +65,8 @@ test("a first birth announces the device and the address", async () => {
         prev_for_device:    null,
         prev_device_addrid: null,
         prev_address_devid: null,
+        prev_open:          null,
+        prev_adr_open:      null,
     }), { 200: [SCH_A] });
     assert.deepEqual(got, [
         `Device_UUID=${DEV}`,
@@ -117,4 +121,17 @@ test("a session that has been replaced publishes nothing", async () => {
         next_for_address:   201,
     }), { 100: [SCH_A], 200: [SCH_A] });
     assert.deepEqual(got, []);
+});
+
+test("a birth after a death is announced", async () => {
+    /* The previous session was closed by a DEATH before this BIRTH,
+     * so the device has come back online */
+    const got = await notices(mk_session({
+        prev_open:      false,
+        prev_adr_open:  false,
+    }), { 100: [SCH_A], 200: [SCH_A] });
+    assert.deepEqual(got, [
+        `Device_UUID=${DEV}`,
+        "Device_Address=Group/Node/Device",
+    ]);
 });

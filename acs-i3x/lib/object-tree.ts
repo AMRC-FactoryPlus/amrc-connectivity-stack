@@ -268,35 +268,65 @@ export class ObjectTree {
      * caller can drop their values too.
      */
     dropOrphans(): string[] {
-        const s = this.store;
         const dropped: string[] = [];
-        s.transaction(() => {
-            for (;;) {
-                /* object_uns_ix covers only UNS rows, and object_type_ix
-                 * finds the ISA-95 levels, so neither scans the tree. */
-                const ids = [
-                    ...(s.prepare(`
-                        select element_id from object
-                        where source = 'uns' and parent_id is not null
-                            and not exists (select 1 from object p where p.element_id = object.parent_id)
-                    `).all() as any[]),
-                    ...(s.prepare(`
-                        select element_id from object
-                        where type_element_id = 'isa95-level'
-                            and not exists (select 1 from object c where c.parent_id = object.element_id)
-                    `).all() as any[]),
-                ].map(r => r.element_id as string);
-                if (ids.length === 0) break;
-                this.objectRev++;
+        for (const ids of this.dropOrphanSteps()) dropped.push(...ids);
+        return dropped;
+    }
+
+    /**
+     * dropOrphans in small steps: each step is a page of the parents of
+     * UNS rows (from the partial index on UNS rows) and the deletes for
+     * the ones that are gone, in one transaction, and yields the ids it
+     * dropped (often none). A caller can pause between steps, as
+     * ConfigSync's reconcile does: at 74k devices there are half a
+     * million UNS rows to check.
+     */
+    *dropOrphanSteps(pageSize: number = 1000): Generator<string[]> {
+        const s = this.store;
+        const drop = (ids: string[]) => {
+            if (!ids.length) return;
+            this.objectRev++;
+            s.transaction(() => {
                 for (const id of ids) {
                     s.prepare("delete from metric_meta where element_id = ?").run(id);
                     s.prepare("delete from object where element_id = ?").run(id);
                 }
-                dropped.push(...ids);
+            });
+            this.changed();
+        };
+        for (;;) {
+            let any = false;
+            let after = "";
+            for (;;) {
+                const parents = (s.prepare(`
+                    select distinct parent_id from object
+                    where source = 'uns' and parent_id > ?
+                    order by parent_id limit ?
+                `).all(after, pageSize) as any[]).map(r => r.parent_id as string);
+                const ids: string[] = [];
+                for (const p of parents) {
+                    if (s.prepare("select 1 from object where element_id = ?").get(p)) continue;
+                    for (const r of s.prepare("select element_id from object where source = 'uns' and parent_id = ?")
+                            .all(p) as any[])
+                        ids.push(r.element_id);
+                }
+                drop(ids);
+                if (ids.length) any = true;
+                yield ids;
+                if (parents.length < pageSize) break;
+                after = parents[parents.length - 1];
             }
-        });
-        if (dropped.length) this.changed();
-        return dropped;
+            /* Empty ISA-95 levels: a few per site, found by type. */
+            const levels = (s.prepare(`
+                select element_id from object
+                where type_element_id = 'isa95-level'
+                    and not exists (select 1 from object c where c.parent_id = object.element_id)
+            `).all() as any[]).map(r => r.element_id as string);
+            drop(levels);
+            if (levels.length) any = true;
+            yield levels;
+            if (!any) return;
+        }
     }
 
     /** Test-facing inspector for a node's origin. */
@@ -412,6 +442,15 @@ export class ObjectTree {
     getDeviceUuids(): string[] {
         return (this.store.prepare("select distinct device_uuid from device_schema").all() as any[])
             .map(r => r.device_uuid);
+    }
+
+    /** A page of the UUIDs of the devices in the tree, after `after`,
+     * in order. */
+    deviceUuidPage(after: string, limit: number): string[] {
+        return (this.store.prepare(`
+            select distinct device_uuid from device_schema
+            where device_uuid > ? order by device_uuid limit ?
+        `).all(after, limit) as any[]).map(r => r.device_uuid);
     }
 
     /** The schema UUIDs referenced by one device's DeviceInformation. */

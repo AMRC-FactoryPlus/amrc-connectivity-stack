@@ -35,6 +35,7 @@ import {
 } from "./constants.js";
 import type { ObjectTree } from "./object-tree.js";
 import type { I3xStore } from "./store.js";
+import { Slicer } from "./slicer.js";
 
 /** The parts of an immutable.js Set we use. */
 export interface MemberSet {
@@ -173,6 +174,8 @@ export class ConfigSync {
     private reconciled = false;
     private reconcileTimer: ReturnType<typeof setTimeout> | null = null;
     private lostTimer: ReturnType<typeof setTimeout> | null = null;
+    private reconciling = false;
+    private reconcileAgain = false;
     private offCommitFailure: () => void;
     private retries = new Map<string, ReturnType<typeof setTimeout>>();
     /** Keys whose last fetch failed and has not succeeded since. */
@@ -306,43 +309,87 @@ export class ConfigSync {
         if (this.reconcileTimer || this.stopped) return;
         this.reconcileTimer = setTimeout(() => {
             this.reconcileTimer = null;
-            try {
-                this.reconcile();
-            } catch (err) {
-                console.error("ConfigSync: reconcile failed:", err);
-                this.stats.errors++;
+            if (this.reconciling) {
+                /* One at a time; run again when this one ends. */
+                this.reconcileAgain = true;
+                return;
             }
+            this.reconciling = true;
+            this.reconcile()
+                .catch(err => {
+                    console.error("ConfigSync: reconcile failed:", err);
+                    this.stats.errors++;
+                })
+                .finally(() => {
+                    this.reconciling = false;
+                    if (this.reconcileAgain) {
+                        this.reconcileAgain = false;
+                        this.scheduleReconcile();
+                    }
+                });
         }, 20);
     }
 
-    /** Compare everything stored with the current ETags. */
-    private reconcile(): void {
+    /**
+     * Compare everything stored with the current ETags. At 74k devices
+     * that is hundreds of thousands of rows, so it reads them a page at
+     * a time and pauses for the event loop between steps.
+     */
+    private async reconcile(): Promise<void> {
         if (!this.haveAll() || this.stopped) return;
         const members = this.members!;
         const t0 = Date.now();
+        const slicer = new Slicer();
+        const PAGE = 2000;
 
-        const stored = new Map((this.store.prepare("select * from sync_device").all() as unknown as DeviceRow[])
-            .map(r => [r.uuid, r]));
+        const stored = new Map<string, DeviceRow>();
+        for (let after = "";;) {
+            const rows = this.store.prepare("select * from sync_device where uuid > ? order by uuid limit ?")
+                .all(after, PAGE) as unknown as DeviceRow[];
+            for (const r of rows) stored.set(r.uuid, r);
+            await slicer.maybe();
+            if (rows.length < PAGE) break;
+            after = rows[rows.length - 1].uuid;
+        }
         const gone = new Set<string>();
-        for (const uuid of stored.keys()) if (!members.has(uuid)) gone.add(uuid);
-        for (const uuid of this.tree.getDeviceUuids()) if (!members.has(uuid)) gone.add(uuid);
-        for (const uuid of gone) this.removeDevice(uuid);
+        for (const uuid of stored.keys()) {
+            if (!members.has(uuid)) gone.add(uuid);
+            await slicer.maybe();
+        }
+        for (let after = "";;) {
+            const uuids = this.tree.deviceUuidPage(after, PAGE);
+            for (const uuid of uuids) if (!members.has(uuid)) gone.add(uuid);
+            await slicer.maybe();
+            if (uuids.length < PAGE) break;
+            after = uuids[uuids.length - 1];
+        }
+        for (const uuid of gone) {
+            if (this.stopped) return;
+            this.removeDevice(uuid);
+            await slicer.maybe();
+        }
 
         /* UNS nodes left hanging (from before a device left the tree,
          * or from an earlier run) and empty ISA-95 levels. */
-        const orphans = this.tree.dropOrphans();
-        if (orphans.length) {
-            this.opts.valueCache?.removeElements?.(orphans);
-            this.log("dropped %d orphan objects", orphans.length);
+        let orphans = 0;
+        for (const ids of this.tree.dropOrphanSteps()) {
+            if (ids.length) {
+                this.opts.valueCache?.removeElements?.(ids);
+                orphans += ids.length;
+            }
+            await slicer.maybe();
         }
+        if (orphans) this.log("dropped %d orphan objects", orphans);
 
         let queued = 0;
         this.startBatch();
         for (const uuid of members) {
+            if (this.stopped) return;
             if (this.deviceNeeds(uuid, stored.get(uuid))) {
                 this.queue.add(`d:${uuid}`);
                 queued++;
             }
+            await slicer.maybe();
         }
 
         const referenced = new Set(this.tree.getReferencedSchemaUuids());

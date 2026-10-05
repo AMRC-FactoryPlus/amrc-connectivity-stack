@@ -161,6 +161,36 @@ describe("I3xStore", () => {
         other.close();
     });
 
+    it("commits a batch early once it holds maxBatchChanges rows", () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 60_000, maxBatchChanges: 50 });
+        const other = new (process.getBuiltinModule("node:sqlite") as any).DatabaseSync(path);
+        const seen = () => other.prepare("select count(*) n from meta where key like 'k%'").get().n;
+        s.transaction(() => { for (let i = 0; i < 10; i++) s.setMeta(`k${i}`, "x"); });
+        expect(seen()).toBe(0);
+        s.transaction(() => { for (let i = 10; i < 60; i++) s.setMeta(`k${i}`, "x"); });
+        expect(seen()).toBe(60);
+        other.close();
+        s.close();
+    });
+
+    it("checkpoints the WAL from a worker thread, not in a commit", async () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 50 });
+        expect((s.db.prepare("pragma wal_autocheckpoint").get() as any).wal_autocheckpoint).toBe(0);
+        const before = statSync(path).size;
+        const t = tree(s);
+        for (let i = 0; i < 300; i++) t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+        // Nothing on this thread copied the WAL into the file...
+        expect(statSync(path).size).toBe(before);
+        expect(statSync(`${path}-wal`).size).toBeGreaterThan(100_000);
+        // ...the worker does, within a few intervals.
+        for (let i = 0; i < 100 && statSync(path).size === before; i++)
+            await new Promise(r => setTimeout(r, 20));
+        expect(statSync(path).size).toBeGreaterThan(before);
+        s.close();
+    });
+
     it("commits each transaction at once with commitInterval 0", () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0 });

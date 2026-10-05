@@ -191,7 +191,12 @@ export class ValueCache {
         /* A failed group commit loses the values written in its batch,
          * so a stored value may no longer be the last one. Forget them
          * all, as after an MQTT reconnect. */
-        this.store.onCommitFailure(() => this.safeClear("after a failed commit"));
+        /* With group commit a write error usually surfaces here, at the
+         * commit, not in writeChunk, so back off here too. */
+        this.store.onCommitFailure(() => {
+            this.backOff();
+            this.safeClear("after a failed commit");
+        });
     }
 
     async init(fplus: any): Promise<this> {
@@ -421,8 +426,7 @@ export class ValueCache {
             this.retryNotBefore = 0;
             return true;
         } catch (err) {
-            this.retryDelay = Math.min(this.retryDelay * 2 || WRITE_RETRY_MIN, WRITE_RETRY_MAX);
-            this.retryNotBefore = Date.now() + this.retryDelay;
+            this.backOff();
             this.errorsSinceLog++;
             if (this.logDue()) {
                 console.error("ValueCache: writing %d values failed (%d failures since the last report), next try in %d s:",
@@ -453,6 +457,12 @@ export class ValueCache {
             console.error("ValueCache: dropped the %d oldest unwritten values", this.droppedSinceLog);
             this.droppedSinceLog = 0;
         }
+    }
+
+    /** Wait longer before the next background write: 5 s, doubling to 60 s. */
+    private backOff(): void {
+        this.retryDelay = Math.min(this.retryDelay * 2 || WRITE_RETRY_MIN, WRITE_RETRY_MAX);
+        this.retryNotBefore = Date.now() + this.retryDelay;
     }
 
     /** True at most once per WRITE_RETRY_MAX, for write error logs. */

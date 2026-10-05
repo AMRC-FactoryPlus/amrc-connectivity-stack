@@ -350,6 +350,56 @@ describe("database errors while writing values", () => {
         }
     });
 
+    it("a failed group commit backs off background writes and logs at most once a minute", () => {
+        const store = new I3xStore({ commitInterval: 60_000 });
+        const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+        tree.addDevice(DEV, devInfo(), { name: "Device 1" });
+        tree.setReady();
+        /* The device is committed; only value batches fail. */
+        store.commit();
+        const vc = new ValueCache({ objectTree: tree, store, staleThreshold: 60_000,
+            flushInterval: 60_000, flushMaxRows: 2 });
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        let now = 1_000_000;
+        const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+        let tries = 0;
+        const prepare = store.prepare.bind(store);
+        const prep = jest.spyOn(store, "prepare").mockImplementation((sql: string) => {
+            if (sql.includes("insert into last_value") && sql.includes("'uns'")) tries++;
+            return prepare(sql);
+        });
+        const db = (store as any).db;
+        const exec = db.exec.bind(db);
+        const ex = jest.spyOn(db, "exec").mockImplementation((sql: any) => {
+            if (sql === "commit") throw new Error("database or disk is full");
+            return exec(sql);
+        });
+        let n = 0;
+        const send = () => uns(vc, [n % 2 ? "Speed" : "Status"], n++, "2026-10-05T12:00:00Z");
+        try {
+            /* The write succeeds into the open batch; its commit fails. */
+            send(); send();
+            expect(tries).toBe(1);
+            store.commit();
+            /* Backing off: a full batch does not write again for 5 s. */
+            for (let i = 0; i < 20; i++) send();
+            expect(tries).toBe(1);
+            now += 5_000; send();
+            expect(tries).toBe(2);
+            store.commit();
+            now += 5_000; send(); send();
+            store.commit();
+            const commitLogs = err.mock.calls.filter(c => String(c[0]).includes("commit failed"));
+            expect(commitLogs.length).toBe(1);
+        } finally {
+            ex.mockRestore();
+            prep.mockRestore();
+            clock.mockRestore();
+            err.mockRestore();
+            store.close();
+        }
+    });
+
     it("at start and on an MQTT reconnect are logged, not thrown", async () => {
         const s = setup();
         const err = jest.spyOn(console, "error").mockImplementation(() => {});

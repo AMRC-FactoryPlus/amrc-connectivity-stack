@@ -16,6 +16,7 @@ import * as rx from "rxjs";
 import { config as rxConfig } from "rxjs";
 
 import { ConfigSync } from "../lib/sync.js";
+import { Slicer } from "../lib/slicer.js";
 import type { EtagChange } from "../lib/sync.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { I3xStore } from "../lib/store.js";
@@ -678,6 +679,36 @@ describe("ConfigSync", () => {
         } finally {
             rmSync(dir, { recursive: true, force: true });
         }
+    });
+
+    it("keeps a device that joins while a reconcile is running", async () => {
+        const cdb = new FakeConfigDB();
+        const uuids = seed(cdb, N + 1);
+        const members = uuids.slice(0, N);
+        const joiner = uuids[N];
+        const { tree, sync } = start(stack(cdb));
+        cdb.setMembers(members);
+        cdb.snapshots();
+        await settle(sync);
+        expect(tree.getObject(joiner)).toBeUndefined();
+
+        /* Make the next reconcile pause for a while at every step, and
+         * add a device during its first pause. */
+        let first = true;
+        const maybe = jest.spyOn(Slicer.prototype, "maybe").mockImplementation(async () => {
+            if (first) { first = false; cdb.setMembers([...members, joiner]); }
+            await sleep(30);
+        });
+        try {
+            cdb.snapshots();
+            await sleep(600);
+            await settle(sync);
+        } finally {
+            maybe.mockRestore();
+        }
+        await settle(sync);
+        expect(tree.getObject(joiner)).toBeDefined();
+        expect(state(tree)).toEqual(state(reference(cdb, [...members, joiner])));
     });
 
     it("marks the RAG index dirty on every tree change, so MCP search sees it", async () => {

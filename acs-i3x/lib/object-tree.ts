@@ -497,12 +497,15 @@ export class ObjectTree {
      * replaceDeviceSubtree's re-graft loop relies on.
      */
     private captureUnsDescendants(rootId: string): UnsCapture[] {
+        /* CROSS JOIN makes SQLite walk the subtree and look each id up,
+         * rather than scan the whole object table against it (which it
+         * chose when asked to order by seq). Sort here instead. */
         const rows = this.store.prepare(`${SUBTREE}
             select o.seq, o.source, ${OBJECT_COLS.split(", ").map(c => `o.${c}`).join(", ")}
-            from object o join sub on o.element_id = sub.id
-            order by o.seq
+            from sub cross join object o on o.element_id = sub.id
         `).all(rootId) as unknown as SubtreeRow[];
         if (!rows.some(r => r.source === "uns")) return [];
+        rows.sort((a, b) => a.seq - b.seq);
 
         const children = new Map<string, SubtreeRow[]>();
         for (const r of rows) {

@@ -401,6 +401,18 @@ mqtt:
     repository: acs-mqtt
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
+  # -- Extra JVM options for the HiveMQ broker, passed as JAVA_OPTS.
+  # Without a heap limit the JVM sizes its heap from the node's memory
+  # (25% by default, 4 GB on a 16 GB node) and rarely gives memory back,
+  # so the broker grows to whatever peak it has seen. With a 512 MB
+  # heap the broker runs at about 800 MB resident under a large
+  # Sparkplug fleet (~44k devices). Set to "" to use the JVM default.
+  javaOpts: "-Xmx512m"
+  # -- Kubernetes resources for the broker container, for example
+  # `{ requests: { memory: 1Gi }, limits: { memory: 1536Mi } }`. Allow
+  # about 300 MB above the heap limit for non-heap memory. Empty by
+  # default.
+  resources: {}
 
 unsIngesters:
   sparkplug:

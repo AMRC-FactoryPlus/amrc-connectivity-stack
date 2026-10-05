@@ -24,9 +24,6 @@ function sym_diff(one, two) {
     return diff;
 }
 
-/* Queries is a separate class, because sometimes we want to query on
- * the database directly, and sometimes we need to query using a query
- * function for a transaction. The model inherits from this class. */
 /* Work out which Last_Changed notices a BIRTH needs, from the
  * sessions it replaces (as they were before the birth closed them).
  * A rebirth of a device which was online, at the same address, changes
@@ -42,6 +39,9 @@ export function birth_changes (opts, prev_dev, prev_adr) {
     };
 }
 
+/* Queries is a separate class, because sometimes we want to query on
+ * the database directly, and sometimes we need to query using a query
+ * function for a transaction. The model inherits from this class. */
 export default class Queries {
     static DBVersion = 14;
 

@@ -794,6 +794,35 @@ export default class Model extends EventEmitter {
         });
     }
 
+    /* The ETag of every config entry for an Application, without the
+     * JSON. Returns null if the Application does not exist. */
+    config_etags (app) {
+        return this.db.txn({}, async query => {
+            const app_id = await this._app_id(query, app);
+            if (app_id == null) return null;
+
+            return _q_set(query, `
+                select o.uuid object, c.etag
+                from config c
+                    join object o on o.id = c.object
+                where c.app = $1
+            `, [app_id]);
+        });
+    }
+
+    /* The ETag of one config entry, or undefined if it does not
+     * exist. */
+    config_etag (q) {
+        return _q_row(this.db.query.bind(this.db), `
+            select c.etag
+            from config c
+                join object a on a.id = c.app
+                join object o on o.id = c.object
+            where a.uuid = $1
+                and o.uuid = $2
+        `, [q.app, q.object]).then(r => r?.etag);
+    }
+
     async _config_validate (query, { app, object, config, special }) {
         const schema = await this.find_schema(query, app);
         if (schema && !schema(config))

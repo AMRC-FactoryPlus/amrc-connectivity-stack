@@ -41,3 +41,23 @@ async () => {
     assert.ok(logs.some(l => /MQTT error: read ECONNRESET/.test(l)),
         "the error is logged");
 });
+
+test("an MQTT error from the Sparkplug app client is logged, not thrown",
+async () => {
+    const { SparkplugApp } = await import("@amrc-factoryplus/sparkplug-app");
+
+    const logs = [];
+    const debug = {
+        log: (ch, ...args) => logs.push(`${ch}: ${format(...args)}`),
+    };
+    const mqtt = new EventEmitter();
+    const fplus = { debug, MQTT: { mqtt_client: async () => mqtt } };
+
+    await new SparkplugApp({ fplus }).init();
+
+    const err = Object.assign(new Error("read ECONNRESET"),
+        { code: "ECONNRESET" });
+    assert.doesNotThrow(() => mqtt.emit("error", err));
+    assert.ok(logs.some(l => /MQTT error: read ECONNRESET/.test(l)),
+        "the error is logged");
+});

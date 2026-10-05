@@ -309,11 +309,24 @@ export default class MQTTCli {
 
         /* Only publish change notifications for sessions which are
          * still current. We will get another notification for the
-         * new current session and don't want to publish twice. */
-        if (session.next_for_device == null)
+         * new current session and don't want to publish twice.
+         *
+         * A rebirth creates a new session even when nothing about the
+         * device has changed. Don't announce those: a Directory restart
+         * rebirths every device, and announcing each one floods MQTT
+         * with notices nothing needs to act on. So for a session which
+         * is still open (a BIRTH), announce the device only if it has
+         * moved address, and the address only if a different device
+         * now uses it. A session which has closed (a DEATH) is still
+         * announced as before. */
+        const open = session.online;
+
+        if (session.next_for_device == null
+            && !(open && session.prev_device_addrid == session.addrid))
             notify.push(["Device_UUID", session.device]);
 
-        if (session.next_for_address == null) {
+        if (session.next_for_address == null
+            && !(open && session.prev_address_devid == session.devid)) {
             const addr = new Address(
                 session.group_id, session.node_id, session.device_id);
             notify.push(["Device_Address", addr.toString(), "String"]);

@@ -95,16 +95,22 @@ export default class Queries {
         const dbr = await this.query(`
             select dev.uuid device,
                    ses.device devid,
+                   ses.address addrid,
+                   ses.finish is null online,
                    adr.group_id,
                    adr.node_id,
                    adr.device_id,
                    ses.next_for_device,
                    ses.next_for_address,
-                   prev.id  prev_for_device
+                   prev.id  prev_for_device,
+                   prev.address prev_device_addrid,
+                   prev_adr.device prev_address_devid
             from session ses
                      join device dev on dev.id = ses.device
                      join address adr on adr.id = ses.address
                      left join session prev on prev.next_for_device = ses.id
+                     left join session prev_adr
+                         on prev_adr.next_for_address = ses.id
             where ses.id = $1
         `, [id]);
 

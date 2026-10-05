@@ -104,7 +104,12 @@ export default class Queries {
                    ses.next_for_address,
                    prev.id  prev_for_device,
                    prev.address prev_device_addrid,
-                   prev_adr.device prev_address_devid
+                   prev_adr.device prev_address_devid,
+                   -- record_birth closes the session it replaces at the
+                   -- new session's start. If it closed earlier, a DEATH
+                   -- closed it and there was a gap.
+                   prev.finish = ses.start prev_open,
+                   prev_adr.finish = ses.start prev_adr_open
             from session ses
                      join device dev on dev.id = ses.device
                      join address adr on adr.id = ses.address

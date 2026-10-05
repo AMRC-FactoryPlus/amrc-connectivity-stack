@@ -490,6 +490,26 @@ i3x:
   verbosity: "ALL,!query,!acl,!notify-msg"
   # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
   # namespaceUri: https://example.com/i3x
+  # i3X keeps its namespace (the object tree) and the last value of
+  # each metric in a SQLite database at /data/i3x.db. The database is
+  # a cache of ConfigDB and the UNS, so losing it costs only a full
+  # sync from ConfigDB on the next start.
+  persistence:
+    # -- Keep the database on a PersistentVolumeClaim (ReadWriteOnce),
+    # so a restart serves the stored tree at once and fetches only the
+    # configs that changed. The Deployment then uses the Recreate
+    # strategy. When false the database is on an emptyDir and every
+    # start syncs from scratch.
+    enabled: true
+    # -- Size of the PersistentVolumeClaim.
+    size: 5Gi
+    # -- StorageClass for the claim. Empty uses the cluster default.
+    storageClass: ""
+  mcp:
+    # -- Serve the MCP endpoint (/mcp) and build the search index it
+    # uses. Off by default: the index costs about 47 KB of memory per
+    # device. When off, /mcp answers 404.
+    enabled: false
 
 admin:
   # -- Whether or not to enable the Admin component

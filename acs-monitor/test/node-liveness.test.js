@@ -37,7 +37,7 @@ class Harness {
         this.logs = [];
         this.rebirths = 0;
         this.topics = new Map();
-        /* Our MQTT connection, for connect events */
+        /* Our MQTT connection, for authenticated events */
         this.mqtt = new EventEmitter();
 
         const debug = {
@@ -206,18 +206,21 @@ test("a late Will is corrected by the rebirth reply", async t => {
     assert.equal(h.is_offline(), false, "no Offline alert");
 });
 
-test("Device packets show the Node is up", async t => {
+test("Device packets show the Node is up but don't replace its NBIRTH",
+async t => {
     const h = await new Harness().start();
     t.after(() => h.stop());
 
     /* We missed the NBIRTH but see a Device death */
     h.publish(DEVICE, "DEATH");
     await tick();
-    assert.equal(await h.state(), State.Alive,
+    assert.equal(await h.state(), State.Seen,
         "a DDEATH is not an NDEATH");
 
     await tick(15 * INTERVAL);
-    assert.equal(h.rebirths, 0);
+    assert.equal(h.rebirths, 1, "one rebirth to get the births");
+    assert.equal(await h.state(), State.Alive);
+    assert.equal(h.is_offline(), false, "never Offline");
 });
 
 test("our own MQTT reconnect causes one rebirth", async t => {
@@ -226,7 +229,7 @@ test("our own MQTT reconnect causes one rebirth", async t => {
 
     h.births();
     await tick();
-    h.mqtt.emit("connect");
+    h.mqtt.emit("authenticated");
     await tick();
     assert.equal(await h.state(), State.Unknown,
         "we may have missed packets");
@@ -235,4 +238,43 @@ test("our own MQTT reconnect causes one rebirth", async t => {
     assert.equal(h.rebirths, 1);
     assert.equal(await h.state(), State.Alive);
     assert.equal(h.is_offline(), false);
+});
+
+test("DATA after our reconnect doesn't cancel the rebirth", async t => {
+    const h = await new Harness().start();
+    t.after(() => h.stop());
+
+    h.births();
+    await tick();
+    /* We reconnect. The Node restarted while we were away, and we
+     * missed its new births. Then it publishes some data. */
+    h.mqtt.emit("authenticated");
+    h.publish(AGENT, "DATA");
+    h.publish(DEVICE, "DATA");
+    await tick();
+    assert.equal(await h.state(), State.Seen);
+
+    await tick(15 * INTERVAL);
+    assert.equal(h.rebirths, 1, "rebirth to get the new births");
+    assert.equal(await h.state(), State.Alive);
+    assert.equal(h.is_offline(), false);
+});
+
+test("a retried packet watch may have missed packets", async t => {
+    const h = await new Harness({ answers: false }).start();
+    t.after(() => h.stop());
+
+    h.births();
+    await tick();
+    assert.equal(await h.state(), State.Alive);
+
+    /* The watch fails. The monitor retries after 10 s, and we must not
+     * assume the Node is still up when it does. */
+    h.topic(AGENT).error(new Error("watch failed"));
+    h.topics.delete(AGENT);
+    await tick(10500);
+    assert.equal(await h.state(), State.Unknown);
+
+    await tick(2 * INTERVAL);
+    assert.ok(h.rebirths >= 1, "rebirth to find the Node");
 });

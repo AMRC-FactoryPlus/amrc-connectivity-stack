@@ -223,6 +223,10 @@ export class I3xStore {
     private batchOpen = false;
     private batchTimer: ReturnType<typeof setTimeout> | null = null;
     private commitFailureListeners: Set<(err: unknown) => void> = new Set();
+    /* Commit failures since the last log line; logged at most once a
+     * minute, as a full disk fails every batch. */
+    private commitFailures = 0;
+    private lastCommitFailureLog = 0;
 
     /** True if the database was opened with tables already in place,
      * rather than created or rebuilt now. */
@@ -560,7 +564,14 @@ export class I3xStore {
             /* For example a full disk. The batch is lost. The database
              * is a cache; listeners (the sync engine) arrange to write
              * what was lost again. */
-            console.error("I3xStore: commit failed, batch discarded:", err);
+            this.commitFailures++;
+            const now = Date.now();
+            if (now - this.lastCommitFailureLog >= 60_000) {
+                console.error("I3xStore: commit failed, batch discarded (%d failures since the last report):",
+                    this.commitFailures, err);
+                this.lastCommitFailureLog = now;
+                this.commitFailures = 0;
+            }
             try { this.db.exec("rollback"); } catch { /* already closed */ }
             for (const l of this.commitFailureListeners) {
                 try {

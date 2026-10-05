@@ -72,14 +72,19 @@ const subscriptions = new SubscriptionManager({
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
 });
 
-// Build RAG engine (graph + search index)
-const i3xRag = new I3xRag(objectTree, valueCache, history);
-i3xRag.init();
-objectTree.onChange(() => i3xRag.markDirty());
+// The MCP endpoint and its RAG index (a graph and a search index of
+// the whole tree, about 47 KB of heap per device) are opt-in. When
+// off, nothing is built and /mcp answers 404.
+let mcpServer: McpServer | undefined;
+if (env.I3X_MCP_ENABLED === "true") {
+    // Built on the first MCP query, and again on the first query
+    // after any change to the tree.
+    const i3xRag = new I3xRag(objectTree, valueCache, history);
+    objectTree.onChange(() => i3xRag.markDirty());
 
-// MCP server
-const mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
-registerRagTools(mcpServer, i3xRag);
+    mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
+    registerRagTools(mcpServer, i3xRag);
+}
 
 const api = await new WebAPI({
     ping: {

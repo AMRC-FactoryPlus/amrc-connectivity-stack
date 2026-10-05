@@ -15,6 +15,7 @@
  * write, the same guarantee the in-memory snapshot gave.
  */
 
+import { rmSync, statSync } from "node:fs";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 
 /** Bump this whenever the tables below change. */
@@ -166,22 +167,66 @@ export class I3xStore {
         this.path = opts.path ?? ":memory:";
         this.log = opts.log ?? (() => {});
         this.commitInterval = opts.commitInterval ?? 250;
+
+        try {
+            this.db = this.open(opts);
+        } catch (err) {
+            /* A corrupt or truncated file (a node crash, a bad volume
+             * restore) would fail every start. The database is a cache
+             * of ConfigDB, so start again from nothing; the next sync
+             * fills it. */
+            if (this.path === ":memory:" || this.path === "") throw err;
+            console.error(`I3xStore: cannot open ${this.path}; DELETING it and the WAL and starting a new database. The next sync rebuilds it from ConfigDB.`, err);
+            for (const f of [this.path, `${this.path}-wal`, `${this.path}-shm`])
+                rmSync(f, { force: true });
+            this.warm = false;
+            this.db = this.open(opts);
+        }
+    }
+
+    /**
+     * Throw if the file is shorter than the database it claims to hold,
+     * as after a truncated copy or restore. Only checked with no WAL to
+     * replay: pages in the WAL can legitimately extend past the file.
+     */
+    private checkLength(db: DatabaseSync): void {
+        if (this.path === ":memory:" || this.path === "") return;
+        let wal = 0;
+        try { wal = statSync(`${this.path}-wal`).size; } catch { /* no WAL */ }
+        if (wal > 0) return;
+        const pages = (db.prepare("pragma page_count").get() as any).page_count;
+        const size = (db.prepare("pragma page_size").get() as any).page_size;
+        const file = statSync(this.path).size;
+        if (pages * size > file)
+            throw new Error(`database file is truncated: ${file} bytes, ${pages} pages of ${size}`);
+    }
+
+    /** Open the database and check or create its schema. On failure
+     * the connection is closed before the error is thrown. */
+    private open(opts: I3xStoreOpts): DatabaseSync {
         const { DatabaseSync } = loadSqlite();
-        this.db = new DatabaseSync(this.path);
-
-        const cacheMb = opts.cacheMb ?? 64;
-        this.db.exec(`
-            pragma journal_mode = wal;
-            pragma synchronous = normal;
-            -- After a checkpoint, cut the WAL file back to 64 MiB; it
-            -- otherwise stays as large as the largest batch made it.
-            pragma journal_size_limit = 67108864;
-            pragma cache_size = ${-Math.max(1, Math.floor(cacheMb)) * 1024};
-            pragma temp_store = file;
-            pragma foreign_keys = off;
-        `);
-
-        this.ensureSchema(opts.fingerprint ?? "");
+        const db = new DatabaseSync(this.path);
+        try {
+            const cacheMb = opts.cacheMb ?? 64;
+            db.exec(`
+                pragma journal_mode = wal;
+                pragma synchronous = normal;
+                -- After a checkpoint, cut the WAL file back to 64 MiB; it
+                -- otherwise stays as large as the largest batch made it.
+                pragma journal_size_limit = 67108864;
+                pragma cache_size = ${-Math.max(1, Math.floor(cacheMb)) * 1024};
+                pragma temp_store = file;
+                pragma foreign_keys = off;
+            `);
+            (this as { db: DatabaseSync }).db = db;
+            this.checkLength(db);
+            this.ensureSchema(opts.fingerprint ?? "");
+            return db;
+        } catch (err) {
+            this.statements.clear();
+            try { db.close(); } catch { /* already unusable */ }
+            throw err;
+        }
     }
 
     private ensureSchema(fingerprint: string): void {

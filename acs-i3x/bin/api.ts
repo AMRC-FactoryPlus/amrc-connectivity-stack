@@ -17,18 +17,32 @@ import { registerRagTools } from "../lib/mcp/tools.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
-import { ObjectTreeRefresh } from "../lib/refresh.js";
+import { I3xStore } from "../lib/store.js";
+import { ConfigSync, configSyncFeeds } from "../lib/sync.js";
 
 const { env } = process;
 
 // Init Factory+ service client (RxClient adds notify-v2 Observables on ConfigDB)
 const fplus = await new RxClient({ env }).init();
 
-// Build object tree from ConfigDB + Directory
+const namespaceName = env.I3X_NAMESPACE_NAME || "Default";
+const namespaceUri = env.I3X_NAMESPACE_URI || "https://example.com";
+
+// The namespace and last values live in SQLite, not on the heap. The
+// database is a cache of ConfigDB: a new namespace starts it afresh.
+const store = new I3xStore({
+    path: env.I3X_DB_PATH || "/data/i3x.db",
+    cacheMb: parseInt(env.I3X_DB_CACHE_MB || "64"),
+    fingerprint: JSON.stringify([namespaceName, namespaceUri]),
+    log: fplus.debug.bound("store"),
+});
+
+// The object tree. ConfigSync (below) fills it from ConfigDB.
 const objectTree = await new ObjectTree({
     fplus,
-    namespaceName: env.I3X_NAMESPACE_NAME || "Default",
-    namespaceUri: env.I3X_NAMESPACE_URI || "https://example.com"
+    namespaceName,
+    namespaceUri,
+    store,
 }).init();
 
 // Start value cache (subscribes to UNS/v1/#)
@@ -55,6 +69,7 @@ const subscriptions = new SubscriptionManager({
 // Build RAG engine (graph + search index)
 const i3xRag = new I3xRag(objectTree, valueCache, history);
 i3xRag.init();
+objectTree.onChange(() => i3xRag.markDirty());
 
 // MCP server
 const mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
@@ -88,4 +103,13 @@ const api = await new WebAPI({
 }).init();
 
 api.run();
-new ObjectTreeRefresh({fplus, objectTree, i3xRag, valueCache}).run()
+
+// Keep the tree in step with ConfigDB. The API answers 503 until the
+// first sync completes, or at once with a database from an earlier run.
+new ConfigSync({
+    objectTree,
+    store,
+    ...configSyncFeeds(fplus),
+    concurrency: parseInt(env.I3X_SYNC_CONCURRENCY || "16"),
+    log: fplus.debug.bound("sync"),
+}).run();

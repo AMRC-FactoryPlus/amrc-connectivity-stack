@@ -3,8 +3,8 @@
  */
 
 /*
- * Lazy rebuild of I3xRag. The refresh pipeline marks the RAG dirty on
- * every emission, and the next query rebuilds it. These tests check
+ * Lazy rebuild of I3xRag. The tree marks the RAG dirty on every change
+ * (ObjectTree.onChange), and the next query rebuilds it. These tests check
  * that a lazily rebuilt RAG answers every query exactly as a full
  * rebuild from the same tree does (the old behaviour), across config
  * changes and UNS-discovered nodes, and that a failed rebuild keeps
@@ -15,7 +15,6 @@ import { jest } from "@jest/globals";
 import { I3xRag } from "../../lib/rag/i3x-rag.js";
 import type { ValueCacheLike } from "../../lib/rag/i3x-rag.js";
 import { ObjectTree } from "../../lib/object-tree.js";
-import { applyDiff } from "../../lib/diff.js";
 import { createMockHistory } from "../helpers/mock-rag.js";
 // @ts-ignore - plain ESM benchmark fixture
 import { device, deviceUuid, pipelineSnapshot } from "../../bench/dataset.mjs";
@@ -112,18 +111,18 @@ describe("I3xRag lazy rebuild", () => {
         const steps: Array<[string, () => void]> = [
             ["add devices", () => {
                 const next = pipelineSnapshot(N + 5);
-                applyDiff(prev, next, tree); prev = next;
+                tree.refreshFromSnapshot(next); prev = next;
             }],
             ["remove a device", () => {
                 const next = pipelineSnapshot(N + 5);
                 next.devices.delete(deviceUuid(3));
-                applyDiff(prev, next, tree); prev = next;
+                tree.refreshFromSnapshot(next); prev = next;
             }],
             ["rename a device", () => {
                 const next = pipelineSnapshot(N + 5);
                 next.devices.delete(deviceUuid(3));
                 next.devices.get(deviceUuid(1)).info = { name: "Renamed Signal" };
-                applyDiff(prev, next, tree); prev = next;
+                tree.refreshFromSnapshot(next); prev = next;
             }],
             ["UNS-discovered nodes", () => {
                 ids.uns = addUns(tree, 2, ["Brakes", "Front", "Brake_Pressure"]);
@@ -135,7 +134,7 @@ describe("I3xRag lazy rebuild", () => {
                 next.devices.get(deviceUuid(1)).info = { name: "Renamed Signal" };
                 const d5 = next.devices.get(deviceUuid(5));
                 d5.devInfo = { ...d5.devInfo, sparkplugName: "Changed" };
-                applyDiff(prev, next, tree); prev = next;
+                tree.refreshFromSnapshot(next); prev = next;
             }],
             ["full swap keeps UNS nodes", () => {
                 tree.refreshFromSnapshot(prev);

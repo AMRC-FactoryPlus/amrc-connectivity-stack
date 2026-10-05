@@ -280,6 +280,8 @@ export class ConfigSync {
         const prev = this.members;
         this.members = next;
         if (!this.haveAll()) return;
+        /* A reconcile in progress may have passed this change by. */
+        if (this.reconciling) this.reconcileAgain = true;
         if (!this.reconciled || prev === null) return this.scheduleReconcile();
 
         /* The watch sends the whole set each time; act on the change. */
@@ -296,6 +298,7 @@ export class ConfigSync {
     private onEtags(kind: Kind, change: EtagChange): void {
         this.etags[kind] = change.map;
         if (!this.haveAll()) return;
+        if (this.reconciling) this.reconcileAgain = true;
         if (change.child === null || !this.reconciled) return this.scheduleReconcile();
 
         const uuid = change.child;
@@ -337,7 +340,8 @@ export class ConfigSync {
      */
     private async reconcile(): Promise<void> {
         if (!this.haveAll() || this.stopped) return;
-        const members = this.members!;
+        /* The Device class can change while this pauses: always read
+         * the current set, this.members, never a copy from the start. */
         const t0 = Date.now();
         const slicer = new Slicer();
         const PAGE = 2000;
@@ -353,18 +357,19 @@ export class ConfigSync {
         }
         const gone = new Set<string>();
         for (const uuid of stored.keys()) {
-            if (!members.has(uuid)) gone.add(uuid);
+            if (!this.members!.has(uuid)) gone.add(uuid);
             await slicer.maybe();
         }
         for (let after = "";;) {
             const uuids = this.tree.deviceUuidPage(after, PAGE);
-            for (const uuid of uuids) if (!members.has(uuid)) gone.add(uuid);
+            for (const uuid of uuids) if (!this.members!.has(uuid)) gone.add(uuid);
             await slicer.maybe();
             if (uuids.length < PAGE) break;
             after = uuids[uuids.length - 1];
         }
         for (const uuid of gone) {
             if (this.stopped) return;
+            if (this.members!.has(uuid)) continue;    // joined meanwhile
             this.removeDevice(uuid);
             await slicer.maybe();
         }
@@ -383,7 +388,7 @@ export class ConfigSync {
 
         let queued = 0;
         this.startBatch();
-        for (const uuid of members) {
+        for (const uuid of this.members!) {
             if (this.stopped) return;
             if (this.deviceNeeds(uuid, stored.get(uuid))) {
                 this.queue.add(`d:${uuid}`);

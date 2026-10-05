@@ -131,11 +131,14 @@ export interface I3xStoreOpts {
     maxBatchChanges?: number;
     /**
      * Run WAL checkpoints in a worker thread, every this many ms,
-     * instead of inside a COMMIT on the main thread. Default 1,000; 0
+     * instead of inside a COMMIT on the main thread. Default 100; 0
      * leaves SQLite's automatic checkpoints on the main thread. File
      * databases only.
      */
     checkpointInterval?: number;
+    /** WAL size in bytes past which a commit helps the checkpoint
+     * finish, so the WAL can rewind. Default 64 MiB. */
+    walLimit?: number;
     log?: (msg: string, ...args: any[]) => void;
 }
 
@@ -156,9 +159,16 @@ const db = new DatabaseSync(workerData.path);
 db.exec("pragma busy_timeout = 1000");
 const st = db.prepare("pragma wal_checkpoint(PASSIVE)");
 setInterval(() => {
-    try { st.get(); } catch (err) { console.error("I3xStore checkpoint worker:", err.message); }
+    if (Atomics.load(workerData.pause, 0) === 1) return;
+    try {
+        const r = st.get();
+        if (r && r.busy === 0) Atomics.store(workerData.pause, 1, r.log);
+    } catch (err) { console.error("I3xStore checkpoint worker:", err.message); }
 }, workerData.interval);
 `;
+
+/** WAL size beyond which the main thread helps the checkpoint finish. */
+const WAL_LIMIT = 64 * 1024 * 1024;
 
 let warningFilter = false;
 
@@ -194,6 +204,11 @@ export class I3xStore {
     private maxBatchChanges: number;
     private batchStartChanges = 0;
     private checkpointer: Worker | null = null;
+    private walLimit: number;
+    private lastCatchUp = -Infinity;
+    /* Set while the main thread wants the worker to skip its turns. */
+    private pauseFlag: Int32Array | null = null;
+    private pageSize = 4096;
     private batchOpen = false;
     private batchTimer: ReturnType<typeof setTimeout> | null = null;
     private commitFailureListeners: Set<(err: unknown) => void> = new Set();
@@ -207,6 +222,7 @@ export class I3xStore {
         this.log = opts.log ?? (() => {});
         this.commitInterval = opts.commitInterval ?? 250;
         this.maxBatchChanges = opts.maxBatchChanges ?? 2000;
+        this.walLimit = opts.walLimit ?? WAL_LIMIT;
 
         try {
             this.db = this.open(opts);
@@ -222,7 +238,7 @@ export class I3xStore {
             this.warm = false;
             this.db = this.open(opts);
         }
-        this.startCheckpointer(opts.checkpointInterval ?? 1000);
+        this.startCheckpointer(opts.checkpointInterval ?? 100);
     }
 
     /**
@@ -231,15 +247,19 @@ export class I3xStore {
      * 1,000 pages, which held the event loop for up to 700 ms during a
      * cold sync. Instead a worker thread, on its own connection, runs a
      * PASSIVE checkpoint (which never blocks the writer) every
-     * `interval` ms. If the worker cannot start, SQLite's own
+     * `interval` ms; see catchUpWal for keeping the WAL bounded. If the worker cannot start, SQLite's own
      * checkpoints stay on.
      */
     private startCheckpointer(interval: number): void {
         if (this.path === ":memory:" || this.path === "" || !(interval > 0)) return;
         try {
+            /* [0] the main thread wants the worker to skip its turns;
+             * [1] frames in the WAL at the last checkpoint. */
+            this.pauseFlag = new Int32Array(new SharedArrayBuffer(8));
+            this.pageSize = (this.db.prepare("pragma page_size").get() as any).page_size;
             const w = new Worker(CHECKPOINTER, {
                 eval: true,
-                workerData: { path: this.path, interval },
+                workerData: { path: this.path, interval, pause: this.pauseFlag },
             });
             w.on("error", err => {
                 console.error("I3xStore: checkpoint worker failed; checkpointing on the main thread:", err);
@@ -361,6 +381,7 @@ export class I3xStore {
         try {
             const rv = fn();
             this.db.exec(outer ? "commit" : `release ${sp}`);
+            if (outer) this.catchUpWal();
             /* A large batch would make a long COMMIT; end it now. */
             if (this.depth === 1 && this.batchOpen && this.batchChanges() >= this.maxBatchChanges) {
                 this.depth--;
@@ -377,6 +398,42 @@ export class I3xStore {
             throw err;
         } finally {
             this.depth--;
+        }
+    }
+
+    /**
+     * The worker's checkpoints copy the WAL into the file, but SQLite
+     * can only rewind the WAL once a checkpoint has caught up with
+     * every frame, and under constant writes the worker never quite
+     * does: the WAL grew without limit (52 GB in a 74k-device cold
+     * start). Once it passes walLimit, catch up here, just after a
+     * commit. This connection is the only writer, so a checkpoint run
+     * here reaches the last frame, and the next write rewinds the WAL
+     * (unless a long read still uses it; then it tries again). The
+     * worker has copied all but its last interval's frames, so this
+     * copies little. A PASSIVE checkpoint does nothing while another is
+     * running, so the worker is asked to skip its turns until this one
+     * has run.
+     */
+    private catchUpWal(): void {
+        if (!this.checkpointer || !this.pauseFlag) return;
+        const now = performance.now();
+        if (now - this.lastCatchUp < 50) return;
+        /* Frames in the WAL, as the worker's last checkpoint found them.
+         * Not the file size: once rewound, the file stays at
+         * journal_size_limit while its frames are reused. */
+        const frames = Atomics.load(this.pauseFlag, 1);
+        if (frames * this.pageSize < this.walLimit) {
+            Atomics.store(this.pauseFlag, 0, 0);
+            return;
+        }
+        this.lastCatchUp = now;
+        Atomics.store(this.pauseFlag, 0, 1);
+        const r = this.prepare("pragma wal_checkpoint(PASSIVE)").get() as any;
+        // busy: the worker was part way through one; try next commit.
+        if (!r?.busy) {
+            Atomics.store(this.pauseFlag, 1, r.log);
+            Atomics.store(this.pauseFlag, 0, 0);
         }
     }
 
@@ -421,6 +478,7 @@ export class I3xStore {
         this.batchOpen = false;
         try {
             this.db.exec("commit");
+            this.catchUpWal();
         } catch (err) {
             /* For example a full disk. The batch is lost. The database
              * is a cache; listeners (the sync engine) arrange to write

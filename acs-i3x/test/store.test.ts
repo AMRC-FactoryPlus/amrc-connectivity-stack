@@ -191,6 +191,23 @@ describe("I3xStore", () => {
         s.close();
     });
 
+    it("keeps the WAL bounded under constant writes", async () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 5, walLimit: 4 * 1024 * 1024 });
+        const t = tree(s);
+        let largest = 0;
+        for (let i = 0; i < 3000; i++) {
+            t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+            largest = Math.max(largest, statSync(`${path}-wal`).size);
+            if (i % 50 === 49) await new Promise(r => setTimeout(r, 1));
+        }
+        // 3,000 devices write about 450 MB of WAL frames. Rewound and
+        // reused, the file stays near journal_size_limit (64 MiB).
+        expect(largest).toBeLessThan(128 * 1024 * 1024);
+        expect(t.objectCount()).toBeGreaterThan(3000);
+        s.close();
+    }, 60_000);
+
     it("commits each transaction at once with commitInterval 0", () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0 });

@@ -30,7 +30,7 @@ interface ValueCacheOpts {
     store?: I3xStore;
     /** Most ms a UNS value waits before it is written. */
     flushInterval?: number;
-    /** Write at once when this many values are waiting. */
+    /** Write at once when this many values are waiting (default 1,000). */
     flushMaxRows?: number;
 }
 
@@ -169,7 +169,8 @@ export class ValueCache {
         this.staleThreshold = opts.staleThreshold;
         this.store = opts.store ?? new I3xStore();
         this.flushInterval = opts.flushInterval ?? 250;
-        this.flushMaxRows = opts.flushMaxRows ?? 5000;
+        /* Each flush is one synchronous write; keep it short. */
+        this.flushMaxRows = opts.flushMaxRows ?? 1000;
     }
 
     async init(fplus: any): Promise<this> {

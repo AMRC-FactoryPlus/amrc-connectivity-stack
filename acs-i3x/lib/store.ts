@@ -216,6 +216,9 @@ export class I3xStore {
     /* Set while the main thread wants the worker to skip its turns. */
     private walShared: Int32Array | null = null;
     private lastHard = -Infinity;
+    /* Frames copied when a reader was found holding the checkpoint
+     * back, or -1. */
+    private pinnedAt = -1;
     private pageSize = 4096;
     private batchOpen = false;
     private batchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -458,7 +461,19 @@ export class I3xStore {
      * copied every frame; the next write then rewinds the WAL.
      */
     walBehind(): boolean {
-        return this.walOverLimit();
+        if (!this.walOverLimit()) {
+            this.pinnedAt = -1;
+            return false;
+        }
+        if (this.pinnedAt >= 0) {
+            /* A reader holds the checkpoint back; holding writers back
+             * would not help. Resume once the checkpoint moves again. */
+            const sh = this.walShared!;
+            if (Atomics.load(sh, 2) <= this.pinnedAt && Atomics.load(sh, 1) !== Atomics.load(sh, 2))
+                return false;
+            this.pinnedAt = -1;
+        }
+        return true;
     }
 
     /**
@@ -476,8 +491,15 @@ export class I3xStore {
         const until = performance.now() + maxWait;
         while (performance.now() < until) {
             await new Promise(r => setTimeout(r, 10));
-            if (Atomics.load(sh, 0) >= start + 2 || !this.walBehind()) {
-                if (!this.walBehind() || Atomics.load(sh, 1) === Atomics.load(sh, 2)) return;
+            if (!this.walBehind()) return;
+            if (Atomics.load(sh, 0) >= start + 2) {
+                if (Atomics.load(sh, 1) === Atomics.load(sh, 2)) return;
+                /* A checkpoint that started after we stopped writing
+                 * still could not copy every frame: a reader (a long
+                 * stream) holds it back. Stop waiting; walBehind stays
+                 * false until the checkpoint moves on. */
+                this.pinnedAt = Atomics.load(sh, 2);
+                return;
             }
         }
     }

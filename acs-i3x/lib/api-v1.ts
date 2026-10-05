@@ -91,6 +91,13 @@ function etagMatches(header: string | string[] | undefined, etag: string): boole
     });
 }
 
+/** Longest wait for a slow client to take more of a streamed body,
+ * in ms (I3X_STREAM_IDLE_MS, default 60,000). */
+function streamIdleMs(): number {
+    const n = Number(process.env.I3X_STREAM_IDLE_MS);
+    return Number.isFinite(n) && n > 0 ? n : 60_000;
+}
+
 /** Bytes to gather before writing a chunk of a streamed response. */
 const STREAM_CHUNK = 64 * 1024;
 
@@ -170,8 +177,25 @@ async function streamText(res: Response, parts: Iterator<string>): Promise<void>
             if (buf.length >= STREAM_CHUNK) {
                 const ok = res.write(buf);
                 buf = "";
-                if (!ok && !res.destroyed)
-                    await new Promise<void>(resolve => { wake = resolve; });
+                if (!ok && !res.destroyed) {
+                    /* A client that stops reading would hold the read
+                     * snapshot open for ever, and a held snapshot stops
+                     * WAL checkpoints. Give up after an idle deadline. */
+                    let timer: ReturnType<typeof setTimeout> | undefined;
+                    const drained = await new Promise<boolean>(resolve => {
+                        wake = () => resolve(true);
+                        timer = setTimeout(() => resolve(false), streamIdleMs());
+                    });
+                    clearTimeout(timer);
+                    if (!drained) {
+                        wake = null;
+                        console.error("%s %s: client read nothing for %d ms; closing",
+                            res.req?.method, res.req?.originalUrl, streamIdleMs());
+                        parts.return?.();
+                        res.destroy();
+                        return;
+                    }
+                }
             }
             if (slicer.due()) await slicer.pause();
             if (res.destroyed || res.writableEnded) {

@@ -228,6 +228,42 @@ describe("I3xStore", () => {
         s.close();
     }, 60_000);
 
+    it("does not hold writers back while a reader pins the checkpoint", async () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 5, walLimit: 1024 * 1024 });
+        const t = tree(s);
+        t.addDevice("dev-0", devInfo("D0", ["AMRC"]), { name: "D0" });
+        // A long read: a snapshot no checkpoint can pass.
+        const reader = s.openReader()!;
+        reader.exec("begin");
+        reader.prepare("select count(*) n from object").get();
+        try {
+            const t0 = performance.now();
+            let waited = 0;
+            for (let i = 1; i < 400; i++) {
+                const w0 = performance.now();
+                await s.walReady();
+                waited += performance.now() - w0;
+                t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+                if (performance.now() - t0 > 8000) break;
+            }
+            // The WAL went over the limit, and writers went on anyway.
+            expect(statSync(`${path}-wal`).size).toBeGreaterThan(1024 * 1024);
+            expect(t.objectCount()).toBeGreaterThan(400);
+            expect(waited).toBeLessThan(3000);
+        } finally {
+            reader.exec("commit");
+            reader.close();
+        }
+        // Once the reader goes, writers that can wait hold back again
+        // until the checkpoint catches up, and the WAL rewinds.
+        for (let i = 400; i < 800; i++) {
+            await s.walReady();
+            t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+        }
+        s.close();
+    }, 60_000);
+
     it("commits each transaction at once with commitInterval 0", () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0 });

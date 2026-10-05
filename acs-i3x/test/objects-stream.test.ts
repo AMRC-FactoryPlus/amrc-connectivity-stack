@@ -8,6 +8,7 @@
  * reading the tree while the client is not reading the response.
  */
 
+import { jest } from "@jest/globals";
 import express from "express";
 import http from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -343,6 +344,49 @@ describe("GET /v1/objects snapshot", () => {
             expect(readers).toHaveLength(1);
             expect(readers[0].isOpen).toBe(false);
         } finally {
+            server.close();
+            store.close();
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }, 60_000);
+});
+
+describe("GET /v1/objects and a client that stops reading", () => {
+    it("closes the stream, and its read snapshot, after the idle deadline", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "i3x-idle-"));
+        const store = new I3xStore({ path: join(dir, "i3x.db") });
+        const server = http.createServer();
+        const prev = process.env.I3X_STREAM_IDLE_MS;
+        process.env.I3X_STREAM_IDLE_MS = "300";
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+            t.refreshFromSnapshot(pipelineSnapshot(1500));
+            t.setReady();
+            const readers: any[] = [];
+            const open = store.openReader.bind(store);
+            store.openReader = () => { const r = open(); readers.push(r); return r; };
+
+            server.on("request", bareApp(t)).listen(0);
+            await new Promise(r => server.once("listening", r));
+            const port = (server.address() as AddressInfo).port;
+            let closed = false;
+            const res = await new Promise<http.IncomingMessage>(r =>
+                http.get({ port, path: "/v1/objects" }, r).on("error", () => {}));
+            res.on("close", () => { closed = true; });
+            res.on("error", () => {});
+            res.pause();
+            for (let i = 0; i < 100 && readers[0]?.isOpen !== false; i++)
+                await new Promise(r => setTimeout(r, 20));
+            expect(readers).toHaveLength(1);
+            expect(readers[0].isOpen).toBe(false);
+            res.resume();
+            for (let i = 0; i < 50 && !closed; i++) await new Promise(r => setTimeout(r, 20));
+            expect(closed).toBe(true);
+        } finally {
+            if (prev === undefined) delete process.env.I3X_STREAM_IDLE_MS;
+            else process.env.I3X_STREAM_IDLE_MS = prev;
+            err.mockRestore();
             server.close();
             store.close();
             rmSync(dir, { recursive: true, force: true });

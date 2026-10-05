@@ -239,7 +239,7 @@ describe("InfluxDB write-back", () => {
         expect(s.queries).toHaveLength(1);
     });
 
-    it("the leaves of a composition read from InfluxDB are kept too", async () => {
+    it("the leaves of a composition read from InfluxDB are kept, for leaf reads only", async () => {
         const s = setup();
         s.series.set(s.leaf("Speed"), { _value: 1, _time: "2026-10-05T11:00:00Z" });
         s.series.set(s.leaf("Position", "axis-1"), { _value: 2, _time: "2026-10-05T11:00:00Z" });
@@ -250,11 +250,50 @@ describe("InfluxDB write-back", () => {
             .toEqual([s.leaf("Speed"), s.leaf("Position", "axis-1")].sort());
         expect(s.queries).toHaveLength(1);
 
-        // Each leaf is now local, filed under its parent.
+        // Each leaf is now local...
         expect(s.valueCache.getValue(s.leaf("Position", "axis-1"))!.value).toBe(2);
-        expect(Object.keys(s.valueCache.getChildValues("axis-1", 1)!)).toEqual([s.leaf("Position", "axis-1")]);
-        await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        const leaf = await request(app).post("/v1/objects/value")
+            .send({ elementIds: [s.leaf("Speed"), s.leaf("Position", "axis-1")] });
+        expect(leaf.body.success).toBe(true);
         expect(s.queries).toHaveLength(1);
+
+        // ...but the composition is read from InfluxDB again, whole.
+        expect(s.valueCache.getValue(DEV)).toBeNull();
+        expect(s.valueCache.getChildValues("axis-1", 1)).toBeNull();
+        const again = await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        expect(again.body).toEqual(r.body);
+        expect(s.queries).toHaveLength(2);
+    });
+
+    it("a composition is not answered from leaves cached from InfluxDB", async () => {
+        const s = setup();
+        s.series.set(s.leaf("Speed"), { _value: 7, _time: "2026-10-05T11:00:00Z" });
+        s.series.set(s.leaf("Status"), { _value: "ok", _time: "2026-10-05T11:00:00Z" });
+        const app = api(s);
+
+        // Reading one leaf keeps it.
+        await request(app).post("/v1/objects/value").send({ elementIds: [s.leaf("Speed")] });
+        // The device then still gets every leaf, from InfluxDB.
+        const r = await request(app).get(`/v1/objects/${DEV}/value`);
+        expect(Object.keys(r.body.result.components).sort())
+            .toEqual([s.leaf("Speed"), s.leaf("Status")].sort());
+        expect(s.queries).toHaveLength(2);
+    });
+
+    it("files UNS and InfluxDB values for a leaf under the same parent: its parent in the tree", () => {
+        const s = setup();
+        // The instance path stops at the device, but Position's parent
+        // in the tree is the Axis composition.
+        uns(s.valueCache, ["Axis", "Position"], 5, "2026-10-05T12:00:00Z", DEV);
+        const pos = s.leaf("Position", "axis-1");
+        const anchor = () => (s.valueCache.flush(), s.store.prepare("select anchor from last_value where element_id = ?").get(pos) as any).anchor;
+        expect(anchor()).toBe("axis-1");
+        expect(Object.keys(s.valueCache.getChildValues("axis-1", 1)!)).toEqual([pos]);
+        expect(s.valueCache.getChildValues(DEV, 1)).toBeNull();
+
+        s.valueCache.recordInfluxValues([{ elementId: pos, device: DEV,
+            anchor: s.tree.getObject(pos)!.parentId, value: 6, quality: "Good", timestamp: "2026-10-05T13:00:00Z" }]);
+        expect(anchor()).toBe("axis-1");
     });
 
     it("does not replace a newer UNS value", async () => {

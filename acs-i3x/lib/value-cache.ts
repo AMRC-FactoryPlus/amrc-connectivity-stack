@@ -44,7 +44,7 @@ interface ObjectTreeLike {
         metricSegments: string[],
         isa95Segments?: string[],
     ): string | null;
-    getObject(elementId: string): { elementId: string; isComposition: boolean } | undefined;
+    getObject(elementId: string): { elementId: string; isComposition: boolean; parentId?: string | null } | undefined;
     getChildElementIds(elementId: string): string[];
     isReady(): boolean;
 }
@@ -243,9 +243,13 @@ export class ValueCache {
 
         const vqt = toI3xVqt(parsed.value, quality, parsed.timestamp);
 
-        // Queue it for the next write, filed under its parent (bottom UUID)
+        // Queue it for the next write, filed under its parent in the
+        // tree. That is where History files InfluxDB values too; the
+        // bottom instance UUID is not the parent when the instance path
+        // is shorter than the metric path.
+        const anchor = this.objectTree.getObject(elementId)?.parentId ?? bottomUuid;
         this.pending.set(elementId, {
-            anchor: bottomUuid,
+            anchor,
             device: instanceUuidPath[0],
             valueJson: toJson(vqt.value),
             quality: vqt.quality,
@@ -417,10 +421,14 @@ export class ValueCache {
     ): Record<string, I3xVqt> | null {
         const result: Record<string, I3xVqt> = {};
 
-        // Collect direct leaf metrics cached under this elementId,
-        // in the order they were first seen
+        // Collect direct leaf metrics cached under this elementId, in
+        // the order they were first seen. Only UNS values: values kept
+        // from InfluxDB cover only the leaves someone asked for, so a
+        // composition built from them would look complete when it is
+        // not. Without UNS data the caller falls back to InfluxDB for
+        // the whole composition, as it did before values were kept.
         const direct = this.store.prepare(
-            "select element_id, value_json, quality, timestamp from last_value where anchor = ? order by seq",
+            "select element_id, value_json, quality, timestamp from last_value where anchor = ? and source = 'uns' order by seq",
         ).all(elementId) as unknown as ValueRow[];
         for (const r of direct) {
             result[r.element_id] = toVqt(r);

@@ -228,13 +228,16 @@ export class ValueCache {
 
         // Tell the object tree about the full composition chain.
         // Also passes ISA-95 segments so the tree can create hierarchy above the device.
-        // Returns the leaf elementId.
-        const elementId = this.objectTree.addCompositionFromUns(
+        // Returns the leaf elementId, or null if the device is not in
+        // the tree: then nothing can find the value, so drop it.
+        const leafId = this.objectTree.addCompositionFromUns(
             instanceUuidPath,
             schemaUuidPath,
             metricSegments,
             isa95Segments,
-        ) ?? `${bottomUuid}/${metricName}`;
+        );
+        if (leafId === null) return;
+        const elementId = leafId ?? `${bottomUuid}/${metricName}`;
 
         // Derive quality — for values received from UNS, the device is
         // online and we have a value, so quality is Good.
@@ -360,6 +363,17 @@ export class ValueCache {
         } catch (err) {
             console.error(`ValueCache: clearing values ${when} failed:`, err);
         }
+    }
+
+    /** Drop the values of objects that have left the tree. */
+    removeElements(ids: string[]): void {
+        const st = this.store.prepare("delete from last_value where element_id = ?");
+        this.store.transaction(() => {
+            for (const id of ids) {
+                this.pending.delete(id);
+                st.run(id);
+            }
+        });
     }
 
     /** Forget every value. */

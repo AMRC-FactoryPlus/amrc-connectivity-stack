@@ -68,7 +68,7 @@ export interface ConfigSyncOpts {
     etags: (app: string) => rx.Observable<EtagChange>;
     fetcher: ConfigFetcher;
     /** Told when a device leaves the tree, to drop its values. */
-    valueCache?: { removeDevice(uuid: string): void };
+    valueCache?: { removeDevice(uuid: string): void; removeElements?(ids: string[]): void };
     /** Fetches in flight at once. */
     concurrency?: number;
     /** Wait before retrying a failed fetch or a failed feed, ms. */
@@ -327,6 +327,14 @@ export class ConfigSync {
         for (const uuid of stored.keys()) if (!members.has(uuid)) gone.add(uuid);
         for (const uuid of this.tree.getDeviceUuids()) if (!members.has(uuid)) gone.add(uuid);
         for (const uuid of gone) this.removeDevice(uuid);
+
+        /* UNS nodes left hanging (from before a device left the tree,
+         * or from an earlier run) and empty ISA-95 levels. */
+        const orphans = this.tree.dropOrphans();
+        if (orphans.length) {
+            this.opts.valueCache?.removeElements?.(orphans);
+            this.log("dropped %d orphan objects", orphans.length);
+        }
 
         let queued = 0;
         this.startBatch();

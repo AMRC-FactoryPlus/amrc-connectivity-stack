@@ -167,6 +167,7 @@ describe("UNS values", () => {
         uns(s.valueCache, ["Status"], "ok", "2026-10-05T12:00:00Z");
         s.valueCache.flush();
         uns(s.valueCache, ["Speed"], 1, "2026-10-05T12:00:00Z");   // still pending
+        s.tree.addDevice("dev-2", { schema: "top", originMap: { Schema_UUID: "top", Instance_UUID: "dev-2" } }, null);
         uns(s.valueCache, ["X"], 1, "2026-10-05T12:00:00Z", "dev-2:");
         s.valueCache.removeDevice(DEV);
         expect(s.valueCache.size()).toBe(1);
@@ -212,6 +213,20 @@ describe("UNS message errors", () => {
         } finally {
             err.mockRestore();
         }
+    });
+});
+
+describe("UNS messages for devices not in the tree", () => {
+    it("add no objects and keep no values", () => {
+        const s = setup();
+        const before = s.tree.objectCount();
+        const seen: string[] = [];
+        s.valueCache.onValueChange(id => seen.push(id));
+        uns(s.valueCache, ["Some", "Metric"], 1, "2026-10-05T12:00:00Z", "not-a-device:");
+        expect(s.tree.objectCount()).toBe(before);
+        expect(s.valueCache.size()).toBe(0);
+        expect(seen).toEqual([]);
+        expect(s.tree.getObjects().filter(o => o.parentId === "not-a-device")).toEqual([]);
     });
 });
 

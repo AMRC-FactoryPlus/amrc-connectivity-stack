@@ -263,28 +263,40 @@ export class ObjectTree {
 
     /**
      * Drop UNS nodes whose parent is gone, and ISA-95 levels with no
-     * children, repeatedly, until nothing more goes.
+     * children, repeatedly, until nothing more goes. Their metric
+     * metadata goes with them. Returns the elementIds dropped, so the
+     * caller can drop their values too.
      */
-    private dropOrphans(): void {
+    dropOrphans(): string[] {
         const s = this.store;
-        for (;;) {
-            this.objectRev++;
-            const a = s.prepare(`
-                delete from object
-                where source = 'uns' and parent_id is not null
-                    and parent_id not in (select element_id from object)
-            `).run().changes;
-            const b = s.prepare(`
-                delete from object
-                where type_element_id = 'isa95-level'
-                    and not exists (select 1 from object c where c.parent_id = object.element_id)
-            `).run().changes;
-            if (!a && !b) break;
-        }
-        s.prepare(`
-            delete from metric_meta
-            where element_id not in (select element_id from object)
-        `).run();
+        const dropped: string[] = [];
+        s.transaction(() => {
+            for (;;) {
+                /* object_uns_ix covers only UNS rows, and object_type_ix
+                 * finds the ISA-95 levels, so neither scans the tree. */
+                const ids = [
+                    ...(s.prepare(`
+                        select element_id from object
+                        where source = 'uns' and parent_id is not null
+                            and not exists (select 1 from object p where p.element_id = object.parent_id)
+                    `).all() as any[]),
+                    ...(s.prepare(`
+                        select element_id from object
+                        where type_element_id = 'isa95-level'
+                            and not exists (select 1 from object c where c.parent_id = object.element_id)
+                    `).all() as any[]),
+                ].map(r => r.element_id as string);
+                if (ids.length === 0) break;
+                this.objectRev++;
+                for (const id of ids) {
+                    s.prepare("delete from metric_meta where element_id = ?").run(id);
+                    s.prepare("delete from object where element_id = ?").run(id);
+                }
+                dropped.push(...ids);
+            }
+        });
+        if (dropped.length) this.changed();
+        return dropped;
     }
 
     /** Test-facing inspector for a node's origin. */
@@ -817,6 +829,10 @@ export class ObjectTree {
             // Since f46612c5, Instance_UUID === ConfigDB object UUID,
             // so the device UUID from UNS messages is the elementId directly.
             const deviceElementId = instanceUuidPath[0];
+
+            // A device not in the tree (not a Device class member, or not
+            // synced yet) gets no nodes: they would hang from nothing.
+            if (!this.hasObject(deviceElementId)) return null;
 
             // Build ISA-95 hierarchy above the device if segments provided
             // and the device is in the tree

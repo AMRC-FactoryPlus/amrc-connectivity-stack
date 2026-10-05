@@ -640,6 +640,46 @@ describe("ConfigSync", () => {
         }
     });
 
+    it("drops orphan UNS nodes, empty ISA-95 levels and their values when it reconciles", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "i3x-sync-"));
+        try {
+            const path = join(dir, "i3x.db");
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const first = start(stack(cdb, new I3xStore({ path })));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+            await settle(first.sync);
+
+            /* Orphans as an earlier run could leave them: UNS rows under
+             * a device that is not in the tree, an empty ISA-95 level,
+             * and values for those rows. */
+            const st = first.store;
+            const put = st.prepare(`insert into object (element_id, parent_id, type_element_id, display_name, is_composition, source)
+                values (?, ?, ?, ?, ?, ?)`);
+            put.run("orphan-a", "gone-device", "t", "A", 1, "uns");
+            put.run("orphan-b", "orphan-a", "t", "B", 0, "uns");
+            put.run("empty-level", "/", "isa95-level", "Empty", 1, "config");
+            st.prepare(`insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+                values ('orphan-b', 'orphan-a', 'gone-device', '1', 't', 'Good', 'uns')`).run();
+            first.sync.stop();
+            first.store.close();
+
+            const second = start(stack(cdb, new I3xStore({ path })));
+            const removed: string[][] = [];
+            (second.sync as any).opts.valueCache.removeElements = (ids: string[]) => removed.push(ids);
+            cdb.snapshots();
+            await settle(second.sync);
+            for (const id of ["orphan-a", "orphan-b", "empty-level"])
+                expect(second.tree.getObject(id)).toBeUndefined();
+            expect(removed.flat().sort()).toEqual(["empty-level", "orphan-a", "orphan-b"]);
+            expect(state(second.tree)).toEqual(state(reference(cdb, uuids)));
+            second.store.close();
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     it("marks the RAG index dirty on every tree change, so MCP search sees it", async () => {
         const cdb = new FakeConfigDB();
         const uuids = seed(cdb);

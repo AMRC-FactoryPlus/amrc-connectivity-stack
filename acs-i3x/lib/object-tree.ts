@@ -165,6 +165,12 @@ export class ObjectTree {
     /** Counts object writes, so a caller can tell whether it changed
      * anything. */
     private writes: number = 0;
+    /* Bumped by every write to the object table; see revision(). Every
+     * statement that inserts, updates or deletes an object row must
+     * bump it, or GET /objects can answer 304 for a changed tree. */
+    private objectRev: number = 0;
+    /* Distinguishes this process's revisions from an earlier one's. */
+    private readonly epoch: string = Date.now().toString(36);
     private isa95IdCache: Map<string, string[]> = new Map();
 
     constructor(opts: ObjectTreeOpts) {
@@ -195,6 +201,16 @@ export class ObjectTree {
 
     isReady(): boolean {
         return this.ready;
+    }
+
+    /**
+     * A token that changes whenever any object changes: added,
+     * removed, renamed or moved. GET /objects builds its ETag from it,
+     * so a client can revalidate the whole listing without the server
+     * reading the tree. Values are not objects and don't change it.
+     */
+    revision(): string {
+        return `${this.epoch}.${this.objectRev}`;
     }
 
     /**
@@ -252,6 +268,7 @@ export class ObjectTree {
     private dropOrphans(): void {
         const s = this.store;
         for (;;) {
+            this.objectRev++;
             const a = s.prepare(`
                 delete from object
                 where source = 'uns' and parent_id is not null
@@ -349,6 +366,7 @@ export class ObjectTree {
 
     /** Update only the device's displayName. */
     updateDeviceName(uuid: string, displayName: string): void {
+        this.objectRev++;
         const r = this.store.prepare("update object set display_name = ? where element_id = ?")
             .run(displayName, uuid);
         if (r.changes) this.changed();
@@ -424,6 +442,7 @@ export class ObjectTree {
      */
     private putObject(obj: I3xObject, source: NodeSource): void {
         this.writes++;
+        this.objectRev++;
         this.store.prepare(`
             insert into object (element_id, parent_id, type_element_id, display_name, is_composition, source)
             values (?, ?, ?, ?, ?, ?)
@@ -479,6 +498,7 @@ export class ObjectTree {
         const s = this.store;
         for (const ancestorId of ancestors) {
             if (s.prepare("select 1 from object where parent_id = ? limit 1").get(ancestorId)) break;
+            this.objectRev++;
             s.prepare("delete from object where element_id = ?").run(ancestorId);
         }
     }
@@ -486,6 +506,7 @@ export class ObjectTree {
     /** Remove a subtree, the root included. */
     private removeSubtree(id: string): void {
         const s = this.store;
+        this.objectRev++;
         s.prepare(`${SUBTREE} delete from metric_meta where element_id in (select id from sub)`).run(id);
         s.prepare(`${SUBTREE} delete from object where element_id in (select id from sub)`).run(id);
     }
@@ -730,6 +751,7 @@ export class ObjectTree {
         // Re-parent the device under the deepest ISA-95 level
         if (device && device.parentId !== parentId) {
             this.writes++;
+            this.objectRev++;
             this.store.prepare("update object set parent_id = ? where element_id = ?")
                 .run(parentId, deviceElementId);
         }

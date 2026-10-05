@@ -165,6 +165,7 @@ export class ObjectTree {
     /** Counts object writes, so a caller can tell whether it changed
      * anything. */
     private writes: number = 0;
+    private isa95IdCache: Map<string, string[]> = new Map();
 
     constructor(opts: ObjectTreeOpts) {
         this.namespaceName = opts.namespaceName;
@@ -688,10 +689,26 @@ export class ObjectTree {
      * deviceElementId: the ConfigDB UUID of the device
      */
     ensureIsa95Hierarchy(isa95Segments: string[], deviceElementId: string): void {
+        this.ensureIsa95(isa95Segments, deviceElementId, false);
+    }
+
+    /** As ensureIsa95Hierarchy; with `onlyForDevice`, do nothing at all
+     * unless the device is in the tree (the UNS path). */
+    private ensureIsa95(isa95Segments: string[], deviceElementId: string, onlyForDevice: boolean): void {
+        const device = this.getObject(deviceElementId);
+        if (!device && onlyForDevice) return;
+        const ids = this.isa95Ids(isa95Segments);
+
+        // Every UNS message lands here. If the device already sits under
+        // the deepest level, the chain exists: a level is only removed
+        // once it has no children.
+        if (device && ids.length > 0 && device.parentId === ids[ids.length - 1]) return;
+
         let parentId = "/";
 
-        for (const segment of isa95Segments) {
-            const elementId = uuidv5(`isa95:${parentId}:${segment}`, I3X_UUID_NAMESPACE);
+        for (let i = 0; i < isa95Segments.length; i++) {
+            const segment = isa95Segments[i];
+            const elementId = ids[i];
 
             if (!this.hasObject(elementId)) {
                 const obj = toI3xObject(
@@ -708,12 +725,30 @@ export class ObjectTree {
         }
 
         // Re-parent the device under the deepest ISA-95 level
-        const device = this.getObject(deviceElementId);
         if (device && device.parentId !== parentId) {
             this.writes++;
             this.store.prepare("update object set parent_id = ? where element_id = ?")
                 .run(parentId, deviceElementId);
         }
+    }
+
+    /** The elementIds of an ISA-95 chain, top first. These are v5
+     * UUIDs of the path; there are few distinct chains, so remember
+     * them rather than hash on every UNS message. */
+    private isa95Ids(segments: string[]): string[] {
+        const key = segments.join("\u0000");
+        let ids = this.isa95IdCache.get(key);
+        if (!ids) {
+            ids = [];
+            let parentId = "/";
+            for (const segment of segments) {
+                parentId = uuidv5(`isa95:${parentId}:${segment}`, I3X_UUID_NAMESPACE);
+                ids.push(parentId);
+            }
+            if (this.isa95IdCache.size >= 10_000) this.isa95IdCache.clear();
+            this.isa95IdCache.set(key, ids);
+        }
+        return ids;
     }
 
     /* ---- UNS composition ---- */
@@ -734,8 +769,9 @@ export class ObjectTree {
             const deviceElementId = instanceUuidPath[0];
 
             // Build ISA-95 hierarchy above the device if segments provided
-            if (isa95Segments && isa95Segments.length > 0 && this.hasObject(deviceElementId)) {
-                this.ensureIsa95Hierarchy(isa95Segments, deviceElementId);
+            // and the device is in the tree
+            if (isa95Segments && isa95Segments.length > 0) {
+                this.ensureIsa95(isa95Segments, deviceElementId, true);
             }
 
             // Build the full tree from metric segments.

@@ -100,6 +100,39 @@ describe("I3xStore", () => {
         s.close();
     });
 
+    it("group-commits writes after commitInterval, or on commit() and close()", async () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 50 });
+        const other = new (process.getBuiltinModule("node:sqlite") as any).DatabaseSync(path);
+        const seen = (k: string) => other.prepare("select value from meta where key = ?").get(k)?.value;
+
+        s.setMeta("a", "1");
+        // This connection sees its own write at once; others do not yet.
+        expect(s.getMeta("a")).toBe("1");
+        expect(seen("a")).toBeUndefined();
+        await new Promise(r => setTimeout(r, 120));
+        expect(seen("a")).toBe("1");
+
+        s.setMeta("b", "2");
+        s.commit();
+        expect(seen("b")).toBe("2");
+
+        s.setMeta("c", "3");
+        s.close();
+        expect(seen("c")).toBe("3");
+        other.close();
+    });
+
+    it("commits each transaction at once with commitInterval 0", () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 0 });
+        const other = new (process.getBuiltinModule("node:sqlite") as any).DatabaseSync(path);
+        s.setMeta("a", "1");
+        expect(other.prepare("select value from meta where key = 'a'").get()?.value).toBe("1");
+        other.close();
+        s.close();
+    });
+
     it("rolls a failed transaction back, nested calls included", () => {
         const s = new I3xStore();
         expect(() => s.transaction(() => {
@@ -112,6 +145,16 @@ describe("I3xStore", () => {
 
         s.transaction(() => s.transaction(() => s.setMeta("c", "3")));
         expect(s.getMeta("c")).toBe("3");
+
+        // An inner failure undoes only the inner writes.
+        s.transaction(() => {
+            s.setMeta("d", "4");
+            try {
+                s.transaction(() => { s.setMeta("e", "5"); throw new Error("inner"); });
+            } catch { /* expected */ }
+        });
+        expect(s.getMeta("d")).toBe("4");
+        expect(s.getMeta("e")).toBeUndefined();
     });
 });
 

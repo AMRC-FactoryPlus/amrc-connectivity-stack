@@ -109,6 +109,15 @@ export interface I3xStoreOpts {
     /** Must match the stored value or the database is rebuilt. Use it
      * for settings the stored rows depend on, such as the namespace. */
     fingerprint?: string;
+    /**
+     * Group commit: writes join one open transaction, committed this
+     * many ms after the first write. A COMMIT costs far more than the
+     * writes of one device or one UNS message, so committing each on
+     * its own took most of the CPU. 0 commits every transaction at
+     * once. The database is a cache, so a crash loses at most this
+     * much, and each batch commits whole.
+     */
+    commitInterval?: number;
     log?: (msg: string, ...args: any[]) => void;
 }
 
@@ -142,6 +151,9 @@ export class I3xStore {
     private statements: Map<string, StatementSync> = new Map();
     private depth = 0;
     private log: (msg: string, ...args: any[]) => void;
+    private commitInterval: number;
+    private batchOpen = false;
+    private batchTimer: ReturnType<typeof setTimeout> | null = null;
 
     /** True if the database was opened with tables already in place,
      * rather than created or rebuilt now. */
@@ -150,6 +162,7 @@ export class I3xStore {
     constructor(opts: I3xStoreOpts = {}) {
         this.path = opts.path ?? ":memory:";
         this.log = opts.log ?? (() => {});
+        this.commitInterval = opts.commitInterval ?? 250;
         const { DatabaseSync } = loadSqlite();
         this.db = new DatabaseSync(this.path);
 
@@ -211,31 +224,58 @@ export class I3xStore {
     }
 
     /**
-     * Run `fn` in a transaction. Nested calls join the outer one, so a
-     * method that writes in a transaction can be called from inside
-     * another. An exception rolls the whole outer transaction back.
+     * Run `fn` atomically: if it throws, everything it wrote is undone
+     * and the exception passes on. Calls may nest; an inner failure
+     * undoes only the inner call's writes. With group commit the
+     * writes are committed with the rest of the current batch, so
+     * other code in this process sees them at once and a crash may
+     * lose them; without it they are committed before this returns.
      */
     transaction<T>(fn: () => T): T {
-        if (this.depth > 0) {
-            this.depth++;
-            try {
-                return fn();
-            } finally {
-                this.depth--;
-            }
-        }
-        this.db.exec("begin");
-        this.depth = 1;
+        if (this.commitInterval > 0) this.openBatch();
+        const outer = this.depth === 0 && !this.batchOpen;
+        const sp = `sp${this.depth}`;
+        this.db.exec(outer ? "begin" : `savepoint ${sp}`);
+        this.depth++;
         try {
             const rv = fn();
-            this.db.exec("commit");
+            this.db.exec(outer ? "commit" : `release ${sp}`);
             return rv;
         } catch (err) {
-            this.db.exec("rollback");
+            if (outer) {
+                this.db.exec("rollback");
+            } else {
+                this.db.exec(`rollback to ${sp}`);
+                this.db.exec(`release ${sp}`);
+            }
             throw err;
         } finally {
-            this.depth = 0;
+            this.depth--;
         }
+    }
+
+    private openBatch(): void {
+        if (this.batchOpen) return;
+        this.db.exec("begin");
+        this.batchOpen = true;
+        this.batchTimer = setTimeout(() => this.commit(), this.commitInterval);
+        this.batchTimer.unref?.();
+    }
+
+    /** Commit the current batch now, if one is open. */
+    commit(): void {
+        if (this.batchTimer) {
+            clearTimeout(this.batchTimer);
+            this.batchTimer = null;
+        }
+        if (!this.batchOpen) return;
+        if (this.depth > 0) {
+            /* Not reachable from a timer; finish the transaction first. */
+            this.batchTimer = setTimeout(() => this.commit(), this.commitInterval);
+            return;
+        }
+        this.batchOpen = false;
+        this.db.exec("commit");
     }
 
     getMeta(key: string): string | undefined {
@@ -244,11 +284,13 @@ export class I3xStore {
     }
 
     setMeta(key: string, value: string | null): void {
-        if (value === null)
-            this.prepare("delete from meta where key = ?").run(key);
-        else
-            this.prepare("insert into meta (key, value) values (?, ?) on conflict (key) do update set value = excluded.value")
-                .run(key, value);
+        this.transaction(() => {
+            if (value === null)
+                this.prepare("delete from meta where key = ?").run(key);
+            else
+                this.prepare("insert into meta (key, value) values (?, ?) on conflict (key) do update set value = excluded.value")
+                    .run(key, value);
+        });
     }
 
     /** Size of the database file in bytes (pages in use), or 0 in memory. */
@@ -259,6 +301,7 @@ export class I3xStore {
     }
 
     close(): void {
+        this.commit();
         this.statements.clear();
         this.db.close();
     }

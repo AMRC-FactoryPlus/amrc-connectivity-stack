@@ -160,6 +160,7 @@ db.exec("pragma busy_timeout = 1000");
 const st = db.prepare("pragma wal_checkpoint(PASSIVE)");
 setInterval(() => {
     const sh = workerData.shared;
+    if (Atomics.load(sh, 3) === 1) return;
     try {
         const r = st.get();
         if (r && r.busy === 0) {
@@ -261,8 +262,9 @@ export class I3xStore {
         if (this.path === ":memory:" || this.path === "" || !(interval > 0)) return;
         try {
             /* [0] checkpoints the worker has completed; [1] frames
-             * in the WAL and [2] frames copied, at the last one. */
-            this.walShared = new Int32Array(new SharedArrayBuffer(12));
+             * in the WAL and [2] frames copied, at the last one;
+             * [3] set while the main thread needs the worker to wait. */
+            this.walShared = new Int32Array(new SharedArrayBuffer(16));
             this.pageSize = (this.db.prepare("pragma page_size").get() as any).page_size;
             const w = new Worker(CHECKPOINTER, {
                 eval: true,
@@ -414,20 +416,27 @@ export class I3xStore {
      * objects, a full value queue) can keep the worker from ever
      * finishing a checkpoint. Once the WAL holds WAL_HARD_FACTOR times
      * walLimit (1 GiB by default), checkpoint here after a commit, at
-     * most once a second: a stall of the event loop, but the disk must
+     * most every 100 ms: a stall of the event loop, but the disk must
      * not fill.
      */
     private hardCheckpoint(): void {
-        if (!this.walShared) return;
-        if (Atomics.load(this.walShared, 1) * this.pageSize < WAL_HARD_FACTOR * this.walLimit) return;
+        const sh = this.walShared;
+        if (!sh) return;
+        const paused = Atomics.load(sh, 3) === 1;
+        if (!paused && Atomics.load(sh, 1) * this.pageSize < WAL_HARD_FACTOR * this.walLimit) return;
         const now = performance.now();
-        if (now - this.lastHard < 1000) return;
+        if (now - this.lastHard < (paused ? 50 : 100)) return;
         this.lastHard = now;
+        /* Two checkpoints cannot run at once, and a PASSIVE one does
+         * nothing if another is running: ask the worker to start no
+         * more, and try again after the next commit until this one
+         * gets through. */
+        Atomics.store(sh, 3, 1);
         const r = this.prepare("pragma wal_checkpoint(PASSIVE)").get() as any;
-        if (r && !r.busy) {
-            Atomics.store(this.walShared, 1, r.log);
-            Atomics.store(this.walShared, 2, r.checkpointed);
-        }
+        if (!r || r.busy) return;
+        Atomics.store(sh, 1, r.log);
+        Atomics.store(sh, 2, r.checkpointed);
+        Atomics.store(sh, 3, 0);
         this.log("WAL over %d MiB: checkpointed on the main thread", (WAL_HARD_FACTOR * this.walLimit) >> 20);
     }
 

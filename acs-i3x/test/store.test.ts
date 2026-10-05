@@ -210,6 +210,24 @@ describe("I3xStore", () => {
         s.close();
     }, 60_000);
 
+    it("keeps the WAL bounded when writers never wait, by the hard cap", async () => {
+        const path = join(dir, "i3x.db");
+        // Hard cap: 16 x 1 MiB.
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 5, walLimit: 1024 * 1024 });
+        const t = tree(s);
+        let largest = 0;
+        for (let i = 0; i < 6000; i++) {
+            t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+            largest = Math.max(largest, statSync(`${path}-wal`).size);
+            if (i % 50 === 49) await new Promise(r => setTimeout(r, 1));
+        }
+        // About 900 MB of WAL frames are written. The file rewinds after
+        // each hard checkpoint (and is cut back to journal_size_limit,
+        // 64 MiB), growing only between them.
+        expect(largest).toBeLessThan(300 * 1024 * 1024);
+        s.close();
+    }, 60_000);
+
     it("commits each transaction at once with commitInterval 0", () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0 });

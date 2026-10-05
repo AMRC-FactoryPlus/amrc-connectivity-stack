@@ -74,7 +74,8 @@ const TABLES = `
     create table sync_schema (
         uuid            text primary key,
         etag_schema     text,
-        etag_info       text
+        etag_info       text,
+        info_name       text
     ) without rowid;
 
     -- The last known value of each leaf metric. anchor is the object

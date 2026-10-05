@@ -125,27 +125,3 @@ docker network rm i3xbulk-net
   defaults. `run.mjs` waits `--cooldown` seconds (default 35, longer
   than the macOS TIME_WAIT of 30 s) after any run that issued more
   than 1,000 queries.
-
-## RAG refresh benchmark
-
-`rag-refresh.mjs` measures what one ConfigDB change costs the refresh
-pipeline and what the next RAG query costs. It runs the real
-`ObjectTreeRefresh`, `ObjectTree` and `I3xRag` from a compiled `dist/`.
-ConfigDB is replaced by one subject per config, filled from the
-synthetic fleet. It needs no InfluxDB. 8,800 devices is about 300,000
-nodes; 24,000 devices is about 818,000.
-
-```sh
-node --expose-gc --max-old-space-size=8192 bench/rag-refresh.mjs \
-  --dist ./dist --devices 8800 --storm 20 --gap 50
-```
-
-`--check` prints a hash of every RAG query's answers after a fixed
-sequence of renames, UNS-discovered nodes, a device removal and a
-device addition. Run it against two builds; equal hashes mean equal
-answers:
-
-```sh
-node bench/rag-refresh.mjs --dist /tmp/i3x-before/acs-i3x/dist --devices 2000 --check
-node bench/rag-refresh.mjs --dist ./dist --devices 2000 --check
-```

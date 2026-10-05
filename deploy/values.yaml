@@ -501,8 +501,10 @@ i3x:
     # strategy. When false the database is on an emptyDir and every
     # start syncs from scratch.
     enabled: true
-    # -- Size of the PersistentVolumeClaim.
-    size: 5Gi
+    # -- Size of the PersistentVolumeClaim. At 74,000 devices the
+    # database is about 2 GB, and its write-ahead log can reach about
+    # 1.5 GB more during a burst of new UNS metrics.
+    size: 10Gi
     # -- StorageClass for the claim. Empty uses the cluster default.
     storageClass: ""
   mcp:

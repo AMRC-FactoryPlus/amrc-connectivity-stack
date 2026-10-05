@@ -265,6 +265,57 @@ describe("database errors while writing values", () => {
         }
     });
 
+    it("back off from 5 s, doubling to 60 s, and log at most once a minute", () => {
+        const s = setup({ flushInterval: 60_000, flushMaxRows: 2 });
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        let now = 1_000_000;
+        const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+        let fail = true, tries = 0;
+        const prepare = s.store.prepare.bind(s.store);
+        const spy = jest.spyOn(s.store, "prepare").mockImplementation((sql: string) => {
+            if (sql.includes("insert into last_value") && sql.includes("'uns'")) {
+                tries++;
+                if (fail) throw new Error("disk I/O error");
+            }
+            return prepare(sql);
+        });
+        /* Each message fills the batch of two and asks for a write. */
+        let n = 0;
+        const send = () => uns(s.valueCache, [n % 2 ? "Speed" : "Status"], n++, "2026-10-05T12:00:00Z");
+        try {
+            send(); send();
+            for (let i = 0; i < 50; i++) send();
+            expect(tries).toBe(1);
+            now += 4_999; send();
+            expect(tries).toBe(1);
+            now += 1; send();                       // 5 s: second try, next in 10 s
+            expect(tries).toBe(2);
+            now += 9_999; send();
+            expect(tries).toBe(2);
+            now += 1; send();                       // then 20 s, 40 s, 60 s, 60 s
+            expect(tries).toBe(3);
+            for (const wait of [20_000, 40_000, 60_000, 60_000]) {
+                now += wait - 1; send();
+                now += 1; send();
+            }
+            expect(tries).toBe(7);
+            /* Seven failures over 195 s: four logs, not seven. */
+            expect(err).toHaveBeenCalledTimes(4);
+
+            fail = false;
+            now += 60_000; send();
+            expect(tries).toBe(8);
+            expect(rowCount(s.store)).toBe(2);
+            /* Success reset the backoff: every second message writes. */
+            for (let i = 0; i < 4; i++) send();
+            expect(tries).toBe(10);
+        } finally {
+            spy.mockRestore();
+            clock.mockRestore();
+            err.mockRestore();
+        }
+    });
+
     it("a failed group commit forgets the stored and queued values", () => {
         const store = new I3xStore({ commitInterval: 60_000 });
         const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });

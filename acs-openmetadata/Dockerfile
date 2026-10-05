@@ -1,7 +1,4 @@
-FROM openmetadata/ingestion:2.0.1
-
-# Pre-install the package during image build time
-RUN pip install --no-cache-dir "apache-airflow-providers-fab==2.4.4"
+FROM openmetadata/ingestion:2.0.3
 
 # pyspark bundles its own log4j-core/log4j-api (2.20.0), which is in the
 # affected range for CVE-2025-68161/CVE-2026-34477/CVE-2026-34480. Swap in a

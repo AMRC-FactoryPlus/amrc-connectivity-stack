@@ -788,6 +788,24 @@ openmetadata:
               secretRef: airflow-secrets
               secretKey: openmetadata-airflow-password
 
+# PVCs for Airflow's DAGs and task logs, created by
+# deploy/templates/openmetadata/openmetadata-logs.pvc.yaml. They are shared
+# by the Airflow api-server, scheduler and triggerer pods.
+#
+# The defaults (ReadWriteOnce on the cluster default StorageClass) work on
+# multi-node clusters only because of the podAffinity on those three pods
+# below, which keeps them on the same node. On a cluster with an RWX
+# StorageClass (CephFS, NFS, ...) you can instead set accessMode to
+# ReadWriteMany and storageClassName to that class. Both fields are
+# immutable on an existing PVC, so changing them means deleting and
+# recreating the PVCs.
+openmetadataStorage:
+  # Empty means the cluster default StorageClass.
+  storageClassName: ""
+  accessMode: ReadWriteOnce
+  dagsSize: 1Gi
+  logsSize: 10Gi
+
 openmetadata-dependencies:
   enabled: false
 
@@ -809,6 +827,14 @@ openmetadata-dependencies:
       # primary.configuration) is used so the chart's own default my.cnf
       # (datadir, socket, skip-name-resolve, etc.) isn't clobbered.
       extraFlags: "--sort_buffer_size=20M"
+      # The chart's default (15s + 10 x 10s) kills mysqld after ~2 minutes.
+      # On network block storage (Ceph RBD, Longhorn) first-boot
+      # initialisation plus mysql_upgrade can take longer than that, and a
+      # kill partway through leaves a half-built datadir that then never
+      # starts. Allow ~10 minutes instead.
+      startupProbe:
+        initialDelaySeconds: 30
+        failureThreshold: 60
       extraEnvVars:
         - name: AIRFLOW_MYSQL_PASSWORD
           valueFrom:
@@ -846,7 +872,7 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: ghcr.io/amrc-factoryplus/openmetadata-ingestion
-        tag: 2.0.1-patched
+        tag: 2.0.3-patched
     # The chart's own fernet-key Secret is a pre-install-only Helm hook, so
     # it never gets created when openmetadata is enabled on an existing acs
     # release (an upgrade, not a fresh install). Point at our own instead -
@@ -870,6 +896,43 @@ openmetadata-dependencies:
     airflow:
       config:
         AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
+
+    # The api-server, scheduler and triggerer all mount the DAGs/logs PVCs.
+    # A ReadWriteOnce volume can only be attached to one node, so on a
+    # multi-node cluster these pods must share a node or all but the first
+    # fail with a Multi-Attach error. Each pod requires a node already
+    # running one of the others; the first one to schedule matches its own
+    # term, which the scheduler allows, so it can land anywhere. Not needed
+    # if openmetadataStorage above is switched to ReadWriteMany.
+    scheduler:
+      affinity: &airflow-colocate
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: tier
+                    operator: In
+                    values: [airflow]
+                  - key: component
+                    operator: In
+                    values: [api-server, scheduler, triggerer]
+              topologyKey: kubernetes.io/hostname
+    triggerer:
+      affinity: *airflow-colocate
+    apiServer:
+      affinity: *airflow-colocate
+      # OpenMetadata writes the ingestion DAGs it generates through the
+      # api-server, and the scheduler has to read them from its own dags
+      # folder. The chart's default mounts "<airflow fullname>-dags"
+      # (acs-dags) here instead, which is a different volume from the
+      # scheduler's existingClaim above. Point it at the same PVC. This
+      # replaces the chart's list; extraVolumeMounts is left as the chart
+      # sets it (name: dags at /opt/airflow/dags). We don't create acs-dags,
+      # so if this override is removed the api-server will not start.
+      extraVolumes:
+        - name: dags
+          persistentVolumeClaim:
+            claimName: manual-airflow-dags
 
     createUserJob:
       # Reset the webserver admin user's password to the same random value

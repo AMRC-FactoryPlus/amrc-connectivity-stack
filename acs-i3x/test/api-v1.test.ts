@@ -2,6 +2,7 @@ import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import express from "express";
 import request from "supertest";
 import { APIv1 } from "../lib/api-v1.js";
+import { lazyFromValue } from "../lib/value-cache.js";
 import { I3X_SPEC_VERSION, Version } from "../lib/constants.js";
 import type {
     I3xNamespace,
@@ -36,9 +37,13 @@ function mockObjectTree() {
 }
 
 function mockValueCache() {
-    return {
+    const vc = {
         getValue: jest.fn<(id: string) => I3xValueResponse | null>().mockReturnValue(null),
+        /* The value routes read through getValueLazy; this one serves
+         * whatever getValue is set up to return. */
+        getValueLazy: jest.fn((id: string) => lazyFromValue(vc.getValue(id))),
     };
+    return vc;
 }
 
 function mockHistory(objectTree: { getObject: (id: string) => any }) {

@@ -98,6 +98,48 @@ function toVqt(r: ValueRow): I3xVqt {
     };
 }
 
+/**
+ * A cached value whose components, for a composition, are read as they
+ * are iterated rather than all at once. A composition high in the
+ * ISA-95 hierarchy can have millions of components.
+ */
+export interface LazyValue {
+    /** The response, without `components`. */
+    head: I3xValueResponse;
+    /** A composition's components, in response order. Each call reads
+     * them again. */
+    components?: () => Iterable<[string, I3xVqt]>;
+}
+
+/** A LazyValue over a value already built in memory. */
+export function lazyFromValue(v: I3xValueResponse | null): LazyValue | null {
+    if (!v) return null;
+    if (!v.components) return { head: v };
+    const { components, ...head } = v;
+    return { head: head as I3xValueResponse, components: () => Object.entries(components) };
+}
+
+/* The UNS values filed under the subtree rooted at ?, in the order the
+ * recursive in-memory walk gave: a node's own values (first seen
+ * first), then each child's subtree in tree order. The path of zero-
+ * padded seqs sorts a node before its descendants and siblings in seq
+ * order. The depth limit guards against a parent cycle. */
+const SUBTREE_VALUES = `
+    with recursive sub(id, path, depth) as (
+        select ?, '', 0
+        union all
+        select o.element_id, sub.path || printf('%012d', o.seq), sub.depth + 1
+        from sub join object o on o.parent_id = sub.id
+        where sub.depth < 64
+    )`;
+const COMPONENTS_SQL = `${SUBTREE_VALUES}
+    select lv.element_id, lv.value_json, lv.quality, lv.timestamp
+    from sub cross join last_value lv on lv.anchor = sub.id and lv.source = 'uns'
+    order by sub.path, lv.seq`;
+const SUMMARY_SQL = `${SUBTREE_VALUES}
+    select count(*) n, max(lv.timestamp) ts
+    from sub cross join last_value lv on lv.anchor = sub.id and lv.source = 'uns'`;
+
 /** Most unwritten values kept while writes fail, in batches. */
 const MAX_BACKLOG_BATCHES = 10;
 
@@ -394,7 +436,75 @@ export class ValueCache {
 
     /* ---- Query methods ---- */
 
+    /** True when the tree lives in our database, so a composition's
+     * components can be read with one query. A mock tree in unit tests
+     * is walked through its own interface instead. */
+    private treeInStore(): boolean {
+        return (this.objectTree as any).store === this.store;
+    }
+
+    /**
+     * As getValue, but a composition's components are not built: they
+     * are read, in the same order, as `components()` is iterated, from
+     * one consistent snapshot of the database. Memory does not grow
+     * with the size of the composition. The head's timestamp comes
+     * from a separate read just before, so a value written in between
+     * can make it differ slightly from the components'.
+     */
+    getValueLazy(elementId: string): LazyValue | null {
+        if (!this.treeInStore()) return lazyFromValue(this.getValue(elementId));
+
+        this.flush();
+        const row = this.store.prepare(
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+        ).get(elementId) as unknown as ValueRow | undefined;
+        if (row) return { head: { elementId, isComposition: false, ...toVqt(row) } };
+
+        const obj = this.objectTree.getObject(elementId);
+        if (!obj?.isComposition) return null;
+        const sum = this.store.prepare(SUMMARY_SQL).get(elementId) as any;
+        if (!sum?.n) return null;
+        return {
+            head: {
+                elementId,
+                isComposition: true,
+                value: null,
+                quality: "Good",
+                timestamp: sum.ts ?? "",
+            },
+            components: () => this.iterateComponents(elementId),
+        };
+    }
+
+    /** A composition's components, read from a snapshot a row at a time. */
+    private *iterateComponents(elementId: string): Generator<[string, I3xVqt]> {
+        this.flush();
+        this.store.commit();
+        const reader = this.store.openReader();
+        try {
+            let rows: Iterable<ValueRow>;
+            if (reader) {
+                reader.exec("begin");
+                rows = reader.prepare(COMPONENTS_SQL).iterate(elementId) as Iterable<ValueRow>;
+            } else {
+                rows = this.store.prepare(COMPONENTS_SQL).all(elementId) as unknown as ValueRow[];
+            }
+            for (const r of rows) yield [r.element_id, toVqt(r)];
+        } finally {
+            if (reader) {
+                try { reader.exec("commit"); } catch { /* not in a transaction */ }
+                reader.close();
+            }
+        }
+    }
+
     getValue(elementId: string): I3xValueResponse | null {
+        if (this.treeInStore()) {
+            const lazy = this.getValueLazy(elementId);
+            if (!lazy?.components) return lazy?.head ?? null;
+            return { ...lazy.head, components: Object.fromEntries(lazy.components()) };
+        }
+
         this.flush();
 
         // Check if it's a direct leaf metric in the cache

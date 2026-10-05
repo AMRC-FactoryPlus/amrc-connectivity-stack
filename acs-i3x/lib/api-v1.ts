@@ -12,7 +12,7 @@ import type { Request, Response, NextFunction } from "express";
 import { I3X_SPEC_VERSION, Version } from "./constants.js";
 import { i3xEnvelope, i3xErrorHandler } from "./middleware/envelope.js";
 import type { ObjectTree } from "./object-tree.js";
-import type { ValueCache } from "./value-cache.js";
+import type { ValueCache, LazyValue } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
 import validator from 'validator';
@@ -95,19 +95,51 @@ const STREAM_CHUNK = 64 * 1024;
 
 /**
  * Send `prefix`, the items of `items` as JSON separated by commas, then
- * `suffix`, a chunk at a time, waiting for the socket to drain when it
- * is full. The body is byte for byte what res.json would send for the
- * same array. A failure after the first chunk can no longer become an
- * error response, so it destroys the connection instead and the
- * client sees a truncated body.
+ * `suffix`: byte for byte what res.json would send for the same array.
  */
-async function streamJsonArray(
+function streamJsonArray(
     res: Response, prefix: string, items: Iterable<unknown>, suffix: string,
 ): Promise<void> {
-    const it = items[Symbol.iterator]();
-    /* Read the first item before sending anything, so an error here
-     * still goes to the error handler as a proper response. */
-    let next = it.next();
+    return streamText(res, (function* () {
+        yield prefix;
+        let first = true;
+        for (const item of items) {
+            yield (first ? "" : ",") + JSON.stringify(item);
+            first = false;
+        }
+        yield suffix;
+    })());
+}
+
+/**
+ * The JSON of a cached value whose composition components are read as
+ * they are written: exactly what JSON.stringify gives for the value
+ * with its components built in memory.
+ */
+function* lazyValueJson(v: LazyValue): Generator<string> {
+    if (!v.components) {
+        yield JSON.stringify(v.head);
+        return;
+    }
+    yield JSON.stringify(v.head).slice(0, -1) + ',"components":{';
+    let first = true;
+    for (const [id, vqt] of v.components()) {
+        yield (first ? "" : ",") + JSON.stringify(id) + ":" + JSON.stringify(vqt);
+        first = false;
+    }
+    yield "}}";
+}
+
+/**
+ * Send a JSON body made of `parts`, a chunk at a time, waiting for the
+ * socket to drain when it is full and stopping (closing `parts`) when
+ * the client goes away. Nothing is sent until STREAM_CHUNK bytes have
+ * gathered, so a failure before then still goes to the error handler
+ * as a proper response. A failure after that can no longer become an
+ * error response, so it destroys the connection instead and the client
+ * sees a truncated body.
+ */
+async function streamText(res: Response, parts: Iterator<string>): Promise<void> {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
 
     /* One 'drain' and one 'close' listener for the whole response.
@@ -124,27 +156,25 @@ async function streamJsonArray(
     res.on("drain", onWake);
     res.on("close", onWake);
 
-    let buf = prefix;
-    let first = true;
+    let buf = "";
     try {
-        for (; !next.done; next = it.next()) {
-            buf += (first ? "" : ",") + JSON.stringify(next.value);
-            first = false;
+        for (let next = parts.next(); !next.done; next = parts.next()) {
+            buf += next.value;
             if (buf.length < STREAM_CHUNK) continue;
             const ok = res.write(buf);
             buf = "";
             if (!ok && !res.destroyed)
                 await new Promise<void>(resolve => { wake = resolve; });
             if (res.destroyed || res.writableEnded) {
-                it.return?.();
+                parts.return?.();
                 return;
             }
         }
-        res.end(buf + suffix);
+        res.end(buf);
     } catch (err) {
-        it.return?.();
+        parts.return?.();
         if (!res.headersSent) throw err;
-        console.error("GET /objects: failed while streaming:", err);
+        console.error("%s %s: failed while streaming:", res.req?.method, res.req?.originalUrl, err);
         res.destroy(err as Error);
     }
 }
@@ -440,8 +470,9 @@ export class APIv1 {
         const ids = elementIds as string[];
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
 
-        // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = ids.map(id => this.valueCache.getValue(id));
+        // Try UNS cache first (real-time), fall back to InfluxDB last().
+        // A cached composition's components are read as they are sent.
+        const cached = ids.map(id => this.valueCache.getValueLazy(id));
         const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
         const fromInflux = misses.length > 0
             ? await this.history.getValues(misses, effective)
@@ -451,7 +482,7 @@ export class APIv1 {
         const results = ids.map((id, i) => {
             const hit = cached[i];
             if (hit) {
-                return { success: true, elementId: id, result: hit };
+                return { success: true, elementId: id, hit };
             }
             const item = fromInflux.get(id);
             if (item) {
@@ -467,7 +498,22 @@ export class APIv1 {
 
         if (clamped) res.status(206);
         const allSuccess = results.every(r => r.success);
-        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+        await streamText(res, (function* () {
+            yield `{"success":${allSuccess},"results":[`;
+            let first = true;
+            for (const r of results) {
+                if (!first) yield ",";
+                first = false;
+                if ("hit" in r && r.hit) {
+                    yield `{"success":true,"elementId":${JSON.stringify(r.elementId)},"result":`;
+                    yield* lazyValueJson(r.hit);
+                    yield "}";
+                } else {
+                    yield JSON.stringify(r);
+                }
+            }
+            yield "]}";
+        })());
     }
 
     /**
@@ -527,10 +573,20 @@ export class APIv1 {
         const id = req.params.elementId;
         const obj = this.objectTree.getObject(id);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = this.valueCache.getValue(id);
+        const cached = this.valueCache.getValueLazy(id);
         if (cached) {
             this.log("GET /objects/%s/value: UNS cache hit", id);
-            res.json(cached);
+            if (!cached.components) {
+                res.json(cached.head);
+                return;
+            }
+            // A composition high in the hierarchy can have millions of
+            // components: send them as they are read.
+            await streamText(res, (function* () {
+                yield '{"success":true,"result":';
+                yield* lazyValueJson(cached);
+                yield "}";
+            })());
             return;
         }
         const result = obj?.isComposition

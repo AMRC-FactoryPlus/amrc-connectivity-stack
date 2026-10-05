@@ -167,6 +167,7 @@ export class ValueCache {
      * flushMaxRows and flushInterval. */
     private pending: Map<string, Pending> = new Map();
     private timer: ReturnType<typeof setTimeout> | null = null;
+    private continuing = false;
 
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
@@ -325,7 +326,15 @@ export class ValueCache {
             this.scheduleFlush();
             return;
         }
-        this.flush();
+        /* One chunk per turn of the event loop. */
+        if (!this.writeChunk(this.flushMaxRows)) return;
+        if (this.pending.size > 0 && !this.continuing) {
+            this.continuing = true;
+            setImmediate(() => {
+                this.continuing = false;
+                this.flushInBackground();
+            });
+        }
     }
 
     private scheduleFlush(): void {
@@ -338,20 +347,47 @@ export class ValueCache {
     }
 
     /**
-     * Write every waiting UNS value, in one transaction. If the write
-     * fails (a full disk, an I/O error) the values go back in the queue,
-     * behind any newer value for the same metric, and are tried again
-     * on the next flush. Returns false on failure; it does not throw, so
-     * a read goes on with what is stored.
+     * Write every waiting UNS value now, synchronously. For callers that
+     * need them stored at once (small reads, tests). Returns false if a
+     * write failed; then the values are kept for the next try.
      */
     flush(): boolean {
         if (this.timer) {
             clearTimeout(this.timer);
             this.timer = null;
         }
+        return this.writeChunk(Infinity);
+    }
+
+    /** Write waiting values in chunks, pausing for the event loop. */
+    private async flushSliced(): Promise<void> {
+        const slicer = new Slicer();
+        while (this.pending.size > 0) {
+            if (!this.writeChunk(this.flushMaxRows)) return;
+            await slicer.maybe();
+        }
+    }
+
+    /**
+     * Write up to `max` of the oldest waiting values, in one transaction.
+     * If the write fails (a full disk, an I/O error) they go back in the
+     * queue, behind any newer value for the same metric, and are tried
+     * again later; this logs and returns false rather than throwing.
+     */
+    private writeChunk(max: number): boolean {
         if (this.pending.size === 0) return true;
-        const batch = this.pending;
-        this.pending = new Map();
+        let batch: Map<string, Pending>;
+        if (this.pending.size <= max) {
+            batch = this.pending;
+            this.pending = new Map();
+        } else {
+            batch = new Map();
+            for (const [id, p] of this.pending) {
+                if (batch.size >= max) break;
+                batch.set(id, p);
+            }
+            for (const id of batch.keys()) this.pending.delete(id);
+        }
         try {
             const st = this.store.prepare(UPSERT("uns", ""));
             this.store.transaction(() => {
@@ -361,15 +397,14 @@ export class ValueCache {
             return true;
         } catch (err) {
             console.error("ValueCache: writing %d values failed, will retry:", batch.size, err);
-            /* Newer values (none can arrive during the write, but keep
-             * the rule) win over the ones put back. */
+            /* Newer values win over the ones put back. */
             for (const [id, p] of this.pending) batch.set(id, p);
             this.pending = batch;
             /* Do not hold an unbounded backlog while the database is
              * broken: keep the newest entries. */
-            const max = MAX_BACKLOG_BATCHES * this.flushMaxRows;
-            if (this.pending.size > max) {
-                let drop = this.pending.size - max;
+            const limit = MAX_BACKLOG_BATCHES * this.flushMaxRows;
+            if (this.pending.size > limit) {
+                let drop = this.pending.size - limit;
                 console.error("ValueCache: dropping the %d oldest unwritten values", drop);
                 for (const id of this.pending.keys()) {
                     if (drop-- <= 0) break;
@@ -388,7 +423,6 @@ export class ValueCache {
      */
     recordInfluxValues(values: InfluxValue[]): void {
         if (values.length === 0) return;
-        this.flush();
         const st = this.store.prepare(UPSERT("influx",
             "where julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
         this.store.transaction(() => {
@@ -467,7 +501,14 @@ export class ValueCache {
     async getValueLazy(elementId: string): Promise<LazyValue | null> {
         if (!this.treeInStore()) return lazyFromValue(this.getValue(elementId));
 
-        this.flush();
+        /* A leaf value still queued is the newest. */
+        const queued = this.pending.get(elementId);
+        if (queued) {
+            return { head: { elementId, isComposition: false, ...toVqt({
+                element_id: elementId, value_json: queued.valueJson,
+                quality: queued.quality, timestamp: queued.timestamp,
+            }) } };
+        }
         const row = this.store.prepare(
             "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
         ).get(elementId) as unknown as ValueRow | undefined;
@@ -475,6 +516,10 @@ export class ValueCache {
 
         const obj = this.objectTree.getObject(elementId);
         if (!obj?.isComposition) return null;
+
+        /* The walk reads the database, so store what is queued, a chunk
+         * at a time. */
+        await this.flushSliced();
 
         /* The old value took the latest timestamp, by string order,
          * starting from "". */
@@ -513,7 +558,7 @@ export class ValueCache {
      * node, so the consumer can pause however few values there are.
      */
     private *walkComponents(rootId: string): Generator<ComponentStep> {
-        this.flush();
+        /* Callers store queued values first (flush or flushSliced). */
         this.store.commit();
         const reader = this.store.openReader();
         try {

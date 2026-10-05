@@ -288,6 +288,33 @@ describe("I3xStore", () => {
         }
     });
 
+    it("does not report a checkpoint error after a commit as a failed commit", () => {
+        const path = join(dir, "i3x.db");
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        for (const commitInterval of [60_000, 0]) {
+            rmSync(path, { force: true });
+            const s = new I3xStore({ path, commitInterval });
+            const failed: unknown[] = [];
+            s.onCommitFailure(e => failed.push(e));
+            const hard = jest.spyOn(s as any, "hardCheckpoint")
+                .mockImplementation(() => { throw new Error("disk I/O error"); });
+            try {
+                expect(() => s.setMeta("kept", "yes")).not.toThrow();
+                s.commit();
+                expect(failed).toEqual([]);
+                expect(s.getMeta("kept")).toBe("yes");
+            } finally {
+                hard.mockRestore();
+                s.close();
+            }
+            const again = new I3xStore({ path });
+            expect(again.getMeta("kept")).toBe("yes");
+            again.close();
+        }
+        expect(err).toHaveBeenCalled();
+        err.mockRestore();
+    });
+
     it("commits each transaction at once with commitInterval 0", () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0 });

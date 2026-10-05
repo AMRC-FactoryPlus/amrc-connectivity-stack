@@ -400,7 +400,7 @@ export class I3xStore {
         try {
             const rv = fn();
             this.db.exec(outer ? "commit" : `release ${sp}`);
-            if (outer) this.hardCheckpoint();
+            if (outer) this.afterCommit();
             /* A large batch would make a long COMMIT; end it now. */
             if (this.depth === 1 && this.batchOpen && this.batchChanges() >= this.maxBatchChanges) {
                 this.depth--;
@@ -551,7 +551,6 @@ export class I3xStore {
         this.batchOpen = false;
         try {
             this.db.exec("commit");
-            this.hardCheckpoint();
         } catch (err) {
             /* For example a full disk. The batch is lost. The database
              * is a cache; listeners (the sync engine) arrange to write
@@ -565,6 +564,18 @@ export class I3xStore {
                     console.error("I3xStore: commit failure listener threw:", e);
                 }
             }
+            return;
+        }
+        this.afterCommit();
+    }
+
+    /** Work after a successful commit. A failure here is not a failed
+     * commit: the batch is safe, so log it and go on. */
+    private afterCommit(): void {
+        try {
+            this.hardCheckpoint();
+        } catch (err) {
+            console.error("I3xStore: checkpoint after commit failed:", err);
         }
     }
 

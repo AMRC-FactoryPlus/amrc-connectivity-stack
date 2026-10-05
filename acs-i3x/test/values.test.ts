@@ -192,6 +192,29 @@ describe("UNS values", () => {
     });
 });
 
+describe("UNS message errors", () => {
+    it("are logged and dropped, not thrown out of the MQTT handler", async () => {
+        const s = setup();
+        const handlers = new Map<string, Function>();
+        const mqtt = { subscribe: () => {}, on: (ev: string, fn: Function) => handlers.set(ev, fn) };
+        await s.valueCache.init({ mqtt_client: async () => mqtt, debug: { bound: () => () => {} } });
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        const add = jest.spyOn(s.tree, "addCompositionFromUns")
+            .mockImplementation(() => { throw new Error("database is full"); });
+        try {
+            const msg = ["UNS/v1/AMRC/Edge/Dev/Status", Buffer.from('{"timestamp":"t","value":1}'),
+                { properties: { userProperties: { InstanceUUIDPath: DEV, SchemaUUIDPath: "top" } } }];
+            expect(() => handlers.get("message")!(...msg)).not.toThrow();
+            expect(err).toHaveBeenCalled();
+            add.mockRestore();
+            handlers.get("message")!(...msg);
+            expect(s.valueCache.getValue(s.leaf("Status"))!.value).toBe(1);
+        } finally {
+            err.mockRestore();
+        }
+    });
+});
+
 describe("InfluxDB write-back", () => {
     it("a value read from InfluxDB is served locally next time", async () => {
         const s = setup();

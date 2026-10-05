@@ -22,6 +22,16 @@ import { ConfigSync, configSyncFeeds } from "../lib/sync.js";
 
 const { env } = process;
 
+/** A positive integer setting, or `dflt` if unset or not one. */
+function positiveInt(name: string, dflt: number): number {
+    const v = env[name];
+    if (v === undefined || v === "") return dflt;
+    const n = Number(v);
+    if (Number.isInteger(n) && n > 0) return n;
+    console.warn(`Ignoring ${name}=${v}: not a positive integer, using ${dflt}`);
+    return dflt;
+}
+
 // Init Factory+ service client (RxClient adds notify-v2 Observables on ConfigDB)
 const fplus = await new RxClient({ env }).init();
 
@@ -32,7 +42,7 @@ const namespaceUri = env.I3X_NAMESPACE_URI || "https://example.com";
 // database is a cache of ConfigDB: a new namespace starts it afresh.
 const store = new I3xStore({
     path: env.I3X_DB_PATH || "/data/i3x.db",
-    cacheMb: parseInt(env.I3X_DB_CACHE_MB || "64"),
+    cacheMb: positiveInt("I3X_DB_CACHE_MB", 64),
     fingerprint: JSON.stringify([namespaceName, namespaceUri]),
     log: fplus.debug.bound("store"),
 });
@@ -61,7 +71,7 @@ const history = new History({
     influxBucket: env.INFLUX_BUCKET || "default",
     objectTree,
     // Flux queries in flight across the whole process.
-    influxConcurrency: parseInt(env.I3X_INFLUX_CONCURRENCY || "4"),
+    influxConcurrency: positiveInt("I3X_INFLUX_CONCURRENCY", 4),
     // Current values read from InfluxDB are kept for the next read.
     valueCache,
 });
@@ -70,7 +80,7 @@ const history = new History({
 const subscriptions = new SubscriptionManager({
     valueCache,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
-    maxQueue: parseInt(env.I3X_SUBSCRIPTION_QUEUE_MAX || "10000"),
+    maxQueue: positiveInt("I3X_SUBSCRIPTION_QUEUE_MAX", 10_000),
 });
 
 // The MCP endpoint and its RAG index (a graph and a search index of
@@ -123,6 +133,6 @@ new ConfigSync({
     store,
     ...configSyncFeeds(fplus),
     valueCache,
-    concurrency: parseInt(env.I3X_SYNC_CONCURRENCY || "16"),
+    concurrency: positiveInt("I3X_SYNC_CONCURRENCY", 16),
     log: fplus.debug.bound("sync"),
 }).run();

@@ -170,6 +170,9 @@ export class I3xStore {
         this.db.exec(`
             pragma journal_mode = wal;
             pragma synchronous = normal;
+            -- After a checkpoint, cut the WAL file back to 64 MiB; it
+            -- otherwise stays as large as the largest batch made it.
+            pragma journal_size_limit = 67108864;
             pragma cache_size = ${-Math.max(1, Math.floor(cacheMb)) * 1024};
             pragma temp_store = file;
             pragma foreign_keys = off;
@@ -200,7 +203,7 @@ export class I3xStore {
         ).all() as Array<{ type: string; name: string }>;
         this.db.exec("begin");
         try {
-            for (const { type, name } of old.filter(o => o.type === "table"))
+            for (const { name } of old.filter(o => o.type === "table"))
                 this.db.exec(`drop table if exists "${name.replace(/"/g, '""')}"`);
             this.db.exec(TABLES);
             this.db.prepare("insert into meta (key, value) values ('fingerprint', ?)")
@@ -275,7 +278,14 @@ export class I3xStore {
             return;
         }
         this.batchOpen = false;
-        this.db.exec("commit");
+        try {
+            this.db.exec("commit");
+        } catch (err) {
+            /* For example a full disk. The batch is lost; the database
+             * is a cache, and the next sync or message writes it again. */
+            console.error("I3xStore: commit failed, batch discarded:", err);
+            try { this.db.exec("rollback"); } catch { /* already closed */ }
+        }
     }
 
     getMeta(key: string): string | undefined {

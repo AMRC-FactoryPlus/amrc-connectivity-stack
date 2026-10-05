@@ -311,25 +311,19 @@ export default class MQTTCli {
          * still current. We will get another notification for the
          * new current session and don't want to publish twice.
          *
-         * A rebirth creates a new session even when nothing about the
-         * device has changed. Don't announce those: a rebirth request
-         * makes every device under a node rebirth, and announcing each
-         * one floods MQTT with notices nothing needs to act on. So for
-         * a session which is still open (a BIRTH) and which replaced a
-         * session that was open until then, announce the device only
-         * if it has moved address, and the address only if a different
-         * device now uses it. A BIRTH after a DEATH changes the online
-         * state, so it is announced, as is the DEATH itself. */
-        const open = session.online;
+         * A session which is still open has just been born, and
+         * on_birth has already announced it if it changed anything. A
+         * rebirth creates a new session even when nothing about the
+         * device has changed, and a rebirth request makes every device
+         * under a node rebirth, so announcing every new session floods
+         * MQTT with notices nothing needs to act on. A session which
+         * has closed (a DEATH) is announced here. */
+        const closed = !session.online;
 
-        if (session.next_for_device == null
-            && !(open && session.prev_open
-                && session.prev_device_addrid == session.addrid))
+        if (closed && session.next_for_device == null)
             notify.push(["Device_UUID", session.device]);
 
-        if (session.next_for_address == null
-            && !(open && session.prev_adr_open
-                && session.prev_address_devid == session.devid)) {
+        if (closed && session.next_for_address == null) {
             const addr = new Address(
                 session.group_id, session.node_id, session.device_id);
             notify.push(["Device_Address", addr.toString(), "String"]);
@@ -494,7 +488,7 @@ export default class MQTTCli {
         const alerts = this.find_alerts(tree, payload.timestamp);
         this.record_alert_metrics(address, alerts);
 
-        await this.model.birth({
+        const born = await this.model.birth({
             time: payload.timestamp,
             address,
             uuid: tree.Instance_UUID?.value,
@@ -504,8 +498,27 @@ export default class MQTTCli {
             alerts,
             links:      this.find_links(tree),
         });
+        this.announce_birth(address, born);
 
         this.log("device", `Finished BIRTH for ${address}`);
+    }
+
+    /* Announce a BIRTH which changed the device's address, the
+     * address's device or the device's online state. We decide this
+     * here, from the state the birth replaced, rather than when the
+     * session notification arrives: by then a later rebirth may have
+     * replaced this session too. */
+    announce_birth(address, born) {
+        if (!born) return;
+
+        const notify = [];
+        if (born.device_changed)
+            notify.push(["Device_UUID", born.uuid]);
+        if (born.address_changed)
+            notify.push(["Device_Address", address.toString(), "String"]);
+
+        if (notify.length)
+            this.publish_changed(notify);
     }
 
     async on_death(address, payload) {

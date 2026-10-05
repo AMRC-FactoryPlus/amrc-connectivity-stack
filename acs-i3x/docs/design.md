@@ -216,7 +216,7 @@ Subscribes to `UNS/v1/#`. On each message:
    device that is not in the tree is dropped.
 4. Notifies the subscription manager.
 5. Queues the VQT for the `last_value` table, filed under the leaf's parent
-   in the tree; queued values are written every 250 ms or 5,000 values,
+   in the tree; queued values are written every 250 ms or 1,000 values,
    and every read flushes first. A failed write keeps the values for the
    next one.
 

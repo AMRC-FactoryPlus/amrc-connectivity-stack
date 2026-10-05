@@ -72,10 +72,37 @@ device fleet out of memory.
   them again. A file that cannot be opened, or is shorter than its header
   says, is deleted (with its WAL) and recreated, with a loud log line.
 - Group commit: writes join one open transaction that commits 250 ms after
-  the first write. A COMMIT costs more than one device's or one UNS
-  message's writes, so this keeps the commit rate low. Nested
+  the first write, or as soon as it holds 2,000 changed rows. A COMMIT
+  costs more than one device's or one UNS message's writes, so this keeps
+  the commit rate low, and the size cap keeps each COMMIT short. Nested
   `transaction()` calls are savepoints. The process sees its writes at
   once; a crash loses at most the open batch.
+- WAL checkpoints run in a worker thread on its own connection (PASSIVE,
+  every 100 ms), not inside a COMMIT on the main thread. SQLite rewinds
+  the WAL only once a checkpoint has caught up with every frame, so when
+  the WAL passes 64 MiB the writers that can wait (the sync engine,
+  background value flushes) hold back until it has. Writers that cannot
+  wait (UNS messages that add objects) can still grow it during a burst;
+  at 1 GiB the main thread checkpoints itself, a stall but a bound.
+- Queued UNS values are written 1,000 per turn of the event loop; a leaf
+  read answers from the queue.
+
+## The event loop
+
+node:sqlite is synchronous, so any long loop over the tree holds the
+event loop, and with it every other request, MQTT and the UNS. Work that
+grows with the fleet runs in small steps and pauses with setImmediate
+once 20 ms have passed (`lib/slicer.ts`):
+
+- `GET /objects`, the related routes and composition values stream with
+  pauses even when the client keeps up; their rows are read a page at a
+  time from a snapshot.
+- A composition's components are read by a depth-first walk with indexed
+  child pages, not one sorted query.
+- History expands compositions to leaves, matches series and writes
+  values back in slices.
+- ConfigSync's reconcile reads the stored devices a page at a time, and
+  the orphan drop works in pages of UNS parents.
 
 Tables:
 
@@ -138,8 +165,29 @@ cold sync 371 s, peak RSS 329 MiB; 279 MiB RSS and 74 MiB heap after sync;
 and no GETs). UNS ingest ran at 9,500 messages a second creating nodes and
 25,500 without. The cached value of the top ISA-95 level (2.6 million
 components, a 300 MiB body) streamed in 33 s, raising RSS by 9 MiB with a
-heap peak of 129 MiB. Most of those 33 s is SQLite sorting the components
-before the first one is sent, which blocks the event loop.
+heap peak of 129 MiB. Most of those 33 s was SQLite sorting the components
+before the first one was sent, which blocked the event loop; see the next
+paragraph and "The event loop" for the walk that replaced it.
+
+With the event-loop work below, at 74,000 devices with
+`--max-old-space-size=384` (monitorEventLoopDelay, longest delay):
+
+| | Total time | Longest delay, cold start | Longest delay, warm start |
+|---|---|---|---|
+| `GET /objects` (586 MiB) | 4.4 s | 33 ms | 38 ms |
+| Top ISA-95 level's cached value (300 MiB) | 30 s | 44 ms | 38 ms |
+| `POST /objects/value`, 1,000 cached leaves | 15-17 ms | 0 | 0 |
+| Initial sync (p99) | 366 s / 1.2 s | 276 ms (41 ms) | 287 ms (240 ms) |
+| UNS burst, every metric of the fleet (p99) | 143 s / 89 s | 2.2 s (46 ms) | 560 ms (28 ms) |
+
+Cold sync peaked at 306 MiB RSS; steady state was 277 MiB (331 MiB after
+a warm restart) with 74 MiB of heap. The WAL peaked at 1.5 GB during the
+cold burst and 77 MB warm. The long delays left are background work: the
+WAL hard cap's checkpoints on the main thread during a sustained burst of
+writes that cannot wait (a cold start that adds half a million UNS objects
+at full speed; the 2.2 s also includes the harness's own final flush), and
+parsing the three ETag SEARCH snapshots (about 7 MB of JSON each) when the
+sync starts.
 
 ## Core Components
 

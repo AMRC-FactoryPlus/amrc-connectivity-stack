@@ -312,7 +312,7 @@ export default class MQTTCli {
          * new current session and don't want to publish twice.
          *
          * A session which is still open has just been born, and
-         * on_birth has already announced it if it changed anything. A
+         * on_birth announces it if it changed anything. A
          * rebirth creates a new session even when nothing about the
          * device has changed, and a rebirth request makes every device
          * under a node rebirth, so announcing every new session floods

@@ -147,7 +147,12 @@ export class ValueCache {
         this.log("MQTT client obtained, subscribing to UNS/v1/#");
         mqtt.subscribe("UNS/v1/#");
         mqtt.on("message", (topic: string, payload: Buffer, packet: any) => {
-            this.onUnsMessage(topic, payload, packet);
+            try {
+                this.onUnsMessage(topic, payload, packet);
+            } catch (err) {
+                // For example a database error; drop this message only.
+                console.error("ValueCache: UNS message failed:", topic, err);
+            }
         });
         let connected = false;
         mqtt.on("connect", () => {
@@ -249,7 +254,13 @@ export class ValueCache {
         if (this.pending.size >= this.flushMaxRows) {
             this.flush();
         } else if (!this.timer) {
-            this.timer = setTimeout(() => this.flush(), this.flushInterval);
+            this.timer = setTimeout(() => {
+                try {
+                    this.flush();
+                } catch (err) {
+                    console.error("ValueCache: writing values failed:", err);
+                }
+            }, this.flushInterval);
             this.timer.unref?.();
         }
 

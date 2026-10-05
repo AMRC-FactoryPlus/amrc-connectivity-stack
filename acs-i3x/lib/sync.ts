@@ -190,7 +190,8 @@ export class ConfigSync {
         this.store = opts.store;
         this.log = opts.log ?? (() => {});
         this.retryDelay = opts.retryDelay ?? 10_000;
-        this.queue = new KeyedQueue(opts.concurrency ?? 16,
+        const limit = opts.concurrency ?? 16;
+        this.queue = new KeyedQueue(Number.isInteger(limit) && limit >= 1 ? limit : 16,
             key => this.work(key), () => this.onIdle());
     }
 

@@ -173,6 +173,8 @@ export class ConfigSync {
     private reconciled = false;
     private reconcileTimer: ReturnType<typeof setTimeout> | null = null;
     private retries = new Map<string, ReturnType<typeof setTimeout>>();
+    /** Keys whose last fetch failed and has not succeeded since. */
+    private failed = new Set<string>();
     private subs: rx.Subscription[] = [];
     private queue: KeyedQueue;
     private stopped = false;
@@ -252,6 +254,8 @@ export class ConfigSync {
         for (const uuid of next) {
             if (!prev.has(uuid)) this.checkDevice(uuid);
         }
+        /* Removing a device may have ended the last wait on a retry. */
+        if (this.queue.size === 0) this.onIdle();
     }
 
     private onEtags(kind: Kind, change: EtagChange): void {
@@ -377,19 +381,43 @@ export class ConfigSync {
         try {
             if (key.startsWith("d:")) await this.syncDevice(uuid);
             else await this.syncSchema(uuid);
+            this.failed.delete(key);
         } catch (err) {
             this.stats.errors++;
+            this.failed.add(key);
             console.error(`ConfigSync: fetching ${key} failed, retrying:`, err);
             if (!this.retries.has(key) && !this.stopped) {
                 const t = setTimeout(() => {
                     this.retries.delete(key);
-                    if (key.startsWith("d:")) this.checkDevice(uuid);
-                    else if (this.tree.isSchemaReferenced(uuid)) this.checkSchema(uuid);
+                    /* Forget the failure; checking queues the key again
+                     * if it still needs fetching, and a new failure
+                     * records it again. */
+                    this.failed.delete(key);
+                    try {
+                        if (key.startsWith("d:")) {
+                            if (this.members?.has(uuid)) this.checkDevice(uuid);
+                        } else if (this.tree.isSchemaReferenced(uuid)) {
+                            this.checkSchema(uuid);
+                        }
+                    } catch (err) {
+                        this.stats.errors++;
+                        console.error(`ConfigSync: retrying ${key} failed:`, err);
+                        this.failed.add(key);
+                    }
+                    if (this.queue.size === 0) this.onIdle();
                 }, this.retryDelay);
                 t.unref?.();
                 this.retries.set(key, t);
             }
         }
+    }
+
+    /** Stop retrying a key that no longer needs fetching. */
+    private forget(key: string): void {
+        const t = this.retries.get(key);
+        if (t) clearTimeout(t);
+        this.retries.delete(key);
+        this.failed.delete(key);
     }
 
     /** Fetch whichever of a device's configs changed, and apply them. */
@@ -485,6 +513,7 @@ export class ConfigSync {
     }
 
     private dropSchema(uuid: string): void {
+        this.forget(`s:${uuid}`);
         this.store.transaction(() => {
             this.tree.removeObjectType(uuid);
             this.store.prepare("delete from sync_schema where uuid = ?").run(uuid);
@@ -492,6 +521,7 @@ export class ConfigSync {
     }
 
     private removeDevice(uuid: string): void {
+        this.forget(`d:${uuid}`);
         const schemas = this.tree.getDeviceSchemaUuids(uuid);
         this.store.transaction(() => {
             this.tree.removeDevice(uuid);
@@ -512,6 +542,10 @@ export class ConfigSync {
 
     private onIdle(): void {
         if (!this.reconciled || this.stopped) return;
+        /* A failed fetch waits on a retry timer, outside the queue. The
+         * tree is not complete until it has succeeded, so do not mark it
+         * ready, or record a completed sync, until then. */
+        if (this.retries.size > 0 || this.failed.size > 0) return;
         if (this.applied >= 1000) {
             this.log("sync complete: %d devices in %d s", this.applied,
                 ((Date.now() - this.batchStart) / 1000).toFixed(1));

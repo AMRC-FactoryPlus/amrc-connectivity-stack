@@ -519,6 +519,8 @@ export class ConfigSync {
             needDI ? this.fetch("devinfo", uuid) : null,
             needInfo ? this.fetch("info", uuid) : null,
         ]);
+        /* Let the WAL checkpoint catch up before writing more. */
+        await this.store.walReady();
         /* Removed from the Device class while we waited. */
         if (this.stopped || !this.members?.has(uuid)) return;
 
@@ -565,6 +567,7 @@ export class ConfigSync {
             needSchema ? this.fetch("schema", uuid) : null,
             needInfo ? this.fetch("info", uuid) : null,
         ]);
+        await this.store.walReady();
         if (this.stopped || !this.tree.isSchemaReferenced(uuid)) return;
 
         const cur = this.schemaRow(uuid);

@@ -136,8 +136,8 @@ export interface I3xStoreOpts {
      * databases only.
      */
     checkpointInterval?: number;
-    /** WAL size in bytes past which a commit helps the checkpoint
-     * finish, so the WAL can rewind. Default 64 MiB. */
+    /** WAL size in bytes past which writers that can wait hold back
+     * until the checkpoint has caught up (walBehind). Default 64 MiB. */
     walLimit?: number;
     log?: (msg: string, ...args: any[]) => void;
 }
@@ -159,16 +159,23 @@ const db = new DatabaseSync(workerData.path);
 db.exec("pragma busy_timeout = 1000");
 const st = db.prepare("pragma wal_checkpoint(PASSIVE)");
 setInterval(() => {
-    if (Atomics.load(workerData.pause, 0) === 1) return;
+    const sh = workerData.shared;
     try {
         const r = st.get();
-        if (r && r.busy === 0) Atomics.store(workerData.pause, 1, r.log);
+        if (r && r.busy === 0) {
+            Atomics.store(sh, 1, r.log);
+            Atomics.store(sh, 2, r.checkpointed);
+            Atomics.add(sh, 0, 1);
+        }
     } catch (err) { console.error("I3xStore checkpoint worker:", err.message); }
 }, workerData.interval);
 `;
 
-/** WAL size beyond which the main thread helps the checkpoint finish. */
+/** WAL size beyond which writers that can wait let the checkpoint finish. */
 const WAL_LIMIT = 64 * 1024 * 1024;
+/** Times walLimit at which the main thread checkpoints, whatever the cost. */
+const WAL_HARD_FACTOR = 16;
+
 
 let warningFilter = false;
 
@@ -205,9 +212,9 @@ export class I3xStore {
     private batchStartChanges = 0;
     private checkpointer: Worker | null = null;
     private walLimit: number;
-    private lastCatchUp = -Infinity;
     /* Set while the main thread wants the worker to skip its turns. */
-    private pauseFlag: Int32Array | null = null;
+    private walShared: Int32Array | null = null;
+    private lastHard = -Infinity;
     private pageSize = 4096;
     private batchOpen = false;
     private batchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -247,19 +254,19 @@ export class I3xStore {
      * 1,000 pages, which held the event loop for up to 700 ms during a
      * cold sync. Instead a worker thread, on its own connection, runs a
      * PASSIVE checkpoint (which never blocks the writer) every
-     * `interval` ms; see catchUpWal for keeping the WAL bounded. If the worker cannot start, SQLite's own
+     * `interval` ms; see walBehind for keeping the WAL bounded. If the worker cannot start, SQLite's own
      * checkpoints stay on.
      */
     private startCheckpointer(interval: number): void {
         if (this.path === ":memory:" || this.path === "" || !(interval > 0)) return;
         try {
-            /* [0] the main thread wants the worker to skip its turns;
-             * [1] frames in the WAL at the last checkpoint. */
-            this.pauseFlag = new Int32Array(new SharedArrayBuffer(8));
+            /* [0] checkpoints the worker has completed; [1] frames
+             * in the WAL and [2] frames copied, at the last one. */
+            this.walShared = new Int32Array(new SharedArrayBuffer(12));
             this.pageSize = (this.db.prepare("pragma page_size").get() as any).page_size;
             const w = new Worker(CHECKPOINTER, {
                 eval: true,
-                workerData: { path: this.path, interval, pause: this.pauseFlag },
+                workerData: { path: this.path, interval, shared: this.walShared },
             });
             w.on("error", err => {
                 console.error("I3xStore: checkpoint worker failed; checkpointing on the main thread:", err);
@@ -348,6 +355,7 @@ export class I3xStore {
                 .run(fingerprint);
             this.db.exec(`pragma user_version = ${SCHEMA_VERSION}`);
             this.db.exec("commit");
+            this.hardCheckpoint();
         } catch (err) {
             this.db.exec("rollback");
             throw err;
@@ -381,7 +389,7 @@ export class I3xStore {
         try {
             const rv = fn();
             this.db.exec(outer ? "commit" : `release ${sp}`);
-            if (outer) this.catchUpWal();
+            if (outer) this.hardCheckpoint();
             /* A large batch would make a long COMMIT; end it now. */
             if (this.depth === 1 && this.batchOpen && this.batchChanges() >= this.maxBatchChanges) {
                 this.depth--;
@@ -402,38 +410,66 @@ export class I3xStore {
     }
 
     /**
-     * The worker's checkpoints copy the WAL into the file, but SQLite
-     * can only rewind the WAL once a checkpoint has caught up with
-     * every frame, and under constant writes the worker never quite
-     * does: the WAL grew without limit (52 GB in a 74k-device cold
-     * start). Once it passes walLimit, catch up here, just after a
-     * commit. This connection is the only writer, so a checkpoint run
-     * here reaches the last frame, and the next write rewinds the WAL
-     * (unless a long read still uses it; then it tries again). The
-     * worker has copied all but its last interval's frames, so this
-     * copies little. A PASSIVE checkpoint does nothing while another is
-     * running, so the worker is asked to skip its turns until this one
-     * has run.
+     * The last resort. Writers that cannot wait (UNS messages that add
+     * objects, a full value queue) can keep the worker from ever
+     * finishing a checkpoint. Once the WAL holds WAL_HARD_FACTOR times
+     * walLimit (1 GiB by default), checkpoint here after a commit, at
+     * most once a second: a stall of the event loop, but the disk must
+     * not fill.
      */
-    private catchUpWal(): void {
-        if (!this.checkpointer || !this.pauseFlag) return;
+    private hardCheckpoint(): void {
+        if (!this.walShared) return;
+        if (Atomics.load(this.walShared, 1) * this.pageSize < WAL_HARD_FACTOR * this.walLimit) return;
         const now = performance.now();
-        if (now - this.lastCatchUp < 50) return;
-        /* Frames in the WAL, as the worker's last checkpoint found them.
-         * Not the file size: once rewound, the file stays at
-         * journal_size_limit while its frames are reused. */
-        const frames = Atomics.load(this.pauseFlag, 1);
-        if (frames * this.pageSize < this.walLimit) {
-            Atomics.store(this.pauseFlag, 0, 0);
-            return;
-        }
-        this.lastCatchUp = now;
-        Atomics.store(this.pauseFlag, 0, 1);
+        if (now - this.lastHard < 1000) return;
+        this.lastHard = now;
         const r = this.prepare("pragma wal_checkpoint(PASSIVE)").get() as any;
-        // busy: the worker was part way through one; try next commit.
-        if (!r?.busy) {
-            Atomics.store(this.pauseFlag, 1, r.log);
-            Atomics.store(this.pauseFlag, 0, 0);
+        if (r && !r.busy) {
+            Atomics.store(this.walShared, 1, r.log);
+            Atomics.store(this.walShared, 2, r.checkpointed);
+        }
+        this.log("WAL over %d MiB: checkpointed on the main thread", (WAL_HARD_FACTOR * this.walLimit) >> 20);
+    }
+
+    /** True when the WAL holds more than walLimit of frames. */
+    private walOverLimit(): boolean {
+        return !!this.walShared && Atomics.load(this.walShared, 1) * this.pageSize >= this.walLimit;
+    }
+
+    /**
+     * True while writers that can wait should hold back. The worker's
+     * checkpoints copy the WAL into the file, but SQLite rewinds the WAL
+     * only once a checkpoint has caught up with every frame, and beside
+     * a writer that never stops it never quite does: the WAL grew
+     * without limit (52 GB in a 74k-device cold start). Copying the
+     * rest on this thread would hold the event loop (650 ms measured,
+     * mostly the sync). So once the WAL is over walLimit, the writers
+     * that can wait (the sync engine, background value flushes) hold
+     * back (walReady) until a checkpoint run after they stopped has
+     * copied every frame; the next write then rewinds the WAL.
+     */
+    walBehind(): boolean {
+        return this.walOverLimit();
+    }
+
+    /**
+     * Resolves when writers need not hold back (see walBehind), or after
+     * `maxWait` ms whatever: a stuck checkpoint must not stop the sync.
+     */
+    async walReady(maxWait: number = 5000): Promise<void> {
+        if (!this.walShared || !this.walBehind()) return;
+        /* A checkpoint's counts are from when it started, and writes go
+         * on while it runs. Wait for one that started after we stopped
+         * writing and caught up with every frame. */
+        this.commit();
+        const sh = this.walShared;
+        const start = Atomics.load(sh, 0);
+        const until = performance.now() + maxWait;
+        while (performance.now() < until) {
+            await new Promise(r => setTimeout(r, 10));
+            if (Atomics.load(sh, 0) >= start + 2 || !this.walBehind()) {
+                if (!this.walBehind() || Atomics.load(sh, 1) === Atomics.load(sh, 2)) return;
+            }
         }
     }
 
@@ -478,7 +514,7 @@ export class I3xStore {
         this.batchOpen = false;
         try {
             this.db.exec("commit");
-            this.catchUpWal();
+            this.hardCheckpoint();
         } catch (err) {
             /* For example a full disk. The batch is lost. The database
              * is a cache; listeners (the sync engine) arrange to write

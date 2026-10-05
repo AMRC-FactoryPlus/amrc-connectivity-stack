@@ -133,6 +133,10 @@ export function lazyFromValue(v: I3xValueResponse | null): LazyValue | null {
 /** Children read per query while walking a subtree. */
 const WALK_PAGE = 256;
 
+/** Most values held back while the WAL checkpoint catches up, in
+ * batches: about 10 MB at 50 batches of 1,000. */
+const DEFER_BATCHES = 50;
+
 /** Most unwritten values kept while writes fail, in batches. */
 const MAX_BACKLOG_BATCHES = 10;
 
@@ -307,15 +311,28 @@ export class ValueCache {
             }
         }
 
-        if (this.pending.size >= this.flushMaxRows) this.flush();
+        if (this.pending.size >= this.flushMaxRows) this.flushInBackground();
         else this.scheduleFlush();
+    }
+
+    /**
+     * A flush nobody is waiting for. While the WAL checkpoint is behind
+     * (store.walBehind), hold the values a little longer rather than
+     * add to it, up to the backlog cap.
+     */
+    private flushInBackground(): void {
+        if (this.store.walBehind() && this.pending.size < DEFER_BATCHES * this.flushMaxRows) {
+            this.scheduleFlush();
+            return;
+        }
+        this.flush();
     }
 
     private scheduleFlush(): void {
         if (this.timer) return;
         this.timer = setTimeout(() => {
             this.timer = null;
-            this.flush();
+            this.flushInBackground();
         }, this.flushInterval);
         this.timer.unref?.();
     }

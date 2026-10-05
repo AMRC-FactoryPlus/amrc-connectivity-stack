@@ -197,6 +197,8 @@ describe("I3xStore", () => {
         const t = tree(s);
         let largest = 0;
         for (let i = 0; i < 3000; i++) {
+            // As the sync engine does: wait while the checkpoint is behind.
+            await s.walReady();
             t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
             largest = Math.max(largest, statSync(`${path}-wal`).size);
             if (i % 50 === 49) await new Promise(r => setTimeout(r, 1));

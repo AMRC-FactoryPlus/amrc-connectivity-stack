@@ -5,6 +5,7 @@
  * together behind HTTP endpoints with the i3X envelope middleware.
  */
 
+import { createHash } from "node:crypto";
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 
@@ -64,6 +65,31 @@ function badRequest(message: string): Error & { status: number } {
     return err;
 }
 
+/**
+ * The ETag for a GET /objects listing: the tree revision plus the
+ * filters that shape the body. Weak, as the body is not compared byte
+ * for byte.
+ */
+function objectsEtag(
+    rev: string,
+    opts: { typeElementId?: string; root: boolean; includeMetadata: boolean },
+): string {
+    const q = JSON.stringify([opts.typeElementId ?? null, opts.root, opts.includeMetadata]);
+    const h = createHash("sha1").update(q).digest("base64url").slice(0, 16);
+    return `W/"objects-${rev}-${h}"`;
+}
+
+/** Does an If-None-Match header match `etag`? Weak comparison. */
+function etagMatches(header: string | string[] | undefined, etag: string): boolean {
+    if (header === undefined) return false;
+    const want = etag.replace(/^W\//, "");
+    const tags = (Array.isArray(header) ? header.join(",") : header).split(",");
+    return tags.some(t => {
+        const tag = t.trim();
+        return tag === "*" || tag.replace(/^W\//, "") === want;
+    });
+}
+
 /** Bytes to gather before writing a chunk of a streamed response. */
 const STREAM_CHUNK = 64 * 1024;
 
@@ -84,6 +110,20 @@ async function streamJsonArray(
     let next = it.next();
     res.setHeader("Content-Type", "application/json; charset=utf-8");
 
+    /* One 'drain' and one 'close' listener for the whole response.
+     * compression() moves 'drain' listeners to its gzip stream but
+     * does not move res.off() with them, so adding and removing a
+     * listener per wait would leave one behind on the gzip stream
+     * each time the client is slow. */
+    let wake: (() => void) | null = null;
+    const onWake = () => {
+        const w = wake;
+        wake = null;
+        w?.();
+    };
+    res.on("drain", onWake);
+    res.on("close", onWake);
+
     let buf = prefix;
     let first = true;
     try {
@@ -93,17 +133,8 @@ async function streamJsonArray(
             if (buf.length < STREAM_CHUNK) continue;
             const ok = res.write(buf);
             buf = "";
-            if (!ok) {
-                await new Promise<void>(resolve => {
-                    const done = () => {
-                        res.off("drain", done);
-                        res.off("close", done);
-                        resolve();
-                    };
-                    res.on("drain", done);
-                    res.on("close", done);
-                });
-            }
+            if (!ok && !res.destroyed)
+                await new Promise<void>(resolve => { wake = resolve; });
             if (res.destroyed || res.writableEnded) {
                 it.return?.();
                 return;
@@ -351,11 +382,27 @@ export class APIv1 {
      * would send, a chunk at a time, waiting while the client is slow.
      **/
     async get_objects(req: Request, res: Response): Promise<void> {
-        const objects = this.objectTree.iterateObjects({
+        const opts = {
             typeElementId: req.query.typeElementId as string | undefined,
             root: req.query.root === "true",
             includeMetadata: req.query.includeMetadata === "true",
-        });
+        };
+
+        /* The ETag comes from the tree's revision and the filters, so a
+         * client can revalidate without us reading the tree. res.json
+         * hashed the whole body for its ETag; we no longer build the
+         * body in one piece, so this replaces it. */
+        const rev = this.objectTree.revision?.();
+        if (rev !== undefined) {
+            const etag = objectsEtag(rev, opts);
+            res.setHeader("ETag", etag);
+            if (etagMatches(req.headers["if-none-match"], etag)) {
+                res.status(304).end();
+                return;
+            }
+        }
+
+        const objects = this.objectTree.iterateObjects(opts);
         await streamJsonArray(res, '{"success":true,"result":[', objects, "]}");
     }
 

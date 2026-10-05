@@ -85,6 +85,52 @@ describe("GET /v1/objects", () => {
         expect(res.text).toBe(oldBody(t));
     });
 
+    it("adds one drain listener per response under gzip", async () => {
+        /* compression() moves 'drain' listeners to its gzip stream and
+         * does not remove them with res.off(); adding one per wait
+         * leaked one each time the client was slow. */
+        const big = tree(1500);
+        const app = express();
+        app.use((req, _res, next) => { (req as any).auth = "p@R"; next(); });
+        routes({
+            objectTree: big,
+            valueCache: new ValueCache({ objectTree: big, staleThreshold: 60_000 }),
+            history: {} as any,
+            subscriptions: {} as any,
+        })(app);
+
+        const zlib = await import("node:zlib");
+        const proto = Object.getPrototypeOf(zlib.createGzip());
+        const on = proto.on;
+        let drains = 0;
+        proto.on = function (ev: string, fn: any) {
+            if (ev === "drain") drains++;
+            return on.call(this, ev, fn);
+        };
+        const server = http.createServer(app).listen(0);
+        try {
+            const port = (server.address() as AddressInfo).port;
+            const res = await new Promise<http.IncomingMessage>(r =>
+                http.get({ port, path: "/v1/objects",
+                    headers: { "Accept-Encoding": "gzip" } }, r));
+            expect(res.headers["content-encoding"]).toBe("gzip");
+            const ended = new Promise(r => res.on("end", r));
+            let waits = 0;
+            // Read slowly, so the server waits many times
+            res.on("data", () => {
+                res.pause();
+                waits++;
+                setTimeout(() => res.resume(), 2);
+            });
+            await ended;
+            expect(waits).toBeGreaterThan(20);
+            expect(drains).toBeLessThanOrEqual(2);
+        } finally {
+            proto.on = on;
+            server.close();
+        }
+    }, 60_000);
+
     it("answers 503 before the tree is ready", async () => {
         const empty = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
         const res = await request(bareApp(empty)).get("/v1/objects");
@@ -149,4 +195,77 @@ describe("GET /v1/objects", () => {
             server.close();
         }
     }, 60_000);
+});
+
+describe("GET /v1/objects ETag", () => {
+    it("answers 304 to a matching If-None-Match without a body", async () => {
+        const t = tree(50);
+        const app = bareApp(t);
+        const first = await request(app).get("/v1/objects");
+        const etag = first.headers["etag"];
+        expect(etag).toMatch(/^W\/"objects-/);
+
+        const again = await request(app).get("/v1/objects")
+            .set("If-None-Match", etag);
+        expect(again.status).toBe(304);
+        expect(again.text).toBe("");
+
+        // Strong form, a list, and * all match
+        const strong = etag.replace(/^W\//, "");
+        for (const h of [strong, `"other", ${etag}`, "*"]) {
+            const r = await request(app).get("/v1/objects").set("If-None-Match", h);
+            expect(r.status).toBe(304);
+        }
+    });
+
+    it("gives each filter its own ETag", async () => {
+        const t = tree(20);
+        const app = bareApp(t);
+        const all = (await request(app).get("/v1/objects")).headers["etag"];
+        const root = (await request(app).get("/v1/objects?root=true")).headers["etag"];
+        expect(root).not.toBe(all);
+
+        const r = await request(app).get("/v1/objects?root=true")
+            .set("If-None-Match", all);
+        expect(r.status).toBe(200);
+        expect(r.text).toBe(oldBody(t, { root: true }));
+    });
+
+    it("changes after every kind of change to the objects", async () => {
+        const t = tree(5);
+        const app = bareApp(t);
+        const dev = t.getObjects({ root: false })
+            .find(o => o.typeElementId !== "isa95-level" && o.parentId !== null
+                && t.getChildElementIds(o.elementId).length > 0
+                && t.getObject(o.parentId!)?.typeElementId === "isa95-level")!;
+        const snap = pipelineSnapshot(5);
+        const [uuid, cfg] = [...snap.devices.entries()][0];
+
+        const changes: Array<[string, () => void]> = [
+            ["rename", () => t.updateDeviceName(dev.elementId, "Renamed")],
+            ["UNS node", () => t.addCompositionFromUns(
+                [uuid, "etag-sub-uuid"], ["s0", "s1", "s2"], ["Extra", "Leaf"])],
+            ["replace", () => t.replaceDeviceSubtree(uuid, cfg.devInfo, cfg.info)],
+            ["remove", () => t.removeDevice(uuid)],
+            ["add", () => t.addDevice(uuid, cfg.devInfo, cfg.info)],
+        ];
+        for (const [name, change] of changes) {
+            const before = (await request(app).get("/v1/objects")).headers["etag"];
+            const objsBefore = JSON.stringify(t.getObjects());
+            change();
+            if (JSON.stringify(t.getObjects()) === objsBefore) continue;
+            const r = await request(app).get("/v1/objects").set("If-None-Match", before);
+            expect([name, r.status]).toEqual([name, 200]);
+            expect(r.text).toBe(oldBody(t));
+        }
+    });
+
+    it("does not change when only values change", async () => {
+        const t = tree(5);
+        const rev = t.revision();
+        const vc = new ValueCache({ objectTree: t, staleThreshold: 60_000 });
+        const leaf = t.getObjects().find(o => !o.isComposition)!;
+        (vc as any).set?.(leaf.elementId, { value: 1, quality: "Good", timestamp: new Date().toISOString() });
+        expect(t.revision()).toBe(rev);
+    });
 });

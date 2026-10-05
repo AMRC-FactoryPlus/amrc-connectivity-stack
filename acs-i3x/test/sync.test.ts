@@ -493,25 +493,75 @@ describe("ConfigSync", () => {
         expect(tree.getObject(uuids[6])).toBeUndefined();
     });
 
-    it("retries a failed fetch, and still becomes ready", async () => {
+    it("is not ready, nor recorded as synced, until failed fetches succeed", async () => {
         const err = jest.spyOn(console, "error").mockImplementation(() => {});
         try {
             const cdb = new FakeConfigDB();
             const uuids = seed(cdb);
-            const { tree, sync } = start(stack(cdb, undefined, { retryDelay: 30 }));
+            const { tree, store, sync } = start(stack(cdb, undefined, { retryDelay: 60 }));
+            cdb.failing.add(cdb.key(DI, uuids[2]));
+            cdb.failing.add(cdb.key(INFO, uuids[5]));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+            await settle(sync);
+            // Every other device is in, but the tree is incomplete.
+            expect(tree.getObject(uuids[3])).toBeDefined();
+            expect(tree.getObject(uuids[2])).toBeUndefined();
+            expect(sync.stats.errors).toBeGreaterThan(0);
+            expect(tree.isReady()).toBe(false);
+            expect(store.getMeta("synced")).toBeUndefined();
+
+            // Still failing after a retry: still not ready.
+            await sleep(120);
+            await settle(sync);
+            expect(tree.isReady()).toBe(false);
+
+            cdb.failing.clear();
+            await sleep(120);
+            await settle(sync);
+            expect(tree.isReady()).toBe(true);
+            expect(store.getMeta("synced")).toBe("1");
+            expect(state(tree)).toEqual(state(reference(cdb, uuids)));
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("is not ready while a schema fetch is failing", async () => {
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const { tree, sync } = start(stack(cdb, undefined, { retryDelay: 60 }));
+            cdb.failing.add(cdb.key(SCHEMA, TOP));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+            await settle(sync);
+            expect(tree.isReady()).toBe(false);
+            cdb.failing.clear();
+            await sleep(120);
+            await settle(sync);
+            expect(tree.isReady()).toBe(true);
+            expect(tree.getObjectType(TOP)!.displayName).toBe("Traffic Signal v1");
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("stops waiting for a failing device that leaves the Device class", async () => {
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const { tree, sync } = start(stack(cdb, undefined, { retryDelay: 10_000 }));
             cdb.failing.add(cdb.key(DI, uuids[2]));
             cdb.setMembers(uuids);
             cdb.snapshots();
             await settle(sync);
-            expect(tree.isReady()).toBe(true);
-            expect(tree.getObject(uuids[2])).toBeUndefined();
-            expect(sync.stats.errors).toBeGreaterThan(0);
-
-            cdb.failing.clear();
-            await sleep(60);
+            expect(tree.isReady()).toBe(false);
+            cdb.setMembers(uuids.filter(u => u !== uuids[2]));
             await settle(sync);
-            expect(tree.getObject(uuids[2])).toBeDefined();
-            expect(state(tree)).toEqual(state(reference(cdb, uuids)));
+            expect(tree.isReady()).toBe(true);
         } finally {
             err.mockRestore();
         }

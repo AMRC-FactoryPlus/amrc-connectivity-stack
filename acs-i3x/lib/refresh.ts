@@ -27,7 +27,6 @@ import {
 import { ObjectTree, PipelineSnapshot } from "./object-tree.js";
 import { I3xRag } from "./rag/i3x-rag.js";
 import type { ValueCache } from "./value-cache.js";
-import type { I3xObject } from "./types/i3x.js";
 import { applyDiff, configEqual } from "./diff.js";
 
 /** Minimal duck-typed shape we need from an immutable.js Set. */
@@ -64,16 +63,12 @@ export class ObjectTreeRefresh {
         const cdb = this.fplus.ConfigDB;
 
         // UNS messages add nodes to the tree outside this pipeline, so
-        // config emissions do not cover them. Mark the RAG index dirty
-        // the first time each UNS node is seen. The set holds the node
-        // objects, so a node removed and then found again counts as new.
-        const unsSeen = new WeakSet<I3xObject>();
-        this.valueCache?.onValueChange((elementId: string) => {
-            if (this.objectTree.getNodeSource(elementId) !== "uns") return;
-            const obj = this.objectTree.getObject(elementId);
-            if (!obj || unsSeen.has(obj)) return;
-            unsSeen.add(obj);
-            this.i3xRag.markDirty();
+        // config emissions do not cover them. The tree reports every
+        // write; mark the RAG index dirty for those this pipeline did
+        // not make. A UNS message that adds nothing writes nothing.
+        let applying = false;
+        this.objectTree.onChange(() => {
+            if (!applying) this.i3xRag.markDirty();
         });
 
         // Cached per-config watch. Keyed by `${app}:${obj}` so identical
@@ -144,6 +139,7 @@ export class ObjectTreeRefresh {
 
         pipeline$.subscribe({
             next: (emission: PipelineSnapshot) => {
+                applying = true;
                 try {
                     if (prev === null) {
                         this.objectTree.refreshFromSnapshot(emission);
@@ -167,6 +163,8 @@ export class ObjectTreeRefresh {
                     } catch (err2) {
                         console.error("Full-rebuild fallback also failed:", err2);
                     }
+                } finally {
+                    applying = false;
                 }
             },
             error: (err: unknown) =>

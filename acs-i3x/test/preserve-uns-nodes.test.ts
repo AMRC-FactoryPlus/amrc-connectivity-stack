@@ -6,52 +6,31 @@ import { ObjectTree } from "../lib/object-tree.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 
 /*
- * preserveUnsNodes walks a work queue. It used to drain the queue with
- * queue.shift(), which is O(n) per call, so the walk was quadratic. These
- * tests check the index walk gives exactly the same tree as the shift
- * version, and stays fast on a large tree.
+ * UNS-discovered nodes must survive a config-driven rebuild of their
+ * device while their parent survives. The rule, which the in-memory
+ * tree's preserveUnsNodes / captureUnsDescendants implemented:
+ *
+ *  - walk the old subtree in pre-order;
+ *  - a UNS node is kept, under its old parent, if the new config does
+ *    not define it and its parent exists in the new tree (from config,
+ *    or kept earlier in the walk);
+ *  - a UNS node the new config does define becomes config (config wins).
+ *
+ * These tests build random device trees with UNS nodes at random
+ * depths, change the config, and check the SQLite-backed tree against
+ * that rule computed independently here.
  */
 
-type Snap = {
-    objectTypes: Map<string, any>;
-    objects: Map<string, any>;
-    children: Map<string, Set<string>>;
-    metricMeta: Map<string, any>;
-    sources: Map<string, "config" | "uns">;
-};
+const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
+const DEV = "dev-preserve";
+const SCHEMA = "schema-preserve";
 
-function emptySnap(): Snap {
-    return {
-        objectTypes: new Map(),
-        objects: new Map(),
-        children: new Map(),
-        metricMeta: new Map(),
-        sources: new Map(),
-    };
-}
-
-function makeTree(): any {
+function makeTree(): ObjectTree {
     return new ObjectTree({
         fplus: createMockFplus(),
         namespaceName: "Factory+",
         namespaceUri: "urn:factoryplus:ns",
     });
-}
-
-/** The previous implementation, kept verbatim as the reference. */
-function preserveUnsNodesWithShift(tree: any, old: Snap, next: Snap): void {
-    const queue: string[] = [...next.objects.keys()];
-    while (queue.length > 0) {
-        const parentId = queue.shift()!;
-        const oldChildren = old.children.get(parentId);
-        if (!oldChildren) continue;
-        for (const childId of oldChildren) {
-            if (next.objects.has(childId)) continue;
-            if (old.sources.get(childId) !== "uns") continue;
-            tree.copyUnsSubtree(childId, old, next);
-            queue.push(childId);
-        }
-    }
 }
 
 /** Small deterministic PRNG so failures reproduce. */
@@ -66,141 +45,169 @@ function rng(seed: number): () => number {
     };
 }
 
-function addNode(snap: Snap, id: string, parentId: string | null, source: "config" | "uns") {
-    snap.objects.set(id, { elementId: id, displayName: id, parentId });
-    snap.sources.set(id, source);
-    if (parentId !== null) {
-        if (!snap.children.has(parentId)) snap.children.set(parentId, new Set());
-        snap.children.get(parentId)!.add(id);
-    }
-}
+/** A config container: has an Instance_UUID and one leaf, `v`. */
+interface CNode { id: string; key: string; parent: CNode | null; path: string[]; kids: CNode[] }
 
-/**
- * Build an old snapshot with `configCount` config nodes and `unsCount` UNS
- * nodes hung at random depths, then a next snapshot that keeps most config
- * nodes, drops some (orphaning their UNS children) and promotes some UNS
- * nodes to config (config wins).
- */
-function buildPair(seed: number, configCount: number, unsCount: number, chain = false) {
-    const rand = rng(seed);
-    const old = emptySnap();
-    const ids: string[] = [];
-    for (let i = 0; i < configCount; i++) {
-        const id = `c${i}`;
-        const parent = i === 0 || rand() < 0.1 ? null : ids[Math.floor(rand() * ids.length)];
-        addNode(old, id, parent, "config");
-        ids.push(id);
-    }
-    const unsIds: string[] = [];
-    for (let i = 0; i < unsCount; i++) {
-        const id = `u${i}`;
-        let parent: string;
-        if (chain && i > 0 && rand() < 0.7) parent = unsIds[unsIds.length - 1];
-        else parent = ids[Math.floor(rand() * ids.length)];
-        addNode(old, id, parent, "uns");
-        ids.push(id);
-        unsIds.push(id);
-    }
-
-    const next = emptySnap();
-    for (const [id, obj] of old.objects) {
-        if (old.sources.get(id) === "config") {
-            if (rand() < 0.15) continue;
-            addNode(next, id, obj.parentId, "config");
-        } else if (rand() < 0.05) {
-            addNode(next, id, obj.parentId, "config");
-        }
-    }
-    for (const id of unsIds) {
-        if (rand() < 0.3) old.metricMeta.set(id, { name: id });
-    }
-    return { old, next };
-}
-
-function clone(s: Snap): Snap {
-    const c = emptySnap();
-    c.objectTypes = new Map(s.objectTypes);
-    c.objects = new Map(s.objects);
-    c.children = new Map([...s.children].map(([k, v]) => [k, new Set(v)]));
-    c.metricMeta = new Map(s.metricMeta);
-    c.sources = new Map(s.sources);
-    return c;
-}
-
-/** Entries as arrays, so Map and Set insertion order is compared too. */
-function dump(s: Snap) {
-    return {
-        objects: [...s.objects],
-        children: [...s.children].map(([k, v]) => [k, [...v]]),
-        metricMeta: [...s.metricMeta],
-        sources: [...s.sources],
+function devInfo(roots: CNode[], keep: (n: CNode) => boolean, extra: Map<string, Array<{ key: string; id: string }>>) {
+    const build = (n: CNode): any => {
+        const out: any = { Schema_UUID: "s", Instance_UUID: n.id, v: { Sparkplug_Type: "Float" } };
+        for (const k of n.kids) if (keep(k)) out[k.key] = build(k);
+        for (const p of extra.get(n.id) ?? [])
+            out[p.key] = { Schema_UUID: "s", Instance_UUID: p.id, v: { Sparkplug_Type: "Float" } };
+        return out;
     };
+    const originMap: any = {
+        Schema_UUID: SCHEMA,
+        Instance_UUID: DEV,
+        Device_Information: {
+            Schema_UUID: "2dd093e9-1450-44c5-be8c-c0d78e48219b",
+            ISA95_Hierarchy: { Schema_UUID: HIERARCHY, Enterprise: { Value: "AMRC" } },
+        },
+    };
+    for (const r of roots) if (keep(r)) originMap[r.key] = build(r);
+    for (const p of extra.get(DEV) ?? [])
+        originMap[p.key] = { Schema_UUID: "s", Instance_UUID: p.id, v: { Sparkplug_Type: "Float" } };
+    return { schema: SCHEMA, sparkplugName: "Dev", originMap };
 }
 
-describe("preserveUnsNodes index walk", () => {
+/** Every node under `root`, pre-order, with source and parent. */
+function walk(tree: ObjectTree, root: string) {
+    const out: Array<{ id: string; parent: string; source: string | undefined }> = [];
+    const visit = (id: string) => {
+        for (const c of tree.getChildElementIds(id)) {
+            out.push({ id: c, parent: id, source: tree.getNodeSource(c) });
+            visit(c);
+        }
+    };
+    visit(root);
+    return out;
+}
+
+function scenario(seed: number, configCount: number, unsCount: number, chain: boolean) {
+    const rand = rng(seed);
+    const tree = makeTree();
+
+    const roots: CNode[] = [];
+    const all: CNode[] = [];
+    for (let i = 0; i < configCount; i++) {
+        const parent = all.length === 0 || rand() < 0.1 ? null : all[Math.floor(rand() * all.length)];
+        const key = `n${i}`;
+        const n: CNode = { id: `c${i}`, key, parent, path: [...(parent?.path ?? []), key], kids: [] };
+        (parent ? parent.kids : roots).push(n);
+        all.push(n);
+    }
+    tree.addDevice(DEV, devInfo(roots, () => true, new Map()), { name: "Dev" });
+
+    /* UNS nodes hang under a config container or, with `chain`, under
+     * the previous UNS node. Each message names the whole path from the
+     * device, as the UNS topic does. */
+    const unsPaths: string[][] = [];
+    for (let j = 0; j < unsCount; j++) {
+        const under = chain && j > 0 && rand() < 0.7
+            ? unsPaths[unsPaths.length - 1]
+            : all[Math.floor(rand() * all.length)].path;
+        const path = [...under, `u${j}`];
+        tree.addCompositionFromUns([DEV], [SCHEMA], path);
+        unsPaths.push(path);
+    }
+
+    const before = walk(tree, DEV);
+    const unsBefore = before.filter(n => n.source === "uns");
+    expect(unsBefore.length).toBe(unsCount);
+
+    /* New config: drop some containers (with their subtrees) and
+     * declare some UNS nodes that sit directly under a surviving
+     * container. */
+    const dropped = new Set(all.filter(() => rand() < 0.15).map(n => n.id));
+    const isDropped = (n: CNode): boolean =>
+        dropped.has(n.id) || (n.parent ? isDropped(n.parent) : false);
+    const keep = (n: CNode) => !isDropped(n);
+    const configIds = new Set(all.filter(keep).map(n => n.id));
+    const promoted = new Map<string, Array<{ key: string; id: string }>>();
+    const promotedIds = new Set<string>();
+    for (const u of unsBefore) {
+        if (!configIds.has(u.parent) || rand() >= 0.05) continue;
+        const name = tree.getObject(u.id)!.displayName;
+        if (!promoted.has(u.parent)) promoted.set(u.parent, []);
+        promoted.get(u.parent)!.push({ key: name, id: u.id });
+        promotedIds.add(u.id);
+    }
+
+    /* The rule, computed from the old tree alone. */
+    const present = new Set<string>([DEV, ...configIds, ...promotedIds]);
+    const kept = new Map<string, string>();
+    for (const u of unsBefore) {
+        if (present.has(u.id)) continue;
+        if (!present.has(u.parent)) continue;
+        present.add(u.id);
+        kept.set(u.id, u.parent);
+    }
+
+    tree.replaceDeviceSubtree(DEV, devInfo(roots, keep, promoted), { name: "Dev" });
+
+    const after = walk(tree, DEV);
+    const unsAfter = new Map(after.filter(n => n.source === "uns").map(n => [n.id, n.parent]));
+    expect(unsAfter).toEqual(kept);
+    for (const id of promotedIds) expect(tree.getNodeSource(id)).toBe("config");
+    for (const id of dropped) expect(tree.getObject(id)).toBeUndefined();
+
+    /* Nothing outside the device and its ISA-95 chain is left over. */
+    const isa = tree.getObjects().filter(o => o.typeElementId === "isa95-level");
+    expect(tree.objectCount()).toBe(after.length + 1 + isa.length);
+    return { kept: kept.size, dropped: unsCount - kept.size };
+}
+
+describe("UNS nodes across a device rebuild", () => {
     it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])(
-        "matches the shift version on a random tree (seed %i)",
+        "keeps exactly the UNS nodes whose parent survives (seed %i)",
         (seed) => {
-            const { old, next } = buildPair(seed, 200, 600, seed % 2 === 0);
-            const tree = makeTree();
-            const expected = clone(next);
-            const actual = clone(next);
-
-            preserveUnsNodesWithShift(tree, old, expected);
-            tree.preserveUnsNodes(old, actual);
-
-            expect(actual.objects.size).toBeGreaterThan(next.objects.size);
-            expect(dump(actual)).toEqual(dump(expected));
+            const { kept, dropped } = scenario(seed, 120, 300, seed % 2 === 0);
+            // Both outcomes happen, so the test checks something.
+            expect(kept).toBeGreaterThan(0);
+            expect(dropped).toBeGreaterThan(0);
         });
 
     it("keeps nested UNS subtrees at many depths", () => {
-        const old = emptySnap();
-        addNode(old, "root", null, "config");
-        let parent = "root";
-        for (let d = 0; d < 50; d++) {
-            addNode(old, `u${d}`, parent, "uns");
-            parent = `u${d}`;
-        }
-        const next = emptySnap();
-        addNode(next, "root", null, "config");
-        makeTree().preserveUnsNodes(old, next);
-        expect(next.objects.size).toBe(51);
-        expect(next.sources.get("u49")).toBe("uns");
+        const tree = makeTree();
+        const info = devInfo([], () => true, new Map());
+        tree.addDevice(DEV, info, { name: "Dev" });
+        const path = Array.from({ length: 50 }, (_, d) => `u${d}`);
+        const leaf = tree.addCompositionFromUns([DEV], [SCHEMA], path)!;
+
+        tree.replaceDeviceSubtree(DEV, info, { name: "Dev" });
+        expect(walk(tree, DEV).filter(n => n.source === "uns")).toHaveLength(50);
+        expect(tree.getNodeSource(leaf)).toBe("uns");
     });
 
     it("drops UNS nodes whose parent is gone", () => {
-        const old = emptySnap();
-        addNode(old, "gone", null, "config");
-        addNode(old, "orphan", "gone", "uns");
-        const next = emptySnap();
-        makeTree().preserveUnsNodes(old, next);
-        expect(next.objects.size).toBe(0);
+        const tree = makeTree();
+        const gone: CNode = { id: "gone", key: "Gone", parent: null, path: ["Gone"], kids: [] };
+        tree.addDevice(DEV, devInfo([gone], () => true, new Map()), { name: "Dev" });
+        const orphan = tree.addCompositionFromUns([DEV], [SCHEMA], ["Gone", "Orphan"])!;
+        expect(tree.getObject(orphan)!.parentId).toBe("gone");
+
+        tree.replaceDeviceSubtree(DEV, devInfo([gone], () => false, new Map()), { name: "Dev" });
+        expect(tree.getObject("gone")).toBeUndefined();
+        expect(tree.getObject(orphan)).toBeUndefined();
     });
 
-    it("walks about 300k nodes quickly", () => {
-        const { old, next } = buildPair(42, 100_000, 200_000);
+    it("drops a device's UNS nodes with the device", () => {
         const tree = makeTree();
-        const actual = clone(next);
+        tree.addDevice(DEV, devInfo([], () => true, new Map()), { name: "Dev" });
+        const leaf = tree.addCompositionFromUns([DEV], [SCHEMA], ["A", "B"])!;
+        tree.refreshFromSnapshot({ devices: new Map(), schemas: new Map() });
+        expect(tree.getObject(leaf)).toBeUndefined();
+        expect(tree.objectCount()).toBe(0);
+    });
 
+    it("rebuilds a large device quickly", () => {
         const t0 = performance.now();
-        tree.preserveUnsNodes(old, actual);
-        const indexMs = performance.now() - t0;
-        console.log(`index walk, ${old.objects.size} nodes: ${indexMs.toFixed(0)} ms`);
-
-        // The shift version takes several seconds here, so only run it
-        // when asked. It also proves the results match at this size.
-        if (process.env.COMPARE_SHIFT) {
-            const expected = clone(next);
-            const t1 = performance.now();
-            preserveUnsNodesWithShift(tree, old, expected);
-            const shiftMs = performance.now() - t1;
-            console.log(`shift walk, ${old.objects.size} nodes: ${shiftMs.toFixed(0)} ms`);
-            expect(dump(actual)).toEqual(dump(expected));
-        }
-
+        scenario(42, 2_000, 6_000, true);
+        const ms = performance.now() - t0;
+        console.log(`2,000 config + 6,000 UNS nodes, build and rebuild: ${ms.toFixed(0)} ms`);
         // A wall-clock bound flakes on a busy machine, so only assert
-        // it when asked. The comparison above is the real check.
+        // it when asked.
         if (process.env.CHECK_TIMING)
-            expect(indexMs).toBeLessThan(2000);
+            expect(ms).toBeLessThan(10_000);
     }, 120_000);
 });

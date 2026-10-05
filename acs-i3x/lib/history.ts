@@ -14,6 +14,8 @@ import { InfluxDB } from "@influxdata/influxdb-client";
 import type { QueryApi } from "@influxdata/influxdb-client";
 import type { ObjectTree } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
+import type { InfluxValue } from "./value-cache.js";
+import { Semaphore } from "./semaphore.js";
 
 interface HistoryOpts {
     influxUrl: string;
@@ -36,6 +38,19 @@ interface HistoryOpts {
      * does not depend on the client library version.
      */
     queryTimeout?: number;
+    /**
+     * Flux queries allowed in flight across the whole process, for
+     * current values and history alike. Default 4. Ignored if
+     * `semaphore` is given.
+     */
+    influxConcurrency?: number;
+    /** A semaphore to share with other users of InfluxDB. */
+    semaphore?: Semaphore;
+    /**
+     * Where to keep current values read from InfluxDB, so the next
+     * read of the same metric does not need a Flux query.
+     */
+    valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
 }
 
 /** One row of the bulk last-value query. */
@@ -95,10 +110,14 @@ export class History {
     private bulkChunkSize: number;
     private bulkConcurrency: number;
     private bulkMeasurementFilterMax: number;
+    private semaphore: Semaphore;
+    private valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
         this.objectTree = opts.objectTree;
+        this.semaphore = opts.semaphore ?? new Semaphore(opts.influxConcurrency ?? 4);
+        this.valueCache = opts.valueCache;
         this.bulkChunkSize = opts.bulkChunkSize ?? 100;
         this.bulkConcurrency = opts.bulkConcurrency ?? 4;
         this.bulkMeasurementFilterMax = opts.bulkMeasurementFilterMax ?? 50;
@@ -109,6 +128,34 @@ export class History {
             timeout: opts.queryTimeout ?? 10_000,
         });
         this.queryApi = influx.getQueryApi(opts.influxOrg);
+    }
+
+    /** Run one Flux query, waiting for a slot under the process-wide cap. */
+    private query<T>(flux: string): Promise<T[]> {
+        return this.semaphore.run(() => this.queryApi.collectRows<T>(flux));
+    }
+
+    /** Keep leaf values read from InfluxDB in the value cache. */
+    private remember(values: Iterable<I3xValueResponse>): void {
+        if (!this.valueCache) return;
+        const out: InfluxValue[] = [];
+        for (const v of values) {
+            const meta = this.objectTree.getMetricMeta(v.elementId);
+            if (!meta) continue;
+            out.push({
+                elementId: v.elementId,
+                device: meta.topLevelInstanceUuid,
+                anchor: this.objectTree.getObject(v.elementId)?.parentId ?? null,
+                value: v.value,
+                quality: v.quality,
+                timestamp: v.timestamp,
+            });
+        }
+        try {
+            this.valueCache.recordInfluxValues(out);
+        } catch (err) {
+            console.error("History: storing InfluxDB values failed:", err);
+        }
     }
 
     /**
@@ -133,19 +180,20 @@ export class History {
             `  |> last()`,
         ].filter(Boolean).join("\n");
 
-        const rows: Array<{ _value: unknown; _time: string }> =
-            await this.queryApi.collectRows(query);
+        const rows = await this.query<{ _value: unknown; _time: string }>(query);
 
         if (rows.length === 0) return null;
 
         const row = rows[0];
-        return {
+        const result: I3xValueResponse = {
             elementId,
             isComposition: false,
             value: row._value,
             quality: "Good",
             timestamp: row._time,
         };
+        this.remember([result]);
+        return result;
     }
 
     /**
@@ -290,7 +338,7 @@ export class History {
             const filter = measurements.size <= this.bulkMeasurementFilterMax
                 ? [...measurements]
                 : undefined;
-            const rows = await this.queryApi.collectRows<LastRow>(this.buildBulkLastQuery(tlis, filter));
+            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter));
             for (const row of rows) {
                 const path = row.path ?? "";
                 const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
@@ -311,6 +359,7 @@ export class History {
                 timestamp: row._time,
             });
         }
+        this.remember(out.values());
         return out;
     }
 
@@ -390,8 +439,7 @@ export class History {
         const query = this.buildFluxQuery(elementId, startTime, endTime);
         if (query === null) return [];
 
-        const rows: Array<{ _value: unknown; _time: string }> =
-            await this.queryApi.collectRows(query);
+        const rows = await this.query<{ _value: unknown; _time: string }>(query);
 
         return rows.map((row) => ({
             value: row._value,

@@ -161,6 +161,19 @@ configdb:
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
   bodyLimit: 100kb
+  # -- Resource requests and limits for the `webapi` container. The
+  # default is empty, which leaves the pod BestEffort: first in line for
+  # the kernel OOM killer and for eviction under node memory pressure.
+  # Set a memory request to make it Burstable, and a memory limit to cap
+  # it. Size the limit above the normal working set, because a limit that
+  # is too low turns memory pressure into a restart loop.
+  # For example:
+  # resources:
+  #   requests:
+  #     memory: 1Gi
+  #   limits:
+  #     memory: 2Gi
+  resources: {}
   # -- Minimum time in ms between the class member and subclass lookups
   # that ConfigDB runs for notify watchers when classes change. During a
   # bulk import this stops every watched class being looked up again on
@@ -500,6 +513,19 @@ i3x:
   # tags, so they still appear. Set this to "1" to log everything, for
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
+  # -- Resource requests and limits for the `i3x` container. The
+  # default is empty, which leaves the pod BestEffort: first in line for
+  # the kernel OOM killer and for eviction under node memory pressure.
+  # Set a memory request to make it Burstable, and a memory limit to cap
+  # it. Size the limit above the normal working set, because a limit that
+  # is too low turns memory pressure into a restart loop.
+  # For example:
+  # resources:
+  #   requests:
+  #     memory: 1Gi
+  #   limits:
+  #     memory: 2Gi
+  resources: {}
   # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
   # namespaceUri: https://example.com/i3x
   # i3X keeps its namespace (the object tree) and the last value of

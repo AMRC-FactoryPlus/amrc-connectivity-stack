@@ -53,6 +53,10 @@ spec:
 {{ include "amrc-connectivity-stack.image" (list . .Values.i3x) | indent 10 }}
           command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
           args: [ "node", "--es-module-specifier-resolution=node", "bin/api.js" ]
+          {{- with .Values.i3x.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf

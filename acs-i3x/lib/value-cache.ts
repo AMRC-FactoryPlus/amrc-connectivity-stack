@@ -176,6 +176,10 @@ export class ValueCache {
         this.flushInterval = opts.flushInterval ?? 250;
         /* Each flush is one synchronous write; keep it short. */
         this.flushMaxRows = opts.flushMaxRows ?? 1000;
+        /* A failed group commit loses the values written in its batch,
+         * so a stored value may no longer be the last one. Forget them
+         * all, as after an MQTT reconnect. */
+        this.store.onCommitFailure(() => this.safeClear("after a failed commit"));
     }
 
     async init(fplus: any): Promise<this> {

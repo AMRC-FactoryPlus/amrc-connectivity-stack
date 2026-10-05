@@ -264,6 +264,41 @@ describe("I3xStore", () => {
         s.close();
     }, 60_000);
 
+    it("holds writers back past the hard cap even while a reader pins the checkpoint", async () => {
+        /* A slow client that keeps reading never trips the stream idle
+         * deadline, so its snapshot can pin the WAL for minutes. */
+        const path = join(dir, "i3x.db");
+        const walLimit = 64 * 1024;
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 5, walLimit });
+        const t = tree(s);
+        t.addDevice("dev-0", devInfo("D0", ["AMRC"]), { name: "D0" });
+        const reader = s.openReader()!;
+        reader.exec("begin");
+        reader.prepare("select count(*) n from object").get();
+        const hard = 16 * walLimit;
+        try {
+            let pinnedSeen = false;
+            // Write as the sync engine does, letting the checkpoint
+            // worker run between writes.
+            for (let i = 1; i < 2000 && statSync(`${path}-wal`).size < 1.5 * hard; i++) {
+                await s.walReady(50);
+                if ((s as any).pinnedAt >= 0) pinnedSeen = true;
+                t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+                await new Promise(r => setTimeout(r, 2));
+            }
+            // Below the hard cap the pinned reader let writers go on...
+            expect(pinnedSeen).toBe(true);
+            expect(statSync(`${path}-wal`).size).toBeGreaterThan(hard);
+            // ...but past it they are held back again.
+            await new Promise(r => setTimeout(r, 30));
+            expect(s.walBehind()).toBe(true);
+        } finally {
+            reader.exec("commit");
+            reader.close();
+            s.close();
+        }
+    }, 60_000);
+
     it("falls back to checkpoints on the main thread if the worker dies", async () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 5, walLimit: 64 * 1024 });

@@ -473,8 +473,13 @@ export class I3xStore {
         }
         if (this.pinnedAt >= 0) {
             /* A reader holds the checkpoint back; holding writers back
-             * would not help. Resume once the checkpoint moves again. */
+             * would not help. Resume once the checkpoint moves again.
+             * But a slow client that keeps reading can hold its
+             * snapshot for many minutes, so past the hard cap hold the
+             * writers that can wait back anyway, to bound the WAL. */
             const sh = this.walShared!;
+            if (Atomics.load(sh, 1) * this.pageSize >= WAL_HARD_FACTOR * this.walLimit)
+                return true;
             if (Atomics.load(sh, 2) <= this.pinnedAt && Atomics.load(sh, 1) !== Atomics.load(sh, 2))
                 return false;
             this.pinnedAt = -1;

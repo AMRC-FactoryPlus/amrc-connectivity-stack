@@ -273,11 +273,17 @@ export class I3xStore {
                 eval: true,
                 workerData: { path: this.path, interval, shared: this.walShared },
             });
-            w.on("error", err => {
-                console.error("I3xStore: checkpoint worker failed; checkpointing on the main thread:", err);
+            /* If the worker dies, SQLite checkpoints on this thread again,
+             * and nothing waits for the worker's reports. */
+            const lost = (why: string, err?: unknown) => {
+                if (this.checkpointer !== w) return;   // closed on purpose
+                console.error(`I3xStore: checkpoint worker ${why}; checkpointing on the main thread:`, err ?? "");
                 this.checkpointer = null;
+                this.walShared = null;
                 try { this.db.exec("pragma wal_autocheckpoint = 1000"); } catch { /* closed */ }
-            });
+            };
+            w.on("error", err => lost("failed", err));
+            w.on("exit", code => lost(`exited (code ${code})`));
             w.unref();
             this.db.exec("pragma wal_autocheckpoint = 0");
             this.checkpointer = w;

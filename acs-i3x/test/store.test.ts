@@ -264,6 +264,30 @@ describe("I3xStore", () => {
         s.close();
     }, 60_000);
 
+    it("falls back to checkpoints on the main thread if the worker dies", async () => {
+        const path = join(dir, "i3x.db");
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 5, walLimit: 64 * 1024 });
+        const t = tree(s);
+        for (let i = 0; i < 50; i++) t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+        await new Promise(r => setTimeout(r, 50));
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            await (s as any).checkpointer.terminate();
+            await new Promise(r => setTimeout(r, 50));
+            expect(err).toHaveBeenCalled();
+            expect((s.db.prepare("pragma wal_autocheckpoint").get() as any).wal_autocheckpoint).toBe(1000);
+            // Nothing waits for reports that will never come.
+            for (let i = 50; i < 100; i++) t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+            expect(s.walBehind()).toBe(false);
+            const t0 = performance.now();
+            await s.walReady();
+            expect(performance.now() - t0).toBeLessThan(100);
+        } finally {
+            err.mockRestore();
+            s.close();
+        }
+    });
+
     it("commits each transaction at once with commitInterval 0", () => {
         const path = join(dir, "i3x.db");
         const s = new I3xStore({ path, commitInterval: 0 });

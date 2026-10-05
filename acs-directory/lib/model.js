@@ -57,6 +57,8 @@ export default class Model extends Queries {
 
     /* BIRTH/DEATH */
 
+    /* Returns the device UUID and which Last_Changed notices the birth
+     * needs (see birth_changes), or undefined if nothing was recorded. */
     async birth(opts) {
         return this.txn(async q => {
             const addrid = await q.find_or_create_address(opts.address);
@@ -70,12 +72,13 @@ export default class Model extends Queries {
             const devid = await q.find_or_create("device", uuid);
             if (devid == null) return;
 
-            const sess = await q.record_birth({
-                devid,
-                addrid,
-                time: opts.time,
-                top_schema: opts.top_schema,
-            });
+            const { sess, device_changed, address_changed } =
+                await q.record_birth({
+                    devid,
+                    addrid,
+                    time: opts.time,
+                    top_schema: opts.top_schema,
+                });
 
             for (const schema of opts.schemas)
                 await q.record_schema(sess, schema);
@@ -90,6 +93,7 @@ export default class Model extends Queries {
             await q.record_stale_alerts(devid,
                 Object.values(opts.alerts).map(a => a.uuid));
 
+            return { uuid, device_changed, address_changed };
         });
     }
 

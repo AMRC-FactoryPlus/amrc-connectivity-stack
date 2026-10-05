@@ -27,6 +27,21 @@ function sym_diff(one, two) {
 /* Queries is a separate class, because sometimes we want to query on
  * the database directly, and sometimes we need to query using a query
  * function for a transaction. The model inherits from this class. */
+/* Work out which Last_Changed notices a BIRTH needs, from the
+ * sessions it replaces (as they were before the birth closed them).
+ * A rebirth of a device which was online, at the same address, changes
+ * nothing anyone can read from the Directory. Anything else does: a
+ * new device or address, a move, a different device taking over an
+ * address, or a birth after a DEATH (the device is back online). */
+export function birth_changes (opts, prev_dev, prev_adr) {
+    return {
+        device_changed:
+            !(prev_dev?.open && prev_dev.address == opts.addrid),
+        address_changed:
+            !(prev_adr?.open && prev_adr.device == opts.devid),
+    };
+}
+
 export default class Queries {
     static DBVersion = 14;
 
@@ -95,27 +110,17 @@ export default class Queries {
         const dbr = await this.query(`
             select dev.uuid device,
                    ses.device devid,
-                   ses.address addrid,
-                   ses.finish is null online,
                    adr.group_id,
                    adr.node_id,
                    adr.device_id,
+                   ses.finish is null online,
                    ses.next_for_device,
                    ses.next_for_address,
-                   prev.id  prev_for_device,
-                   prev.address prev_device_addrid,
-                   prev_adr.device prev_address_devid,
-                   -- record_birth closes the session it replaces at the
-                   -- new session's start. If it closed earlier, a DEATH
-                   -- closed it and there was a gap.
-                   prev.finish = ses.start prev_open,
-                   prev_adr.finish = ses.start prev_adr_open
+                   prev.id  prev_for_device
             from session ses
                      join device dev on dev.id = ses.device
                      join address adr on adr.id = ses.address
                      left join session prev on prev.next_for_device = ses.id
-                     left join session prev_adr
-                         on prev_adr.next_for_address = ses.id
             where ses.id = $1
         `, [id]);
 
@@ -458,6 +463,21 @@ export default class Queries {
 
         /* Check noone else has claimed this device already? */
 
+        /* Read the sessions this one replaces before we close them, so
+         * we know whether this birth changes anything. */
+        const prev_dev = await this.query(`
+            select address, finish is null open
+            from session
+            where device = $1 and next_for_device is null
+        `, [opts.devid]);
+        const prev_adr = await this.query(`
+            select device, finish is null open
+            from session
+            where address = $1 and next_for_address is null
+        `, [opts.addrid]);
+        const changes = birth_changes(opts,
+            prev_dev.rows[0], prev_adr.rows[0]);
+
         const dbr = await this.query(`
             insert into session (device, address, start, top_schema)
             values ($1, $2, $3, $4) returning id
@@ -485,7 +505,7 @@ export default class Queries {
               and id != $1
         `, [sess, opts.addrid, opts.time]);
 
-        return sess;
+        return { sess, ...changes };
     }
 
     /* This will close all child device sessions when closing a node

@@ -125,6 +125,7 @@ export class CDBNotify {
             notify.watch(`${vers}/app/:app/object/`, this.config_list.bind(this));
             notify.search(`${vers}/app/:app/object/`, this.config_search.bind(this));
         }
+        notify.search(`v2/app/:app/etag/`, this.etag_search.bind(this));
 
         for (const rel of Relations) {
             notify.watch(`v2/class/:class/${rel.path}/`,
@@ -215,6 +216,46 @@ export class CDBNotify {
                 child:      entry.object,
                 response:   entry_response(entry),
             })));
+
+        return { acl, full, updates };
+    }
+
+    async etag_full (app) {
+        const entries = await this.model.config_etags(app);
+        if (!entries)
+            return { response: { status: 404 } };
+
+        const children = Object.fromEntries(
+            entries.map(e => [e.object, { status: 200, body: e.etag }]));
+
+        return {
+            children,
+            response:   { status: 204 },
+        };
+    }
+
+    /* A SEARCH over the ETags of an Application's config entries. Each
+     * child body is the entry's current ETag, so a client can keep a
+     * whole Application in step at a few bytes per entry, and fetch
+     * only the entries whose ETag has changed. A config update carries
+     * no ETag, so each one is looked up, in order. */
+    etag_search (session, app) {
+        const acl = this.acl_checker(session, Perm.ReadApp, app, true);
+
+        const full = () => this.etag_full(app);
+        const updates = rxx.rx(
+            this.config_updates,
+            rx.filter(u => u.app == app),
+            rx.concatMap(async u => {
+                const etag = await this.model.config_etag(u);
+                return {
+                    status:     200,
+                    child:      u.object,
+                    response:   etag
+                        ? { status: 200, body: etag }
+                        : { status: 404 },
+                };
+            }));
 
         return { acl, full, updates };
     }

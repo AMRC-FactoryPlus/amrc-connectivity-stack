@@ -265,6 +265,40 @@ describe("database errors while writing values", () => {
         }
     });
 
+    it("a failed group commit forgets the stored and queued values", () => {
+        const store = new I3xStore({ commitInterval: 60_000 });
+        const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+        tree.addDevice(DEV, devInfo(), { name: "Device 1" });
+        tree.setReady();
+        const vc = new ValueCache({ objectTree: tree, store, staleThreshold: 60_000, flushInterval: 60_000 });
+        const speed = tree.getChildElementIds(DEV).find(id => tree.getObject(id)!.displayName === "Speed")!;
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            uns(vc, ["Speed"], 1, "2026-10-05T12:00:00Z");
+            vc.flush();
+            store.commit();
+            /* The next batch holds a newer value; its commit fails. */
+            uns(vc, ["Speed"], 2, "2026-10-05T12:00:01Z");
+            vc.flush();
+            uns(vc, ["Status"], "queued", "2026-10-05T12:00:02Z");
+            const db = (store as any).db;
+            const exec = db.exec.bind(db);
+            const spy = jest.spyOn(db, "exec").mockImplementation((sql: any) => {
+                if (sql === "commit") throw new Error("disk I/O error");
+                return exec(sql);
+            });
+            store.commit();
+            spy.mockRestore();
+            /* Not the older value 1: that is no longer the last one. */
+            expect(rowCount(store)).toBe(0);
+            expect(vc.getValue(speed)).toBeNull();
+            expect((vc as any).pending.size).toBe(0);
+        } finally {
+            err.mockRestore();
+            store.close();
+        }
+    });
+
     it("at start and on an MQTT reconnect are logged, not thrown", async () => {
         const s = setup();
         const err = jest.spyOn(console, "error").mockImplementation(() => {});

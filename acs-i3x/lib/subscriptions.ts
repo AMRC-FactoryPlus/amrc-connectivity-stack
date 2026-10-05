@@ -1,6 +1,12 @@
 /*
  * SubscriptionManager — Manages i3X subscriptions supporting SSE
  * streaming and sync polling with TTL-based cleanup.
+ *
+ * A subscription is in one of two delivery modes at any moment. While
+ * an SSE stream is attached, changes are written to the stream and are
+ * not queued: streaming is at-most-once, so there is nothing to keep.
+ * While no stream is attached, changes are queued for /sync (or for the
+ * next stream to open), up to `maxQueue` items, oldest dropped first.
  */
 
 import { randomUUID } from "crypto";
@@ -14,6 +20,16 @@ interface ValueCacheLike {
 interface SubscriptionManagerOpts {
     valueCache: ValueCacheLike;
     ttl: number;
+    /* Maximum queued updates per subscription. Once reached, the
+     * oldest update is dropped for each new one, and the next /sync
+     * reports the loss with HTTP 206. */
+    maxQueue: number;
+}
+
+export interface SyncResult {
+    updates: I3xSyncItem[];
+    /* Updates dropped from the queue since the previous /sync. */
+    dropped: number;
 }
 
 interface Subscription {
@@ -28,6 +44,8 @@ interface Subscription {
     displayName: string;
     registeredElements: Map<string, number>; // elementId -> maxDepth
     queue: I3xSyncItem[];
+    /* Updates dropped since the last /sync reported it. */
+    dropped: number;
     nextSequenceNumber: number;
     activeStream: any | null;
     lastAccessed: number;
@@ -37,12 +55,14 @@ interface Subscription {
 export class SubscriptionManager {
     private valueCache: ValueCacheLike;
     private ttl: number;
+    private maxQueue: number;
     private subscriptions: Map<string, Subscription> = new Map();
     private boundOnValueChange: (elementId: string, vqt: I3xVqt) => void;
 
     constructor(opts: SubscriptionManagerOpts) {
         this.valueCache = opts.valueCache;
         this.ttl = opts.ttl;
+        this.maxQueue = opts.maxQueue;
         this.boundOnValueChange = this.onValueChange.bind(this);
         this.valueCache.onValueChange(this.boundOnValueChange);
     }
@@ -59,6 +79,7 @@ export class SubscriptionManager {
             displayName: displayName ?? "",
             registeredElements: new Map(),
             queue: [],
+            dropped: 0,
             nextSequenceNumber: 1,
             activeStream: null,
             lastAccessed: Date.now(),
@@ -150,22 +171,45 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
-    sync(owner: string, subscriptionId: string, lastSequenceNumber?: number): I3xSyncItem[] {
+    /* `lastSequenceNumber` acknowledges every update at or below it;
+     * -1 acknowledges the whole queue. Anything else that is not a
+     * non-negative integer is ignored and clears nothing, as the spec
+     * requires. Sync is refused while a stream is open: the stream owns
+     * delivery and the queue is empty. */
+    sync(owner: string, subscriptionId: string, lastSequenceNumber?: number): SyncResult {
         const sub = this.getAndVerify(owner, subscriptionId);
 
-        if (lastSequenceNumber !== undefined) {
-            sub.queue = sub.queue.filter(item => item.sequenceNumber > lastSequenceNumber);
+        if (sub.activeStream) {
+            const err: any = new Error(
+                `Subscription ${subscriptionId} has an open stream; close it before calling sync`);
+            err.status = 409;
+            throw err;
         }
 
+        if (lastSequenceNumber === -1) {
+            sub.queue = [];
+        } else if (Number.isInteger(lastSequenceNumber) && lastSequenceNumber! >= 0) {
+            sub.queue = sub.queue.filter(item => item.sequenceNumber > lastSequenceNumber!);
+        }
+
+        const dropped = sub.dropped;
+        sub.dropped = 0;
+
         this.resetTtl(sub);
-        return [...sub.queue];
+        return { updates: [...sub.queue], dropped };
     }
 
+    /* Only one stream per subscription: a new stream closes the
+     * existing one cleanly and takes over. The queue built up while no
+     * stream was attached is sent on the new stream and then released;
+     * from here until the stream closes, nothing is queued. */
     stream(owner: string, subscriptionId: string, res: any): void {
         const sub = this.getAndVerify(owner, subscriptionId);
 
         if (sub.activeStream) {
-            throw new Error(`Subscription ${subscriptionId} already has an active stream`);
+            console.log(`[SSE] replacing existing stream: sub=${subscriptionId.slice(0,8)}`);
+            sub.activeStream.end();
+            sub.activeStream = null;
         }
 
         console.log(`[SSE] stream opened: sub=${subscriptionId.slice(0,8)} registered=[${[...sub.registeredElements.keys()].map(k => k.slice(0,8)).join(", ")}] queued=${sub.queue.length}`);
@@ -185,11 +229,20 @@ export class SubscriptionManager {
         for (const item of sub.queue) {
             this.writeSseEvent(res, item);
         }
+        sub.queue = [];
+        sub.dropped = 0;
 
         // Handle close
         res.on("close", () => {
             console.log(`[SSE] stream closed: sub=${subscriptionId.slice(0,8)}`);
+            /* A stream replaced by a newer one must not detach its
+             * successor, and a deleted subscription must not get a
+             * fresh TTL timer. */
+            if (sub.activeStream !== res) return;
             sub.activeStream = null;
+            /* The TTL counts from when the stream went away. */
+            if (this.subscriptions.get(subscriptionId) === sub)
+                this.resetTtl(sub);
         });
 
         this.resetTtl(sub);
@@ -215,23 +268,29 @@ export class SubscriptionManager {
         for (const sub of this.subscriptions.values()) {
             if (!sub.registeredElements.has(elementId)) continue;
 
+            if (sub.activeStream) {
+                console.log(`[SSE] writing to sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} value=${JSON.stringify(vqt.value)}`);
+                this.writeSseEvent(sub.activeStream, { elementId, ...vqt });
+                continue;
+            }
+
+            /* Only queued updates get a sequence number; streamed
+             * updates are never acknowledged, so need none. */
             const item: I3xSyncItem = {
                 sequenceNumber: sub.nextSequenceNumber++,
                 elementId,
                 ...vqt,
             };
-            sub.queue.push(item);
-
-            if (sub.activeStream) {
-                console.log(`[SSE] writing seq=${item.sequenceNumber} to sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} value=${JSON.stringify(vqt.value)}`);
-                this.writeSseEvent(sub.activeStream, item);
-            } else {
-                console.log(`[SSE] queued seq=${item.sequenceNumber} for sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} (no active stream)`);
+            if (sub.queue.length >= this.maxQueue) {
+                sub.queue.shift();
+                sub.dropped++;
             }
+            sub.queue.push(item);
+            console.log(`[SSE] queued seq=${item.sequenceNumber} for sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} (no active stream)`);
         }
     }
 
-    private writeSseEvent(res: any, item: I3xSyncItem): void {
+    private writeSseEvent(res: any, item: I3xVqt & { elementId: string; sequenceNumber?: number }): void {
         // SSE events use the same VQT shape as the spec — no sequenceNumber
         const { sequenceNumber, ...vqt } = item;
         const data = `data: ${JSON.stringify([vqt])}\n\n`;
@@ -274,15 +333,18 @@ export class SubscriptionManager {
         );
     }
 
+    /* The spec expires a subscription only when it has had neither an
+     * active stream nor a /sync for a whole TTL. An open stream keeps
+     * it alive; the timer restarts when the stream closes. */
     private expireSubscription(subscriptionId: string): void {
         const sub = this.subscriptions.get(subscriptionId);
         if (!sub) return;
+        if (sub.activeStream) {
+            this.resetTtl(sub);
+            return;
+        }
 
         clearTimeout(sub.ttlTimer);
-        if (sub.activeStream) {
-            sub.activeStream.end();
-            sub.activeStream = null;
-        }
         sub.queue.length = 0;
         this.subscriptions.delete(subscriptionId);
     }

@@ -14,6 +14,7 @@ import { jest, describe, it, expect, beforeAll } from "@jest/globals";
 import express from "express";
 import request from "supertest";
 import { APIv1 } from "../lib/api-v1.js";
+import type { SyncResult } from "../lib/subscriptions.js";
 import { I3X_SPEC_VERSION, Version, RelType } from "../lib/constants.js";
 import type {
     I3xNamespace,
@@ -23,7 +24,6 @@ import type {
     I3xValueResponse,
     I3xVqt,
     I3xSubscription,
-    I3xSyncItem,
 } from "../lib/types/i3x.js";
 
 /* ================================================================
@@ -302,11 +302,14 @@ function createPreloadedMocks() {
         unregister: jest.fn<(owner: string, subId: string, ids: string[]) => void>(),
         unregisterOne: jest.fn<(owner: string, subId: string, id: string) => void>(),
         stream: jest.fn<(owner: string, subId: string, res: any) => void>(),
-        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
-            .mockReturnValue([
-                { sequenceNumber: 1, elementId: "obj-cnc-1", ...vqtCnc1 },
-                { sequenceNumber: 2, elementId: "obj-robot-1", ...vqtRobot },
-            ]),
+        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => SyncResult>()
+            .mockReturnValue({
+                updates: [
+                    { sequenceNumber: 1, elementId: "obj-cnc-1", ...vqtCnc1 },
+                    { sequenceNumber: 2, elementId: "obj-robot-1", ...vqtRobot },
+                ],
+                dropped: 0,
+            }),
     };
 
     return { objectTree, valueCache, history, subscriptions };

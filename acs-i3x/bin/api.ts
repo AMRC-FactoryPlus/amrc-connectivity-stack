@@ -50,6 +50,7 @@ const history = new History({
 const subscriptions = new SubscriptionManager({
     valueCache,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
+    maxQueue: parseInt(env.I3X_SUBSCRIPTION_MAX_QUEUE || "10000"),
 });
 
 // Build RAG engine (graph + search index)

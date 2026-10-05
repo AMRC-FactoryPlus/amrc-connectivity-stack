@@ -25,6 +25,7 @@ function mockSseRes() {
 }
 
 const TTL = 30_000;
+const MAX_QUEUE = 5;
 
 function makeVqt(value: unknown = 42, timestamp?: string): I3xVqt {
     return {
@@ -34,6 +35,16 @@ function makeVqt(value: unknown = 42, timestamp?: string): I3xVqt {
     };
 }
 
+function closeHandler(res: any): () => void {
+    const call = res.on.mock.calls.find((c: any[]) => c[0] === "close");
+    return call![1] as () => void;
+}
+
+function sseUpdates(res: any): any[] {
+    return res.write.mock.calls.flatMap((c: any[]) =>
+        JSON.parse((c[0] as string).replace("data: ", "").trim()));
+}
+
 describe("SubscriptionManager", () => {
     let valueCache: ReturnType<typeof mockValueCache>;
     let mgr: SubscriptionManager;
@@ -41,7 +52,7 @@ describe("SubscriptionManager", () => {
     beforeEach(() => {
         jest.useFakeTimers();
         valueCache = mockValueCache();
-        mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL });
+        mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL, maxQueue: MAX_QUEUE });
     });
 
     afterEach(() => {
@@ -230,7 +241,7 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-1");
         });
@@ -278,7 +289,7 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-1");
         });
@@ -317,7 +328,7 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(0);
         });
 
@@ -332,7 +343,7 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-2", makeVqt(200));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-2");
         });
@@ -371,7 +382,7 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(0);
         });
 
@@ -409,7 +420,7 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100, "2026-04-01T12:00:00Z"));
             listener("elem-1", makeVqt(200, "2026-04-01T12:00:01Z"));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(2);
             expect(items[0].sequenceNumber).toBe(1);
             expect(items[1].sequenceNumber).toBe(2);
@@ -427,8 +438,8 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items1 = mgr.sync("client-1", sub1.subscriptionId);
-            const items2 = mgr.sync("client-1", sub2.subscriptionId);
+            const items1 = mgr.sync("client-1", sub1.subscriptionId).updates;
+            const items2 = mgr.sync("client-1", sub2.subscriptionId).updates;
             expect(items1).toHaveLength(1);
             expect(items2).toHaveLength(0);
         });
@@ -448,7 +459,7 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100));
             listener("elem-1", makeVqt(200));
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(2);
         });
 
@@ -464,7 +475,7 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(200));
             listener("elem-1", makeVqt(300));
 
-            const items = mgr.sync("client-1", sub.subscriptionId, 2);
+            const items = mgr.sync("client-1", sub.subscriptionId, 2).updates;
             expect(items).toHaveLength(1);
             expect(items[0].sequenceNumber).toBe(3);
             expect(items[0].value).toBe(300);
@@ -473,7 +484,7 @@ describe("SubscriptionManager", () => {
         it("returns empty array on empty queue", () => {
             const sub = mgr.create("client-1", "client-1");
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             expect(items).toHaveLength(0);
         });
 
@@ -489,10 +500,96 @@ describe("SubscriptionManager", () => {
                 listener("elem-1", makeVqt(i));
             }
 
-            const items = mgr.sync("client-1", sub.subscriptionId);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
             for (let i = 1; i < items.length; i++) {
                 expect(items[i].sequenceNumber).toBeGreaterThan(items[i - 1].sequenceNumber);
             }
+        });
+
+        it("clears the whole queue when lastSequenceNumber is -1", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+            listener("elem-1", makeVqt(200));
+
+            expect(mgr.sync("client-1", sub.subscriptionId, -1).updates).toEqual([]);
+
+            listener("elem-1", makeVqt(300));
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            expect(items).toHaveLength(1);
+            expect(items[0].sequenceNumber).toBe(3);
+        });
+
+        it("clears nothing when lastSequenceNumber is invalid", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+
+            for (const bad of ["1", 1.5, -2, null] as any[]) {
+                expect(mgr.sync("client-1", sub.subscriptionId, bad).updates).toHaveLength(1);
+            }
+        });
+
+        it("refuses with 409 while a stream is open", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.stream("client-1", sub.subscriptionId, mockSseRes());
+
+            try {
+                mgr.sync("client-1", sub.subscriptionId);
+                fail("expected sync to throw");
+            } catch (err: any) {
+                expect(err.status).toBe(409);
+            }
+        });
+
+        it("allows sync again once the stream has closed", () => {
+            const sub = mgr.create("client-1", "client-1");
+            const res = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res);
+            closeHandler(res)();
+
+            expect(mgr.sync("client-1", sub.subscriptionId).updates).toEqual([]);
+        });
+
+        it("drops the oldest updates beyond the queue limit", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            for (let i = 1; i <= MAX_QUEUE + 3; i++) {
+                listener("elem-1", makeVqt(i));
+            }
+
+            const { updates, dropped } = mgr.sync("client-1", sub.subscriptionId);
+            expect(dropped).toBe(3);
+            expect(updates).toHaveLength(MAX_QUEUE);
+            expect(updates[0].sequenceNumber).toBe(4);
+            expect(updates[MAX_QUEUE - 1].sequenceNumber).toBe(MAX_QUEUE + 3);
+        });
+
+        it("reports dropped updates only once", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            for (let i = 1; i <= MAX_QUEUE + 1; i++) {
+                listener("elem-1", makeVqt(i));
+            }
+
+            expect(mgr.sync("client-1", sub.subscriptionId).dropped).toBe(1);
+            expect(mgr.sync("client-1", sub.subscriptionId).dropped).toBe(0);
         });
 
         it("throws 404 for a different owner", () => {
@@ -553,6 +650,63 @@ describe("SubscriptionManager", () => {
             expect(writtenData).toContain("data:");
         });
 
+        it("releases the queue once it has been sent on the stream", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+
+            const res = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res);
+            expect(sseUpdates(res).map(u => u.value)).toEqual([100]);
+            closeHandler(res)();
+
+            expect(mgr.sync("client-1", sub.subscriptionId).updates).toEqual([]);
+        });
+
+        it("does not queue updates while a stream is open", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+
+            const res = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res);
+            listener("elem-1", makeVqt(100));
+            listener("elem-1", makeVqt(200));
+            closeHandler(res)();
+            listener("elem-1", makeVqt(300));
+
+            expect(sseUpdates(res).map(u => u.value)).toEqual([100, 200]);
+            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            expect(items.map(i => i.value)).toEqual([300]);
+            expect(items[0].sequenceNumber).toBe(1);
+        });
+
+        it("does not resend updates an earlier stream delivered", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+
+            const res1 = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res1);
+            listener("elem-1", makeVqt(100));
+            closeHandler(res1)();
+            listener("elem-1", makeVqt(200));
+
+            const res2 = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res2);
+            expect(sseUpdates(res2).map(u => u.value)).toEqual([200]);
+        });
+
         it("sends new items as they arrive", () => {
             const sub = mgr.create("client-1", "client-1");
             mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
@@ -573,15 +727,41 @@ describe("SubscriptionManager", () => {
             expect(writtenData).toContain("999");
         });
 
-        it("throws error on second stream call (one stream per subscription)", () => {
+        it("closes the existing stream when a second one opens", () => {
             const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
             const res1 = mockSseRes();
             mgr.stream("client-1", sub.subscriptionId, res1);
 
             const res2 = mockSseRes();
-            expect(() =>
-                mgr.stream("client-1", sub.subscriptionId, res2),
-            ).toThrow();
+            mgr.stream("client-1", sub.subscriptionId, res2);
+            expect(res1.end).toHaveBeenCalled();
+
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+            expect(res1.write).not.toHaveBeenCalled();
+            expect(sseUpdates(res2).map(u => u.value)).toEqual([100]);
+        });
+
+        it("keeps the new stream when the replaced one reports close", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const res1 = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res1);
+            const res2 = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res2);
+
+            closeHandler(res1)();
+
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+            expect(sseUpdates(res2).map(u => u.value)).toEqual([100]);
         });
 
         it("clears activeStream on res close", () => {
@@ -692,14 +872,40 @@ describe("SubscriptionManager", () => {
             expect(result).toHaveLength(0);
         });
 
-        it("closes active stream on expiry", () => {
+        it("does not expire while a stream is open", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
             mgr.stream("client-1", sub.subscriptionId, res);
 
-            jest.advanceTimersByTime(TTL + 1);
+            jest.advanceTimersByTime(TTL * 5);
 
-            expect(res.end).toHaveBeenCalled();
+            expect(res.end).not.toHaveBeenCalled();
+            expect(mgr.list("client-1", [sub.subscriptionId])).toHaveLength(1);
+        });
+
+        it("expires a TTL after the stream closes", () => {
+            const sub = mgr.create("client-1", "client-1");
+            const res = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res);
+            jest.advanceTimersByTime(TTL * 2);
+
+            closeHandler(res)();
+            jest.advanceTimersByTime(TTL - 1000);
+            expect(mgr.list("client-1", [sub.subscriptionId])).toHaveLength(1);
+
+            jest.advanceTimersByTime(1001);
+            expect(mgr.list("client-1", [sub.subscriptionId])).toHaveLength(0);
+        });
+
+        it("does not revive a deleted subscription when its stream closes", () => {
+            const sub = mgr.create("client-1", "client-1");
+            const res = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res);
+
+            mgr.deleteOne("client-1", sub.subscriptionId);
+            closeHandler(res)();
+
+            expect(jest.getTimerCount()).toBe(0);
         });
     });
 
@@ -848,7 +1054,7 @@ describe("SubscriptionManager", () => {
                 (elementId: string, vqt: I3xVqt) => void;
             listener("elem-1", makeVqt(7));
 
-            const items = mgr.sync(OWNER, sub.subscriptionId);
+            const items = mgr.sync(OWNER, sub.subscriptionId).updates;
             expect(items).toHaveLength(1);
             expect(items[0].value).toBe(7);
 

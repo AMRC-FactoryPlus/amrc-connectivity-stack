@@ -6,10 +6,11 @@
  * The SQLite store and the ObjectTree rows it holds.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, truncateSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { jest } from "@jest/globals";
 import { I3xStore, SCHEMA_VERSION } from "../lib/store.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { ValueCache } from "../lib/value-cache.js";
@@ -91,6 +92,42 @@ describe("I3xStore", () => {
         expect(rows(s3, "object")).toBe(0);
         expect((s3.db.prepare("pragma user_version").get() as any).user_version).toBe(SCHEMA_VERSION);
         s3.close();
+    });
+
+    it("starts a new database in place of a file that is not one", () => {
+        const path = join(dir, "i3x.db");
+        writeFileSync(path, "this is not a database ".repeat(500));
+        writeFileSync(`${path}-wal`, "garbage");
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const s = new I3xStore({ path });
+            expect(err).toHaveBeenCalled();
+            expect(s.warm).toBe(false);
+            tree(s).addDevice("dev-1", devInfo("D1", ["AMRC"]), { name: "Device 1" });
+            s.close();
+            expect(readFileSync(path).subarray(0, 15).toString()).toBe("SQLite format 3");
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("starts a new database in place of a truncated one", () => {
+        const path = join(dir, "i3x.db");
+        const s1 = new I3xStore({ path });
+        const t1 = tree(s1);
+        for (let i = 0; i < 200; i++) t1.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+        s1.close();
+        truncateSync(path, Math.floor(statSync(path).size / 2));
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const s2 = new I3xStore({ path });
+            expect(err).toHaveBeenCalled();
+            expect(s2.warm).toBe(false);
+            expect(tree(s2).objectCount()).toBe(0);
+            s2.close();
+        } finally {
+            err.mockRestore();
+        }
     });
 
     it("uses WAL and the configured page cache", () => {

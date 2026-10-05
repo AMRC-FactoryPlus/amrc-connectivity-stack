@@ -132,14 +132,15 @@ publishes as the agent's Will if its session drops. An Edge Agent whose
 Devices never change can publish nothing after its births and still be
 up.
 
-If the Edge Monitor has not seen the Edge Agent come up (it has seen no
-packets since the monitor started or since the monitor's own MQTT
-connection dropped, or the last packet was an NDEATH) for a certain
-length of time (by default 3 minutes) it will send a rebirth request.
-It repeats the request with an increasing delay, up to 8 times that
-length, until the agent answers. If the Edge Agent is not up for 3 times
-that length the Edge Monitor will raise an Offline Alert over Sparkplug.
-The Alert clears as soon as the agent publishes again.
+The Edge Monitor may miss packets when it starts, or when its own MQTT
+connection drops. If it has not seen the Edge Agent's NBIRTH since then,
+or the last packet was an NDEATH, for a certain length of time (by
+default 3 minutes) it will send a rebirth request. It repeats the
+request with an increasing delay, up to 8 times that length, until the
+agent births. If the Edge Monitor sees no packets at all from the Edge
+Agent for 3 times that length, after it starts or after an NDEATH, it
+will raise an Offline Alert over Sparkplug. The Alert clears as soon as
+the agent publishes again.
 
 ## Implementation Details
 

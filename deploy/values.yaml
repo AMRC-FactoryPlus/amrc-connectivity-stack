@@ -827,6 +827,14 @@ openmetadata-dependencies:
       # primary.configuration) is used so the chart's own default my.cnf
       # (datadir, socket, skip-name-resolve, etc.) isn't clobbered.
       extraFlags: "--sort_buffer_size=20M"
+      # The chart's default (15s + 10 x 10s) kills mysqld after ~2 minutes.
+      # On network block storage (Ceph RBD, Longhorn) first-boot
+      # initialisation plus mysql_upgrade can take longer than that, and a
+      # kill partway through leaves a half-built datadir that then never
+      # starts. Allow ~10 minutes instead.
+      startupProbe:
+        initialDelaySeconds: 30
+        failureThreshold: 60
       extraEnvVars:
         - name: AIRFLOW_MYSQL_PASSWORD
           valueFrom:
@@ -864,7 +872,7 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: ghcr.io/amrc-factoryplus/openmetadata-ingestion
-        tag: 2.0.1-patched
+        tag: 2.0.3-patched
     # The chart's own fernet-key Secret is a pre-install-only Helm hook, so
     # it never gets created when openmetadata is enabled on an existing acs
     # release (an upgrade, not a fresh install). Point at our own instead -

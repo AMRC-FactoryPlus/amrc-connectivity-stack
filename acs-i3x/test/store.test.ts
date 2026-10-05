@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 import { I3xStore, SCHEMA_VERSION } from "../lib/store.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { ValueCache } from "../lib/value-cache.js";
 
 const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 
@@ -266,5 +267,47 @@ describe("ObjectTree rows", () => {
         t.addCompositionFromUns(["dev-1"], ["schema-top"], ["New", "Leaf"]);
         t.addCompositionFromUns(["dev-1"], ["schema-top"], ["Status"]);
         expect(n).toBe(2);
+    });
+
+    it("never scans a whole table on the per-device and per-message paths", () => {
+        const t = tree();
+        for (let i = 0; i < 20; i++)
+            t.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC", "S"]), { name: `Device ${i}` });
+        const vc = new ValueCache({ objectTree: t, store: t.store, staleThreshold: 1 });
+
+        /* Record every statement the hot paths prepare. */
+        const used = new Set<string>();
+        const prepare = t.store.prepare.bind(t.store);
+        t.store.prepare = (sql: string) => { used.add(sql); return prepare(sql); };
+
+        t.addDevice("dev-new", devInfo("New", ["AMRC", "S"]), { name: "New" });
+        t.addCompositionFromUns(["dev-3"], ["schema-top"], ["Extra", "Leaf"], ["AMRC", "S"]);
+        vc.onUnsMessage("UNS/v1/AMRC/S/Edge/D3/Status",
+            Buffer.from('{"timestamp":"2026-10-05T12:00:00Z","value":1}'),
+            { properties: { userProperties: { InstanceUUIDPath: "dev-3:", SchemaUUIDPath: "schema-top:" } } });
+        vc.getValue("dev-3");
+        vc.recordInfluxValues([{ elementId: "x", device: "dev-3", anchor: "dev-3",
+            value: 1, quality: "Good", timestamp: "2026-10-05T12:00:00Z" }]);
+        t.replaceDeviceSubtree("dev-3", devInfo("D3", ["AMRC", "T"]), { name: "Device 3" });
+        t.updateDeviceName("dev-4", "Renamed");
+        t.removeDevice("dev-5");
+        vc.removeDevice("dev-5");
+        t.getRelated("dev-6");
+        t.getDescendantLeafIds("dev-6", 0);
+        t.getDeviceSchemaUuids("dev-6");
+        t.isSchemaReferenced("schema-top");
+        t.getObjectType("schema-top");
+        expect(used.size).toBeGreaterThan(15);
+
+        const scans: string[] = [];
+        for (const sql of used) {
+            for (const r of t.store.db.prepare(`explain query plan ${sql}`).all() as any[]) {
+                // "SCAN x" without an index, or "SCAN x USING [COVERING] INDEX"
+                // with no search terms, reads every row of x.
+                if (/^SCAN (object|o|metric_meta|last_value|device_schema|object_type)\b/.test(r.detail))
+                    scans.push(`${r.detail} <- ${sql.replace(/\s+/g, " ").trim()}`);
+            }
+        }
+        expect(scans).toEqual([]);
     });
 });

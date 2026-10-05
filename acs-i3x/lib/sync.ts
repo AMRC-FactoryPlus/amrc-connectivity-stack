@@ -172,6 +172,8 @@ export class ConfigSync {
     /** True once a full reconcile has run since the feeds started. */
     private reconciled = false;
     private reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+    private lostTimer: ReturnType<typeof setTimeout> | null = null;
+    private offCommitFailure: () => void;
     private retries = new Map<string, ReturnType<typeof setTimeout>>();
     /** Keys whose last fetch failed and has not succeeded since. */
     private failed = new Set<string>();
@@ -193,6 +195,20 @@ export class ConfigSync {
         this.log = opts.log ?? (() => {});
         this.retryDelay = opts.retryDelay ?? 10_000;
         const limit = opts.concurrency ?? 16;
+        /* A failed group commit rolls back changes we have applied and
+         * recorded as applied. Compare everything again, after a pause
+         * in case the disk is still full. */
+        this.offCommitFailure = this.store.onCommitFailure(() => {
+            this.stats.errors++;
+            if (this.stopped || this.lostTimer) return;
+            console.error("ConfigSync: a commit failed; checking ConfigDB again in %d ms",
+                this.retryDelay);
+            this.lostTimer = setTimeout(() => {
+                this.lostTimer = null;
+                this.scheduleReconcile();
+            }, this.retryDelay);
+            this.lostTimer.unref?.();
+        });
         this.queue = new KeyedQueue(Number.isInteger(limit) && limit >= 1 ? limit : 16,
             key => this.work(key), () => this.onIdle());
     }
@@ -213,11 +229,25 @@ export class ConfigSync {
             },
         });
 
+        /* An exception in a subscriber is not an error on the feed:
+         * RxJS rethrows it later, outside any handler, and Node exits.
+         * Log it and count it instead; the next snapshot or update
+         * compares again. */
+        const guard = <T>(name: string, fn: (v: T) => void) => (v: T) => {
+            try {
+                fn(v);
+            } catch (err) {
+                this.stats.errors++;
+                console.error(`ConfigSync: handling a ${name} update failed:`, err);
+                /* Part of the change may not have been applied. */
+                if (this.reconciled) this.scheduleReconcile();
+            }
+        };
         this.subs.push(this.opts.members.pipe(retry("Device class watch"))
-            .subscribe(m => this.onMembers(m)));
+            .subscribe(guard("Device class", m => this.onMembers(m))));
         for (const kind of Object.keys(APP) as Kind[]) {
             this.subs.push(this.opts.etags(APP[kind]).pipe(retry(`${kind} ETag search`))
-                .subscribe(c => this.onEtags(kind, c)));
+                .subscribe(guard(`${kind} ETag`, c => this.onEtags(kind, c))));
         }
         return this;
     }
@@ -227,6 +257,8 @@ export class ConfigSync {
         this.subs.forEach(s => s.unsubscribe());
         this.subs = [];
         if (this.reconcileTimer) clearTimeout(this.reconcileTimer);
+        if (this.lostTimer) clearTimeout(this.lostTimer);
+        this.offCommitFailure();
         for (const t of this.retries.values()) clearTimeout(t);
         this.retries.clear();
     }

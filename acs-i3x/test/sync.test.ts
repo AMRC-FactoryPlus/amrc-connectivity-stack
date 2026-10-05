@@ -13,6 +13,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as rx from "rxjs";
+import { config as rxConfig } from "rxjs";
 
 import { ConfigSync } from "../lib/sync.js";
 import type { EtagChange } from "../lib/sync.js";
@@ -563,6 +564,78 @@ describe("ConfigSync", () => {
             await settle(sync);
             expect(tree.isReady()).toBe(true);
         } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("fetches again what a failed commit rolled back", async () => {
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const { tree, store, sync } = start(stack(cdb, undefined, { retryDelay: 50 }));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+            await settle(sync);
+            store.commit();
+
+            /* The next group commit fails, as on a full disk. */
+            const exec = store.db.exec.bind(store.db);
+            let fail = true;
+            const spy = jest.spyOn(store.db, "exec").mockImplementation((sql: string) => {
+                if (fail && sql === "commit") { fail = false; throw new Error("database or disk is full"); }
+                return exec(sql);
+            });
+            cdb.put(INFO, uuids[4], { name: "Lost then found" });
+            await settle(sync);
+            expect(tree.getObject(uuids[4])!.displayName).toBe("Lost then found");
+            store.commit();
+            // The rename was rolled back with the batch...
+            expect(fail).toBe(false);
+            // ...and is fetched and applied again.
+            await sleep(150);
+            await settle(sync);
+            store.commit();
+            spy.mockRestore();
+            expect(tree.getObject(uuids[4])!.displayName).toBe("Lost then found");
+            expect((store.prepare("select etag_info from sync_device where uuid = ?").get(uuids[4]) as any).etag_info)
+                .toBe(cdb.configs.get(cdb.key(INFO, uuids[4]))!.etag);
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("logs and counts an exception while handling an update, without crashing", async () => {
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        const unhandled: unknown[] = [];
+        const prev = rxConfig.onUnhandledError;
+        rxConfig.onUnhandledError = e => unhandled.push(e);
+        try {
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const { tree, sync } = start(stack(cdb));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+            await settle(sync);
+
+            const remove = jest.spyOn(tree, "removeDevice")
+                .mockImplementationOnce(() => { throw new Error("database or disk is full"); });
+            const before = sync.stats.errors;
+            cdb.setMembers(uuids.slice(1));
+            const check = jest.spyOn(tree, "isSchemaReferenced")
+                .mockImplementationOnce(() => { throw new Error("disk I/O error"); });
+            cdb.put(INFO, TOP, { name: "x" });
+            await settle(sync);
+            remove.mockRestore();
+            check.mockRestore();
+            await settle(sync);
+
+            expect(unhandled).toEqual([]);
+            expect(sync.stats.errors).toBeGreaterThanOrEqual(before + 2);
+            // The failed removal is done by the reconcile that follows.
+            expect(tree.getObject(uuids[0])).toBeUndefined();
+        } finally {
+            rxConfig.onUnhandledError = prev;
             err.mockRestore();
         }
     });

@@ -43,6 +43,8 @@ class FakeConfigDB {
     private open: (() => void) | null = null;
     /** App:object keys whose GET fails while listed. */
     failing = new Set<string>();
+    /** App:object keys whose GET waits for the given promise. */
+    held = new Map<string, Promise<void>>();
     private n = 0;
 
     key(app: string, obj: string) { return `${app}:${obj}`; }
@@ -96,6 +98,7 @@ class FakeConfigDB {
                 const e = this.configs.get(this.key(app, obj));
                 const fail = this.failing.has(this.key(app, obj));
                 await (this.gate ?? new Promise(r => setImmediate(r)));
+                await this.held.get(this.key(app, obj));
                 if (fail) throw new Error("HTTP 503");
                 /* Return a copy, as a parsed HTTP body is. */
                 return e ? [JSON.parse(JSON.stringify(e.config)), e.etag] : [];
@@ -558,6 +561,50 @@ describe("ConfigSync", () => {
             expect(tree.getObject(uuids[2])).toBeDefined();
             expect(store.getMeta("synced")).toBe("1");
         } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("times the grace from when fetches began failing without a break", async () => {
+        /* A failure early in a long cold sync that recovers must not use
+         * up the grace of a later failure. The held fetch keeps the
+         * queue busy throughout, as a long sync does. */
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        let releaseC = () => {};
+        try {
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const [A, B, C] = [uuids[1], uuids[4], uuids[6]];
+            cdb.held.set(cdb.key(DI, C), new Promise<void>(r => releaseC = r));
+            cdb.failing.add(cdb.key(DI, A));
+            const { tree, sync } = start(stack(cdb, undefined, { retryDelay: 30, readyGrace: 300 }));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+
+            // A fails, then recovers on retry, while C is still in flight.
+            for (let i = 0; i < 200 && sync.stats.errors === 0; i++) await sleep(5);
+            expect(sync.stats.errors).toBeGreaterThan(0);
+            cdb.failing.delete(cdb.key(DI, A));
+            for (let i = 0; i < 200 && !tree.getObject(A); i++) await sleep(5);
+            expect(tree.getObject(A)).toBeDefined();
+
+            // Longer than the grace later, B starts failing.
+            await sleep(350);
+            cdb.failing.add(cdb.key(DI, B));
+            cdb.put(DI, B, cdb.configs.get(cdb.key(DI, B))!.config);
+            const errors = sync.stats.errors;
+            for (let i = 0; i < 200 && sync.stats.errors === errors; i++) await sleep(5);
+
+            // The queue goes idle with B waiting to retry: B has failed for
+            // well under the grace, so the tree must not be ready yet.
+            releaseC();
+            await sleep(60);
+            expect(tree.isReady()).toBe(false);
+
+            await sleep(400);
+            expect(tree.isReady()).toBe(true);
+        } finally {
+            releaseC();
             err.mockRestore();
         }
     });

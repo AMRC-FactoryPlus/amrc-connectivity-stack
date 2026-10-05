@@ -74,6 +74,9 @@ export interface ConfigSyncOpts {
     concurrency?: number;
     /** Wait before retrying a failed fetch or a failed feed, ms. */
     retryDelay?: number;
+    /** Once a cold sync has otherwise finished, how long configs may
+     * keep failing before the tree is served without them, ms. */
+    readyGrace?: number;
     log?: (msg: string, ...args: any[]) => void;
 }
 
@@ -180,6 +183,10 @@ export class ConfigSync {
     private retries = new Map<string, ReturnType<typeof setTimeout>>();
     /** Keys whose last fetch failed and has not succeeded since. */
     private failed = new Set<string>();
+    /** When fetches started failing (Date.now), or 0. */
+    private failingSince = 0;
+    private graceTimer: ReturnType<typeof setTimeout> | null = null;
+    private lastFailLog = 0;
     private subs: rx.Subscription[] = [];
     private queue: KeyedQueue;
     private stopped = false;
@@ -261,6 +268,7 @@ export class ConfigSync {
         this.subs = [];
         if (this.reconcileTimer) clearTimeout(this.reconcileTimer);
         if (this.lostTimer) clearTimeout(this.lostTimer);
+        if (this.graceTimer) clearTimeout(this.graceTimer);
         this.offCommitFailure();
         for (const t of this.retries.values()) clearTimeout(t);
         this.retries.clear();
@@ -477,6 +485,7 @@ export class ConfigSync {
         } catch (err) {
             this.stats.errors++;
             this.failed.add(key);
+            if (!this.failingSince) this.failingSince = Date.now();
             console.error(`ConfigSync: fetching ${key} failed, retrying:`, err);
             if (!this.retries.has(key) && !this.stopped) {
                 const t = setTimeout(() => {
@@ -640,7 +649,8 @@ export class ConfigSync {
         /* A failed fetch waits on a retry timer, outside the queue. The
          * tree is not complete until it has succeeded, so do not mark it
          * ready, or record a completed sync, until then. */
-        if (this.retries.size > 0 || this.failed.size > 0) return;
+        if (this.retries.size > 0 || this.failed.size > 0) return this.stillFailing();
+        this.failingSince = 0;
         if (this.applied >= 1000) {
             this.log("sync complete: %d devices in %d s", this.applied,
                 ((Date.now() - this.batchStart) / 1000).toFixed(1));
@@ -648,6 +658,40 @@ export class ConfigSync {
         if (this.store.getMeta("synced") !== "1") this.store.setMeta("synced", "1");
         if (!this.tree.isReady()) {
             this.log("initial sync complete: %d objects", this.tree.objectCount());
+            this.tree.setReady();
+        }
+    }
+
+    /**
+     * The queue is idle but some configs keep failing. Do not hold the
+     * API at 503 for ever over them: after readyGrace, serve the tree
+     * without them, say so loudly, and keep retrying. The sync is not
+     * recorded as complete until a pass ends with no failures.
+     */
+    private stillFailing(): void {
+        const grace = this.opts.readyGrace ?? 120_000;
+        if (!this.failingSince) this.failingSince = Date.now();
+        const wait = this.failingSince + grace - Date.now();
+        if (wait > 0) {
+            if (!this.graceTimer && !this.tree.isReady()) {
+                this.graceTimer = setTimeout(() => {
+                    this.graceTimer = null;
+                    if (this.queue.size === 0) this.onIdle();
+                }, wait);
+                this.graceTimer.unref?.();
+            }
+            return;
+        }
+        const now = Date.now();
+        if (now - this.lastFailLog >= grace) {
+            this.lastFailLog = now;
+            const keys = [...new Set([...this.failed, ...this.retries.keys()])];
+            console.error("ConfigSync: %d configs have failed to fetch for %d s; serving the tree without them and still retrying: %s",
+                keys.length, Math.round((now - this.failingSince) / 1000),
+                keys.slice(0, 20).join(", ") + (keys.length > 20 ? ", ..." : ""));
+        }
+        if (!this.tree.isReady()) {
+            this.log("initial sync complete except for failing configs: %d objects", this.tree.objectCount());
             this.tree.setReady();
         }
     }

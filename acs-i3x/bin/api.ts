@@ -134,5 +134,6 @@ new ConfigSync({
     ...configSyncFeeds(fplus),
     valueCache,
     concurrency: positiveInt("I3X_SYNC_CONCURRENCY", 16),
+    readyGrace: positiveInt("I3X_READY_GRACE_MS", 120_000),
     log: fplus.debug.bound("sync"),
 }).run();

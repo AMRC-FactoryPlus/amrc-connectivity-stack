@@ -25,6 +25,9 @@ function mockObjectTree() {
         getRelationshipTypes: jest.fn<(ns?: string) => I3xRelationshipType[]>().mockReturnValue([]),
         getRelationshipType: jest.fn<(id: string) => I3xRelationshipType | undefined>().mockReturnValue(undefined),
         getObjects: jest.fn<(opts?: any) => I3xObject[]>().mockReturnValue([]),
+        /* GET /objects streams from iterateObjects; this one reads
+         * whatever getObjects is set up to return. */
+        iterateObjects: jest.fn(function* (this: any, opts?: any) { yield* this.getObjects(opts); }),
         getObject: jest.fn<(id: string) => I3xObject | undefined>().mockReturnValue(undefined),
         getRelated: jest.fn<(id: string, rt?: string) => I3xObject[]>().mockReturnValue([]),
         getChildElementIds: jest.fn<(id: string) => string[]>().mockReturnValue([]),

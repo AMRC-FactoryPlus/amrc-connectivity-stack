@@ -69,7 +69,8 @@ device fleet out of memory.
 - The database is a cache of ConfigDB and the UNS. The schema version is in
   `PRAGMA user_version`, with a fingerprint of the namespace settings; on
   any mismatch the tables are dropped and rebuilt, and the next sync fills
-  them again.
+  them again. A file that cannot be opened, or is shorter than its header
+  says, is deleted (with its WAL) and recreated, with a loud log line.
 - Group commit: writes join one open transaction that commits 250 ms after
   the first write. A COMMIT costs more than one device's or one UNS
   message's writes, so this keeps the commit rate low. Nested
@@ -130,6 +131,16 @@ with MCP enabled the RAG index alone needs several GB at that size, and
 memory limits are set separately. A smaller page cache
 (`I3X_DB_CACHE_MB=16`) made the sync slower and saved no memory.
 
+After the fixes from the review of this change, at 74,000 devices with
+`--max-old-space-size=384` (the chart's `i3x.maxHeapMB` default, MCP off):
+cold sync 371 s, peak RSS 329 MiB; 279 MiB RSS and 74 MiB heap after sync;
+277 MiB at steady state (304 MiB after a warm restart, which took 1.9 s
+and no GETs). UNS ingest ran at 9,500 messages a second creating nodes and
+25,500 without. The cached value of the top ISA-95 level (2.6 million
+components, a 300 MiB body) streamed in 33 s, raising RSS by 9 MiB with a
+heap peak of 129 MiB. Most of those 33 s is SQLite sorting the components
+before the first one is sent, which blocks the event loop.
+
 ## Core Components
 
 ### object-tree.ts
@@ -155,7 +166,12 @@ hierarchy and its metric tree; its Info config gives its display name.
 - `refreshFromSnapshot` makes the tree hold exactly a given set of devices
   and schemas, with the same per-device mutations.
 - `iterateObjects` reads the tree a page at a time; `GET /objects` streams
-  from it instead of building one array.
+  from it instead of building one array. With a file database the pages
+  come from one read transaction on a separate read-only connection, so a
+  stream sees one consistent view however long the client takes.
+- `addCompositionFromUns` adds nothing for a device that is not in the
+  tree. `dropOrphans` removes UNS nodes whose parent is gone and empty
+  ISA-95 levels; the sync engine runs it on every reconcile.
 - `onChange` reports writes; the RAG index uses it to know it is stale.
 
 ### sync.ts (ConfigSync)
@@ -181,8 +197,13 @@ Fetches use an uncached ServiceClient (`fplus.uncached()`: the default HTTP
 cache keeps every response for ever), at most `I3X_SYNC_CONCURRENCY` (16)
 at once and one per device or schema. A config that changes again while
 its fetch is in flight is fetched again. Applying a result is synchronous,
-so writes never interleave. Failed fetches are retried after 10 s. A cold
-sync logs progress every 1,000 devices.
+so writes never interleave. Failed fetches are retried after 10 s, and the
+tree is not marked ready (nor a completed sync recorded) while any fetch
+is failing or waiting to be retried. A group commit that fails (a full
+disk) rolls back applied changes; the engine then compares everything with
+ConfigDB again after the retry delay. Errors while handling an update are
+logged and counted, and followed by a reconcile. A cold sync logs progress
+every 1,000 devices.
 
 ### value-cache.ts
 
@@ -191,17 +212,29 @@ Subscribes to `UNS/v1/#`. On each message:
 2. Reads the MQTT v5 user properties (InstanceUUIDPath, SchemaUUIDPath).
    A trailing `:` (uns-ingester sends `device:` for a metric directly under
    the device) does not add an empty segment.
-3. Adds any new composition nodes to the object tree.
-4. Queues the VQT for the `last_value` table; queued values are written
-   every 250 ms or 5,000 values, and every read flushes first.
-5. Notifies the subscription manager.
+3. Adds any new composition nodes to the object tree. A message for a
+   device that is not in the tree is dropped.
+4. Notifies the subscription manager.
+5. Queues the VQT for the `last_value` table, filed under the leaf's parent
+   in the tree; queued values are written every 250 ms or 5,000 values,
+   and every read flushes first. A failed write keeps the values for the
+   next one.
 
 InfluxDB values that History reads on a cache miss are written back
-(`recordInfluxValues`), never over a newer UNS value. Values are cleared at
-start and on an MQTT reconnect, because UNS messages sent while i3X was
-not listening are lost.
+(`recordInfluxValues`), never over a newer UNS value, and serve later
+reads of that leaf. Compositions are built from UNS values only, so a
+composition with no UNS data still falls back to InfluxDB whole. Values are
+cleared at start and on an MQTT reconnect, because UNS messages sent while
+i3X was not listening are lost.
 
-Exposes: `getValue(elementId)`, `getChildValues(elementId, maxDepth)`.
+A composition's cached value is every UNS value in its whole subtree, in
+tree order (the cache path does not apply maxDepth). Near the top of the
+ISA-95 hierarchy that is millions of components, so `getValueLazy` reads
+them with one recursive query over a read snapshot, and the value routes
+stream them to the client instead of building the value.
+
+Exposes: `getValue(elementId)`, `getValueLazy(elementId)`,
+`getChildValues(elementId, maxDepth)`.
 
 ### history.ts
 

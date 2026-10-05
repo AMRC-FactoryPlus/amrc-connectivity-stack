@@ -16,6 +16,7 @@
  */
 
 import { rmSync, statSync } from "node:fs";
+import { Worker } from "node:worker_threads";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 
 /** Bump this whenever the tables below change. */
@@ -121,8 +122,43 @@ export interface I3xStoreOpts {
      * much, and each batch commits whole.
      */
     commitInterval?: number;
+    /**
+     * Commit the open batch early, at the end of the transaction that
+     * takes it past this many changed rows. A COMMIT writes every dirty
+     * page at once and holds the event loop while it does; this keeps
+     * each one short. Default 2,000.
+     */
+    maxBatchChanges?: number;
+    /**
+     * Run WAL checkpoints in a worker thread, every this many ms,
+     * instead of inside a COMMIT on the main thread. Default 1,000; 0
+     * leaves SQLite's automatic checkpoints on the main thread. File
+     * databases only.
+     */
+    checkpointInterval?: number;
     log?: (msg: string, ...args: any[]) => void;
 }
+
+/* The checkpoint worker. It loads node:sqlite with the same warning
+ * filter, and checkpoints PASSIVE: copy what it can without waiting
+ * for, or blocking, the writer or readers. */
+const CHECKPOINTER = `
+const { workerData } = require("node:worker_threads");
+const emit = process.emitWarning;
+process.emitWarning = function (w, ...a) {
+    const type = typeof a[0] === "string" ? a[0] : a[0]?.type;
+    const text = typeof w === "string" ? w : w?.message;
+    if ((type === "ExperimentalWarning" || w?.name === "ExperimentalWarning") && /SQLite/.test(text ?? "")) return;
+    return emit.call(process, w, ...a);
+};
+const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
+const db = new DatabaseSync(workerData.path);
+db.exec("pragma busy_timeout = 1000");
+const st = db.prepare("pragma wal_checkpoint(PASSIVE)");
+setInterval(() => {
+    try { st.get(); } catch (err) { console.error("I3xStore checkpoint worker:", err.message); }
+}, workerData.interval);
+`;
 
 let warningFilter = false;
 
@@ -155,6 +191,9 @@ export class I3xStore {
     private depth = 0;
     private log: (msg: string, ...args: any[]) => void;
     private commitInterval: number;
+    private maxBatchChanges: number;
+    private batchStartChanges = 0;
+    private checkpointer: Worker | null = null;
     private batchOpen = false;
     private batchTimer: ReturnType<typeof setTimeout> | null = null;
     private commitFailureListeners: Set<(err: unknown) => void> = new Set();
@@ -167,6 +206,7 @@ export class I3xStore {
         this.path = opts.path ?? ":memory:";
         this.log = opts.log ?? (() => {});
         this.commitInterval = opts.commitInterval ?? 250;
+        this.maxBatchChanges = opts.maxBatchChanges ?? 2000;
 
         try {
             this.db = this.open(opts);
@@ -181,6 +221,36 @@ export class I3xStore {
                 rmSync(f, { force: true });
             this.warm = false;
             this.db = this.open(opts);
+        }
+        this.startCheckpointer(opts.checkpointInterval ?? 1000);
+    }
+
+    /**
+     * A WAL checkpoint copies the WAL into the database file and syncs
+     * it. SQLite runs one inside whichever COMMIT takes the WAL past
+     * 1,000 pages, which held the event loop for up to 700 ms during a
+     * cold sync. Instead a worker thread, on its own connection, runs a
+     * PASSIVE checkpoint (which never blocks the writer) every
+     * `interval` ms. If the worker cannot start, SQLite's own
+     * checkpoints stay on.
+     */
+    private startCheckpointer(interval: number): void {
+        if (this.path === ":memory:" || this.path === "" || !(interval > 0)) return;
+        try {
+            const w = new Worker(CHECKPOINTER, {
+                eval: true,
+                workerData: { path: this.path, interval },
+            });
+            w.on("error", err => {
+                console.error("I3xStore: checkpoint worker failed; checkpointing on the main thread:", err);
+                this.checkpointer = null;
+                try { this.db.exec("pragma wal_autocheckpoint = 1000"); } catch { /* closed */ }
+            });
+            w.unref();
+            this.db.exec("pragma wal_autocheckpoint = 0");
+            this.checkpointer = w;
+        } catch (err) {
+            console.error("I3xStore: cannot start the checkpoint worker:", err);
         }
     }
 
@@ -291,6 +361,11 @@ export class I3xStore {
         try {
             const rv = fn();
             this.db.exec(outer ? "commit" : `release ${sp}`);
+            /* A large batch would make a long COMMIT; end it now. */
+            if (this.depth === 1 && this.batchOpen && this.batchChanges() >= this.maxBatchChanges) {
+                this.depth--;
+                try { this.commit(); } finally { this.depth++; }
+            }
             return rv;
         } catch (err) {
             if (outer) {
@@ -305,10 +380,19 @@ export class I3xStore {
         }
     }
 
+    private totalChanges(): number {
+        return (this.prepare("select total_changes() n").get() as any).n;
+    }
+
+    private batchChanges(): number {
+        return this.totalChanges() - this.batchStartChanges;
+    }
+
     private openBatch(): void {
         if (this.batchOpen) return;
         this.db.exec("begin");
         this.batchOpen = true;
+        this.batchStartChanges = this.totalChanges();
         this.batchTimer = setTimeout(() => this.commit(), this.commitInterval);
         this.batchTimer.unref?.();
     }
@@ -389,6 +473,18 @@ export class I3xStore {
 
     close(): void {
         this.commit();
+        if (this.checkpointer) {
+            this.checkpointer.terminate();
+            this.checkpointer = null;
+            /* Leave the file whole, as closing the last connection
+             * would: the worker's connection may not have closed yet. */
+            try {
+                this.db.exec("pragma busy_timeout = 2000");
+                this.db.prepare("pragma wal_checkpoint(TRUNCATE)").get();
+            } catch (err) {
+                console.error("I3xStore: final checkpoint failed:", err);
+            }
+        }
         this.statements.clear();
         this.db.close();
     }

@@ -56,6 +56,10 @@ spec:
               value: "{{ .Values.acs.secure | ternary "mqtts://" "mqtt://" }}mqtt.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}"
             - name: VERBOSE
               value: {{.Values.mqtt.verbosity | quote | required "values.mqtt.verbosity is required!"}}
+            {{- with .Values.mqtt.javaOpts }}
+            - name: JAVA_OPTS
+              value: {{ . | quote }}
+            {{- end }}
 {{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
           volumeMounts:
             - mountPath: /etc/krb5.conf
@@ -66,6 +70,10 @@ spec:
             - mountPath: /opt/hivemq/conf/config.xml
               name: mqtt-conf
               subPath: config.xml
+          {{- with .Values.mqtt.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap

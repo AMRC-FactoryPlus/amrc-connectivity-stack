@@ -125,7 +125,7 @@ function seed(cdb: FakeConfigDB, n = N) {
     return Array.from({ length: n }, (_, i) => deviceUuid(i) as string);
 }
 
-function stack(cdb: FakeConfigDB, store = new I3xStore(), opts: Partial<{ concurrency: number; retryDelay: number }> = {}) {
+function stack(cdb: FakeConfigDB, store = new I3xStore(), opts: Partial<{ concurrency: number; retryDelay: number; readyGrace: number }> = {}) {
     const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
     const removed: string[] = [];
     const sync = new ConfigSync({
@@ -137,6 +137,7 @@ function stack(cdb: FakeConfigDB, store = new I3xStore(), opts: Partial<{ concur
         valueCache: { removeDevice: (uuid: string) => removed.push(uuid) },
         concurrency: opts.concurrency ?? 4,
         retryDelay: opts.retryDelay ?? 50,
+        readyGrace: opts.readyGrace,
     });
     return { tree, store, sync, removed };
 }
@@ -524,6 +525,38 @@ describe("ConfigSync", () => {
             expect(tree.isReady()).toBe(true);
             expect(store.getMeta("synced")).toBe("1");
             expect(state(tree)).toEqual(state(reference(cdb, uuids)));
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it("is ready after the grace period despite a failing config, but not recorded as synced", async () => {
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const cdb = new FakeConfigDB();
+            const uuids = seed(cdb);
+            const { tree, store, sync } = start(stack(cdb, undefined, { retryDelay: 60, readyGrace: 300 }));
+            cdb.failing.add(cdb.key(DI, uuids[2]));
+            cdb.setMembers(uuids);
+            cdb.snapshots();
+            await settle(sync);
+            expect(tree.isReady()).toBe(false);
+
+            await sleep(400);
+            await settle(sync);
+            expect(tree.isReady()).toBe(true);
+            expect(tree.getObject(uuids[3])).toBeDefined();
+            expect(store.getMeta("synced")).toBeUndefined();
+            const loud = err.mock.calls.filter(c => String(c[0]).includes("serving the tree without them"));
+            expect(loud.length).toBe(1);
+            expect(loud[0].join(" ")).toContain(`d:${uuids[2]}`);
+
+            // Still retrying: once it succeeds, the sync is recorded.
+            cdb.failing.clear();
+            await sleep(120);
+            await settle(sync);
+            expect(tree.getObject(uuids[2])).toBeDefined();
+            expect(store.getMeta("synced")).toBe("1");
         } finally {
             err.mockRestore();
         }

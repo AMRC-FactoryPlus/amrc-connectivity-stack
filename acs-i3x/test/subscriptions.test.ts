@@ -434,6 +434,54 @@ describe("SubscriptionManager", () => {
         });
     });
 
+    /* ---- queue bound ---- */
+
+    describe("queue bound", () => {
+        const listen = () => valueCache.onValueChange.mock.calls.at(-1)![0] as (
+            elementId: string,
+            vqt: I3xVqt,
+        ) => void;
+
+        it("drops the oldest updates when full, and counts them", () => {
+            mgr.destroy();
+            mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL, maxQueue: 3 });
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            for (let i = 1; i <= 5; i++) listen()("elem-1", makeVqt(i));
+
+            const items = mgr.sync("client-1", sub.subscriptionId);
+            expect(items.map(i => i.sequenceNumber)).toEqual([3, 4, 5]);
+            expect(items.map(i => i.value)).toEqual([3, 4, 5]);
+            expect(mgr.droppedCount("client-1", sub.subscriptionId)).toBe(2);
+        });
+
+        it("still streams every update when the queue is full", () => {
+            mgr.destroy();
+            mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL, maxQueue: 2 });
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            const res = mockSseRes();
+            mgr.stream("client-1", sub.subscriptionId, res);
+            for (let i = 1; i <= 5; i++) listen()("elem-1", makeVqt(i));
+            expect(res.write).toHaveBeenCalledTimes(5);
+        });
+
+        it("does not log per update", () => {
+            const log = jest.spyOn(console, "log").mockImplementation(() => {});
+            try {
+                const sub = mgr.create("client-1", "client-1");
+                mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+                const res = mockSseRes();
+                mgr.stream("client-1", sub.subscriptionId, res);
+                log.mockClear();
+                for (let i = 1; i <= 20; i++) listen()("elem-1", makeVqt(i));
+                expect(log).not.toHaveBeenCalled();
+            } finally {
+                log.mockRestore();
+            }
+        });
+    });
+
     /* ---- sync ---- */
 
     describe("sync", () => {

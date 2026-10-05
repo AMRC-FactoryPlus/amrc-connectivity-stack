@@ -88,6 +88,48 @@ Tables:
 | `last_value` | The last value of each leaf metric, with the object it is filed under (`anchor`) and its device. |
 | `meta` | Fingerprint, and whether a sync has completed. |
 
+## Measured scale
+
+Measured on 5 October 2026 with a scale harness (outside this repo) that
+drives the compiled classes: real ObjectTree, I3xStore, ConfigSync,
+ValueCache, History and routes, and the real rx-client NotifyV2 over a real
+WebSocket. ConfigDB is a fake in a separate process that answers the
+Device class WATCH, the ETag SEARCHes and the config GETs, which i3X makes
+through service-client's HTTP stack (got-fetch, `no-cache`). Devices are
+synthetic streetlights: 5.3 KB DeviceInformation, 34 config objects and 35
+UNS metrics each. Node 22.23 on node:22-alpine, in Docker on an Apple
+silicon laptop; 64 MiB page cache, 16 fetches in flight.
+
+| Devices | Cold sync | Peak RSS, cold sync | RSS / heap after sync | RSS / heap, steady (cold / warm start) | Warm restart | Database |
+|---|---|---|---|---|---|---|
+| 7,300 | 10 s | 270 MiB | 267 / 32 MiB | 267 / 32, 303 / 32 MiB | 0.2 s, 0 GETs | 233 MiB |
+| 20,000 | 41 s | 268 MiB | 264 / 40 MiB | 264 / 40, 323 / 37 MiB | 0.3 s, 0 GETs | 599 MiB |
+| 44,000 | 157 s | 435 MiB | 428 / 55 MiB | 385 / 55, 386 / 53 MiB | 0.8 s, 0 GETs | 1.2 GiB |
+| 74,000 | 346 s | 551 MiB | 477 / 74 MiB | 478 / 74, 450 / 71 MiB | 1.4 s, 0 GETs | 2.0 GiB |
+
+"Steady" is after every UNS metric of every device has arrived once.
+A warm restart serves the stored tree at once; the time is to finish
+comparing the ETag snapshots. The database size includes last values.
+`GET /objects` at 74,000 devices streams 586 MiB in about 4 s and raises
+RSS by about 14 MiB. A current-value read of 1,000 leaves known to the
+value cache takes about 12 ms and no Flux query. UNS ingest runs at 11,000
+to 34,000 messages a second when it creates nodes and 32,000 to 59,000
+when it does not, slower as the database outgrows the page cache.
+
+The in-memory design measured about 116 KB of heap per device: 5.1 GB at
+44,000 devices and 8.6 GB at 74,000, and it was OOM-killed at 2 to
+3.5 GiB.
+
+Most of the RSS above the heap is the SQLite page cache and memory the
+allocator keeps after the cold sync's churn; the live heap stays under
+75 MiB. The cold-sync peak is V8 letting the heap grow between
+collections while 148,000 config bodies are parsed. With
+`--max-old-space-size=256` the 74,000-device cold sync peaked at 319 MiB
+RSS and settled at 268 MiB, in the same time. The chart does not set it:
+with MCP enabled the RAG index alone needs several GB at that size, and
+memory limits are set separately. A smaller page cache
+(`I3X_DB_CACHE_MB=16`) made the sync slower and saved no memory.
+
 ## Core Components
 
 ### object-tree.ts

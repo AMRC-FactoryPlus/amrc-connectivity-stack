@@ -2,6 +2,7 @@ import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import express from "express";
 import request from "supertest";
 import { APIv1 } from "../lib/api-v1.js";
+import type { SyncResult } from "../lib/subscriptions.js";
 import { I3X_SPEC_VERSION, Version } from "../lib/constants.js";
 import type {
     I3xNamespace,
@@ -71,8 +72,8 @@ function mockSubscriptions() {
         unregister: jest.fn<(owner: string, subId: string, ids: string[]) => void>(),
         unregisterOne: jest.fn<(owner: string, subId: string, id: string) => void>(),
         stream: jest.fn<(owner: string, subId: string, res: any) => void>(),
-        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => I3xSyncItem[]>()
-            .mockReturnValue([]),
+        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => SyncResult>()
+            .mockReturnValue({ updates: [], dropped: 0 }),
     };
 }
 
@@ -1091,7 +1092,7 @@ describe("APIv1", () => {
                 elementId: "obj-1",
                 ...sampleVqt,
             };
-            subscriptions.sync.mockReturnValue([syncItem]);
+            subscriptions.sync.mockReturnValue({ updates: [syncItem], dropped: 0 });
 
             const res = await request(app)
                 .post("/subscriptions/sync")
@@ -1103,6 +1104,46 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(res.body.result).toEqual([syncItem]);
+        });
+
+        it("returns 206 with responseDetail when updates were dropped", async () => {
+            const { app, subscriptions } = createApp();
+            const syncItem: I3xSyncItem = {
+                sequenceNumber: 151,
+                elementId: "obj-1",
+                ...sampleVqt,
+            };
+            subscriptions.sync.mockReturnValue({ updates: [syncItem], dropped: 50 });
+
+            const res = await request(app)
+                .post("/subscriptions/sync")
+                .send({ clientId: "c1", subscriptionId: "sub-1", lastSequenceNumber: 100 });
+
+            expect(res.status).toBe(206);
+            expect(res.body.success).toBe(true);
+            expect(res.body.result).toEqual([syncItem]);
+            expect(res.body.responseDetail).toEqual({
+                title: "Updates dropped due to queue overflow",
+                status: 206,
+                detail: expect.stringContaining("50 updates were dropped"),
+            });
+        });
+
+        it("returns 409 envelope while a stream is open", async () => {
+            const { app, subscriptions } = createApp();
+            subscriptions.sync.mockImplementation(() => {
+                const err: any = new Error("Subscription sub-1 has an open stream; close it before calling sync");
+                err.status = 409;
+                throw err;
+            });
+
+            const res = await request(app)
+                .post("/subscriptions/sync")
+                .send({ clientId: "c1", subscriptionId: "sub-1" });
+
+            expect(res.status).toBe(409);
+            expect(res.body.success).toBe(false);
+            expect(res.body.error.code).toBe(409);
         });
 
         it("returns 404 envelope when subscription is unknown", async () => {

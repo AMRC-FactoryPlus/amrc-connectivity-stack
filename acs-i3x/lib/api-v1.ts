@@ -579,12 +579,32 @@ export class APIv1 {
     }
 
     /**
-     * POST /subscriptions/sync — replays missed updates after `lastSequenceNumber`.
+     * POST /subscriptions/sync — acknowledges updates up to
+     * `lastSequenceNumber` and returns the rest of the queue. If the
+     * queue overflowed since the previous sync, the response is HTTP
+     * 206 with a `responseDetail` describing the loss; the client can
+     * size the gap from the sequence numbers. Refused with 409 while
+     * a stream is open.
      **/
     sync_subscription(req: Request, res: Response): void {
         const { subscriptionId, lastSequenceNumber } = req.body;
-        res.json(this.subscriptions.sync(
-            subscription_owner(req), subscriptionId, lastSequenceNumber));
+        const { updates, dropped } = this.subscriptions.sync(
+            subscription_owner(req), subscriptionId, lastSequenceNumber);
+        if (!dropped) {
+            res.json(updates);
+            return;
+        }
+        res.status(206);
+        ((res as any)._originalJson || res.json.bind(res))({
+            success: true,
+            result: updates,
+            responseDetail: {
+                title: "Updates dropped due to queue overflow",
+                status: 206,
+                detail: `${dropped} updates were dropped from the subscription queue `
+                    + "because it reached the server-imposed queue limit.",
+            },
+        });
     }
 
     /**

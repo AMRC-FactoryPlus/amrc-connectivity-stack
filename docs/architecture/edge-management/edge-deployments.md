@@ -126,11 +126,20 @@ Secret are then referenced by the Edge Agent configuration in place of
 the secret information.
 
 The Edge Monitor also tries to make sure that an Edge Agent which should
-be running is actually running. If it has seen no data packets from the
-Edge Agent for a certain length of time (by default 3 minutes) it will
-send a rebirth request. If three rebirth requests are sent with no
-packet received then the Edge Monitor will raise an Alert over
-Sparkplug.
+be running is actually running. It treats the Edge Agent as up from any
+packet (normally its NBIRTH) until its NDEATH, which the MQTT broker
+publishes as the agent's Will if its session drops. An Edge Agent whose
+Devices never change can publish nothing after its births and still be
+up.
+
+If the Edge Monitor has not seen the Edge Agent come up (it has seen no
+packets since the monitor started or since the monitor's own MQTT
+connection dropped, or the last packet was an NDEATH) for a certain
+length of time (by default 3 minutes) it will send a rebirth request.
+It repeats the request with an increasing delay, up to 8 times that
+length, until the agent answers. If the Edge Agent is not up for 3 times
+that length the Edge Monitor will raise an Offline Alert over Sparkplug.
+The Alert clears as soon as the agent publishes again.
 
 ## Implementation Details
 

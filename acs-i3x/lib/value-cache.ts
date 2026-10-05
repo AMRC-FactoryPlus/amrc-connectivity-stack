@@ -140,6 +140,12 @@ const DEFER_BATCHES = 50;
 /** Most unwritten values kept while writes fail, in batches. */
 const MAX_BACKLOG_BATCHES = 10;
 
+/** After a failed write, background flushes wait this long before the
+ * next try, doubling up to WRITE_RETRY_MAX. Failures are logged at most
+ * once per WRITE_RETRY_MAX. */
+const WRITE_RETRY_MIN = 5_000;
+const WRITE_RETRY_MAX = 60_000;
+
 const UPSERT = (source: string, guard: string) => `
     insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
     values (?, ?, ?, ?, ?, ?, '${source}')
@@ -168,6 +174,12 @@ export class ValueCache {
     private pending: Map<string, Pending> = new Map();
     private timer: ReturnType<typeof setTimeout> | null = null;
     private continuing = false;
+    /** Write backoff: no background write before this time (Date.now). */
+    private retryNotBefore = 0;
+    private retryDelay = 0;
+    private lastErrorLog = 0;
+    private errorsSinceLog = 0;
+    private droppedSinceLog = 0;
 
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
@@ -326,6 +338,13 @@ export class ValueCache {
      * add to it, up to the backlog cap.
      */
     private flushInBackground(): void {
+        const wait = this.retryNotBefore - Date.now();
+        if (wait > 0) {
+            /* The database failed recently; do not try every message. */
+            this.trimBacklog();
+            this.scheduleFlush(wait);
+            return;
+        }
         if (this.store.walBehind() && this.pending.size < DEFER_BATCHES * this.flushMaxRows) {
             this.scheduleFlush();
             return;
@@ -341,12 +360,12 @@ export class ValueCache {
         }
     }
 
-    private scheduleFlush(): void {
+    private scheduleFlush(delay: number = this.flushInterval): void {
         if (this.timer) return;
         this.timer = setTimeout(() => {
             this.timer = null;
             this.flushInBackground();
-        }, this.flushInterval);
+        }, delay);
         this.timer.unref?.();
     }
 
@@ -398,26 +417,50 @@ export class ValueCache {
                 for (const [id, p] of batch)
                     st.run(id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality);
             });
+            this.retryDelay = 0;
+            this.retryNotBefore = 0;
             return true;
         } catch (err) {
-            console.error("ValueCache: writing %d values failed, will retry:", batch.size, err);
+            this.retryDelay = Math.min(this.retryDelay * 2 || WRITE_RETRY_MIN, WRITE_RETRY_MAX);
+            this.retryNotBefore = Date.now() + this.retryDelay;
+            this.errorsSinceLog++;
+            if (this.logDue()) {
+                console.error("ValueCache: writing %d values failed (%d failures since the last report), next try in %d s:",
+                    batch.size, this.errorsSinceLog, this.retryDelay / 1000, err);
+                this.errorsSinceLog = 0;
+            }
             /* Newer values win over the ones put back. */
             for (const [id, p] of this.pending) batch.set(id, p);
             this.pending = batch;
-            /* Do not hold an unbounded backlog while the database is
-             * broken: keep the newest entries. */
-            const limit = MAX_BACKLOG_BATCHES * this.flushMaxRows;
-            if (this.pending.size > limit) {
-                let drop = this.pending.size - limit;
-                console.error("ValueCache: dropping the %d oldest unwritten values", drop);
-                for (const id of this.pending.keys()) {
-                    if (drop-- <= 0) break;
-                    this.pending.delete(id);
-                }
-            }
-            this.scheduleFlush();
+            this.trimBacklog();
+            this.scheduleFlush(this.retryDelay);
             return false;
         }
+    }
+
+    /** Do not hold an unbounded backlog while the database is broken:
+     * keep the newest entries. */
+    private trimBacklog(): void {
+        const limit = MAX_BACKLOG_BATCHES * this.flushMaxRows;
+        if (this.pending.size <= limit) return;
+        let drop = this.pending.size - limit;
+        this.droppedSinceLog += drop;
+        for (const id of this.pending.keys()) {
+            if (drop-- <= 0) break;
+            this.pending.delete(id);
+        }
+        if (this.logDue()) {
+            console.error("ValueCache: dropped the %d oldest unwritten values", this.droppedSinceLog);
+            this.droppedSinceLog = 0;
+        }
+    }
+
+    /** True at most once per WRITE_RETRY_MAX, for write error logs. */
+    private logDue(): boolean {
+        const now = Date.now();
+        if (now - this.lastErrorLog < WRITE_RETRY_MAX) return false;
+        this.lastErrorLog = now;
+        return true;
     }
 
     /**

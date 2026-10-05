@@ -100,6 +100,10 @@ spec:
               value: /data/i3x.db
             - name: I3X_MCP_ENABLED
               value: {{ .Values.i3x.mcp.enabled | toString | quote }}
+            {{- if and (not .Values.i3x.mcp.enabled) (gt (int .Values.i3x.maxHeapMB) 0) }}
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size={{ int .Values.i3x.maxHeapMB }}"
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

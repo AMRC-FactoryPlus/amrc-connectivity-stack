@@ -510,6 +510,14 @@ i3x:
     # uses. Off by default: the index costs about 47 KB of memory per
     # device. When off, /mcp answers 404.
     enabled: false
+  # -- Cap on the i3X JavaScript heap in MiB (--max-old-space-size).
+  # The object tree and values live in SQLite, so the heap stays small
+  # (about 75 MiB at 74,000 devices). Without a cap V8 lets the heap
+  # grow between collections during a cold sync (about 550 MiB RSS at
+  # 74,000 devices, against about 320 MiB with a 256 MiB cap). Only
+  # applied while MCP is off: the MCP search index needs several GB at
+  # fleet scale. Set to 0 for no cap.
+  maxHeapMB: 384
 
 admin:
   # -- Whether or not to enable the Admin component

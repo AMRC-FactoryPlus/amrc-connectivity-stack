@@ -98,6 +98,9 @@ function toVqt(r: ValueRow): I3xVqt {
     };
 }
 
+/** Most unwritten values kept while writes fail, in batches. */
+const MAX_BACKLOG_BATCHES = 10;
+
 const UPSERT = (source: string, guard: string) => `
     insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
     values (?, ?, ?, ?, ?, ?, '${source}')
@@ -140,7 +143,7 @@ export class ValueCache {
         /* Values stored by an earlier run may have changed while it was
          * down; we did not see those UNS messages. Start empty, as the
          * in-memory cache did, and let reads fill it from InfluxDB. */
-        this.clear();
+        this.safeClear("at start");
 
         this.log("requesting MQTT client from ServiceClient");
         const mqtt = await fplus.mqtt_client();
@@ -159,7 +162,7 @@ export class ValueCache {
             this.log("MQTT connected");
             /* Messages sent while we were disconnected are lost, so a
              * stored value may no longer be the last one. */
-            if (connected) this.clear();
+            if (connected) this.safeClear("after an MQTT reconnect");
             connected = true;
         });
         mqtt.on("error", (err: any) => {
@@ -255,20 +258,8 @@ export class ValueCache {
             quality: vqt.quality,
             timestamp: vqt.timestamp ?? null,
         });
-        if (this.pending.size >= this.flushMaxRows) {
-            this.flush();
-        } else if (!this.timer) {
-            this.timer = setTimeout(() => {
-                try {
-                    this.flush();
-                } catch (err) {
-                    console.error("ValueCache: writing values failed:", err);
-                }
-            }, this.flushInterval);
-            this.timer.unref?.();
-        }
-
-        // Notify listeners
+        // Notify listeners first: a failed write below must not cost
+        // subscribers this message.
         for (const listener of this.listeners) {
             try {
                 listener(elementId, vqt);
@@ -276,22 +267,62 @@ export class ValueCache {
                 console.error("ValueCache: listener threw:", err);
             }
         }
+
+        if (this.pending.size >= this.flushMaxRows) this.flush();
+        else this.scheduleFlush();
     }
 
-    /** Write every waiting UNS value, in one transaction. */
-    flush(): void {
+    private scheduleFlush(): void {
+        if (this.timer) return;
+        this.timer = setTimeout(() => {
+            this.timer = null;
+            this.flush();
+        }, this.flushInterval);
+        this.timer.unref?.();
+    }
+
+    /**
+     * Write every waiting UNS value, in one transaction. If the write
+     * fails (a full disk, an I/O error) the values go back in the queue,
+     * behind any newer value for the same metric, and are tried again
+     * on the next flush. Returns false on failure; it does not throw, so
+     * a read goes on with what is stored.
+     */
+    flush(): boolean {
         if (this.timer) {
             clearTimeout(this.timer);
             this.timer = null;
         }
-        if (this.pending.size === 0) return;
+        if (this.pending.size === 0) return true;
         const batch = this.pending;
         this.pending = new Map();
-        const st = this.store.prepare(UPSERT("uns", ""));
-        this.store.transaction(() => {
-            for (const [id, p] of batch)
-                st.run(id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality);
-        });
+        try {
+            const st = this.store.prepare(UPSERT("uns", ""));
+            this.store.transaction(() => {
+                for (const [id, p] of batch)
+                    st.run(id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality);
+            });
+            return true;
+        } catch (err) {
+            console.error("ValueCache: writing %d values failed, will retry:", batch.size, err);
+            /* Newer values (none can arrive during the write, but keep
+             * the rule) win over the ones put back. */
+            for (const [id, p] of this.pending) batch.set(id, p);
+            this.pending = batch;
+            /* Do not hold an unbounded backlog while the database is
+             * broken: keep the newest entries. */
+            const max = MAX_BACKLOG_BATCHES * this.flushMaxRows;
+            if (this.pending.size > max) {
+                let drop = this.pending.size - max;
+                console.error("ValueCache: dropping the %d oldest unwritten values", drop);
+                for (const id of this.pending.keys()) {
+                    if (drop-- <= 0) break;
+                    this.pending.delete(id);
+                }
+            }
+            this.scheduleFlush();
+            return false;
+        }
     }
 
     /**
@@ -318,6 +349,17 @@ export class ValueCache {
             if (p.device === uuid) this.pending.delete(id);
         }
         this.store.prepare("delete from last_value where device_uuid = ?").run(uuid);
+    }
+
+    /** clear(), logging a failure instead of throwing: it runs at start
+     * and from an MQTT event handler, where a throw would end the
+     * process. Stored values then stay until the next clear. */
+    private safeClear(when: string): void {
+        try {
+            this.clear();
+        } catch (err) {
+            console.error(`ValueCache: clearing values ${when} failed:`, err);
+        }
     }
 
     /** Forget every value. */

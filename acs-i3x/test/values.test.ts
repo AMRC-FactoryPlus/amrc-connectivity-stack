@@ -215,6 +215,64 @@ describe("UNS message errors", () => {
     });
 });
 
+describe("database errors while writing values", () => {
+    it("keep the batch for the next write, newer values winning, and still notify subscribers", () => {
+        const s = setup({ flushInterval: 60_000, flushMaxRows: 2 });
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        const seen: unknown[] = [];
+        s.valueCache.onValueChange((_id, vqt) => seen.push(vqt.value));
+        /* Fail the next write of values, once. */
+        let fail = true;
+        const prepare = s.store.prepare.bind(s.store);
+        const tx = jest.spyOn(s.store, "prepare").mockImplementation((sql: string) => {
+            if (fail && sql.includes("insert into last_value")) {
+                fail = false;
+                throw new Error("database or disk is full");
+            }
+            return prepare(sql);
+        });
+        try {
+            uns(s.valueCache, ["Speed"], 1, "2026-10-05T12:00:00Z");
+            // The second message fills the batch; its write fails.
+            expect(() => uns(s.valueCache, ["Status"], "a", "2026-10-05T12:00:01Z")).not.toThrow();
+            expect(seen).toEqual([1, "a"]);
+            expect(err).toHaveBeenCalled();
+            expect(rowCount(s.store)).toBe(0);
+
+            uns(s.valueCache, ["Speed"], 3, "2026-10-05T12:00:02Z");
+            expect(seen).toEqual([1, "a", 3]);
+            tx.mockRestore();
+            expect(s.valueCache.getValue(s.leaf("Speed"))!.value).toBe(3);
+            expect(s.valueCache.getValue(s.leaf("Status"))!.value).toBe("a");
+        } finally {
+            tx.mockRestore();
+            err.mockRestore();
+        }
+    });
+
+    it("at start and on an MQTT reconnect are logged, not thrown", async () => {
+        const s = setup();
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        const prepare = s.store.prepare.bind(s.store);
+        const spy = jest.spyOn(s.store, "prepare").mockImplementation((sql: string) => {
+            if (sql.startsWith("delete from last_value")) throw new Error("database or disk is full");
+            return prepare(sql);
+        });
+        try {
+            const handlers = new Map<string, Function>();
+            const mqtt = { subscribe: () => {}, on: (ev: string, fn: Function) => handlers.set(ev, fn) };
+            await expect(s.valueCache.init({ mqtt_client: async () => mqtt, debug: { bound: () => () => {} } }))
+                .resolves.toBe(s.valueCache);
+            handlers.get("connect")!();
+            expect(() => handlers.get("connect")!()).not.toThrow();
+            expect(err).toHaveBeenCalledTimes(2);
+        } finally {
+            spy.mockRestore();
+            err.mockRestore();
+        }
+    });
+});
+
 describe("InfluxDB write-back", () => {
     it("a value read from InfluxDB is served locally next time", async () => {
         const s = setup();

@@ -11,6 +11,13 @@ import * as rxx     from "@amrc-factoryplus/rx-util";
 
 import { rx_rx }    from "../util.js";
 
+/* What we know of a Node's Sparkplug session */
+export const State = {
+    Unknown:    "unknown",
+    Alive:      "alive",
+    Dead:       "dead",
+};
+
 export class NodeMonitor {
     constructor (op, spec) {
         this.operator = op;
@@ -36,8 +43,11 @@ export class NodeMonitor {
         /* Read all packets from the Node, including Devices */
         this.all_pkts = this._init_all_pkts();
 
-        /* Check for updates to the config file */
-        this._checks.push(this._rebirth_if_silent());
+        /* Track whether the Node's Sparkplug session is up */
+        this.state = this._init_state();
+
+        /* Rebirth the Node if we can't see it is up */
+        this._checks.push(this._rebirth_unless_alive());
 
         this.offline = this._init_offline();
 
@@ -83,24 +93,57 @@ export class NodeMonitor {
         );
     }
 
-    _rebirth_if_silent () {
-        /* If we see no packets for our timeout interval, send a
-         * rebirth. Delay the rebirth by up to half the interval again
-         * to avoid rebirth storms. */
+    /* Track the Node's Sparkplug session. A Node is Alive from any
+     * packet (normally its NBIRTH) until its NDEATH. MQTT gives us the
+     * NDEATH as the Node's Will if its session drops, so we do not need
+     * the Node to keep publishing to know it is there: a Node whose
+     * Devices never change is entitled to publish nothing after its
+     * births. We don't know the state when we start, or after our own
+     * MQTT connection drops, as we may have missed packets. */
+    _init_state () {
+        const { app, all_pkts } = this;
 
-        const each = this.interval;
-        const jitter = each / 4;
+        const seen = all_pkts.pipe(
+            rx.map(p => p.type == "DEATH" && !p.address.isDevice()
+                ? State.Dead : State.Alive));
+        const reconnects = app.mqtt
+            ? rx.fromEvent(app.mqtt, "connect").pipe(rx.map(() => State.Unknown))
+            : rx.EMPTY;
 
         return rx_rx(
-            this.all_pkts,
-            rx.startWith(null),
-            rx.switchMap(() => rx_rx(
+            rx.merge(seen, reconnects),
+            rx.startWith(State.Unknown),
+            rx.distinctUntilChanged(),
+            rx.tap(s => this.log("Node %s is %s", this.node, s)),
+            rxx.shareLatest(),
+        );
+    }
+
+    _rebirth_unless_alive () {
+        /* If the Node is not Alive (we have seen no packets since we
+         * started, or we saw its NDEATH) for our interval, send a
+         * rebirth. A Node that is up answers with its births, which
+         * makes it Alive. This covers a birth we missed and a Will
+         * delivered after the Node had already reconnected. Repeat with
+         * an increasing delay, up to 8 intervals, while the Node stays
+         * silent; a Node that is down will birth on its own when it
+         * reconnects. Add up to a quarter of the delay again to avoid
+         * rebirth storms. */
+
+        const each = this.interval;
+        const max = each * 8;
+        const wait = n => {
+            const delay = Math.min(each * 2**(n - 1), max);
+            return rx.timer(delay + Math.random()*delay/4);
+        };
+
+        return rx_rx(
+            this.state,
+            rx.switchMap(state => state == State.Alive ? rx.EMPTY : rx_rx(
                 rx.of(null),
-                rx.repeat({ 
-                    delay: () => rx.timer(each + Math.random()*jitter),
-                }),
+                rx.repeat({ delay: wait }),
                 rx.skip(1),
-                rx.tap(() => this.log("No packets for %s", this.node)),
+                rx.tap(() => this.log("No birth from %s", this.node)),
                 rx.exhaustMap(() => this.device.rebirth()),
             )),
             rx.tap({ 
@@ -114,20 +157,18 @@ export class NodeMonitor {
     }
 
     _init_offline () {
-        /* If we see no packets for 3 times our interval, raise an alert */
+        /* If the Node is not Alive for 3 times our interval, raise an
+         * alert. Clear it as soon as the Node is Alive again. */
 
         const delay = this.interval * 3;
 
-        return this.all_pkts.pipe(
-            /* Pretend we saw an initial packet to give the device a
-             * chance to speak */
-            rx.startWith(null),
-            /* Each time we see a packet, restart this sub-seq */
-            rx.switchMap(() => rx.merge(
-                /* the offline alert goes inactive immediately */
-                rx.of(false),
-                /* but it goes active again after this delay */
-                rx.of(true).pipe(rx.delay(delay)))),
+        return this.state.pipe(
+            rx.switchMap(state => state == State.Alive
+                ? rx.of(false)
+                : rx.timer(delay).pipe(rx.map(() => true))),
+            /* Give the Node a chance to speak when we start */
+            rx.startWith(false),
+            rx.distinctUntilChanged(),
             /* Always make a value available */
             rxx.shareLatest());
     }

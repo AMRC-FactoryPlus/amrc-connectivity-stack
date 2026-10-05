@@ -154,6 +154,7 @@ export class I3xStore {
     private commitInterval: number;
     private batchOpen = false;
     private batchTimer: ReturnType<typeof setTimeout> | null = null;
+    private commitFailureListeners: Set<(err: unknown) => void> = new Set();
 
     /** True if the database was opened with tables already in place,
      * rather than created or rebuilt now. */
@@ -265,6 +266,15 @@ export class I3xStore {
         this.batchTimer.unref?.();
     }
 
+    /**
+     * Call `listener` when a group commit fails and its batch is rolled
+     * back. Returns a function that removes the listener.
+     */
+    onCommitFailure(listener: (err: unknown) => void): () => void {
+        this.commitFailureListeners.add(listener);
+        return () => this.commitFailureListeners.delete(listener);
+    }
+
     /** Commit the current batch now, if one is open. */
     commit(): void {
         if (this.batchTimer) {
@@ -281,10 +291,18 @@ export class I3xStore {
         try {
             this.db.exec("commit");
         } catch (err) {
-            /* For example a full disk. The batch is lost; the database
-             * is a cache, and the next sync or message writes it again. */
+            /* For example a full disk. The batch is lost. The database
+             * is a cache; listeners (the sync engine) arrange to write
+             * what was lost again. */
             console.error("I3xStore: commit failed, batch discarded:", err);
             try { this.db.exec("rollback"); } catch { /* already closed */ }
+            for (const l of this.commitFailureListeners) {
+                try {
+                    l(err);
+                } catch (e) {
+                    console.error("I3xStore: commit failure listener threw:", e);
+                }
+            }
         }
     }
 

@@ -32,6 +32,11 @@ export class SparkplugNode {
             publishDeath:   true,
         });
 
+        /* The node re-emits MQTT client errors. With no listener an
+         * 'error' event throws, so a refused CONNACK or a reset
+         * connection (for example while the broker restarts) would
+         * crash the process. The client reconnects by itself. */
+        splug.on("error", e => this.log("MQTT error: %s", e?.message ?? e));
         splug.on("birth", this.rebirth.bind(this));
         splug.on("ncmd", this._ncmd.bind(this));
         splug.on("dcmd", this._dcmd.bind(this));

@@ -225,6 +225,10 @@ function createPreloadedMocks() {
                 return result;
             }),
 
+        /* GET /objects streams from iterateObjects; this one reads
+         * whatever getObjects returns. */
+        iterateObjects: jest.fn(function* (this: any, opts?: any) { yield* this.getObjects(opts); }),
+
         getObject: jest.fn<(id: string) => I3xObject | undefined>()
             .mockImplementation((id: string) => objectsById.get(id)),
 

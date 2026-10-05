@@ -64,6 +64,60 @@ function badRequest(message: string): Error & { status: number } {
     return err;
 }
 
+/** Bytes to gather before writing a chunk of a streamed response. */
+const STREAM_CHUNK = 64 * 1024;
+
+/**
+ * Send `prefix`, the items of `items` as JSON separated by commas, then
+ * `suffix`, a chunk at a time, waiting for the socket to drain when it
+ * is full. The body is byte for byte what res.json would send for the
+ * same array. A failure after the first chunk can no longer become an
+ * error response, so it destroys the connection instead and the
+ * client sees a truncated body.
+ */
+async function streamJsonArray(
+    res: Response, prefix: string, items: Iterable<unknown>, suffix: string,
+): Promise<void> {
+    const it = items[Symbol.iterator]();
+    /* Read the first item before sending anything, so an error here
+     * still goes to the error handler as a proper response. */
+    let next = it.next();
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+    let buf = prefix;
+    let first = true;
+    try {
+        for (; !next.done; next = it.next()) {
+            buf += (first ? "" : ",") + JSON.stringify(next.value);
+            first = false;
+            if (buf.length < STREAM_CHUNK) continue;
+            const ok = res.write(buf);
+            buf = "";
+            if (!ok) {
+                await new Promise<void>(resolve => {
+                    const done = () => {
+                        res.off("drain", done);
+                        res.off("close", done);
+                        resolve();
+                    };
+                    res.on("drain", done);
+                    res.on("close", done);
+                });
+            }
+            if (res.destroyed || res.writableEnded) {
+                it.return?.();
+                return;
+            }
+        }
+        res.end(buf + suffix);
+    } catch (err) {
+        it.return?.();
+        if (!res.headersSent) throw err;
+        console.error("GET /objects: failed while streaming:", err);
+        res.destroy(err as Error);
+    }
+}
+
 /**
  * Returns the authenticated principal which owns any subscription
  * created or accessed by this request.
@@ -151,7 +205,7 @@ export class APIv1 {
         api.post("/relationshiptypes/query", this.query_relationship_types.bind(this));
 
         /* ---- Explore: Objects ---- */
-        api.get("/objects", this.get_objects.bind(this));
+        api.get("/objects", asyncHandler(this.get_objects.bind(this)));
 
         /* Value and history sub-routes must be declared before the
          * /:elementId catch-all to avoid path conflicts. */
@@ -291,13 +345,18 @@ export class APIv1 {
 
     /**
      * GET /objects — lists objects with optional `typeElementId`, `root`, and `includeMetadata` filters.
+     *
+     * The whole tree is millions of objects at fleet scale, so this
+     * does not build the array: it streams the same bytes res.json
+     * would send, a chunk at a time, waiting while the client is slow.
      **/
-    get_objects(req: Request, res: Response): void {
-        res.json(this.objectTree.getObjects({
+    async get_objects(req: Request, res: Response): Promise<void> {
+        const objects = this.objectTree.iterateObjects({
             typeElementId: req.query.typeElementId as string | undefined,
             root: req.query.root === "true",
             includeMetadata: req.query.includeMetadata === "true",
-        }));
+        });
+        await streamJsonArray(res, '{"success":true,"result":[', objects, "]}");
     }
 
     /**

@@ -70,6 +70,7 @@ const history = new History({
 const subscriptions = new SubscriptionManager({
     valueCache,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
+    maxQueue: parseInt(env.I3X_SUBSCRIPTION_QUEUE_MAX || "10000"),
 });
 
 // The MCP endpoint and its RAG index (a graph and a search index of

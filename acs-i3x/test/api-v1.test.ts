@@ -31,6 +31,9 @@ function mockObjectTree() {
         iterateObjects: jest.fn(function* (this: any, opts?: any) { yield* this.getObjects(opts); }),
         getObject: jest.fn<(id: string) => I3xObject | undefined>().mockReturnValue(undefined),
         getRelated: jest.fn<(id: string, rt?: string) => I3xObject[]>().mockReturnValue([]),
+        /* The related routes stream from iterateRelated; this one reads
+         * whatever getRelated is set up to return. */
+        iterateRelated: jest.fn(function* (this: any, id: string, rt?: string) { yield* this.getRelated(id, rt); }),
         getChildElementIds: jest.fn<(id: string) => string[]>().mockReturnValue([]),
         addCompositionFromUns: jest.fn(),
     };

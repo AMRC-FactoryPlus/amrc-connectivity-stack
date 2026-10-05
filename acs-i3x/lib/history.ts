@@ -16,6 +16,7 @@ import type { ObjectTree } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import type { InfluxValue } from "./value-cache.js";
 import { Semaphore } from "./semaphore.js";
+import { Slicer } from "./slicer.js";
 
 interface HistoryOpts {
     influxUrl: string;
@@ -136,9 +137,20 @@ export class History {
     }
 
     /** Keep leaf values read from InfluxDB in the value cache. */
-    private remember(values: Iterable<I3xValueResponse>): void {
+    private async remember(values: Iterable<I3xValueResponse>): Promise<void> {
         if (!this.valueCache) return;
-        const out: InfluxValue[] = [];
+        /* Written a chunk at a time, pausing between: a large read can
+         * return values for millions of leaves. */
+        const slicer = new Slicer();
+        let out: InfluxValue[] = [];
+        const write = () => {
+            try {
+                this.valueCache!.recordInfluxValues(out);
+            } catch (err) {
+                console.error("History: storing InfluxDB values failed:", err);
+            }
+            out = [];
+        };
         for (const v of values) {
             const meta = this.objectTree.getMetricMeta(v.elementId);
             if (!meta) continue;
@@ -150,12 +162,10 @@ export class History {
                 quality: v.quality,
                 timestamp: v.timestamp,
             });
+            if (out.length >= 1000) write();
+            await slicer.maybe();
         }
-        try {
-            this.valueCache.recordInfluxValues(out);
-        } catch (err) {
-            console.error("History: storing InfluxDB values failed:", err);
-        }
+        if (out.length) write();
     }
 
     /**
@@ -192,7 +202,7 @@ export class History {
             quality: "Good",
             timestamp: row._time,
         };
-        this.remember([result]);
+        await this.remember([result]);
         return result;
     }
 
@@ -225,17 +235,30 @@ export class History {
         maxDepth: number = 1,
     ): Promise<Map<string, I3xValueResponse | null>> {
         // Work out which leaves each requested id needs.
+        /* A composition high in the hierarchy expands to millions of
+         * leaves: read them in steps, pausing for the event loop. */
+        const slicer = new Slicer();
         const plan = new Map<string, { composition: boolean; leafIds: string[] }>();
         const allLeaves = new Set<string>();
         for (const id of elementIds) {
             if (plan.has(id)) continue;
             const obj = this.objectTree.getObject(id);
             const composition = !!obj?.isComposition;
-            const leafIds = composition
-                ? this.objectTree.getDescendantLeafIds(id, maxDepth)
-                : [id];
+            let leafIds: string[];
+            if (!composition) {
+                leafIds = [id];
+            } else if (this.objectTree.iterateDescendantLeafIds) {
+                leafIds = [];
+                for (const leaf of this.objectTree.iterateDescendantLeafIds(id, maxDepth)) {
+                    if (leaf !== null) leafIds.push(leaf);
+                    await slicer.maybe();
+                }
+            } else {
+                leafIds = this.objectTree.getDescendantLeafIds(id, maxDepth);
+            }
             plan.set(id, { composition, leafIds });
             for (const leaf of leafIds) allLeaves.add(leaf);
+            await slicer.maybe();
         }
 
         const leafValues = await this.getCurrentValues([...allLeaves]);
@@ -252,6 +275,7 @@ export class History {
             const components: Record<string, I3xVqt> = {};
             let latestTimestamp = "";
             for (const leafId of leafIds) {
+                await slicer.maybe();
                 const val = leafValues.get(leafId);
                 if (!val) continue;
                 components[leafId] = {
@@ -307,7 +331,9 @@ export class History {
         const wanted: Array<{ leafId: string; key: string }> = [];
         // Measurements each device's leaves need.
         const devices = new Map<string, Set<string>>();
+        const slicer = new Slicer();
         for (const leafId of leafIds) {
+            await slicer.maybe();
             const meta = this.objectTree.getMetricMeta(leafId);
             if (!meta) continue;
             const measurement = `${meta.metricName}:${meta.typeSuffix}`;
@@ -349,6 +375,7 @@ export class History {
         });
 
         for (const { leafId, key } of wanted) {
+            await slicer.maybe();
             const row = first.get(key);
             if (!row) continue;
             out.set(leafId, {
@@ -359,7 +386,7 @@ export class History {
                 timestamp: row._time,
             });
         }
-        this.remember(out.values());
+        await this.remember(out.values());
         return out;
     }
 

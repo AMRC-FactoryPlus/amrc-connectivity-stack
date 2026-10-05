@@ -643,7 +643,16 @@ export class ObjectTree {
         const sql = `select seq, ${OBJECT_COLS} from object
             where seq > ? ${where ? `and ${where}` : ""}
             order by seq limit ?`;
+        for (const r of this.snapshotPages(sql, args, pageSize)) yield toObject(r);
+    }
 
+    /**
+     * Rows of `sql` (which takes `seq > ?`, then `args`, then a limit,
+     * and orders by seq) a page at a time, from one read snapshot when
+     * the database is a file (see iterateObjects). Each page is one
+     * short query.
+     */
+    private *snapshotPages(sql: string, args: string[], pageSize: number): Generator<any> {
         this.store.commit();
         const reader = this.store.openReader();
         const st = reader ? reader.prepare(sql) : null;
@@ -652,7 +661,7 @@ export class ObjectTree {
             let after = -1;
             for (;;) {
                 const rows = (st ?? this.store.prepare(sql)).all(after, ...args, pageSize) as any[];
-                for (const r of rows) yield toObject(r);
+                for (const r of rows) yield r;
                 if (rows.length < pageSize) return;
                 after = rows[rows.length - 1].seq;
             }
@@ -671,6 +680,29 @@ export class ObjectTree {
     }
 
     /* ---- Relationships ---- */
+
+    /**
+     * The objects getRelated would return, in the same order, with the
+     * children read a page at a time from one snapshot: an ISA-95 level
+     * can have tens of thousands of children.
+     */
+    *iterateRelated(elementId: string, relationshipType?: string, pageSize: number = 1000): Generator<I3xObject> {
+        const obj = this.getObject(elementId);
+        if (!obj) return;
+
+        if (relationshipType === undefined || relationshipType === RelType.HasParent) {
+            if (obj.parentId !== null && obj.parentId !== "/") {
+                const parent = this.getObject(obj.parentId);
+                if (parent) yield parent;
+            }
+        }
+
+        if (relationshipType === undefined || relationshipType === RelType.HasChildren) {
+            const sql = `select seq, ${OBJECT_COLS} from object
+                where seq > ? and parent_id = ? order by seq limit ?`;
+            for (const r of this.snapshotPages(sql, [elementId], pageSize)) yield toObject(r);
+        }
+    }
 
     getRelated(elementId: string, relationshipType?: string): I3xObject[] {
         const obj = this.getObject(elementId);
@@ -722,6 +754,49 @@ export class ObjectTree {
      * Collect all leaf metric elementIds that are descendants of the
      * given elementId (for composition value queries).
      */
+    /**
+     * The ids getDescendantLeafIds would return, in the same order, read
+     * a page of children at a time, with a null after each page so a
+     * caller can pause for the event loop. Near the top of the ISA-95
+     * hierarchy the whole list is millions of ids.
+     */
+    *iterateDescendantLeafIds(elementId: string, maxDepth: number = 0): Generator<string | null> {
+        const st = this.store.prepare(`
+            select seq, element_id, is_composition from object
+            where parent_id = ? and seq > ? order by seq limit ?`);
+        const PAGE = 256;
+        interface Level { id: string; depth: number; page: any[]; i: number; after: number; done: boolean }
+        const fill = (l: Level) => {
+            l.page = st.all(l.id, l.after, PAGE) as any[];
+            l.i = 0;
+            if (l.page.length < PAGE) l.done = true;
+            if (l.page.length) l.after = l.page[l.page.length - 1].seq;
+        };
+        if (maxDepth > 0 && 0 >= maxDepth) return;
+        const stack: Level[] = [{ id: elementId, depth: 0, page: [], i: 0, after: -1, done: false }];
+        fill(stack[0]);
+        while (stack.length) {
+            const top = stack[stack.length - 1];
+            if (top.i >= top.page.length) {
+                if (top.done) { stack.pop(); continue; }
+                fill(top);
+                yield null;
+                continue;
+            }
+            const child = top.page[top.i++];
+            if (child.is_composition !== 1) {
+                yield child.element_id;
+                continue;
+            }
+            const depth = top.depth + 1;
+            if (maxDepth > 0 && depth >= maxDepth) continue;
+            const level: Level = { id: child.element_id, depth, page: [], i: 0, after: -1, done: false };
+            fill(level);
+            stack.push(level);
+            yield null;
+        }
+    }
+
     getDescendantLeafIds(elementId: string, maxDepth: number = 0, depth: number = 0): string[] {
         if (maxDepth > 0 && depth >= maxDepth) return [];
         const children = this.store.prepare(

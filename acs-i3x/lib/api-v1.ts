@@ -11,6 +11,7 @@ import type { Request, Response, NextFunction } from "express";
 
 import { I3X_SPEC_VERSION, Version } from "./constants.js";
 import { i3xEnvelope, i3xErrorHandler } from "./middleware/envelope.js";
+import { Slicer } from "./slicer.js";
 import type { ObjectTree } from "./object-tree.js";
 import type { ValueCache, LazyValue } from "./value-cache.js";
 import type { History } from "./history.js";
@@ -123,7 +124,10 @@ function* lazyValueJson(v: LazyValue): Generator<string> {
     }
     yield JSON.stringify(v.head).slice(0, -1) + ',"components":{';
     let first = true;
-    for (const [id, vqt] of v.components()) {
+    for (const step of v.components()) {
+        /* A tick: work done, nothing to send; lets streamText pause. */
+        if (!step) { yield ""; continue; }
+        const [id, vqt] = step;
         yield (first ? "" : ",") + JSON.stringify(id) + ":" + JSON.stringify(vqt);
         first = false;
     }
@@ -157,14 +161,19 @@ async function streamText(res: Response, parts: Iterator<string>): Promise<void>
     res.on("close", onWake);
 
     let buf = "";
+    /* Producing the parts reads the database synchronously. Pause for
+     * the event loop every SLICE_MS, even while the socket keeps up. */
+    const slicer = new Slicer();
     try {
         for (let next = parts.next(); !next.done; next = parts.next()) {
             buf += next.value;
-            if (buf.length < STREAM_CHUNK) continue;
-            const ok = res.write(buf);
-            buf = "";
-            if (!ok && !res.destroyed)
-                await new Promise<void>(resolve => { wake = resolve; });
+            if (buf.length >= STREAM_CHUNK) {
+                const ok = res.write(buf);
+                buf = "";
+                if (!ok && !res.destroyed)
+                    await new Promise<void>(resolve => { wake = resolve; });
+            }
+            if (slicer.due()) await slicer.pause();
             if (res.destroyed || res.writableEnded) {
                 parts.return?.();
                 return;
@@ -273,11 +282,11 @@ export class APIv1 {
         api.post("/objects/list", this.list_objects.bind(this));
         api.post("/objects/value", asyncHandler(this.value_objects.bind(this)));
         api.post("/objects/history", asyncHandler(this.history_objects.bind(this)));
-        api.post("/objects/related", this.related_objects.bind(this));
+        api.post("/objects/related", asyncHandler(this.related_objects.bind(this)));
 
         api.get("/objects/:elementId/value", asyncHandler(this.get_object_value.bind(this)));
         api.get("/objects/:elementId/history", asyncHandler(this.get_object_history.bind(this)));
-        api.get("/objects/:elementId/related", this.get_object_related.bind(this));
+        api.get("/objects/:elementId/related", asyncHandler(this.get_object_related.bind(this)));
         api.get("/objects/:elementId", this.get_object.bind(this));
 
         /* ---- Subscriptions ---- */
@@ -472,7 +481,8 @@ export class APIv1 {
 
         // Try UNS cache first (real-time), fall back to InfluxDB last().
         // A cached composition's components are read as they are sent.
-        const cached = ids.map(id => this.valueCache.getValueLazy(id));
+        const cached: Array<LazyValue | null> = [];
+        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id));
         const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
         const fromInflux = misses.length > 0
             ? await this.history.getValues(misses, effective)
@@ -549,18 +559,34 @@ export class APIv1 {
      * filtered by `relationshiptype`. Per-id success/error envelope:
      * missing ids are reported as failures.
      */
-    related_objects(req: Request, res: Response): void {
+    async related_objects(req: Request, res: Response): Promise<void> {
         const { elementIds, relationshiptype } = req.body;
-        const results = (elementIds as string[]).map(id => {
-            const obj = this.objectTree.getObject(id);
-            if (!obj) {
-                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+        const ids = elementIds as string[];
+        /* Existence first, for the envelope's success flag; the related
+         * objects themselves are read as they are sent. */
+        const found = ids.map(id => !!this.objectTree.getObject(id));
+        const allSuccess = found.every(Boolean);
+        const tree = this.objectTree;
+        await streamText(res, (function* () {
+            yield `{"success":${allSuccess},"results":[`;
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                if (i) yield ",";
+                if (!found[i]) {
+                    yield JSON.stringify({ success: false, elementId: id,
+                        error: { code: 404, message: `Object ${id} not found` } });
+                    continue;
+                }
+                yield `{"success":true,"elementId":${JSON.stringify(id)},"result":[`;
+                let first = true;
+                for (const o of tree.iterateRelated(id, relationshiptype)) {
+                    yield (first ? "" : ",") + JSON.stringify(o);
+                    first = false;
+                }
+                yield "]}";
             }
-            const related = this.objectTree.getRelated(id, relationshiptype);
-            return { success: true, elementId: id, result: related };
-        });
-        const allSuccess = results.every(r => r.success);
-        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+            yield "]}";
+        })());
     }
 
     /**
@@ -573,7 +599,7 @@ export class APIv1 {
         const id = req.params.elementId;
         const obj = this.objectTree.getObject(id);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = this.valueCache.getValueLazy(id);
+        const cached = await this.valueCache.getValueLazy(id);
         if (cached) {
             this.log("GET /objects/%s/value: UNS cache hit", id);
             if (!cached.components) {
@@ -616,11 +642,13 @@ export class APIv1 {
     /**
      * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
      **/
-    get_object_related(req: Request, res: Response, next: NextFunction): void {
+    async get_object_related(req: Request, res: Response, next: NextFunction): Promise<void> {
         const obj = this.objectTree.getObject(req.params.elementId);
         if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
         const rt = req.query.relationshiptype as string | undefined;
-        res.json(this.objectTree.getRelated(req.params.elementId, rt));
+        // An ISA-95 level can have tens of thousands of children.
+        await streamJsonArray(res, '{"success":true,"result":[',
+            this.objectTree.iterateRelated(req.params.elementId, rt), "]}");
     }
 
     /**

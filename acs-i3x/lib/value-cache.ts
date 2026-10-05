@@ -21,6 +21,7 @@ import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import { deriveQuality } from "./quality.js";
 import { toI3xVqt } from "./mapping.js";
 import { I3xStore } from "./store.js";
+import { Slicer } from "./slicer.js";
 
 interface ValueCacheOpts {
     objectTree: ObjectTreeLike;
@@ -103,12 +104,22 @@ function toVqt(r: ValueRow): I3xVqt {
  * are iterated rather than all at once. A composition high in the
  * ISA-95 hierarchy can have millions of components.
  */
+/** One step of a composition walk: a component, or null when the walk
+ * has done some work without finding one (a tick, so a consumer can
+ * yield to the event loop between steps). */
+export type ComponentStep = [string, I3xVqt] | null;
+
+/**
+ * A cached value whose components, for a composition, are read as they
+ * are iterated rather than all at once. A composition high in the
+ * ISA-95 hierarchy can have millions of components.
+ */
 export interface LazyValue {
     /** The response, without `components`. */
     head: I3xValueResponse;
-    /** A composition's components, in response order. Each call reads
-     * them again. */
-    components?: () => Iterable<[string, I3xVqt]>;
+    /** A composition's components, in response order, with null ticks
+     * between them. Each call reads them again. */
+    components?: () => Iterable<ComponentStep>;
 }
 
 /** A LazyValue over a value already built in memory. */
@@ -119,26 +130,8 @@ export function lazyFromValue(v: I3xValueResponse | null): LazyValue | null {
     return { head: head as I3xValueResponse, components: () => Object.entries(components) };
 }
 
-/* The UNS values filed under the subtree rooted at ?, in the order the
- * recursive in-memory walk gave: a node's own values (first seen
- * first), then each child's subtree in tree order. The path of zero-
- * padded seqs sorts a node before its descendants and siblings in seq
- * order. The depth limit guards against a parent cycle. */
-const SUBTREE_VALUES = `
-    with recursive sub(id, path, depth) as (
-        select ?, '', 0
-        union all
-        select o.element_id, sub.path || printf('%012d', o.seq), sub.depth + 1
-        from sub join object o on o.parent_id = sub.id
-        where sub.depth < 64
-    )`;
-const COMPONENTS_SQL = `${SUBTREE_VALUES}
-    select lv.element_id, lv.value_json, lv.quality, lv.timestamp
-    from sub cross join last_value lv on lv.anchor = sub.id and lv.source = 'uns'
-    order by sub.path, lv.seq`;
-const SUMMARY_SQL = `${SUBTREE_VALUES}
-    select count(*) n, max(lv.timestamp) ts
-    from sub cross join last_value lv on lv.anchor = sub.id and lv.source = 'uns'`;
+/** Children read per query while walking a subtree. */
+const WALK_PAGE = 256;
 
 /** Most unwritten values kept while writes fail, in batches. */
 const MAX_BACKLOG_BATCHES = 10;
@@ -445,13 +438,15 @@ export class ValueCache {
 
     /**
      * As getValue, but a composition's components are not built: they
-     * are read, in the same order, as `components()` is iterated, from
-     * one consistent snapshot of the database. Memory does not grow
-     * with the size of the composition. The head's timestamp comes
-     * from a separate read just before, so a value written in between
-     * can make it differ slightly from the components'.
+     * are read, in the same order, as `components()` is iterated. The
+     * head (whether there is a value at all, and its latest timestamp)
+     * comes from a first pass over the same walk. Both passes run in
+     * small steps with pauses for the event loop, so a composition with
+     * millions of components does not stall other work. Each pass reads
+     * its own snapshot, so a value written in between can make the
+     * head differ slightly from the components.
      */
-    getValueLazy(elementId: string): LazyValue | null {
+    async getValueLazy(elementId: string): Promise<LazyValue | null> {
         if (!this.treeInStore()) return lazyFromValue(this.getValue(elementId));
 
         this.flush();
@@ -462,34 +457,92 @@ export class ValueCache {
 
         const obj = this.objectTree.getObject(elementId);
         if (!obj?.isComposition) return null;
-        const sum = this.store.prepare(SUMMARY_SQL).get(elementId) as any;
-        if (!sum?.n) return null;
+
+        /* The old value took the latest timestamp, by string order,
+         * starting from "". */
+        let n = 0;
+        let latest = "";
+        const slicer = new Slicer();
+        for (const step of this.walkComponents(elementId)) {
+            if (step) {
+                n++;
+                const ts = step[1].timestamp;
+                if (ts > latest) latest = ts;
+            }
+            await slicer.maybe();
+        }
+        if (n === 0) return null;
         return {
             head: {
                 elementId,
                 isComposition: true,
                 value: null,
                 quality: "Good",
-                timestamp: sum.ts ?? "",
+                timestamp: latest,
             },
-            components: () => this.iterateComponents(elementId),
+            components: () => this.walkComponents(elementId),
         };
     }
 
-    /** A composition's components, read from a snapshot a row at a time. */
-    private *iterateComponents(elementId: string): Generator<[string, I3xVqt]> {
+    /**
+     * Walk the subtree under `rootId` depth first, from a read snapshot,
+     * yielding the UNS values filed under each node: the order of the
+     * old recursive walk (a node's own values, first seen first, then
+     * each child's subtree in tree order). Every step is a few indexed
+     * queries; children are read a page at a time. A leaf with no
+     * children has no values filed under it (values are filed under
+     * their parent) and is not visited. A null is yielded after each
+     * node, so the consumer can pause however few values there are.
+     */
+    private *walkComponents(rootId: string): Generator<ComponentStep> {
         this.flush();
         this.store.commit();
         const reader = this.store.openReader();
         try {
-            let rows: Iterable<ValueRow>;
-            if (reader) {
-                reader.exec("begin");
-                rows = reader.prepare(COMPONENTS_SQL).iterate(elementId) as Iterable<ValueRow>;
-            } else {
-                rows = this.store.prepare(COMPONENTS_SQL).all(elementId) as unknown as ValueRow[];
+            const db: any = reader ?? this.store.db;
+            if (reader) reader.exec("begin");
+            const values = db.prepare(`
+                select element_id, value_json, quality, timestamp from last_value
+                where anchor = ? and source = 'uns' order by seq`);
+            const children = db.prepare(`
+                select o.seq, o.element_id,
+                    o.is_composition or exists (select 1 from object c where c.parent_id = o.element_id) walk
+                from object o where o.parent_id = ? and o.seq > ? order by o.seq limit ?`);
+
+            interface Level { id: string; page: any[]; i: number; after: number; done: boolean }
+            const visit = function* (id: string): Generator<ComponentStep> {
+                /* all(): a few dozen rows at most, and no statement left
+                 * open while the consumer pauses. */
+                for (const r of values.all(id) as ValueRow[])
+                    yield [r.element_id, toVqt(r)];
+                yield null;
+            };
+            const fill = (l: Level) => {
+                l.page = children.all(l.id, l.after, WALK_PAGE);
+                l.i = 0;
+                if (l.page.length < WALK_PAGE) l.done = true;
+                if (l.page.length) l.after = l.page[l.page.length - 1].seq;
+            };
+
+            yield* visit(rootId);
+            const stack: Level[] = [{ id: rootId, page: [], i: 0, after: -1, done: false }];
+            fill(stack[0]);
+            while (stack.length) {
+                const top = stack[stack.length - 1];
+                if (top.i >= top.page.length) {
+                    if (top.done) { stack.pop(); continue; }
+                    fill(top);
+                    yield null;
+                    continue;
+                }
+                const child = top.page[top.i++];
+                if (!child.walk) continue;
+                if (stack.length >= 64) continue;   // guards against a parent cycle
+                yield* visit(child.element_id);
+                const level: Level = { id: child.element_id, page: [], i: 0, after: -1, done: false };
+                fill(level);
+                stack.push(level);
             }
-            for (const r of rows) yield [r.element_id, toVqt(r)];
         } finally {
             if (reader) {
                 try { reader.exec("commit"); } catch { /* not in a transaction */ }
@@ -500,9 +553,24 @@ export class ValueCache {
 
     getValue(elementId: string): I3xValueResponse | null {
         if (this.treeInStore()) {
-            const lazy = this.getValueLazy(elementId);
-            if (!lazy?.components) return lazy?.head ?? null;
-            return { ...lazy.head, components: Object.fromEntries(lazy.components()) };
+            /* Synchronous, and so for small compositions (MCP, tests):
+             * the value routes use getValueLazy. */
+            this.flush();
+            const row = this.store.prepare(
+                "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+            ).get(elementId) as unknown as ValueRow | undefined;
+            if (row) return { elementId, isComposition: false, ...toVqt(row) };
+            const obj = this.objectTree.getObject(elementId);
+            if (!obj?.isComposition) return null;
+            const components: Record<string, I3xVqt> = {};
+            let latest = "";
+            for (const step of this.walkComponents(elementId)) {
+                if (!step) continue;
+                components[step[0]] = step[1];
+                if (step[1].timestamp > latest) latest = step[1].timestamp;
+            }
+            if (Object.keys(components).length === 0) return null;
+            return { elementId, isComposition: true, value: null, quality: "Good", timestamp: latest, components };
         }
 
         this.flush();

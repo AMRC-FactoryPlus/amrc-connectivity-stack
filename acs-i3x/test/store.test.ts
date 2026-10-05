@@ -296,6 +296,7 @@ describe("ObjectTree rows", () => {
         t.getDescendantLeafIds("dev-6", 0);
         t.getDeviceSchemaUuids("dev-6");
         t.isSchemaReferenced("schema-top");
+        t.dropOrphans();
         t.getObjectType("schema-top");
         expect(used.size).toBeGreaterThan(15);
 

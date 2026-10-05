@@ -608,22 +608,47 @@ export class ObjectTree {
 
     /**
      * The objects getObjects would return, in the same order, read a
-     * page at a time. Each page is a separate query, so no statement
-     * stays open while the caller waits (for example on a slow HTTP
-     * client). Objects added or removed between pages may or may not
-     * be included.
+     * page at a time, so the caller can wait between pages (for example
+     * on a slow HTTP client) without the whole list in memory.
+     *
+     * With a file database the pages are read in one read transaction
+     * on a separate read-only connection, so the result is one
+     * consistent view of the committed tree however long the caller
+     * takes: a device rebuilt meanwhile is neither listed twice nor
+     * half old and half new. The current write batch is committed
+     * first, so the view includes every change made so far. The
+     * reader is closed when the iteration ends or is abandoned with
+     * return(), as streamJsonArray does on a client abort; a caller
+     * that drops it without return() holds the snapshot (and stops WAL
+     * checkpoints passing it) until garbage collection.
+     *
+     * An in-memory database (tests) cannot be opened twice. There each
+     * page is a separate query on the main connection, and objects
+     * changed between pages may be missed or repeated.
      */
     *iterateObjects(opts?: ObjectFilter, pageSize: number = 1000): Generator<I3xObject> {
         const { where, args } = this.objectWhere(opts);
         const sql = `select seq, ${OBJECT_COLS} from object
             where seq > ? ${where ? `and ${where}` : ""}
             order by seq limit ?`;
-        let after = -1;
-        for (;;) {
-            const rows = this.store.prepare(sql).all(after, ...args, pageSize) as any[];
-            for (const r of rows) yield toObject(r);
-            if (rows.length < pageSize) return;
-            after = rows[rows.length - 1].seq;
+
+        this.store.commit();
+        const reader = this.store.openReader();
+        const st = reader ? reader.prepare(sql) : null;
+        try {
+            if (reader) reader.exec("begin");
+            let after = -1;
+            for (;;) {
+                const rows = (st ?? this.store.prepare(sql)).all(after, ...args, pageSize) as any[];
+                for (const r of rows) yield toObject(r);
+                if (rows.length < pageSize) return;
+                after = rows[rows.length - 1].seq;
+            }
+        } finally {
+            if (reader) {
+                try { reader.exec("commit"); } catch { /* not in a transaction */ }
+                reader.close();
+            }
         }
     }
 

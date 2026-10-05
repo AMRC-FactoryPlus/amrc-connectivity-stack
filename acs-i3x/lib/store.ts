@@ -310,6 +310,18 @@ export class I3xStore {
         return pages * size;
     }
 
+    /**
+     * A new read-only connection to the same database file, for reads
+     * that must see one consistent snapshot over several event-loop
+     * turns (begin a transaction on it). The caller closes it. null for
+     * an in-memory database, which only this connection can see.
+     */
+    openReader(): DatabaseSync | null {
+        if (this.path === ":memory:" || this.path === "") return null;
+        const { DatabaseSync } = loadSqlite();
+        return new DatabaseSync(this.path, { readOnly: true });
+    }
+
     close(): void {
         this.commit();
         this.statements.clear();

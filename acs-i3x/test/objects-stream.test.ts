@@ -10,6 +10,9 @@
 
 import express from "express";
 import http from "node:http";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import request from "supertest";
 
@@ -17,6 +20,7 @@ import { APIv1 } from "../lib/api-v1.js";
 import { routes } from "../lib/routes.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { ValueCache } from "../lib/value-cache.js";
+import { I3xStore } from "../lib/store.js";
 // @ts-ignore - plain ESM benchmark fixture
 import { pipelineSnapshot } from "../bench/dataset.mjs";
 
@@ -269,3 +273,80 @@ describe("GET /v1/objects ETag", () => {
         expect(t.revision()).toBe(rev);
     });
 });
+
+describe("GET /v1/objects snapshot", () => {
+    it("streams one consistent view while a device is rebuilt mid-stream", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "i3x-stream-"));
+        const store = new I3xStore({ path: join(dir, "i3x.db") });
+        const server = http.createServer();
+        try {
+            const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+            const snap = pipelineSnapshot(1500);
+            t.refreshFromSnapshot(snap);
+            t.setReady();
+            const before = oldBody(t);
+
+            server.on("request", bareApp(t)).listen(0);
+            await new Promise(r => server.once("listening", r));
+            const port = (server.address() as AddressInfo).port;
+            const res = await new Promise<http.IncomingMessage>(r =>
+                http.get({ port, path: "/v1/objects" }, r));
+            res.pause();
+            await new Promise(r => setTimeout(r, 300));
+
+            /* The first device, whose rows went out first, is rebuilt
+             * and renamed; its rows get new, higher seqs. */
+            const [uuid, d] = [...snap.devices][0] as [string, any];
+            t.replaceDeviceSubtree(uuid, d.devInfo, { name: "Renamed while streaming" });
+            store.commit();
+
+            const chunks: Buffer[] = [];
+            res.on("data", c => chunks.push(c));
+            res.resume();
+            await new Promise(r => res.on("end", r));
+            const text = Buffer.concat(chunks).toString();
+            const ids = JSON.parse(text).result.map((o: any) => o.elementId);
+            expect(new Set(ids).size).toBe(ids.length);
+            // Exactly the tree as it was when the stream began.
+            expect(text).toBe(before);
+            expect(t.getObject(uuid)!.displayName).toBe("Renamed while streaming");
+        } finally {
+            server.close();
+            store.close();
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }, 60_000);
+
+    it("closes the reader when the client goes away", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "i3x-stream-"));
+        const store = new I3xStore({ path: join(dir, "i3x.db") });
+        const server = http.createServer();
+        try {
+            const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+            t.refreshFromSnapshot(pipelineSnapshot(1500));
+            t.setReady();
+            const readers: any[] = [];
+            const open = store.openReader.bind(store);
+            store.openReader = () => { const r = open(); readers.push(r); return r; };
+
+            server.on("request", bareApp(t)).listen(0);
+            await new Promise(r => server.once("listening", r));
+            const port = (server.address() as AddressInfo).port;
+            await new Promise<void>(resolve => {
+                const req = http.get({ port, path: "/v1/objects" }, res => {
+                    res.once("data", () => { req.destroy(); resolve(); });
+                });
+                req.on("error", () => {});
+            });
+            for (let i = 0; i < 100 && readers[0]?.isOpen; i++)
+                await new Promise(r => setTimeout(r, 20));
+            expect(readers).toHaveLength(1);
+            expect(readers[0].isOpen).toBe(false);
+        } finally {
+            server.close();
+            store.close();
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }, 60_000);
+});
+

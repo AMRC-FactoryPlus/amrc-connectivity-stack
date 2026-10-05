@@ -45,9 +45,11 @@ const objectTree = await new ObjectTree({
     store,
 }).init();
 
-// Start value cache (subscribes to UNS/v1/#)
+// Start value cache (subscribes to UNS/v1/#). Last values go to the
+// same database, in batches.
 const valueCache = await new ValueCache({
     objectTree,
+    store,
     staleThreshold: parseInt(env.I3X_STALE_THRESHOLD || "300000")
 }).init(fplus);
 
@@ -58,6 +60,10 @@ const history = new History({
     influxOrg: env.INFLUX_ORG || "default",
     influxBucket: env.INFLUX_BUCKET || "default",
     objectTree,
+    // Flux queries in flight across the whole process.
+    influxConcurrency: parseInt(env.I3X_INFLUX_CONCURRENCY || "4"),
+    // Current values read from InfluxDB are kept for the next read.
+    valueCache,
 });
 
 // Subscription manager
@@ -110,6 +116,7 @@ new ConfigSync({
     objectTree,
     store,
     ...configSyncFeeds(fplus),
+    valueCache,
     concurrency: parseInt(env.I3X_SYNC_CONCURRENCY || "16"),
     log: fplus.debug.bound("sync"),
 }).run();

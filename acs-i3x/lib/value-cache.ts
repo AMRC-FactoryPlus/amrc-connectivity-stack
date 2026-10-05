@@ -3,17 +3,34 @@
  */
 
 /*
- * ValueCache — Subscribes to UNS MQTT topics, maintains an in-memory
- * cache of current values, and notifies subscribers of changes.
+ * ValueCache — Subscribes to UNS MQTT topics, keeps the last value of
+ * every leaf metric, and notifies subscribers of changes.
+ *
+ * The values live in the last_value table of the SQLite store, not on
+ * the heap. UNS messages are written in batches (every flushInterval
+ * ms, or every flushMaxRows rows). Reads flush first, so they always
+ * see every message already received. Listeners (SSE subscriptions)
+ * are still called synchronously for every message.
+ *
+ * InfluxDB results read by History on a cache miss are written back
+ * here too (recordInfluxValues), so the next read of that metric is
+ * served locally.
  */
 
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import { deriveQuality } from "./quality.js";
 import { toI3xVqt } from "./mapping.js";
+import { I3xStore } from "./store.js";
 
 interface ValueCacheOpts {
     objectTree: ObjectTreeLike;
     staleThreshold: number;
+    /** The database for last values. Defaults to a new in-memory one. */
+    store?: I3xStore;
+    /** Most ms a UNS value waits before it is written. */
+    flushInterval?: number;
+    /** Write at once when this many values are waiting. */
+    flushMaxRows?: number;
 }
 
 /**
@@ -34,29 +51,97 @@ interface ObjectTreeLike {
 
 type ValueChangeListener = (elementId: string, vqt: I3xVqt) => void;
 
+/** A value read from InfluxDB, to keep for the next read. */
+export interface InfluxValue {
+    elementId: string;
+    /** The device (topLevelInstance) the metric belongs to. */
+    device: string;
+    /** The object whose composition includes this leaf directly. */
+    anchor: string | null;
+    value: unknown;
+    quality: string;
+    timestamp: string;
+}
+
+interface Pending {
+    anchor: string;
+    device: string;
+    valueJson: string | null;
+    quality: string;
+    timestamp: string | null;
+}
+
+interface ValueRow {
+    element_id: string;
+    value_json: string | null;
+    quality: string;
+    timestamp: string | null;
+}
+
+/** A colon-separated UUID path, without the empty segment a trailing
+ * colon leaves. uns-ingester sends `top:` for a metric directly under
+ * the device, which used to file it under the parent ''. */
+function splitPath(s: string): string[] {
+    const parts = s.split(":");
+    while (parts.length > 1 && parts[parts.length - 1] === "") parts.pop();
+    return parts;
+}
+
+/* JSON has no undefined; store it as SQL NULL and give it back. */
+const toJson = (v: unknown): string | null => v === undefined ? null : JSON.stringify(v);
+
+function toVqt(r: ValueRow): I3xVqt {
+    return {
+        value: r.value_json === null ? undefined : JSON.parse(r.value_json),
+        quality: r.quality as I3xVqt["quality"],
+        timestamp: r.timestamp ?? undefined as any,
+    };
+}
+
+const UPSERT = (source: string, guard: string) => `
+    insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+    values (?, ?, ?, ?, ?, ?, '${source}')
+    on conflict (element_id) do update set
+        anchor = excluded.anchor,
+        device_uuid = excluded.device_uuid,
+        value_json = excluded.value_json,
+        timestamp = excluded.timestamp,
+        quality = excluded.quality,
+        source = excluded.source
+    ${guard}`;
+
 export class ValueCache {
     private objectTree: ObjectTreeLike;
     private staleThreshold: number;
+    private store: I3xStore;
+    private flushInterval: number;
+    private flushMaxRows: number;
     private log: (msg: string, ...args: any[]) => void = () => {};
 
     private ready: boolean = false;
-    private cache: Map<string, I3xVqt> = new Map();
     private listeners: Set<ValueChangeListener> = new Set();
 
-    /**
-     * Reverse index: parentUuid -> Set of cached leaf element IDs.
-     * Allows efficient lookup of all leaf metrics belonging to a
-     * composition object.
-     */
-    private parentToLeaves: Map<string, Set<string>> = new Map();
+    /** UNS values not yet written, by elementId. Bounded by
+     * flushMaxRows and flushInterval. */
+    private pending: Map<string, Pending> = new Map();
+    private timer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
         this.staleThreshold = opts.staleThreshold;
+        this.store = opts.store ?? new I3xStore();
+        this.flushInterval = opts.flushInterval ?? 250;
+        this.flushMaxRows = opts.flushMaxRows ?? 5000;
     }
 
     async init(fplus: any): Promise<this> {
         this.log = fplus.debug.bound("value-cache");
+
+        /* Values stored by an earlier run may have changed while it was
+         * down; we did not see those UNS messages. Start empty, as the
+         * in-memory cache did, and let reads fill it from InfluxDB. */
+        this.clear();
+
         this.log("requesting MQTT client from ServiceClient");
         const mqtt = await fplus.mqtt_client();
         this.log("MQTT client obtained, subscribing to UNS/v1/#");
@@ -64,8 +149,13 @@ export class ValueCache {
         mqtt.on("message", (topic: string, payload: Buffer, packet: any) => {
             this.onUnsMessage(topic, payload, packet);
         });
+        let connected = false;
         mqtt.on("connect", () => {
             this.log("MQTT connected");
+            /* Messages sent while we were disconnected are lost, so a
+             * stored value may no longer be the last one. */
+            if (connected) this.clear();
+            connected = true;
         });
         mqtt.on("error", (err: any) => {
             console.error("ValueCache: MQTT error:", err);
@@ -112,8 +202,8 @@ export class ValueCache {
 
         if (!instanceUuidPathStr) return;
 
-        const instanceUuidPath = instanceUuidPathStr.split(":");
-        const schemaUuidPath = schemaUuidPathStr.split(":");
+        const instanceUuidPath = splitPath(instanceUuidPathStr);
+        const schemaUuidPath = splitPath(schemaUuidPathStr);
         const bottomUuid = instanceUuidPath[instanceUuidPath.length - 1];
 
         // Parse payload
@@ -148,14 +238,20 @@ export class ValueCache {
 
         const vqt = toI3xVqt(parsed.value, quality, parsed.timestamp);
 
-        // Store in cache
-        this.cache.set(elementId, vqt);
-
-        // Track this leaf under its parent (bottom UUID)
-        if (!this.parentToLeaves.has(bottomUuid)) {
-            this.parentToLeaves.set(bottomUuid, new Set());
+        // Queue it for the next write, filed under its parent (bottom UUID)
+        this.pending.set(elementId, {
+            anchor: bottomUuid,
+            device: instanceUuidPath[0],
+            valueJson: toJson(vqt.value),
+            quality: vqt.quality,
+            timestamp: vqt.timestamp ?? null,
+        });
+        if (this.pending.size >= this.flushMaxRows) {
+            this.flush();
+        } else if (!this.timer) {
+            this.timer = setTimeout(() => this.flush(), this.flushInterval);
+            this.timer.unref?.();
         }
-        this.parentToLeaves.get(bottomUuid)!.add(elementId);
 
         // Notify listeners
         for (const listener of this.listeners) {
@@ -167,16 +263,78 @@ export class ValueCache {
         }
     }
 
+    /** Write every waiting UNS value, in one transaction. */
+    flush(): void {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        if (this.pending.size === 0) return;
+        const batch = this.pending;
+        this.pending = new Map();
+        const st = this.store.prepare(UPSERT("uns", ""));
+        this.store.transaction(() => {
+            for (const [id, p] of batch)
+                st.run(id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality);
+        });
+    }
+
+    /**
+     * Keep values History read from InfluxDB. A stored value with a
+     * later timestamp (a UNS message that arrived during the query)
+     * is not replaced.
+     */
+    recordInfluxValues(values: InfluxValue[]): void {
+        if (values.length === 0) return;
+        this.flush();
+        const st = this.store.prepare(UPSERT("influx",
+            "where julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
+        this.store.transaction(() => {
+            for (const v of values) {
+                st.run(v.elementId, v.anchor ?? v.device, v.device,
+                    toJson(v.value), v.timestamp ?? null, v.quality);
+            }
+        });
+    }
+
+    /** Drop the values of a device that has left the tree. */
+    removeDevice(uuid: string): void {
+        for (const [id, p] of this.pending) {
+            if (p.device === uuid) this.pending.delete(id);
+        }
+        this.store.prepare("delete from last_value where device_uuid = ?").run(uuid);
+    }
+
+    /** Forget every value. */
+    clear(): void {
+        this.pending.clear();
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        this.store.prepare("delete from last_value").run();
+    }
+
+    /** Number of stored values, for tests and diagnostics. */
+    size(): number {
+        this.flush();
+        return (this.store.prepare("select count(*) n from last_value").get() as any).n;
+    }
+
     /* ---- Query methods ---- */
 
     getValue(elementId: string): I3xValueResponse | null {
+        this.flush();
+
         // Check if it's a direct leaf metric in the cache
-        const vqt = this.cache.get(elementId);
-        if (vqt) {
+        const row = this.store.prepare(
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+        ).get(elementId) as unknown as ValueRow | undefined;
+        if (row) {
             return {
                 elementId,
                 isComposition: false,
-                ...vqt,
+                ...toVqt(row),
             };
         }
 
@@ -210,6 +368,7 @@ export class ValueCache {
     }
 
     getChildValues(elementId: string, maxDepth: number): Record<string, I3xVqt> | null {
+        this.flush();
         const result = this.collectChildValues(elementId, maxDepth);
         if (result !== null && Object.keys(result).length === 0) {
             return null;
@@ -247,15 +406,13 @@ export class ValueCache {
     ): Record<string, I3xVqt> | null {
         const result: Record<string, I3xVqt> = {};
 
-        // Collect direct leaf metrics cached under this elementId
-        const directLeaves = this.parentToLeaves.get(elementId);
-        if (directLeaves) {
-            for (const leafId of directLeaves) {
-                const vqt = this.cache.get(leafId);
-                if (vqt) {
-                    result[leafId] = vqt;
-                }
-            }
+        // Collect direct leaf metrics cached under this elementId,
+        // in the order they were first seen
+        const direct = this.store.prepare(
+            "select element_id, value_json, quality, timestamp from last_value where anchor = ? order by seq",
+        ).all(elementId) as unknown as ValueRow[];
+        for (const r of direct) {
+            result[r.element_id] = toVqt(r);
         }
 
         // If we haven't hit the depth limit, recurse into child objects

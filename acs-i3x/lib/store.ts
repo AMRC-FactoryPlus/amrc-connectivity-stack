@@ -79,17 +79,20 @@ const TABLES = `
     ) without rowid;
 
     -- The last known value of each leaf metric. anchor is the object
-    -- whose composition value includes this leaf directly.
+    -- whose composition value includes this leaf directly. seq keeps
+    -- the order leaves were first seen in, which is the order of a
+    -- composition's components.
     create table last_value (
-        element_id      text primary key,
+        seq             integer primary key,
+        element_id      text not null unique,
         anchor          text,
         device_uuid     text,
         value_json      text,
-        timestamp       text not null,
+        timestamp       text,
         quality         text not null,
         source          text not null           -- 'uns' | 'influx'
-    ) without rowid;
-    create index last_value_anchor_ix on last_value (anchor);
+    );
+    create index last_value_anchor_ix on last_value (anchor, seq);
     create index last_value_device_ix on last_value (device_uuid);
 
     create table meta (

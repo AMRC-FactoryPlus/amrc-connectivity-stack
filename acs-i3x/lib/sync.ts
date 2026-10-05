@@ -475,6 +475,17 @@ export class ConfigSync {
         return { config: config ?? null, etag: etag ?? null };
     }
 
+    /* The readiness grace runs from when fetches started failing
+     * without a break, so once a fetch succeeds and nothing else is
+     * failing or waiting to retry, the clock stops. Otherwise a failure
+     * early in a long cold sync that recovered would use up the grace
+     * of a later one. Only a success stops it: a retry briefly leaves
+     * nothing failing before it queues the key again. */
+    private clearFailingSince(): void {
+        if (this.failed.size === 0 && this.retries.size === 0)
+            this.failingSince = 0;
+    }
+
     private async work(key: string): Promise<void> {
         if (this.stopped) return;
         const uuid = key.slice(2);
@@ -482,6 +493,7 @@ export class ConfigSync {
             if (key.startsWith("d:")) await this.syncDevice(uuid);
             else await this.syncSchema(uuid);
             this.failed.delete(key);
+            this.clearFailingSince();
         } catch (err) {
             this.stats.errors++;
             this.failed.add(key);

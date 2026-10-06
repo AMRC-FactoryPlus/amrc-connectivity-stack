@@ -51,7 +51,10 @@ interface HistoryOpts {
      * Where to keep current values read from InfluxDB, so the next
      * read of the same metric does not need a Flux query.
      */
-    valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
+    valueCache?: {
+        recordInfluxValues(values: InfluxValue[]): void;
+        recordInfluxEmpty?(leaves: Array<{ elementId: string; device: string | null; anchor: string | null }>): void;
+    };
 }
 
 /** One row of the bulk last-value query. */
@@ -112,7 +115,7 @@ export class History {
     private bulkConcurrency: number;
     private bulkMeasurementFilterMax: number;
     private semaphore: Semaphore;
-    private valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
+    private valueCache?: HistoryOpts["valueCache"];
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
@@ -164,6 +167,50 @@ export class History {
             });
             if (out.length >= 1000) write();
             await slicer.maybe();
+        }
+        if (out.length) write();
+    }
+
+    /**
+     * Record, for each composition read, the leaves InfluxDB had no
+     * value for. With the values remember() keeps, every leaf the read
+     * covered is then accounted for, so the value cache can answer the
+     * composition next time (see ValueCache.compositionComplete).
+     */
+    private async rememberEmpty(
+        plan: Map<string, { composition: boolean; leafIds: string[] }>,
+        values: Map<string, I3xValueResponse>,
+    ): Promise<void> {
+        if (!this.valueCache?.recordInfluxEmpty) return;
+        const slicer = new Slicer();
+        let out: Array<{ elementId: string; device: string | null; anchor: string | null }> = [];
+        const write = () => {
+            try {
+                this.valueCache!.recordInfluxEmpty!(out);
+            } catch (err) {
+                console.error("History: storing empty InfluxDB results failed:", err);
+            }
+            out = [];
+        };
+        for (const { composition, leafIds } of plan.values()) {
+            if (!composition) continue;
+            /* A leaf without MetricMeta has no device of its own; file it
+             * under its composition's device, so it goes with it. */
+            let device: string | null = null;
+            for (const leafId of leafIds) {
+                device = this.objectTree.getMetricMeta(leafId)?.topLevelInstanceUuid ?? null;
+                if (device) break;
+            }
+            for (const leafId of leafIds) {
+                await slicer.maybe();
+                if (values.has(leafId)) continue;
+                out.push({
+                    elementId: leafId,
+                    device: this.objectTree.getMetricMeta(leafId)?.topLevelInstanceUuid ?? device,
+                    anchor: this.objectTree.getObject(leafId)?.parentId ?? null,
+                });
+                if (out.length >= 1000) write();
+            }
         }
         if (out.length) write();
     }
@@ -262,6 +309,7 @@ export class History {
         }
 
         const leafValues = await this.getCurrentValues([...allLeaves]);
+        await this.rememberEmpty(plan, leafValues);
 
         const out = new Map<string, I3xValueResponse | null>();
         for (const [id, { composition, leafIds }] of plan) {

@@ -1045,22 +1045,6 @@ export class ObjectTree {
     }
 
     /**
-     * Recursively search an originMap for an object whose Schema_UUID
-     * matches the target. Returns the matching object or undefined.
-     */
-    private findBySchemaUuid(obj: any, targetSchemaUuid: string): any | undefined {
-        if (obj == null || typeof obj !== "object") return undefined;
-        if (obj.Schema_UUID === targetSchemaUuid) return obj;
-        for (const value of Object.values(obj)) {
-            if (value != null && typeof value === "object") {
-                const found = this.findBySchemaUuid(value, targetSchemaUuid);
-                if (found) return found;
-            }
-        }
-        return undefined;
-    }
-
-    /**
      * Extract ISA-95 hierarchy values from an ISA95_Hierarchy object.
      * Returns the segments in order (Enterprise, Site, Area, WorkCenter, WorkUnit),
      * stopping at the first missing level (unbroken chain).
@@ -1227,8 +1211,13 @@ export class ObjectTree {
         }
         const schemaUuids = new Set<string>([schemaUuid]);
 
-        // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
-        const hierarchyObj = this.findBySchemaUuid(devInfo.originMap, HIERARCHY_SCHEMA_UUID);
+        // The ISA-95 hierarchy: a Hierarchy-v1 object at
+        // Device_Information/ISA95_Hierarchy. uns-ingester-sparkplug
+        // looks only there, and publishes a device to UNS only if it
+        // finds one; a hierarchy elsewhere must not count (see
+        // publishesToUns).
+        const candidate = devInfo.originMap?.Device_Information?.ISA95_Hierarchy;
+        const hierarchyObj = candidate?.Schema_UUID === HIERARCHY_SCHEMA_UUID ? candidate : undefined;
         const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
 
         if (isa95Segments.length === 0) {

@@ -724,6 +724,79 @@ describe("InfluxDB write-back for devices that do not publish to UNS", () => {
         expect(s.queries).toHaveLength(2);
     });
 
+    it("a mixed composition with UNS values is answered from those alone, as on main", async () => {
+        const s = setup();
+        s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
+        s.tree.addDevice("dev-3", plainDevInfo("dev-3", "NS"), null);
+        const ns = s.tree.getObject("dev-3")!.parentId!;
+        s.series.set(s.leaf("Temp", "dev-2"), { _value: 1, _time: T1 });
+        s.valueCache.onUnsMessage("UNS/v1/NS/Edge/D3/Mode",
+            Buffer.from(JSON.stringify({ timestamp: T1, value: "auto" })),
+            { properties: { userProperties: { InstanceUUIDPath: "dev-3:", SchemaUUIDPath: "top:" } } });
+
+        // Never complete, so only UNS values: dev-2's leaves are left
+        // out and InfluxDB is not read, which is what main did.
+        const r = await request(api(s)).post("/v1/objects/value").send({ elementIds: [ns], maxDepth: 0 });
+        expect(Object.keys(r.body.results[0].result.components)).toEqual([s.leaf("Mode", "dev-3")]);
+        expect(s.queries).toHaveLength(0);
+    });
+
+    it("takes the hierarchy only from Device_Information/ISA95_Hierarchy, as the ingester does", async () => {
+        const s = setup();
+        const info: any = plainDevInfo("dev-2");
+        // Hierarchy-v1 elsewhere: uns-ingester-sparkplug ignores it.
+        info.originMap.Extra = {
+            Schema_UUID: "extra",
+            ISA95_Hierarchy: { Schema_UUID: HIERARCHY, Enterprise: { Value: "AMRC" } },
+        };
+        s.tree.addDevice("dev-2", info, null);
+        expect(s.tree.publishesToUns("dev-2")).toBe(false);
+        const temp = s.leaf("Temp", "dev-2");
+        s.series.set(temp, { _value: 1, _time: T1 });
+        await request(api(s)).post("/v1/objects/value").send({ elementIds: [temp] });
+        expect(rowCount(s.store)).toBe(0);
+    });
+
+    /* A device with 1,100 leaves, so History writes two chunks with a
+     * pause between them. */
+    function bigDevInfo(enterprise?: string) {
+        const d: any = plainDevInfo("dev-big", enterprise);
+        for (let i = 0; i < 1100; i++) d.originMap[`L${i}`] = { Schema_UUID: "m", Sparkplug_Type: "Double" };
+        return d;
+    }
+
+    it("stops keeping values when the device loses its hierarchy between chunks", async () => {
+        const s = setup();
+        s.tree.addDevice("dev-big", bigDevInfo("AMRC"), null);
+        for (const leaf of s.tree.getDescendantLeafIds("dev-big", 0))
+            s.series.set(leaf, { _value: 1, _time: T1 });
+        const record = s.valueCache.recordInfluxValues.bind(s.valueCache);
+        let calls = 0;
+        jest.spyOn(s.valueCache, "recordInfluxValues").mockImplementation(values => {
+            record(values);
+            // Sync applies the change after the first chunk, as it can
+            // during a pause between chunks.
+            if (calls++ === 0) s.tree.replaceDeviceSubtree("dev-big", bigDevInfo(), null);
+        });
+        await s.history.getValues(["dev-big"], 0);
+        expect(calls).toBe(1);
+        expect(rowCount(s.store)).toBe(1000);
+    });
+
+    it("stops keeping markers when the device loses its hierarchy between chunks", async () => {
+        const s = setup();
+        s.tree.addDevice("dev-big", bigDevInfo("AMRC"), null);
+        const record = s.valueCache.recordInfluxEmpty.bind(s.valueCache);
+        let calls = 0;
+        jest.spyOn(s.valueCache, "recordInfluxEmpty").mockImplementation(leaves => {
+            record(leaves);
+            if (calls++ === 0) s.tree.replaceDeviceSubtree("dev-big", bigDevInfo(), null);
+        });
+        await s.history.getValues(["dev-big"], 0);
+        expect(calls).toBe(1);
+        expect(rowCount(s.store)).toBe(1000);
+    });
+
     it("keeps nothing for a device that loses its hierarchy while InfluxDB is read", async () => {
         const s = setup();
         s.series.set(s.leaf("Speed"), { _value: 1, _time: T1 });

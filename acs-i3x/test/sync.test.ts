@@ -20,6 +20,7 @@ import { Slicer } from "../lib/slicer.js";
 import type { EtagChange } from "../lib/sync.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { I3xStore } from "../lib/store.js";
+import { ValueCache } from "../lib/value-cache.js";
 import { I3xRag } from "../lib/rag/i3x-rag.js";
 import {
     DEVICE_INFORMATION_APP_UUID as DI,
@@ -759,6 +760,45 @@ describe("ConfigSync", () => {
         } finally {
             rmSync(dir, { recursive: true, force: true });
         }
+    });
+
+    it("drops the InfluxDB values of a device that loses its ISA-95 hierarchy, not its UNS values", async () => {
+        const cdb = new FakeConfigDB();
+        const uuids = seed(cdb);
+        const s = start(stack(cdb));
+        const vc = new ValueCache({ objectTree: s.tree, store: s.store, staleThreshold: 60_000 });
+        (s.sync as any).opts.valueCache = vc;
+        cdb.setMembers(uuids);
+        cdb.snapshots();
+        await settle(s.sync);
+
+        /* A value and a marker kept from InfluxDB, and a UNS value, for
+         * two devices. */
+        const keep = (uuid: string) => {
+            const [a, b, c] = s.tree.getDescendantLeafIds(uuid, 0);
+            vc.recordInfluxValues([{ elementId: a, device: uuid, anchor: uuid,
+                value: 1, quality: "Good", timestamp: "2026-10-05T11:00:00Z" }]);
+            vc.recordInfluxEmpty([{ elementId: b, device: uuid, anchor: uuid }]);
+            s.store.prepare(`insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+                values (?, ?, ?, '2', '2026-10-05T12:00:00Z', 'Good', 'uns')`).run(c, uuid, uuid);
+        };
+        keep(uuids[5]);
+        keep(uuids[6]);
+        const sources = (uuid: string) => (s.store.prepare(
+            "select source from last_value where device_uuid = ? order by source").all(uuid) as any[]).map(r => r.source);
+
+        /* uuids[5] loses its hierarchy; uuids[6] changes but keeps it. */
+        const d5 = device(5);
+        const om5 = JSON.parse(JSON.stringify(d5.originMap));
+        delete om5.Device_Information.ISA95_Hierarchy;
+        cdb.put(DI, uuids[5], { schema: TOP, sparkplugName: d5.name, originMap: om5 });
+        const d6 = device(6);
+        cdb.put(DI, uuids[6], { schema: TOP, sparkplugName: d6.name,
+            originMap: { ...d6.originMap, Added_Metric: { Sparkplug_Type: "Double" } } });
+        await settle(s.sync);
+
+        expect(sources(uuids[5])).toEqual(["uns"]);
+        expect(sources(uuids[6])).toEqual(["empty", "influx", "uns"]);
     });
 
     it("keeps a device that joins while a reconcile is running", async () => {

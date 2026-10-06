@@ -74,13 +74,22 @@ export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = M
 
 /**
  * Read the levels below a composition the user expanded. They are read
- * into a copy, so the rows appear with their values.
+ * into a copy, so the rows appear with their values. If `is_current`
+ * says the selection changed while they were read, the node is left
+ * alone and a failure is dropped. Returns whether the node was updated.
  */
-export async function expand (i3x, node, opts) {
+export async function expand (i3x, node, { is_current = () => true, ...opts } = {}) {
   const loaded = mk_node(node)
-  await load_subtree(i3x, loaded, opts)
+  try {
+    await load_subtree(i3x, loaded, opts)
+  } catch (e) {
+    if (is_current()) throw e
+    return false
+  }
+  if (!is_current()) return false
   node.children = loaded.children
   node.error = loaded.error
+  return true
 }
 
 /**

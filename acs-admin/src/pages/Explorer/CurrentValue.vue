@@ -35,6 +35,8 @@ async function fetchValue () {
   const mine = ++generation
   loading.value = true
   error.value = null
+  // Expands still in flight belong to the earlier selection.
+  loadingIds.clear()
   try {
     if (props.isComposition) {
       const top = mk_node({ elementId: props.elementId, isComposition: true })
@@ -59,14 +61,17 @@ async function fetchValue () {
 async function toggle (node) {
   if (loadingIds.has(node.elementId)) return
   if (node.children === null) {
+    const mine = generation
+    const is_current = () => mine === generation
     loadingIds.add(node.elementId)
     try {
-      await expand(i3x, node)
-      collapsed.delete(node.elementId)
+      if (await expand(i3x, node, { is_current }))
+        collapsed.delete(node.elementId)
     } catch (e) {
+      // expand only throws for the current selection.
       error.value = e.message
     } finally {
-      loadingIds.delete(node.elementId)
+      if (is_current()) loadingIds.delete(node.elementId)
     }
     return
   }

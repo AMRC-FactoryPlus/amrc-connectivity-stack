@@ -174,4 +174,31 @@ describe('composition value tree', () => {
     expect(names(location)).toEqual(['Latitude', 'Longitude'])
     expect(location.children[0].vqt).toEqual(vqt('lat'))
   })
+
+  it('leaves the tree alone when an expand settles after the selection changed', async () => {
+    const i3x = fake_i3x()
+    const t = top()
+    await load_subtree(i3x, t, { depth: 2 })
+    const network = t.children[3].children[0]
+
+    let current = true
+    const pending = expand(i3x, network, { is_current: () => current })
+    current = false
+    expect(await pending).toBe(false)
+    expect(network.children).toBe(null)
+  })
+
+  it('drops the failure of an expand that settles after the selection changed', async () => {
+    const i3x = fake_i3x()
+    i3x.getRelatedBulk = async () => { throw new Error('i3X request failed: 503') }
+    const node = mk_node({ elementId: 'network', isComposition: true })
+
+    let current = true
+    const stale = expand(i3x, node, { is_current: () => current })
+    current = false
+    expect(await stale).toBe(false)
+
+    await expect(expand(i3x, node, { is_current: () => true }))
+      .rejects.toThrow('i3X request failed: 503')
+  })
 })

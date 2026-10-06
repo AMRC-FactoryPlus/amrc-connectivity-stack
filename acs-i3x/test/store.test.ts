@@ -241,7 +241,9 @@ describe("I3xStore", () => {
 
     it("checkpoints the WAL from a worker thread, not in a commit", async () => {
         const path = join(dir, "i3x.db");
-        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 50 });
+        // The worker runs alongside this thread: its interval must be
+        // longer than the writes below take, or it checkpoints them first.
+        const s = new I3xStore({ path, commitInterval: 0, checkpointInterval: 1000 });
         expect((s.db.prepare("pragma wal_autocheckpoint").get() as any).wal_autocheckpoint).toBe(0);
         const before = statSync(path).size;
         const t = tree(s);
@@ -250,7 +252,7 @@ describe("I3xStore", () => {
         expect(statSync(path).size).toBe(before);
         expect(statSync(`${path}-wal`).size).toBeGreaterThan(100_000);
         // ...the worker does, within a few intervals.
-        for (let i = 0; i < 100 && statSync(path).size === before; i++)
+        for (let i = 0; i < 250 && statSync(path).size === before; i++)
             await new Promise(r => setTimeout(r, 20));
         expect(statSync(path).size).toBeGreaterThan(before);
         s.close();

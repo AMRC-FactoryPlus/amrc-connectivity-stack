@@ -3,11 +3,13 @@
   -->
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import QualityBadge from '@components/QualityBadge.vue'
+import ValueTreeRow from './ValueTreeRow.vue'
 import { useI3xClient } from '@composables/useI3xClient.js'
+import { mk_node, load_subtree, count_leaves } from '@/lib/explorer/value-tree.js'
 import dayjs from 'dayjs'
 
 const props = defineProps({
@@ -18,24 +20,72 @@ const props = defineProps({
 const i3x = useI3xClient()
 const loading = ref(false)
 const error = ref(null)
-const data = ref(null)
+const leafValue = ref(null)
+// The selected composition, as { elementId, displayName, isComposition,
+// children, vqt }. `children` is null until that level is read.
+const root = ref(null)
+const collapsed = reactive(new Set())
+const loadingIds = reactive(new Set())
+
+// Bumped on every fetch, so a slow answer for an earlier selection
+// does not replace the current one.
+let generation = 0
 
 async function fetchValue () {
+  const mine = ++generation
   loading.value = true
   error.value = null
   try {
-    data.value = await i3x.getValue(props.elementId)
+    if (props.isComposition) {
+      const top = mk_node({ elementId: props.elementId, isComposition: true })
+      await load_subtree(i3x, top)
+      if (mine !== generation) return
+      leafValue.value = null
+      root.value = top
+    } else {
+      const value = await i3x.getValue(props.elementId)
+      if (mine !== generation) return
+      leafValue.value = value
+      root.value = null
+    }
   } catch (e) {
-    error.value = e.message
+    if (mine === generation) error.value = e.message
   } finally {
-    loading.value = false
+    if (mine === generation) loading.value = false
   }
 }
 
-watch(() => props.elementId, () => {
-  data.value = null
+async function toggle (node) {
+  if (loadingIds.has(node.elementId)) return
+  if (node.children === null) {
+    loadingIds.add(node.elementId)
+    try {
+      // Read into a copy, so the rows appear with their values.
+      const loaded = mk_node(node)
+      await load_subtree(i3x, loaded)
+      node.children = loaded.children
+      collapsed.delete(node.elementId)
+    } catch (e) {
+      error.value = e.message
+    } finally {
+      loadingIds.delete(node.elementId)
+    }
+    return
+  }
+  if (collapsed.has(node.elementId)) collapsed.delete(node.elementId)
+  else collapsed.add(node.elementId)
+}
+
+watch(() => [props.elementId, props.isComposition], () => {
+  leafValue.value = null
+  root.value = null
+  collapsed.clear()
   fetchValue()
 }, { immediate: true })
+
+const summary = computed(() => root.value
+  ? count_leaves(root.value)
+  : { leaves: 0, values: 0 })
 
 function formatTimestamp (ts) {
   if (!ts) return '-'
@@ -61,36 +111,40 @@ function formatValue (val) {
     </CardHeader>
     <CardContent>
       <div v-if="error" class="text-sm text-red-500">{{ error }}</div>
-      <div v-else-if="loading && !data" class="text-sm text-slate-400">Loading...</div>
-      <div v-else-if="data">
-        <div v-if="!data.isComposition" class="flex items-center gap-3">
-          <span class="text-2xl font-semibold font-mono">{{ formatValue(data.value) }}</span>
-          <QualityBadge :quality="data.quality" />
-          <span class="text-xs text-slate-400 ml-auto">{{ formatTimestamp(data.timestamp) }}</span>
-        </div>
+      <div v-else-if="loading && !leafValue && !root" class="text-sm text-slate-400">Loading...</div>
 
-        <div v-else>
-          <p class="text-sm text-slate-500 mb-3">Composition with {{ Object.keys(data.components || {}).length }} components</p>
-          <div class="border rounded-md overflow-hidden" v-if="data.components">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-50">
-                <tr>
-                  <th class="text-left px-3 py-1.5 font-medium text-slate-600">Component</th>
-                  <th class="text-left px-3 py-1.5 font-medium text-slate-600">Value</th>
-                  <th class="text-left px-3 py-1.5 font-medium text-slate-600">Quality</th>
-                  <th class="text-left px-3 py-1.5 font-medium text-slate-600">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(vqt, key) in data.components" :key="key" class="border-t">
-                  <td class="px-3 py-1.5 font-mono text-xs truncate max-w-[200px]">{{ key }}</td>
-                  <td class="px-3 py-1.5 font-mono">{{ formatValue(vqt.value) }}</td>
-                  <td class="px-3 py-1.5"><QualityBadge :quality="vqt.quality" /></td>
-                  <td class="px-3 py-1.5 text-xs text-slate-400">{{ formatTimestamp(vqt.timestamp) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      <div v-else-if="leafValue && !leafValue.isComposition" class="flex items-center gap-3">
+        <span class="text-2xl font-semibold font-mono">{{ formatValue(leafValue.value) }}</span>
+        <QualityBadge :quality="leafValue.quality" />
+        <span class="text-xs text-slate-400 ml-auto">{{ formatTimestamp(leafValue.timestamp) }}</span>
+      </div>
+
+      <div v-else-if="root?.children?.length">
+        <p class="text-sm text-slate-500 mb-3">
+          {{ summary.leaves }} values<template v-if="summary.leaves > summary.values">, {{ summary.leaves - summary.values }} with no data</template>
+        </p>
+        <div class="border rounded-md overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="text-left px-3 py-1.5 font-medium text-slate-600">Name</th>
+                <th class="text-left px-3 py-1.5 font-medium text-slate-600">Value</th>
+                <th class="text-left px-3 py-1.5 font-medium text-slate-600">Quality</th>
+                <th class="text-left px-3 py-1.5 font-medium text-slate-600">Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ValueTreeRow
+                v-for="child in root.children"
+                :key="child.elementId"
+                :node="child"
+                :depth="0"
+                :collapsed="collapsed"
+                :loading-ids="loadingIds"
+                @toggle="toggle"
+              />
+            </tbody>
+          </table>
         </div>
       </div>
       <div v-else class="text-sm text-slate-400">No value available</div>

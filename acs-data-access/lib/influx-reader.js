@@ -2,6 +2,7 @@ import { PassThrough } from "stream";
 import { once } from "events";
 import pLimit from "p-limit";
 
+import { source_queries } from "./flux-query.js";
 import { csv_escape, strip_metric_suffix } from "./utils.js";
 
 const CSV_HEADER = "device,metric,timestamp,value,unit";
@@ -66,34 +67,37 @@ export class InfluxReader {
         writable,
         meta
     ) {
-        const query =
-            this.#buildFluxQuery(
-                source,
-                meta
-            );
+        const queries = source_queries({
+            bucket:         this.influx_bucket,
+            source,
+            measurement:    meta.measurement,
+        });
 
         this.log(
-            "streaming",
-            source.device_uuid
+            "streaming %s (%d queries)",
+            source.device_uuid,
+            queries.length
         );
 
-        const response =
-            this.influx_query_api.response(query);
+        for (const query of queries) {
+            const response =
+                this.influx_query_api.response(query);
 
-        for await (
-            const row of response.iterateRows()
-        ) {
-            const o = row.tableMeta.toObject(row.values);
+            for await (
+                const row of response.iterateRows()
+            ) {
+                const o = row.tableMeta.toObject(row.values);
 
-            const line = [
-                csv_escape(o.device),
-                csv_escape(strip_metric_suffix(o._measurement)),
-                csv_escape(o._time),
-                csv_escape(o._value),
-                csv_escape(o.unit),
-            ].join(",");
+                const line = [
+                    csv_escape(o.device),
+                    csv_escape(strip_metric_suffix(o._measurement)),
+                    csv_escape(o._time),
+                    csv_escape(o._value),
+                    csv_escape(o.unit),
+                ].join(",");
 
-            await this.#write(writable, line + "\n");
+                await this.#write(writable, line + "\n");
+            }
         }
     }
 
@@ -101,55 +105,5 @@ export class InfluxReader {
         if (!writable.write(chunk)) {
             await once(writable, "drain");
         }
-    }
-
-
-    #buildFluxQuery(
-        source,
-        meta = {}
-    ) {
-        const start =
-            source.from ??
-            "1970-01-01T00:00:00Z";
-
-        const stop =
-            source.to ??
-            "2100-01-01T00:00:00Z";
-
-        const measurementFilter =
-            meta.measurement
-                ? `
-                |> filter(
-                    fn: (r) =>
-                        r._measurement ==
-                        "${meta.measurement}"
-                )
-            `
-                : "";
-
-        return `
-            from(bucket: "${this.influx_bucket}")
-
-            |> range(
-                start: time(v: "${start}"),
-                stop: time(v: "${stop}")
-            )
-
-            ${measurementFilter}
-
-            |> filter(
-                fn: (r) =>
-                    r.topLevelInstance ==
-                    "${source.device_uuid}"
-            )
-
-            |> keep(columns: [
-                "_time",
-                "_value",
-                "_measurement",
-                "device",
-                "unit"
-            ])
-        `;
     }
 }

@@ -275,6 +275,21 @@ composition with no UNS data still falls back to InfluxDB whole. Values are
 cleared at start and on an MQTT reconnect, because UNS messages sent while
 i3X was not listening are lost.
 
+Only a later UNS message replaces a value kept from InfluxDB, so values
+(and "no data" markers) are kept only for devices that publish to UNS.
+uns-ingester-sparkplug publishes a device only if its birth certificate has
+an ISA-95 hierarchy with at least an Enterprise; the Sparkplug historian
+writes every device to InfluxDB. `ObjectTree.publishesToUns` tells them
+apart by where the device sits: a device without a hierarchy is filed under
+`<namespace>/Unknown`, and a UNS message moves a device under the levels it
+was published with. A device without a hierarchy is read from InfluxDB on
+every request, and a composition that includes it has no markers for its
+leaves, so it is never complete and is read from InfluxDB whole. History
+checks just before each write, so a device that loses its hierarchy during
+a read keeps nothing. When a DeviceInformation change leaves a device
+without a hierarchy, ConfigSync drops its InfluxDB values and markers
+(`removeInfluxValues`); its UNS values stay.
+
 A composition's cached value is every UNS value in its whole subtree, in
 tree order (the cache path does not apply maxDepth). Near the top of the
 ISA-95 hierarchy that is millions of components, so `getValueLazy` reads

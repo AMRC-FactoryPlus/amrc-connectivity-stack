@@ -14,7 +14,8 @@
  *
  * InfluxDB results read by History on a cache miss are written back
  * here too (recordInfluxValues), so the next read of that metric is
- * served locally.
+ * served locally. Only for devices that publish to UNS: nothing else
+ * would ever replace them.
  */
 
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
@@ -515,6 +516,16 @@ export class ValueCache {
             if (p.device === uuid) this.pending.delete(id);
         }
         this.store.prepare("delete from last_value where device_uuid = ?").run(uuid);
+    }
+
+    /**
+     * Drop the values and markers kept from InfluxDB for a device that
+     * no longer publishes to UNS (History keeps none for such a device):
+     * no UNS message would replace them, so they would be served as
+     * current for ever. Its UNS values stay.
+     */
+    removeInfluxValues(uuid: string): void {
+        this.store.prepare("delete from last_value where device_uuid = ? and source != 'uns'").run(uuid);
     }
 
     /** clear(), logging a failure instead of throwing: it runs at start

@@ -69,7 +69,11 @@ export interface ConfigSyncOpts {
     etags: (app: string) => rx.Observable<EtagChange>;
     fetcher: ConfigFetcher;
     /** Told when a device leaves the tree, to drop its values. */
-    valueCache?: { removeDevice(uuid: string): void; removeElements?(ids: string[]): void };
+    valueCache?: {
+        removeDevice(uuid: string): void;
+        removeElements?(ids: string[]): void;
+        removeInfluxValues?(uuid: string): void;
+    };
     /** Fetches in flight at once. */
     concurrency?: number;
     /** Wait before retrying a failed fetch or a failed feed, ms. */
@@ -559,6 +563,12 @@ export class ConfigSync {
             if (di) {
                 this.tree.replaceDeviceSubtree(uuid, di.config,
                     infoName === null ? null : { name: infoName });
+                /* A device that has lost its ISA-95 hierarchy no longer
+                 * publishes to UNS, so nothing would replace the values
+                 * kept from InfluxDB. Dropped here, once per change, not
+                 * checked on every read of a composition. */
+                if (!this.tree.publishesToUns(uuid))
+                    this.opts.valueCache?.removeInfluxValues?.(uuid);
             } else {
                 this.tree.updateDeviceName(uuid, infoName ?? sparkplugName ?? uuid);
             }

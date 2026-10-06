@@ -466,6 +466,10 @@ export class APIv1 {
     const ok2 = await handler.check_sources_permissions(principal, config);
     if(!ok2) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
 
+    /* After the permission check: normalising can report what a source
+     * contains, which only a principal allowed to use it may learn. */
+    config = await handler.normalise_config(config);
+
     // Create new Dataset object
     if(!dataset_uuid){
       dataset_uuid = await this.cdb.create_object(Constants.Class.Dataset);

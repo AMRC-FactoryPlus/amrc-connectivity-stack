@@ -206,6 +206,7 @@ describe("source_queries", () => {
  * { structure, config }, the shape DataFlow produces. */
 function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = {}) {
     const acl_checks = [];
+    const calls = { get_config: 0, created: [], put: [] };
 
     const api = new APIv1({
         data: { datasets: rx.of(IMap(datasets)) },
@@ -217,16 +218,24 @@ function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = 
         },
         cdb: {
             async get_config (app, obj) {
+                calls.get_config++;
                 if (app == UUIDs.App.DeviceInformation && obj == DEVICE && origin_map)
                     return { originMap: origin_map, sparkplugName: "Test" };
                 return undefined;
+            },
+            async create_object (klass) {
+                calls.created.push(klass);
+                return SUBSET;
+            },
+            async put_config (app, obj, config) {
+                calls.put.push({ app, obj, config });
             },
         },
         debug: { bound: () => () => {} },
         influxReader: {},
     });
 
-    return { api, acl_checks, handler: api.handlers[SUBSET_APP] };
+    return { api, acl_checks, calls, handler: api.handlers[SUBSET_APP] };
 }
 
 function make_res () {
@@ -311,6 +320,103 @@ describe("SparkplugSubset handler", () => {
 
     test("never references another dataset", () => {
         expect(handler.references(valid, SUBSET)).toBe(false);
+    });
+});
+
+describe("SparkplugSubset path entries", () => {
+    test("validation accepts { path } entries alongside { instance, metric }", () => {
+        const { handler } = make_api();
+        expect(() => handler.validate_config({ source: DEVICE, metrics: [
+            { path: "Axes/X/Position/Actual" },
+            { instance: DEVICE, metric: "Switch_Closed" },
+        ]})).not.toThrow();
+    });
+
+    test.each([
+        ["extra fields", { path: "Switch_Closed", instance: DEVICE }],
+        ["an empty path", { path: "" }],
+        ["a trailing slash", { path: "Axes/X/" }],
+        ["a non-string path", { path: 42 }],
+    ])("validation rejects a path entry with %s", (_, ref) => {
+        const { handler } = make_api();
+        expect(() => handler.validate_config({ source: DEVICE, metrics: [ref] }))
+            .toThrow(expect.objectContaining({ status: 422 }));
+    });
+
+    test("normalising converts paths to the stored form", async () => {
+        const { handler } = make_api();
+        const config = await handler.normalise_config({ source: DEVICE, metrics: [
+            { path: "Axes/X/Position/Actual" },
+            { path: "Switch_Closed" },
+            { instance: CHARS, metric: "Current_AC" },
+        ]});
+        expect(config).toEqual({ source: DEVICE, metrics: [
+            { instance: AXIS, metric: "Position/Actual" },
+            { instance: DEVICE, metric: "Switch_Closed" },
+            { instance: CHARS, metric: "Current_AC" },
+        ]});
+    });
+
+    test("a config with no path entries is stored as given, with no lookup", async () => {
+        const { handler, calls } = make_api();
+        const config = { source: DEVICE, metrics: [{ instance: CHARS, metric: "Current_AC" }] };
+        expect(await handler.normalise_config(config)).toBe(config);
+        expect(calls.get_config).toBe(0);
+    });
+
+    test.each([
+        ["a path that does not exist", "Axes/Y/Position/Actual"],
+        ["a metric not recorded to the historian", "Characteristics/Debug"],
+        ["an object rather than a metric", "Characteristics"],
+    ])("normalising rejects %s with 422", async (_, path) => {
+        const { handler } = make_api();
+        await expect(handler.normalise_config({ source: DEVICE, metrics: [{ path }] }))
+            .rejects.toMatchObject({ status: 422 });
+    });
+
+    test("normalising rejects a path that duplicates a UUID entry", async () => {
+        const { handler } = make_api();
+        await expect(handler.normalise_config({ source: DEVICE, metrics: [
+            { path: "Characteristics/Current_AC" },
+            { instance: CHARS, metric: "Current_AC" },
+        ]})).rejects.toMatchObject({ status: 422 });
+    });
+});
+
+describe("POST v1/structure with path entries", () => {
+    const body = {
+        structure: SUBSET_APP,
+        config: { source: DEVICE, metrics: [{ path: "Axes/X/Position/Actual" }] },
+    };
+
+    test("stores the normalised config", async () => {
+        const { api, calls } = make_api();
+        const res = make_res();
+        await api.structure_create({ body, auth: "tester" }, res);
+
+        expect(res.code).toBe(200);
+        expect(calls.put).toEqual([{ app: SUBSET_APP, obj: SUBSET, config: {
+            source: DEVICE,
+            metrics: [{ instance: AXIS, metric: "Position/Actual" }],
+        }}]);
+    });
+
+    test("an unknown path creates nothing", async () => {
+        const { api, calls } = make_api();
+        await expect(api.structure_create({ auth: "tester", body: {
+            ...body,
+            config: { source: DEVICE, metrics: [{ path: "No/Such/Metric" }] },
+        }}, make_res())).rejects.toMatchObject({ status: 422 });
+
+        expect(calls.created).toEqual([]);
+        expect(calls.put).toEqual([]);
+    });
+
+    test("without USE_SPARKPLUG the origin map is never read", async () => {
+        const { api, calls } = make_api({ allowed: false });
+        await expect(api.structure_create({ body, auth: "tester" }, make_res()))
+            .rejects.toMatchObject({ status: 403 });
+        expect(calls.get_config).toBe(0);
     });
 });
 

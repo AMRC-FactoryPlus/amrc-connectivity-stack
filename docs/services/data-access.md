@@ -45,6 +45,15 @@ map (its `DeviceInformation` config):
 `GET v1/sparkplug-sources/:uuid/metrics` lists the references a device
 offers. Up to 500 metrics may be listed, with no duplicates.
 
+When creating or updating a dataset, an entry may instead give the full
+Sparkplug metric name, as `{ "path": "Axes/X/Position/Actual" }`. The
+service looks the path up in the device's current origin map and stores
+the equivalent `{ "instance", "metric" }` entry, so the stored config
+(and `GET v1/structure/:uuid`) always uses the `instance` form. A path
+must name a metric recorded to the historian; anything else is rejected
+with `422` and nothing is created. The two forms can be mixed in one
+request.
+
 When the dataset is read, each `instance` is looked up in the device's
 current origin map, and the metric is located in Influx by the `path`
 tag (everything before the last `/` of the full metric name) and
@@ -189,7 +198,7 @@ Property | Meaning
 ---|---
 `instance` | `Instance_UUID` of the nearest enclosing object (the device UUID if none); store as the reference's `instance`
 `metric` | Path from that object to the metric; store as the reference's `metric`
-`path` | Full Sparkplug metric name, for display
+`path` | Full Sparkplug metric name; can be sent back as a `{ "path" }` entry instead of `instance` + `metric`
 `type` | Sparkplug type
 `unit` | Engineering unit, if any
 `documentation` | Description, if any
@@ -224,9 +233,28 @@ Validates the config shape for the chosen structural app, then requires:
 * the relevant per-source permission for every source named in `config`
   (see [Permissions](#permissions)).
 
+Once those checks pass, a `Sub-device` config's `{ "path" }` entries
+are converted to `{ "instance", "metric" }` (see
+[Sub-device](#sub-device)); a path that does not resolve returns `422`.
+
 On success, creates a new `Dataset` object, writes the config entry
 under `structure`, records the corresponding subclass relationship(s),
 and returns the new dataset's UUID as a JSON string.
+
+For example, a `Sub-device` dataset named by path:
+
+```json
+{
+    "structure": "7f7d40cc-4075-4f06-90cf-aa6261d68f18",
+    "config": {
+        "source": "<device UUID>",
+        "metrics": [
+            { "path": "Axes/X/Position/Actual" },
+            { "path": "Switch_Closed" }
+        ]
+    }
+}
+```
 
 ### `PUT v1/structure/:uuid`
 
@@ -238,14 +266,21 @@ but must match the path if present. Requires `Edit dataset` on `:uuid`.
   type to another via `PUT` returns `409`. The old source's subclass
   relationship(s) are removed before the new one is written.
 * If the dataset is currently **invalid**, any existing config entries
-  under any of the three structural apps are deleted (404s from a
-  missing entry are ignored) and the new config is written; no old
-  subclass relationships are touched, since an invalid dataset by
-  definition doesn't have a coherent one.
+  under any of the structural apps are deleted (404s from a missing
+  entry are ignored) and the new config is written; no old subclass
+  relationships are touched, since an invalid dataset by definition
+  doesn't have a coherent one.
 
 In both cases, only the per-source permission for the new config's
 source(s) is checked — `PUT` does **not** re-check `Create dataset` on
-the structural app the way `POST` does.
+the structural app the way `POST` does. `Sub-device` path entries are
+converted as for `POST`.
+
+The source permission check and the path conversion both happen after
+the steps above. If either rejects the new config (`403`, or `422` for
+a path that does not resolve), an invalid dataset's old config entries
+and a valid dataset's old subclass relationships have already been
+removed.
 
 ### `GET v1/delete/:uuid`
 

@@ -26,10 +26,12 @@ export class SparkplugSubsetHandler extends BaseStructureHandler {
     this.sourcePermission = Constants.Perm.UseSparkplug;
   }
 
-  /* config is { source, metrics: [{ instance, metric }] }. `instance` is
-   * the Instance_UUID of the metric's nearest enclosing object (the device
-   * UUID for metrics with none) and `metric` is the path from that object
-   * to the metric, without a type suffix. */
+  /* config is { source, metrics: [...] }. Each stored entry is
+   * { instance, metric }: `instance` is the Instance_UUID of the metric's
+   * nearest enclosing object (the device UUID for metrics with none) and
+   * `metric` is the path from that object to the metric, without a type
+   * suffix. On create and update an entry may instead be { path }, the
+   * full Sparkplug metric name; normalise_config converts it. */
   validate_config(config) {
     if(!config)
       return fail(this.log, 422, `config not provided`);
@@ -44,19 +46,62 @@ export class SparkplugSubsetHandler extends BaseStructureHandler {
     if(metrics.length > MAX_METRICS)
       return fail(this.log, 422, `config.metrics has ${metrics.length} entries; the maximum is ${MAX_METRICS}.`);
 
-    const seen = new Set();
     for(const ref of metrics){
+      if(ref && "path" in ref){
+        if(Object.keys(ref).length != 1)
+          return fail(this.log, 422, `metric entry with "path" must have no other fields`);
+
+        if(typeof ref.path != "string" || !METRIC_rx.test(ref.path))
+          return fail(this.log, 422, `metric path ${ref.path} is invalid`);
+
+        continue;
+      }
+
       if(!valid_uuid(ref?.instance))
         return fail(this.log, 422, `metric instance ${ref?.instance} is invalid UUID`);
 
       if(typeof ref.metric != "string" || !METRIC_rx.test(ref.metric))
         return fail(this.log, 422, `metric path ${ref.metric} is invalid`);
+    }
 
+    /* Path entries are checked for duplicates once normalise_config has
+     * converted them. */
+    this.check_duplicates(metrics.filter(ref => !("path" in ref)));
+  }
+
+  check_duplicates(refs) {
+    const seen = new Set();
+    for(const ref of refs){
       const key = `${ref.instance}/${ref.metric}`;
       if(seen.has(key))
         return fail(this.log, 422, `metric ${key} is listed twice`);
       seen.add(key);
     }
+  }
+
+  /* Converts { path } entries to { instance, metric } through the
+   * device's current origin map. A path must name a metric recorded to
+   * the historian: nothing else can be read back. */
+  async normalise_config(config) {
+    if(!config.metrics.some(ref => "path" in ref)) return config;
+
+    const device = config.source;
+    const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
+    const by_path = new Map(
+      walk_origin_map(info?.originMap, device).metrics
+        .map(m => [m.path, { instance: m.instance, metric: m.metric }]));
+
+    const metrics = config.metrics.map(ref => {
+      if(!("path" in ref)) return ref;
+
+      const found = by_path.get(ref.path);
+      if(!found)
+        return fail(this.log, 422, `${ref.path} is not a metric of ${device} recorded to the historian`);
+      return found;
+    });
+
+    this.check_duplicates(metrics);
+    return { ...config, metrics };
   }
 
   async check_sources_permissions(principal, config) {

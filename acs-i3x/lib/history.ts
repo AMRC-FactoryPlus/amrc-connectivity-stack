@@ -139,7 +139,13 @@ export class History {
         return this.semaphore.run(() => this.queryApi.collectRows<T>(flux));
     }
 
-    /** Keep leaf values read from InfluxDB in the value cache. */
+    /**
+     * Keep leaf values read from InfluxDB in the value cache, for
+     * devices that publish to UNS. A stored value is replaced only by a
+     * later UNS message, and a device without ISA-95 hierarchy sends
+     * none: its value would be served as current for ever. Its leaves
+     * are read from InfluxDB every time instead.
+     */
     private async remember(values: Iterable<I3xValueResponse>): Promise<void> {
         if (!this.valueCache) return;
         /* Written a chunk at a time, pausing between: a large read can
@@ -147,8 +153,11 @@ export class History {
         const slicer = new Slicer();
         let out: InfluxValue[] = [];
         const write = () => {
+            /* Sync may move a device out of its hierarchy during a
+             * pause, so check just before writing. */
+            out = this.publishingToUns(out);
             try {
-                this.valueCache!.recordInfluxValues(out);
+                if (out.length) this.valueCache!.recordInfluxValues(out);
             } catch (err) {
                 console.error("History: storing InfluxDB values failed:", err);
             }
@@ -188,7 +197,7 @@ export class History {
             /* Sync may have removed a device while InfluxDB was read, or
              * during a pause here. A marker for a leaf that has gone
              * would never be deleted, so check just before writing. */
-            out = out.filter(l => this.objectTree.getObject(l.elementId));
+            out = this.publishingToUns(out.filter(l => this.objectTree.getObject(l.elementId)));
             try {
                 if (out.length) this.valueCache!.recordInfluxEmpty!(out);
             } catch (err) {
@@ -212,6 +221,23 @@ export class History {
             }
         }
         if (out.length) write();
+    }
+
+    /**
+     * The entries whose device publishes to UNS (see remember). No
+     * marker either for a device that does not: a composition with its
+     * leaves is then never complete. It is answered from its UNS values
+     * only, as on main, or read from InfluxDB whole when it has none.
+     * Synchronous, so the answer holds until the caller has written.
+     */
+    private publishingToUns<T extends { device: string | null }>(entries: T[]): T[] {
+        const known = new Map<string, boolean>();
+        return entries.filter(e => {
+            if (!e.device) return false;
+            let yes = known.get(e.device);
+            if (yes === undefined) known.set(e.device, yes = this.objectTree.publishesToUns(e.device));
+            return yes;
+        });
     }
 
     /**

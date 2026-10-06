@@ -270,10 +270,38 @@ Subscribes to `UNS/v1/#`. On each message:
 
 InfluxDB values that History reads on a cache miss are written back
 (`recordInfluxValues`), never over a newer UNS value, and serve later
-reads of that leaf. Compositions are built from UNS values only, so a
-composition with no UNS data still falls back to InfluxDB whole. Values are
+reads of that leaf. A composition read whole from InfluxDB also leaves a
+"no data" marker for each leaf InfluxDB had nothing for; once every leaf has
+a value or a marker the composition is complete and is built from all its
+stored values. Otherwise it is built from UNS values only, and one with no
+UNS data falls back to InfluxDB whole. Values are
 cleared at start and on an MQTT reconnect, because UNS messages sent while
 i3X was not listening are lost.
+
+Only a later UNS message replaces a value kept from InfluxDB, so values
+(and "no data" markers) are kept only for devices that publish to UNS.
+uns-ingester-sparkplug publishes a device only if its birth certificate has
+an ISA-95 hierarchy with at least an Enterprise; the Sparkplug historian
+writes every device to InfluxDB. `ObjectTree.publishesToUns` tells them
+apart by where the device sits: a device without a hierarchy is filed under
+`<namespace>/Unknown`, and a UNS message moves a device under the levels it
+was published with. Like the ingester, the tree takes the hierarchy only
+from `Device_Information/ISA95_Hierarchy`. A real hierarchy of exactly
+`<namespace>/Unknown` counts as none, which costs only InfluxDB reads. A
+device without a hierarchy is read from InfluxDB on every request. A
+composition that includes it has no markers for its leaves, so it is never
+complete: it is built from the UNS values of its other devices, as on main,
+or read from InfluxDB whole if it has none. History
+checks just before each write, so a device that loses its hierarchy during
+a read keeps nothing. When a DeviceInformation change leaves a device
+without a hierarchy, ConfigSync drops its InfluxDB values and markers
+(`removeInfluxValues`); its UNS values stay.
+
+The check reads ConfigDB, while the ingester reads the device's birth
+certificate. Edge agents build births from the same DeviceInformation, but
+if they disagree (a birth not yet republished after a change) a device with
+a hierarchy in ConfigDB and none in its birth keeps InfluxDB values that no
+UNS message replaces, until the next clear at start or reconnect.
 
 A composition's cached value is every UNS value in its whole subtree, in
 tree order (the cache path does not apply maxDepth). Near the top of the

@@ -783,6 +783,28 @@ export class ObjectTree {
             .all(elementId) as any[]).map(r => r.element_id);
     }
 
+    /**
+     * Does this device publish to UNS? uns-ingester-sparkplug publishes
+     * only devices with an ISA-95 hierarchy (at least an Enterprise).
+     * buildDevice files a device without one under <namespace>/Unknown,
+     * and a UNS message moves a device under the levels it was
+     * published with, so: a device in the tree, not under Unknown. One
+     * indexed lookup. A real hierarchy of exactly <namespace>/Unknown
+     * counts as none, which costs only InfluxDB reads.
+     */
+    publishesToUns(uuid: string): boolean {
+        const r = this.store.prepare("select parent_id from object where element_id = ?")
+            .get(uuid) as { parent_id: string | null } | undefined;
+        if (!r || r.parent_id === null || r.parent_id === "/") return false;
+        const unknown = this.isa95Ids(this.unknownIsa95());
+        return r.parent_id !== unknown[unknown.length - 1];
+    }
+
+    /** Where buildDevice files a device without ISA-95 hierarchy. */
+    private unknownIsa95(): string[] {
+        return [this.namespaceName, "Unknown"];
+    }
+
     /** Get InfluxDB query metadata for a leaf metric. */
     getMetricMeta(elementId: string): MetricMeta | undefined {
         const r = this.store.prepare("select * from metric_meta where element_id = ?").get(elementId);
@@ -1023,22 +1045,6 @@ export class ObjectTree {
     }
 
     /**
-     * Recursively search an originMap for an object whose Schema_UUID
-     * matches the target. Returns the matching object or undefined.
-     */
-    private findBySchemaUuid(obj: any, targetSchemaUuid: string): any | undefined {
-        if (obj == null || typeof obj !== "object") return undefined;
-        if (obj.Schema_UUID === targetSchemaUuid) return obj;
-        for (const value of Object.values(obj)) {
-            if (value != null && typeof value === "object") {
-                const found = this.findBySchemaUuid(value, targetSchemaUuid);
-                if (found) return found;
-            }
-        }
-        return undefined;
-    }
-
-    /**
      * Extract ISA-95 hierarchy values from an ISA95_Hierarchy object.
      * Returns the segments in order (Enterprise, Site, Area, WorkCenter, WorkUnit),
      * stopping at the first missing level (unbroken chain).
@@ -1205,13 +1211,18 @@ export class ObjectTree {
         }
         const schemaUuids = new Set<string>([schemaUuid]);
 
-        // Find ISA-95 hierarchy by searching for the Hierarchy-v1 Schema_UUID
-        const hierarchyObj = this.findBySchemaUuid(devInfo.originMap, HIERARCHY_SCHEMA_UUID);
+        // The ISA-95 hierarchy: a Hierarchy-v1 object at
+        // Device_Information/ISA95_Hierarchy. uns-ingester-sparkplug
+        // looks only there, and publishes a device to UNS only if it
+        // finds one; a hierarchy elsewhere must not count (see
+        // publishesToUns).
+        const candidate = devInfo.originMap?.Device_Information?.ISA95_Hierarchy;
+        const hierarchyObj = candidate?.Schema_UUID === HIERARCHY_SCHEMA_UUID ? candidate : undefined;
         const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
 
         if (isa95Segments.length === 0) {
             // Default to <namespace>/Unknown for devices without ISA-95
-            isa95Segments.push(this.namespaceName, "Unknown");
+            isa95Segments.push(...this.unknownIsa95());
             this.log("buildDevice: no ISA-95 for %s, placing under Unknown", uuid);
         } else {
             this.log("buildDevice: ISA-95 hierarchy for %s: %o", uuid, isa95Segments);

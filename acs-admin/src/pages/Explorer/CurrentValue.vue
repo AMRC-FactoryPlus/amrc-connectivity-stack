@@ -85,7 +85,7 @@ watch(() => [props.elementId, props.isComposition], () => {
 
 const summary = computed(() => root.value
   ? count_leaves(root.value)
-  : { leaves: 0, values: 0 })
+  : { leaves: 0, reported: 0 })
 
 function formatTimestamp (ts) {
   if (!ts) return '-'
@@ -121,7 +121,7 @@ function formatValue (val) {
 
       <div v-else-if="root?.children?.length">
         <p class="text-sm text-slate-500 mb-3">
-          {{ summary.leaves }} values<template v-if="summary.leaves > summary.values">, {{ summary.leaves - summary.values }} with no data</template>
+          {{ summary.leaves }} values<template v-if="summary.leaves > summary.reported">, {{ summary.leaves - summary.reported }} not reported</template>
         </p>
         <div class="border rounded-md overflow-hidden">
           <table class="w-full text-sm">

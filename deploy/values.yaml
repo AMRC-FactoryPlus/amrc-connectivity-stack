@@ -509,7 +509,8 @@ i3x:
   persistence:
     # -- Keep the database on a PersistentVolumeClaim (ReadWriteOnce),
     # so a restart serves the stored tree at once and fetches only the
-    # configs that changed. The Deployment then uses the Recreate
+    # configs that changed. The Deployment then stops the old pod before
+    # starting the new one (RollingUpdate with maxSurge 0), like the Recreate
     # strategy. When false the database is on an emptyDir and every
     # start syncs from scratch.
     enabled: true

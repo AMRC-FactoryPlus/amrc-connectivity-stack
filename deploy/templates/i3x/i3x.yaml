@@ -9,9 +9,16 @@ metadata:
 spec:
   {{- if .Values.i3x.persistence.enabled }}
   # The database volume is ReadWriteOnce: stop the old pod before the
-  # new one starts.
+  # new one starts. With one replica, maxSurge 0 does what Recreate does.
+  # Recreate itself cannot be used: switching an existing Deployment to
+  # it fails under server-side apply (the Helm 4 default), because the
+  # defaulted rollingUpdate block stays and the API server rejects
+  # rollingUpdate with type Recreate.
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   {{- end }}
   replicas: 1
   selector:

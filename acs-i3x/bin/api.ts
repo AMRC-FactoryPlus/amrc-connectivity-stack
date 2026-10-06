@@ -55,13 +55,19 @@ const objectTree = await new ObjectTree({
     store,
 }).init();
 
-// Start value cache (subscribes to UNS/v1/#). Last values go to the
-// same database, in batches.
-const valueCache = await new ValueCache({
+// The value cache. Last values go to the same database, in batches.
+const valueCache = new ValueCache({
     objectTree,
     store,
-    staleThreshold: parseInt(env.I3X_STALE_THRESHOLD || "300000")
-}).init(fplus);
+    staleThreshold: parseInt(env.I3X_STALE_THRESHOLD || "300000"),
+    // After a restart or MQTT reconnect, stored values are caught up
+    // from InfluxDB rather than cleared, unless the gap is too long.
+    catchUpMargin: positiveInt("I3X_CATCHUP_MARGIN_MS", 60_000),
+    catchUpMaxGap: positiveInt("I3X_CATCHUP_MAX_GAP_MS", 24 * 3600_000),
+    // Values kept from InfluxDB are refreshed the same way while
+    // connected: their devices may not publish to the UNS.
+    refreshInterval: positiveInt("I3X_INFLUX_REFRESH_MS", 300_000),
+});
 
 // History module (InfluxDB)
 const history = new History({
@@ -75,6 +81,9 @@ const history = new History({
     // Current values read from InfluxDB are kept for the next read.
     valueCache,
 });
+
+// Subscribe to UNS/v1/#, catching up stored values from InfluxDB.
+await valueCache.init(fplus, history);
 
 // Subscription manager
 const subscriptions = new SubscriptionManager({

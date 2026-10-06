@@ -105,7 +105,7 @@ const TABLES = `
         value_json      text,
         timestamp       text,
         quality         text not null,
-        source          text not null           -- 'uns' | 'influx'
+        source          text not null           -- 'uns' | 'influx' | 'empty'
     );
     create index last_value_anchor_ix on last_value (anchor, seq);
     create index last_value_device_ix on last_value (device_uuid);
@@ -114,6 +114,18 @@ const TABLES = `
         key             text primary key,
         value           text
     ) without rowid;
+`;
+
+/**
+ * Indexes added since SCHEMA_VERSION was last bumped. Created if
+ * missing on every open, so an existing database gains them without a
+ * rebuild (a few hundred ms at 3 million values).
+ */
+const ADDED_INDEXES = `
+    -- Values not kept current by the UNS ('influx' and 'empty'), by
+    -- device, for ValueCache's refresh. Queries must say
+    -- source != 'uns' for SQLite to use it.
+    create index if not exists last_value_kept_ix on last_value (device_uuid) where source != 'uns';
 `;
 
 export interface I3xStoreOpts {
@@ -374,6 +386,7 @@ export class I3xStore {
         }
         if (version === SCHEMA_VERSION && stored === fingerprint) {
             this.warm = true;
+            this.db.exec(ADDED_INDEXES);
             return;
         }
 
@@ -390,6 +403,7 @@ export class I3xStore {
             for (const { name } of old.filter(o => o.type === "table"))
                 this.db.exec(`drop table if exists "${name.replace(/"/g, '""')}"`);
             this.db.exec(TABLES);
+            this.db.exec(ADDED_INDEXES);
             this.db.prepare("insert into meta (key, value) values ('fingerprint', ?)")
                 .run(fingerprint);
             this.db.exec(`pragma user_version = ${SCHEMA_VERSION}`);

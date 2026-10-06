@@ -113,8 +113,8 @@ Tables:
 | `object_type` | ObjectTypes: display name and JSON schema. |
 | `device_schema` | The Schema_UUIDs each device in the tree references. |
 | `sync_device`, `sync_schema` | The ConfigDB ETags each device and schema was last built from. |
-| `last_value` | The last value of each leaf metric, with the object it is filed under (`anchor`) and its device. |
-| `meta` | Fingerprint, and whether a sync has completed. |
+| `last_value` | The last value of each leaf metric, with the object it is filed under (`anchor`), its device and its source (`uns`, `influx`, or `empty` for an InfluxDB "no data" marker). |
+| `meta` | Fingerprint, whether a sync has completed, and when the stored values were last current (`values_current_until`). |
 
 ## Measured scale
 
@@ -274,9 +274,76 @@ reads of that leaf. A composition read whole from InfluxDB also leaves a
 "no data" marker for each leaf InfluxDB had nothing for; once every leaf has
 a value or a marker the composition is complete and is built from all its
 stored values. Otherwise it is built from UNS values only, and one with no
-UNS data falls back to InfluxDB whole. Values are
-cleared at start and on an MQTT reconnect, because UNS messages sent while
-i3X was not listening are lost.
+UNS data falls back to InfluxDB whole.
+
+UNS messages sent while i3X was not listening (down, or disconnected from
+MQTT) are lost: they are QoS 0 and not retained. So after a restart or an
+MQTT reconnect the stored values are caught up from InfluxDB instead of
+being cleared, which made every restart re-read every value (about 24
+minutes for a 62,000-device map, against seconds from the cache):
+
+1. While MQTT is connected and the values are trusted, every 5 s and when
+   the connection closes, `values_current_until` in the `meta` table
+   records the earliest of: when the oldest UNS message not yet written
+   arrived, when the last MQTT packet came (a dead link is noticed only by
+   the keepalive, up to 90 s later), and when the oldest value dropped
+   unwritten after failed writes came. It joins the group commit, so it is
+   durable with the values before it.
+2. At start and on a reconnect, every stored row (seq up to the current
+   maximum) is marked untrusted. Reads skip untrusted rows, so they behave
+   exactly as after a clear: InfluxDB answers and its values are kept. A
+   UNS message, or a value read from InfluxDB, replaces an untrusted row
+   and takes a new seq, so it is trusted.
+3. Once MQTT is connected (the subscription is renewed on each connect),
+   i3X waits `I3X_CATCHUP_MARGIN_MS` (default 60 s) for the historian to
+   write what was published just before, then reads, for the leaves the
+   untrusted rows hold, the last point of every series since
+   `values_current_until` less the same margin. The margin also covers
+   device clocks behind i3X's: InfluxDB filters on the metric timestamp,
+   and has no time of arrival. The query is the bulk `last()` read with a
+   time-bounded range, using half the bulk concurrency under the shared
+   Flux semaphore, a page of devices at a time with pauses for the event
+   loop.
+4. A point newer than the stored value replaces it, and any point
+   replaces a "no data" marker; a newer UNS value written meanwhile is
+   kept. Rows are only updated, so values of a device the sync removes
+   meanwhile stay gone. A row keeps its source, so a UNS leaf stays in the
+   compositions built from UNS values. A leaf with no point since has not
+   changed. Rows InfluxDB cannot vouch for (a leaf without MetricMeta, or
+   with no device) are dropped; a "no data" marker for a leaf without
+   MetricMeta stays, as InfluxDB can never have data for it. Then every
+   row is trusted again, and the counts and time are logged.
+
+The values are cleared instead, as before, when there is no History to
+catch up from, when there is no record of when they were current (the
+first start of this version) or that record is in the future, when the gap is
+longer than `I3X_CATCHUP_MAX_GAP_MS` (default 24 h, at most 30 days; keep
+it below the InfluxDB bucket's retention, or points from the gap may have
+gone), when the catch-up query still fails after three retries (5, 15 and
+45 s apart), or when more than 1,000,000 stored values changed (a fixed
+limit). A failed group commit still clears. A clear that fails hides the
+rows it should have removed, and is tried again every 5 s. A reconnect during a catch-up starts it again from
+the same time; `values_current_until` does not move until a catch-up
+finishes, so a crash part way through is caught up again on the next
+start.
+
+Values kept from InfluxDB, and "no data" markers, are refreshed the same
+way while connected, every `I3X_INFLUX_REFRESH_MS` (default 5 min): the
+catch-up query over the time since the last refresh (less the margin),
+for the leaves those rows hold, found through the partial index
+`last_value_kept_ix` (created on open if missing, so no rebuild). The
+first refresh after a catch-up covers the whole gap again, for values
+read from InfluxDB while the historian may still have been writing. Only
+devices that publish to the UNS keep InfluxDB values, but i3X decides
+that from ConfigDB while the ingester decides from the birth
+certificate, so a device can change only in InfluxDB while it is kept
+here. Before the catch-up only the clear at start or on a reconnect
+replaced such values; now they are behind by at most one interval, the
+query time and the historian's write delay. A refresh that takes longer
+than the interval is logged. A failed refresh is logged and the next covers the
+same time again; after a gap longer than `I3X_CATCHUP_MAX_GAP_MS`, or more
+than 1,000,000 changes, those rows are dropped, 500 at a time, and read
+again when asked for.
 
 Only a later UNS message replaces a value kept from InfluxDB, so values
 (and "no data" markers) are kept only for devices that publish to UNS.

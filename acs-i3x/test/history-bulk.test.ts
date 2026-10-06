@@ -263,6 +263,35 @@ describe("History bulk current values", () => {
         });
     });
 
+    describe("lastValuesSince", () => {
+        it("reads only the window from the given time, matches like getCurrentValues, and keeps nothing", async () => {
+            const { history, collectRows } = makeHistory([
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 20, _time: T2 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Other", _value: 1, _time: T2 },
+            ], { bulkConcurrency: 4 });
+            const remember = jest.spyOn(history as any, "remember");
+            const out = await history.lastValuesSince(["a-temp", "a-status-rpm", "orphan-leaf"], T1);
+            expect(collectRows).toHaveBeenCalledTimes(1);
+            expect(collectRows.mock.calls[0][0]).toContain(`|> range(start: ${T1})`);
+            expect([...out.known].sort()).toEqual(["a-status-rpm", "a-temp"]);
+            expect([...out.values.keys()]).toEqual(["a-temp"]);
+            expect(out.values.get("a-temp")!.timestamp).toBe(T2);
+            expect(remember).not.toHaveBeenCalled();
+        });
+
+        it("leaves half the bulk concurrency for other reads", async () => {
+            let inFlight = 0, peak = 0;
+            const { history } = makeHistory(async () => {
+                peak = Math.max(peak, ++inFlight);
+                await new Promise(r => setTimeout(r, 5));
+                inFlight--;
+                return [];
+            }, { bulkChunkSize: 1, bulkConcurrency: 4 });
+            await history.lastValuesSince(["a-temp", "b-temp", "a-status-rpm"], T1);
+            expect(peak).toBe(2);
+        });
+    });
+
     describe("getValues", () => {
         const rows: Row[] = [
             { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 20, _time: T1 },

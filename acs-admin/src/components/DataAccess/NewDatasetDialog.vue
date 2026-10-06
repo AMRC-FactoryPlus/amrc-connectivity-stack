@@ -22,8 +22,9 @@
 
         <!-- Tabs -->
         <Tabs v-model="active_tab">
-          <TabsList class="grid w-full grid-cols-2">
+          <TabsList class="grid w-full grid-cols-3">
             <TabsTrigger value="sparkplug" :disabled="is_edit && active_tab !== 'sparkplug'">Sparkplug Source</TabsTrigger>
+            <TabsTrigger value="subset" :disabled="is_edit && active_tab !== 'subset'">Sub-device</TabsTrigger>
             <TabsTrigger value="components" :disabled="is_edit && active_tab !== 'components'">Component Datasets</TabsTrigger>
           </TabsList>
 
@@ -60,6 +61,100 @@
               </PopoverContent>
             </Popover>
             <p class="text-xs text-gray-500">The Sparkplug device whose data this dataset covers.</p>
+          </TabsContent>
+
+          <!-- ─── Sub-device Tab ─── -->
+          <TabsContent value="subset" class="flex flex-col gap-2 mt-3">
+            <label class="text-sm font-medium">Sparkplug Device <span class="text-red-500">*</span></label>
+            <Popover v-model:open="subset_source_open">
+              <PopoverTrigger as-child>
+                <Button variant="outline" role="combobox" :aria-expanded="!!subset_source_open" class="w-full justify-between">
+                  {{ device_label(subset_source) }}
+                  <i class="fa-solid fa-chevron-down ml-2 h-4 w-4 shrink-0 opacity-50"></i>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-[--reka-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Search devices..." />
+                  <CommandList>
+                    <CommandEmpty>No devices found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        v-for="device in available_devices"
+                        :key="device.uuid"
+                        :value="device.name ? `${device.name} ${device.uuid}` : device.uuid"
+                        @select="select_subset_source(device.uuid)"
+                      >
+                        <div class="flex flex-col">
+                          <span class="font-medium">{{ device.name ?? device.uuid }}</span>
+                          <span class="text-xs text-gray-400 font-mono">{{ device.uuid }}</span>
+                        </div>
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <template v-if="subset_source">
+              <div class="flex items-center justify-between mt-2">
+                <label class="text-sm font-medium">Metrics <span class="text-red-500">*</span></label>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                  <span>{{ subset_selected.length }} selected</span>
+                  <Button v-if="subset_selected.length" variant="ghost" size="xs" @click="subset_selected = []">Clear</Button>
+                </div>
+              </div>
+
+              <div v-if="subset_loading" class="flex items-center gap-2 text-sm text-gray-500 py-4">
+                <i class="fa-solid fa-circle-notch animate-spin"></i> Loading metrics…
+              </div>
+              <p v-else-if="subset_load_error" class="text-sm text-red-500">{{ subset_load_error }}</p>
+              <p v-else-if="!subset_metrics.length" class="text-sm text-gray-500">
+                This device has no metrics recorded to the historian.
+              </p>
+              <template v-else>
+                <div v-if="subset_missing.length" class="border border-amber-300 bg-amber-50 rounded p-2 text-xs">
+                  <div class="font-medium text-amber-800 mb-1">
+                    {{ subset_missing.length }} saved metric(s) are no longer in this device's origin map, usually because its schema changed. They read no data.
+                  </div>
+                  <div v-for="key in subset_missing" :key="key" class="flex items-center justify-between gap-2">
+                    <span class="truncate text-amber-900" :title="`Object ${key_to_ref(key).instance}`">
+                      {{ key_to_ref(key).metric }}
+                      <span class="text-amber-700">(object no longer exists)</span>
+                    </span>
+                    <Button variant="ghost" size="xs" @click="toggle_metric(key, false)">Remove</Button>
+                  </div>
+                </div>
+
+                <Input v-model="subset_search" placeholder="Filter metrics by path…" />
+                <div class="border rounded max-h-72 overflow-y-auto">
+                  <div v-for="group in filtered_subset_groups" :key="group.instance" class="border-b last:border-b-0">
+                    <label class="flex items-center gap-2 px-2 py-1.5 bg-gray-50 cursor-pointer">
+                      <Checkbox :model-value="group_state(group)" @update:model-value="v => toggle_group(group, v === true)">
+                        <i :class="group_state(group) === 'indeterminate' ? 'fa-solid fa-minus' : 'fa-solid fa-check'" class="text-[10px]"></i>
+                      </Checkbox>
+                      <span class="text-xs font-medium font-mono truncate">{{ group.path || 'Device' }}</span>
+                      <span class="text-xs text-gray-400 ml-auto">{{ group.metrics.length }}</span>
+                    </label>
+                    <label
+                      v-for="m in group.metrics"
+                      :key="m.key"
+                      class="flex items-center gap-2 pl-7 pr-2 py-1 hover:bg-gray-50 cursor-pointer"
+                      :title="m.documentation ?? m.path"
+                    >
+                      <Checkbox :model-value="subset_selected_set.has(m.key)" @update:model-value="v => toggle_metric(m.key, v === true)" />
+                      <span class="text-sm truncate">{{ m.name }}</span>
+                      <span class="text-xs text-gray-400 ml-auto whitespace-nowrap">{{ m.unit ? `${m.unit} · ` : '' }}{{ m.type }}</span>
+                    </label>
+                  </div>
+                  <p v-if="!filtered_subset_groups.length" class="text-sm text-gray-500 p-2">No metrics match.</p>
+                </div>
+              </template>
+              <p v-if="subset_selected.length > MAX_SUBSET_METRICS" class="text-xs text-red-500">
+                A Sub-device dataset can contain at most {{ MAX_SUBSET_METRICS }} metrics.
+              </p>
+            </template>
+            <p class="text-xs text-gray-500">Only the selected metrics from this device are included in the dataset.</p>
           </TabsContent>
 
           <!-- ─── Component Datasets Tab ─── -->
@@ -221,6 +316,7 @@ import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
+import { Checkbox } from '@/components/ui/checkbox'
 import { getLocalTimeZone, today } from '@internationalized/date'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDataAccessStore } from '@store/useDataAccessStore.js'
@@ -228,6 +324,10 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { toast } from 'vue-sonner'
 import { STRUCTURE_APPS, structure_label } from '@pages/DataAccess/datasetColumns.ts'
+import {
+  MAX_SUBSET_METRICS, metric_key, key_to_ref,
+  group_metrics, filter_groups, missing_keys, group_state, set_group,
+} from '@/lib/sub-device.js'
 
 const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
@@ -256,7 +356,7 @@ export default {
     Button, Input,
     Tabs, TabsContent, TabsList, TabsTrigger,
     Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxList,
-    Calendar,
+    Calendar, Checkbox,
     Popover, PopoverTrigger, PopoverContent,
     Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem
   },
@@ -267,6 +367,8 @@ export default {
       da: useDataAccessStore(),
       d: useDeviceStore(),
       STRUCTURE_APPS,
+      MAX_SUBSET_METRICS,
+      key_to_ref,
       structure_label,
       cn
     }
@@ -284,6 +386,15 @@ export default {
       // Sparkplug source fields
       sparkplug_source: '',
       sparkplug_source_open: false,
+
+      // Sub-device fields
+      subset_source: '',
+      subset_source_open: false,
+      subset_metrics: [],     // from DataAccess.get_device_metrics
+      subset_loading: false,
+      subset_load_error: '',
+      subset_selected: [],    // metric_key() of each selected reference
+      subset_search: '',
 
       // Dataset components
       dataset_components: [], // Each one is { source, from, to, from_date, from_time, to_date, to_time }
@@ -316,9 +427,25 @@ export default {
     },
 
     sparkplug_device_label() {
-      if (!this.sparkplug_source) return 'Select a device…'
-      const match = this.available_devices.find(d => d.uuid === this.sparkplug_source)
-      return match ? (match.name ?? match.uuid) : this.sparkplug_source
+      return this.device_label(this.sparkplug_source)
+    },
+
+    subset_selected_set() {
+      return new Set(this.subset_selected)
+    },
+
+    subset_groups() {
+      return group_metrics(this.subset_metrics)
+    },
+
+    filtered_subset_groups() {
+      return filter_groups(this.subset_groups, this.subset_search)
+    },
+
+    // Only known once the device's metrics have loaded.
+    subset_missing() {
+      if (this.subset_loading || this.subset_load_error) return []
+      return missing_keys(this.subset_selected, this.subset_metrics)
     },
 
     // All datasets known to the ConfigDB, regardless of whether we are allowed to embed them
@@ -351,6 +478,13 @@ export default {
 
       if (this.active_tab === 'sparkplug') {
         return is_valid_uuid(this.sparkplug_source)
+      }
+
+      if (this.active_tab === 'subset') {
+        return is_valid_uuid(this.subset_source)
+          && !this.subset_loading
+          && this.subset_selected.length > 0
+          && this.subset_selected.length <= MAX_SUBSET_METRICS
       }
 
       // components tab
@@ -392,6 +526,13 @@ export default {
       this.active_tab = 'sparkplug'
       this.sparkplug_source = ''
       this.sparkplug_source_open = false
+      this.subset_source = ''
+      this.subset_source_open = false
+      this.subset_metrics = []
+      this.subset_loading = false
+      this.subset_load_error = ''
+      this.subset_selected = []
+      this.subset_search = ''
       this.dataset_components = []
       this.dataset_components_source_open = []
       this.dataset_components_from_open = []
@@ -406,6 +547,11 @@ export default {
       if (existingDataset.structure === STRUCTURE_APPS.SPARKPLUG) {
         this.active_tab = 'sparkplug'
         this.sparkplug_source = config.source ?? ''
+      } else if (existingDataset.structure === STRUCTURE_APPS.SUBSET) {
+        this.active_tab = 'subset'
+        this.subset_source = config.source ?? ''
+        this.subset_selected = (config.metrics ?? []).map(metric_key)
+        this.load_subset_metrics()
       } else if (existingDataset.structure === STRUCTURE_APPS.SESSION) {
         this.active_tab = 'components'
         const from = config.from ?? ''
@@ -436,6 +582,58 @@ export default {
     select_sparkplug_source(uuid) {
       this.sparkplug_source = uuid
       this.sparkplug_source_open = false
+    },
+
+    device_label(uuid) {
+      if (!uuid) return 'Select a device…'
+      const match = this.available_devices.find(d => d.uuid === uuid)
+      return match ? (match.name ?? match.uuid) : uuid
+    },
+
+    select_subset_source(uuid) {
+      this.subset_source_open = false
+      if (uuid === this.subset_source) return
+      // References are per device, so a new device starts a new selection.
+      this.subset_source = uuid
+      this.subset_selected = []
+      this.subset_search = ''
+      this.load_subset_metrics()
+    },
+
+    async load_subset_metrics() {
+      const device = this.subset_source
+      this.subset_metrics = []
+      this.subset_load_error = ''
+      this.subset_loading = true
+      try {
+        const metrics = await this.s.client.DataAccess.get_device_metrics(device)
+        // Ignore a slow response for a device that is no longer selected.
+        if (device === this.subset_source) this.subset_metrics = metrics
+      } catch (err) {
+        console.error('Loading device metrics failed:', err)
+        if (device === this.subset_source) {
+          this.subset_load_error = err.status === 403
+            ? 'You do not have permission to use Sparkplug data from this device.'
+            : 'Could not load the metrics for this device.'
+        }
+      } finally {
+        if (device === this.subset_source) this.subset_loading = false
+      }
+    },
+
+    toggle_metric(key, checked) {
+      const has = this.subset_selected_set.has(key)
+      if (checked && !has) this.subset_selected.push(key)
+      if (!checked && has) this.subset_selected = this.subset_selected.filter(k => k !== key)
+    },
+
+    // Groups here are filtered, so these act on the visible metrics only.
+    group_state(group) {
+      return group_state(group, this.subset_selected_set)
+    },
+
+    toggle_group(group, checked) {
+      this.subset_selected = set_group(this.subset_selected, group, checked)
     },
 
     filtered_datasets_for_component(idx) {
@@ -510,6 +708,20 @@ export default {
             created_uuid = this.edit_uuid
           } else {
             created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SPARKPLUG, config)
+          }
+          await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
+            name: this.name.trim(),
+          })
+        } else if (this.active_tab === 'subset') {
+          const config = {
+            source: this.subset_source,
+            metrics: this.subset_selected.map(key_to_ref),
+          }
+          if (this.is_edit) {
+            await this.s.client.DataAccess.update_dataset(this.edit_uuid, STRUCTURE_APPS.SUBSET, config)
+            created_uuid = this.edit_uuid
+          } else {
+            created_uuid = await this.s.client.DataAccess.create_dataset(STRUCTURE_APPS.SUBSET, config)
           }
           await this.s.client.ConfigDB.put_config(UUIDs.App.Info, created_uuid, {
             name: this.name.trim(),

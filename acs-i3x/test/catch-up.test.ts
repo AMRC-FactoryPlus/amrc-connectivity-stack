@@ -19,6 +19,9 @@ import { ValueCache } from "../lib/value-cache.js";
 import { History } from "../lib/history.js";
 import { APIv1 } from "../lib/api-v1.js";
 import { I3xStore } from "../lib/store.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 const DEV = "dev-1";
@@ -59,7 +62,14 @@ function fakeInflux(tree: ObjectTree) {
         const m = /range\(start: ([^)]+)\)/.exec(q)!;
         const since = m[1].startsWith("-") ? -Infinity : Date.parse(m[1]);
         const rows: any[] = [];
-        for (const dev of tree.deviceUuidPage("", 1000)) {
+        const devices: string[] = [];
+        for (let after = "";;) {
+            const page = tree.deviceUuidPage(after, 1000);
+            devices.push(...page);
+            if (page.length < 1000) break;
+            after = page[page.length - 1];
+        }
+        for (const dev of devices) {
             for (const leaf of tree.getDescendantLeafIds(dev, 0)) {
                 const meta = tree.getMetricMeta(leaf);
                 const s = series.get(leaf);
@@ -85,6 +95,8 @@ function fakeMqtt() {
         fplus: { mqtt_client: async () => mqtt, debug: { bound: () => () => {} } },
         connect: () => handlers.get("connect")!(),
         close: () => handlers.get("close")!(),
+        /** Any packet from the broker, such as a ping response. */
+        packet: () => handlers.get("packetreceive")?.(),
         message: (...a: any[]) => handlers.get("message")!(...a),
     };
 }
@@ -262,13 +274,26 @@ describe("after a restart", () => {
         w.influx.series.set(w.leaf("Speed"), { _value: 5, _time: iso(gapTime) });
 
         const r = await run(w, { catchUpMargin: 60 });
+        /* The message comes while the catch-up query for Speed is in
+         * flight, after the catch-up has read which rows to check. */
+        const collect = w.influx.collectRows.getMockImplementation()!;
+        const asked: string[] = [];
+        w.influx.collectRows.mockImplementation(async (q: string) => {
+            const out = await collect(q);
+            if (isCatchUp(q)) {
+                asked.push(...out.map((row: any) => row._measurement));
+                uns(r.valueCache, ["Speed"], 7, iso(gapTime + 1000));
+                /* Served at once, before the catch-up applies. */
+                expect(r.valueCache.getValue(w.leaf("Speed"))!.value).toBe(7);
+            }
+            return out;
+        });
         r.mqtt.connect();
-        uns(r.valueCache, ["Speed"], 7, iso(gapTime + 1000));
-        /* Served at once, before the catch-up. */
-        expect(r.valueCache.getValue(w.leaf("Speed"))!.value).toBe(7);
         await caughtUp(r.valueCache);
         await sleep(100);
-        expect(w.influx.queries.filter(isCatchUp).length).toBeGreaterThan(0);
+        /* The catch-up did read the older point for Speed... */
+        expect(asked.some(m => m.startsWith("Speed:"))).toBe(true);
+        /* ...and did not apply it over the newer UNS value. */
         expect(r.valueCache.getValue(w.leaf("Speed"))!.value).toBe(7);
         expect(r.valueCache.getValue(w.leaf("Status"))!.value).toBe("ok");
     });
@@ -438,15 +463,231 @@ describe("after an MQTT reconnect", () => {
 });
 
 describe("a failed group commit", () => {
-    it("still clears, and ends a catch-up", async () => {
+    it("still clears, ends a catch-up, and goes live", async () => {
         const w = world();
         await firstRun(w);
+        w.store.commit();
         const r = await run(w, { catchUpMargin: 60_000 });
         r.mqtt.connect();
         expect((r.valueCache as any).catchingUp()).toBe(true);
-        (r.valueCache as any).safeClear("after a failed commit");
+        uns(r.valueCache, ["Speed"], 2, iso(Date.now()));
+        r.valueCache.flush();
+        const db = (w.store as any).db;
+        const exec = db.exec.bind(db);
+        const spy = jest.spyOn(db, "exec").mockImplementation((sql: any) => {
+            if (sql === "commit") throw new Error("disk I/O error");
+            return exec(sql);
+        });
+        try {
+            w.store.commit();
+        } finally {
+            spy.mockRestore();
+        }
         expect(rows(w.store)).toEqual([]);
         expect((r.valueCache as any).catchingUp()).toBe(false);
+        expect((r.valueCache as any).live).toBe(true);
+    });
+});
+
+describe("review fixes", () => {
+    it("refreshes, after the catch-up, a value read from InfluxDB before a late gap point was written", async () => {
+        const w = world();
+        await firstRun(w);
+        w.influx.series.delete(w.leaf("Position", `axis-${DEV}`));
+        w.influx.series.set(w.leaf("Speed"), { _value: 1, _time: iso(Date.now() - 3600_000) });
+        const r = await run(w, { catchUpMargin: 150, refreshInterval: 40 });
+        const connectedAt = Date.now();
+        r.mqtt.connect();
+        /* A read during the margin gets the old point and is trusted. */
+        const res = await request(r.app).get(`/v1/objects/${w.leaf("Speed")}/value`);
+        expect(res.body.result.value).toBe(1);
+        /* The historian then writes a point from just before connect. */
+        w.influx.series.set(w.leaf("Speed"), { _value: 9, _time: iso(connectedAt - 50) });
+        await caughtUp(r.valueCache);
+        await sleep(300);
+        expect(r.valueCache.getValue(w.leaf("Speed"))!.value).toBe(9);
+        (r.valueCache as any).live = false;
+    });
+
+    it("records values current only up to the last packet from the broker", async () => {
+        const w = world();
+        const r = await run(w);
+        r.mqtt.connect();
+        const connectedAt = Date.now();
+        await sleep(60);
+        /* No packet since connecting: the link may be dead. */
+        expect(Number(w.store.getMeta("values_current_until"))).toBeLessThanOrEqual(connectedAt);
+        const before = Date.now();
+        r.mqtt.packet();
+        const after = Date.now();
+        await sleep(40);
+        r.mqtt.close();
+        /* The packet's time, not the close 40 ms later. */
+        const until = Number(w.store.getMeta("values_current_until"));
+        expect(until).toBeGreaterThanOrEqual(before);
+        expect(until).toBeLessThanOrEqual(after);
+    });
+
+    it("does not record values current past a value dropped unwritten", async () => {
+        const w = world();
+        const r = await run(w, { flushMaxRows: 1, flushInterval: 1 });
+        r.mqtt.connect();
+        const prepare = w.store.prepare.bind(w.store);
+        const spy = jest.spyOn(w.store, "prepare").mockImplementation((sql: string) => {
+            if (sql.includes("insert into last_value") && sql.includes("'uns'")) throw new Error("database is locked");
+            return prepare(sql);
+        });
+        const t0 = Date.now();
+        try {
+            /* More than the 10 batches kept while writes fail. */
+            for (let i = 0; i < 15; i++) uns(r.valueCache, ["New", `M${i}`], i, iso(Date.now()));
+        } finally {
+            spy.mockRestore();
+        }
+        await sleep(20);
+        r.mqtt.packet();
+        r.valueCache.flush();
+        await sleep(40);
+        expect(Number(w.store.getMeta("values_current_until"))).toBeLessThanOrEqual(t0 + 5);
+    });
+
+    it("hides, and does not record as current, rows a failed clear left, and tries again", async () => {
+        const w = world();
+        await firstRun(w);
+        w.store.setMeta("values_current_until", null);
+        const prepare = w.store.prepare.bind(w.store);
+        let failing = true;
+        const spy = jest.spyOn(w.store, "prepare").mockImplementation((sql: string) => {
+            if (failing && sql === "delete from last_value") throw new Error("database is locked");
+            return prepare(sql);
+        });
+        try {
+            const r = await run(w);
+            r.mqtt.connect();
+            await sleep(40);
+            expect(rows(w.store)).toHaveLength(3);
+            expect(r.valueCache.getValue(w.leaf("Speed"))).toBeNull();
+            expect(r.valueCache.size()).toBe(0);
+            expect(w.store.getMeta("values_current_until")).toBeUndefined();
+            failing = false;
+            await sleep(40);
+            expect(rows(w.store)).toEqual([]);
+            expect((r.valueCache as any).live).toBe(true);
+            expect(w.store.getMeta("values_current_until")).toBeDefined();
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it("keeps a UNS leaf that changed during the gap in a composition built from UNS values", async () => {
+        const w = world();
+        const first = await run(w);
+        first.mqtt.connect();
+        const old = iso(Date.now() - 3600_000);
+        uns(first.valueCache, ["Speed"], 1, old);
+        uns(first.valueCache, ["Status"], "ok", old);
+        first.valueCache.flush();
+        await sleep(30);
+        first.mqtt.close();
+        /* Position has no row, so DEV is answered from UNS values only. */
+        w.influx.series.set(w.leaf("Speed"), { _value: 9, _time: iso(Date.now()) });
+        const r = await run(w);
+        r.mqtt.connect();
+        await caughtUp(r.valueCache);
+        const dev = r.valueCache.getValue(DEV)!;
+        expect(dev.components![w.leaf("Speed")].value).toBe(9);
+        expect(dev.components![w.leaf("Status")].value).toBe("ok");
+    });
+
+    it("streams a composition's components as trusted when its head was read", async () => {
+        const w = world();
+        const r = await run(w, { catchUpMargin: 60_000 });
+        r.mqtt.connect();
+        uns(r.valueCache, ["Speed"], 1, iso(Date.now()));
+        r.valueCache.flush();
+        const lazy = (await r.valueCache.getValueLazy(DEV))!;
+        expect(lazy.head.value).toBeNull();
+        /* A reconnect between the head and the streaming. */
+        r.mqtt.close();
+        r.mqtt.connect();
+        expect((r.valueCache as any).catchingUp()).toBe(true);
+        const got = [...lazy.components!()].filter(Boolean);
+        expect(got.map(c => c![0])).toEqual([w.leaf("Speed")]);
+    });
+
+    it("clears when the values were last current in the future", async () => {
+        const w = world();
+        await firstRun(w);
+        w.store.setMeta("values_current_until", String(Date.now() + 600_000));
+        await run(w);
+        expect(rows(w.store)).toEqual([]);
+    });
+
+    it("counts only values that differ towards the limit, not every point in the window", async () => {
+        const w = world();
+        const first = await run(w);
+        first.mqtt.connect();
+        const now = iso(Date.now());
+        uns(first.valueCache, ["Speed"], 1, now);
+        uns(first.valueCache, ["Status"], "ok", now);
+        first.valueCache.flush();
+        await sleep(30);
+        first.mqtt.close();
+        /* InfluxDB has the same points: in the window, but unchanged. */
+        w.influx.series.set(w.leaf("Speed"), { _value: 1, _time: now });
+        w.influx.series.set(w.leaf("Status"), { _value: "ok", _time: now });
+        const r = await run(w, { catchUpMaxRows: 1, catchUpMargin: 200 });
+        r.mqtt.connect();
+        await caughtUp(r.valueCache);
+        await sleep(300);
+        const q = w.influx.queries.filter(isCatchUp);
+        expect(q).toHaveLength(1);
+        /* The points are in the window the catch-up read. */
+        expect(Date.parse(/range\(start: ([^)]+)\)/.exec(q[0])![1])).toBeLessThan(Date.parse(now));
+        expect(r.valueCache.size()).toBe(2);
+    });
+
+    it("pages through more devices than one page, and more leaves than one batch", async () => {
+        const w = world();
+        const n = 1800;
+        for (let i = 2; i <= n; i++) w.tree.addDevice(`dev-${i}`, devInfo(`dev-${i}`), null);
+        const first = await run(w);
+        first.mqtt.connect();
+        const old = iso(Date.now() - 3600_000);
+        for (let i = 1; i <= n; i++) {
+            uns(first.valueCache, ["Speed"], 1, old, `dev-${i}`);
+            uns(first.valueCache, ["Status"], "ok", old, `dev-${i}`);
+        }
+        first.valueCache.flush();
+        await sleep(30);
+        first.mqtt.close();
+        for (let i = 1; i <= n; i++)
+            w.influx.series.set(w.leaf("Speed", `dev-${i}`), { _value: i, _time: iso(Date.now()) });
+        const r = await run(w);
+        r.mqtt.connect();
+        for (let i = 0; i < 300 && (r.valueCache as any).catchingUp(); i++) await sleep(20);
+        expect(r.valueCache.size()).toBe(2 * n);
+        for (const i of [1, 256, 257, 900, n])
+            expect(r.valueCache.getValue(w.leaf("Speed", `dev-${i}`))!.value).toBe(i);
+    }, 30_000);
+
+    it("reads a composition from InfluxDB during the catch-up, and from the cache after", async () => {
+        const w = world();
+        await firstRun(w);
+        w.influx.series.set(w.leaf("Speed"), { _value: 1, _time: iso(Date.now() - 3600_000) });
+        const r = await run(w, { catchUpMargin: 100 });
+        r.mqtt.connect();
+        const reads = () => w.influx.queries.filter(q => !isCatchUp(q)).length;
+        const n = reads();
+        const during = await request(r.app).get(`/v1/objects/${DEV}/value`);
+        expect(reads()).toBe(n + 1);
+        expect(during.body.result.isComposition).toBe(true);
+        await caughtUp(r.valueCache);
+        await sleep(100);
+        const m = reads();
+        const after = await request(r.app).get(`/v1/objects/${DEV}/value`);
+        expect(reads()).toBe(m);
+        expect(after.body.result.components[w.leaf("Speed")].value).toBe(1);
     });
 });
 
@@ -506,7 +747,34 @@ describe("values kept from InfluxDB, while connected", () => {
         uns(r.valueCache, ["Status"], "uns", iso(Date.now()));
         r.valueCache.flush();
         (r.valueCache as any).refresh();
+        await sleep(20);
         expect(rows(w.store).map(x => [x.id, x.source])).toEqual([[w.leaf("Status"), "uns"]]);
+    });
+
+    it("are found through an index, not a scan of every value", () => {
+        const w = world();
+        const plan = (sql: string) => (w.store.db.prepare(`explain query plan ${sql}`).all() as any[])
+            .map(r => r.detail).join("; ");
+        expect(plan(`select distinct device_uuid d from last_value
+            where device_uuid > '' and source != 'uns' order by device_uuid limit 256`))
+            .toContain("last_value_kept_ix");
+        expect(plan("select element_id, source from last_value where device_uuid = 'x' and source != 'uns'"))
+            .toContain("last_value_kept_ix");
+    });
+
+    it("gain the index in a database made before it existed", () => {
+        const path = join(mkdtempSync(join(tmpdir(), "i3x-")), "i3x.db");
+        try {
+            const a = new I3xStore({ path, checkpointInterval: 0 });
+            a.db.exec("drop index last_value_kept_ix");
+            a.close();
+            const b = new I3xStore({ path, checkpointInterval: 0 });
+            expect(b.warm).toBe(true);
+            expect(b.db.prepare("select 1 from sqlite_master where name = 'last_value_kept_ix'").get()).toBeTruthy();
+            b.close();
+        } finally {
+            rmSync(dirname(path), { recursive: true, force: true });
+        }
     });
 
     it("are not refreshed while disconnected or catching up", async () => {

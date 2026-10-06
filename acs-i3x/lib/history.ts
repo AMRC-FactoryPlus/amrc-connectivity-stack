@@ -226,7 +226,8 @@ export class History {
     /**
      * The entries whose device publishes to UNS (see remember). No
      * marker either for a device that does not: a composition with its
-     * leaves is then never complete, and is read from InfluxDB whole.
+     * leaves is then never complete. It is answered from its UNS values
+     * only, as on main, or read from InfluxDB whole when it has none.
      * Synchronous, so the answer holds until the caller has written.
      */
     private publishingToUns<T extends { device: string | null }>(entries: T[]): T[] {

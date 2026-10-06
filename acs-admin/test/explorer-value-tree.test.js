@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest'
 
-import { mk_node, load_subtree, count_leaves } from '../src/lib/explorer/value-tree.js'
+import { mk_node, load_subtree, count_leaves, leaf_state } from '../src/lib/explorer/value-tree.js'
 
 /* A street light: leaves of its own, a Location composition with
  * leaves, and a Cyber_Profile two levels deep. */
@@ -87,12 +87,39 @@ describe('composition value tree', () => {
     expect(network.children[0].vqt).toEqual(vqt('ip'))
   })
 
-  it('shows a leaf with no value as a row with no value', async () => {
+  it('counts a leaf the server left out as not reported', async () => {
     const t = top()
     await load_subtree(fake_i3x(), t)
     const owner = t.children[1]
     expect(owner.vqt).toBe(null)
-    expect(count_leaves(t)).toEqual({ leaves: 6, values: 5 })
+    expect(count_leaves(t)).toEqual({ leaves: 6, reported: 5 })
+  })
+
+  it('keeps a reported leaf with a null value apart from one not reported', async () => {
+    const i3x = fake_i3x()
+    const value = i3x.getValueBulk
+    i3x.getValueBulk = async (ids, maxDepth) => (await value(ids, maxDepth))
+      .map(r => {
+        r.result.components.kind = { value: null, quality: 'Bad', timestamp: null }
+        return r
+      })
+    const t = top()
+    await load_subtree(i3x, t)
+    expect(t.children[0].vqt).toEqual({ value: null, quality: 'Bad', timestamp: null })
+    expect(leaf_state(t.children[0])).toBe('no-value')
+    expect(leaf_state(t.children[1])).toBe('not-reported')
+    expect(leaf_state(t.children[2].children[0])).toBe('value')
+    expect(count_leaves(t)).toEqual({ leaves: 6, reported: 5 })
+  })
+
+  it('counts every leaf as not reported when the composition has no value', async () => {
+    const i3x = fake_i3x()
+    i3x.getValueBulk = async ids => ids.map(id =>
+      ({ success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } }))
+    const t = top()
+    await load_subtree(i3x, t)
+    expect(leaf_state(t.children[0])).toBe('not-reported')
+    expect(count_leaves(t)).toEqual({ leaves: 6, reported: 0 })
   })
 
   it('reads one level per request and the values in one request', async () => {

@@ -5,6 +5,7 @@
 <script setup>
 import { computed } from 'vue'
 import QualityBadge from '@components/QualityBadge.vue'
+import { leaf_state } from '@/lib/explorer/value-tree.js'
 import dayjs from 'dayjs'
 
 const props = defineProps({
@@ -21,6 +22,7 @@ const emit = defineEmits(['toggle'])
 const isOpen = computed(() =>
   props.node.children !== null && !props.collapsed.has(props.node.elementId))
 const isLoading = computed(() => props.loadingIds.has(props.node.elementId))
+const state = computed(() => leaf_state(props.node))
 
 function formatTimestamp (ts) {
   if (!ts) return '-'
@@ -64,10 +66,11 @@ function formatValue (val) {
       </td>
     </template>
     <template v-else>
-      <td class="px-3 py-1.5 font-mono whitespace-pre-wrap break-words">{{ formatValue(node.vqt?.value) }}</td>
+      <td v-if="state === 'not-reported'" class="px-3 py-1.5 text-slate-400" title="Not reported by the server">–</td>
+      <td v-else-if="state === 'no-value'" class="px-3 py-1.5 text-xs text-slate-400">No value</td>
+      <td v-else class="px-3 py-1.5 font-mono whitespace-pre-wrap break-words">{{ formatValue(node.vqt.value) }}</td>
       <td class="px-3 py-1.5">
         <QualityBadge v-if="node.vqt" :quality="node.vqt.quality" />
-        <span v-else class="text-xs text-slate-400">No value</span>
       </td>
       <td class="px-3 py-1.5 text-xs text-slate-400 whitespace-nowrap">{{ formatTimestamp(node.vqt?.timestamp) }}</td>
     </template>

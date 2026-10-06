@@ -19,7 +19,7 @@ const HAS_CHILDREN = 'i3x:rel:has-children'
 
 /**
  * A row of the tree. `children` is null until that level is read; `vqt`
- * is the value of a leaf, null if it has none.
+ * is the value of a leaf, null if the server did not report one.
  */
 export function mk_node (obj) {
   return {
@@ -66,15 +66,26 @@ export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = M
   fill(top)
 }
 
-/** Count the leaves loaded under `node`, and those with a value. */
+/**
+ * How a leaf's value reads. The server leaves out of a composition's
+ * value any leaf it has no value for, and when the cache only holds
+ * part of a composition it answers with that part alone, so a leaf
+ * that is left out is not known to have no data.
+ */
+export function leaf_state (node) {
+  if (!node.vqt) return 'not-reported'
+  return node.vqt.value == null ? 'no-value' : 'value'
+}
+
+/** Count the leaves loaded under `node`, and those the server reported. */
 export function count_leaves (node) {
-  const count = { leaves: 0, values: 0 }
+  const count = { leaves: 0, reported: 0 }
   const walk = n => {
     for (const c of n.children ?? []) {
       if (c.isComposition) walk(c)
       else {
         count.leaves++
-        if (c.vqt) count.values++
+        if (c.vqt) count.reported++
       }
     }
   }

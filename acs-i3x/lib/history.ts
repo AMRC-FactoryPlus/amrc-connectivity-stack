@@ -14,6 +14,9 @@ import { InfluxDB } from "@influxdata/influxdb-client";
 import type { QueryApi } from "@influxdata/influxdb-client";
 import type { ObjectTree } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
+import type { InfluxValue } from "./value-cache.js";
+import { Semaphore } from "./semaphore.js";
+import { Slicer } from "./slicer.js";
 
 interface HistoryOpts {
     influxUrl: string;
@@ -36,6 +39,19 @@ interface HistoryOpts {
      * does not depend on the client library version.
      */
     queryTimeout?: number;
+    /**
+     * Flux queries allowed in flight across the whole process, for
+     * current values and history alike. Default 4. Ignored if
+     * `semaphore` is given.
+     */
+    influxConcurrency?: number;
+    /** A semaphore to share with other users of InfluxDB. */
+    semaphore?: Semaphore;
+    /**
+     * Where to keep current values read from InfluxDB, so the next
+     * read of the same metric does not need a Flux query.
+     */
+    valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
 }
 
 /** One row of the bulk last-value query. */
@@ -95,10 +111,14 @@ export class History {
     private bulkChunkSize: number;
     private bulkConcurrency: number;
     private bulkMeasurementFilterMax: number;
+    private semaphore: Semaphore;
+    private valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
         this.objectTree = opts.objectTree;
+        this.semaphore = opts.semaphore ?? new Semaphore(opts.influxConcurrency ?? 4);
+        this.valueCache = opts.valueCache;
         this.bulkChunkSize = opts.bulkChunkSize ?? 100;
         this.bulkConcurrency = opts.bulkConcurrency ?? 4;
         this.bulkMeasurementFilterMax = opts.bulkMeasurementFilterMax ?? 50;
@@ -109,6 +129,43 @@ export class History {
             timeout: opts.queryTimeout ?? 10_000,
         });
         this.queryApi = influx.getQueryApi(opts.influxOrg);
+    }
+
+    /** Run one Flux query, waiting for a slot under the process-wide cap. */
+    private query<T>(flux: string): Promise<T[]> {
+        return this.semaphore.run(() => this.queryApi.collectRows<T>(flux));
+    }
+
+    /** Keep leaf values read from InfluxDB in the value cache. */
+    private async remember(values: Iterable<I3xValueResponse>): Promise<void> {
+        if (!this.valueCache) return;
+        /* Written a chunk at a time, pausing between: a large read can
+         * return values for millions of leaves. */
+        const slicer = new Slicer();
+        let out: InfluxValue[] = [];
+        const write = () => {
+            try {
+                this.valueCache!.recordInfluxValues(out);
+            } catch (err) {
+                console.error("History: storing InfluxDB values failed:", err);
+            }
+            out = [];
+        };
+        for (const v of values) {
+            const meta = this.objectTree.getMetricMeta(v.elementId);
+            if (!meta) continue;
+            out.push({
+                elementId: v.elementId,
+                device: meta.topLevelInstanceUuid,
+                anchor: this.objectTree.getObject(v.elementId)?.parentId ?? null,
+                value: v.value,
+                quality: v.quality,
+                timestamp: v.timestamp,
+            });
+            if (out.length >= 1000) write();
+            await slicer.maybe();
+        }
+        if (out.length) write();
     }
 
     /**
@@ -133,19 +190,20 @@ export class History {
             `  |> last()`,
         ].filter(Boolean).join("\n");
 
-        const rows: Array<{ _value: unknown; _time: string }> =
-            await this.queryApi.collectRows(query);
+        const rows = await this.query<{ _value: unknown; _time: string }>(query);
 
         if (rows.length === 0) return null;
 
         const row = rows[0];
-        return {
+        const result: I3xValueResponse = {
             elementId,
             isComposition: false,
             value: row._value,
             quality: "Good",
             timestamp: row._time,
         };
+        await this.remember([result]);
+        return result;
     }
 
     /**
@@ -177,17 +235,30 @@ export class History {
         maxDepth: number = 1,
     ): Promise<Map<string, I3xValueResponse | null>> {
         // Work out which leaves each requested id needs.
+        /* A composition high in the hierarchy expands to millions of
+         * leaves: read them in steps, pausing for the event loop. */
+        const slicer = new Slicer();
         const plan = new Map<string, { composition: boolean; leafIds: string[] }>();
         const allLeaves = new Set<string>();
         for (const id of elementIds) {
             if (plan.has(id)) continue;
             const obj = this.objectTree.getObject(id);
             const composition = !!obj?.isComposition;
-            const leafIds = composition
-                ? this.objectTree.getDescendantLeafIds(id, maxDepth)
-                : [id];
+            let leafIds: string[];
+            if (!composition) {
+                leafIds = [id];
+            } else if (this.objectTree.iterateDescendantLeafIds) {
+                leafIds = [];
+                for (const leaf of this.objectTree.iterateDescendantLeafIds(id, maxDepth)) {
+                    if (leaf !== null) leafIds.push(leaf);
+                    await slicer.maybe();
+                }
+            } else {
+                leafIds = this.objectTree.getDescendantLeafIds(id, maxDepth);
+            }
             plan.set(id, { composition, leafIds });
             for (const leaf of leafIds) allLeaves.add(leaf);
+            await slicer.maybe();
         }
 
         const leafValues = await this.getCurrentValues([...allLeaves]);
@@ -204,6 +275,7 @@ export class History {
             const components: Record<string, I3xVqt> = {};
             let latestTimestamp = "";
             for (const leafId of leafIds) {
+                await slicer.maybe();
                 const val = leafValues.get(leafId);
                 if (!val) continue;
                 components[leafId] = {
@@ -259,7 +331,9 @@ export class History {
         const wanted: Array<{ leafId: string; key: string }> = [];
         // Measurements each device's leaves need.
         const devices = new Map<string, Set<string>>();
+        const slicer = new Slicer();
         for (const leafId of leafIds) {
+            await slicer.maybe();
             const meta = this.objectTree.getMetricMeta(leafId);
             if (!meta) continue;
             const measurement = `${meta.metricName}:${meta.typeSuffix}`;
@@ -290,7 +364,7 @@ export class History {
             const filter = measurements.size <= this.bulkMeasurementFilterMax
                 ? [...measurements]
                 : undefined;
-            const rows = await this.queryApi.collectRows<LastRow>(this.buildBulkLastQuery(tlis, filter));
+            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter));
             for (const row of rows) {
                 const path = row.path ?? "";
                 const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
@@ -301,6 +375,7 @@ export class History {
         });
 
         for (const { leafId, key } of wanted) {
+            await slicer.maybe();
             const row = first.get(key);
             if (!row) continue;
             out.set(leafId, {
@@ -311,6 +386,7 @@ export class History {
                 timestamp: row._time,
             });
         }
+        await this.remember(out.values());
         return out;
     }
 
@@ -390,8 +466,7 @@ export class History {
         const query = this.buildFluxQuery(elementId, startTime, endTime);
         if (query === null) return [];
 
-        const rows: Array<{ _value: unknown; _time: string }> =
-            await this.queryApi.collectRows(query);
+        const rows = await this.query<{ _value: unknown; _time: string }>(query);
 
         return rows.map((row) => ({
             value: row._value,

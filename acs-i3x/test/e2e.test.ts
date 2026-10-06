@@ -14,6 +14,7 @@ import { jest, describe, it, expect, beforeAll } from "@jest/globals";
 import express from "express";
 import request from "supertest";
 import { APIv1 } from "../lib/api-v1.js";
+import { lazyFromValue } from "../lib/value-cache.js";
 import { I3X_SPEC_VERSION, Version, RelType } from "../lib/constants.js";
 import type {
     I3xNamespace,
@@ -225,6 +226,10 @@ function createPreloadedMocks() {
                 return result;
             }),
 
+        /* GET /objects streams from iterateObjects; this one reads
+         * whatever getObjects returns. */
+        iterateObjects: jest.fn(function* (this: any, opts?: any) { yield* this.getObjects(opts); }),
+
         getObject: jest.fn<(id: string) => I3xObject | undefined>()
             .mockImplementation((id: string) => objectsById.get(id)),
 
@@ -235,6 +240,10 @@ function createPreloadedMocks() {
                 return objRels.get(rt) ?? objRels.get(undefined) ?? [];
             }),
 
+        /* The related routes stream from iterateRelated; this one reads
+         * whatever getRelated returns. */
+        iterateRelated: jest.fn(function* (this: any, id: string, rt?: string) { yield* this.getRelated(id, rt); }),
+
         getChildElementIds: jest.fn<(id: string) => string[]>()
             .mockReturnValue([]),
 
@@ -244,6 +253,9 @@ function createPreloadedMocks() {
     const valueCache = {
         getValue: jest.fn<(id: string) => I3xValueResponse | null>()
             .mockImplementation((id: string) => valuesById.get(id) ?? null),
+        /* The value routes read through getValueLazy; this one serves
+         * whatever getValue returns. */
+        getValueLazy: jest.fn((id: string) => lazyFromValue(valueCache.getValue(id))),
     };
 
     const history = {

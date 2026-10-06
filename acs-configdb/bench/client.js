@@ -161,6 +161,7 @@ export class HttpClient {
             status: res.status,
             body: text && res.headers.get("content-type")?.includes("json")
                 ? JSON.parse(text) : text,
+            etag: res.headers.get("etag"),
             ms: performance.now() - t0,
         };
     }

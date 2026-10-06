@@ -3,17 +3,35 @@
  */
 
 /*
- * ValueCache — Subscribes to UNS MQTT topics, maintains an in-memory
- * cache of current values, and notifies subscribers of changes.
+ * ValueCache — Subscribes to UNS MQTT topics, keeps the last value of
+ * every leaf metric, and notifies subscribers of changes.
+ *
+ * The values live in the last_value table of the SQLite store, not on
+ * the heap. UNS messages are written in batches (every flushInterval
+ * ms, or every flushMaxRows rows). Reads flush first, so they always
+ * see every message already received. Listeners (SSE subscriptions)
+ * are still called synchronously for every message.
+ *
+ * InfluxDB results read by History on a cache miss are written back
+ * here too (recordInfluxValues), so the next read of that metric is
+ * served locally.
  */
 
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import { deriveQuality } from "./quality.js";
 import { toI3xVqt } from "./mapping.js";
+import { I3xStore } from "./store.js";
+import { Slicer } from "./slicer.js";
 
 interface ValueCacheOpts {
     objectTree: ObjectTreeLike;
     staleThreshold: number;
+    /** The database for last values. Defaults to a new in-memory one. */
+    store?: I3xStore;
+    /** Most ms a UNS value waits before it is written. */
+    flushInterval?: number;
+    /** Write at once when this many values are waiting (default 1,000). */
+    flushMaxRows?: number;
 }
 
 /**
@@ -27,45 +45,187 @@ interface ObjectTreeLike {
         metricSegments: string[],
         isa95Segments?: string[],
     ): string | null;
-    getObject(elementId: string): { elementId: string; isComposition: boolean } | undefined;
+    getObject(elementId: string): { elementId: string; isComposition: boolean; parentId?: string | null } | undefined;
     getChildElementIds(elementId: string): string[];
     isReady(): boolean;
 }
 
 type ValueChangeListener = (elementId: string, vqt: I3xVqt) => void;
 
+/** A value read from InfluxDB, to keep for the next read. */
+export interface InfluxValue {
+    elementId: string;
+    /** The device (topLevelInstance) the metric belongs to. */
+    device: string;
+    /** The object whose composition includes this leaf directly. */
+    anchor: string | null;
+    value: unknown;
+    quality: string;
+    timestamp: string;
+}
+
+interface Pending {
+    anchor: string;
+    device: string;
+    valueJson: string | null;
+    quality: string;
+    timestamp: string | null;
+}
+
+interface ValueRow {
+    element_id: string;
+    value_json: string | null;
+    quality: string;
+    timestamp: string | null;
+}
+
+/** A colon-separated UUID path, without the empty segment a trailing
+ * colon leaves. uns-ingester sends `top:` for a metric directly under
+ * the device, which used to file it under the parent ''. */
+function splitPath(s: string): string[] {
+    const parts = s.split(":");
+    while (parts.length > 1 && parts[parts.length - 1] === "") parts.pop();
+    return parts;
+}
+
+/* JSON has no undefined; store it as SQL NULL and give it back. */
+const toJson = (v: unknown): string | null => v === undefined ? null : JSON.stringify(v);
+
+function toVqt(r: ValueRow): I3xVqt {
+    return {
+        value: r.value_json === null ? undefined : JSON.parse(r.value_json),
+        quality: r.quality as I3xVqt["quality"],
+        timestamp: r.timestamp ?? undefined as any,
+    };
+}
+
+/**
+ * A cached value whose components, for a composition, are read as they
+ * are iterated rather than all at once. A composition high in the
+ * ISA-95 hierarchy can have millions of components.
+ */
+/** One step of a composition walk: a component, or null when the walk
+ * has done some work without finding one (a tick, so a consumer can
+ * yield to the event loop between steps). */
+export type ComponentStep = [string, I3xVqt] | null;
+
+/**
+ * A cached value whose components, for a composition, are read as they
+ * are iterated rather than all at once. A composition high in the
+ * ISA-95 hierarchy can have millions of components.
+ */
+export interface LazyValue {
+    /** The response, without `components`. */
+    head: I3xValueResponse;
+    /** A composition's components, in response order, with null ticks
+     * between them. Each call reads them again. */
+    components?: () => Iterable<ComponentStep>;
+}
+
+/** A LazyValue over a value already built in memory. */
+export function lazyFromValue(v: I3xValueResponse | null): LazyValue | null {
+    if (!v) return null;
+    if (!v.components) return { head: v };
+    const { components, ...head } = v;
+    return { head: head as I3xValueResponse, components: () => Object.entries(components) };
+}
+
+/** Children read per query while walking a subtree. */
+const WALK_PAGE = 256;
+
+/** Most values held back while the WAL checkpoint catches up, in
+ * batches: about 10 MB at 50 batches of 1,000. */
+const DEFER_BATCHES = 50;
+
+/** Most unwritten values kept while writes fail, in batches. */
+const MAX_BACKLOG_BATCHES = 10;
+
+/** After a failed write, background flushes wait this long before the
+ * next try, doubling up to WRITE_RETRY_MAX. Failures are logged at most
+ * once per WRITE_RETRY_MAX. */
+const WRITE_RETRY_MIN = 5_000;
+const WRITE_RETRY_MAX = 60_000;
+
+const UPSERT = (source: string, guard: string) => `
+    insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+    values (?, ?, ?, ?, ?, ?, '${source}')
+    on conflict (element_id) do update set
+        anchor = excluded.anchor,
+        device_uuid = excluded.device_uuid,
+        value_json = excluded.value_json,
+        timestamp = excluded.timestamp,
+        quality = excluded.quality,
+        source = excluded.source
+    ${guard}`;
+
 export class ValueCache {
     private objectTree: ObjectTreeLike;
     private staleThreshold: number;
+    private store: I3xStore;
+    private flushInterval: number;
+    private flushMaxRows: number;
     private log: (msg: string, ...args: any[]) => void = () => {};
 
     private ready: boolean = false;
-    private cache: Map<string, I3xVqt> = new Map();
     private listeners: Set<ValueChangeListener> = new Set();
 
-    /**
-     * Reverse index: parentUuid -> Set of cached leaf element IDs.
-     * Allows efficient lookup of all leaf metrics belonging to a
-     * composition object.
-     */
-    private parentToLeaves: Map<string, Set<string>> = new Map();
+    /** UNS values not yet written, by elementId. Bounded by
+     * flushMaxRows and flushInterval. */
+    private pending: Map<string, Pending> = new Map();
+    private timer: ReturnType<typeof setTimeout> | null = null;
+    private continuing = false;
+    /** Write backoff: no background write before this time (Date.now). */
+    private retryNotBefore = 0;
+    private retryDelay = 0;
+    private lastErrorLog = 0;
+    private errorsSinceLog = 0;
+    private droppedSinceLog = 0;
 
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
         this.staleThreshold = opts.staleThreshold;
+        this.store = opts.store ?? new I3xStore();
+        this.flushInterval = opts.flushInterval ?? 250;
+        /* Each flush is one synchronous write; keep it short. */
+        this.flushMaxRows = opts.flushMaxRows ?? 1000;
+        /* A failed group commit loses the values written in its batch,
+         * so a stored value may no longer be the last one. Forget them
+         * all, as after an MQTT reconnect. */
+        /* With group commit a write error usually surfaces here, at the
+         * commit, not in writeChunk, so back off here too. */
+        this.store.onCommitFailure(() => {
+            this.backOff();
+            this.safeClear("after a failed commit");
+        });
     }
 
     async init(fplus: any): Promise<this> {
         this.log = fplus.debug.bound("value-cache");
+
+        /* Values stored by an earlier run may have changed while it was
+         * down; we did not see those UNS messages. Start empty, as the
+         * in-memory cache did, and let reads fill it from InfluxDB. */
+        this.safeClear("at start");
+
         this.log("requesting MQTT client from ServiceClient");
         const mqtt = await fplus.mqtt_client();
         this.log("MQTT client obtained, subscribing to UNS/v1/#");
         mqtt.subscribe("UNS/v1/#");
         mqtt.on("message", (topic: string, payload: Buffer, packet: any) => {
-            this.onUnsMessage(topic, payload, packet);
+            try {
+                this.onUnsMessage(topic, payload, packet);
+            } catch (err) {
+                // For example a database error; drop this message only.
+                console.error("ValueCache: UNS message failed:", topic, err);
+            }
         });
+        let connected = false;
         mqtt.on("connect", () => {
             this.log("MQTT connected");
+            /* Messages sent while we were disconnected are lost, so a
+             * stored value may no longer be the last one. */
+            if (connected) this.safeClear("after an MQTT reconnect");
+            connected = true;
         });
         mqtt.on("error", (err: any) => {
             console.error("ValueCache: MQTT error:", err);
@@ -112,8 +272,8 @@ export class ValueCache {
 
         if (!instanceUuidPathStr) return;
 
-        const instanceUuidPath = instanceUuidPathStr.split(":");
-        const schemaUuidPath = schemaUuidPathStr.split(":");
+        const instanceUuidPath = splitPath(instanceUuidPathStr);
+        const schemaUuidPath = splitPath(schemaUuidPathStr);
         const bottomUuid = instanceUuidPath[instanceUuidPath.length - 1];
 
         // Parse payload
@@ -130,13 +290,16 @@ export class ValueCache {
 
         // Tell the object tree about the full composition chain.
         // Also passes ISA-95 segments so the tree can create hierarchy above the device.
-        // Returns the leaf elementId.
-        const elementId = this.objectTree.addCompositionFromUns(
+        // Returns the leaf elementId, or null if the device is not in
+        // the tree: then nothing can find the value, so drop it.
+        const leafId = this.objectTree.addCompositionFromUns(
             instanceUuidPath,
             schemaUuidPath,
             metricSegments,
             isa95Segments,
-        ) ?? `${bottomUuid}/${metricName}`;
+        );
+        if (leafId === null) return;
+        const elementId = leafId ?? `${bottomUuid}/${metricName}`;
 
         // Derive quality — for values received from UNS, the device is
         // online and we have a value, so quality is Good.
@@ -148,16 +311,20 @@ export class ValueCache {
 
         const vqt = toI3xVqt(parsed.value, quality, parsed.timestamp);
 
-        // Store in cache
-        this.cache.set(elementId, vqt);
-
-        // Track this leaf under its parent (bottom UUID)
-        if (!this.parentToLeaves.has(bottomUuid)) {
-            this.parentToLeaves.set(bottomUuid, new Set());
-        }
-        this.parentToLeaves.get(bottomUuid)!.add(elementId);
-
-        // Notify listeners
+        // Queue it for the next write, filed under its parent in the
+        // tree. That is where History files InfluxDB values too; the
+        // bottom instance UUID is not the parent when the instance path
+        // is shorter than the metric path.
+        const anchor = this.objectTree.getObject(elementId)?.parentId ?? bottomUuid;
+        this.pending.set(elementId, {
+            anchor,
+            device: instanceUuidPath[0],
+            valueJson: toJson(vqt.value),
+            quality: vqt.quality,
+            timestamp: vqt.timestamp ?? null,
+        });
+        // Notify listeners first: a failed write below must not cost
+        // subscribers this message.
         for (const listener of this.listeners) {
             try {
                 listener(elementId, vqt);
@@ -165,18 +332,378 @@ export class ValueCache {
                 console.error("ValueCache: listener threw:", err);
             }
         }
+
+        if (this.pending.size >= this.flushMaxRows) this.flushInBackground();
+        else this.scheduleFlush();
+    }
+
+    /**
+     * A flush nobody is waiting for. While the WAL checkpoint is behind
+     * (store.walBehind), hold the values a little longer rather than
+     * add to it, up to the backlog cap.
+     */
+    private flushInBackground(): void {
+        const wait = this.retryNotBefore - Date.now();
+        if (wait > 0) {
+            /* The database failed recently; do not try every message. */
+            this.trimBacklog();
+            this.scheduleFlush(wait);
+            return;
+        }
+        if (this.store.walBehind() && this.pending.size < DEFER_BATCHES * this.flushMaxRows) {
+            this.scheduleFlush();
+            return;
+        }
+        /* One chunk per turn of the event loop. */
+        if (!this.writeChunk(this.flushMaxRows)) return;
+        if (this.pending.size > 0 && !this.continuing) {
+            this.continuing = true;
+            setImmediate(() => {
+                this.continuing = false;
+                this.flushInBackground();
+            });
+        }
+    }
+
+    private scheduleFlush(delay: number = this.flushInterval): void {
+        if (this.timer) return;
+        this.timer = setTimeout(() => {
+            this.timer = null;
+            this.flushInBackground();
+        }, delay);
+        this.timer.unref?.();
+    }
+
+    /**
+     * Write every waiting UNS value now, synchronously. For callers that
+     * need them stored at once (small reads, tests). Returns false if a
+     * write failed; then the values are kept for the next try.
+     */
+    flush(): boolean {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        return this.writeChunk(Infinity);
+    }
+
+    /** Write waiting values in chunks, pausing for the event loop. */
+    private async flushSliced(): Promise<void> {
+        const slicer = new Slicer();
+        while (this.pending.size > 0) {
+            if (!this.writeChunk(this.flushMaxRows)) return;
+            await slicer.maybe();
+        }
+    }
+
+    /**
+     * Write up to `max` of the oldest waiting values, in one transaction.
+     * If the write fails (a full disk, an I/O error) they go back in the
+     * queue, behind any newer value for the same metric, and are tried
+     * again later; this logs and returns false rather than throwing.
+     */
+    private writeChunk(max: number): boolean {
+        if (this.pending.size === 0) return true;
+        let batch: Map<string, Pending>;
+        if (this.pending.size <= max) {
+            batch = this.pending;
+            this.pending = new Map();
+        } else {
+            batch = new Map();
+            for (const [id, p] of this.pending) {
+                if (batch.size >= max) break;
+                batch.set(id, p);
+            }
+            for (const id of batch.keys()) this.pending.delete(id);
+        }
+        try {
+            const st = this.store.prepare(UPSERT("uns", ""));
+            this.store.transaction(() => {
+                for (const [id, p] of batch)
+                    st.run(id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality);
+            });
+            this.retryDelay = 0;
+            this.retryNotBefore = 0;
+            return true;
+        } catch (err) {
+            this.backOff();
+            this.errorsSinceLog++;
+            if (this.logDue()) {
+                console.error("ValueCache: writing %d values failed (%d failures since the last report), next try in %d s:",
+                    batch.size, this.errorsSinceLog, this.retryDelay / 1000, err);
+                this.errorsSinceLog = 0;
+            }
+            /* Newer values win over the ones put back. */
+            for (const [id, p] of this.pending) batch.set(id, p);
+            this.pending = batch;
+            this.trimBacklog();
+            this.scheduleFlush(this.retryDelay);
+            return false;
+        }
+    }
+
+    /** Do not hold an unbounded backlog while the database is broken:
+     * keep the newest entries. */
+    private trimBacklog(): void {
+        const limit = MAX_BACKLOG_BATCHES * this.flushMaxRows;
+        if (this.pending.size <= limit) return;
+        let drop = this.pending.size - limit;
+        this.droppedSinceLog += drop;
+        for (const id of this.pending.keys()) {
+            if (drop-- <= 0) break;
+            this.pending.delete(id);
+        }
+        if (this.logDue()) {
+            console.error("ValueCache: dropped the %d oldest unwritten values", this.droppedSinceLog);
+            this.droppedSinceLog = 0;
+        }
+    }
+
+    /** Wait longer before the next background write: 5 s, doubling to 60 s. */
+    private backOff(): void {
+        this.retryDelay = Math.min(this.retryDelay * 2 || WRITE_RETRY_MIN, WRITE_RETRY_MAX);
+        this.retryNotBefore = Date.now() + this.retryDelay;
+    }
+
+    /** True at most once per WRITE_RETRY_MAX, for write error logs. */
+    private logDue(): boolean {
+        const now = Date.now();
+        if (now - this.lastErrorLog < WRITE_RETRY_MAX) return false;
+        this.lastErrorLog = now;
+        return true;
+    }
+
+    /**
+     * Keep values History read from InfluxDB. A stored value with a
+     * later timestamp (a UNS message that arrived during the query)
+     * is not replaced.
+     */
+    recordInfluxValues(values: InfluxValue[]): void {
+        if (values.length === 0) return;
+        const st = this.store.prepare(UPSERT("influx",
+            "where julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
+        this.store.transaction(() => {
+            for (const v of values) {
+                st.run(v.elementId, v.anchor ?? v.device, v.device,
+                    toJson(v.value), v.timestamp ?? null, v.quality);
+            }
+        });
+    }
+
+    /** Drop the values of a device that has left the tree. */
+    removeDevice(uuid: string): void {
+        for (const [id, p] of this.pending) {
+            if (p.device === uuid) this.pending.delete(id);
+        }
+        this.store.prepare("delete from last_value where device_uuid = ?").run(uuid);
+    }
+
+    /** clear(), logging a failure instead of throwing: it runs at start
+     * and from an MQTT event handler, where a throw would end the
+     * process. Stored values then stay until the next clear. */
+    private safeClear(when: string): void {
+        try {
+            this.clear();
+        } catch (err) {
+            console.error(`ValueCache: clearing values ${when} failed:`, err);
+        }
+    }
+
+    /** Drop the values of objects that have left the tree. */
+    removeElements(ids: string[]): void {
+        const st = this.store.prepare("delete from last_value where element_id = ?");
+        this.store.transaction(() => {
+            for (const id of ids) {
+                this.pending.delete(id);
+                st.run(id);
+            }
+        });
+    }
+
+    /** Forget every value. */
+    clear(): void {
+        this.pending.clear();
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        this.store.prepare("delete from last_value").run();
+    }
+
+    /** Number of stored values, for tests and diagnostics. */
+    size(): number {
+        this.flush();
+        return (this.store.prepare("select count(*) n from last_value").get() as any).n;
     }
 
     /* ---- Query methods ---- */
 
+    /** True when the tree lives in our database, so a composition's
+     * components can be read with one query. A mock tree in unit tests
+     * is walked through its own interface instead. */
+    private treeInStore(): boolean {
+        return (this.objectTree as any).store === this.store;
+    }
+
+    /**
+     * As getValue, but a composition's components are not built: they
+     * are read, in the same order, as `components()` is iterated. The
+     * head (whether there is a value at all, and its latest timestamp)
+     * comes from a first pass over the same walk. Both passes run in
+     * small steps with pauses for the event loop, so a composition with
+     * millions of components does not stall other work. Each pass reads
+     * its own snapshot, so a value written in between can make the
+     * head differ slightly from the components.
+     */
+    async getValueLazy(elementId: string): Promise<LazyValue | null> {
+        if (!this.treeInStore()) return lazyFromValue(this.getValue(elementId));
+
+        /* A leaf value still queued is the newest. */
+        const queued = this.pending.get(elementId);
+        if (queued) {
+            return { head: { elementId, isComposition: false, ...toVqt({
+                element_id: elementId, value_json: queued.valueJson,
+                quality: queued.quality, timestamp: queued.timestamp,
+            }) } };
+        }
+        const row = this.store.prepare(
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+        ).get(elementId) as unknown as ValueRow | undefined;
+        if (row) return { head: { elementId, isComposition: false, ...toVqt(row) } };
+
+        const obj = this.objectTree.getObject(elementId);
+        if (!obj?.isComposition) return null;
+
+        /* The walk reads the database, so store what is queued, a chunk
+         * at a time. */
+        await this.flushSliced();
+
+        /* The old value took the latest timestamp, by string order,
+         * starting from "". */
+        let n = 0;
+        let latest = "";
+        const slicer = new Slicer();
+        for (const step of this.walkComponents(elementId)) {
+            if (step) {
+                n++;
+                const ts = step[1].timestamp;
+                if (ts > latest) latest = ts;
+            }
+            await slicer.maybe();
+        }
+        if (n === 0) return null;
+        return {
+            head: {
+                elementId,
+                isComposition: true,
+                value: null,
+                quality: "Good",
+                timestamp: latest,
+            },
+            components: () => this.walkComponents(elementId),
+        };
+    }
+
+    /**
+     * Walk the subtree under `rootId` depth first, from a read snapshot,
+     * yielding the UNS values filed under each node: the order of the
+     * old recursive walk (a node's own values, first seen first, then
+     * each child's subtree in tree order). Every step is a few indexed
+     * queries; children are read a page at a time. A leaf with no
+     * children has no values filed under it (values are filed under
+     * their parent) and is not visited. A null is yielded after each
+     * node, so the consumer can pause however few values there are.
+     */
+    private *walkComponents(rootId: string): Generator<ComponentStep> {
+        /* Callers store queued values first (flush or flushSliced). */
+        this.store.commit();
+        const reader = this.store.openReader();
+        try {
+            const db: any = reader ?? this.store.db;
+            if (reader) reader.exec("begin");
+            const values = db.prepare(`
+                select element_id, value_json, quality, timestamp from last_value
+                where anchor = ? and source = 'uns' order by seq`);
+            const children = db.prepare(`
+                select o.seq, o.element_id,
+                    o.is_composition or exists (select 1 from object c where c.parent_id = o.element_id) walk
+                from object o where o.parent_id = ? and o.seq > ? order by o.seq limit ?`);
+
+            interface Level { id: string; page: any[]; i: number; after: number; done: boolean }
+            const visit = function* (id: string): Generator<ComponentStep> {
+                /* all(): a few dozen rows at most, and no statement left
+                 * open while the consumer pauses. */
+                for (const r of values.all(id) as ValueRow[])
+                    yield [r.element_id, toVqt(r)];
+                yield null;
+            };
+            const fill = (l: Level) => {
+                l.page = children.all(l.id, l.after, WALK_PAGE);
+                l.i = 0;
+                if (l.page.length < WALK_PAGE) l.done = true;
+                if (l.page.length) l.after = l.page[l.page.length - 1].seq;
+            };
+
+            yield* visit(rootId);
+            const stack: Level[] = [{ id: rootId, page: [], i: 0, after: -1, done: false }];
+            fill(stack[0]);
+            while (stack.length) {
+                const top = stack[stack.length - 1];
+                if (top.i >= top.page.length) {
+                    if (top.done) { stack.pop(); continue; }
+                    fill(top);
+                    yield null;
+                    continue;
+                }
+                const child = top.page[top.i++];
+                if (!child.walk) continue;
+                if (stack.length >= 64) continue;   // guards against a parent cycle
+                yield* visit(child.element_id);
+                const level: Level = { id: child.element_id, page: [], i: 0, after: -1, done: false };
+                fill(level);
+                stack.push(level);
+            }
+        } finally {
+            if (reader) {
+                try { reader.exec("commit"); } catch { /* not in a transaction */ }
+                reader.close();
+            }
+        }
+    }
+
     getValue(elementId: string): I3xValueResponse | null {
+        if (this.treeInStore()) {
+            /* Synchronous, and so for small compositions (MCP, tests):
+             * the value routes use getValueLazy. */
+            this.flush();
+            const row = this.store.prepare(
+                "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+            ).get(elementId) as unknown as ValueRow | undefined;
+            if (row) return { elementId, isComposition: false, ...toVqt(row) };
+            const obj = this.objectTree.getObject(elementId);
+            if (!obj?.isComposition) return null;
+            const components: Record<string, I3xVqt> = {};
+            let latest = "";
+            for (const step of this.walkComponents(elementId)) {
+                if (!step) continue;
+                components[step[0]] = step[1];
+                if (step[1].timestamp > latest) latest = step[1].timestamp;
+            }
+            if (Object.keys(components).length === 0) return null;
+            return { elementId, isComposition: true, value: null, quality: "Good", timestamp: latest, components };
+        }
+
+        this.flush();
+
         // Check if it's a direct leaf metric in the cache
-        const vqt = this.cache.get(elementId);
-        if (vqt) {
+        const row = this.store.prepare(
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+        ).get(elementId) as unknown as ValueRow | undefined;
+        if (row) {
             return {
                 elementId,
                 isComposition: false,
-                ...vqt,
+                ...toVqt(row),
             };
         }
 
@@ -210,6 +737,7 @@ export class ValueCache {
     }
 
     getChildValues(elementId: string, maxDepth: number): Record<string, I3xVqt> | null {
+        this.flush();
         const result = this.collectChildValues(elementId, maxDepth);
         if (result !== null && Object.keys(result).length === 0) {
             return null;
@@ -247,15 +775,17 @@ export class ValueCache {
     ): Record<string, I3xVqt> | null {
         const result: Record<string, I3xVqt> = {};
 
-        // Collect direct leaf metrics cached under this elementId
-        const directLeaves = this.parentToLeaves.get(elementId);
-        if (directLeaves) {
-            for (const leafId of directLeaves) {
-                const vqt = this.cache.get(leafId);
-                if (vqt) {
-                    result[leafId] = vqt;
-                }
-            }
+        // Collect direct leaf metrics cached under this elementId, in
+        // the order they were first seen. Only UNS values: values kept
+        // from InfluxDB cover only the leaves someone asked for, so a
+        // composition built from them would look complete when it is
+        // not. Without UNS data the caller falls back to InfluxDB for
+        // the whole composition, as it did before values were kept.
+        const direct = this.store.prepare(
+            "select element_id, value_json, quality, timestamp from last_value where anchor = ? and source = 'uns' order by seq",
+        ).all(elementId) as unknown as ValueRow[];
+        for (const r of direct) {
+            result[r.element_id] = toVqt(r);
         }
 
         // If we haven't hit the depth limit, recurse into child objects

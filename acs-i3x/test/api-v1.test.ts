@@ -2,6 +2,7 @@ import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import express from "express";
 import request from "supertest";
 import { APIv1 } from "../lib/api-v1.js";
+import { lazyFromValue } from "../lib/value-cache.js";
 import { I3X_SPEC_VERSION, Version } from "../lib/constants.js";
 import type {
     I3xNamespace,
@@ -25,17 +26,27 @@ function mockObjectTree() {
         getRelationshipTypes: jest.fn<(ns?: string) => I3xRelationshipType[]>().mockReturnValue([]),
         getRelationshipType: jest.fn<(id: string) => I3xRelationshipType | undefined>().mockReturnValue(undefined),
         getObjects: jest.fn<(opts?: any) => I3xObject[]>().mockReturnValue([]),
+        /* GET /objects streams from iterateObjects; this one reads
+         * whatever getObjects is set up to return. */
+        iterateObjects: jest.fn(function* (this: any, opts?: any) { yield* this.getObjects(opts); }),
         getObject: jest.fn<(id: string) => I3xObject | undefined>().mockReturnValue(undefined),
         getRelated: jest.fn<(id: string, rt?: string) => I3xObject[]>().mockReturnValue([]),
+        /* The related routes stream from iterateRelated; this one reads
+         * whatever getRelated is set up to return. */
+        iterateRelated: jest.fn(function* (this: any, id: string, rt?: string) { yield* this.getRelated(id, rt); }),
         getChildElementIds: jest.fn<(id: string) => string[]>().mockReturnValue([]),
         addCompositionFromUns: jest.fn(),
     };
 }
 
 function mockValueCache() {
-    return {
+    const vc = {
         getValue: jest.fn<(id: string) => I3xValueResponse | null>().mockReturnValue(null),
+        /* The value routes read through getValueLazy; this one serves
+         * whatever getValue is set up to return. */
+        getValueLazy: jest.fn((id: string) => lazyFromValue(vc.getValue(id))),
     };
+    return vc;
 }
 
 function mockHistory(objectTree: { getObject: (id: string) => any }) {

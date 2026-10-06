@@ -14,6 +14,11 @@ interface ValueCacheLike {
 interface SubscriptionManagerOpts {
     valueCache: ValueCacheLike;
     ttl: number;
+    /**
+     * Most updates a subscription queues for sync and stream replay.
+     * When full the oldest is dropped. Default 10,000.
+     */
+    maxQueue?: number;
 }
 
 interface Subscription {
@@ -28,6 +33,8 @@ interface Subscription {
     displayName: string;
     registeredElements: Map<string, number>; // elementId -> maxDepth
     queue: I3xSyncItem[];
+    /** Updates dropped from the front of a full queue. */
+    dropped: number;
     nextSequenceNumber: number;
     activeStream: any | null;
     lastAccessed: number;
@@ -37,12 +44,14 @@ interface Subscription {
 export class SubscriptionManager {
     private valueCache: ValueCacheLike;
     private ttl: number;
+    private maxQueue: number;
     private subscriptions: Map<string, Subscription> = new Map();
     private boundOnValueChange: (elementId: string, vqt: I3xVqt) => void;
 
     constructor(opts: SubscriptionManagerOpts) {
         this.valueCache = opts.valueCache;
         this.ttl = opts.ttl;
+        this.maxQueue = Math.max(1, opts.maxQueue ?? 10_000);
         this.boundOnValueChange = this.onValueChange.bind(this);
         this.valueCache.onValueChange(this.boundOnValueChange);
     }
@@ -59,6 +68,7 @@ export class SubscriptionManager {
             displayName: displayName ?? "",
             registeredElements: new Map(),
             queue: [],
+            dropped: 0,
             nextSequenceNumber: 1,
             activeStream: null,
             lastAccessed: Date.now(),
@@ -87,6 +97,11 @@ export class SubscriptionManager {
             }
         }
         return results;
+    }
+
+    /** Updates dropped from a subscription's full queue. */
+    droppedCount(owner: string, subscriptionId: string): number {
+        return this.getAndVerify(owner, subscriptionId).dropped;
     }
 
     getOne(owner: string, subscriptionId: string): I3xSubscription {
@@ -168,7 +183,7 @@ export class SubscriptionManager {
             throw new Error(`Subscription ${subscriptionId} already has an active stream`);
         }
 
-        console.log(`[SSE] stream opened: sub=${subscriptionId.slice(0,8)} registered=[${[...sub.registeredElements.keys()].map(k => k.slice(0,8)).join(", ")}] queued=${sub.queue.length}`);
+        console.log(`[SSE] stream opened: sub=${subscriptionId.slice(0,8)} registered=[${[...sub.registeredElements.keys()].map(k => k.slice(0,8)).join(", ")}] queued=${sub.queue.length} dropped=${sub.dropped}`);
 
         // Set SSE headers
         res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -220,13 +235,16 @@ export class SubscriptionManager {
                 elementId,
                 ...vqt,
             };
+            /* The queue is kept until the client syncs past it, so a
+             * client that never does would grow it without limit. */
+            if (sub.queue.length >= this.maxQueue) {
+                sub.queue.splice(0, sub.queue.length - this.maxQueue + 1);
+                sub.dropped++;
+            }
             sub.queue.push(item);
 
             if (sub.activeStream) {
-                console.log(`[SSE] writing seq=${item.sequenceNumber} to sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} value=${JSON.stringify(vqt.value)}`);
                 this.writeSseEvent(sub.activeStream, item);
-            } else {
-                console.log(`[SSE] queued seq=${item.sequenceNumber} for sub=${sub.subscriptionId.slice(0,8)} element=${elementId.slice(0,8)} (no active stream)`);
             }
         }
     }

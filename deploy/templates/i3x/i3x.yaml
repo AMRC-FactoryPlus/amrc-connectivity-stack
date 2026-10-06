@@ -7,6 +7,12 @@ metadata:
   labels:
     component: i3x
 spec:
+  {{- if .Values.i3x.persistence.enabled }}
+  # The database volume is ReadWriteOnce: stop the old pod before the
+  # new one starts.
+  strategy:
+    type: Recreate
+  {{- end }}
   replicas: 1
   selector:
     matchLabels:
@@ -17,6 +23,9 @@ spec:
         component: i3x
         factory-plus.service: i3x
     spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       {{- with .Values.acs.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -28,6 +37,13 @@ spec:
         - name: keytabs
           secret:
             secretName: i3x-keytabs
+        - name: data
+          {{- if .Values.i3x.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: i3x-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
 
       initContainers:
 {{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
@@ -80,14 +96,45 @@ spec:
               value: "300000"
             - name: I3X_STALE_THRESHOLD
               value: "300000"
+            - name: I3X_DB_PATH
+              value: /data/i3x.db
+            - name: I3X_MCP_ENABLED
+              value: {{ .Values.i3x.mcp.enabled | toString | quote }}
+            {{- if and (not .Values.i3x.mcp.enabled) (gt (int .Values.i3x.maxHeapMB) 0) }}
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size={{ int .Values.i3x.maxHeapMB }}"
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
             - mountPath: /keytabs
               name: keytabs
+            - mountPath: /data
+              name: data
 
 {{ include "amrc-connectivity-stack.service-probes" (list . 8080) | indent 10 }}
 ---
+{{- if .Values.i3x.persistence.enabled }}
+# The i3X database: the object tree and last values. It is a cache of
+# ConfigDB and the UNS, so losing it costs only a full sync.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: i3x-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: i3x
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.i3x.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.i3x.persistence.size | required "values.i3x.persistence.size is required!" }}
+---
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:

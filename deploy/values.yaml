@@ -490,6 +490,36 @@ i3x:
   verbosity: "ALL,!query,!acl,!notify-msg"
   # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
   # namespaceUri: https://example.com/i3x
+  # i3X keeps its namespace (the object tree) and the last value of
+  # each metric in a SQLite database at /data/i3x.db. The database is
+  # a cache of ConfigDB and the UNS, so losing it costs only a full
+  # sync from ConfigDB on the next start.
+  persistence:
+    # -- Keep the database on a PersistentVolumeClaim (ReadWriteOnce),
+    # so a restart serves the stored tree at once and fetches only the
+    # configs that changed. The Deployment then uses the Recreate
+    # strategy. When false the database is on an emptyDir and every
+    # start syncs from scratch.
+    enabled: true
+    # -- Size of the PersistentVolumeClaim. At 74,000 devices the
+    # database is about 2 GB, and its write-ahead log can reach about
+    # 1.5 GB more during a burst of new UNS metrics.
+    size: 10Gi
+    # -- StorageClass for the claim. Empty uses the cluster default.
+    storageClass: ""
+  mcp:
+    # -- Serve the MCP endpoint (/mcp) and build the search index it
+    # uses. Off by default: the index costs about 47 KB of memory per
+    # device. When off, /mcp answers 404.
+    enabled: false
+  # -- Cap on the i3X JavaScript heap in MiB (--max-old-space-size).
+  # The object tree and values live in SQLite, so the heap stays small
+  # (about 75 MiB at 74,000 devices). Without a cap V8 lets the heap
+  # grow between collections during a cold sync (about 550 MiB RSS at
+  # 74,000 devices, against about 320 MiB with a 256 MiB cap). Only
+  # applied while MCP is off: the MCP search index needs several GB at
+  # fleet scale. Set to 0 for no cap.
+  maxHeapMB: 384
 
 admin:
   # -- Whether or not to enable the Admin component

@@ -241,6 +241,61 @@ describe("notify/v2", { skip }, () => {
         ]);
     });
 
+    test("etag search", async () => {
+        const auth = await client("auth");
+        const obj = await mkobj(Class.Device);
+        await ok(admin.put(`/${cfg(App.Info, obj)}`, { name: "e1" }));
+        const etag = async () => {
+            const r = await ok(admin.get(`/${cfg(App.Info, obj)}`));
+            return r.etag.replace(/"/g, "");
+        };
+        const e1 = await etag();
+
+        const s = auth.search(`v2/app/${App.Info}/etag/`);
+        await auth.initialised();
+
+        await ok(admin.put(`/${cfg(App.Info, obj)}`, { name: "e2" }));
+        await settle();
+        const e2 = await etag();
+        /* An unchanged PUT sends nothing */
+        await ok(admin.put(`/${cfg(App.Info, obj)}`, { name: "e2" }));
+        await settle();
+        await ok(admin.delete(`/${cfg(App.Info, obj)}`));
+        await settle();
+
+        const [full, ...rest] = seen(s);
+        assert.equal(full.status, 201);
+        assert.equal(full.response.status, 204);
+        assert.deepEqual(full.children[obj], { status: 200, body: e1 });
+        /* Every child is an ETag, never a config body. */
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+        for (const c of Object.values(full.children))
+            assert.match(c.body, uuid);
+        assert.notEqual(e1, e2);
+        assert.deepEqual(rest, [
+            { status: 200, child: obj, response: { status: 200, body: e2 } },
+            { status: 200, child: obj, response: { status: 404 } },
+        ]);
+    });
+
+    test("etag search of an unknown app, without access, and on v1", async () => {
+        const adm = await client("admin");
+        const nobody = await client("nobody");
+        const unknown = adm.search("v2/app/0b0b0b0b-0000-4000-8000-000000000000/etag/");
+        const denied_s = nobody.search(`v2/app/${App.Info}/etag/`);
+        const v1 = adm.search(`v1/app/${App.Info}/etag/`);
+        await adm.initialised();
+        await nobody.initialised();
+
+        await ok(admin.put(`/${cfg(App.Info, await mkobj(Class.Device))}`, { name: "x" }));
+        await settle();
+
+        stream(unknown, [{ status: 201, response: { status: 404 } }]);
+        assert.deepEqual(seen(denied_s)[0], denied(201));
+        assert.ok(seen(denied_s).every(u => u.response?.status == 403));
+        assert.deepEqual(seen(v1), [{ status: 404 }]);
+    });
+
     test("ACL changes", async () => {
         const nobody = await client("nobody");
         const K = await mkclass();

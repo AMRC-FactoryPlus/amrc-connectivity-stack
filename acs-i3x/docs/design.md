@@ -11,177 +11,307 @@ See [to-improve.md](to-improve.md) for tracked spec deviations and known limitat
 
 ```
 acs-i3x/
-├── docs/
-│   ├── pitch.md
-│   ├── to-improve.md
-│   └── design.md              (this file)
+├── docs/                      Design notes, pitch, to-improve list
 ├── bin/
-│   └── api.ts                 Entry point (WebAPI + ServiceClient init)
-├── src/
-│   ├── constants.ts           UUIDs, permissions, version
+│   └── api.ts                 Entry point (wires everything below)
+├── lib/
+│   ├── constants.ts           UUIDs, relationship types, version
 │   ├── git-version.ts         (generated at build)
-│   ├── routes.ts              Route factory → Express app
+│   ├── routes.ts              Route factory → Express app (+ /mcp)
 │   ├── api-v1.ts              i3X v1 endpoint router
-│   ├── object-tree.ts         Object graph from ConfigDB + Directory
-│   ├── value-cache.ts         UNS MQTT → in-memory VQT cache
+│   ├── store.ts               SQLite database (node:sqlite)
+│   ├── object-tree.ts         Object graph, kept in the database
+│   ├── sync.ts                ConfigDB sync engine (ETag searches)
+│   ├── value-cache.ts         UNS MQTT → last values in the database
 │   ├── history.ts             InfluxDB query translation
+│   ├── semaphore.ts           Process-wide cap on Flux queries
 │   ├── subscriptions.ts       Subscription manager (SSE + sync)
 │   ├── mapping.ts             Factory+ → i3X translation helpers
-│   ├── quality.ts             Quality state machine
-│   └── types/
-│       └── i3x.ts             i3X response/request type definitions
-├── test/
-│   ├── explore.test.ts        Explore endpoint tests
-│   ├── value.test.ts          Current value tests
-│   ├── history.test.ts        History endpoint tests
-│   ├── subscriptions.test.ts  Subscription lifecycle + SSE + sync tests
-│   ├── envelope.test.ts       Response envelope format tests
-│   ├── auth.test.ts           Auth rejection tests
-│   ├── mapping.test.ts        Data model mapping unit tests
-│   └── helpers/
-│       └── mock-services.ts   Mock ConfigDB, Directory, Auth, InfluxDB, MQTT
-├── package.json
-├── tsconfig.json
-├── Dockerfile
-├── Makefile
-└── .env.example
+│   ├── quality.ts             Quality derivation
+│   ├── middleware/envelope.ts i3X response envelope
+│   ├── rag/i3x-rag.ts         Graph + search index for MCP (opt-in)
+│   ├── mcp/                   MCP tools and transport (opt-in)
+│   └── types/i3x.ts           i3X request/response types
+├── test/                      Jest suites (see Test Strategy)
+└── bench/                     Bulk value benchmark against InfluxDB
 ```
-
-## Dependencies
-
-```json
-{
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "start": "node --es-module-specifier-resolution=node dist/bin/api.js",
-    "test": "jest"
-  },
-  "dependencies": {
-    "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
-    "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
-    "@influxdata/influxdb-client": "^1.x",
-    "compression": "^1.x",
-    "pino": "^8.x",
-    "uuid": "^9.x"
-  },
-  "devDependencies": {
-    "typescript": "^5.x",
-    "jest": "^29.x",
-    "ts-jest": "^29.x",
-    "@types/express": "^4.x",
-    "@types/compression": "^1.x",
-    "@types/node": "^20.x"
-  }
-}
-```
-
-`service-api` provides WebAPI (Express + Kerberos/Basic/Bearer auth + CORS + error handling).
-`service-client` provides ServiceClient (ConfigDB, Directory, Auth, MQTT).
 
 ## Entry Point (bin/api.ts)
 
 ```
-ServiceClient.init()
-    → start object-tree (queries ConfigDB + Directory, builds graph)
-    → start value-cache (subscribes to UNS/v1/#, populates VQT store)
-    → wait for initial warm-up
-    → WebAPI.init({ routes, ping })
-    → api.run()
+RxClient.init()
+    → I3xStore (opens /data/i3x.db)
+    → ObjectTree (over the store)
+    → ValueCache.init (subscribes to UNS/v1/#)
+    → History, SubscriptionManager
+    → MCP server + RAG index, only if I3X_MCP_ENABLED=true
+    → WebAPI.init({ routes, ping }), api.run()
+    → ConfigSync.run (fills the tree from ConfigDB)
 ```
 
-WebAPI handles HTTP server, auth middleware, CORS. Routes factory mounts the i3X
-v1 router at `/v1/`. The `/v1/info` endpoint is mounted outside auth middleware
-(spec requires it unauthenticated). Returns 503 for any request (except `/v1/info`)
-while warming up.
+WebAPI handles the HTTP server, auth middleware and CORS. The routes
+factory mounts the i3X v1 router at `/v1/`. `/v1/info` is public (the spec
+requires it unauthenticated). Every other route returns 503 until the
+object tree is ready: after the first sync, or at once if the database
+holds the tree from an earlier run.
+
+## Storage (store.ts)
+
+The namespace and last values do not live on the JS heap. They live in an
+embedded SQLite database, opened with the built-in `node:sqlite` module (no
+native dependency; its ExperimentalWarning is suppressed). Measured on the
+in-memory design, the heap cost about 116 KB per device, which ran a 74,000
+device fleet out of memory.
+
+- Path: `I3X_DB_PATH` (default `/data/i3x.db`, a volume in the chart).
+- WAL journal, `synchronous=NORMAL`, page cache capped at `I3X_DB_CACHE_MB`
+  MiB (default 64).
+- The database is a cache of ConfigDB and the UNS. The schema version is in
+  `PRAGMA user_version`, with a fingerprint of the namespace settings; on
+  any mismatch the tables are dropped and rebuilt, and the next sync fills
+  them again. A file that cannot be opened, or is shorter than its header
+  says, is deleted (with its WAL) and recreated, with a loud log line.
+- Group commit: writes join one open transaction that commits 250 ms after
+  the first write, or as soon as it holds 2,000 changed rows. A COMMIT
+  costs more than one device's or one UNS message's writes, so this keeps
+  the commit rate low, and the size cap keeps each COMMIT short. Nested
+  `transaction()` calls are savepoints. The process sees its writes at
+  once; a crash loses at most the open batch.
+- WAL checkpoints run in a worker thread on its own connection (PASSIVE,
+  every 100 ms), not inside a COMMIT on the main thread. SQLite rewinds
+  the WAL only once a checkpoint has caught up with every frame, so when
+  the WAL passes 64 MiB the writers that can wait (the sync engine,
+  background value flushes) hold back until it has. Writers that cannot
+  wait (UNS messages that add objects) can still grow it during a burst;
+  at 1 GiB the main thread checkpoints itself, a stall but a bound.
+- Queued UNS values are written 1,000 per turn of the event loop; a leaf
+  read answers from the queue.
+
+## The event loop
+
+node:sqlite is synchronous, so any long loop over the tree holds the
+event loop, and with it every other request, MQTT and the UNS. Work that
+grows with the fleet runs in small steps and pauses with setImmediate
+once 20 ms have passed (`lib/slicer.ts`):
+
+- `GET /objects`, the related routes and composition values stream with
+  pauses even when the client keeps up; their rows are read a page at a
+  time from a snapshot.
+- A composition's components are read by a depth-first walk with indexed
+  child pages, not one sorted query.
+- History expands compositions to leaves, matches series and writes
+  values back in slices.
+- ConfigSync's reconcile reads the stored devices a page at a time, and
+  the orphan drop works in pages of UNS parents.
+
+Tables:
+
+| Table | Holds |
+|---|---|
+| `object` | Every i3X object: elementId, parent, type, display name, composition flag, source (`config` or `uns`). `seq` keeps insertion order. |
+| `metric_meta` | InfluxDB query metadata per leaf metric. |
+| `object_type` | ObjectTypes: display name and JSON schema. |
+| `device_schema` | The Schema_UUIDs each device in the tree references. |
+| `sync_device`, `sync_schema` | The ConfigDB ETags each device and schema was last built from. |
+| `last_value` | The last value of each leaf metric, with the object it is filed under (`anchor`) and its device. |
+| `meta` | Fingerprint, and whether a sync has completed. |
+
+## Measured scale
+
+Measured on 5 October 2026 with a scale harness (outside this repo) that
+drives the compiled classes: real ObjectTree, I3xStore, ConfigSync,
+ValueCache, History and routes, and the real rx-client NotifyV2 over a real
+WebSocket. ConfigDB is a fake in a separate process that answers the
+Device class WATCH, the ETag SEARCHes and the config GETs, which i3X makes
+through service-client's HTTP stack (got-fetch, `no-cache`). Devices are
+synthetic streetlights: 5.3 KB DeviceInformation, 34 config objects and 35
+UNS metrics each. Node 22.23 on node:22-alpine, in Docker on an Apple
+silicon laptop; 64 MiB page cache, 16 fetches in flight.
+
+| Devices | Cold sync | Peak RSS, cold sync | RSS / heap after sync | RSS / heap, steady (cold / warm start) | Warm restart | Database |
+|---|---|---|---|---|---|---|
+| 7,300 | 10 s | 270 MiB | 267 / 32 MiB | 267 / 32, 303 / 32 MiB | 0.2 s, 0 GETs | 233 MiB |
+| 20,000 | 41 s | 268 MiB | 264 / 40 MiB | 264 / 40, 323 / 37 MiB | 0.3 s, 0 GETs | 599 MiB |
+| 44,000 | 157 s | 435 MiB | 428 / 55 MiB | 385 / 55, 386 / 53 MiB | 0.8 s, 0 GETs | 1.2 GiB |
+| 74,000 | 346 s | 551 MiB | 477 / 74 MiB | 478 / 74, 450 / 71 MiB | 1.4 s, 0 GETs | 2.0 GiB |
+
+"Steady" is after every UNS metric of every device has arrived once.
+A warm restart serves the stored tree at once; the time is to finish
+comparing the ETag snapshots. The database size includes last values.
+`GET /objects` at 74,000 devices streams 586 MiB in about 4 s and raises
+RSS by about 14 MiB. A current-value read of 1,000 leaves known to the
+value cache takes about 12 ms and no Flux query. UNS ingest runs at 11,000
+to 34,000 messages a second when it creates nodes and 32,000 to 59,000
+when it does not, slower as the database outgrows the page cache.
+
+The in-memory design measured about 116 KB of heap per device: 5.1 GB at
+44,000 devices and 8.6 GB at 74,000, and it was OOM-killed at 2 to
+3.5 GiB.
+
+Most of the RSS above the heap is the SQLite page cache and memory the
+allocator keeps after the cold sync's churn; the live heap stays under
+75 MiB. The cold-sync peak is V8 letting the heap grow between
+collections while 148,000 config bodies are parsed. With
+`--max-old-space-size=256` the 74,000-device cold sync peaked at 319 MiB
+RSS and settled at 268 MiB, in the same time. The chart does not set it:
+with MCP enabled the RAG index alone needs several GB at that size, and
+memory limits are set separately. A smaller page cache
+(`I3X_DB_CACHE_MB=16`) made the sync slower and saved no memory.
+
+After the fixes from the review of this change, at 74,000 devices with
+`--max-old-space-size=384` (the chart's `i3x.maxHeapMB` default, MCP off):
+cold sync 371 s, peak RSS 329 MiB; 279 MiB RSS and 74 MiB heap after sync;
+277 MiB at steady state (304 MiB after a warm restart, which took 1.9 s
+and no GETs). UNS ingest ran at 9,500 messages a second creating nodes and
+25,500 without. The cached value of the top ISA-95 level (2.6 million
+components, a 300 MiB body) streamed in 33 s, raising RSS by 9 MiB with a
+heap peak of 129 MiB. Most of those 33 s was SQLite sorting the components
+before the first one was sent, which blocked the event loop; see the next
+paragraph and "The event loop" for the walk that replaced it.
+
+With the event-loop work below, at 74,000 devices with
+`--max-old-space-size=384` (monitorEventLoopDelay, longest delay):
+
+| | Total time | Longest delay, cold start | Longest delay, warm start |
+|---|---|---|---|
+| `GET /objects` (586 MiB) | 4.4 s | 33 ms | 38 ms |
+| Top ISA-95 level's cached value (300 MiB) | 30 s | 44 ms | 38 ms |
+| `POST /objects/value`, 1,000 cached leaves | 15-17 ms | 0 | 0 |
+| Initial sync (p99) | 366 s / 1.2 s | 276 ms (41 ms) | 287 ms (240 ms) |
+| UNS burst, every metric of the fleet (p99) | 143 s / 89 s | 2.2 s (46 ms) | 560 ms (28 ms) |
+
+Cold sync peaked at 306 MiB RSS; steady state was 277 MiB (331 MiB after
+a warm restart) with 74 MiB of heap. The WAL peaked at 1.5 GB during the
+cold burst and 77 MB warm. The long delays left are background work: the
+WAL hard cap's checkpoints on the main thread during a sustained burst of
+writes that cannot wait (a cold start that adds half a million UNS objects
+at full speed; the 2.2 s also includes the harness's own final flush), and
+parsing the three ETag SEARCH snapshots (about 7 MB of JSON each) when the
+sync starts.
 
 ## Core Components
 
 ### object-tree.ts
 
-Builds and maintains the i3X object graph from Factory+ services.
+The i3X object graph, read and written with synchronous SQL. Every public
+method keeps the name, signature and return shape it had when the tree was
+a set of in-memory Maps, and objects come back field for field as before.
+List order is insertion order, as Map iteration was.
 
-On startup, queries:
-- `ConfigDB.class_members(Device)` for all device objects
-- `ConfigDB.get_config(ConfigSchema, classUuid)` for each class's JSON schema
-- `Directory.get_device_info(uuid)` for online status per device
+Built from ConfigDB only; the Directory is not used. A device's
+DeviceInformation `originMap` gives its type (Schema_UUID), its ISA-95
+hierarchy and its metric tree; its Info config gives its display name.
 
-Builds: namespace, objectTypes map, objects map, relationshipTypes.
+- `addDevice`, `replaceDeviceSubtree`, `removeDevice`, `updateDeviceName`,
+  `addObjectType`, `updateObjectType`, `removeObjectType`: one change each,
+  in one transaction.
+- ISA-95 levels (Enterprise → Work Unit) have deterministic v5 UUIDs,
+  are shared by every device under them, and are removed with the last
+  device under them.
+- `addCompositionFromUns` adds nodes a UNS message names but the config
+  does not (source `uns`). `replaceDeviceSubtree` keeps them while their
+  parent survives; a node the new config defines becomes `config`.
+- `refreshFromSnapshot` makes the tree hold exactly a given set of devices
+  and schemas, with the same per-device mutations.
+- `iterateObjects` reads the tree a page at a time; `GET /objects` streams
+  from it instead of building one array. With a file database the pages
+  come from one read transaction on a separate read-only connection, so a
+  stream sees one consistent view however long the client takes.
+- `addCompositionFromUns` adds nothing for a device that is not in the
+  tree. `dropOrphans` removes UNS nodes whose parent is gone and empty
+  ISA-95 levels; the sync engine runs it on every reconcile.
+- `onChange` reports writes; the RAG index uses it to know it is stale.
 
-Re-polls every 60s to pick up changes (TID L1 — to be replaced with Directory
-change notification).
+### sync.ts (ConfigSync)
 
-Composition sub-objects are added when the value cache sees a UNS message (which
-carries SchemaUUIDPath and InstanceUUIDPath in MQTT v5 custom properties). Top-level
-device objects exist from ConfigDB alone; internal structure comes from live data.
+Keeps the tree in step with ConfigDB with a fixed number of subscriptions,
+however many devices there are:
 
-Only devices with ISA-95 Enterprise set are included (same filtering as UNS ingester).
+- one notify WATCH of the Device class members;
+- one notify SEARCH of `v2/app/:app/etag/` each for the DeviceInformation,
+  Info and Schema Applications. Each child of these searches is a config
+  entry's ETag, not its body.
 
-Exposes: `getNamespaces()`, `getObjectTypes(?namespaceUri)`, `getObjectType(elementId)`,
-`getObjects(?typeElementId, ?root)`, `getObject(elementId)`, `getRelated(elementId, ?relationshipType)`,
-`getRelationshipTypes()`.
+When the searches send a full snapshot (at start and after every
+reconnect), the stored ETags are compared with it and only the configs that
+differ are fetched. A warm restart with no changes fetches nothing. After
+that, each child update fetches the one config it names:
+DeviceInformation rebuilds the device, Info renames it (or renames an
+ObjectType), Schema updates an ObjectType. A device that leaves the Device
+class is removed, with its values; an ObjectType no device references any
+more is dropped.
+
+Fetches use an uncached ServiceClient (`fplus.uncached()`: the default HTTP
+cache keeps every response for ever), at most `I3X_SYNC_CONCURRENCY` (16)
+at once and one per device or schema. A config that changes again while
+its fetch is in flight is fetched again. Applying a result is synchronous,
+so writes never interleave. Failed fetches are retried after 10 s, and the
+tree is not marked ready (nor a completed sync recorded) while any fetch
+is failing or waiting to be retried. A group commit that fails (a full
+disk) rolls back applied changes; the engine then compares everything with
+ConfigDB again after the retry delay. Errors while handling an update are
+logged and counted, and followed by a reconcile. A cold sync logs progress
+every 1,000 devices.
 
 ### value-cache.ts
 
 Subscribes to `UNS/v1/#`. On each message:
-1. Parses UNS topic structure (ISA-95 hierarchy + metric path)
-2. Reads MQTT v5 custom properties (InstanceUUID, SchemaUUID, InstanceUUIDPath, SchemaUUIDPath, Type, Unit)
-3. Stores VQT keyed by composite of InstanceUUIDPath + metric name
-4. Updates object tree with composition structure from UUID paths (if new)
-5. Notifies subscription manager of value changes
+1. Parses the UNS topic (ISA-95 hierarchy + metric path).
+2. Reads the MQTT v5 user properties (InstanceUUIDPath, SchemaUUIDPath).
+   A trailing `:` (uns-ingester sends `device:` for a metric directly under
+   the device) does not add an empty segment.
+3. Adds any new composition nodes to the object tree. A message for a
+   device that is not in the tree is dropped.
+4. Notifies the subscription manager.
+5. Queues the VQT for the `last_value` table, filed under the leaf's parent
+   in the tree; queued values are written every 250 ms or 1,000 values,
+   and every read flushes first. A failed write keeps the values for the
+   next one.
 
-Exposes: `getValue(elementId)`, `getChildValues(elementId, maxDepth)`.
+InfluxDB values that History reads on a cache miss are written back
+(`recordInfluxValues`), never over a newer UNS value, and serve later
+reads of that leaf. Compositions are built from UNS values only, so a
+composition with no UNS data still falls back to InfluxDB whole. Values are
+cleared at start and on an MQTT reconnect, because UNS messages sent while
+i3X was not listening are lost.
+
+A composition's cached value is every UNS value in its whole subtree, in
+tree order (the cache path does not apply maxDepth). Near the top of the
+ISA-95 hierarchy that is millions of components, so `getValueLazy` reads
+them with one recursive query over a read snapshot, and the value routes
+stream them to the client instead of building the value.
+
+Exposes: `getValue(elementId)`, `getValueLazy(elementId)`,
+`getChildValues(elementId, maxDepth)`.
 
 ### history.ts
 
-Translates i3X history requests to InfluxDB Flux queries.
-
-- Leaf metric elementId → filter by `bottomLevelInstance` tag + measurement name
-- Composition elementId → filter by `topLevelInstance` or `usesInstances` containing the UUID
-- Maps startTime/endTime to Flux `range()`
-- Respects maxDepth for composition queries
-- Returns VQT arrays in i3X format
+Translates i3X value and history requests into Flux queries against the
+Sparkplug bucket, using each leaf's MetricMeta (measurement name, device,
+path). Current values for many leaves are read with a few bulk `last()`
+queries. Every Flux query, for current values and history alike, waits for
+a slot in a process-wide semaphore (`I3X_INFLUX_CONCURRENCY`, default 4).
+History is only served for leaf metrics.
 
 ### subscriptions.ts
 
-In-memory subscription store with SSE and sync delivery.
+In-memory subscription store with SSE and sync delivery. Ownership is the
+authenticated principal. Each subscription queues updates for sync and
+stream replay; the queue holds at most `I3X_SUBSCRIPTION_QUEUE_MAX`
+updates (default 10,000), dropping the oldest and counting the drops.
+Subscriptions not used within the TTL are deleted.
 
-- `create(clientId)` → allocates subscription with unique ID + queue
-- `register(subscriptionId, elementIds, maxDepth)` → maps elementIds to value-cache watch keys
-- `unregister(subscriptionId, elementIds)` → removes watch keys
-- `stream(subscriptionId, res)` → sets SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`), pipes value changes to response. One SSE connection per subscription (spec requirement).
-- `sync(subscriptionId, lastSequenceNumber)` → returns queued updates with monotonic sequence numbers, advances cursor on acknowledge
-- `delete(subscriptionId)` → removes subscription and all queued values
-- `list(clientId, subscriptionIds)` → returns subscription details
-- TTL cleanup: subscriptions not accessed within configurable timeout are deleted
+### MCP and the RAG index (opt-in)
 
-### mapping.ts
+With `I3X_MCP_ENABLED=true`, `/mcp` serves MCP tools over a graph and
+full-text index of the whole tree. The index is built on the first MCP
+query and again on the first query after any change. It costs about 47 KB
+of heap per device, so it is off by default; then nothing is built and
+`/mcp` answers 404.
 
-Pure translation functions between Factory+ and i3X data shapes:
+### mapping.ts, quality.ts, types/i3x.ts
 
-- `toI3xNamespace(orgName, orgUri)` → i3X Namespace
-- `toI3xObjectType(classUuid, schema, namespace)` → i3X ObjectType
-- `toI3xObject(obj, directoryInfo, parentId, isComposition)` → i3X Object
-- `toI3xVqt(value, quality, timestamp)` → i3X VQT
-- `toI3xRelationshipType(id, name, reverseId, namespace)` → i3X RelationshipType
-- `wrapResponse(result)` → `{ success: true, result }`
-- `wrapError(message)` → `{ success: false, error: { message } }`
-- `wrapBulkResponse(results)` → ordered bulk response with per-item success/error
-
-### quality.ts
-
-Derives i3X quality from device/metric state:
-
-- Device online + value received → `Good`
-- Device online + in birth but no DATA yet → `GoodNoData`
-- Device offline → `Bad`
-- Metric timestamp older than configurable threshold → `Uncertain`
-
-### types/i3x.ts
-
-TypeScript interfaces for all i3X request and response shapes: Namespace,
-ObjectType, Object, RelationshipType, VQT, ValueResponse, HistoryResponse,
-SubscriptionRequest, BulkRequest, ResponseEnvelope, ErrorEnvelope, etc.
+Pure translation helpers, quality derivation and the i3X type definitions.
 
 ## Endpoint Mapping
 
@@ -202,7 +332,7 @@ All mounted under `/v1/`:
 | GET | `/relationshiptypes` | Object tree |
 | GET | `/relationshiptypes/:elementId` | Object tree |
 | POST | `/relationshiptypes/query` | Object tree bulk |
-| GET | `/objects` | Object tree (ConfigDB + Directory) |
+| GET | `/objects` | Object tree, streamed in chunks |
 | GET | `/objects/:elementId` | Object tree |
 | POST | `/objects/list` | Object tree bulk |
 | GET | `/objects/:elementId/related` | Object tree relationships |
@@ -286,26 +416,40 @@ INFLUX_BUCKET=default
 I3X_NAMESPACE_NAME=<organisation name from Helm values.organisation>
 I3X_NAMESPACE_URI=<organisation URI>
 I3X_SUBSCRIPTION_TTL=300000
+I3X_SUBSCRIPTION_QUEUE_MAX=10000   # updates queued per subscription
 I3X_STALE_THRESHOLD=300000
+I3X_MAX_DEPTH_CAP=0                # 0: no cap on composition maxDepth
+
+# Storage and sync
+I3X_DB_PATH=/data/i3x.db           # ":memory:" also works
+I3X_DB_CACHE_MB=64                 # SQLite page cache
+I3X_SYNC_CONCURRENCY=16            # ConfigDB fetches in flight
+I3X_INFLUX_CONCURRENCY=4           # Flux queries in flight, process-wide
+I3X_MCP_ENABLED=false              # serve /mcp and build the RAG index
 
 # Logging
-LOG_LEVEL=info
+VERBOSE=ALL,!query,!acl,!notify-msg
 ```
 
 ## Test Strategy
 
-### Unit tests (Jest, mocked services)
-- `mapping.test.ts` — pure function tests for every translation helper
-- `envelope.test.ts` — response wrapping, bulk response ordering, error shapes
-- `quality.test.ts` — quality derivation from all device states
+Jest suites under `test/`, run with Node 22 (`node:sqlite`):
 
-### Integration tests (mock MQTT + mock HTTP backends)
-- `explore.test.ts` — all explore endpoints return correct i3X shapes
-- `value.test.ts` — current values, maxDepth composition, quality mapping
-- `history.test.ts` — InfluxDB query construction, time range translation
-- `subscriptions.test.ts` — full lifecycle: create → register → stream/sync → unregister → delete → TTL cleanup
-- `auth.test.ts` — 401 missing auth, 403 insufficient ACL, /info unauthenticated
-
-### Mock services
-Simulate: ConfigDB class/member/config responses, Directory device info, Auth ACL
-checks, InfluxDB Flux query results, UNS MQTT messages with v5 custom properties.
+- `store.test.ts`: the database (schema rebuild, warm reopen, group
+  commit, savepoints) and the tree's rows (ISA-95 sharing and cleanup,
+  order, object types, `iterateObjects`).
+- `object-tree.test.ts`, `preserve-uns-nodes.test.ts`: the tree's public
+  API, and UNS nodes across device rebuilds on random trees.
+- `sync.test.ts`: ConfigSync against a fake ConfigDB: cold sync, warm
+  restart, child updates, membership changes, reconnects, schemas, the
+  concurrency cap, in-flight races, retries.
+- `values.test.ts`: UNS batching, InfluxDB write-back, device removal and
+  the Flux semaphore, through the real API.
+- `objects-stream.test.ts`: `GET /objects` sends exactly the bytes
+  `res.json` sent, and waits for slow clients.
+- `api-v1.test.ts`, `e2e.test.ts`: every endpoint and the i3X envelope,
+  over mocked components.
+- `subscriptions.test.ts`, `history*.test.ts`, `value-cache.test.ts`,
+  `mapping.test.ts`, `quality.test.ts`, `envelope.test.ts`, `rag/`, `mcp/`.
+- `history-influx.test.ts` runs against a real InfluxDB when
+  `I3X_TEST_INFLUX_URL` is set.

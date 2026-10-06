@@ -185,34 +185,52 @@ export class History {
         const slicer = new Slicer();
         let out: Array<{ elementId: string; device: string | null; anchor: string | null }> = [];
         const write = () => {
+            /* Sync may have removed a device while InfluxDB was read, or
+             * during a pause here. A marker for a leaf that has gone
+             * would never be deleted, so check just before writing. */
+            out = out.filter(l => this.objectTree.getObject(l.elementId));
             try {
-                this.valueCache!.recordInfluxEmpty!(out);
+                if (out.length) this.valueCache!.recordInfluxEmpty!(out);
             } catch (err) {
                 console.error("History: storing empty InfluxDB results failed:", err);
             }
             out = [];
         };
+        const devices = new Map<string, string | null>();
         for (const { composition, leafIds } of plan.values()) {
             if (!composition) continue;
-            /* A leaf without MetricMeta has no device of its own; file it
-             * under its composition's device, so it goes with it. */
-            let device: string | null = null;
-            for (const leafId of leafIds) {
-                device = this.objectTree.getMetricMeta(leafId)?.topLevelInstanceUuid ?? null;
-                if (device) break;
-            }
             for (const leafId of leafIds) {
                 await slicer.maybe();
                 if (values.has(leafId)) continue;
-                out.push({
-                    elementId: leafId,
-                    device: this.objectTree.getMetricMeta(leafId)?.topLevelInstanceUuid ?? device,
-                    anchor: this.objectTree.getObject(leafId)?.parentId ?? null,
-                });
+                const anchor = this.objectTree.getObject(leafId)?.parentId ?? null;
+                const device = this.objectTree.getMetricMeta(leafId)?.topLevelInstanceUuid
+                    ?? this.deviceAbove(anchor, devices);
+                /* No device: removeDevice could never delete the marker. */
+                if (!device) continue;
+                out.push({ elementId: leafId, device, anchor });
                 if (out.length >= 1000) write();
             }
         }
         if (out.length) write();
+    }
+
+    /**
+     * The device an object belongs to: the nearest of `id` and its
+     * ancestors that has schemas, as a device does. For a leaf without
+     * MetricMeta, so its marker goes with its own device. Answers are
+     * kept in `cache` by object, as siblings share their ancestors.
+     */
+    private deviceAbove(id: string | null, cache: Map<string, string | null>): string | null {
+        const path: string[] = [];
+        let found: string | null = null;
+        for (let i = 0; id && i < 64; i++) {
+            if (cache.has(id)) { found = cache.get(id)!; break; }
+            path.push(id);
+            if (this.objectTree.getDeviceSchemaUuids(id).length) { found = id; break; }
+            id = this.objectTree.getObject(id)?.parentId ?? null;
+        }
+        for (const p of path) cache.set(p, found);
+        return found;
     }
 
     /**

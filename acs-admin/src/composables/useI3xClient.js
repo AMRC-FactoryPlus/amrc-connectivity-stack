@@ -6,7 +6,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { openI3xStream } from '@composables/useI3xSSE.js'
 
-async function request (client, opts) {
+async function fetch_body (client, opts) {
   const res = await client.Fetch.fetch({
     service: UUIDs.Service.i3x,
     ...opts,
@@ -16,11 +16,29 @@ async function request (client, opts) {
     try { body = await res.json() } catch { /* not JSON */ }
     throw new Error(body?.error?.message || `i3X request failed: ${res.status}`)
   }
-  const body = await res.json()
+  return { status: res.status, body: await res.json() }
+}
+
+async function request (client, opts) {
+  const { body } = await fetch_body(client, opts)
   if (body.success === false) {
     throw new Error(body.error?.message || 'i3X request failed')
   }
   return body.result
+}
+
+// Bulk endpoints answer with one { success, elementId, result | error }
+// per id, and `success: false` at the top when any id failed. Return the
+// per-id results, with the HTTP status, and leave the caller to handle
+// the failures.
+async function bulk (client, url, body) {
+  const res = await fetch_body(client, {
+    url,
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return { status: res.status, results: res.body.results ?? [] }
 }
 
 function get (client, url, query) {
@@ -49,8 +67,10 @@ export function useI3xClient () {
   }
 
   return {
-    getInfo () {
-      return get(c(), 'v1/info')
+    // /info is not wrapped in the { success, result } envelope.
+    async getInfo () {
+      const { body } = await fetch_body(c(), { url: 'v1/info', method: 'GET' })
+      return body
     },
 
     getObjects (params = {}) {
@@ -73,17 +93,20 @@ export function useI3xClient () {
     getRelatedBulk (elementIds, relationshipType) {
       const body = { elementIds }
       if (relationshipType) body.relationshiptype = relationshipType
-      return post(c(), 'v1/objects/related', body)
+      return bulk(c(), 'v1/objects/related', body).then(r => r.results)
     },
 
     getValue (elementId) {
       return get(c(), `v1/objects/${encodeURIComponent(elementId)}/value`)
     },
 
-    getValueBulk (elementIds, maxDepth) {
+    // `partial` is set when the server's maxDepthCap cut maxDepth short
+    // (HTTP 206): leaves below the cap are then missing from the answer.
+    async getValueBulk (elementIds, maxDepth) {
       const body = { elementIds }
       if (maxDepth != null) body.maxDepth = maxDepth
-      return post(c(), 'v1/objects/value', body)
+      const { status, results } = await bulk(c(), 'v1/objects/value', body)
+      return { results, partial: status === 206 }
     },
 
     getHistory (elementId, startTime, endTime) {
@@ -92,7 +115,7 @@ export function useI3xClient () {
     },
 
     getHistoryBulk (params) {
-      return post(c(), 'v1/objects/history', params)
+      return bulk(c(), 'v1/objects/history', params).then(r => r.results)
     },
 
     createSubscription (clientId, displayName) {

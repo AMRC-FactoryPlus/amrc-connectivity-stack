@@ -262,7 +262,8 @@ export class APIv1 {
      * request was clamped (caller should return HTTP 206 if so).
      */
     private clampDepth(requested: number): { effective: number; clamped: boolean } {
-        if (this.maxDepthCap > 0 && requested > this.maxDepthCap) {
+        /* 0 asks for the whole subtree, which is deeper than any cap. */
+        if (this.maxDepthCap > 0 && (requested === 0 || requested > this.maxDepthCap)) {
             return { effective: this.maxDepthCap, clamped: true };
         }
         return { effective: requested, clamped: false };
@@ -493,20 +494,24 @@ export class APIv1 {
      * cannot answer is then read from InfluxDB in one batch via
      * `history.getValues`, which reads leaves and compositions with a
      * small, bounded number of Flux queries. `maxDepth` controls
-     * composition recursion; defaults to 1 for compositions. If the
+     * composition recursion; defaults to 1 for compositions, and one
+     * that is not a non-negative integer is refused with a 400. If the
      * server's `maxDepthCap` clamped any request, the response is
      * returned with HTTP 206 to indicate a partial result.
      */
-    async value_objects(req: Request, res: Response): Promise<void> {
+    async value_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
         const started = Date.now();
         const { elementIds, maxDepth } = req.body;
         const ids = elementIds as string[];
+        if (maxDepth != null && !(Number.isInteger(maxDepth) && maxDepth >= 0)) {
+            return next(badRequest("maxDepth must be a non-negative integer"));
+        }
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
 
         // Try UNS cache first (real-time), fall back to InfluxDB last().
         // A cached composition's components are read as they are sent.
         const cached: Array<LazyValue | null> = [];
-        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id));
+        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id, effective));
         const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
         const fromInflux = misses.length > 0
             ? await this.history.getValues(misses, effective)
@@ -617,13 +622,22 @@ export class APIv1 {
      * GET /objects/:elementId/value — single-id current value. Same
      * cache-then-InfluxDB strategy as `value_objects` (UNS cache,
      * then `history.getCompositionValue`/`getCurrentValue`); 404 if
-     * neither source has a value.
+     * neither source has a value. The `maxDepth` query parameter works
+     * as it does for `value_objects`, including the 206 when clamped.
      */
     async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
         const id = req.params.elementId;
         const obj = this.objectTree.getObject(id);
+        /* Digits only: Number() would take "" as 0 (the whole
+         * subtree), and " 1", "0x10" or "1e1" as other depths. */
+        const raw = req.query.maxDepth;
+        if (raw !== undefined && !(typeof raw === "string" && /^\d+$/.test(raw))) {
+            return next(badRequest("maxDepth must be a non-negative integer"));
+        }
+        const { effective, clamped } = this.clampDepth(raw === undefined ? 1 : Number(raw));
+        if (clamped) res.status(206);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = await this.valueCache.getValueLazy(id);
+        const cached = await this.valueCache.getValueLazy(id, effective);
         if (cached) {
             this.log("GET /objects/%s/value: UNS cache hit", id);
             if (!cached.components) {
@@ -640,7 +654,7 @@ export class APIv1 {
             return;
         }
         const result = obj?.isComposition
-            ? await this.history.getCompositionValue(id)
+            ? await this.history.getCompositionValue(id, effective)
             : await this.history.getCurrentValue(id);
         this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
             id, result ? "hit" : "no data");

@@ -3,11 +3,11 @@
  */
 
 /*
- * Cached values of compositions. A composition's cached value is every
- * UNS value in its whole subtree (the cache path never honoured
- * maxDepth). High in the ISA-95 hierarchy that is millions of
- * components, so they are read with one ordered query and streamed to
- * the client, never built in memory. These tests check the order and
+ * Cached values of compositions. With maxDepth 0 a composition's cached
+ * value is every UNS value in its whole subtree. High in the ISA-95
+ * hierarchy that is millions of components, so they are read with one
+ * ordered query and streamed to the client, never built in memory.
+ * Other depths stop the walk where the InfluxDB read stops. These tests check the order and
  * the bytes against the recursive walk the cache used to do, and that
  * a slow client holds the read back.
  */
@@ -63,8 +63,9 @@ function oldValue(s: ReturnType<typeof stack>, id: string) {
     return { elementId: id, isComposition: true, value: null, quality: "Good", timestamp: ts, components };
 }
 
-function app(s: ReturnType<typeof stack>) {
+function app(s: ReturnType<typeof stack>, maxDepthCap = 0) {
     const api = new APIv1({
+        maxDepthCap,
         objectTree: s.tree, valueCache: s.valueCache,
         history: {
             getValues: async () => new Map(),
@@ -107,12 +108,12 @@ describe("composition values from the cache", () => {
         const device = s.tree.getChildElementIds(s.tree.getChildElementIds(root)[0])[0];
         const leaf = s.tree.getObjects().find(o => !o.isComposition)!.elementId;
 
-        const one = await request(a).get(`/v1/objects/${root}/value`);
+        const one = await request(a).get(`/v1/objects/${root}/value?maxDepth=0`);
         expect(one.text).toBe(JSON.stringify({ success: true, result: oldValue(s, root) }));
         expect(one.headers["content-type"]).toBe("application/json; charset=utf-8");
 
         const ids = [root, leaf, "no-such-id", device, root];
-        const many = await request(a).post("/v1/objects/value").send({ elementIds: ids });
+        const many = await request(a).post("/v1/objects/value").send({ elementIds: ids, maxDepth: 0 });
         const results = ids.map(id => {
             const v = id === leaf ? s.valueCache.getValue(leaf) : id === "no-such-id" ? null : oldValue(s, id);
             return v
@@ -157,7 +158,7 @@ describe("composition values from the cache", () => {
             await new Promise(r => server.once("listening", r));
             const port = (server.address() as AddressInfo).port;
             const res = await new Promise<http.IncomingMessage>(r =>
-                http.get({ port, path: `/v1/objects/${root}/value` }, r));
+                http.get({ port, path: `/v1/objects/${root}/value?maxDepth=0` }, r));
             res.pause();
             await new Promise(r => setTimeout(r, 300));
             expect(reads).toHaveLength(2);
@@ -179,6 +180,85 @@ describe("composition values from the cache", () => {
             rmSync(dir, { recursive: true, force: true });
         }
     }, 60_000);
+});
+
+describe("composition values to a depth", () => {
+    /* The leaves InfluxDB would read to this depth: the cache must
+     * answer for the same ones. */
+    const leaves = (s: ReturnType<typeof stack>, id: string, depth: number) =>
+        s.tree.getDescendantLeafIds(id, depth).sort();
+
+    it("stop where the InfluxDB read stops", async () => {
+        const s = stack(40);
+        fill(s);
+        const a = app(s);
+        const root = s.tree.getObjects({ root: true })[0].elementId;
+        const all = leaves(s, root, 0).length;
+        let last = 0;
+        for (const depth of [1, 2, 3, 4, 0]) {
+            const r = await request(a).post("/v1/objects/value")
+                .send({ elementIds: [root], maxDepth: depth });
+            const got = Object.keys(r.body.results[0].result?.components ?? {}).sort();
+            expect(got).toEqual(leaves(s, root, depth));
+            expect(got.length).toBeGreaterThanOrEqual(last);
+            last = got.length;
+        }
+        expect(last).toBe(all);
+    });
+
+    it("default to the direct leaves for GET, as for POST", async () => {
+        const s = stack(40);
+        fill(s);
+        const a = app(s);
+        /* A composition with leaves of its own and compositions below. */
+        const id = s.tree.getObjects().find(o => o.isComposition
+            && leaves(s, o.elementId, 1).length > 0
+            && leaves(s, o.elementId, 0).length > leaves(s, o.elementId, 1).length)!.elementId;
+        const one = await request(a).get(`/v1/objects/${id}/value`);
+        expect(Object.keys(one.body.result.components).sort()).toEqual(leaves(s, id, 1));
+        const many = await request(a).post("/v1/objects/value").send({ elementIds: [id] });
+        expect(many.body.results[0].result).toEqual(one.body.result);
+    });
+
+    it("refuse a maxDepth that is not a non-negative integer", async () => {
+        const s = stack(4);
+        fill(s);
+        const root = s.tree.getObjects({ root: true })[0].elementId;
+        for (const bad of ["-1", "1.5", "deep", "", "%201", "0x10", "1e1"]) {
+            const r = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=${bad}`);
+            expect(r.status).toBe(400);
+        }
+        const twice = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=1&maxDepth=2`);
+        expect(twice.status).toBe(400);
+    });
+
+    it("refuse a body maxDepth that is not a non-negative integer", async () => {
+        const s = stack(4);
+        fill(s);
+        const root = s.tree.getObjects({ root: true })[0].elementId;
+        for (const bad of [-1, 1.5, "1", "", true]) {
+            const r = await request(app(s)).post("/v1/objects/value")
+                .send({ elementIds: [root], maxDepth: bad });
+            expect(r.status).toBe(400);
+        }
+    });
+
+    it("are clamped with a 206 when the whole subtree is asked for past a cap", async () => {
+        const s = stack(40);
+        fill(s);
+        const a = app(s, 2);
+        /* Leaves within the cap and more below it. */
+        const id = s.tree.getObjects().find(o => o.isComposition
+            && leaves(s, o.elementId, 2).length > 0
+            && leaves(s, o.elementId, 0).length > leaves(s, o.elementId, 2).length)!.elementId;
+        const one = await request(a).get(`/v1/objects/${id}/value?maxDepth=0`);
+        expect(one.status).toBe(206);
+        expect(Object.keys(one.body.result.components).sort()).toEqual(leaves(s, id, 2));
+        const many = await request(a).post("/v1/objects/value").send({ elementIds: [id], maxDepth: 0 });
+        expect(many.status).toBe(206);
+        const within = await request(a).get(`/v1/objects/${id}/value?maxDepth=2`);
+        expect(within.status).toBe(200);
+    });
 });
 
 describe("long reads and the event loop", () => {
@@ -228,7 +308,7 @@ describe("long reads and the event loop", () => {
             let chunks: Buffer[] = [];
             let valueStall = 0, objectsStall = 0, relatedStall = 0;
             try {
-                valueStall = await longestStall(async () => { chunks = await get(`/v1/objects/${root}/value`); });
+                valueStall = await longestStall(async () => { chunks = await get(`/v1/objects/${root}/value?maxDepth=0`); });
                 objectsStall = await longestStall(() => get("/v1/objects"));
                 relatedStall = await longestStall(() => get(`/v1/objects/${root}/related`));
             } finally {

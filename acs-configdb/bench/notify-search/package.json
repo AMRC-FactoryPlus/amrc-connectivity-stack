@@ -1,0 +1,9 @@
+{
+  "name": "acs-configdb-bench",
+  "private": true,
+  "type": "module",
+  "description": "Notify load bench for ConfigDB. Not part of the image.",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

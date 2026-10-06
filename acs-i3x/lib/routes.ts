@@ -14,6 +14,7 @@ export function routes(opts: {
     subscriptions: SubscriptionManager;
     mcpServer?: McpServer;
     maxDepthCap?: number;
+    debug?: any;
 }) {
     const api = new APIv1(opts);
 
@@ -38,6 +39,14 @@ export function routes(opts: {
         // Mount MCP Streamable HTTP endpoint (if configured)
         if (opts.mcpServer) {
             mountMcpTransport(app, opts.mcpServer);
+        } else {
+            app.all("/mcp", (_req: any, res: any) => {
+                res.status(404).json({
+                    jsonrpc: "2.0",
+                    error: { code: -32601, message: "MCP is not enabled on this server" },
+                    id: null,
+                });
+            });
         }
     };
 }

@@ -218,6 +218,26 @@ denied or to hide the resource from the child altogether with a 404
 response. In either case a consistent strategy should be followed which
 should also match the results from the HTTP API.
 
+#### Slow clients
+
+A service may combine pending updates for a client that reads more
+slowly than updates arrive. It may then skip intermediate states:
+
+* For a WATCH, the client may receive only the latest response.
+* For a SEARCH, the client may receive only the latest update for each
+  child that changed. A parent update without `child` replaces any
+  pending child updates.
+
+The state the client ends with is the same as if it had received every
+update. Updates for one subscription still arrive in order, the first
+still has subscription status 201, and a closing status is still sent
+last. Clients must treat updates as the current state of the resource,
+not as a log of events. A client that needs every change must get it
+from another source, such as MQTT.
+
+The JS service API holds updates once 8 MiB is waiting to be sent to a
+client. Set `NOTIFY_MAX_BUFFER` (a number of bytes) to change this.
+
 ## Subscription methods
 
 The request methods listed here each request a different form of

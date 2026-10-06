@@ -161,6 +161,28 @@ configdb:
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
   bodyLimit: 100kb
+  # -- Resource requests and limits for the `webapi` container. The
+  # default is empty, which leaves the pod BestEffort: first in line for
+  # the kernel OOM killer and for eviction under node memory pressure.
+  # Set a memory request to make it Burstable, and a memory limit to cap
+  # it. Size the limit above the normal working set, because a limit that
+  # is too low turns memory pressure into a restart loop. With about
+  # 40,000 devices ConfigDB used about 0.9 GiB at rest and 1.5 GiB while
+  # i3X ran its first sync; a 2 GiB limit was too low (the heap ran out
+  # during client reconnects).
+  # For example:
+  # resources:
+  #   requests:
+  #     memory: 1Gi
+  #   limits:
+  #     memory: 4Gi
+  resources: {}
+  # -- Minimum time in ms between the class member and subclass lookups
+  # that ConfigDB runs for notify watchers when classes change. During a
+  # bulk import this stops every watched class being looked up again on
+  # every object create. A change can reach watchers up to this long
+  # after it is made. 0 looks up again on every change.
+  classLookupInterval: 1000
   backup:
     # -- Whether to run a pg_dump of the ConfigDB before every helm upgrade
     enabled: true
@@ -395,6 +417,18 @@ mqtt:
     repository: acs-mqtt
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
+  # -- Extra JVM options for the HiveMQ broker, passed as JAVA_OPTS.
+  # Without a heap limit the JVM sizes its heap from the node's memory
+  # (25% by default, 4 GB on a 16 GB node) and rarely gives memory back,
+  # so the broker grows to whatever peak it has seen. With a 512 MB
+  # heap the broker runs at about 800 MB resident under a large
+  # Sparkplug fleet (~44k devices). Set to "" to use the JVM default.
+  javaOpts: "-Xmx512m"
+  # -- Kubernetes resources for the broker container, for example
+  # `{ requests: { memory: 1Gi }, limits: { memory: 1536Mi } }`. Allow
+  # about 300 MB above the heap limit for non-heap memory. Empty by
+  # default.
+  resources: {}
 
 unsIngesters:
   sparkplug:
@@ -482,8 +516,72 @@ i3x:
   # tags, so they still appear. Set this to "1" to log everything, for
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
+  # -- Resource requests and limits for the `i3x` container. The
+  # default is empty, which leaves the pod BestEffort: first in line for
+  # the kernel OOM killer and for eviction under node memory pressure.
+  # Set a memory request to make it Burstable, and a memory limit to cap
+  # it. Size the limit above the normal working set, because a limit that
+  # is too low turns memory pressure into a restart loop. With MCP off and
+  # the default maxHeapMB, i3X used about 370 MiB during its first sync of
+  # about 40,000 devices and about 280 MiB at 74,000 devices in testing.
+  # With MCP on, allow several GiB.
+  # For example:
+  # resources:
+  #   requests:
+  #     memory: 512Mi
+  #   limits:
+  #     memory: 1Gi
+  resources: {}
   # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
   # namespaceUri: https://example.com/i3x
+  # i3X keeps its namespace (the object tree) and the last value of
+  # each metric in a SQLite database at /data/i3x.db. The database is
+  # a cache of ConfigDB and the UNS, so losing it costs only a full
+  # sync from ConfigDB on the next start.
+  persistence:
+    # -- Keep the database on a PersistentVolumeClaim (ReadWriteOnce),
+    # so a restart serves the stored tree at once and fetches only the
+    # configs that changed. The Deployment then stops the old pod before
+    # starting the new one (RollingUpdate with maxSurge 0), like the Recreate
+    # strategy. When false the database is on an emptyDir and every
+    # start syncs from scratch.
+    enabled: true
+    # -- Size of the PersistentVolumeClaim. At 74,000 devices the
+    # database is about 2 GB, and its write-ahead log can reach about
+    # 1.5 GB more during a burst of new UNS metrics.
+    size: 10Gi
+    # -- StorageClass for the claim. Empty uses the cluster default.
+    storageClass: ""
+  mcp:
+    # -- Serve the MCP endpoint (/mcp) and build the search index it
+    # uses. Off by default: the index costs about 47 KB of memory per
+    # device. When off, /mcp answers 404.
+    enabled: false
+  # -- Cap on the i3X JavaScript heap in MiB (--max-old-space-size).
+  # The object tree and values live in SQLite, so the heap stays small
+  # (about 75 MiB at 74,000 devices). Without a cap V8 lets the heap
+  # grow between collections during a cold sync (about 550 MiB RSS at
+  # 74,000 devices, against about 320 MiB with a 256 MiB cap). Only
+  # applied while MCP is off: the MCP search index needs several GB at
+  # fleet scale. Set to 0 for no cap.
+  maxHeapMB: 384
+  # After a restart or an MQTT reconnect, i3X catches up its stored
+  # values from InfluxDB (the points written while it was not listening)
+  # instead of clearing them and reading every value again.
+  catchUp:
+    # -- Ms to allow for the historian's write delay and for device
+    # clocks behind i3X's. i3X waits this long after connecting before
+    # it reads InfluxDB, and reads from this long before the values were
+    # last current. Keep it above the historians' flushInterval.
+    marginMs: 60000
+    # -- Longest gap, in ms, to catch up; after a longer one the values
+    # are cleared and read again. At most 30 days. Keep it below the
+    # InfluxDB bucket's retention.
+    maxGapMs: 86400000
+    # -- Ms between refreshes of the values i3X keeps from InfluxDB,
+    # while connected: the same query over the time since the last
+    # refresh. Devices that do not publish to the UNS change only there.
+    refreshMs: 300000
 
 admin:
   # -- Whether or not to enable the Admin component

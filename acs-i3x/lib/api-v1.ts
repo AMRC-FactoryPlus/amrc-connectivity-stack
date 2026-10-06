@@ -5,13 +5,15 @@
  * together behind HTTP endpoints with the i3X envelope middleware.
  */
 
+import { createHash } from "node:crypto";
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 
 import { I3X_SPEC_VERSION, Version } from "./constants.js";
 import { i3xEnvelope, i3xErrorHandler } from "./middleware/envelope.js";
+import { Slicer } from "./slicer.js";
 import type { ObjectTree } from "./object-tree.js";
-import type { ValueCache } from "./value-cache.js";
+import type { ValueCache, LazyValue } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
 import validator from 'validator';
@@ -27,6 +29,11 @@ interface APIv1Opts {
      * clamped and the response is returned with HTTP 206.
      */
     maxDepthCap?: number;
+    /**
+     * The service-client Debug object. Used to build the module
+     * logger; omitted in tests, where logging is silenced.
+     */
+    debug?: any;
 }
 
 /**
@@ -60,6 +67,152 @@ function badRequest(message: string): Error & { status: number } {
 }
 
 /**
+ * The ETag for a GET /objects listing: the tree revision plus the
+ * filters that shape the body. Weak, as the body is not compared byte
+ * for byte.
+ */
+function objectsEtag(
+    rev: string,
+    opts: { typeElementId?: string; root: boolean; includeMetadata: boolean },
+): string {
+    const q = JSON.stringify([opts.typeElementId ?? null, opts.root, opts.includeMetadata]);
+    const h = createHash("sha1").update(q).digest("base64url").slice(0, 16);
+    return `W/"objects-${rev}-${h}"`;
+}
+
+/** Does an If-None-Match header match `etag`? Weak comparison. */
+function etagMatches(header: string | string[] | undefined, etag: string): boolean {
+    if (header === undefined) return false;
+    const want = etag.replace(/^W\//, "");
+    const tags = (Array.isArray(header) ? header.join(",") : header).split(",");
+    return tags.some(t => {
+        const tag = t.trim();
+        return tag === "*" || tag.replace(/^W\//, "") === want;
+    });
+}
+
+/** Longest wait for a slow client to take more of a streamed body,
+ * in ms (I3X_STREAM_IDLE_MS, default 60,000). */
+function streamIdleMs(): number {
+    const n = Number(process.env.I3X_STREAM_IDLE_MS);
+    return Number.isFinite(n) && n > 0 ? n : 60_000;
+}
+
+/** Bytes to gather before writing a chunk of a streamed response. */
+const STREAM_CHUNK = 64 * 1024;
+
+/**
+ * Send `prefix`, the items of `items` as JSON separated by commas, then
+ * `suffix`: byte for byte what res.json would send for the same array.
+ */
+function streamJsonArray(
+    res: Response, prefix: string, items: Iterable<unknown>, suffix: string,
+): Promise<void> {
+    return streamText(res, (function* () {
+        yield prefix;
+        let first = true;
+        for (const item of items) {
+            yield (first ? "" : ",") + JSON.stringify(item);
+            first = false;
+        }
+        yield suffix;
+    })());
+}
+
+/**
+ * The JSON of a cached value whose composition components are read as
+ * they are written: exactly what JSON.stringify gives for the value
+ * with its components built in memory.
+ */
+function* lazyValueJson(v: LazyValue): Generator<string> {
+    if (!v.components) {
+        yield JSON.stringify(v.head);
+        return;
+    }
+    yield JSON.stringify(v.head).slice(0, -1) + ',"components":{';
+    let first = true;
+    for (const step of v.components()) {
+        /* A tick: work done, nothing to send; lets streamText pause. */
+        if (!step) { yield ""; continue; }
+        const [id, vqt] = step;
+        yield (first ? "" : ",") + JSON.stringify(id) + ":" + JSON.stringify(vqt);
+        first = false;
+    }
+    yield "}}";
+}
+
+/**
+ * Send a JSON body made of `parts`, a chunk at a time, waiting for the
+ * socket to drain when it is full and stopping (closing `parts`) when
+ * the client goes away. Nothing is sent until STREAM_CHUNK bytes have
+ * gathered, so a failure before then still goes to the error handler
+ * as a proper response. A failure after that can no longer become an
+ * error response, so it destroys the connection instead and the client
+ * sees a truncated body.
+ */
+async function streamText(res: Response, parts: Iterator<string>): Promise<void> {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+    /* One 'drain' and one 'close' listener for the whole response.
+     * compression() moves 'drain' listeners to its gzip stream but
+     * does not move res.off() with them, so adding and removing a
+     * listener per wait would leave one behind on the gzip stream
+     * each time the client is slow. */
+    let wake: (() => void) | null = null;
+    const onWake = () => {
+        const w = wake;
+        wake = null;
+        w?.();
+    };
+    res.on("drain", onWake);
+    res.on("close", onWake);
+
+    let buf = "";
+    /* Producing the parts reads the database synchronously. Pause for
+     * the event loop every SLICE_MS, even while the socket keeps up. */
+    const slicer = new Slicer();
+    try {
+        for (let next = parts.next(); !next.done; next = parts.next()) {
+            buf += next.value;
+            if (buf.length >= STREAM_CHUNK) {
+                const ok = res.write(buf);
+                buf = "";
+                if (!ok && !res.destroyed) {
+                    /* A client that stops reading would hold the read
+                     * snapshot open for ever, and a held snapshot stops
+                     * WAL checkpoints. Give up after an idle deadline. */
+                    let timer: ReturnType<typeof setTimeout> | undefined;
+                    const drained = await new Promise<boolean>(resolve => {
+                        wake = () => resolve(true);
+                        timer = setTimeout(() => resolve(false), streamIdleMs());
+                    });
+                    clearTimeout(timer);
+                    if (!drained) {
+                        wake = null;
+                        console.error("%s %s: client read nothing for %d ms; closing",
+                            res.req?.method, res.req?.originalUrl, streamIdleMs());
+                        parts.return?.();
+                        res.destroy();
+                        return;
+                    }
+                }
+            }
+            if (slicer.due()) await slicer.pause();
+            if (res.destroyed || res.writableEnded) {
+                parts.return?.();
+                return;
+            }
+        }
+        res.end(buf);
+    } catch (err) {
+        parts.return?.();
+        if (!res.headersSent) throw err;
+        console.error("%s %s: failed while streaming:", res.req?.method, res.req?.originalUrl, err);
+        res.destroy(err as Error);
+    }
+}
+
+/**
  * Returns the authenticated principal which owns any subscription
  * created or accessed by this request.
  *
@@ -84,6 +237,7 @@ export class APIv1 {
     private history: History;
     private subscriptions: SubscriptionManager;
     private maxDepthCap: number;
+    private log: (msg: string, ...args: any[]) => void;
 
     /**
      * Stores the collaborator services and builds both routers.
@@ -94,6 +248,7 @@ export class APIv1 {
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
         this.maxDepthCap = opts.maxDepthCap ?? 0;
+        this.log = opts.debug?.bound("api-v1") ?? (() => {});
 
         this.routes = Router();
         this.infoRoute = Router();
@@ -107,7 +262,8 @@ export class APIv1 {
      * request was clamped (caller should return HTTP 206 if so).
      */
     private clampDepth(requested: number): { effective: number; clamped: boolean } {
-        if (this.maxDepthCap > 0 && requested > this.maxDepthCap) {
+        /* 0 asks for the whole subtree, which is deeper than any cap. */
+        if (this.maxDepthCap > 0 && (requested === 0 || requested > this.maxDepthCap)) {
             return { effective: this.maxDepthCap, clamped: true };
         }
         return { effective: requested, clamped: false };
@@ -144,18 +300,18 @@ export class APIv1 {
         api.post("/relationshiptypes/query", this.query_relationship_types.bind(this));
 
         /* ---- Explore: Objects ---- */
-        api.get("/objects", this.get_objects.bind(this));
+        api.get("/objects", asyncHandler(this.get_objects.bind(this)));
 
         /* Value and history sub-routes must be declared before the
          * /:elementId catch-all to avoid path conflicts. */
         api.post("/objects/list", this.list_objects.bind(this));
         api.post("/objects/value", asyncHandler(this.value_objects.bind(this)));
         api.post("/objects/history", asyncHandler(this.history_objects.bind(this)));
-        api.post("/objects/related", this.related_objects.bind(this));
+        api.post("/objects/related", asyncHandler(this.related_objects.bind(this)));
 
         api.get("/objects/:elementId/value", asyncHandler(this.get_object_value.bind(this)));
         api.get("/objects/:elementId/history", asyncHandler(this.get_object_history.bind(this)));
-        api.get("/objects/:elementId/related", this.get_object_related.bind(this));
+        api.get("/objects/:elementId/related", asyncHandler(this.get_object_related.bind(this)));
         api.get("/objects/:elementId", this.get_object.bind(this));
 
         /* ---- Subscriptions ---- */
@@ -284,13 +440,34 @@ export class APIv1 {
 
     /**
      * GET /objects — lists objects with optional `typeElementId`, `root`, and `includeMetadata` filters.
+     *
+     * The whole tree is millions of objects at fleet scale, so this
+     * does not build the array: it streams the same bytes res.json
+     * would send, a chunk at a time, waiting while the client is slow.
      **/
-    get_objects(req: Request, res: Response): void {
-        res.json(this.objectTree.getObjects({
+    async get_objects(req: Request, res: Response): Promise<void> {
+        const opts = {
             typeElementId: req.query.typeElementId as string | undefined,
             root: req.query.root === "true",
             includeMetadata: req.query.includeMetadata === "true",
-        }));
+        };
+
+        /* The ETag comes from the tree's revision and the filters, so a
+         * client can revalidate without us reading the tree. res.json
+         * hashed the whole body for its ETag; we no longer build the
+         * body in one piece, so this replaces it. */
+        const rev = this.objectTree.revision?.();
+        if (rev !== undefined) {
+            const etag = objectsEtag(rev, opts);
+            res.setHeader("ETag", etag);
+            if (etagMatches(req.headers["if-none-match"], etag)) {
+                res.status(304).end();
+                return;
+            }
+        }
+
+        const objects = this.objectTree.iterateObjects(opts);
+        await streamJsonArray(res, '{"success":true,"result":[', objects, "]}");
     }
 
     /**
@@ -313,38 +490,69 @@ export class APIv1 {
 
     /**
      * POST /objects/value — bulk current-value lookup. For each id,
-     * tries the real-time UNS `valueCache` first, then falls back to
-     * InfluxDB via `history.getCurrentValue` (or `getCompositionValue`
-     * for composition objects). `maxDepth` controls composition
-     * recursion; defaults to 1 for compositions. If the server's
-     * `maxDepthCap` clamped any request, the response is returned
-     * with HTTP 206 to indicate a partial result.
+     * tries the real-time UNS `valueCache` first. Every id the cache
+     * cannot answer is then read from InfluxDB in one batch via
+     * `history.getValues`, which reads leaves and compositions with a
+     * small, bounded number of Flux queries. `maxDepth` controls
+     * composition recursion; defaults to 1 for compositions, and one
+     * that is not a non-negative integer is refused with a 400. If the
+     * server's `maxDepthCap` clamped any request, the response is
+     * returned with HTTP 206 to indicate a partial result.
      */
-    async value_objects(req: Request, res: Response): Promise<void> {
+    async value_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const started = Date.now();
         const { elementIds, maxDepth } = req.body;
+        const ids = elementIds as string[];
+        if (maxDepth != null && !(Number.isInteger(maxDepth) && maxDepth >= 0)) {
+            return next(badRequest("maxDepth must be a non-negative integer"));
+        }
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
-        const results = await Promise.all((elementIds as string[]).map(async (id) => {
-            // Try UNS cache first (real-time), fall back to InfluxDB last()
-            const cached = this.valueCache.getValue(id);
-            if (cached) {
-                console.log(`[VALUE] ${id.slice(0,16)} → UNS cache hit: value=${JSON.stringify(cached.value)} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
-                return { success: true, elementId: id, result: cached };
+
+        // Try UNS cache first (real-time), fall back to InfluxDB last().
+        // A cached composition's components are read as they are sent.
+        const cached: Array<LazyValue | null> = [];
+        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id, effective));
+        const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
+        const fromInflux = misses.length > 0
+            ? await this.history.getValues(misses, effective)
+            : new Map();
+
+        let influxHits = 0;
+        const results = ids.map((id, i) => {
+            const hit = cached[i];
+            if (hit) {
+                return { success: true, elementId: id, hit };
             }
-            console.log(`[VALUE] ${id.slice(0,16)} → UNS cache miss, querying InfluxDB...`);
-            const obj = this.objectTree.getObject(id);
-            const item = obj?.isComposition
-                ? await this.history.getCompositionValue(id, effective)
-                : await this.history.getCurrentValue(id);
+            const item = fromInflux.get(id);
             if (item) {
-                console.log(`[VALUE] ${id.slice(0,16)} → InfluxDB hit: value=${JSON.stringify(item.value)} ts=${item.timestamp}`);
+                influxHits++;
                 return { success: true, elementId: id, result: item };
             }
-            console.log(`[VALUE] ${id.slice(0,16)} → no data`);
             return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
-        }));
+        });
+        this.log("POST /objects/value: %d ids, %d UNS cache hits, %d InfluxDB hits, %d no data, %dms",
+            ids.length, cached.filter(Boolean).length, influxHits,
+            results.length - results.filter(r => r.success).length,
+            Date.now() - started);
+
         if (clamped) res.status(206);
         const allSuccess = results.every(r => r.success);
-        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+        await streamText(res, (function* () {
+            yield `{"success":${allSuccess},"results":[`;
+            let first = true;
+            for (const r of results) {
+                if (!first) yield ",";
+                first = false;
+                if ("hit" in r && r.hit) {
+                    yield `{"success":true,"elementId":${JSON.stringify(r.elementId)},"result":`;
+                    yield* lazyValueJson(r.hit);
+                    yield "}";
+                } else {
+                    yield JSON.stringify(r);
+                }
+            }
+            yield "]}";
+        })());
     }
 
     /**
@@ -380,45 +588,76 @@ export class APIv1 {
      * filtered by `relationshiptype`. Per-id success/error envelope:
      * missing ids are reported as failures.
      */
-    related_objects(req: Request, res: Response): void {
+    async related_objects(req: Request, res: Response): Promise<void> {
         const { elementIds, relationshiptype } = req.body;
-        const results = (elementIds as string[]).map(id => {
-            const obj = this.objectTree.getObject(id);
-            if (!obj) {
-                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+        const ids = elementIds as string[];
+        /* Existence first, for the envelope's success flag; the related
+         * objects themselves are read as they are sent. */
+        const found = ids.map(id => !!this.objectTree.getObject(id));
+        const allSuccess = found.every(Boolean);
+        const tree = this.objectTree;
+        await streamText(res, (function* () {
+            yield `{"success":${allSuccess},"results":[`;
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                if (i) yield ",";
+                if (!found[i]) {
+                    yield JSON.stringify({ success: false, elementId: id,
+                        error: { code: 404, message: `Object ${id} not found` } });
+                    continue;
+                }
+                yield `{"success":true,"elementId":${JSON.stringify(id)},"result":[`;
+                let first = true;
+                for (const o of tree.iterateRelated(id, relationshiptype)) {
+                    yield (first ? "" : ",") + JSON.stringify(o);
+                    first = false;
+                }
+                yield "]}";
             }
-            const related = this.objectTree.getRelated(id, relationshiptype);
-            return { success: true, elementId: id, result: related };
-        });
-        const allSuccess = results.every(r => r.success);
-        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+            yield "]}";
+        })());
     }
 
     /**
      * GET /objects/:elementId/value — single-id current value. Same
      * cache-then-InfluxDB strategy as `value_objects` (UNS cache,
      * then `history.getCompositionValue`/`getCurrentValue`); 404 if
-     * neither source has a value.
+     * neither source has a value. The `maxDepth` query parameter works
+     * as it does for `value_objects`, including the 206 when clamped.
      */
     async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
         const id = req.params.elementId;
         const obj = this.objectTree.getObject(id);
+        /* Digits only: Number() would take "" as 0 (the whole
+         * subtree), and " 1", "0x10" or "1e1" as other depths. */
+        const raw = req.query.maxDepth;
+        if (raw !== undefined && !(typeof raw === "string" && /^\d+$/.test(raw))) {
+            return next(badRequest("maxDepth must be a non-negative integer"));
+        }
+        const { effective, clamped } = this.clampDepth(raw === undefined ? 1 : Number(raw));
+        if (clamped) res.status(206);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = this.valueCache.getValue(id);
+        const cached = await this.valueCache.getValueLazy(id, effective);
         if (cached) {
-            console.log(`[VALUE] ${id} → UNS cache hit: value=${JSON.stringify(cached.value)} ts=${cached.timestamp} age=${Date.now() - new Date(cached.timestamp).getTime()}ms`);
-            res.json(cached);
+            this.log("GET /objects/%s/value: UNS cache hit", id);
+            if (!cached.components) {
+                res.json(cached.head);
+                return;
+            }
+            // A composition high in the hierarchy can have millions of
+            // components: send them as they are read.
+            await streamText(res, (function* () {
+                yield '{"success":true,"result":';
+                yield* lazyValueJson(cached);
+                yield "}";
+            })());
             return;
         }
-        console.log(`[VALUE] ${id} → UNS cache miss, querying InfluxDB...`);
         const result = obj?.isComposition
-            ? await this.history.getCompositionValue(id)
+            ? await this.history.getCompositionValue(id, effective)
             : await this.history.getCurrentValue(id);
-        if (result) {
-            console.log(`[VALUE] ${id} → InfluxDB hit: value=${JSON.stringify(result.value)} ts=${result.timestamp}`);
-        } else {
-            console.log(`[VALUE] ${id} → InfluxDB miss: no data`);
-        }
+        this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
+            id, result ? "hit" : "no data");
         if (!result) return next(notFound(`No value for ${id}`));
         res.json(result);
     }
@@ -441,11 +680,13 @@ export class APIv1 {
     /**
      * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
      **/
-    get_object_related(req: Request, res: Response, next: NextFunction): void {
+    async get_object_related(req: Request, res: Response, next: NextFunction): Promise<void> {
         const obj = this.objectTree.getObject(req.params.elementId);
         if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
         const rt = req.query.relationshiptype as string | undefined;
-        res.json(this.objectTree.getRelated(req.params.elementId, rt));
+        // An ISA-95 level can have tens of thousands of children.
+        await streamJsonArray(res, '{"success":true,"result":[',
+            this.objectTree.iterateRelated(req.params.elementId, rt), "]}");
     }
 
     /**

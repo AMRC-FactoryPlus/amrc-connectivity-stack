@@ -17,25 +17,57 @@ import { registerRagTools } from "../lib/mcp/tools.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
-import { ObjectTreeRefresh } from "../lib/refresh.js";
+import { I3xStore } from "../lib/store.js";
+import { ConfigSync, configSyncFeeds } from "../lib/sync.js";
 
 const { env } = process;
+
+/** A positive integer setting, or `dflt` if unset or not one. */
+function positiveInt(name: string, dflt: number): number {
+    const v = env[name];
+    if (v === undefined || v === "") return dflt;
+    const n = Number(v);
+    if (Number.isInteger(n) && n > 0) return n;
+    console.warn(`Ignoring ${name}=${v}: not a positive integer, using ${dflt}`);
+    return dflt;
+}
 
 // Init Factory+ service client (RxClient adds notify-v2 Observables on ConfigDB)
 const fplus = await new RxClient({ env }).init();
 
-// Build object tree from ConfigDB + Directory
+const namespaceName = env.I3X_NAMESPACE_NAME || "Default";
+const namespaceUri = env.I3X_NAMESPACE_URI || "https://example.com";
+
+// The namespace and last values live in SQLite, not on the heap. The
+// database is a cache of ConfigDB: a new namespace starts it afresh.
+const store = new I3xStore({
+    path: env.I3X_DB_PATH || "/data/i3x.db",
+    cacheMb: positiveInt("I3X_DB_CACHE_MB", 64),
+    fingerprint: JSON.stringify([namespaceName, namespaceUri]),
+    log: fplus.debug.bound("store"),
+});
+
+// The object tree. ConfigSync (below) fills it from ConfigDB.
 const objectTree = await new ObjectTree({
     fplus,
-    namespaceName: env.I3X_NAMESPACE_NAME || "Default",
-    namespaceUri: env.I3X_NAMESPACE_URI || "https://example.com"
+    namespaceName,
+    namespaceUri,
+    store,
 }).init();
 
-// Start value cache (subscribes to UNS/v1/#)
-const valueCache = await new ValueCache({
+// The value cache. Last values go to the same database, in batches.
+const valueCache = new ValueCache({
     objectTree,
-    staleThreshold: parseInt(env.I3X_STALE_THRESHOLD || "300000")
-}).init(fplus);
+    store,
+    staleThreshold: parseInt(env.I3X_STALE_THRESHOLD || "300000"),
+    // After a restart or MQTT reconnect, stored values are caught up
+    // from InfluxDB rather than cleared, unless the gap is too long.
+    catchUpMargin: positiveInt("I3X_CATCHUP_MARGIN_MS", 60_000),
+    catchUpMaxGap: positiveInt("I3X_CATCHUP_MAX_GAP_MS", 24 * 3600_000),
+    // Values kept from InfluxDB are refreshed the same way while
+    // connected: their devices may not publish to the UNS.
+    refreshInterval: positiveInt("I3X_INFLUX_REFRESH_MS", 300_000),
+});
 
 // History module (InfluxDB)
 const history = new History({
@@ -44,21 +76,35 @@ const history = new History({
     influxOrg: env.INFLUX_ORG || "default",
     influxBucket: env.INFLUX_BUCKET || "default",
     objectTree,
+    // Flux queries in flight across the whole process.
+    influxConcurrency: positiveInt("I3X_INFLUX_CONCURRENCY", 4),
+    // Current values read from InfluxDB are kept for the next read.
+    valueCache,
 });
+
+// Subscribe to UNS/v1/#, catching up stored values from InfluxDB.
+await valueCache.init(fplus, history);
 
 // Subscription manager
 const subscriptions = new SubscriptionManager({
     valueCache,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
+    maxQueue: positiveInt("I3X_SUBSCRIPTION_QUEUE_MAX", 10_000),
 });
 
-// Build RAG engine (graph + search index)
-const i3xRag = new I3xRag(objectTree, valueCache, history);
-i3xRag.init();
+// The MCP endpoint and its RAG index (a graph and a search index of
+// the whole tree, about 47 KB of heap per device) are opt-in. When
+// off, nothing is built and /mcp answers 404.
+let mcpServer: McpServer | undefined;
+if (env.I3X_MCP_ENABLED === "true") {
+    // Built on the first MCP query, and again on the first query
+    // after any change to the tree.
+    const i3xRag = new I3xRag(objectTree, valueCache, history);
+    objectTree.onChange(() => i3xRag.markDirty());
 
-// MCP server
-const mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
-registerRagTools(mcpServer, i3xRag);
+    mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
+    registerRagTools(mcpServer, i3xRag);
+}
 
 const api = await new WebAPI({
     ping: {
@@ -83,8 +129,20 @@ const api = await new WebAPI({
         subscriptions,
         mcpServer,
         maxDepthCap: parseInt(env.I3X_MAX_DEPTH_CAP || "0"),
+        debug: fplus.debug,
     }),
 }).init();
 
 api.run();
-new ObjectTreeRefresh({fplus, objectTree, i3xRag}).run()
+
+// Keep the tree in step with ConfigDB. The API answers 503 until the
+// first sync completes, or at once with a database from an earlier run.
+new ConfigSync({
+    objectTree,
+    store,
+    ...configSyncFeeds(fplus),
+    valueCache,
+    concurrency: positiveInt("I3X_SYNC_CONCURRENCY", 16),
+    readyGrace: positiveInt("I3X_READY_GRACE_MS", 120_000),
+    log: fplus.debug.bound("sync"),
+}).run();

@@ -14,6 +14,7 @@ import { Optional, Response } from "@amrc-factoryplus/rx-util";
 
 import { Class, Perm, Special }     from "./uuids.js";
 import { valid_uuid, valid_krb }    from "./validate.js";
+import { owned_apply }              from "./owned.js";
 
 export class DataFlow {
     constructor (opts) {
@@ -106,14 +107,14 @@ export class DataFlow {
         const { cdb } = this;
         const { App } = UUIDs;
 
+        /* The Registration app holds an entry for every object, so
+         * it is large. Rebuilding this index from the whole map on
+         * every change made each object create cost O(N). Apply each
+         * change to the previous index instead. This emits once per
+         * Registration update, as the rebuild did. */
         return rxx.rx(
-            cdb.search_app(App.Registration),
-            rx.map(es => es.entrySeq()
-                .map(([obj, inf]) => [obj, inf.owner])
-                .filter(([obj, owner]) => owner != Special.Unowned)
-                .groupBy(([obj, owner]) => owner)
-                .toMap()
-                .map(es => new imm.Set(es.map(e => e[0])))),
+            cdb.search_app_changes(App.Registration),
+            rx.scan(owned_apply, null),
             rx.shareReplay(1));
     }
 

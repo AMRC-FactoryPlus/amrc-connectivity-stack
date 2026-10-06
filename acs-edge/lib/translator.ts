@@ -35,6 +35,34 @@ import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
 import { DriverConnection } from "./devices/driver.js";
 import { Scout, ScoutResult } from "./scout.js";
 
+/* Does this parsed config contain a secret placeholder anywhere, in a
+ * key or in a string value? Uses an explicit stack, as a config can be
+ * tens of MB and deeply nested. The test is the "__FPSI__" prefix alone,
+ * which is looser than the full token pattern in fetchConfig. A false
+ * positive only costs the string round trip. A false negative would leak
+ * a placeholder, and none is possible: JSON.stringify escapes none of
+ * the characters in the prefix or the token, so any token in the
+ * stringified config is also in a key or value here. */
+export function hasSecretPlaceholder (root: unknown): boolean {
+    const stack: unknown[] = [root];
+    while (stack.length) {
+        const node = stack.pop();
+        if (typeof node === "string") {
+            if (node.includes("__FPSI__")) return true;
+        }
+        else if (Array.isArray(node)) {
+            for (const v of node) stack.push(v);
+        }
+        else if (node !== null && typeof node === "object") {
+            for (const k of Object.keys(node)) {
+                if (k.includes("__FPSI__")) return true;
+                stack.push((node as any)[k]);
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Translator class basically turns config file into instantiated classes
  * for device protocol translation and Sparkplug communication
@@ -66,6 +94,9 @@ export class Translator extends EventEmitter {
     devices: {
         [index: string]: any
     }
+    /* Bumped whenever this.devices is rebuilt, so the data routes of
+     * each connection know to rebuild too. */
+    deviceGen = 0
 
     constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
@@ -301,6 +332,7 @@ export class Translator extends EventEmitter {
                 this.devices[devConf.deviceId] = new Device(
                     this.sparkplugNode, newConn, devConf);
             });
+            this.deviceGen++;
     
             // What to do when the connection is open
             newConn.on('open', () => {
@@ -309,16 +341,43 @@ export class Translator extends EventEmitter {
                 })
             });
     
-            // What to do when the device connection has new data from a device
+            // What to do when the device connection has new data from a device.
+            // Only the devices that own one of the addresses in the message
+            // can use it, so call just those, in config order, with the
+            // whole message. Splitting the message per address would change
+            // what _handleData sees (it checks the number of keys).
+            let routes: Map<string, number[]> = new Map();
+            let routeGen = -1;
             newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
                 //log(util.format("Received data for %s: (%s) %O",
                 //    connection.name, parseVals, obj));
-                connection.devices?.forEach((devConf: deviceOptions) => {
-                    this.devices[devConf.deviceId]?._handleData(obj, parseVals);
-                })
+                const confs: deviceOptions[] = connection.devices ?? [];
+                if (routeGen !== this.deviceGen) {
+                    routes = this.buildRoutes(confs);
+                    routeGen = this.deviceGen;
+                }
+                // Not a Set of one: avoid allocating on the common path
+                let owners: number[] | undefined;
+                let union: Set<number> | undefined;
+                for (const addr in obj) {
+                    const own = routes.get(addr);
+                    if (!own) continue;
+                    if (!owners) owners = own;
+                    else {
+                        union ??= new Set(owners);
+                        for (const i of own) union.add(i);
+                    }
+                }
+                if (union) owners = [...union].sort((a, b) => a - b);
+                if (!owners) return;
+                for (const i of owners)
+                    this.devices[confs[i].deviceId]?._handleData(obj, parseVals);
             })
-    
-            // What to do when device connection dies
+
+            // What to do when device connection dies. Every device is told,
+            // not just the owners of an address. If the death timer in
+            // Device is ever re-enabled, data must again go to every device
+            // as {} so that a silent device can be refreshed.
             newConn.on('close', () => {
                 connection.devices?.forEach((devConf: deviceOptions) => {
                     this.devices[devConf.deviceId]?._deviceDisconnected();
@@ -330,6 +389,23 @@ export class Translator extends EventEmitter {
         catch(err){
             log(`Error when trying to create devices ${(err as Error).message}`)
         }
+    }
+
+    /* Map each address to the indices (into confs) of the devices that
+     * read it, in ascending order. Addresses come from the devices as
+     * currently registered in this.devices. Websocket and UDP data use
+     * the address "". */
+    buildRoutes (confs: deviceOptions[]): Map<string, number[]> {
+        const routes = new Map<string, number[]>();
+        confs.forEach((conf, i) => {
+            const addrs: string[] = this.devices[conf.deviceId]?._metrics?.addresses ?? [];
+            for (const addr of addrs) {
+                const own = routes.get(addr);
+                if (own) own.push(i);
+                else routes.set(addr, [i]);
+            }
+        });
+        return routes;
     }
 
     /* There is a better way to do this. At minimum this should be in a
@@ -406,7 +482,9 @@ export class Translator extends EventEmitter {
         log(`Fetched config with etag [${etag}]`);
 
         let valid = true;
-        if (config) {
+        /* Skip the string round trip when there is nothing to fill. For
+         * a large config it costs a transient of over 100 MiB. */
+        if (config && hasSecretPlaceholder(config)) {
             // Replace all occurrences of __FPSI_<v4UUID> with the actual
             // secret of the same name from /etc/secrets
 

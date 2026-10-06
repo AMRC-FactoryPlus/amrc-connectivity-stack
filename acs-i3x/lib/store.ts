@@ -20,6 +20,17 @@ import { Worker } from "node:worker_threads";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 
 /** Bump this whenever the tables below change. */
+/** Is this error from opening a database file that is damaged, as
+ * opposed to busy or unreadable? SQLITE_CORRUPT (11) or SQLITE_NOTADB
+ * (26), including their extended codes (the low byte is the primary
+ * code), or our own length check. */
+function isCorrupt(err: unknown): boolean {
+    const e = err as { errcode?: number; message?: string };
+    const code = (e?.errcode ?? 0) & 0xff;
+    return code === 11 || code === 26
+        || /database file is truncated/.test(e?.message ?? "");
+}
+
 export const SCHEMA_VERSION = 2;
 
 const TABLES = `
@@ -108,6 +119,8 @@ const TABLES = `
 export interface I3xStoreOpts {
     /** File path, or ":memory:". */
     path?: string;
+    /** Ms to wait for another process's lock while opening. */
+    openBusyTimeout?: number;
     /** Page cache limit in MiB. */
     cacheMb?: number;
     /** Must match the stored value or the database is rebuilt. Use it
@@ -245,8 +258,13 @@ export class I3xStore {
             /* A corrupt or truncated file (a node crash, a bad volume
              * restore) would fail every start. The database is a cache
              * of ConfigDB, so start again from nothing; the next sync
-             * fills it. */
+             * fills it. Only for corruption: during a rolling restart
+             * the old pod can still hold a lock, and deleting the file
+             * then would throw away a good database (and pull it from
+             * under the old process). Anything else fails the start and
+             * Kubernetes tries again. */
             if (this.path === ":memory:" || this.path === "") throw err;
+            if (!isCorrupt(err)) throw err;
             console.error(`I3xStore: cannot open ${this.path}; DELETING it and the WAL and starting a new database. The next sync rebuilds it from ConfigDB.`, err);
             for (const f of [this.path, `${this.path}-wal`, `${this.path}-shm`])
                 rmSync(f, { force: true });
@@ -319,6 +337,9 @@ export class I3xStore {
         const { DatabaseSync } = loadSqlite();
         const db = new DatabaseSync(this.path);
         try {
+            /* Wait for another process's lock rather than fail: the old
+             * pod of a rolling restart may still be shutting down. */
+            db.exec(`pragma busy_timeout = ${opts.openBusyTimeout ?? 30_000}`);
             const cacheMb = opts.cacheMb ?? 64;
             db.exec(`
                 pragma journal_mode = wal;
@@ -333,6 +354,9 @@ export class I3xStore {
             (this as { db: DatabaseSync }).db = db;
             this.checkLength(db);
             this.ensureSchema(opts.fingerprint ?? "");
+            /* At run time a lock is never worth blocking the event loop
+             * for; the callers handle SQLITE_BUSY. */
+            db.exec("pragma busy_timeout = 0");
             return db;
         } catch (err) {
             this.statements.clear();

@@ -8,10 +8,20 @@ metadata:
     component: i3x
 spec:
   {{- if .Values.i3x.persistence.enabled }}
-  # The database volume is ReadWriteOnce: stop the old pod before the
-  # new one starts.
+  # The database volume is ReadWriteOnce, so never run two pods by
+  # design: with one replica, maxSurge 0 scales the old pod down before
+  # the new one is created. Unlike Recreate it does not wait for the old
+  # pod to finish terminating, so the two can share the file for a few
+  # seconds; the store waits for the old pod's locks when it opens.
+  # Recreate itself cannot be used: switching an existing Deployment to
+  # it fails under server-side apply (the Helm 4 default), because the
+  # defaulted rollingUpdate block stays and the API server rejects
+  # rollingUpdate with type Recreate.
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   {{- end }}
   replicas: 1
   selector:

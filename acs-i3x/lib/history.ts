@@ -420,7 +420,36 @@ export class History {
      * absent from the returned map.
      */
     async getCurrentValues(leafIds: string[]): Promise<Map<string, I3xValueResponse>> {
+        const { values } = await this.readLast(leafIds, "-30d", this.bulkConcurrency);
+        await this.remember(values.values());
+        return values;
+    }
+
+    /**
+     * For ValueCache's catch-up after a restart or reconnect: the last
+     * value of each leaf that has a point at or after `start` (an RFC
+     * 3339 time), matched exactly as getCurrentValues matches them.
+     * `known` holds the leaves that have MetricMeta, so could be looked
+     * up; a known leaf missing from `values` has no point since
+     * `start`. Nothing is written to the value cache. Uses half the
+     * bulk concurrency, leaving semaphore slots for the reads that fall
+     * back to InfluxDB meanwhile.
+     */
+    async lastValuesSince(leafIds: string[], start: string): Promise<{
+        known: Set<string>;
+        values: Map<string, I3xValueResponse>;
+    }> {
+        return this.readLast(leafIds, start, Math.max(1, Math.floor(this.bulkConcurrency / 2)));
+    }
+
+    /** getCurrentValues over the window from `start`, without writing
+     * the values back. */
+    private async readLast(leafIds: string[], start: string, concurrency: number): Promise<{
+        known: Set<string>;
+        values: Map<string, I3xValueResponse>;
+    }> {
         const wanted: Array<{ leafId: string; key: string }> = [];
+        const known = new Set<string>();
         // Measurements each device's leaves need.
         const devices = new Map<string, Set<string>>();
         const slicer = new Slicer();
@@ -428,6 +457,7 @@ export class History {
             await slicer.maybe();
             const meta = this.objectTree.getMetricMeta(leafId);
             if (!meta) continue;
+            known.add(leafId);
             const measurement = `${meta.metricName}:${meta.typeSuffix}`;
             // A leaf without a path is not filtered on path at all by
             // the per-leaf query, so match it on measurement and
@@ -442,13 +472,13 @@ export class History {
         }
 
         const out = new Map<string, I3xValueResponse>();
-        if (wanted.length === 0) return out;
+        if (wanted.length === 0) return { known, values: out };
 
         // First row seen per key. Both the path-qualified and the
         // path-less key are recorded for every row.
         const first = new Map<string, { _value: unknown; _time: string }>();
         const chunks = chunk([...devices.keys()], this.bulkChunkSize);
-        await mapLimit(chunks, this.bulkConcurrency, async (tlis) => {
+        await mapLimit(chunks, concurrency, async (tlis) => {
             const measurements = new Set<string>();
             for (const tli of tlis) {
                 for (const m of devices.get(tli)!) measurements.add(m);
@@ -456,7 +486,7 @@ export class History {
             const filter = measurements.size <= this.bulkMeasurementFilterMax
                 ? [...measurements]
                 : undefined;
-            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter));
+            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter, start));
             for (const row of rows) {
                 const path = row.path ?? "";
                 const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
@@ -478,17 +508,17 @@ export class History {
                 timestamp: row._time,
             });
         }
-        await this.remember(out.values());
-        return out;
+        return { known, values: out };
     }
 
     /**
      * Build the bulk last-value query for a chunk of devices, and
-     * optionally only those measurements. Uses `or` chains of equality
-     * tests, directly after range(), because InfluxDB pushes those
-     * down to the storage index.
+     * optionally only those measurements, over the window from `start`
+     * (a Flux duration or an RFC 3339 time we made, never client
+     * input). Uses `or` chains of equality tests, directly after
+     * range(), because InfluxDB pushes those down to the storage index.
      */
-    buildBulkLastQuery(topLevelInstances: string[], measurements?: string[]): string {
+    buildBulkLastQuery(topLevelInstances: string[], measurements?: string[], start: string = "-30d"): string {
         const anyOf = (tag: string, values: string[]) => values
             .map((v) => `r[${fluxString(tag)}] == ${fluxString(v)}`)
             .join(" or ");
@@ -497,7 +527,7 @@ export class History {
             : "";
         return [
             `from(bucket: ${fluxString(this.bucket)})`,
-            `  |> range(start: -30d)`,
+            `  |> range(start: ${start})`,
             measurementFilter,
             `  |> filter(fn: (r) => ${anyOf("topLevelInstance", topLevelInstances)})`,
             `  |> filter(fn: (r) => r["_field"] == "value")`,

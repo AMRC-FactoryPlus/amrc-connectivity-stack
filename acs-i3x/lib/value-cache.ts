@@ -14,8 +14,15 @@
  *
  * InfluxDB results read by History on a cache miss are written back
  * here too (recordInfluxValues), so the next read of that metric is
- * served locally. Only for devices that publish to UNS: nothing else
- * would ever replace them.
+ * served locally. Only for devices that publish to UNS, whose later
+ * changes arrive as UNS messages.
+ *
+ * UNS messages are not retained, so those sent while i3X was down or
+ * disconnected are lost. After a restart or an MQTT reconnect the
+ * stored values are not trusted until a catch-up has read from
+ * InfluxDB every series with a point since they were last known to be
+ * current (see catchUp). Until then reads see only rows written since,
+ * as they would after clearing every value.
  */
 
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
@@ -33,7 +40,54 @@ interface ValueCacheOpts {
     flushInterval?: number;
     /** Write at once when this many values are waiting (default 1,000). */
     flushMaxRows?: number;
+    /**
+     * Ms subtracted from the time stored values were last current, and
+     * waited after connecting, before the catch-up reads InfluxDB:
+     * covers the historian's write delay and device clocks behind
+     * ours. Default 60 s.
+     */
+    catchUpMargin?: number;
+    /** Longest gap, in ms, to catch up rather than clear. Default 24 h,
+     * at most 30 days (the window InfluxDB reads use). */
+    catchUpMaxGap?: number;
+    /** Most changed values a catch-up takes before it gives up and
+     * clears instead. Default 1,000,000. */
+    catchUpMaxRows?: number;
+    /** Waits, in ms, before each retry of a failed catch-up query; once
+     * they are used up the values are cleared. */
+    catchUpRetryDelays?: number[];
+    /** How often, in ms, to record that the stored values are current.
+     * Default 5 s. */
+    currentInterval?: number;
+    /**
+     * How often, in ms, to refresh the values kept from InfluxDB (and
+     * "no data" markers) while connected, with the catch-up query over
+     * the time since the last refresh. Their devices may not publish
+     * to the UNS, so nothing else would replace them. Default 5 min.
+     */
+    refreshInterval?: number;
 }
+
+/**
+ * What ValueCache needs from History to catch up: for each leaf it can
+ * look up (`known`), the last value at or after `start`, if any.
+ */
+export interface CatchUpSource {
+    lastValuesSince(leafIds: string[], start: string): Promise<{
+        known: Set<string>;
+        values: Map<string, { value: unknown; quality: string; timestamp: string }>;
+    }>;
+}
+
+/** The meta key for the time (ms since the epoch) up to which every
+ * UNS message received is reflected in last_value. */
+const CURRENT_UNTIL = "values_current_until";
+
+/** The window History reads current values over. */
+const MAX_GAP_LIMIT = 30 * 24 * 3600_000;
+
+/** A catch-up result too large to apply; the values are cleared. */
+class CatchUpTooLarge extends Error {}
 
 /**
  * Minimal interface that ValueCache needs from ObjectTree.
@@ -68,6 +122,8 @@ export interface InfluxValue {
 }
 
 interface Pending {
+    /** When the oldest message not yet written for this leaf came. */
+    at: number;
     anchor: string;
     device: string;
     valueJson: string | null;
@@ -149,10 +205,17 @@ const MAX_BACKLOG_BATCHES = 10;
 const WRITE_RETRY_MIN = 5_000;
 const WRITE_RETRY_MAX = 60_000;
 
+/* The first parameter is the trust boundary (ValueCache.trustAbove): a
+ * new row, or one replacing an untrusted row, gets a seq above it and
+ * above every row, so it is trusted. SQLite would otherwise reuse the
+ * seq of a deleted last row, which can be below the boundary. */
+const NEXT_SEQ = "max(coalesce((select max(seq) from last_value), 0), ?) + 1";
+
 const UPSERT = (source: string, guard: string) => `
-    insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
-    values (?, ?, ?, ?, ?, ?, '${source}')
+    insert into last_value (seq, element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+    values (${NEXT_SEQ}, ?, ?, ?, ?, ?, ?, '${source}')
     on conflict (element_id) do update set
+        seq = case when last_value.seq <= ? then excluded.seq else last_value.seq end,
         anchor = excluded.anchor,
         device_uuid = excluded.device_uuid,
         value_json = excluded.value_json,
@@ -184,6 +247,31 @@ export class ValueCache {
     private errorsSinceLog = 0;
     private droppedSinceLog = 0;
 
+    /** Rows with seq up to this are not trusted: they were stored
+     * before a restart or reconnect and the catch-up has not yet
+     * checked them. 0 when every row is trusted. */
+    private trustAbove = 0;
+    /** Bumped to abandon a running catch-up. */
+    private catchUpGen = 0;
+    private catchUpSource: CatchUpSource | null = null;
+    private catchUpMargin: number;
+    private catchUpMaxGap: number;
+    private catchUpMaxRows: number;
+    private catchUpRetryDelays: number[];
+    private currentInterval: number;
+    private currentTimer: ReturnType<typeof setInterval> | null = null;
+    private refreshInterval: number;
+    private refreshTimer: ReturnType<typeof setInterval> | null = null;
+    private refreshing = false;
+    /** InfluxDB points before this time (ms, less the margin) are
+     * reflected in the values kept from InfluxDB. */
+    private refreshFrom = 0;
+    /** MQTT is connected. */
+    private mqttUp = false;
+    /** Connected and caught up: every UNS message is being seen, so the
+     * stored values can be recorded as current. */
+    private live = false;
+
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
         this.staleThreshold = opts.staleThreshold;
@@ -191,6 +279,12 @@ export class ValueCache {
         this.flushInterval = opts.flushInterval ?? 250;
         /* Each flush is one synchronous write; keep it short. */
         this.flushMaxRows = opts.flushMaxRows ?? 1000;
+        this.catchUpMargin = opts.catchUpMargin ?? 60_000;
+        this.catchUpMaxGap = Math.min(opts.catchUpMaxGap ?? 24 * 3600_000, MAX_GAP_LIMIT);
+        this.catchUpMaxRows = opts.catchUpMaxRows ?? 1_000_000;
+        this.catchUpRetryDelays = opts.catchUpRetryDelays ?? [5_000, 15_000, 45_000];
+        this.currentInterval = opts.currentInterval ?? 5_000;
+        this.refreshInterval = opts.refreshInterval ?? 300_000;
         /* A failed group commit loses the values written in its batch,
          * so a stored value may no longer be the last one. Forget them
          * all, as after an MQTT reconnect. */
@@ -202,13 +296,19 @@ export class ValueCache {
         });
     }
 
-    async init(fplus: any): Promise<this> {
+    /**
+     * Subscribe to the UNS. With `catchUp` (History), values stored by
+     * an earlier run are kept and caught up from InfluxDB once MQTT is
+     * connected; without it they are cleared, as they always were.
+     */
+    async init(fplus: any, catchUp?: CatchUpSource): Promise<this> {
         this.log = fplus.debug.bound("value-cache");
+        this.catchUpSource = catchUp ?? null;
 
         /* Values stored by an earlier run may have changed while it was
-         * down; we did not see those UNS messages. Start empty, as the
-         * in-memory cache did, and let reads fill it from InfluxDB. */
-        this.safeClear("at start");
+         * down; we did not see those UNS messages. Stop trusting them
+         * until the catch-up has checked them, or start empty. */
+        this.distrust("at start");
 
         this.log("requesting MQTT client from ServiceClient");
         const mqtt = await fplus.mqtt_client();
@@ -225,17 +325,39 @@ export class ValueCache {
         let connected = false;
         mqtt.on("connect", () => {
             this.log("MQTT connected");
+            this.mqttUp = true;
             /* Messages sent while we were disconnected are lost, so a
              * stored value may no longer be the last one. */
-            if (connected) this.safeClear("after an MQTT reconnect");
+            if (connected) this.distrust("after an MQTT reconnect");
             connected = true;
+            /* The subscription is in place (mqtt.js renews it on each
+             * connect), so every message from now on is seen: start the
+             * catch-up, which reads InfluxDB only after the margin. */
+            if (this.trustAbove > 0) this.startCatchUp();
+            else this.goLive();
         });
         mqtt.on("error", (err: any) => {
             console.error("ValueCache: MQTT error:", err);
         });
         mqtt.on("close", () => {
             this.log("MQTT connection closed");
+            /* Fix the time the values were last current at now. */
+            if (this.live) this.recordCurrent();
+            this.mqttUp = false;
+            this.live = false;
         });
+        if (!this.currentTimer) {
+            this.currentTimer = setInterval(() => {
+                if (this.live) this.recordCurrent();
+            }, this.currentInterval);
+            this.currentTimer.unref?.();
+        }
+        if (!this.refreshTimer && this.catchUpSource) {
+            this.refreshTimer = setInterval(() => {
+                if (this.live && !this.refreshing) this.refresh();
+            }, this.refreshInterval);
+            this.refreshTimer.unref?.();
+        }
         this.ready = true;
         this.log("initialised and subscribed");
         return this;
@@ -320,6 +442,7 @@ export class ValueCache {
         // is shorter than the metric path.
         const anchor = this.objectTree.getObject(elementId)?.parentId ?? bottomUuid;
         this.pending.set(elementId, {
+            at: this.pending.get(elementId)?.at ?? Date.now(),
             anchor,
             device: instanceUuidPath[0],
             valueJson: toJson(vqt.value),
@@ -421,9 +544,10 @@ export class ValueCache {
         }
         try {
             const st = this.store.prepare(UPSERT("uns", ""));
+            const b = this.trustAbove;
             this.store.transaction(() => {
                 for (const [id, p] of batch)
-                    st.run(id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality);
+                    st.run(b, id, p.anchor, p.device, p.valueJson, p.timestamp, p.quality, b);
             });
             this.retryDelay = 0;
             this.retryNotBefore = 0;
@@ -479,16 +603,18 @@ export class ValueCache {
     /**
      * Keep values History read from InfluxDB. A stored value with a
      * later timestamp (a UNS message that arrived during the query)
-     * is not replaced.
+     * is not replaced. An untrusted value is replaced whatever its
+     * timestamp, as if it had been cleared.
      */
     recordInfluxValues(values: InfluxValue[]): void {
         if (values.length === 0) return;
         const st = this.store.prepare(UPSERT("influx",
-            "where last_value.source = 'empty' or julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
+            "where last_value.seq <= ? or last_value.source = 'empty' or julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
+        const b = this.trustAbove;
         this.store.transaction(() => {
             for (const v of values) {
-                st.run(v.elementId, v.anchor ?? v.device, v.device,
-                    toJson(v.value), v.timestamp ?? null, v.quality);
+                st.run(b, v.elementId, v.anchor ?? v.device, v.device,
+                    toJson(v.value), v.timestamp ?? null, v.quality, b, b);
             }
         });
     }
@@ -497,16 +623,20 @@ export class ValueCache {
      * Record leaves InfluxDB had no value for, so a composition whose
      * every leaf has been asked about counts as complete (see
      * compositionComplete) and is answered from here next time. A
-     * marker never replaces a value, and any value replaces it.
+     * marker never replaces a trusted value, and any value replaces it.
      */
     recordInfluxEmpty(leaves: Array<{ elementId: string; device: string | null; anchor: string | null }>): void {
         if (leaves.length === 0) return;
         const st = this.store.prepare(`
-            insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
-            values (?, ?, ?, null, null, 'Bad', 'empty')
-            on conflict (element_id) do nothing`);
+            insert into last_value (seq, element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+            values (${NEXT_SEQ}, ?, ?, ?, null, null, 'Bad', 'empty')
+            on conflict (element_id) do update set
+                seq = excluded.seq, anchor = excluded.anchor, device_uuid = excluded.device_uuid,
+                value_json = null, timestamp = null, quality = 'Bad', source = 'empty'
+            where last_value.seq <= ?`);
+        const b = this.trustAbove;
         this.store.transaction(() => {
-            for (const l of leaves) st.run(l.elementId, l.anchor ?? l.device, l.device);
+            for (const l of leaves) st.run(b, l.elementId, l.anchor ?? l.device, l.device, b);
         });
     }
 
@@ -550,7 +680,8 @@ export class ValueCache {
         });
     }
 
-    /** Forget every value. */
+    /** Forget every value. Ends a catch-up: there is nothing left to
+     * check. */
     clear(): void {
         this.pending.clear();
         if (this.timer) {
@@ -558,12 +689,296 @@ export class ValueCache {
             this.timer = null;
         }
         this.store.prepare("delete from last_value").run();
+        this.refreshFrom = Date.now();
+        if (this.trustAbove > 0 || !this.live) {
+            this.catchUpGen++;
+            this.trustAbove = 0;
+            if (this.mqttUp) this.goLive();
+        }
     }
 
-    /** Number of stored values, for tests and diagnostics. */
+    /** Number of stored values a read can see, for tests and
+     * diagnostics. */
     size(): number {
         this.flush();
-        return (this.store.prepare("select count(*) n from last_value where source != 'empty'").get() as any).n;
+        return (this.store.prepare("select count(*) n from last_value where source != 'empty' and seq > ?")
+            .get(this.trustAbove) as any).n;
+    }
+
+    /** True while stored values wait for a catch-up. */
+    catchingUp(): boolean {
+        return this.trustAbove > 0;
+    }
+
+    /* ---- Catching up after a restart or reconnect ---- */
+
+    /**
+     * Record that every UNS message received so far is in last_value,
+     * or will be: the time the oldest unwritten one came, or now. The
+     * write joins the current group commit, so it is durable with the
+     * values before it. Only while live; a catch-up in progress must
+     * not move it, or a crash before the end would skip the gap.
+     */
+    private recordCurrent(): void {
+        let at = Date.now();
+        for (const p of this.pending.values()) { at = Math.min(at, p.at); break; }
+        try {
+            this.store.setMeta(CURRENT_UNTIL, String(at));
+        } catch (err) {
+            if (this.logDue()) console.error("ValueCache: recording the time values were current failed:", err);
+        }
+    }
+
+    private goLive(): void {
+        if (this.live) return;
+        this.live = true;
+        if (!this.refreshFrom) this.refreshFrom = Date.now();
+        this.recordCurrent();
+    }
+
+    /**
+     * After a restart or a reconnect: stop serving the stored values
+     * until a catch-up has checked them, or clear them when a catch-up
+     * cannot be trusted to find every change. Queued values are written
+     * first, so they are checked too, as clearing would have dropped
+     * them.
+     */
+    private distrust(when: string): void {
+        this.catchUpGen++;
+        this.live = false;
+        const why = this.catchUpUnsafe();
+        if (why) {
+            this.log("clearing values %s: %s", when, why);
+            this.safeClear(when);
+            return;
+        }
+        if (!this.flush()) {
+            this.safeClear(when);
+            return;
+        }
+        try {
+            this.trustAbove = (this.store.prepare("select coalesce(max(seq), 0) n from last_value").get() as any).n;
+        } catch (err) {
+            console.error(`ValueCache: reading values ${when} failed:`, err);
+            this.safeClear(when);
+            return;
+        }
+        if (this.trustAbove > 0)
+            this.log("values stored up to seq %d wait for a catch-up %s", this.trustAbove, when);
+    }
+
+    /** Why the stored values cannot be caught up, or null if they can. */
+    private catchUpUnsafe(): string | null {
+        if (!this.catchUpSource) return "no InfluxDB to catch up from";
+        let until: number;
+        try {
+            until = Number(this.store.getMeta(CURRENT_UNTIL));
+        } catch {
+            return "cannot read when they were last current";
+        }
+        if (!Number.isFinite(until) || until <= 0) return "no record of when they were last current";
+        const gap = Date.now() - until;
+        if (gap > this.catchUpMaxGap)
+            return `last current ${Math.round(gap / 1000)} s ago, more than the ${Math.round(this.catchUpMaxGap / 1000)} s limit`;
+        return null;
+    }
+
+    /**
+     * Run the catch-up, after the margin: points published just before
+     * we subscribed reach InfluxDB only when the historian next writes.
+     * A failed query is tried again after each of catchUpRetryDelays;
+     * after the last, or for a result too large, the values are
+     * cleared. A newer distrust() or clear() abandons this one.
+     */
+    private startCatchUp(): void {
+        const gen = this.catchUpGen;
+        const wait = (ms: number) => new Promise<void>(r => {
+            const t = setTimeout(r, ms);
+            t.unref?.();
+        });
+        (async () => {
+            await wait(this.catchUpMargin);
+            if (gen !== this.catchUpGen) return;
+            /* The gap has grown while we waited. */
+            const why = this.catchUpUnsafe();
+            if (why) {
+                this.log("clearing values instead of catching up: %s", why);
+                this.safeClear("before a catch-up");
+                return;
+            }
+            const started = Date.now();
+            try {
+                const until = Number(this.store.getMeta(CURRENT_UNTIL));
+                const counts = await this.catchUp(gen, wait, until, false);
+                if (gen !== this.catchUpGen) return;
+                this.trustAbove = 0;
+                this.refreshFrom = started;
+                this.log("caught up: %d values changed, %d dropped, of %d stored for %d devices, in %d ms",
+                    counts.changed, counts.dropped, counts.checked, counts.devices, Date.now() - started);
+                if (this.mqttUp) this.goLive();
+            } catch (err) {
+                if (gen !== this.catchUpGen) return;
+                console.error("ValueCache: catch-up from InfluxDB failed after %d ms; clearing values instead:",
+                    Date.now() - started, err instanceof CatchUpTooLarge ? err.message : err);
+                this.safeClear("after a failed catch-up");
+            }
+        })();
+    }
+
+    /**
+     * While connected, bring the values kept from InfluxDB, and the
+     * "no data" markers, up to date with the points written since the
+     * last refresh (less the margin). Their devices may not publish to
+     * the UNS, so before catch-up replaced clearing, only a restart or
+     * reconnect refreshed them; now nothing else would. A failure is
+     * logged and the next refresh covers the same time again. After a
+     * gap longer than the catch-up limit, or a result too large, those
+     * rows are dropped and read again when next asked for.
+     */
+    private refresh(): void {
+        const gen = this.catchUpGen;
+        const from = this.refreshFrom;
+        const started = Date.now();
+        const dropAll = (why: string) => {
+            this.log("dropping values kept from InfluxDB: %s", why);
+            try {
+                this.store.prepare("delete from last_value where source in ('influx', 'empty')").run();
+                this.refreshFrom = started;
+            } catch (err) {
+                console.error("ValueCache: dropping values kept from InfluxDB failed:", err);
+            }
+        };
+        if (started - from > this.catchUpMaxGap) {
+            dropAll(`last refreshed ${Math.round((started - from) / 1000)} s ago`);
+            return;
+        }
+        this.refreshing = true;
+        (async () => {
+            try {
+                const counts = await this.catchUp(gen, async () => {}, from, true);
+                if (gen !== this.catchUpGen) return;
+                this.refreshFrom = started;
+                this.log("refreshed values kept from InfluxDB: %d changed, of %d for %d devices, in %d ms",
+                    counts.changed, counts.checked, counts.devices, Date.now() - started);
+            } catch (err) {
+                if (gen !== this.catchUpGen) return;
+                if (err instanceof CatchUpTooLarge) dropAll(err.message);
+                else console.error("ValueCache: refreshing values kept from InfluxDB failed; trying again next time:", err);
+            } finally {
+                this.refreshing = false;
+            }
+        })();
+    }
+
+    /**
+     * Bring the untrusted rows up to date: read from InfluxDB, for the
+     * leaves they hold, the last point of every series written since
+     * the values were last current (less the margin), and apply each as
+     * a newer value. A leaf with no such point has not changed. A row
+     * InfluxDB cannot vouch for (a leaf without MetricMeta, or with no
+     * device) is dropped, as clearing would; a "no data" marker for one
+     * stays, as InfluxDB can never have data for it.
+     *
+     * Works through the devices with untrusted rows a page at a time,
+     * pausing for the event loop. Rows are only updated, never
+     * inserted, so a device sync removes meanwhile stays gone. A newer
+     * value written meanwhile (a UNS message) is kept, as
+     * recordInfluxValues keeps it.
+     *
+     * With `refresh`, the same for the rows kept from InfluxDB and the
+     * markers instead of the untrusted rows (see refresh), dropping
+     * nothing and trying each query once.
+     */
+    private async catchUp(gen: number, wait: (ms: number) => Promise<void>, since: number, refresh: boolean):
+            Promise<{ changed: number; dropped: number; checked: number; devices: number }> {
+        const source = this.catchUpSource!;
+        const b = this.trustAbove;
+        const start = new Date(since - this.catchUpMargin).toISOString();
+        if (!refresh)
+            this.log("catching up values stored up to seq %d from InfluxDB points since %s", b, start);
+
+        const rowsWanted = refresh ? "source in ('influx', 'empty')" : "seq <= ?";
+        const wantArgs = refresh ? [] : [b];
+        const retries = refresh ? [] : this.catchUpRetryDelays;
+        const devicePage = this.store.prepare(`
+            select distinct device_uuid d from last_value
+            where device_uuid > ? and ${rowsWanted} order by device_uuid limit ?`);
+        const leavesOf = this.store.prepare(
+            `select element_id, source from last_value where device_uuid = ? and ${rowsWanted}`);
+        const update = this.store.prepare(`
+            update last_value set value_json = ?, timestamp = ?, quality = ?, source = 'influx'
+            where element_id = ? and (source = 'empty' or (seq <= ? and julianday(timestamp) is null)
+                or julianday(?) > julianday(timestamp))`);
+        const drop = this.store.prepare(
+            "delete from last_value where element_id = ? and seq <= ? and source != 'empty'");
+
+        const counts = { changed: 0, dropped: 0, checked: 0, devices: 0 };
+        const slicer = new Slicer();
+        const abandoned = () => gen !== this.catchUpGen;
+
+        /* Read one batch of leaves from InfluxDB, retrying, and apply. */
+        const apply = async (leaves: Array<{ id: string; source: string }>) => {
+            let result: Awaited<ReturnType<CatchUpSource["lastValuesSince"]>>;
+            for (let attempt = 0;; attempt++) {
+                try {
+                    result = await source.lastValuesSince(leaves.map(l => l.id), start);
+                    break;
+                } catch (err) {
+                    if (abandoned() || attempt >= retries.length) throw err;
+                    const delay = retries[attempt];
+                    console.error("ValueCache: catch-up query failed, trying again in %d s:", delay / 1000, err);
+                    await wait(delay);
+                    if (abandoned()) throw err;
+                }
+            }
+            if (abandoned()) return;
+            counts.changed += result.values.size;
+            if (counts.changed > this.catchUpMaxRows)
+                throw new CatchUpTooLarge(`more than ${this.catchUpMaxRows} values changed`);
+            for (let i = 0; i < leaves.length; i += this.flushMaxRows) {
+                const part = leaves.slice(i, i + this.flushMaxRows);
+                this.store.transaction(() => {
+                    for (const { id, source: src } of part) {
+                        const v = result.values.get(id);
+                        if (v) {
+                            update.run(toJson(v.value), v.timestamp ?? null, v.quality, id, b, v.timestamp ?? null);
+                        } else if (!refresh && !result.known.has(id) && src !== "empty") {
+                            counts.dropped += Number(drop.run(id, b).changes);
+                        }
+                    }
+                });
+                await slicer.maybe();
+                if (abandoned()) return;
+            }
+        };
+
+        let batch: Array<{ id: string; source: string }> = [];
+        for (let after = "";;) {
+            const devices = (devicePage.all(after, ...wantArgs, 256) as Array<{ d: string }>).map(r => r.d);
+            for (const d of devices) {
+                for (const r of leavesOf.all(d, ...wantArgs) as Array<{ element_id: string; source: string }>)
+                    batch.push({ id: r.element_id, source: r.source });
+                counts.devices++;
+                if (batch.length >= 5_000) {
+                    counts.checked += batch.length;
+                    await apply(batch);
+                    batch = [];
+                }
+                if (abandoned()) return counts;
+                await slicer.maybe();
+            }
+            if (devices.length < 256) break;
+            after = devices[devices.length - 1];
+        }
+        if (batch.length) {
+            counts.checked += batch.length;
+            await apply(batch);
+        }
+        if (abandoned() || refresh) return counts;
+        /* Rows with no device: no InfluxDB series to check them by. */
+        counts.dropped += Number(this.store.prepare(
+            "delete from last_value where device_uuid is null and seq <= ? and source != 'empty'").run(b).changes);
+        return counts;
     }
 
     /* ---- Query methods ---- */
@@ -587,11 +1002,11 @@ export class ValueCache {
      * markers, so the next read of it is answered from here.
      */
     private *missingLeaves(rootId: string): Generator<boolean | null> {
-        const has = this.store.prepare("select 1 from last_value where element_id = ?");
+        const has = this.store.prepare("select 1 from last_value where element_id = ? and seq > ?");
         if (!this.objectTree.iterateDescendantLeafIds) { yield true; return; }
         for (const leaf of this.objectTree.iterateDescendantLeafIds(rootId, 0)) {
             if (leaf === null) { yield null; continue; }
-            if (!has.get(leaf)) { yield true; return; }
+            if (!has.get(leaf, this.trustAbove)) { yield true; return; }
         }
     }
 
@@ -631,8 +1046,8 @@ export class ValueCache {
             }) } };
         }
         const row = this.store.prepare(
-            "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
-        ).get(elementId) as unknown as ValueRow | undefined;
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty' and seq > ?",
+        ).get(elementId, this.trustAbove) as unknown as ValueRow | undefined;
         if (row) return { head: { elementId, isComposition: false, ...toVqt(row) } };
 
         const obj = this.objectTree.getObject(elementId);
@@ -688,13 +1103,14 @@ export class ValueCache {
     private *walkComponents(rootId: string, all: boolean = false): Generator<ComponentStep> {
         /* Callers store queued values first (flush or flushSliced). */
         this.store.commit();
+        const trustAbove = this.trustAbove;
         const reader = this.store.openReader();
         try {
             const db: any = reader ?? this.store.db;
             if (reader) reader.exec("begin");
             const values = db.prepare(`
                 select element_id, value_json, quality, timestamp from last_value
-                where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} order by seq`);
+                where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} and seq > ? order by seq`);
             const children = db.prepare(`
                 select o.seq, o.element_id,
                     o.is_composition or exists (select 1 from object c where c.parent_id = o.element_id) walk
@@ -704,7 +1120,7 @@ export class ValueCache {
             const visit = function* (id: string): Generator<ComponentStep> {
                 /* all(): a few dozen rows at most, and no statement left
                  * open while the consumer pauses. */
-                for (const r of values.all(id) as ValueRow[])
+                for (const r of values.all(id, trustAbove) as ValueRow[])
                     yield [r.element_id, toVqt(r)];
                 yield null;
             };
@@ -748,8 +1164,8 @@ export class ValueCache {
              * the value routes use getValueLazy. */
             const flushed = this.flush();
             const row = this.store.prepare(
-                "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
-            ).get(elementId) as unknown as ValueRow | undefined;
+                "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty' and seq > ?",
+            ).get(elementId, this.trustAbove) as unknown as ValueRow | undefined;
             if (row) return { elementId, isComposition: false, ...toVqt(row) };
             const obj = this.objectTree.getObject(elementId);
             if (!obj?.isComposition) return null;
@@ -769,8 +1185,8 @@ export class ValueCache {
 
         // Check if it's a direct leaf metric in the cache
         const row = this.store.prepare(
-            "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
-        ).get(elementId) as unknown as ValueRow | undefined;
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty' and seq > ?",
+        ).get(elementId, this.trustAbove) as unknown as ValueRow | undefined;
         if (row) {
             return {
                 elementId,
@@ -855,8 +1271,8 @@ export class ValueCache {
         // not. Without UNS data the caller falls back to InfluxDB for
         // the whole composition, as it did before values were kept.
         const direct = this.store.prepare(
-            `select element_id, value_json, quality, timestamp from last_value where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} order by seq`,
-        ).all(elementId) as unknown as ValueRow[];
+            `select element_id, value_json, quality, timestamp from last_value where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} and seq > ? order by seq`,
+        ).all(elementId, this.trustAbove) as unknown as ValueRow[];
         for (const r of direct) {
             result[r.element_id] = toVqt(r);
         }

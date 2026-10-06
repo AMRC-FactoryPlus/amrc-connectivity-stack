@@ -565,6 +565,23 @@ i3x:
   # applied while MCP is off: the MCP search index needs several GB at
   # fleet scale. Set to 0 for no cap.
   maxHeapMB: 384
+  # After a restart or an MQTT reconnect, i3X catches up its stored
+  # values from InfluxDB (the points written while it was not listening)
+  # instead of clearing them and reading every value again.
+  catchUp:
+    # -- Ms to allow for the historian's write delay and for device
+    # clocks behind i3X's. i3X waits this long after connecting before
+    # it reads InfluxDB, and reads from this long before the values were
+    # last current. Keep it above the historians' flushInterval.
+    marginMs: 60000
+    # -- Longest gap, in ms, to catch up; after a longer one the values
+    # are cleared and read again. At most 30 days. Keep it below the
+    # InfluxDB bucket's retention.
+    maxGapMs: 86400000
+    # -- Ms between refreshes of the values i3X keeps from InfluxDB,
+    # while connected: the same query over the time since the last
+    # refresh. Devices that do not publish to the UNS change only there.
+    refreshMs: 300000
 
 admin:
   # -- Whether or not to enable the Admin component

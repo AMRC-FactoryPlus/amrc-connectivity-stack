@@ -274,9 +274,63 @@ reads of that leaf. A composition read whole from InfluxDB also leaves a
 "no data" marker for each leaf InfluxDB had nothing for; once every leaf has
 a value or a marker the composition is complete and is built from all its
 stored values. Otherwise it is built from UNS values only, and one with no
-UNS data falls back to InfluxDB whole. Values are
-cleared at start and on an MQTT reconnect, because UNS messages sent while
-i3X was not listening are lost.
+UNS data falls back to InfluxDB whole.
+
+UNS messages sent while i3X was not listening (down, or disconnected from
+MQTT) are lost: they are QoS 0 and not retained. So after a restart or an
+MQTT reconnect the stored values are caught up from InfluxDB instead of
+being cleared, which made every restart re-read every value (about 24
+minutes for a 62,000-device map, against seconds from the cache):
+
+1. While MQTT is connected and the values are trusted, every 5 s and when
+   the connection closes, `values_current_until` in the `meta` table
+   records when the oldest UNS message not yet written arrived (or now).
+   It joins the group commit, so it is durable with the values before it.
+2. At start and on a reconnect, every stored row (seq up to the current
+   maximum) is marked untrusted. Reads skip untrusted rows, so they behave
+   exactly as after a clear: InfluxDB answers and its values are kept. A
+   UNS message, or a value read from InfluxDB, replaces an untrusted row
+   and takes a new seq, so it is trusted.
+3. Once MQTT is connected (the subscription is renewed on each connect),
+   i3X waits `I3X_CATCHUP_MARGIN_MS` (default 60 s) for the historian to
+   write what was published just before, then reads, for the leaves the
+   untrusted rows hold, the last point of every series since
+   `values_current_until` less the same margin. The margin also covers
+   device clocks behind i3X's: InfluxDB filters on the metric timestamp,
+   and has no time of arrival. The query is the bulk `last()` read with a
+   time-bounded range, using half the bulk concurrency under the shared
+   Flux semaphore, a page of devices at a time with pauses for the event
+   loop.
+4. A point newer than the stored value replaces it, and any point
+   replaces a "no data" marker; a newer UNS value written meanwhile is
+   kept. Rows are only updated, so values of a device the sync removes
+   meanwhile stay gone. A leaf with no point since has not changed. Rows
+   InfluxDB cannot vouch for (a leaf without MetricMeta) are dropped.
+   Then every row is trusted again, and the counts and time are logged.
+
+The values are cleared instead, as before, when there is no record of
+when they were current (the first start of this version), when the gap is
+longer than `I3X_CATCHUP_MAX_GAP_MS` (default 24 h, at most 30 days; keep
+it below the InfluxDB bucket's retention, or points from the gap may have
+gone), when the catch-up query still fails after three retries (5, 15 and
+45 s apart), or when more than 1,000,000 values changed. A failed group
+commit still clears. A reconnect during a catch-up starts it again from
+the same time; `values_current_until` does not move until a catch-up
+finishes, so a crash part way through is caught up again on the next
+start.
+
+Values kept from InfluxDB, and "no data" markers, are refreshed the same
+way while connected, every `I3X_INFLUX_REFRESH_MS` (default 5 min): the
+catch-up query over the time since the last refresh (less the margin),
+for the leaves those rows hold. Only devices that publish to the UNS keep InfluxDB values,
+but i3X decides that from ConfigDB while the ingester decides from the
+birth certificate, so a device can change only in InfluxDB while it is
+kept here. Before the catch-up only the clear at start or on a reconnect
+replaced such values; now they are at most one interval plus the margin
+behind. A failed refresh is logged and the next covers the
+same time again; after a gap longer than `I3X_CATCHUP_MAX_GAP_MS`, or more
+than 1,000,000 changes, those rows are dropped and read again when asked
+for.
 
 Only a later UNS message replaces a value kept from InfluxDB, so values
 (and "no data" markers) are kept only for devices that publish to UNS.

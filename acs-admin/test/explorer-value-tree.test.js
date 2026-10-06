@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest'
 
-import { mk_node, load_subtree, count_leaves, leaf_state } from '../src/lib/explorer/value-tree.js'
+import { mk_node, load_subtree, expand, count_leaves, leaf_state } from '../src/lib/explorer/value-tree.js'
 
 /* A street light: leaves of its own, a Location composition with
  * leaves, and a Cyber_Profile two levels deep. */
@@ -153,16 +153,25 @@ describe('composition value tree', () => {
     expect(t.children[3].children).toBe(null)
   })
 
-  it('treats a failed children read as an empty composition', async () => {
+  it('leaves a composition whose children failed to read to be read again', async () => {
     const i3x = fake_i3x()
     const related = i3x.getRelatedBulk
+    let fail = true
     i3x.getRelatedBulk = async (ids, rel) => (await related(ids, rel))
-      .map(r => r.elementId === 'location'
-        ? { success: false, elementId: r.elementId, error: { code: 404 } }
+      .map(r => fail && r.elementId === 'location'
+        ? { success: false, elementId: r.elementId, error: { code: 404, message: 'Object location not found' } }
         : r)
     const t = top()
     await load_subtree(i3x, t)
-    expect(t.children[2].children).toEqual([])
+    const location = t.children[2]
+    expect(location.children).toBe(null)
+    expect(location.error).toBe('Object location not found')
     expect(names(t.children[3])).toEqual(['Network', 'Firmware'])
+
+    fail = false
+    await expand(i3x, location)
+    expect(location.error).toBe(null)
+    expect(names(location)).toEqual(['Latitude', 'Longitude'])
+    expect(location.children[0].vqt).toEqual(vqt('lat'))
   })
 })

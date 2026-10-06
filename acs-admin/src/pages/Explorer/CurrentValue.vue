@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import QualityBadge from '@components/QualityBadge.vue'
 import ValueTreeRow from './ValueTreeRow.vue'
 import { useI3xClient } from '@composables/useI3xClient.js'
-import { mk_node, load_subtree, count_leaves } from '@/lib/explorer/value-tree.js'
+import { mk_node, load_subtree, expand, count_leaves } from '@/lib/explorer/value-tree.js'
 import dayjs from 'dayjs'
 
 const props = defineProps({
@@ -42,6 +42,7 @@ async function fetchValue () {
       if (mine !== generation) return
       leafValue.value = null
       root.value = top
+      if (top.error) error.value = top.error
     } else {
       const value = await i3x.getValue(props.elementId)
       if (mine !== generation) return
@@ -60,10 +61,7 @@ async function toggle (node) {
   if (node.children === null) {
     loadingIds.add(node.elementId)
     try {
-      // Read into a copy, so the rows appear with their values.
-      const loaded = mk_node(node)
-      await load_subtree(i3x, loaded)
-      node.children = loaded.children
+      await expand(i3x, node)
       collapsed.delete(node.elementId)
     } catch (e) {
       error.value = e.message

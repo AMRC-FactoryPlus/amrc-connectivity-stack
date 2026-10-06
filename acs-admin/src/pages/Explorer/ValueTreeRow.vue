@@ -61,7 +61,8 @@ function formatValue (val) {
     </td>
     <template v-if="node.isComposition">
       <td colspan="3" class="px-3 py-1.5 text-xs text-slate-400">
-        <span v-if="node.children === null">Expand to load</span>
+        <span v-if="node.error" class="text-red-500" :title="node.error">Failed to load</span>
+        <span v-else-if="node.children === null">Expand to load</span>
         <span v-else-if="node.children.length === 0">Empty</span>
       </td>
     </template>

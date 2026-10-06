@@ -18,8 +18,9 @@ export const MAX_ROWS = 500
 const HAS_CHILDREN = 'i3x:rel:has-children'
 
 /**
- * A row of the tree. `children` is null until that level is read; `vqt`
- * is the value of a leaf, null if the server did not report one.
+ * A row of the tree. `children` is null until that level is read, or
+ * when reading it failed, with the reason in `error`; `vqt` is the value
+ * of a leaf, null if the server did not report one.
  */
 export function mk_node (obj) {
   return {
@@ -27,6 +28,7 @@ export function mk_node (obj) {
     displayName: obj.displayName ?? obj.elementId,
     isComposition: !!obj.isComposition,
     children: null,
+    error: null,
     vqt: null,
   }
 }
@@ -49,7 +51,11 @@ export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = M
     for (const r of related) {
       const parent = byId.get(r.elementId)
       if (!parent) continue
-      parent.children = (r.success ? r.result : []).map(mk_node)
+      if (!r.success) {
+        parent.error = r.error?.message ?? 'Failed to load'
+        continue
+      }
+      parent.children = r.result.map(mk_node)
       rows += parent.children.length
       next.push(...parent.children.filter(c => c.isComposition))
     }
@@ -64,6 +70,17 @@ export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = M
     node.children?.forEach(fill)
   }
   fill(top)
+}
+
+/**
+ * Read the levels below a composition the user expanded. They are read
+ * into a copy, so the rows appear with their values.
+ */
+export async function expand (i3x, node, opts) {
+  const loaded = mk_node(node)
+  await load_subtree(i3x, loaded, opts)
+  node.children = loaded.children
+  node.error = loaded.error
 }
 
 /**

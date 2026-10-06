@@ -506,7 +506,7 @@ export class APIv1 {
         // Try UNS cache first (real-time), fall back to InfluxDB last().
         // A cached composition's components are read as they are sent.
         const cached: Array<LazyValue | null> = [];
-        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id));
+        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id, effective));
         const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
         const fromInflux = misses.length > 0
             ? await this.history.getValues(misses, effective)
@@ -617,13 +617,21 @@ export class APIv1 {
      * GET /objects/:elementId/value — single-id current value. Same
      * cache-then-InfluxDB strategy as `value_objects` (UNS cache,
      * then `history.getCompositionValue`/`getCurrentValue`); 404 if
-     * neither source has a value.
+     * neither source has a value. The `maxDepth` query parameter works
+     * as it does for `value_objects`, including the 206 when clamped.
      */
     async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
         const id = req.params.elementId;
         const obj = this.objectTree.getObject(id);
+        const raw = req.query.maxDepth;
+        const requested = raw === undefined ? 1 : Number(raw);
+        if (!Number.isInteger(requested) || requested < 0) {
+            return next(badRequest("maxDepth must be a non-negative integer"));
+        }
+        const { effective, clamped } = this.clampDepth(requested);
+        if (clamped) res.status(206);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = await this.valueCache.getValueLazy(id);
+        const cached = await this.valueCache.getValueLazy(id, effective);
         if (cached) {
             this.log("GET /objects/%s/value: UNS cache hit", id);
             if (!cached.components) {
@@ -640,7 +648,7 @@ export class APIv1 {
             return;
         }
         const result = obj?.isComposition
-            ? await this.history.getCompositionValue(id)
+            ? await this.history.getCompositionValue(id, effective)
             : await this.history.getCurrentValue(id);
         this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
             id, result ? "hit" : "no data");

@@ -1085,9 +1085,11 @@ export class ValueCache {
      * small steps with pauses for the event loop, so a composition with
      * millions of components does not stall other work. Each pass reads
      * its own snapshot, so a value written in between can make the
-     * head differ slightly from the components.
+     * head differ slightly from the components. `maxDepth` limits the
+     * walk as it does for InfluxDB reads: 1 is the direct leaves only,
+     * 0 is the whole subtree.
      */
-    async getValueLazy(elementId: string): Promise<LazyValue | null> {
+    async getValueLazy(elementId: string, maxDepth: number = 0): Promise<LazyValue | null> {
         if (!this.treeInStore()) return lazyFromValue(this.getValue(elementId));
 
         /* A leaf value still queued is the newest. */
@@ -1125,7 +1127,7 @@ export class ValueCache {
         let n = 0;
         let latest = "";
         const slicer = new Slicer();
-        for (const step of this.walkComponents(elementId, all, trust)) {
+        for (const step of this.walkComponents(elementId, all, trust, maxDepth)) {
             if (step) {
                 n++;
                 const ts = step[1].timestamp;
@@ -1142,7 +1144,7 @@ export class ValueCache {
                 quality: "Good",
                 timestamp: latest,
             },
-            components: () => this.walkComponents(elementId, all, trust),
+            components: () => this.walkComponents(elementId, all, trust, maxDepth),
         };
     }
 
@@ -1155,9 +1157,11 @@ export class ValueCache {
      * children has no values filed under it (values are filed under
      * their parent) and is not visited. A null is yielded after each
      * node, so the consumer can pause however few values there are.
+     * With `maxDepth` above 0 compositions deeper than that are not
+     * entered, as in ObjectTree.iterateDescendantLeafIds.
      */
     private *walkComponents(rootId: string, all: boolean = false,
-            trustAbove: number = this.trustAbove): Generator<ComponentStep> {
+            trustAbove: number = this.trustAbove, maxDepth: number = 0): Generator<ComponentStep> {
         /* Callers store queued values first (flush or flushSliced). */
         this.store.commit();
         const reader = this.store.openReader();
@@ -1200,6 +1204,7 @@ export class ValueCache {
                 }
                 const child = top.page[top.i++];
                 if (!child.walk) continue;
+                if (maxDepth > 0 && stack.length >= maxDepth) continue;
                 if (stack.length >= 64) continue;   // guards against a parent cycle
                 yield* visit(child.element_id);
                 const level: Level = { id: child.element_id, page: [], i: 0, after: -1, done: false };

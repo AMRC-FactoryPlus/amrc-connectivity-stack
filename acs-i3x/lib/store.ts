@@ -21,11 +21,13 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 
 /** Bump this whenever the tables below change. */
 /** Is this error from opening a database file that is damaged, as
- * opposed to busy or unreadable? SQLITE_CORRUPT (11), SQLITE_NOTADB
- * (26), or our own length check. */
+ * opposed to busy or unreadable? SQLITE_CORRUPT (11) or SQLITE_NOTADB
+ * (26), including their extended codes (the low byte is the primary
+ * code), or our own length check. */
 function isCorrupt(err: unknown): boolean {
     const e = err as { errcode?: number; message?: string };
-    return e?.errcode === 11 || e?.errcode === 26
+    const code = (e?.errcode ?? 0) & 0xff;
+    return code === 11 || code === 26
         || /database file is truncated/.test(e?.message ?? "");
 }
 

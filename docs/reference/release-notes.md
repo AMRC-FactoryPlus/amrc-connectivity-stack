@@ -8,6 +8,327 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+These changes are aimed at installations with tens of thousands of
+devices. Most of them are internal, but a few need you to act during
+the upgrade, and some change what clients see.
+
+### Upgrading: i3X needs a volume, and answers 503 while it first syncs
+
+i3X now keeps its namespace and the last value of each metric in a
+SQLite database at `/data/i3x.db`, instead of on the JavaScript heap.
+By default the chart puts the database on a new PersistentVolumeClaim,
+`i3x-data`, of **10Gi** (ReadWriteOnce):
+
+```yaml
+i3x:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+```
+
+An empty `storageClass` uses the cluster's default StorageClass. If
+your cluster has no default, set `storageClass`, or the claim is never
+bound and the i3X pod stays Pending. At 74,000 devices the database is
+about 2 GB, and its write-ahead log can reach about 1.5 GB more during
+a burst of new UNS metrics. With `persistence.enabled: false` the
+database goes on an `emptyDir`, and every start syncs from scratch.
+
+The first start after the upgrade builds the database from ConfigDB.
+The pod reports ready at once, because its probes only check that the
+port is open, but the API answers **503** until the sync completes. In
+testing this took **about 6 minutes at 74,000 devices**. Later restarts
+serve the stored tree at once and fetch only the configs that changed.
+If a few configs keep failing to load, i3X serves the tree without them
+after 2 minutes and keeps retrying (the `I3X_READY_GRACE_MS`
+environment variable, which the chart does not set).
+
+Upgrade ConfigDB and i3X together. The new i3X follows ConfigDB through
+a new ETag search that older ConfigDB versions do not have. Against an
+older ConfigDB, i3X retries every 10 seconds and, on an empty database,
+never becomes ready. This matters only if you pin image tags for the
+two services separately.
+
+With the volume enabled, the i3X Deployment uses `RollingUpdate` with
+`maxSurge: 0` and `maxUnavailable: 1`. Kubernetes stops the old pod
+before it creates the new one, so **i3X is briefly unavailable on every
+upgrade or restart**.
+
+A Deployment that was patched by hand to `strategy: Recreate` (for
+example to get past an upgrade failure with a 6.11.0 release
+candidate) conflicts with this under Helm 4. That failure looks like
+this:
+
+```
+Deployment.apps "i3x" is invalid: spec.strategy.rollingUpdate: Forbidden: may not be specified when strategy `type` is 'Recreate'
+```
+
+Run `helm upgrade` with `--force-conflicts` once. Later upgrades need
+no flag. Installations that upgrade straight from v6.10.x need nothing.
+
+### Upgrading: the MQTT broker's heap is capped at 512 MB
+
+The HiveMQ broker ran with no JVM heap limit. The JVM then sizes its
+heap from the node's memory (25% by default, so 4 GB on a 16 GB node)
+and rarely gives memory back, so the broker kept whatever peak it had
+seen. The broker now runs with **`-Xmx512m`**, from a new
+`mqtt.javaOpts` value. With this heap the broker ran at about 800 MB
+resident under a fleet of about 44,000 Sparkplug devices.
+
+```yaml
+mqtt:
+  javaOpts: "-Xmx512m"
+  resources: {}
+```
+
+Set `mqtt.javaOpts: ""` to return to the JVM default. `mqtt.resources`
+is new and empty by default. If you set a memory limit, allow about
+300 MB above the heap limit for non-heap memory.
+
+### Set memory for ConfigDB and i3X
+
+ConfigDB and i3X set no resources, so they run as BestEffort pods: the
+first the kernel kills when a node runs short of memory. The chart now
+has `configdb.resources` and `i3x.resources`. Both are empty by
+default, which renders the same manifests as before. We recommend you
+set them. The examples in `values.yaml` are:
+
+```yaml
+configdb:
+  resources:
+    requests:
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+i3x:
+  resources:
+    requests:
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+```
+
+With about 40,000 devices, ConfigDB used about 0.9 GiB at rest and
+1.5 GiB while i3X ran its first sync. A 2 GiB limit was too low: its
+heap ran out while clients reconnected. i3X used about 370 MiB during
+the same sync, with MCP off and the default heap cap. A limit that is
+too low turns memory pressure into a restart loop, so size it above the
+normal working set.
+
+### The i3X MCP endpoint is off by default
+
+The MCP endpoint (`/mcp`) and the search index behind it cost about
+**47 KB of memory per device**, so they are now off by default. While
+they are off, `/mcp` answers 404. Set `i3x.mcp.enabled: true` to turn
+them back on.
+
+`i3x.maxHeapMB` (default **384**) caps the i3X JavaScript heap with
+`--max-old-space-size`. Set it to 0 for no cap. It applies only while
+MCP is off, because the search index needs several GB at fleet scale.
+If you enable MCP, raise the i3X memory limit to several GiB.
+
+### i3X value reads honour maxDepth
+
+`GET /objects/:elementId/value` now takes a `maxDepth` query parameter,
+which defaults to 1, as `POST /objects/value` already did. Before, a
+composition answered from i3X's cache returned its whole subtree
+whatever was asked for, while one read from InfluxDB stopped at
+`maxDepth`. Both now return leaves to depth 1 by default. **Clients
+that want the whole subtree must send `maxDepth: 0`**.
+
+Both endpoints now refuse a `maxDepth` that is not a non-negative
+integer with a 400. When the server sets a depth cap
+(`I3X_MAX_DEPTH_CAP`), `maxDepth: 0` is clamped to the cap and answered
+with a 206, as a request deeper than the cap already was.
+
+The Explorer in the admin UI shows a composition's current value as a
+tree of names, with nested compositions expanded. It reads 3 levels at
+once and loads deeper ones when you expand them.
+
+### Other changes to the i3X API
+
+- `GET /objects`, related objects and composition values are streamed
+  as they are read, so `GET /objects` has no `Content-Length`. Its weak
+  ETag comes from the tree's revision, and a matching `If-None-Match`
+  gets a 304.
+- A client that reads nothing from a streamed response for 60 seconds
+  is disconnected (`I3X_STREAM_IDLE_MS`).
+- Each subscription's queue holds at most 10,000 updates
+  (`I3X_SUBSCRIPTION_QUEUE_MAX`). When it is full, the oldest updates
+  are dropped.
+- UNS messages for devices that are not in ConfigDB are ignored.
+
+The environment variables in this list are not set by the chart.
+
+### i3X keeps current values across restarts
+
+i3X keeps the values it receives from the UNS in its database. It also
+keeps values it reads from InfluxDB, but now only for devices that
+publish to the UNS: those whose `Device_Information` has an ISA-95
+hierarchy (`ISA95_Hierarchy`). A device without one is read from
+InfluxDB every time, as it was on v6.10.x.
+
+After a restart or an MQTT reconnect, i3X catches its stored values up
+from InfluxDB instead of reading every value again. It waits `marginMs`
+after connecting, so the historians can write what was published just
+before. It then reads the points written since the values were last
+current. Reads fall back to InfluxDB until
+the catch-up finishes. While connected, it also refreshes the values it
+keeps from InfluxDB every `refreshMs`.
+
+```yaml
+i3x:
+  catchUp:
+    marginMs: 60000
+    maxGapMs: 86400000
+    refreshMs: 300000
+```
+
+Keep `marginMs` above the historians' `flushInterval`, and keep
+`maxGapMs` (at most 30 days) below the InfluxDB bucket's retention.
+i3X clears its values and reads them again instead of catching up when
+any of these is true:
+
+- It has no record of when the values were last current. This happens
+  on **the first start of this version**.
+- The gap is longer than `maxGapMs` (24 hours by default).
+- The catch-up query still fails after retries at 5, 15 and 45
+  seconds.
+- More than 1,000,000 stored values changed during the gap.
+
+### ConfigDB delivers class changes up to a second later
+
+During a bulk device import, ConfigDB looked up every watched class's
+members again on every object create. On one cluster importing about
+16 devices a second this kept PostgreSQL at about 0.9 of a core. Each
+class lookup now runs at most once per `configdb.classLookupInterval`,
+in ms:
+
+```yaml
+configdb:
+  classLookupInterval: 1000
+```
+
+The first change after a quiet period is delivered at once, and the
+last change of a burst is always delivered. A change that follows
+another within the interval reaches watchers up to a second later. For
+example, a new principal's ACL can take up to a second to appear. If
+Keycloak looks the principal up in that second, its Factory+ SPI caches
+the empty result for 60 seconds.
+Set `classLookupInterval: 0` to look up on every change, as before.
+
+### Slow notify clients no longer grow the server's memory
+
+A client that read its notify WebSocket slowly made ConfigDB hold every
+update for it in memory. During one bulk import ConfigDB grew from 0.66
+GiB to 3.6 GiB this way. Updates now go straight to the socket only
+while less than **8 MiB** is waiting to be sent. After that, the server
+holds back later updates and keeps only the latest state of each
+subscription (and of each child of a search). A slow client can
+therefore skip intermediate states, but it always ends with the
+server's current state. Every service that serves notify uses this.
+Set the limit in bytes with the `NOTIFY_MAX_BUFFER` environment
+variable, which the chart does not set.
+
+### The monitor no longer rebirths quiet Nodes
+
+The monitor rebirthed any Node that published nothing for its interval
+(3 minutes by default), and repeated that every interval. A Node whose
+Devices never change publishes nothing after its births, so it was
+rebirthed every few minutes, indefinitely. The monitor now treats a
+Node as alive from its NBIRTH until its NDEATH:
+
+- A connected Node that publishes nothing is not rebirthed and not
+  marked offline.
+- When the monitor starts, or its own MQTT connection comes back, it
+  rebirths each Node it has not seen birth within one interval. If a
+  Node does not answer, the rebirths back off: about 1, 3, 7 and 15
+  intervals after the first wait, then one every 8 intervals.
+- The offline alert still fires after 3 intervals with nothing from the
+  Node, counted from the monitor's start or the Node's NDEATH.
+- The monitor no longer detects an Edge Agent that keeps its MQTT
+  session open but has hung.
+
+The monitor and the Sparkplug app library (used by the admin UI and
+service-client's ConfigDB watcher) now log MQTT errors such as a reset
+connection. Before, the monitor could crash when the broker
+restarted.
+
+The edge monitor no longer sends an agent a config reload on every
+birth when its cached config revision is stale. It now checks the live
+revision with ConfigDB first.
+
+### The Directory announces only real changes
+
+Every device birth published `Last_Changed` notices for the device and
+its address, even when nothing had changed. A rebirth of one node with
+about 7,300 devices published about 7,300 of them. The Directory now
+publishes these notices for a birth only when the device is new, has
+moved, its address has a different device, or it was offline. Deaths
+and schema changes are announced as before.
+
+### service-setup no longer loops when a restart is slow
+
+After it runs, service-setup restarts the MQTT broker and Keycloak and
+waited 120 seconds for each rollout. A slower rollout failed the Job,
+and each retry restarted both again. On a busy node this restarted the
+broker every few minutes, disconnecting every client. It now waits up
+to 600 seconds, and if the rollout has still not finished, it logs this
+and leaves the rollout to the Deployment controller.
+
+### The UNS value is the newest sample in a batch
+
+When a Sparkplug payload carries several samples of one metric, the
+UNS ingester now publishes the newest as the metric's `value` and puts
+the older ones in `batch`. Before, `value` was the oldest.
+
+### Other improvements
+
+ConfigDB:
+
+- Notify watchers of the same class share one lookup, and a change
+  re-runs only the lookups it can affect (#760, #776).
+- A search watched by a client that reloads no longer drives ConfigDB
+  to a full core of CPU (#762).
+- Class member lookups are faster on large classes (#765, #766).
+- A notify CLOSE request goes straight to its subscription, instead of
+  past every open subscription (#779).
+
+i3X:
+
+- Bulk current-value reads are batched into a few InfluxDB queries,
+  with at most 4 in flight (`I3X_INFLUX_CONCURRENCY`), and no longer
+  time out after a restart (#761).
+- i3X follows ConfigDB with one class watch and three ETag searches,
+  instead of two watches per device, and fetches only the configs whose
+  ETag changed. This also removes most of the memory those watches cost
+  ConfigDB (#790).
+- With MCP enabled, the search index is rebuilt when it is next used,
+  not on every change (#771).
+- A composition read whole from InfluxDB is answered from the cache
+  next time (#792).
+
+Edge agent:
+
+- A node with many devices no longer crashes with "Maximum call stack
+  size exceeded", and a config reload no longer fails with
+  `EADDRINUSE` (#763).
+- The driver's address map is sent once per batch, not once per
+  device. In a benchmark with 7,302 devices, peak memory at start fell
+  from about 1.7 GiB to about 0.5 GiB (#767).
+- Identical metric properties share one object, and a config without
+  secrets skips a JSON round trip (#772, #773).
+- Devices with no addresses no longer send empty polls to the driver,
+  and driver data goes only to the devices that own its addresses (#774,
+  #775).
+
+Auth:
+
+- The registration map is updated per change instead of rebuilt. During
+  a bulk import, Auth no longer uses enough CPU to make Keycloak logins
+  time out (#768). Entries that come from ownership can appear in a
+  different order in an ACL; the set of entries is the same.
+
 ## v6.6.0
 
 ### Upgrading: expect the Directory to be unavailable for several minutes

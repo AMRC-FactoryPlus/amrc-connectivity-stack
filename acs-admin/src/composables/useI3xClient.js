@@ -6,7 +6,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { openI3xStream } from '@composables/useI3xSSE.js'
 
-async function request (client, opts) {
+async function fetch_body (client, opts) {
   const res = await client.Fetch.fetch({
     service: UUIDs.Service.i3x,
     ...opts,
@@ -16,11 +16,28 @@ async function request (client, opts) {
     try { body = await res.json() } catch { /* not JSON */ }
     throw new Error(body?.error?.message || `i3X request failed: ${res.status}`)
   }
-  const body = await res.json()
+  return res.json()
+}
+
+async function request (client, opts) {
+  const body = await fetch_body(client, opts)
   if (body.success === false) {
     throw new Error(body.error?.message || 'i3X request failed')
   }
   return body.result
+}
+
+// Bulk endpoints answer with one { success, elementId, result | error }
+// per id, and `success: false` at the top when any id failed. Return the
+// per-id results and leave the caller to handle the failures.
+async function bulk (client, url, body) {
+  const res = await fetch_body(client, {
+    url,
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return res.results ?? []
 }
 
 function get (client, url, query) {
@@ -73,7 +90,7 @@ export function useI3xClient () {
     getRelatedBulk (elementIds, relationshipType) {
       const body = { elementIds }
       if (relationshipType) body.relationshiptype = relationshipType
-      return post(c(), 'v1/objects/related', body)
+      return bulk(c(), 'v1/objects/related', body)
     },
 
     getValue (elementId) {
@@ -83,7 +100,7 @@ export function useI3xClient () {
     getValueBulk (elementIds, maxDepth) {
       const body = { elementIds }
       if (maxDepth != null) body.maxDepth = maxDepth
-      return post(c(), 'v1/objects/value', body)
+      return bulk(c(), 'v1/objects/value', body)
     },
 
     getHistory (elementId, startTime, endTime) {
@@ -92,7 +109,7 @@ export function useI3xClient () {
     },
 
     getHistoryBulk (params) {
-      return post(c(), 'v1/objects/history', params)
+      return bulk(c(), 'v1/objects/history', params)
     },
 
     createSubscription (clientId, displayName) {

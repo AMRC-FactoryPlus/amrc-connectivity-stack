@@ -524,13 +524,15 @@ export class DataFlow {
 
           /*
           * --------------------------------------------------
-          * SPARKPLUG SOURCE
+          * SPARKPLUG SOURCE / SUB-DEVICE
           * --------------------------------------------------
           */
 
           if (
             structure ===
-            Constants.App.SparkplugSrc
+            Constants.App.SparkplugSrc ||
+            structure ===
+            Constants.App.SparkplugSubset
           ) {
 
             const result = {

@@ -35,6 +35,8 @@ a burst of new UNS metrics. With `persistence.enabled: false` the
 database goes on an `emptyDir`, and every start syncs from scratch.
 
 The first start after the upgrade builds the database from ConfigDB.
+So does a start after the volume is lost, or after a change to the
+database schema or the i3X namespace.
 The pod reports ready at once, because its probes only check that the
 port is open, but the API answers **503** until the sync completes. In
 testing this took **about 6 minutes at 74,000 devices**. Later restarts
@@ -54,17 +56,24 @@ With the volume enabled, the i3X Deployment uses `RollingUpdate` with
 before it creates the new one, so **i3X is briefly unavailable on every
 upgrade or restart**.
 
-A Deployment that was patched by hand to `strategy: Recreate` (for
-example to get past an upgrade failure with a 6.11.0 release
-candidate) conflicts with this under Helm 4. That failure looks like
-this:
+The release candidates v6.11.0-rc.5 and rc.6 set this Deployment to
+`strategy: Recreate`. Under Helm 4, which uses server-side apply, that
+upgrade fails with:
 
 ```
 Deployment.apps "i3x" is invalid: spec.strategy.rollingUpdate: Forbidden: may not be specified when strategy `type` is 'Recreate'
 ```
 
-Run `helm upgrade` with `--force-conflicts` once. Later upgrades need
-no flag. Installations that upgrade straight from v6.10.x need nothing.
+If you patched the i3X Deployment to `Recreate` by hand to get past
+that error, your next Helm 4 upgrade reports a conflict with the
+`kubectl-patch` field manager. Run `helm upgrade` with
+`--force-conflicts` once. Later upgrades need no flag. An installation
+that was never patched by hand needs nothing.
+
+Kubernetes does not wait for the old pod to finish terminating, so the
+old and new pods can have the database open together for a few
+seconds. The new pod waits for the old pod's locks when it opens the
+database.
 
 ### Upgrading: the MQTT broker's heap is capped at 512 MB
 
@@ -164,8 +173,8 @@ The environment variables in this list are not set by the chart.
 
 i3X keeps the values it receives from the UNS in its database. It also
 keeps values it reads from InfluxDB, but now only for devices that
-publish to the UNS: those whose `Device_Information` has an ISA-95
-hierarchy (`ISA95_Hierarchy`). A device without one is read from
+publish to the UNS: those whose `Device_Information` has an
+`ISA95_Hierarchy` with at least an Enterprise. A device without one is read from
 InfluxDB every time, as it was on v6.10.x.
 
 After a restart or an MQTT reconnect, i3X catches its stored values up
@@ -186,8 +195,8 @@ i3x:
 
 Keep `marginMs` above the historians' `flushInterval`, and keep
 `maxGapMs` (at most 30 days) below the InfluxDB bucket's retention.
-i3X clears its values and reads them again instead of catching up when
-any of these is true:
+i3X clears its values and reads them again instead of catching up in
+some cases. The main ones are:
 
 - It has no record of when the values were last current. This happens
   on **the first start of this version**.
@@ -195,6 +204,8 @@ any of these is true:
 - The catch-up query still fails after retries at 5, 15 and 45
   seconds.
 - More than 1,000,000 stored values changed during the gap.
+- The record of when the values were last current is in the future,
+  because the clock has gone back.
 
 ### ConfigDB delivers class changes up to a second later
 
@@ -214,7 +225,7 @@ last change of a burst is always delivered. A change that follows
 another within the interval reaches watchers up to a second later. For
 example, a new principal's ACL can take up to a second to appear. If
 Keycloak looks the principal up in that second, its Factory+ SPI caches
-the empty result for 60 seconds.
+the empty result for its cache TTL (60 seconds by default).
 Set `classLookupInterval: 0` to look up on every change, as before.
 
 ### Slow notify clients no longer grow the server's memory
@@ -242,10 +253,11 @@ Node as alive from its NBIRTH until its NDEATH:
   marked offline.
 - When the monitor starts, or its own MQTT connection comes back, it
   rebirths each Node it has not seen birth within one interval. If a
-  Node does not answer, the rebirths back off: about 1, 3, 7 and 15
-  intervals after the first wait, then one every 8 intervals.
+  Node does not answer, the monitor rebirths it after about 1, 3, 7 and
+  15 intervals, then once every 8 intervals.
 - The offline alert still fires after 3 intervals with nothing from the
-  Node, counted from the monitor's start or the Node's NDEATH.
+  Node, counted from the monitor's start, the return of its own MQTT
+  connection, or the Node's NDEATH. Any packet from the Node clears it.
 - The monitor no longer detects an Edge Agent that keeps its MQTT
   session open but has hung.
 
@@ -300,9 +312,9 @@ i3X:
   with at most 4 in flight (`I3X_INFLUX_CONCURRENCY`), and no longer
   time out after a restart (#761).
 - i3X follows ConfigDB with one class watch and three ETag searches,
-  instead of two watches per device, and fetches only the configs whose
-  ETag changed. This also removes most of the memory those watches cost
-  ConfigDB (#790).
+  instead of two watches per device and per schema, and fetches only
+  the configs whose ETag changed. Those watches cost ConfigDB 0.65 to
+  1.2 GB of memory on a large installation (#790).
 - With MCP enabled, the search index is rebuilt when it is next used,
   not on every change (#771).
 - A composition read whole from InfluxDB is answered from the cache
@@ -313,9 +325,10 @@ Edge agent:
 - A node with many devices no longer crashes with "Maximum call stack
   size exceeded", and a config reload no longer fails with
   `EADDRINUSE` (#763).
-- The driver's address map is sent once per batch, not once per
-  device. In a benchmark with 7,302 devices, peak memory at start fell
-  from about 1.7 GiB to about 0.5 GiB (#767).
+- The driver's address map is sent once per event-loop turn, not once
+  per device. In a benchmark with 7,302 devices the agent sent about 30
+  maps instead of 7,303, and peak memory at start fell from about
+  1.7 GiB to about 0.5 GiB (#767).
 - Identical metric properties share one object, and a config without
   secrets skips a JSON round trip (#772, #773).
 - Devices with no addresses no longer send empty polls to the driver,
@@ -324,10 +337,13 @@ Edge agent:
 
 Auth:
 
-- The registration map is updated per change instead of rebuilt. During
-  a bulk import, Auth no longer uses enough CPU to make Keycloak logins
-  time out (#768). Entries that come from ownership can appear in a
-  different order in an ACL; the set of entries is the same.
+- The registration map is updated per change instead of rebuilt. In a
+  benchmark with 25,000 registrations, the CPU cost of each update
+  fell from about 48 ms to under 1 ms. This removes the load that made
+  Keycloak's calls to Auth time out during bulk imports (#768).
+- Entries that come from ownership can appear in a different order in
+  an ACL, and so in the Effective permissions tab of the admin UI. The
+  set of entries is the same.
 
 ## v6.6.0
 

@@ -84,6 +84,10 @@ objects:
       name: "Sparkplug source"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    !u DataAccess.App.SparkplugSubset:
+      name: "Sub-device"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
     !u DataAccess.App.UnionComponents:
       name: "Union components"
       subclassOf:
@@ -140,6 +144,9 @@ grants:
       !u DataAccess.App.DatasetDefinition: true
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+      # Device originMap, to resolve sub-device metric references to
+      # their current Sparkplug paths.
+      !u UUIDs.App.DeviceInformation: false
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.DatasetDefinition: true
     !u ConfigDB.Perm.CreateObject:

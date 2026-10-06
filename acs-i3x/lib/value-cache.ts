@@ -565,8 +565,10 @@ export class ValueCache {
     }
 
     /**
-     * Has every leaf under `rootId` got a stored value, a queued value,
-     * or a marker that InfluxDB had none? Only then can the stored
+     * Has every leaf under `rootId` got a stored value or a marker that
+     * InfluxDB had none? A queued value does not count: the walk reads
+     * only stored rows, so a leaf whose only value is queued would be
+     * left out of a composition judged complete. Only then can the stored
      * values stand for the composition: values kept from InfluxDB cover
      * only the leaves someone asked about, so a composition built from
      * some of them would look complete when it is not. A composition
@@ -578,7 +580,7 @@ export class ValueCache {
         if (!this.objectTree.iterateDescendantLeafIds) { yield true; return; }
         for (const leaf of this.objectTree.iterateDescendantLeafIds(rootId, 0)) {
             if (leaf === null) { yield null; continue; }
-            if (!this.pending.has(leaf) && !has.get(leaf)) { yield true; return; }
+            if (!has.get(leaf)) { yield true; return; }
         }
     }
 
@@ -631,8 +633,10 @@ export class ValueCache {
         /* Complete: every leaf has a value or an InfluxDB "no data"
          * marker, so all stored values stand for the composition.
          * Otherwise only UNS values, as before values were kept from
-         * InfluxDB; with none, the caller reads InfluxDB. */
-        const all = await this.compositionComplete(elementId);
+         * InfluxDB; with none, the caller reads InfluxDB. A failed write
+         * leaves values queued, and the stored rows may then be missing
+         * some of them, so the composition is not complete. */
+        const all = this.pending.size === 0 && await this.compositionComplete(elementId);
 
         /* The old value took the latest timestamp, by string order,
          * starting from "". */
@@ -731,14 +735,14 @@ export class ValueCache {
         if (this.treeInStore()) {
             /* Synchronous, and so for small compositions (MCP, tests):
              * the value routes use getValueLazy. */
-            this.flush();
+            const flushed = this.flush();
             const row = this.store.prepare(
                 "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
             ).get(elementId) as unknown as ValueRow | undefined;
             if (row) return { elementId, isComposition: false, ...toVqt(row) };
             const obj = this.objectTree.getObject(elementId);
             if (!obj?.isComposition) return null;
-            const all = this.compositionCompleteSync(elementId);
+            const all = flushed && this.compositionCompleteSync(elementId);
             const components: Record<string, I3xVqt> = {};
             let latest = "";
             for (const step of this.walkComponents(elementId, all)) {

@@ -166,13 +166,16 @@ configdb:
   # the kernel OOM killer and for eviction under node memory pressure.
   # Set a memory request to make it Burstable, and a memory limit to cap
   # it. Size the limit above the normal working set, because a limit that
-  # is too low turns memory pressure into a restart loop.
+  # is too low turns memory pressure into a restart loop. With about
+  # 40,000 devices ConfigDB used about 0.9 GiB at rest and 1.5 GiB while
+  # i3X ran its first sync; a 2 GiB limit was too low (the heap ran out
+  # during client reconnects).
   # For example:
   # resources:
   #   requests:
   #     memory: 1Gi
   #   limits:
-  #     memory: 2Gi
+  #     memory: 4Gi
   resources: {}
   # -- Minimum time in ms between the class member and subclass lookups
   # that ConfigDB runs for notify watchers when classes change. During a
@@ -518,13 +521,16 @@ i3x:
   # the kernel OOM killer and for eviction under node memory pressure.
   # Set a memory request to make it Burstable, and a memory limit to cap
   # it. Size the limit above the normal working set, because a limit that
-  # is too low turns memory pressure into a restart loop.
+  # is too low turns memory pressure into a restart loop. With MCP off and
+  # the default maxHeapMB, i3X used about 370 MiB during its first sync of
+  # about 40,000 devices and about 280 MiB at 74,000 devices in testing.
+  # With MCP on, allow several GiB.
   # For example:
   # resources:
   #   requests:
-  #     memory: 1Gi
+  #     memory: 512Mi
   #   limits:
-  #     memory: 2Gi
+  #     memory: 1Gi
   resources: {}
   # -- Override the i3X namespace URI (defaults to https://<baseUrl>/i3x)
   # namespaceUri: https://example.com/i3x

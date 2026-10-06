@@ -8,6 +8,7 @@
 
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, truncateSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 
 import { jest } from "@jest/globals";
@@ -110,6 +111,70 @@ describe("I3xStore", () => {
             err.mockRestore();
         }
     });
+
+    /* Another process (the old pod of a rolling restart) holds a write
+     * lock on the file for `ms`, then exits. Resolves once it holds it. */
+    function holdLock(path: string, ms: number): Promise<ChildProcess> {
+        const child = spawn(process.execPath, ["--no-warnings", "-e", `
+            const { DatabaseSync } = require("node:sqlite");
+            const db = new DatabaseSync(${JSON.stringify(path)});
+            db.exec("begin immediate");
+            process.stdout.write("locked\\n");
+            setTimeout(() => { db.exec("rollback"); db.close(); }, ${ms});
+        `], { stdio: ["ignore", "pipe", "inherit"] });
+        return new Promise((resolve, reject) => {
+            child.stdout!.once("data", () => resolve(child));
+            child.once("error", reject);
+        });
+    }
+    const exited = (c: ChildProcess) => new Promise(r => c.once("exit", r));
+
+    it("waits for another process's lock when opening needs to write", async () => {
+        const path = join(dir, "i3x.db");
+        const s1 = new I3xStore({ path });
+        const t1 = tree(s1);
+        for (let i = 0; i < 20; i++) t1.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+        const count = t1.objectCount();
+        s1.close();
+
+        /* A warm open only reads, which a writer does not block. A
+         * namespace change rebuilds the tables, which needs the lock. */
+        const child = await holdLock(path, 500);
+        const t0 = performance.now();
+        const s2 = new I3xStore({ path, openBusyTimeout: 10_000, fingerprint: "other" });
+        expect(performance.now() - t0).toBeGreaterThan(200);
+        expect(s2.warm).toBe(false);
+        expect(tree(s2).objectCount()).toBe(0);
+        s2.close();
+        await exited(child);
+        expect(count).toBeGreaterThan(0);
+    }, 30_000);
+
+    it("does not delete a database another process holds locked", async () => {
+        const path = join(dir, "i3x.db");
+        const s1 = new I3xStore({ path });
+        const t1 = tree(s1);
+        for (let i = 0; i < 20; i++) t1.addDevice(`dev-${i}`, devInfo(`D${i}`, ["AMRC"]), { name: `D${i}` });
+        const count = t1.objectCount();
+        s1.close();
+
+        const child = await holdLock(path, 3_000);
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            /* The namespace changed, so opening must rebuild, which
+             * needs the lock the other process holds. */
+            expect(() => new I3xStore({ path, openBusyTimeout: 200, fingerprint: "other" }))
+                .toThrow(/database is locked/);
+            expect(err).not.toHaveBeenCalledWith(expect.stringContaining("DELETING"), expect.anything());
+        } finally {
+            err.mockRestore();
+        }
+        await exited(child);
+        const s3 = new I3xStore({ path });
+        expect(s3.warm).toBe(true);
+        expect(tree(s3).objectCount()).toBe(count);
+        s3.close();
+    }, 30_000);
 
     it("starts a new database in place of a truncated one", () => {
         const path = join(dir, "i3x.db");

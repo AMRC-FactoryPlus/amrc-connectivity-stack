@@ -225,7 +225,8 @@ Only works for devices publishing to UNS. Devices not on UNS never trigger SSE e
 | Object names | ConfigDB Info app | Start, then each change | ETag SEARCH |
 | JSON Schemas | ConfigDB ConfigSchema app | Start, then each change | ETag SEARCH |
 | Current value (primary) | MQTT UNS/v1/# into SQLite `last_value` | Continuous | Real-time |
-| Current value (fallback) | InfluxDB default bucket, last(); kept in `last_value` for devices that publish to UNS | First read after start; every read for other devices | ~10s |
+| Current value (fallback) | InfluxDB default bucket, last(); kept in `last_value` for devices that publish to UNS | First read of a leaf (every read for other devices), and any read during a catch-up | ~10s |
+| Current value (catch-up) | InfluxDB default bucket, last() since the values were last current | After a restart or MQTT reconnect, and every refresh interval for values kept from InfluxDB | Margin (60 s) plus the query |
 | Historical values | InfluxDB default bucket, range query | On request | N/A |
 | SSE streaming | MQTT UNS/v1/# via SSE bridge | Continuous | Real-time |
 | Device online/offline | Not currently used | -- | -- |

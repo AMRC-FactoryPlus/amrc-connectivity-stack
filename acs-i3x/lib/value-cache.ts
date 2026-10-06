@@ -48,6 +48,8 @@ interface ObjectTreeLike {
     getObject(elementId: string): { elementId: string; isComposition: boolean; parentId?: string | null } | undefined;
     getChildElementIds(elementId: string): string[];
     isReady(): boolean;
+    /** Leaf ids under a composition, null between pages (ObjectTree). */
+    iterateDescendantLeafIds?(elementId: string, maxDepth?: number): Generator<string | null>;
 }
 
 type ValueChangeListener = (elementId: string, vqt: I3xVqt) => void;
@@ -481,12 +483,29 @@ export class ValueCache {
     recordInfluxValues(values: InfluxValue[]): void {
         if (values.length === 0) return;
         const st = this.store.prepare(UPSERT("influx",
-            "where julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
+            "where last_value.source = 'empty' or julianday(excluded.timestamp) > julianday(last_value.timestamp)"));
         this.store.transaction(() => {
             for (const v of values) {
                 st.run(v.elementId, v.anchor ?? v.device, v.device,
                     toJson(v.value), v.timestamp ?? null, v.quality);
             }
+        });
+    }
+
+    /**
+     * Record leaves InfluxDB had no value for, so a composition whose
+     * every leaf has been asked about counts as complete (see
+     * compositionComplete) and is answered from here next time. A
+     * marker never replaces a value, and any value replaces it.
+     */
+    recordInfluxEmpty(leaves: Array<{ elementId: string; device: string | null; anchor: string | null }>): void {
+        if (leaves.length === 0) return;
+        const st = this.store.prepare(`
+            insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
+            values (?, ?, ?, null, null, 'Bad', 'empty')
+            on conflict (element_id) do nothing`);
+        this.store.transaction(() => {
+            for (const l of leaves) st.run(l.elementId, l.anchor ?? l.device, l.device);
         });
     }
 
@@ -533,7 +552,7 @@ export class ValueCache {
     /** Number of stored values, for tests and diagnostics. */
     size(): number {
         this.flush();
-        return (this.store.prepare("select count(*) n from last_value").get() as any).n;
+        return (this.store.prepare("select count(*) n from last_value where source != 'empty'").get() as any).n;
     }
 
     /* ---- Query methods ---- */
@@ -543,6 +562,38 @@ export class ValueCache {
      * is walked through its own interface instead. */
     private treeInStore(): boolean {
         return (this.objectTree as any).store === this.store;
+    }
+
+    /**
+     * Has every leaf under `rootId` got a stored value, a queued value,
+     * or a marker that InfluxDB had none? Only then can the stored
+     * values stand for the composition: values kept from InfluxDB cover
+     * only the leaves someone asked about, so a composition built from
+     * some of them would look complete when it is not. A composition
+     * read from InfluxDB records every leaf it covered, values and
+     * markers, so the next read of it is answered from here.
+     */
+    private *missingLeaves(rootId: string): Generator<boolean | null> {
+        const has = this.store.prepare("select 1 from last_value where element_id = ?");
+        if (!this.objectTree.iterateDescendantLeafIds) { yield true; return; }
+        for (const leaf of this.objectTree.iterateDescendantLeafIds(rootId, 0)) {
+            if (leaf === null) { yield null; continue; }
+            if (!this.pending.has(leaf) && !has.get(leaf)) { yield true; return; }
+        }
+    }
+
+    private async compositionComplete(rootId: string): Promise<boolean> {
+        const slicer = new Slicer();
+        for (const step of this.missingLeaves(rootId)) {
+            if (step) return false;
+            await slicer.maybe();
+        }
+        return true;
+    }
+
+    private compositionCompleteSync(rootId: string): boolean {
+        for (const step of this.missingLeaves(rootId)) if (step) return false;
+        return true;
     }
 
     /**
@@ -567,7 +618,7 @@ export class ValueCache {
             }) } };
         }
         const row = this.store.prepare(
-            "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
         ).get(elementId) as unknown as ValueRow | undefined;
         if (row) return { head: { elementId, isComposition: false, ...toVqt(row) } };
 
@@ -577,13 +628,18 @@ export class ValueCache {
         /* The walk reads the database, so store what is queued, a chunk
          * at a time. */
         await this.flushSliced();
+        /* Complete: every leaf has a value or an InfluxDB "no data"
+         * marker, so all stored values stand for the composition.
+         * Otherwise only UNS values, as before values were kept from
+         * InfluxDB; with none, the caller reads InfluxDB. */
+        const all = await this.compositionComplete(elementId);
 
         /* The old value took the latest timestamp, by string order,
          * starting from "". */
         let n = 0;
         let latest = "";
         const slicer = new Slicer();
-        for (const step of this.walkComponents(elementId)) {
+        for (const step of this.walkComponents(elementId, all)) {
             if (step) {
                 n++;
                 const ts = step[1].timestamp;
@@ -600,7 +656,7 @@ export class ValueCache {
                 quality: "Good",
                 timestamp: latest,
             },
-            components: () => this.walkComponents(elementId),
+            components: () => this.walkComponents(elementId, all),
         };
     }
 
@@ -614,7 +670,7 @@ export class ValueCache {
      * their parent) and is not visited. A null is yielded after each
      * node, so the consumer can pause however few values there are.
      */
-    private *walkComponents(rootId: string): Generator<ComponentStep> {
+    private *walkComponents(rootId: string, all: boolean = false): Generator<ComponentStep> {
         /* Callers store queued values first (flush or flushSliced). */
         this.store.commit();
         const reader = this.store.openReader();
@@ -623,7 +679,7 @@ export class ValueCache {
             if (reader) reader.exec("begin");
             const values = db.prepare(`
                 select element_id, value_json, quality, timestamp from last_value
-                where anchor = ? and source = 'uns' order by seq`);
+                where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} order by seq`);
             const children = db.prepare(`
                 select o.seq, o.element_id,
                     o.is_composition or exists (select 1 from object c where c.parent_id = o.element_id) walk
@@ -677,14 +733,15 @@ export class ValueCache {
              * the value routes use getValueLazy. */
             this.flush();
             const row = this.store.prepare(
-                "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+                "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
             ).get(elementId) as unknown as ValueRow | undefined;
             if (row) return { elementId, isComposition: false, ...toVqt(row) };
             const obj = this.objectTree.getObject(elementId);
             if (!obj?.isComposition) return null;
+            const all = this.compositionCompleteSync(elementId);
             const components: Record<string, I3xVqt> = {};
             let latest = "";
-            for (const step of this.walkComponents(elementId)) {
+            for (const step of this.walkComponents(elementId, all)) {
                 if (!step) continue;
                 components[step[0]] = step[1];
                 if (step[1].timestamp > latest) latest = step[1].timestamp;
@@ -697,7 +754,7 @@ export class ValueCache {
 
         // Check if it's a direct leaf metric in the cache
         const row = this.store.prepare(
-            "select element_id, value_json, quality, timestamp from last_value where element_id = ?",
+            "select element_id, value_json, quality, timestamp from last_value where element_id = ? and source != 'empty'",
         ).get(elementId) as unknown as ValueRow | undefined;
         if (row) {
             return {
@@ -772,6 +829,7 @@ export class ValueCache {
         elementId: string,
         maxDepth: number,
         currentDepth: number = 1,
+        all: boolean = false,
     ): Record<string, I3xVqt> | null {
         const result: Record<string, I3xVqt> = {};
 
@@ -782,7 +840,7 @@ export class ValueCache {
         // not. Without UNS data the caller falls back to InfluxDB for
         // the whole composition, as it did before values were kept.
         const direct = this.store.prepare(
-            "select element_id, value_json, quality, timestamp from last_value where anchor = ? and source = 'uns' order by seq",
+            `select element_id, value_json, quality, timestamp from last_value where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} order by seq`,
         ).all(elementId) as unknown as ValueRow[];
         for (const r of direct) {
             result[r.element_id] = toVqt(r);
@@ -796,6 +854,7 @@ export class ValueCache {
                     childId,
                     maxDepth,
                     currentDepth + 1,
+                    all,
                 );
                 if (childResult) {
                     Object.assign(result, childResult);

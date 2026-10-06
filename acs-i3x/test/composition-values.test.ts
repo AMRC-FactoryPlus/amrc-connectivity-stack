@@ -224,8 +224,21 @@ describe("composition values to a depth", () => {
         const s = stack(4);
         fill(s);
         const root = s.tree.getObjects({ root: true })[0].elementId;
-        for (const bad of ["-1", "1.5", "deep"]) {
+        for (const bad of ["-1", "1.5", "deep", "", "%201", "0x10", "1e1"]) {
             const r = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=${bad}`);
+            expect(r.status).toBe(400);
+        }
+        const twice = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=1&maxDepth=2`);
+        expect(twice.status).toBe(400);
+    });
+
+    it("refuse a body maxDepth that is not a non-negative integer", async () => {
+        const s = stack(4);
+        fill(s);
+        const root = s.tree.getObjects({ root: true })[0].elementId;
+        for (const bad of [-1, 1.5, "1", "", true]) {
+            const r = await request(app(s)).post("/v1/objects/value")
+                .send({ elementIds: [root], maxDepth: bad });
             expect(r.status).toBe(400);
         }
     });

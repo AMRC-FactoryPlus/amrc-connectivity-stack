@@ -447,7 +447,7 @@ describe("InfluxDB write-back", () => {
         expect(s.queries).toHaveLength(1);
     });
 
-    it("the leaves of a composition read from InfluxDB are kept, for leaf reads only", async () => {
+    it("a composition read whole from InfluxDB is answered from the cache next time", async () => {
         const s = setup();
         s.series.set(s.leaf("Speed"), { _value: 1, _time: "2026-10-05T11:00:00Z" });
         s.series.set(s.leaf("Position", "axis-1"), { _value: 2, _time: "2026-10-05T11:00:00Z" });
@@ -465,12 +465,108 @@ describe("InfluxDB write-back", () => {
         expect(leaf.body.success).toBe(true);
         expect(s.queries).toHaveLength(1);
 
-        // ...but the composition is read from InfluxDB again, whole.
-        expect(s.valueCache.getValue(DEV)).toBeNull();
-        expect(s.valueCache.getChildValues("axis-1", 1)).toBeNull();
+        // ...and so is the composition: every leaf it covered has a
+        // value or a "no data" marker, so it is complete.
         const again = await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
         expect(again.body).toEqual(r.body);
+        expect(s.queries).toHaveLength(1);
+    });
+
+    it("a composition is not answered from leaves read on their own", async () => {
+        const s = setup();
+        s.series.set(s.leaf("Speed"), { _value: 1, _time: "2026-10-05T11:00:00Z" });
+        s.series.set(s.leaf("Position", "axis-1"), { _value: 2, _time: "2026-10-05T11:00:00Z" });
+        const app = api(s);
+
+        // One leaf read alone: the composition is not complete.
+        await request(app).post("/v1/objects/value").send({ elementIds: [s.leaf("Speed")] });
+        expect(s.queries).toHaveLength(1);
+        expect(s.valueCache.getValue(DEV)).toBeNull();
+        const r = await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        expect(Object.keys(r.body.results[0].result.components).sort())
+            .toEqual([s.leaf("Speed"), s.leaf("Position", "axis-1")].sort());
         expect(s.queries).toHaveLength(2);
+    });
+
+    it("a composition read only one level deep is not complete", async () => {
+        const s = setup();
+        s.series.set(s.leaf("Speed"), { _value: 1, _time: "2026-10-05T11:00:00Z" });
+        s.series.set(s.leaf("Position", "axis-1"), { _value: 2, _time: "2026-10-05T11:00:00Z" });
+        const app = api(s);
+        await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 1 });
+        // The nested leaf under axis-1 was not covered.
+        expect(s.valueCache.getValue(DEV)).toBeNull();
+    });
+
+    it("a UNS value replaces a no-data marker, and a marker is not a leaf value", async () => {
+        const s = setup();
+        s.series.set(s.leaf("Speed"), { _value: 1, _time: "2026-10-05T11:00:00Z" });
+        const app = api(s);
+        await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        // Status had no data in InfluxDB: a marker, not a value.
+        expect(s.valueCache.getValue(s.leaf("Status"))).toBeNull();
+        uns(s.valueCache, ["Status"], "ok", "2026-10-05T12:00:00Z");
+        expect(s.valueCache.getValue(s.leaf("Status"))!.value).toBe("ok");
+        const dev = s.valueCache.getValue(DEV)!;
+        expect(dev.components![s.leaf("Status")].value).toBe("ok");
+        expect(dev.components![s.leaf("Speed")].value).toBe(1);
+    });
+
+    it("a composition is not complete while a value waits in the queue after a failed write", async () => {
+        const s = setup();
+        s.series.set(s.leaf("Speed"), { _value: 1, _time: "2026-10-05T11:00:00Z" });
+        const app = api(s);
+        await request(app).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        expect(s.valueCache.getValue(DEV)).not.toBeNull();
+
+        // A new leaf arrives from UNS, but storing its value fails.
+        uns(s.valueCache, ["Extra"], 5, "2026-10-05T12:00:00Z");
+        const extra = s.leaf("Extra");
+        expect(extra).toBeDefined();
+        const err = jest.spyOn(console, "error").mockImplementation(() => {});
+        const tx = jest.spyOn(s.store, "transaction")
+            .mockImplementation(() => { throw new Error("database or disk is full"); });
+        try {
+            // Judged complete, the walk would leave out the queued leaf.
+            const lazy = await s.valueCache.getValueLazy(DEV);
+            const ids = lazy ? [...lazy.components!()].filter(Boolean).map(c => c![0]) : [];
+            expect(lazy === null || ids.includes(extra)).toBe(true);
+        } finally {
+            tx.mockRestore();
+            err.mockRestore();
+        }
+        // Once stored, the composition is complete again, with the leaf.
+        expect(s.valueCache.getValue(DEV)!.components![extra].value).toBe(5);
+    });
+
+    it("leaves no markers for a device removed while InfluxDB is read", async () => {
+        const s = setup();
+        const read = s.collectRows.getMockImplementation()!;
+        s.collectRows.mockImplementation(async (q: string) => {
+            const rows = await read(q);
+            // Sync removes the device before the read finishes.
+            s.tree.removeDevice(DEV);
+            s.valueCache.removeDevice(DEV);
+            return rows;
+        });
+        await request(api(s)).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        expect(rowCount(s.store)).toBe(0);
+    });
+
+    it("files the marker of a leaf without InfluxDB metadata under its own device", async () => {
+        const s = setup();
+        // A leaf found from UNS has no MetricMeta. Drop its value.
+        uns(s.valueCache, ["Extra"], 5, "2026-10-05T12:00:00Z");
+        const extra = s.leaf("Extra");
+        expect(s.tree.getMetricMeta(extra)).toBeFalsy();
+        s.valueCache.flush();
+        s.valueCache.removeElements([extra]);
+
+        await request(api(s)).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
+        const row = s.store.prepare("select device_uuid, source from last_value where element_id = ?").get(extra) as any;
+        expect(row).toEqual({ device_uuid: DEV, source: "empty" });
+        s.valueCache.removeDevice(DEV);
+        expect(rowCount(s.store)).toBe(0);
     });
 
     it("a composition is not answered from leaves cached from InfluxDB", async () => {

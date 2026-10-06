@@ -51,7 +51,10 @@ interface HistoryOpts {
      * Where to keep current values read from InfluxDB, so the next
      * read of the same metric does not need a Flux query.
      */
-    valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
+    valueCache?: {
+        recordInfluxValues(values: InfluxValue[]): void;
+        recordInfluxEmpty?(leaves: Array<{ elementId: string; device: string | null; anchor: string | null }>): void;
+    };
 }
 
 /** One row of the bulk last-value query. */
@@ -112,7 +115,7 @@ export class History {
     private bulkConcurrency: number;
     private bulkMeasurementFilterMax: number;
     private semaphore: Semaphore;
-    private valueCache?: { recordInfluxValues(values: InfluxValue[]): void };
+    private valueCache?: HistoryOpts["valueCache"];
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
@@ -166,6 +169,68 @@ export class History {
             await slicer.maybe();
         }
         if (out.length) write();
+    }
+
+    /**
+     * Record, for each composition read, the leaves InfluxDB had no
+     * value for. With the values remember() keeps, every leaf the read
+     * covered is then accounted for, so the value cache can answer the
+     * composition next time (see ValueCache.compositionComplete).
+     */
+    private async rememberEmpty(
+        plan: Map<string, { composition: boolean; leafIds: string[] }>,
+        values: Map<string, I3xValueResponse>,
+    ): Promise<void> {
+        if (!this.valueCache?.recordInfluxEmpty) return;
+        const slicer = new Slicer();
+        let out: Array<{ elementId: string; device: string | null; anchor: string | null }> = [];
+        const write = () => {
+            /* Sync may have removed a device while InfluxDB was read, or
+             * during a pause here. A marker for a leaf that has gone
+             * would never be deleted, so check just before writing. */
+            out = out.filter(l => this.objectTree.getObject(l.elementId));
+            try {
+                if (out.length) this.valueCache!.recordInfluxEmpty!(out);
+            } catch (err) {
+                console.error("History: storing empty InfluxDB results failed:", err);
+            }
+            out = [];
+        };
+        const devices = new Map<string, string | null>();
+        for (const { composition, leafIds } of plan.values()) {
+            if (!composition) continue;
+            for (const leafId of leafIds) {
+                await slicer.maybe();
+                if (values.has(leafId)) continue;
+                const anchor = this.objectTree.getObject(leafId)?.parentId ?? null;
+                const device = this.objectTree.getMetricMeta(leafId)?.topLevelInstanceUuid
+                    ?? this.deviceAbove(anchor, devices);
+                /* No device: removeDevice could never delete the marker. */
+                if (!device) continue;
+                out.push({ elementId: leafId, device, anchor });
+                if (out.length >= 1000) write();
+            }
+        }
+        if (out.length) write();
+    }
+
+    /**
+     * The device an object belongs to: the nearest of `id` and its
+     * ancestors that has schemas, as a device does. For a leaf without
+     * MetricMeta, so its marker goes with its own device. Answers are
+     * kept in `cache` by object, as siblings share their ancestors.
+     */
+    private deviceAbove(id: string | null, cache: Map<string, string | null>): string | null {
+        const path: string[] = [];
+        let found: string | null = null;
+        for (let i = 0; id && i < 64; i++) {
+            if (cache.has(id)) { found = cache.get(id)!; break; }
+            path.push(id);
+            if (this.objectTree.getDeviceSchemaUuids(id).length) { found = id; break; }
+            id = this.objectTree.getObject(id)?.parentId ?? null;
+        }
+        for (const p of path) cache.set(p, found);
+        return found;
     }
 
     /**
@@ -262,6 +327,7 @@ export class History {
         }
 
         const leafValues = await this.getCurrentValues([...allLeaves]);
+        await this.rememberEmpty(plan, leafValues);
 
         const out = new Map<string, I3xValueResponse | null>();
         for (const [id, { composition, leafIds }] of plan) {

@@ -38,9 +38,9 @@ function stack(devices: number, store = new I3xStore()) {
     return { store, tree, valueCache };
 }
 
-/* A UNS value for every leaf, filed under its parent, in a scrambled
- * first-seen order; some also have a newer InfluxDB row, which
- * compositions must ignore. */
+/* A value for every leaf, filed under its parent, in a scrambled
+ * first-seen order; some came from InfluxDB. Every leaf has a value, so
+ * every composition is complete and uses all of them. */
 function fill(s: ReturnType<typeof stack>, pad = 0) {
     s.store.prepare(`
         insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
@@ -53,9 +53,10 @@ function fill(s: ReturnType<typeof stack>, pad = 0) {
     `).run(pad, pad);
 }
 
-/* What the cache used to return: the recursive walk over the tree. */
+/* What the cache returns: the recursive walk over the tree, over every
+ * stored value (the compositions are complete). */
 function oldValue(s: ReturnType<typeof stack>, id: string) {
-    const components = (s.valueCache as any).collectChildValues(id, 0) as Record<string, any> | null;
+    const components = (s.valueCache as any).collectChildValues(id, 0, 1, true) as Record<string, any> | null;
     if (!components) return null;
     const ts = Object.values(components).reduce(
         (best: string, c: any) => (c.timestamp > best ? c.timestamp : best), "");

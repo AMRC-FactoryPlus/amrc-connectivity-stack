@@ -37,7 +37,9 @@ export function mk_node (obj) {
  * Read up to `depth` levels of structure below `top`, and the values of
  * the leaves in them, into `top`. The structure takes one request per
  * level and the values one request, made alongside. Compositions left
- * at the bottom, or past `max_rows`, keep `children: null`.
+ * at the bottom, or past `max_rows`, keep `children: null`. If the
+ * server's maxDepthCap cut the values short, the compositions below the
+ * cap are left unread too, to be read when they are expanded.
  */
 export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = MAX_ROWS } = {}) {
   const values = i3x.getValueBulk([top.elementId], depth)
@@ -63,13 +65,32 @@ export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = M
     frontier = next
   }
 
-  const result = (await values)[0]
+  const { results, partial } = await values
+  if (partial) {
+    const info = await i3x.getInfo()
+    unread_below(top, info?.capabilities?.query?.maxDepthCap ?? 1)
+  }
+
+  const result = results[0]
   const components = result?.success ? result.result?.components ?? {} : {}
   const fill = node => {
     if (!node.isComposition) node.vqt = components[node.elementId] ?? null
     node.children?.forEach(fill)
   }
   fill(top)
+}
+
+/* Mark the compositions `depth` levels below `top` as unread. Their
+ * leaves are one level further down, past what the values reached. */
+function unread_below (top, depth) {
+  const walk = (node, level) => {
+    for (const c of node.children ?? []) {
+      if (!c.isComposition) continue
+      if (level >= depth) c.children = null
+      else walk(c, level + 1)
+    }
+  }
+  walk(top, 1)
 }
 
 /**

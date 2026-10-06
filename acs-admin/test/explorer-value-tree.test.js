@@ -42,18 +42,25 @@ const depth_of = id => {
 const vqt = id => ({ value: `${id}-value`, quality: 'Good', timestamp: '2026-10-05T11:16:01Z' })
 
 /* A fake i3X client that answers like the server: values to maxDepth,
- * keyed by leaf ID, with `owner` never having had a value. */
-function fake_i3x () {
-  const calls = { related: [], value: [] }
+ * keyed by leaf ID, with `owner` never having had a value. With a
+ * `cap`, a deeper maxDepth is cut to it and marked partial (HTTP 206). */
+function fake_i3x ({ cap = 0 } = {}) {
+  const calls = { related: [], value: [], info: 0 }
   return {
     calls,
+    async getInfo () {
+      calls.info++
+      return { capabilities: { query: cap ? { history: true, maxDepthCap: cap } : { history: true } } }
+    },
     async getRelatedBulk (ids, rel) {
       calls.related.push({ ids, rel })
       return ids.map(id => ({ success: true, elementId: id, result: children(id) }))
     },
-    async getValueBulk (ids, maxDepth) {
-      calls.value.push({ ids, maxDepth })
-      return ids.map(id => {
+    async getValueBulk (ids, requested) {
+      calls.value.push({ ids, maxDepth: requested })
+      const partial = cap > 0 && (requested === 0 || requested > cap)
+      const maxDepth = partial ? cap : requested
+      const results = ids.map(id => {
         const base = depth_of(id)
         const components = {}
         for (const [leaf, o] of Object.entries(OBJECTS)) {
@@ -66,6 +73,7 @@ function fake_i3x () {
         }
         return { success: true, elementId: id, result: { elementId: id, isComposition: true, components } }
       })
+      return { results, partial }
     },
   }
 }
@@ -98,11 +106,12 @@ describe('composition value tree', () => {
   it('keeps a reported leaf with a null value apart from one not reported', async () => {
     const i3x = fake_i3x()
     const value = i3x.getValueBulk
-    i3x.getValueBulk = async (ids, maxDepth) => (await value(ids, maxDepth))
-      .map(r => {
+    i3x.getValueBulk = async (ids, maxDepth) => {
+      const res = await value(ids, maxDepth)
+      for (const r of res.results)
         r.result.components.kind = { value: null, quality: 'Bad', timestamp: null }
-        return r
-      })
+      return res
+    }
     const t = top()
     await load_subtree(i3x, t)
     expect(t.children[0].vqt).toEqual({ value: null, quality: 'Bad', timestamp: null })
@@ -114,8 +123,11 @@ describe('composition value tree', () => {
 
   it('counts every leaf as not reported when the composition has no value', async () => {
     const i3x = fake_i3x()
-    i3x.getValueBulk = async ids => ids.map(id =>
-      ({ success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } }))
+    i3x.getValueBulk = async ids => ({
+      results: ids.map(id =>
+        ({ success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } })),
+      partial: false,
+    })
     const t = top()
     await load_subtree(i3x, t)
     expect(leaf_state(t.children[0])).toBe('not-reported')
@@ -200,5 +212,41 @@ describe('composition value tree', () => {
 
     await expect(expand(i3x, node, { is_current: () => true }))
       .rejects.toThrow('i3X request failed: 503')
+  })
+
+  it('reads no deeper than the values when the server caps the depth', async () => {
+    for (const cap of [1, 2]) {
+      const i3x = fake_i3x({ cap })
+      const t = top()
+      await load_subtree(i3x, t)
+      const [, , location, cyber] = t.children
+      if (cap === 1) {
+        expect(location.children).toBe(null)
+        expect(cyber.children).toBe(null)
+      } else {
+        expect(location.children[0].vqt).toEqual(vqt('lat'))
+        expect(cyber.children[0].children).toBe(null)
+        expect(cyber.children[1].vqt).toEqual(vqt('firmware'))
+      }
+      /* Every leaf left in the tree had its value read. */
+      expect(count_leaves(t).leaves - count_leaves(t).reported).toBe(1)
+    }
+  })
+
+  it('reads the levels past a cap when they are expanded', async () => {
+    const i3x = fake_i3x({ cap: 1 })
+    const t = top()
+    await load_subtree(i3x, t)
+    const cyber = t.children[3]
+    expect(await expand(i3x, cyber)).toBe(true)
+    expect(names(cyber)).toEqual(['Network', 'Firmware'])
+    expect(cyber.children[0].children).toBe(null)
+    expect(cyber.children[1].vqt).toEqual(vqt('firmware'))
+  })
+
+  it('does not ask for the cap when the values are complete', async () => {
+    const i3x = fake_i3x({ cap: 3 })
+    await load_subtree(i3x, top())
+    expect(i3x.calls.info).toBe(0)
   })
 })

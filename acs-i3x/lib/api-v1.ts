@@ -494,14 +494,18 @@ export class APIv1 {
      * cannot answer is then read from InfluxDB in one batch via
      * `history.getValues`, which reads leaves and compositions with a
      * small, bounded number of Flux queries. `maxDepth` controls
-     * composition recursion; defaults to 1 for compositions. If the
+     * composition recursion; defaults to 1 for compositions, and one
+     * that is not a non-negative integer is refused with a 400. If the
      * server's `maxDepthCap` clamped any request, the response is
      * returned with HTTP 206 to indicate a partial result.
      */
-    async value_objects(req: Request, res: Response): Promise<void> {
+    async value_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
         const started = Date.now();
         const { elementIds, maxDepth } = req.body;
         const ids = elementIds as string[];
+        if (maxDepth != null && !(Number.isInteger(maxDepth) && maxDepth >= 0)) {
+            return next(badRequest("maxDepth must be a non-negative integer"));
+        }
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
 
         // Try UNS cache first (real-time), fall back to InfluxDB last().
@@ -624,12 +628,13 @@ export class APIv1 {
     async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
         const id = req.params.elementId;
         const obj = this.objectTree.getObject(id);
+        /* Digits only: Number() would take "" as 0 (the whole
+         * subtree), and " 1", "0x10" or "1e1" as other depths. */
         const raw = req.query.maxDepth;
-        const requested = raw === undefined ? 1 : Number(raw);
-        if (!Number.isInteger(requested) || requested < 0) {
+        if (raw !== undefined && !(typeof raw === "string" && /^\d+$/.test(raw))) {
             return next(badRequest("maxDepth must be a non-negative integer"));
         }
-        const { effective, clamped } = this.clampDepth(requested);
+        const { effective, clamped } = this.clampDepth(raw === undefined ? 1 : Number(raw));
         if (clamped) res.status(206);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
         const cached = await this.valueCache.getValueLazy(id, effective);

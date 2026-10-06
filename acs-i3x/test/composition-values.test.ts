@@ -63,8 +63,9 @@ function oldValue(s: ReturnType<typeof stack>, id: string) {
     return { elementId: id, isComposition: true, value: null, quality: "Good", timestamp: ts, components };
 }
 
-function app(s: ReturnType<typeof stack>) {
+function app(s: ReturnType<typeof stack>, maxDepthCap = 0) {
     const api = new APIv1({
+        maxDepthCap,
         objectTree: s.tree, valueCache: s.valueCache,
         history: {
             getValues: async () => new Map(),
@@ -227,6 +228,23 @@ describe("composition values to a depth", () => {
             const r = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=${bad}`);
             expect(r.status).toBe(400);
         }
+    });
+
+    it("are clamped with a 206 when the whole subtree is asked for past a cap", async () => {
+        const s = stack(40);
+        fill(s);
+        const a = app(s, 2);
+        /* Leaves within the cap and more below it. */
+        const id = s.tree.getObjects().find(o => o.isComposition
+            && leaves(s, o.elementId, 2).length > 0
+            && leaves(s, o.elementId, 0).length > leaves(s, o.elementId, 2).length)!.elementId;
+        const one = await request(a).get(`/v1/objects/${id}/value?maxDepth=0`);
+        expect(one.status).toBe(206);
+        expect(Object.keys(one.body.result.components).sort()).toEqual(leaves(s, id, 2));
+        const many = await request(a).post("/v1/objects/value").send({ elementIds: [id], maxDepth: 0 });
+        expect(many.status).toBe(206);
+        const within = await request(a).get(`/v1/objects/${id}/value?maxDepth=2`);
+        expect(within.status).toBe(200);
     });
 });
 

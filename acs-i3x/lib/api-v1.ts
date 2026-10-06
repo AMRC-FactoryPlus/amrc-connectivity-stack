@@ -262,7 +262,8 @@ export class APIv1 {
      * request was clamped (caller should return HTTP 206 if so).
      */
     private clampDepth(requested: number): { effective: number; clamped: boolean } {
-        if (this.maxDepthCap > 0 && requested > this.maxDepthCap) {
+        /* 0 asks for the whole subtree, which is deeper than any cap. */
+        if (this.maxDepthCap > 0 && (requested === 0 || requested > this.maxDepthCap)) {
             return { effective: this.maxDepthCap, clamped: true };
         }
         return { effective: requested, clamped: false };

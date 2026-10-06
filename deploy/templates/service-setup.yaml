@@ -150,12 +150,23 @@ spec:
               # with backoffLimit 9999, so each retry would bounce mqtt
               # again - restarting the broker every few minutes for
               # weeks while helm upgrade reports success.
+              #
+              # For the same reason, a slow rollout must not fail the
+              # Job. Once the restart is requested the Deployment
+              # controller finishes it whether or not we wait. Keycloak
+              # can take more than two minutes to start on a busy node,
+              # so a short wait that exits 1 sent the Job round again,
+              # restarting mqtt and openid every few minutes. Wait a
+              # while for the logs, then carry on.
               NAMESPACE={{.Release.Namespace}}
               for D in mqtt{{ if .Values.openid.enabled }} openid{{ end }}; do
                 echo "Restarting deployment: $D"
                 kubectl rollout restart "deployment/$D" -n "$NAMESPACE" || exit 1
-                kubectl rollout status "deployment/$D" -n "$NAMESPACE" --timeout=120s || exit 1
-                echo "$D restarted."
+                if kubectl rollout status "deployment/$D" -n "$NAMESPACE" --timeout=600s; then
+                  echo "$D restarted."
+                else
+                  echo "$D has not finished restarting; leaving it to the Deployment controller."
+                fi
               done
 ---
 

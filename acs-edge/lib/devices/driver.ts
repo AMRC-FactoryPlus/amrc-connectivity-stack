@@ -21,6 +21,7 @@ export class DriverConnection extends DeviceConnection {
     addrs:      Map<string, string>
     topics:     Map<string, string>
     groups:     Map<string, addrGroup>
+    #addrsPending: NodeJS.Immediate | null = null
 
     constructor(type: string, details: any, name: string, broker: DriverBroker) {
         // Call constructor of parent class
@@ -48,6 +49,7 @@ export class DriverConnection extends DeviceConnection {
     }
 
     close () {
+        this.#cancel_addrs();
         this.broker.publish({
             id:         this.id,
             msg:        "active",
@@ -64,6 +66,11 @@ export class DriverConnection extends DeviceConnection {
             .filter(a => this.topics.has(a))
             .map(a => this.topics.get(a))
             .join("\n");
+        /* An empty poll asks the driver to read nothing. Do not send
+         * it. A pending address map can wait: it is only needed ahead
+         * of a poll that is actually sent. */
+        if (poll == "") return;
+        this.#flush_addrs();
         this.broker.publish({
             id:         this.id,
             msg:        "poll",
@@ -72,6 +79,7 @@ export class DriverConnection extends DeviceConnection {
     }
 
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat: serialisationType, delimiter?: string) {
+        this.#flush_addrs();
         let err;
 
         metrics.array.forEach(m => {
@@ -126,7 +134,14 @@ export class DriverConnection extends DeviceConnection {
         });
 
         if (this.status != "DOWN")
-            this.#send_addrs();
+            this.#queue_addrs();
+
+        /* A device with no addresses has nothing to poll, so do not
+         * start a timer that only sends empty polls. */
+        if (addrs.length == 0) {
+            subscriptionStartCallback();
+            return;
+        }
 
         super.startSubscription(metrics, payloadFormat, delimiter, interval,
             deviceId, subscriptionStartCallback);
@@ -181,6 +196,9 @@ export class DriverConnection extends DeviceConnection {
                 msg: "conf",
                 payload: Buffer.from(JSON.stringify(this.conf)),
             });
+            /* The driver clears its map on conf, so send the map
+             * straight after it, as before. */
+            this.#cancel_addrs();
             this.#send_addrs();
             break;
         case "UP":
@@ -196,6 +214,36 @@ export class DriverConnection extends DeviceConnection {
                 this.emit("close");
             break;
         }
+    }
+
+    /* Send the address map once the current burst of changes is done.
+     * Each device calls startSubscription from its own ready timer, and
+     * the map is sent whole, so sending it every time is quadratic in
+     * the number of devices. The driver replaces its map on each addr
+     * message, so only the last one matters. setImmediate sends once
+     * per turn of the event loop, after the timers due in that turn. */
+    #queue_addrs () {
+        if (this.#addrsPending) return;
+        this.#addrsPending = setImmediate(() => {
+            this.#addrsPending = null;
+            if (this.status != "DOWN")
+                this.#send_addrs();
+        });
+    }
+
+    /* A poll or a cmd must reach the driver after the map it depends
+     * on, so send any pending map first. */
+    #flush_addrs () {
+        if (!this.#addrsPending) return;
+        this.#cancel_addrs();
+        if (this.status != "DOWN")
+            this.#send_addrs();
+    }
+
+    #cancel_addrs () {
+        if (!this.#addrsPending) return;
+        clearImmediate(this.#addrsPending);
+        this.#addrsPending = null;
     }
 
     #send_addrs () {

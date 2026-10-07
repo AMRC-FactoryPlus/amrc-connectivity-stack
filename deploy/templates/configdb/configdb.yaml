@@ -98,6 +98,10 @@ spec:
 {{ include "amrc-connectivity-stack.image" (list . .Values.configdb) | indent 10 }}
           command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
           args: ["node", "bin/api.js"]
+          {{- with .Values.configdb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
@@ -128,6 +132,8 @@ spec:
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             - name: BODY_LIMIT
               value: "{{ .Values.configdb.bodyLimit }}"
+            - name: CLASS_LOOKUP_INTERVAL
+              value: "{{ .Values.configdb.classLookupInterval }}"
             - name: BOOTSTRAP_ACL
               value: |
                 sv1auth:Perm.ReadApp:App.Registration

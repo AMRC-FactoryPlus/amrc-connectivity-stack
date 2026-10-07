@@ -11,6 +11,7 @@ use tokio::sync::{Mutex, mpsc};
 use crate::config::DriverConfig;
 use crate::error::{ConnectError, Error};
 use crate::handler::Handler;
+use crate::redact::redact;
 use crate::status::Status;
 
 /// Maximum number of poll batches that can queue before we start
@@ -432,7 +433,8 @@ impl<H: Handler + 'static> Driver<H> {
             }
         };
 
-        tracing::debug!(?conf, "received device configuration");
+        // The config may contain secrets from the edge agent.
+        tracing::debug!(conf = ?redact(&conf), "received device configuration");
 
         self.close_handler().await;
         // Clear the poll worker's handler reference

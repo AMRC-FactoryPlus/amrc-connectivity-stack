@@ -6,6 +6,7 @@ import { jest } from "@jest/globals";
 import { ObjectTree } from "../lib/object-tree.js";
 import { RelType } from "../lib/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
+import { loadFromMock } from "./helpers/load-from-mock.js";
 
 const DEVICE_CLASS_UUID = "18773d6d-a70d-443a-b29a-3f1583195290";
 const DEVICE_INFORMATION_APP_UUID = "a98ffed5-c613-4e70-bfd3-efeee250ade5";
@@ -102,9 +103,13 @@ describe("ObjectTree", () => {
     });
 
     describe("after init (empty devices)", () => {
-        it("isReady() returns true", async () => {
+        it("isReady() returns true once the sync engine marks it ready", async () => {
             const tree = makeTree();
             await tree.init();
+            // init() no longer loads devices; the sync engine sets ready
+            // after its initial sync.
+            expect(tree.isReady()).toBe(false);
+            tree.setReady();
             expect(tree.isReady()).toBe(true);
         });
 
@@ -175,7 +180,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             const { dev1, dev2, class1, class2, schema1, schema2 } = setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             // Verify ConfigDB was called correctly
             expect(fplus.ConfigDB.class_members).toHaveBeenCalledWith(DEVICE_CLASS_UUID);
@@ -214,7 +219,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             const objects = tree.getObjects();
             expect(objects.length).toBeGreaterThanOrEqual(4); // devices + ISA-95 + metric tree
@@ -224,7 +229,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             const roots = tree.getObjects({ root: true });
             // Both devices share AMRC → F2050, so there's 1 root: AMRC
@@ -237,7 +242,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             const { dev1, class1 } = setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             const filtered = tree.getObjects({ typeElementId: class1 });
             expect(filtered).toHaveLength(1);
@@ -248,7 +253,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             const { dev1 } = setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             expect(tree.getObject(dev1)).toBeDefined();
             expect(tree.getObject(dev1)!.elementId).toBe(dev1);
@@ -259,7 +264,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             const { class1, schema1 } = setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             const ot = tree.getObjectType(class1);
             expect(ot).toBeDefined();
@@ -271,7 +276,7 @@ describe("ObjectTree", () => {
             const fplus = createMockFplus();
             setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             expect(tree.getObjectTypes(NS_URI).length).toBeGreaterThanOrEqual(2);
             expect(tree.getObjectTypes("urn:other:ns")).toHaveLength(0);
@@ -311,7 +316,7 @@ describe("ObjectTree", () => {
             );
 
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
             return { tree, dev1, classA: schemaA };
         }
 
@@ -479,11 +484,11 @@ describe("ObjectTree", () => {
             }
         });
 
-        it("refresh re-fetches data from ConfigDB/Directory", async () => {
+        it("reloading from ConfigDB drops devices no longer in the Device class", async () => {
             const fplus = createMockFplus();
             const { dev1 } = setupMockDevices(fplus);
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             const initialCount = tree.getObjects().length;
             expect(initialCount).toBeGreaterThanOrEqual(4);
@@ -491,7 +496,7 @@ describe("ObjectTree", () => {
             // Now mock returns only one device
             fplus.ConfigDB.class_members.mockResolvedValue([dev1]);
 
-            await tree.refresh();
+            await loadFromMock(tree, fplus);
             // Should have fewer objects than before
             expect(tree.getObjects().length).toBeLessThan(initialCount);
             expect(tree.getObject(dev1)).toBeDefined();
@@ -542,12 +547,12 @@ describe("ObjectTree", () => {
             };
         }
 
-        it("produces the same Objects and ObjectTypes as the HTTP loadDevices path", async () => {
-            // Build one tree via the HTTP path
+        it("produces the same Objects and ObjectTypes as loading the same configs from ConfigDB", async () => {
+            // Build one tree from the mock ConfigDB
             const fplusHttp = createMockFplus();
             const opts = setupMockDevices(fplusHttp);
             const treeHttp = makeTree(fplusHttp);
-            await treeHttp.init();
+            await loadFromMock(treeHttp, fplusHttp);
 
             // Build a second tree via the pipeline path
             const treeP = makeTree();
@@ -643,7 +648,7 @@ describe("ObjectTree", () => {
             );
 
             const tree = makeTree(fplus);
-            await tree.init();
+            await loadFromMock(tree, fplus);
 
             // UNS discovers Axes/X/Position under the device. Axes and X
             // are composition; Position is a leaf metric.
@@ -672,7 +677,7 @@ describe("ObjectTree", () => {
             expect(tree.getObject(axes)).toBeDefined();
 
             // Refresh with the same device set — UNS subtree must survive
-            await tree.refresh();
+            await loadFromMock(tree, fplus);
 
             expect(tree.getObject(dev1)).toBeDefined();
             expect(tree.getObject(axes)).toBeDefined();
@@ -691,7 +696,7 @@ describe("ObjectTree", () => {
 
             // Device disappears from ConfigDB class membership
             fplus.ConfigDB.class_members.mockResolvedValue([]);
-            await tree.refresh();
+            await loadFromMock(tree, fplus);
 
             expect(tree.getObject(dev1)).toBeUndefined();
             expect(tree.getObject(axes)).toBeUndefined();

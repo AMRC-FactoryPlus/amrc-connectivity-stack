@@ -7,8 +7,8 @@ graph TB
     Client["i3X Client<br/>(Explorer, Aggregator, etc.)"]
     
     subgraph acs-i3x["acs-i3x service"]
-        OT["ObjectTree<br/>objects, types,<br/>hierarchy, metricMeta"]
-        VC["ValueCache<br/>UNS cache (live)"]
+        OT["ObjectTree + ConfigSync<br/>objects, types,<br/>hierarchy, metricMeta<br/>(SQLite)"]
+        VC["ValueCache<br/>last values (SQLite)"]
         HI["History<br/>Flux queries"]
         SM["SubscriptionMgr<br/>SSE/sync queues"]
     end
@@ -18,39 +18,50 @@ graph TB
     InfluxDB["InfluxDB<br/>(default bucket)"]
     
     Client -->|"REST / SSE"| acs-i3x
-    OT -->|"STARTUP"| ConfigDB
+    OT -->|"ETag SEARCH + GET on change"| ConfigDB
     VC -->|"RUNTIME"| MQTT
     HI -->|"ON REQUEST"| InfluxDB
     SM -->|"RUNTIME"| MQTT
 ```
 
-## Startup: ObjectTree builds from ConfigDB
+## Startup: ConfigSync fills the ObjectTree from ConfigDB
 
-The entire object hierarchy is built at startup from ConfigDB. **The Directory is not used.**
+The object hierarchy comes from ConfigDB. **The Directory is not used.** The
+tree is kept in SQLite (`/data/i3x.db`), with the ConfigDB ETags each device
+and schema was built from, so a restart serves the stored tree at once and
+fetches only what changed.
 
 ```mermaid
 sequenceDiagram
-    participant OT as ObjectTree
+    participant CS as ConfigSync
+    participant OT as ObjectTree (SQLite)
     participant CDB as ConfigDB
 
-    OT->>CDB: class_members("18773d6d..." Device class)
-    CDB-->>OT: [uuid1, uuid2, ...] (104 devices)
-    
-    loop For each device UUID
-        OT->>CDB: get_config(DeviceInfo app, device)
-        CDB-->>OT: originMap (full metric structure)
-        Note right of OT: Extract from originMap:<br/>- schema (Schema_UUID = type)<br/>- Instance_UUID<br/>- ISA-95 hierarchy<br/>- Full metric tree (recursive)
-        
-        OT->>CDB: get_config(Info app, device)
-        CDB-->>OT: { name: "MABI_Robot" }
+    CS->>CDB: WATCH v2/class/<Device>/member/
+    CS->>CDB: SEARCH v2/app/<DeviceInformation>/etag/
+    CS->>CDB: SEARCH v2/app/<Info>/etag/
+    CS->>CDB: SEARCH v2/app/<Schema>/etag/
+    CDB-->>CS: members, and { uuid: etag } snapshots
+
+    Note over CS: Compare with the stored ETags:<br/>remove devices no longer in the class,<br/>fetch only configs that differ
+
+    loop Each changed device (16 at a time)
+        CS->>CDB: GET DeviceInformation and/or Info
+        CDB-->>CS: config + ETag
+        CS->>OT: replaceDeviceSubtree / updateDeviceName
+        Note right of OT: Extract from originMap:<br/>- schema (Schema_UUID = type)<br/>- ISA-95 hierarchy<br/>- Full metric tree (recursive)
     end
-    
-    loop For each unique Schema_UUID
-        OT->>CDB: get_config(ConfigSchema app, schema)
-        CDB-->>OT: JSON Schema definition
+
+    loop Each referenced schema that changed
+        CS->>CDB: GET Schema and/or Info
+        CS->>OT: addObjectType
     end
-    
-    Note over OT: Produces:<br/>- i3X Namespace<br/>- ObjectTypes (per Schema_UUID)<br/>- Objects (ISA-95 → device → metrics)<br/>- MetricMeta per leaf<br/>- Instance ↔ ConfigDB UUID mapping
+
+    loop Afterwards, each SEARCH child update
+        CDB-->>CS: { uuid: new etag }
+        CS->>CDB: GET that one config
+        CS->>OT: apply that one change
+    end
 ```
 
 ### What the DeviceInformation app config contains
@@ -107,6 +118,32 @@ flowchart TD
 |---|---|---|
 | ValueCache (UNS MQTT) | Real-time (sub-second) | Only devices publishing to UNS (requires ISA-95 config) |
 | InfluxDB last() | ~10s delayed (historian flush interval) | All devices with any historical data |
+
+`POST /objects/value` checks the ValueCache for every id first. It then
+reads all the misses from InfluxDB in one batch (`History.getValues`).
+The batch reads every leaf it needs, including every descendant leaf
+of a composition, with one Flux query per 100 devices
+(`topLevelInstance`), and runs at most 4 of those queries at once:
+
+```
+from(bucket: "default")
+  |> range(start: -30d)
+  |> filter(fn: (r) => r["_measurement"] == "<measurement 1>" or ...)
+  |> filter(fn: (r) => r["topLevelInstance"] == "<device 1>" or ...)
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> last()
+```
+
+The `_measurement` filter lists the measurements the chunk's leaves
+need. It is left out when a chunk needs more than 50, and the query
+then reads every series of its devices. The InfluxDB client timeout
+is 10 s.
+
+Each leaf takes the first returned row whose measurement, device and
+path match. When a leaf has more than one series (for example after a
+device rename changes the `device` tag), that is the same row the
+single-leaf query returns. `GET /objects/:id/value` on a composition
+uses the same batch read for its leaves.
 
 ## On Request: History
 
@@ -171,7 +208,7 @@ sequenceDiagram
     
     loop Continuous
         MQTT-->>VC: UNS/v1/.../metric message
-        VC->>VC: cache.set(elementId, vqt)
+        VC->>VC: queue for last_value (written every 250 ms)
         VC->>SM: onValueChange(elementId, vqt)
         SM->>SM: elementId registered?
         SM-->>Client: data: [{ elementId, value, quality, timestamp }]
@@ -184,11 +221,12 @@ Only works for devices publishing to UNS. Devices not on UNS never trigger SSE e
 
 | Data | Source | When | Latency |
 |---|---|---|---|
-| Object hierarchy (types, tree, ISA-95) | ConfigDB DeviceInformation app | Startup | Once |
-| Object names | ConfigDB Info app | Startup | Once |
-| JSON Schemas | ConfigDB ConfigSchema app | Startup | Once |
-| Current value (primary) | MQTT UNS/v1/# via in-memory cache | Continuous | Real-time |
-| Current value (fallback) | InfluxDB default bucket, last() | On request | ~10s |
+| Object hierarchy (types, tree, ISA-95) | ConfigDB DeviceInformation app | Start, then each change | ETag SEARCH |
+| Object names | ConfigDB Info app | Start, then each change | ETag SEARCH |
+| JSON Schemas | ConfigDB ConfigSchema app | Start, then each change | ETag SEARCH |
+| Current value (primary) | MQTT UNS/v1/# into SQLite `last_value` | Continuous | Real-time |
+| Current value (fallback) | InfluxDB default bucket, last(); kept in `last_value` for devices that publish to UNS | First read of a leaf (every read for other devices), and any read during a catch-up | ~10s |
+| Current value (catch-up) | InfluxDB default bucket, last() since the values were last current | After a restart or MQTT reconnect, and every refresh interval for values kept from InfluxDB | Margin (60 s) plus the query |
 | Historical values | InfluxDB default bucket, range query | On request | N/A |
 | SSE streaming | MQTT UNS/v1/# via SSE bridge | Continuous | Real-time |
 | Device online/offline | Not currently used | -- | -- |

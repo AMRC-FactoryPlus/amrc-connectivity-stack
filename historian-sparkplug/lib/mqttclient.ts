@@ -9,6 +9,7 @@ import {logger} from "../bin/ingester.js";
 import Long from "long";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
+import {StallWatchdog, parseStallTimeout, subscriptionOutcome} from "./watchdog.js";
 
 let dotenv: any = null;
 try {
@@ -43,7 +44,19 @@ if (!flushInterval) {
     throw new Error("FLUSH_INTERVAL environment variable is not set");
 }
 
+/* Exit if no Sparkplug message arrives for this long. See
+ * lib/watchdog.ts. */
+const stallTimeoutMs: number = parseStallTimeout(process.env.STALL_TIMEOUT);
+
 let i = 0;
+
+/* Log, then exit non-zero so Kubernetes restarts the pod. This is for
+ * states the process cannot recover from by itself. The short delay
+ * gives the log line a chance to reach stdout. */
+function fatal (msg: string, ...args: any[]): void {
+    logger.fatal(msg, ...args);
+    setTimeout(() => process.exit(1), 500);
+}
 
 // Node.js HTTP client OOTB does not reuse established TCP connections, a custom node HTTP agent
 // can be used to reuse them and thus reduce the count of newly established networking sockets
@@ -86,9 +99,18 @@ export default class MQTTClient {
     private mqtt: any;
     private aliasResolver = {};
     private birthDebounce = {};
+    private watchdog: StallWatchdog;
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
+        this.watchdog = new StallWatchdog({
+            timeoutMs: stallTimeoutMs,
+            onArm: () => logger.info(`⏱️ Stall watchdog armed: first Sparkplug message received; exit if none for ${stallTimeoutMs / 1000}s`),
+            onStall: idle => fatal(
+                `🚨 No Sparkplug messages received for ${Math.round(idle / 1000)}s ` +
+                `(STALL_TIMEOUT ${stallTimeoutMs / 1000}s). The MQTT connection ` +
+                `or subscription is not working. Exiting so the pod is restarted.`),
+        });
     }
 
     async init() {
@@ -105,15 +127,36 @@ export default class MQTTClient {
         let bufferSize = i;
         i = 0;
         writeApi.flush().then(() => {
-            logger.info(`🚀 Flushed ${bufferSize} points to InfluxDB [${source}]`);
+            if (bufferSize === 0 && this.watchdog.enabled) {
+                /* Say how long we have been idle, so a stalled
+                 * historian is visible in the log before the
+                 * watchdog fires. */
+                logger.info(this.watchdog.armed
+                    ? `🚀 Flushed 0 points to InfluxDB [${source}]; last Sparkplug message ${Math.round(this.watchdog.idleMs() / 1000)}s ago`
+                    : `🚀 Flushed 0 points to InfluxDB [${source}]; no Sparkplug message received yet`);
+            } else {
+                logger.info(`🚀 Flushed ${bufferSize} points to InfluxDB [${source}]`);
+            }
             // Reset the interval
             this.resetInterval();
-        })
+        }).catch(err => {
+            /* With maxRetries 0 the points in this batch are gone.
+             * This used to be an unhandled rejection, which also
+             * killed the process; make the exit explicit. */
+            fatal("🚨 Write of %d points to InfluxDB failed: %o", bufferSize, err);
+        });
     }
 
     async run() {
 
-        const mqtt = await this.serviceClient.mqtt_client();
+        const mqtt = await this.serviceClient.mqtt_client({
+            /* We subscribe ourselves on every connect and check the
+             * SUBACK each time. MQTT.js's own resubscribe sends the
+             * SUBSCRIBE with no callback, so a refusal on reconnect
+             * would go unseen, and it makes our explicit subscribe a
+             * no-op answered with (null, []). */
+            resubscribe: false,
+        });
         this.mqtt = mqtt;
 
         mqtt.on("authenticated", this.on_connect.bind(this));
@@ -121,6 +164,18 @@ export default class MQTTClient {
         mqtt.on("message", this.on_message.bind(this));
         mqtt.on("close", this.on_close.bind(this));
         mqtt.on("reconnect", this.on_reconnect.bind(this));
+        mqtt.on("offline", this.on_offline.bind(this));
+
+        /* Once armed by the first message, the watchdog covers every
+         * way of data stopping: failing to reconnect, and being
+         * connected with no working subscription. It does not arm on
+         * a site with no traffic at all, so quiet sites don't
+         * restart. */
+        if (this.watchdog.enabled)
+            logger.info(`⏱️ Stall watchdog: arms on the first Sparkplug message, then exits if none arrives for ${stallTimeoutMs / 1000}s`);
+        else
+            logger.warn("⏱️ Stall watchdog disabled (STALL_TIMEOUT=0)");
+        this.watchdog.start();
 
         logger.info("Connecting to Factory+ broker...");
     }
@@ -128,7 +183,34 @@ export default class MQTTClient {
     on_connect() {
         logger.info("🔌 Connected to Factory+ broker");
         logger.info("👂 Subscribing to entire Factory+ namespace");
-        this.mqtt.subscribe('spBv1.0/#');
+        /* With resubscribe off nothing else subscribes for us. If
+         * the connection has already dropped again (a GSSAPI client
+         * reports a connection asynchronously, after checking the
+         * server), skip: MQTT.js would queue the SUBSCRIBE and send it
+         * on the next connect, on top of the one we send then. */
+        if (!this.mqtt.connected) {
+            logger.warn("⚠️ Connection closed before subscribing; will subscribe on the next connect");
+            return;
+        }
+        this.mqtt.subscribe('spBv1.0/#', (err, granted) => {
+            /* A refused subscription (e.g. 0x87 Not authorized) leaves
+             * us connected but receiving nothing. The broker fixes
+             * the ACL at connect time, so retrying on this connection
+             * will not help. Exit and start again. */
+            const outcome = subscriptionOutcome(err, granted);
+            if (outcome.status === "refused") {
+                fatal("🚨 Broker refused the Sparkplug subscription: %s", outcome.detail);
+                return;
+            }
+            if (outcome.status === "unconfirmed") {
+                /* e.g. the connection closed before the SUBACK. We
+                 * subscribe again on the next connect; the watchdog
+                 * catches it if data stops for good. */
+                logger.warn("⚠️ Sparkplug subscription not confirmed: %s", outcome.detail);
+                return;
+            }
+            logger.info("✅ Subscribed to entire Factory+ namespace");
+        });
         this.resetInterval();
     }
 
@@ -150,6 +232,10 @@ export default class MQTTClient {
         logger.warn(`⚠️ Reconnecting to Factory+ broker...`);
     }
 
+    on_offline() {
+        logger.warn(`📴 MQTT client offline`);
+    }
+
     on_error(error: any) {
         logger.error("🚨 MQTT error: %o", error);
         // Flush any remaining data
@@ -157,6 +243,10 @@ export default class MQTTClient {
     }
 
     async on_message(topicString: string, message: Uint8Array | Reader) {
+        /* Any message counts, including births, deaths and STATE: it
+         * proves the connection and subscription work. */
+        this.watchdog.touch();
+
         let topic = Topic.parse(topicString);
         let payload;
 

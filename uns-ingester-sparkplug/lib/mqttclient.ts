@@ -8,6 +8,7 @@ import {Reader} from "protobufjs";
 import {logger} from "../bin/ingester.js";
 import Long from "long";
 import {buildUnsPayload, UnsMetric} from "./uns-payload.js";
+import {StallWatchdog, parseStallTimeout, subscriptionOutcome} from "./watchdog.js";
 
 interface UnsMetricCustomProperties {
     InstanceUUID: string,
@@ -32,6 +33,18 @@ try {
 
 dotenv?.config()
 
+/* Exit if no Sparkplug message arrives for this long. See
+ * lib/watchdog.ts. */
+const stallTimeoutMs: number = parseStallTimeout(process.env.STALL_TIMEOUT);
+
+/* Log, then exit non-zero so Kubernetes restarts the pod. This is for
+ * states the process cannot recover from by itself. The short delay
+ * gives the log line a chance to reach stdout. */
+function fatal (msg: string, ...args: any[]): void {
+    logger.fatal(msg, ...args);
+    setTimeout(() => process.exit(1), 500);
+}
+
 interface MQTTClientConstructorParams {
     e: {
         serviceClient: ServiceClient;
@@ -43,20 +56,49 @@ export default class MQTTClient {
     private aliasResolver = {};
     private birthDebounce = {};
     private sparkplugBroker: any;
+    private watchdog: StallWatchdog;
+    private publishErrors = 0;
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
+        this.watchdog = new StallWatchdog({
+            timeoutMs: stallTimeoutMs,
+            onArm: () => logger.info(`⏱️ Stall watchdog armed: first Sparkplug message received; exit if none for ${stallTimeoutMs / 1000}s`),
+            onStall: idle => fatal(
+                `🚨 No Sparkplug messages received for ${Math.round(idle / 1000)}s ` +
+                `(STALL_TIMEOUT ${stallTimeoutMs / 1000}s). The MQTT connection ` +
+                `or subscription is not working. Exiting so the pod is restarted.`),
+        });
     }
 
     async run() {
 
-        this.sparkplugBroker = await this.serviceClient.mqtt_client();
+        this.sparkplugBroker = await this.serviceClient.mqtt_client({
+            /* We subscribe ourselves on every connect and check the
+             * SUBACK each time. MQTT.js's own resubscribe sends the
+             * SUBSCRIBE with no callback, so a refusal on reconnect
+             * would go unseen, and it makes our explicit subscribe a
+             * no-op answered with (null, []). */
+            resubscribe: false,
+        });
 
         this.sparkplugBroker.on("connect", this.onConnect.bind(this));
         this.sparkplugBroker.on("error", this.onError.bind(this));
         this.sparkplugBroker.on("message", this.onMessage.bind(this));
         this.sparkplugBroker.on("close", this.onClose.bind(this));
         this.sparkplugBroker.on("reconnect", this.onReconnect.bind(this));
+        this.sparkplugBroker.on("offline", this.onOffline.bind(this));
+
+        /* Once armed by the first message, the watchdog covers every
+         * way of data stopping: failing to reconnect, and being
+         * connected with no working subscription. It does not arm on
+         * a site with no traffic at all, so quiet sites don't
+         * restart. */
+        if (this.watchdog.enabled)
+            logger.info(`⏱️ Stall watchdog: arms on the first Sparkplug message, then exits if none arrives for ${stallTimeoutMs / 1000}s`);
+        else
+            logger.warn("⏱️ Stall watchdog disabled (STALL_TIMEOUT=0)");
+        this.watchdog.start();
 
         logger.info("Connecting to MQTT Broker...");
     }
@@ -64,7 +106,34 @@ export default class MQTTClient {
     onConnect() {
         logger.info("🔌 Connected to MQTT Broker");
         logger.info("👂 Subscribing to entire Factory+ namespace");
-        this.sparkplugBroker.subscribe('spBv1.0/#');
+        /* With resubscribe off nothing else subscribes for us. If
+         * the connection has already dropped again (a GSSAPI client
+         * reports a connection asynchronously, after checking the
+         * server), skip: MQTT.js would queue the SUBSCRIBE and send it
+         * on the next connect, on top of the one we send then. */
+        if (!this.sparkplugBroker.connected) {
+            logger.warn("⚠️ Connection closed before subscribing; will subscribe on the next connect");
+            return;
+        }
+        this.sparkplugBroker.subscribe('spBv1.0/#', (err, granted) => {
+            /* A refused subscription (e.g. 0x87 Not authorized) leaves
+             * us connected but receiving nothing. The broker fixes
+             * the ACL at connect time, so retrying on this connection
+             * will not help. Exit and start again. */
+            const outcome = subscriptionOutcome(err, granted);
+            if (outcome.status === "refused") {
+                fatal("🚨 Broker refused the Sparkplug subscription: %s", outcome.detail);
+                return;
+            }
+            if (outcome.status === "unconfirmed") {
+                /* e.g. the connection closed before the SUBACK. We
+                 * subscribe again on the next connect; the watchdog
+                 * catches it if data stops for good. */
+                logger.warn("⚠️ Sparkplug subscription not confirmed: %s", outcome.detail);
+                return;
+            }
+            logger.info("✅ Subscribed to entire Factory+ namespace");
+        });
     }
 
     onClose() {
@@ -75,11 +144,36 @@ export default class MQTTClient {
         logger.warn(`⚠️ Reconnecting to MQTT Broker...`);
     }
 
+    onOffline() {
+        logger.warn(`📴 MQTT client offline`);
+    }
+
+    /* Called back by MQTT.js for every UNS publish. A QoS 0 publish
+     * only fails locally: a write error on a broken connection (MQTT.js
+     * reconnects by itself) or a client that has been ended, which
+     * never reconnects. Exit on the second; log the first. Don't exit
+     * on every error, or one bad message could crash-loop the
+     * ingester and stop UNS for every device. */
+    private onPublished(topic: string, err?: Error) {
+        if (!err) return;
+        const client = this.sparkplugBroker;
+        if (client?.disconnecting || client?.disconnected) {
+            fatal("🚨 Cannot publish to UNS, the MQTT client has shut down: %s", err.message ?? err);
+            return;
+        }
+        this.publishErrors++;
+        logger.error(`🚨 Publish to ${topic} failed (${this.publishErrors} failures so far): ${err.message ?? err}`);
+    }
+
     onError(error: any) {
         logger.error("🚨 MQTT error: %o", error);
     }
 
     async onMessage(topicString: string, message: Uint8Array | Reader) {
+        /* Any message counts, including births, deaths and STATE: it
+         * proves the connection and subscription work. */
+        this.watchdog.touch();
+
         let topic = Topic.parse(topicString);
         let payload;
 
@@ -486,7 +580,7 @@ export default class MQTTClient {
                         ...simProps,
                     }
                 }
-            });
+            }, err => this.onPublished(topic, err));
         })
     }
 

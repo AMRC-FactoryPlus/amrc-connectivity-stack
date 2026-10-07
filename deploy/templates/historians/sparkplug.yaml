@@ -51,6 +51,8 @@ spec:
               value: {{ .Values.historians.sparkplug.batchSize | quote | required "values.historians.sparkplug.batchSize" }}
             - name: FLUSH_INTERVAL
               value: {{ .Values.historians.sparkplug.flushInterval | quote | required "values.historians.sparkplug.flushInterval" }}
+            - name: STALL_TIMEOUT
+              value: {{ .Values.historians.sparkplug.stallTimeout | default 0 | quote }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL

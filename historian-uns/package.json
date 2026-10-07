@@ -22,7 +22,8 @@
     "build": "tsc",
     "clean": "tsc --build --clean",
     "lint": "eslint --ignore-path .gitignore --ext .ts src/",
-    "lint:fix": "npm run lint -- --fix"
+    "lint:fix": "npm run lint -- --fix",
+    "test": "node --test 'test/*.test.mjs'"
   },
   "dependencies": {
     "@influxdata/influxdb-client": "^1.33.2",

@@ -21,7 +21,8 @@
     "build": "tsc && tsc-alias",
     "clean": "tsc --build --clean",
     "lint": "eslint --ignore-path .gitignore --ext .ts src/",
-    "lint:fix": "npm run lint -- --fix"
+    "lint:fix": "npm run lint -- --fix",
+    "test": "node --test 'test/*.test.mjs'"
   },
   "dependencies": {
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",

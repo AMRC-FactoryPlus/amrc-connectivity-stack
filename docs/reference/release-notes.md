@@ -294,6 +294,24 @@ When a Sparkplug payload carries several samples of one metric, the
 UNS ingester now publishes the newest as the metric's `value` and puts
 the older ones in `batch`. Before, `value` was the oldest.
 
+### The Sparkplug historian restarts when it stops receiving data
+
+The Sparkplug historian could keep running, and report healthy, with
+no working MQTT connection or subscription. It logged `Flushed 0
+points` and wrote nothing until someone restarted it. It now exits, so
+Kubernetes restarts it, in these cases:
+
+* No Sparkplug message has arrived for `historians.sparkplug.stallTimeout`
+  seconds (default 600). Any Sparkplug message counts, including
+  births, deaths and STATE.
+* The broker refuses its subscription (for example, Not authorized).
+* A write to InfluxDB fails. This already ended the process, as an
+  unhandled error; the exit is now deliberate and logged.
+
+On a site where Sparkplug traffic can stop for longer than the timeout,
+raise `stallTimeout`, or set it to `0` to turn the check off.
+Otherwise the historian restarts during quiet periods.
+
 ### Other improvements
 
 ConfigDB:

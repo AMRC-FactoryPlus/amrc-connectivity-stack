@@ -121,7 +121,8 @@ export class DriverBroker extends EventEmitter {
 
     async auth (client, username, password, callback) {
         const { id } = client;
-        log("AUTH: %s, %s, %s", id, username, password);
+        /* Never log the password itself. */
+        log("AUTH: %s, %s", id, username);
 
         const fail = (f, ...a) => { log(f, ...a); callback(null, false); };
 

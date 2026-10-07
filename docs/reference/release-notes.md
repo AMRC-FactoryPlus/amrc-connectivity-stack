@@ -344,6 +344,45 @@ message.
 The UNS historian also no longer exits on a message that is not valid
 JSON. It logs the message's topic and skips it.
 
+### Historians and the UNS ingester restart when they cannot connect
+
+The stall check above arms on the first message, so it does not catch
+a service that never receives one: for example, a service whose MQTT
+client never connects after startup, or never reconnects after a
+broker restart, on a site with no traffic. The Sparkplug historian,
+the UNS historian and the UNS ingester now also watch their MQTT
+connection, whatever the traffic. Each service exits, so Kubernetes
+restarts it, if it has not been connected to the broker with a granted
+subscription for `connectTimeout` seconds (default 300). The time
+counts from startup, or from the moment the service lost its
+connection or subscription. Reconnecting without a granted
+subscription does not reset it.
+
+A service that is connected and subscribed is healthy however quiet
+the broker is, so quiet sites do not restart. A broker restart that
+completes within the timeout causes no restart. The default of five
+minutes allows for the broker and the KDC to restart during an
+upgrade.
+
+```yaml
+historians:
+  sparkplug:
+    connectTimeout: 300
+  uns:
+    connectTimeout: 300
+unsIngesters:
+  sparkplug:
+    connectTimeout: 300
+```
+
+Set a value to `0` to turn the check off for that service. An invalid
+value, for example `5m`, stops the service at startup.
+
+The services also now recognise a refused subscription with newer
+MQTT.js releases, which report the refusal in a different form. Before,
+such a refusal was logged as "not confirmed" and the service kept
+running.
+
 ### Other improvements
 
 ConfigDB:

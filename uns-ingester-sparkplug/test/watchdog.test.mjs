@@ -176,6 +176,24 @@ test("subscriptionFailures: MQTT.js 5 style error with reason code", () => {
     assert.match(f[0], /0x87/);
 });
 
+test("subscriptionFailures: ErrorWithSubackPacket with reason codes in the packet", () => {
+    /* Newer MQTT.js 5 releases (for example 5.16) wrap the error and
+     * drop `code`. The reason codes are in the SUBACK packet; the
+     * `granted` argument holds the requested QoS, not the result. */
+    const err = Object.assign(new Error("Subscribe error: Not authorized"),
+        { packet: { cmd: "suback", granted: [0x87] } });
+    const f = subscriptionFailures(err, [{ topic: "spBv1.0/#", qos: 0 }]);
+    assert.deepEqual(f, ["Subscribe error: Not authorized (reason code 0x87)"]);
+    assert.equal(subscriptionOutcome(err, [{ topic: "spBv1.0/#", qos: 0 }]).status, "refused");
+});
+
+test("subscriptionFailures: ErrorWithSubackPacket without a failure code is not a refusal", () => {
+    const err = Object.assign(new Error("Protocol error: suback granted 0 reason code(s) for 1 subscription(s)"),
+        { packet: { cmd: "suback", granted: [] } });
+    assert.deepEqual(subscriptionFailures(err, undefined), []);
+    assert.equal(subscriptionOutcome(err, undefined).status, "unconfirmed");
+});
+
 test("subscriptionFailures: reason code in granted list (older MQTT.js)", () => {
     const f = subscriptionFailures(null, [{ topic: "spBv1.0/#", qos: 128 }]);
     assert.deepEqual(f, ["spBv1.0/#: reason code 0x80"]);

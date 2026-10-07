@@ -71,6 +71,8 @@ spec:
               value: {{ .Values.historians.uns.flushInterval | quote | required "values.historians.uns.flushInterval" }}
             - name: STALL_TIMEOUT
               value: {{ .Values.historians.uns.stallTimeout | default 0 | quote }}
+            - name: CONNECT_TIMEOUT
+              value: {{ .Values.historians.uns.connectTimeout | default 0 | quote }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_URL

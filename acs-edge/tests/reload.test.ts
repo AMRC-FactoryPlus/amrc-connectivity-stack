@@ -171,4 +171,68 @@ describe("config reload", () => {
             process.off("uncaughtException", onUncaught);
         }
     }, 30_000);
+
+    it("loads the config once a missing secret is mounted", async () => {
+        const port = await freePort();
+        const secrets = fs.mkdtempSync(path.join(os.tmpdir(), "fpsi-"));
+        const token = "__FPSI__" + "0123456789abcdef0123456789abcdef";
+        process.env.EDGE_MQTT = `mqtt://localhost:${port}`;
+        process.env.EDGE_PASSWORDS = passwords;
+        process.env.SECRETS_PATH = secrets;
+        mockState.configs = [driverConfig(token)];
+        mockState.fetches = 0;
+        mockState.nodes = [];
+
+        const uncaught: unknown[] = [];
+        const onUncaught = (e: unknown) => uncaught.push(e);
+        process.on("uncaughtException", onUncaught);
+        const errors = jest.spyOn(console, "error").mockImplementation(() => {});
+        let terminated = false;
+
+        try {
+            jest.isolateModules(() => { require("../app"); });
+            await until(() => mockState.nodes.length == 1, "agent to start");
+
+            const confs: string[] = [];
+            drv = mqtt.connect(`mqtt://localhost:${port}`, {
+                clientId: "drv", username: "drv", password: "secret",
+                reconnectPeriod: 100,
+            });
+            drv.on("message", (_t, p) => confs.push(JSON.parse(p.toString()).marker));
+            drv.on("connect", () => {
+                drv!.subscribe("fpEdge1/drv/conf", () =>
+                    drv!.publish("fpEdge1/drv/status", "READY"));
+            });
+
+            /* The secret is not there, so the agent runs with no
+             * connections and the driver gets no config. */
+            await new Promise(r => setTimeout(r, 500));
+            expect(confs).toEqual([]);
+            expect(mockState.fetches).toBe(1);
+
+            /* Flux applies the SealedSecret and the kubelet mounts it. */
+            fs.writeFileSync(path.join(secrets, token), "filled");
+
+            await until(() => confs.length == 1, "config once the secret is mounted");
+            expect(confs).toEqual(["filled"]);
+            expect(mockState.fetches).toBe(2);
+            expect(mockState.nodes).toHaveLength(2);
+            expect(mockState.nodes[0].stopped).toBe(true);
+            expect(uncaught).toEqual([]);
+
+            await new Promise(r => drv!.end(true, {}, r));
+            drv = undefined;
+            terminated = true;
+            process.emit("SIGTERM" as any);
+            await until(() => mockState.nodes[1].stopped, "agent to stop");
+            expect(mockState.fetches).toBe(2);
+        }
+        finally {
+            if (!terminated) process.emit("SIGTERM" as any);
+            process.off("uncaughtException", onUncaught);
+            errors.mockRestore();
+            delete process.env.SECRETS_PATH;
+            fs.rmSync(secrets, { recursive: true, force: true });
+        }
+    }, 30_000);
 });

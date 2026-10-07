@@ -9,6 +9,7 @@ import asyncio
 import urllib.parse
 
 from .handler import Handler
+from .redact import redact
 
 # Permitted status returns from Handler.connect.
 CONNECT_STATUS: Set[str] = {"UP", "CONN", "AUTH"}
@@ -407,7 +408,8 @@ class Driver:
 
     async def conf_handler(self, payload, _=None):
         conf = self.json(payload)
-        self.log.debug(f"CONF: {conf}")
+        # The config may contain secrets from the Edge Agent.
+        self.log.debug(f"CONF: {redact(conf)}")
 
         self.clear_addrs()
         old = getattr(self, "handler", None)

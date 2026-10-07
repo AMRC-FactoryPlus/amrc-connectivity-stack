@@ -55,10 +55,12 @@ mod config;
 mod driver;
 mod error;
 mod handler;
+mod redact;
 mod status;
 
 pub use config::DriverConfig;
 pub use driver::{Driver, DriverHandle};
 pub use error::{ConnectError, Error, HandlerError};
 pub use handler::Handler;
+pub use redact::redact;
 pub use status::Status;

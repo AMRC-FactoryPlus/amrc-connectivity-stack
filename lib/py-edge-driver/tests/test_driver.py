@@ -1,5 +1,7 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
+import json
+import logging
 from typing import assert_type
 import pytest
 from unittest.mock import MagicMock, AsyncMock
@@ -68,3 +70,27 @@ def test_driver_mqtt_url(basic_driver_instance):
     with pytest.raises(ValueError, match="Port not found"):
         basic_driver_instance.get_mqtt_details("mqtt://my.example.com")
 
+
+async def test_conf_logged_without_secrets(caplog):
+    """
+    Test that the driver config is logged with secrets masked, while the
+    handler still receives them.
+    """
+    seen = []
+
+    class FakeHandler:
+        @classmethod
+        def create(cls, driver, conf):
+            seen.append(conf)
+            return None
+
+    driver = Driver(FakeHandler, "test_user", "mqtt://localhost:1883", "x")
+    conf = {"host": "plc", "password": "not-a-real-password"}
+
+    with caplog.at_level(logging.DEBUG, logger="driver"):
+        await driver.conf_handler(json.dumps(conf))
+
+    assert "CONF:" in caplog.text
+    assert "password" in caplog.text
+    assert "not-a-real-password" not in caplog.text
+    assert seen == [conf]

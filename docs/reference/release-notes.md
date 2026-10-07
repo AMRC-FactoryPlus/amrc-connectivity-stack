@@ -294,23 +294,48 @@ When a Sparkplug payload carries several samples of one metric, the
 UNS ingester now publishes the newest as the metric's `value` and puts
 the older ones in `batch`. Before, `value` was the oldest.
 
-### The Sparkplug historian restarts when it stops receiving data
+### Historians and the UNS ingester restart when they stop receiving data
 
-The Sparkplug historian could keep running, and report healthy, with
-no working MQTT connection or subscription. It logged `Flushed 0
-points` and wrote nothing until someone restarted it. It now exits, so
+The Sparkplug historian, the UNS historian and the UNS ingester could
+keep running, and report healthy, with no working MQTT connection or
+subscription. The historians logged `Flushed 0 points` and wrote
+nothing until someone restarted them. Each service now exits, so
 Kubernetes restarts it, in these cases:
 
-* No Sparkplug message has arrived for `historians.sparkplug.stallTimeout`
-  seconds (default 600). Any Sparkplug message counts, including
-  births, deaths and STATE.
+* No message has arrived on its subscription for `stallTimeout`
+  seconds (default 600). The Sparkplug historian and the UNS ingester
+  count any Sparkplug message, including births, deaths and STATE.
+  The UNS historian counts any message under `UNS/v1/`.
 * The broker refuses its subscription (for example, Not authorized).
-* A write to InfluxDB fails. This already ended the process, as an
-  unhandled error; the exit is now deliberate and logged.
+* Historians only: a write to InfluxDB fails. This already ended the
+  process, as an unhandled error; the exit is now deliberate and
+  logged.
+* UNS ingester only: a publish fails because the MQTT client has shut
+  down for good. Other publish failures are logged and counted.
 
-On a site where Sparkplug traffic can stop for longer than the timeout,
-raise `stallTimeout`, or set it to `0` to turn the check off.
-Otherwise the historian restarts during quiet periods.
+The settings are:
+
+```yaml
+historians:
+  sparkplug:
+    stallTimeout: 600
+  uns:
+    stallTimeout: 600
+unsIngesters:
+  sparkplug:
+    stallTimeout: 600
+```
+
+Set a value to `0` to turn the check off for that service. On a site
+where traffic can stop for longer than the timeout, raise it or set
+it to `0`. Otherwise the service restarts during quiet periods. This
+matters most for the UNS historian: UNS messages only flow while the
+UNS ingester is running and devices publish ISA-95 hierarchy
+information. If the UNS ingester stops, the UNS historian also
+restarts until UNS messages flow again.
+
+The UNS historian also no longer exits on a message that is not valid
+JSON. It logs the message's topic and skips it.
 
 ### Other improvements
 

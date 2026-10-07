@@ -9,6 +9,7 @@ import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHea
 // App UUIDs for dataset structure types (from acs-data-access/lib/constants.js)
 export const STRUCTURE_APPS = {
     SPARKPLUG: 'f5d550c4-2831-11f1-b0b0-83fda3035799',
+    SUBSET:    '7f7d40cc-4075-4f06-90cf-aa6261d68f18',
     SESSION:   '8754c000-3778-4ae6-b2b8-bbcd959bb775',
     UNION:     '1c4ca454-de38-44d9-92fb-aa5218bfa257',
     INVALID:   '696396a0-2831-11f1-9b12-33d63b8c5115',
@@ -16,6 +17,7 @@ export const STRUCTURE_APPS = {
 
 const STRUCTURE_LABELS: Record<string, string> = {
     [STRUCTURE_APPS.SPARKPLUG]: 'Sparkplug Source',
+    [STRUCTURE_APPS.SUBSET]:    'Sub-device',
     [STRUCTURE_APPS.SESSION]:   'Session',
     [STRUCTURE_APPS.UNION]:     'Union',
     [STRUCTURE_APPS.INVALID]:   'Invalid',

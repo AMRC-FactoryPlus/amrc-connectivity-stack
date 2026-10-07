@@ -142,6 +142,8 @@
             <SidebarDetail icon="key"     label="UUID"      :value="selectedStructure.uuid"/>
             <SidebarDetail icon="tag"     label="Name"      :value="selectedStructure.name ?? '—'"/>
             <SidebarDetail icon="shapes"  label="Type"      :value="structure_label(selectedStructure.structure)"/>
+            <SidebarDetail v-if="selectedStructure.structure === STRUCTURE_APPS.SUBSET"
+              icon="list-check" label="Metrics" :value="`${selectedStructure.config?.metrics?.length ?? 0} selected`"/>
             <div v-if="selectedStructure.config !== undefined">
               <div class="text-xs text-gray-500 mb-1">Configuration</div>
               <pre class="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-48">{{ JSON.stringify(selectedStructure.config, null, 2) }}</pre>
@@ -205,6 +207,7 @@ export default {
             metadataColumns,
             structureColumns,
             structure_label,
+            STRUCTURE_APPS,
         }
     },
 

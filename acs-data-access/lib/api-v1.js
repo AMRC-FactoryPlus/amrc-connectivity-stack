@@ -7,14 +7,16 @@ import express from "express";
 import { Map as IMap, Seq as ISeq, merge } from "immutable";
 import * as rx from "rxjs";
 
-import { ServiceError } from "@amrc-factoryplus/service-client";
+import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, valid_datetime } from "./validate.js";
 import { fail, maxDate, minDate } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
+import { SparkplugSubsetHandler } from "./sparkplug-subset-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
+import { walk_origin_map } from "./origin-map.js";
 
 export class APIv1 {
   constructor(opts) {
@@ -27,6 +29,9 @@ export class APIv1 {
     this.handlers = {
       [Constants.App.SparkplugSrc]:
         new SparkplugSourcesHandler(this),
+
+      [Constants.App.SparkplugSubset]:
+        new SparkplugSubsetHandler(this),
 
       [Constants.App.SessionLimits]:
         new SessionLimitsHandler(this),
@@ -61,6 +66,9 @@ export class APIv1 {
 
     api.route("/session-sources")
       .get(this.session_sources_list.bind(this));
+
+    api.route("/sparkplug-sources/:uuid/metrics")
+      .get(this.sparkplug_source_metrics.bind(this));
 
     api.route("/delete/:uuid")
       .get(this.delete_dataset.bind(this));
@@ -385,6 +393,36 @@ export class APIv1 {
     return res.status(200).json(uuids);
   }
 
+  /** GET. Lists the metrics of a Sparkplug device that a Sub-device
+   * dataset can select. Requires USE_SPARKPLUG on the device.
+   * Only metrics recorded to the historian are listed, as nothing else
+   * can be read back. A device with no origin map has an empty list.
+   * @returns array of objects:
+              * instance {UUID} - Instance_UUID of the nearest enclosing object
+              * metric {string} - path from that object to the metric
+              * path {string} - full Sparkplug metric name, for display
+              * type {string} - Sparkplug type
+              * unit {string} - engineering unit (if any)
+              * documentation {string} - description (if any)
+   */
+  async sparkplug_source_metrics(req, res){
+    const device = req.params.uuid;
+    if (!valid_uuid(device)) return fail(this.log, 422, `Device uuid ${device} is invalid.`);
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.UseSparkplug,
+      device,
+      true,
+    );
+    if (!ok) return fail(this.log, 403, `You don't have permission to use Sparkplug data from ${device}.`);
+
+    const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
+    const { metrics } = walk_origin_map(info?.originMap, device);
+
+    return res.status(200).json(metrics);
+  }
+
   /** GET. Fetches structural definition of dataset
    * Requires EDIT permission on the dataset
    * READONLY clients can't see this structure
@@ -427,6 +465,10 @@ export class APIv1 {
     
     const ok2 = await handler.check_sources_permissions(principal, config);
     if(!ok2) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
+
+    /* After the permission check: normalising can report what a source
+     * contains, which only a principal allowed to use it may learn. */
+    config = await handler.normalise_config(config);
 
     // Create new Dataset object
     if(!dataset_uuid){

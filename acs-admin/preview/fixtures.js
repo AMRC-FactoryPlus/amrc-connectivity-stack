@@ -365,6 +365,42 @@ export const devices = [
   },
 ]
 
+/* GET v1/sparkplug-sources/:uuid/metrics for the first device, for the
+ * Sub-device dataset dialog. */
+const AXIS_X = 'a1a1a1a1-0000-4000-8000-000000000001'
+const AXIS_Y = 'a1a1a1a1-0000-4000-8000-000000000002'
+const SPINDLE_1 = 'a1a1a1a1-0000-4000-8000-000000000003'
+const DEVICE_1 = 'de910000-0000-4000-8000-000000000001'
+
+export const deviceMetrics = [
+  { instance: DEVICE_1, metric: 'Status', path: 'Status', type: 'String', documentation: 'Machine status' },
+  { instance: DEVICE_1, metric: 'Program/Line', path: 'Program/Line', type: 'Int32' },
+  { instance: AXIS_X, metric: 'Position/Actual', path: 'Axes/X/Position/Actual', type: 'Double', unit: 'mm' },
+  { instance: AXIS_X, metric: 'Position/Demand', path: 'Axes/X/Position/Demand', type: 'Double', unit: 'mm' },
+  { instance: AXIS_X, metric: 'Load', path: 'Axes/X/Load', type: 'FloatLE', unit: '%' },
+  { instance: AXIS_Y, metric: 'Position/Actual', path: 'Axes/Y/Position/Actual', type: 'Double', unit: 'mm' },
+  { instance: AXIS_Y, metric: 'Position/Demand', path: 'Axes/Y/Position/Demand', type: 'Double', unit: 'mm' },
+  { instance: AXIS_Y, metric: 'Load', path: 'Axes/Y/Load', type: 'FloatLE', unit: '%' },
+  { instance: SPINDLE_1, metric: 'Speed', path: 'Spindles/1/Speed', type: 'FloatLE', unit: 'rpm' },
+  { instance: SPINDLE_1, metric: 'Temperature', path: 'Spindles/1/Temperature', type: 'FloatLE', unit: '°C' },
+]
+
+/* An existing Sub-device dataset on the first device. The last reference
+ * points at an instance that is no longer in the origin map, as after a
+ * schema change. */
+export const subsetDataset = {
+  uuid: '5b5b5b5b-0000-4000-8000-000000000001',
+  structure: '7f7d40cc-4075-4f06-90cf-aa6261d68f18',
+  config: {
+    source: DEVICE_1,
+    metrics: [
+      { instance: AXIS_X, metric: 'Position/Actual' },
+      { instance: AXIS_X, metric: 'Load' },
+      { instance: 'a1a1a1a1-0000-4000-8000-0000000000ff', metric: 'Feed_Override' },
+    ],
+  },
+}
+
 export const uuids = {
   CNC: CNC.uuid,
   SPINDLE: SPINDLE.uuid,

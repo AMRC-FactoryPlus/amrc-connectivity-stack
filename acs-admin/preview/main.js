@@ -14,12 +14,13 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import mitt from 'mitt'
 
 import Preview from './Preview.vue'
-import { devices, drafts, schemas } from './fixtures.js'
+import { deviceMetrics, devices, drafts, schemas, subsetDataset } from './fixtures.js'
 
 import { useSchemaStore } from '../src/store/useSchemaStore.js'
 import { useSchemaDraftStore } from '../src/store/useSchemaDraftStore.js'
 import { useDeviceStore } from '../src/store/useDeviceStore.js'
 import { useServiceClientStore } from '../src/store/serviceClientStore.js'
+import { useDataAccessStore } from '../src/store/useDataAccessStore.js'
 
 window.events = mitt()
 
@@ -73,6 +74,14 @@ const seed = () => {
   stub(useSchemaDraftStore(), drafts)
   stub(useDeviceStore(), devices)
 
+  const da = useDataAccessStore()
+  da.start = async () => {}
+  da.stop = () => {}
+  da.datasets = [{ uuid: subsetDataset.uuid, name: 'X axis — position and load' }]
+  da.structures = [subsetDataset]
+  da.loading = false
+  da.ready = true
+
   const s = useServiceClientStore()
   s.ready = true
   s.loaded = true
@@ -93,6 +102,11 @@ const seed = () => {
       },
     },
     ConfigDB: {},
+    /* Only the first device has metrics; the others show the empty state. */
+    DataAccess: {
+      get_device_metrics: async device =>
+        device === devices[0].uuid ? deviceMetrics : [],
+    },
   }
 }
 

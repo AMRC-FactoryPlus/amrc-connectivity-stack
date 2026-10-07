@@ -40,6 +40,9 @@
       <RawSchemaDialog v-else-if="surface === 'raw'"
           :open="true" :body="drafts[0].draft.body"/>
 
+      <NewDatasetDialog v-else-if="surface === 'dataset-subset' || surface === 'dataset-subset-edit'"
+          ref="datasetDialog"/>
+
       <div v-else class="p-10">
         <p class="text-sm text-gray-500">Unknown surface: {{ surface }}</p>
       </div>
@@ -56,19 +59,32 @@ import PublishSchema from '@pages/Schemas/PublishSchema.vue'
 import ComponentPickerDialog from '@components/Schemas/ComponentPickerDialog.vue'
 import SchemaPicker from '@components/Schemas/SchemaPicker.vue'
 import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
+import NewDatasetDialog from '@components/DataAccess/NewDatasetDialog.vue'
 
-import { devices, drafts, schemas } from './fixtures.js'
+import { devices, drafts, schemas, subsetDataset } from './fixtures.js'
 
 export default {
   name: 'Preview',
 
   components: {
-    ComponentPickerDialog, PublishSchema, RawSchemaDialog, SchemaPicker,
-    Schemas, SchemaEditor, Toaster,
+    ComponentPickerDialog, NewDatasetDialog, PublishSchema, RawSchemaDialog,
+    SchemaPicker, Schemas, SchemaEditor, Toaster,
   },
 
   data () {
     return { drafts, schemas, devices, pickerValue: schemas[0]?.uuid ?? null }
+  },
+
+  mounted () {
+    /* The dataset dialog opens through a method, not a prop. */
+    const dialog = this.$refs.datasetDialog
+    if (this.surface === 'dataset-subset') {
+      dialog.open()
+      dialog.active_tab = 'subset'
+    }
+    else if (this.surface === 'dataset-subset-edit') {
+      dialog.open(subsetDataset)
+    }
   },
 
   computed: {

@@ -8,7 +8,7 @@ import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
 import mqtt from "mqtt";
 import {UnsTopic} from "./Utils/UnsTopic.js";
-import {StallWatchdog, parseStallTimeout, subscriptionFailures} from "./Utils/watchdog.js";
+import {StallWatchdog, parseStallTimeout, subscriptionOutcome} from "./Utils/watchdog.js";
 
 let dotenv: any = null;
 try {
@@ -100,6 +100,7 @@ export default class MQTTClient {
         this.serviceClient = e.serviceClient;
         this.watchdog = new StallWatchdog({
             timeoutMs: stallTimeoutMs,
+            onArm: () => logger.info(`⏱️ Stall watchdog armed: first UNS message received; exit if none for ${stallTimeoutMs / 1000}s`),
             onStall: idle => fatal(
                 `🚨 No UNS messages received for ${Math.round(idle / 1000)}s ` +
                 `(STALL_TIMEOUT ${stallTimeoutMs / 1000}s). The MQTT connection ` +
@@ -126,7 +127,9 @@ export default class MQTTClient {
                 /* Say how long we have been idle, so a stalled
                  * historian is visible in the log before the
                  * watchdog fires. */
-                logger.info(`🚀 Flushed 0 points to InfluxDB [${source}]; last UNS message ${Math.round(this.watchdog.idleMs() / 1000)}s ago`);
+                logger.info(this.watchdog.armed
+                    ? `🚀 Flushed 0 points to InfluxDB [${source}]; last UNS message ${Math.round(this.watchdog.idleMs() / 1000)}s ago`
+                    : `🚀 Flushed 0 points to InfluxDB [${source}]; no UNS message received yet`);
             } else {
                 logger.info(`🚀 Flushed ${bufferSize} points to InfluxDB [${source}]`);
             }
@@ -141,7 +144,14 @@ export default class MQTTClient {
     }
 
     async run() {
-        this.sparkplugBroker = await this.serviceClient.mqtt_client();
+        this.sparkplugBroker = await this.serviceClient.mqtt_client({
+            /* We subscribe ourselves on every connect and check the
+             * SUBACK each time. MQTT.js's own resubscribe sends the
+             * SUBSCRIBE with no callback, so a refusal on reconnect
+             * would go unseen, and it makes our explicit subscribe a
+             * no-op answered with (null, []). */
+            resubscribe: false,
+        });
 
         this.sparkplugBroker.on("connect", this.on_connect.bind(this));
         this.sparkplugBroker.on("error", this.on_error.bind(this));
@@ -150,11 +160,13 @@ export default class MQTTClient {
         this.sparkplugBroker.on("reconnect", this.on_reconnect.bind(this));
         this.sparkplugBroker.on("offline", this.on_offline.bind(this));
 
-        /* The watchdog covers every way of not receiving data: never
-         * connecting, failing to reconnect, being connected with no
-         * working subscription, and the UNS ingester not publishing. */
+        /* Once armed by the first message, the watchdog covers every
+         * way of data stopping: failing to reconnect, and being
+         * connected with no working subscription. It does not arm on
+         * a site with no traffic at all, so quiet sites don't
+         * restart. */
         if (this.watchdog.enabled)
-            logger.info(`⏱️ Stall watchdog: exit if no UNS message for ${stallTimeoutMs / 1000}s`);
+            logger.info(`⏱️ Stall watchdog: arms on the first UNS message, then exits if none arrives for ${stallTimeoutMs / 1000}s`);
         else
             logger.warn("⏱️ Stall watchdog disabled (STALL_TIMEOUT=0)");
         this.watchdog.start();
@@ -165,21 +177,30 @@ export default class MQTTClient {
     on_connect() {
         logger.info("🔌 Connected to Factory+ broker");
         logger.info("👂 Subscribing to entire UNS namespace");
+        /* With resubscribe off nothing else subscribes for us. If
+         * the connection has already dropped again (a GSSAPI client
+         * reports a connection asynchronously, after checking the
+         * server), skip: MQTT.js would queue the SUBSCRIBE and send it
+         * on the next connect, on top of the one we send then. */
+        if (!this.sparkplugBroker.connected) {
+            logger.warn("⚠️ Connection closed before subscribing; will subscribe on the next connect");
+            return;
+        }
         this.sparkplugBroker.subscribe("UNS/v1/#", (err, granted) => {
             /* A refused subscription (e.g. 0x87 Not authorized) leaves
              * us connected but receiving nothing. The broker fixes
              * the ACL at connect time, so retrying on this connection
              * will not help. Exit and start again. */
-            const failures = subscriptionFailures(err, granted);
-            if (failures.length) {
-                fatal("🚨 Broker refused the UNS subscription: %s", failures.join("; "));
+            const outcome = subscriptionOutcome(err, granted);
+            if (outcome.status === "refused") {
+                fatal("🚨 Broker refused the UNS subscription: %s", outcome.detail);
                 return;
             }
-            if (err) {
-                /* e.g. the connection closed before the SUBACK. MQTT.js
-                 * resubscribes on reconnect; the watchdog catches it
-                 * if that never happens. */
-                logger.warn("⚠️ Subscription not confirmed: %s", err.message ?? err);
+            if (outcome.status === "unconfirmed") {
+                /* e.g. the connection closed before the SUBACK. We
+                 * subscribe again on the next connect; the watchdog
+                 * catches it if data stops for good. */
+                logger.warn("⚠️ UNS subscription not confirmed: %s", outcome.detail);
                 return;
             }
             logger.info("✅ Subscribed to entire UNS namespace");

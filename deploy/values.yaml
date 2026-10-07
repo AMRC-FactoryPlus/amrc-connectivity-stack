@@ -439,14 +439,15 @@ unsIngesters:
     # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     verbosity: 0
-    # -- Exit (so Kubernetes restarts the pod) if no Sparkplug message
-    # has been received for this many seconds. This catches an
-    # ingester that is running but not receiving data, for example
-    # after a broker or KDC restart. Any Sparkplug message counts,
-    # including births, deaths and STATE. On a site with gaps in
-    # Sparkplug traffic longer than this, raise the value or set it to
-    # 0 to disable the check; otherwise the pod restarts during quiet
-    # periods.
+    # -- Exit (so Kubernetes restarts the pod) if no Sparkplug message has
+    # been received for this many seconds, once data has started to
+    # flow. This catches an ingester that stops receiving data and does
+    # not recover, for example after a broker or KDC restart. Any
+    # Sparkplug message counts, including births, deaths and STATE. The
+    # check arms on the first message, so a site with no traffic at all
+    # does not restart. A gap in traffic longer than this after data has
+    # flowed does cause a restart: raise the value on sites with long
+    # quiet periods, or set it to 0 to disable the check.
     stallTimeout: 600
 
 visualiser:
@@ -473,15 +474,15 @@ historians:
     batchSize: 5000
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
     flushInterval: 10000
-    # -- Exit (so Kubernetes restarts the pod) if no UNS message has
-    # been received for this many seconds. This catches a historian
-    # that is running but not receiving data, for example after a
-    # broker or KDC restart. Any message under UNS/v1/ counts. UNS
-    # messages only flow while the UNS ingester is running and devices
-    # publish ISA-95 hierarchy information, so on a site where UNS
-    # traffic can stop for longer than this, raise the value or set it
-    # to 0 to disable the check; otherwise the pod restarts during
-    # quiet periods.
+    # -- Exit (so Kubernetes restarts the pod) if no UNS message has been
+    # received for this many seconds, once data has started to flow.
+    # This catches a historian that stops receiving data and does not
+    # recover, for example after a broker or KDC restart. Any message
+    # under UNS/v1/ counts. The check arms on the first message, so a
+    # site with no traffic at all does not restart. A gap in traffic
+    # longer than this after data has flowed does cause a restart: raise
+    # the value on sites with long quiet periods, or set it to 0 to
+    # disable the check.
     stallTimeout: 600
     image:
       # -- The repository of the UNS Historian component
@@ -494,14 +495,15 @@ historians:
     batchSize: 5000
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
     flushInterval: 10000
-    # -- Exit (so Kubernetes restarts the pod) if no Sparkplug message
-    # has been received for this many seconds. This catches a
-    # historian that is running but not receiving data, for example
-    # after a broker or KDC restart. Any Sparkplug message counts,
-    # including births, deaths and STATE. On a site with gaps in
-    # Sparkplug traffic longer than this, raise the value or set it to
-    # 0 to disable the check; otherwise the pod restarts during quiet
-    # periods.
+    # -- Exit (so Kubernetes restarts the pod) if no Sparkplug message has
+    # been received for this many seconds, once data has started to
+    # flow. This catches a historian that stops receiving data and does
+    # not recover, for example after a broker or KDC restart. Any
+    # Sparkplug message counts, including births, deaths and STATE. The
+    # check arms on the first message, so a site with no traffic at all
+    # does not restart. A gap in traffic longer than this after data has
+    # flowed does cause a restart: raise the value on sites with long
+    # quiet periods, or set it to 0 to disable the check.
     stallTimeout: 600
     image:
       # -- The repository of the Warehouse component

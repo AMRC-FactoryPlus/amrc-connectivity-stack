@@ -302,11 +302,15 @@ subscription. The historians logged `Flushed 0 points` and wrote
 nothing until someone restarted them. Each service now exits, so
 Kubernetes restarts it, in these cases:
 
-* No message has arrived on its subscription for `stallTimeout`
-  seconds (default 600). The Sparkplug historian and the UNS ingester
-  count any Sparkplug message, including births, deaths and STATE.
-  The UNS historian counts any message under `UNS/v1/`.
+* Data has started to flow, and then no message arrives on its
+  subscription for `stallTimeout` seconds (default 600). The Sparkplug
+  historian and the UNS ingester count any Sparkplug message,
+  including births, deaths and STATE. The UNS historian counts any
+  message under `UNS/v1/`.
 * The broker refuses its subscription (for example, Not authorized).
+  Each service now subscribes itself on every connect and checks the
+  broker's answer each time, instead of relying on the MQTT library's
+  automatic resubscribe, which does not report a refusal.
 * Historians only: a write to InfluxDB fails. This already ended the
   process, as an unhandled error; the exit is now deliberate and
   logged.
@@ -326,13 +330,16 @@ unsIngesters:
     stallTimeout: 600
 ```
 
-Set a value to `0` to turn the check off for that service. On a site
-where traffic can stop for longer than the timeout, raise it or set
-it to `0`. Otherwise the service restarts during quiet periods. This
-matters most for the UNS historian: UNS messages only flow while the
-UNS ingester is running and devices publish ISA-95 hierarchy
-information. If the UNS ingester stops, the UNS historian also
-restarts until UNS messages flow again.
+Set a value to `0` to turn the check off for that service.
+
+The check arms on the first message a service receives. A site with
+no traffic at all, for example a new install with no edge agents, or a
+UNS historian on a site where no device publishes ISA-95 hierarchy
+information, does not restart. A gap longer than `stallTimeout`
+after data has flowed does cause a restart. On a site with long quiet
+periods, raise the value or set it to `0`. If the UNS ingester stops,
+the UNS historian also restarts, then waits quietly for the first UNS
+message.
 
 The UNS historian also no longer exits on a message that is not valid
 JSON. It logs the message's topic and skips it.

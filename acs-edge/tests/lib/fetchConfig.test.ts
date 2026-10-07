@@ -213,6 +213,33 @@ describe("Translator.fetchConfig", () => {
         expect(got.sparkplug.alerts).toEqual({ configFetchFailed: false, configInvalid: true });
     });
 
+    it("records the paths of missing secrets, and only those", async () => {
+        const have = "__FPSI__" + "0123456789abcdef0123456789abcdef";
+        const gone = "__FPSI__" + "fedcba9876543210fedcba9876543210";
+        fs.writeFileSync(`${dir}/${have}`, "plain");
+        const cfg = deviceConfig({ password: gone, user: have, url: `x${gone}` });
+        const t = translatorFor(cfg);
+        const got = await t.fetchConfig(uuid);
+        expect(got.sparkplug.alerts!.configInvalid).toBe(true);
+        expect(t.missingSecrets).toEqual([`${dir}/${gone}`]);
+    });
+
+    it("records no missing secrets when all are present", async () => {
+        const t1 = "__FPSI__" + "0123456789abcdef0123456789abcdef";
+        fs.writeFileSync(`${dir}/${t1}`, "plain");
+        const t = translatorFor(deviceConfig({ password: t1 }));
+        await t.fetchConfig(uuid);
+        expect(t.missingSecrets).toEqual([]);
+    });
+
+    it("does not wait for a secret that is present but breaks the JSON", async () => {
+        const t1 = "__FPSI__" + "0123456789abcdef0123456789abcdef";
+        fs.writeFileSync(`${dir}/${t1}`, 'pa"ss');
+        const t = translatorFor(deviceConfig({ password: t1 }));
+        await t.fetchConfig(uuid);
+        expect(t.missingSecrets).toEqual([]);
+    });
+
     it("still takes the string path for a placeholder in a key", async () => {
         const t = "__FPSI__" + "0123456789abcdef0123456789abcdef";
         fs.writeFileSync(`${dir}/${t}`, "renamed");
@@ -226,5 +253,77 @@ describe("Translator.fetchConfig", () => {
         const got = await new Translator(fplus, 1, {} as any).fetchConfig(uuid);
         expect(got.sparkplug.alerts).toEqual({ configFetchFailed: true, configInvalid: false });
         expect(got.deviceConnections).toEqual([]);
+    });
+});
+
+describe("Translator.waitForSecrets", () => {
+    let dir: string;
+
+    beforeEach(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "fpsi-wait-"));
+        jest.spyOn(console, "log").mockImplementation(() => {});
+    });
+    afterEach(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+        jest.restoreAllMocks();
+    });
+
+    function translator () {
+        const t = new Translator({} as any, 1, {} as any);
+        const stop = jest.spyOn(t, "stop").mockImplementation(async () => {});
+        return { t, stop };
+    }
+
+    it("restarts once every missing secret has appeared", async () => {
+        const { t, stop } = translator();
+        const a = `${dir}/__FPSI__a`, b = `${dir}/__FPSI__b`;
+        const done = t.waitForSecrets([a, b]);
+        await new Promise(r => setTimeout(r, 200));
+        fs.writeFileSync(a, "x");
+        await new Promise(r => setTimeout(r, 1300));
+        expect(stop).not.toHaveBeenCalled();
+        fs.writeFileSync(b, "y");
+        await done;
+        expect(stop).toHaveBeenCalledTimes(1);
+    }, 10_000);
+
+    it("sees a secret that arrives by a Kubernetes-style symlink swap", async () => {
+        const { t, stop } = translator();
+        const name = "__FPSI__a";
+        /* As the kubelet lays out a secret volume: the file is a
+         * symlink through ..data, which is itself a symlink swapped to
+         * a new timestamped directory on each update. */
+        fs.mkdirSync(`${dir}/..2026_10_07_1`);
+        fs.symlinkSync("..2026_10_07_1", `${dir}/..data`);
+        const done = t.waitForSecrets([`${dir}/${name}`]);
+        await new Promise(r => setTimeout(r, 200));
+        fs.mkdirSync(`${dir}/..2026_10_07_2`);
+        fs.writeFileSync(`${dir}/..2026_10_07_2/${name}`, "x");
+        fs.symlinkSync("..2026_10_07_2", `${dir}/..data_tmp`);
+        fs.renameSync(`${dir}/..data_tmp`, `${dir}/..data`);
+        fs.symlinkSync(`..data/${name}`, `${dir}/${name}`);
+        await done;
+        expect(stop).toHaveBeenCalledTimes(1);
+    }, 10_000);
+
+    it("never logs a secret value", async () => {
+        const { t } = translator();
+        const logs = console.log as jest.Mock;
+        const p = `${dir}/__FPSI__a`;
+        const done = t.waitForSecrets([p]);
+        await new Promise(r => setTimeout(r, 100));
+        fs.writeFileSync(p, "hunter2");
+        await done;
+        expect(JSON.stringify(logs.mock.calls)).not.toContain("hunter2");
+    }, 10_000);
+
+    it("gives up without restarting when the agent stops", async () => {
+        const { t, stop } = translator();
+        const done = t.waitForSecrets([`${dir}/__FPSI__a`]);
+        await new Promise(r => setTimeout(r, 100));
+        t.abort.abort();
+        await done;
+        fs.writeFileSync(`${dir}/__FPSI__a`, "x");
+        expect(stop).not.toHaveBeenCalled();
     });
 });

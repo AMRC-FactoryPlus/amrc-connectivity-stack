@@ -97,6 +97,11 @@ export class Translator extends EventEmitter {
     /* Bumped whenever this.devices is rebuilt, so the data routes of
      * each connection know to rebuild too. */
     deviceGen = 0
+    /* Paths of secret files that a placeholder in the config named but
+     * that did not exist when fetchConfig ran. See waitForSecrets. */
+    missingSecrets: string[] = []
+    /* Aborted by stop(), to cancel waitForSecrets. */
+    abort = new AbortController()
 
     constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
@@ -170,6 +175,10 @@ export class Translator extends EventEmitter {
             // Setup Sparkplug node handlers
             this.setupSparkplug();
 
+            if (this.missingSecrets.length)
+                this.waitForSecrets(this.missingSecrets)
+                    .catch(e => log(`Error waiting for secrets: ${e}`));
+
         } catch (e: any) {
             log(`Error starting translator: ${e.message}`);
             console.error((e as Error).stack);
@@ -184,6 +193,7 @@ export class Translator extends EventEmitter {
      * Stop function stops all devices, connections, and clients in preparation for destruction
      */
     async stop(kill: Boolean = false) {
+        this.abort.abort();
         log('Waiting for devices to stop...');
         await Promise.all(Object.values(this.devices)?.map((dev: Device) => {
             log(`Stopping device ${dev._name}`);
@@ -516,15 +526,21 @@ export class Translator extends EventEmitter {
              * part of a neighbouring value. */
             const FPSI = /__FPSI__(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{32})/g;
 
+            const missing = new Set<string>();
             const secretReplacedConfig = configString.replace(FPSI, (match) => {
+                // Attempt to get the secret contents from the file in /etc/secrets with the same name
+                const secretPath = `${secretBasePath}/${match}`;
                 try {
-                    // Attempt to get the secret contents from the file in /etc/secrets with the same name
-                    const secretPath = `${secretBasePath}/${match}`;
                     const val = fs.readFileSync(secretPath, 'utf8');
                     return val;
                 } catch (err: any) {
                     // Handle error (e.g., file not found) gracefully
                     console.error(`Error reading secret from ${match}: ${err.message}`);
+                    /* The secret may simply not have arrived yet. The
+                     * Manager commits it to the cluster's git repo as a
+                     * SealedSecret, and Flux applies that on its own
+                     * interval, so a new agent can start first. */
+                    if (err.code === "ENOENT") missing.add(secretPath);
                     valid = false;
                     return "SECRET_NOT_FOUND";
                 }
@@ -539,6 +555,7 @@ export class Translator extends EventEmitter {
                     valid = false;
                 }
             }
+            this.missingSecrets = [...missing];
         }
 
         const conns = config && valid ? reHashConf(config).deviceConnections : [];
@@ -556,6 +573,46 @@ export class Translator extends EventEmitter {
             },
             deviceConnections: conns,
         };
+    }
+
+    /* Wait for missing secret files to appear, then restart in-process
+     * to load the config again, as a config reload does. Kubernetes
+     * updates a mounted secret volume in place, but nothing else would
+     * tell us, and without this the agent ran with no devices until its
+     * pod was restarted.
+     *
+     * This polls rather than using fs.watch. Kubernetes swaps a whole
+     * new directory in behind the "..data" symlink, which a watch on
+     * the file misses. existsSync follows the per-file symlink, so it
+     * sees the new file as soon as the swap is done. The interval backs
+     * off to a cap, as the wait is usually minutes (the Flux interval
+     * plus the kubelet sync period) but can be indefinite. */
+    async waitForSecrets(paths: string[]) {
+        const signal = this.abort.signal;
+        const maxDelay = 30;
+        let delay = 1;
+
+        while (true) {
+            if (signal.aborted) return;
+            const still = paths.filter(p => !fs.existsSync(p));
+            if (!still.length) break;
+
+            /* The paths name the placeholder, never the value. */
+            log(`Waiting for ${still.length} secret(s) to be mounted: `
+                + `${still.join(", ")}. Checking again in ${delay}s...`);
+            try {
+                await timers.setTimeout(delay * 1000, undefined, { signal });
+            }
+            catch (e: any) {
+                /* stop() was called; the next start does its own check. */
+                if (e?.name === "AbortError") return;
+                throw e;
+            }
+            delay = Math.min(delay * 2, maxDelay);
+        }
+
+        log("All missing secrets are now present. Reloading config...");
+        this.stop();
     }
 
     async retry<RV>(what: string, fetch: () => Promise<RV>): Promise<RV> {

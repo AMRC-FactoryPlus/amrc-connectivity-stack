@@ -10,6 +10,8 @@ import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
 import { describe, expect, test } from "vitest";
 
+import { ServiceError } from "@amrc-factoryplus/service-client";
+
 import { APIv1 } from "../../lib/api-v1.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
 
@@ -26,10 +28,11 @@ const TO = "2025-01-02T00:00:00.000Z";
  *
  * `datasets` maps a dataset UUID to { structure, config }, the same shape
  * DataFlow produces. `denied` lists [permission, target] pairs that the
- * fake ACL refuses; everything else is allowed. Every ConfigDB write is
- * recorded in order in `calls.writes`.
+ * fake ACL refuses; everything else is allowed. `delete_errors` maps a
+ * structure app to the HTTP status that the fake delete_config fails
+ * with for it. Every ConfigDB write is recorded in order in `calls.writes`.
  */
-function make_api(datasets, denied = []) {
+function make_api(datasets, denied = [], delete_errors = {}) {
   const calls = { writes: [] };
   const record = (...args) => calls.writes.push(args);
 
@@ -37,7 +40,12 @@ function make_api(datasets, denied = []) {
     async class_add_subclass(klass, sub) { record("add_subclass", klass, sub); },
     async class_remove_subclass(klass, sub) { record("remove_subclass", klass, sub); },
     async put_config(app, uuid, config) { record("put_config", app, uuid, config); },
-    async delete_config(app, uuid) { record("delete_config", app, uuid); },
+    async delete_config(app, uuid) {
+      const status = delete_errors[app];
+      if (status)
+        throw new ServiceError(null, `Can't remove ${app} for ${uuid}`, status);
+      record("delete_config", app, uuid);
+    },
     async create_object() { throw new Error("create_object not expected"); },
   };
 
@@ -232,5 +240,37 @@ describe("structure_update applies an accepted update", () => {
       ["put_config", Constants.App.UnionComponents, UNION, [SRC_A]],
       ["add_subclass", UNION, SRC_A],
     ]);
+  });
+});
+
+describe("structure_update clean-up of an invalid dataset", () => {
+  test("ignores a 404 for a structure with no entry", async () => {
+    const { api, calls } = make_api(invalid_dataset, [], {
+      [Constants.App.SessionLimits]: 404,
+    });
+
+    const res = make_res();
+    await api.structure_update(
+      make_req(UNION, Constants.App.UnionComponents, [SRC_A]),
+      res,
+    );
+
+    expect(res.code).toBe(200);
+    expect(calls.writes.at(-2))
+      .toEqual(["put_config", Constants.App.UnionComponents, UNION, [SRC_A]]);
+    expect(calls.writes.at(-1)).toEqual(["add_subclass", UNION, SRC_A]);
+  });
+
+  test("fails on any other error and writes nothing further", async () => {
+    const { api, calls } = make_api(invalid_dataset, [], {
+      [Constants.App.SessionLimits]: 503,
+    });
+
+    await expect(api.structure_update(
+      make_req(UNION, Constants.App.UnionComponents, [SRC_A]),
+      make_res(),
+    )).rejects.toMatchObject({ status: 503 });
+
+    expect(calls.writes.every(w => w[0] === "delete_config")).toBe(true);
   });
 });

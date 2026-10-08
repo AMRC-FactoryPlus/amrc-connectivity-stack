@@ -563,15 +563,13 @@ export class APIv1 {
     }
     // For currently INVALID dataset
     else{
-      // delete configs for all other structures
+      // delete configs for all other structures; a 404 means that
+      // structure had no entry, and any other error stops the update
       const all_structure_apps = Object.values(Constants.App);
 
       for(const s of all_structure_apps){
-        try{
-          await this.cdb.delete_config(s, dataset_uuid);
-        }catch(e){
-          ServiceError.check(404);
-        }
+        await this.cdb.delete_config(s, dataset_uuid)
+          .catch(ServiceError.check(404));
       }
     } 
 

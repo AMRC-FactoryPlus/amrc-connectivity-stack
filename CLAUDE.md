@@ -93,10 +93,10 @@ The chain:
 
 ## PR base rule (CRITICAL)
 
-`gh pr create` defaults to the repo's default branch (usually `main`).
+`gh pr create` defaults to the repo's default branch (`dev` in this repo).
 Worktrees are often forked from in-progress feature branches, so a PR
-opened with the default base will silently merge unfinished work to
-production.
+opened with the default base will silently merge unfinished work into
+`dev`.
 
 **Before every `gh pr create`:**
 
@@ -332,7 +332,10 @@ new service. Copy the shape; do not improvise.
 
 ## Contributing
 
+- PRs target `dev` (the default branch), including fixes for a release.
+  `main` only moves when a release is promoted. See
+  `docs/development/releasing.md`.
 - Branch naming: `initials/branch-description` or `feature/xxx` for long-running branches
 - Commit messages: imperative mood, explain the "why", reference issues
 - Keep PRs focused on a single issue/feature
-- Rebase onto `main` rather than merging
+- Rebase onto `dev` rather than merging

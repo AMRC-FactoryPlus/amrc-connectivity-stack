@@ -41,6 +41,10 @@ When reporting an issue, please include:
 ### Submitting Pull Requests
 
 Pull requests for both bug fixes and feature additions can be submitted.
+Open them against `dev`, which is the default branch. `main` only moves
+when a release is made; see [Making a Release](./releasing.md) for how
+`dev` and `main` fit together.
+
 Please consider the following guidance when creating one:
 
 #### Guidelines for Pull Requests
@@ -58,8 +62,12 @@ criteria:
   like Fixes #<issue-number> or Closes #< issue-number> to close them
   automatically when the PR is merged.
 - **Rebase:** For a single PR (rather than a longer-running feature
-  branch), rebase the PR branch onto `main` instead of merging main into
+  branch), rebase the PR branch onto `dev` instead of merging dev into
   it to maintain a cleaner commit history.
+- **Fixes to a release:** Fixes for a release candidate or a released
+  version also go into `dev`. The next release candidate is published
+  from `dev`, so it includes the fix along with anything else merged
+  since the last one.
 
 #### Branch Naming
 
@@ -67,7 +75,10 @@ For consistency, please use the `initials/branch-description` naming
 convention for branches (eg:`bmz/update-schema`).
 
 For long-running feature branches, please use the `feature/xxx` 
-format (e.g. `feature/uns-namespace`).
+format (e.g. `feature/uns-namespace`). Use one when a piece of work
+spans several PRs that need testing together, such as a set of
+performance changes to one service: point those PRs at the feature
+branch, and merge it into `dev` once it has been tested as a whole.
 
 Please also remember to keep branch names relatively short.
 

@@ -68,6 +68,28 @@ spec:
                 secretKeyRef:
                   name: influxdb-auth
                   key: admin-token
+            {{- with .Values.dataAccess.coverage }}
+            - name: COVERAGE_ENABLED
+              value: {{ .enabled | toString | quote }}
+            - name: COVERAGE_BACKFILL
+              value: {{ .backfill | toString | quote }}
+            - name: COVERAGE_PAUSE_MS
+              value: {{ .pauseMs | int64 | quote }}
+            - name: COVERAGE_BACKFILL_EMPTY_DAYS
+              value: {{ .backfillEmptyDays | int64 | quote }}
+            - name: COVERAGE_TIMEOUT_MS
+              value: {{ .timeoutMs | int64 | quote }}
+            - name: COVERAGE_REPAIR_DAYS
+              value: {{ .repairDays | int64 | quote }}
+            {{- with .backfillFrom }}
+            - name: COVERAGE_BACKFILL_FROM
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .rebuild }}
+            - name: COVERAGE_REBUILD
+              value: {{ . | toString | quote }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

@@ -4,25 +4,55 @@
  *
  * On every start, Data Access makes sure the coverage bucket and the
  * hourly InfluxDB task exist (and that the task runs the Flux this
- * image ships). It then backfills the summary day by day from the
- * newest day to the oldest raw point, and repairs the last few days
- * once a day. Everything runs in the background: the series route
+ * image ships). It then backfills the summary day by day from today
+ * backwards, until a long run of days with no raw data, and repairs the
+ * last few days once a day. Everything runs in the background: the series route
  * keeps working from raw data until the summary is ready.
+ *
+ * Every query here is bounded: one local day, or a fixed window below
+ * an empty day. None reads the whole raw bucket. Each one runs over
+ * fetch() with an AbortController, so a timeout or stop() closes the
+ * connection and InfluxDB drops the query.
  */
+
+import {
+    chunksToLinesIterable, linesToRowsIterable,
+} from "@influxdata/influxdb-client";
 
 import {
     COVERAGE_DEFAULTS, MEASUREMENT,
     task_script, chunk_script, hours_script, day_script,
-    earliest_query, newest_query, state_query, previous_query,
+    newest_query, state_query, previous_query,
     parse_state, fresh_state, needs_rebuild, next_chunk, repair_chunks,
-    floor_hour, floor_day, next_local_hour,
+    probe_window, after_probe, retry_delay,
+    floor_hour, next_local_hour,
 } from "./coverage.js";
-import { next_bucket } from "./series.js";
 
-const HOUR = 3600 * 1000;
 const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* The annotated CSV the query rows are parsed from. */
+const DIALECT = {
+    header: true, delimiter: ",", quoteChar: '"', commentPrefix: "#",
+    annotations: ["datatype", "group", "default"],
+};
+
+/** Labels an error with the backfill or repair step it came from, unless
+ * a deeper step already did. */
+async function step(name, fn) {
+    try {
+        return await fn();
+    }
+    catch (err) {
+        err.step ??= name;
+        throw err;
+    }
+}
+
+const day_iso = t => new Date(t).toISOString();
 
 
 /** An error from the InfluxDB HTTP API. */
@@ -121,6 +151,30 @@ export class InfluxAdmin {
         return res?.runs ?? [];
     }
 
+    /** Runs a Flux query and returns its rows as objects. Aborting
+     * `signal` closes the HTTP connection, which makes InfluxDB cancel
+     * the query. (The client library's own timeout does not: it reports
+     * the error but leaves the request open.) */
+    async query(org, flux, { signal } = {}) {
+        const res = await this.fetch(this.url + "/api/v2/query?" + new URLSearchParams({ org }), {
+            method: "POST",
+            signal,
+            headers: {
+                Authorization: `Token ${this.token}`,
+                "Content-Type": "application/json",
+                Accept: "application/csv",
+            },
+            body: JSON.stringify({ query: flux, type: "flux", dialect: DIALECT }),
+        });
+        if (!res.ok)
+            throw new InfluxApiError("POST", "/api/v2/query", res.status, await res.text());
+        const out = [];
+        for await (const { values, tableMeta } of
+                linesToRowsIterable(chunksToLinesIterable(res.body)))
+            out.push(tableMeta.toObject(values));
+        return out;
+    }
+
     /** Writes line protocol with millisecond timestamps. */
     write(org_id, bucket, lines) {
         return this.call("POST", "/api/v2/write", {
@@ -141,6 +195,7 @@ export function state_lines(state) {
         `complete=${state.complete ? "true" : "false"}`,
         `rule=${Math.trunc(state.rule)}i`,
         `rebuild="${esc(state.rebuild ?? "")}"`,
+        `oldest_data=${Math.trunc(state.oldest_data ?? -1)}i`,
     ];
     return `${MEASUREMENT.state} ${fields.join(",")} 0`;
 }
@@ -156,8 +211,7 @@ const env_num = (v, dflt) =>
 export class Coverage {
     /**
      * @param opts.debug The debug logger.
-     * @param opts.admin An InfluxAdmin.
-     * @param opts.query_api An InfluxDB query API (queryRows).
+     * @param opts.admin An InfluxAdmin. Queries run through its query().
      * @param opts.org The InfluxDB org name.
      * @param opts.raw_bucket The raw data bucket.
      * @param opts.env Settings, usually process.env. See the docs for
@@ -169,7 +223,6 @@ export class Coverage {
         const env = opts.env ?? {};
         this.log = opts.debug.bound("coverage");
         this.admin = opts.admin;
-        this.query_api = opts.query_api;
         this.org = opts.org;
         this.raw_bucket = opts.raw_bucket;
         this.now = opts.now ?? Date.now;
@@ -186,6 +239,12 @@ export class Coverage {
             this.log("Ignoring COVERAGE_BACKFILL_FROM: not a date");
             this.backfill_from = null;
         }
+        this.empty_days = env_num(env.COVERAGE_BACKFILL_EMPTY_DAYS, COVERAGE_DEFAULTS.empty_days);
+        if (!(this.empty_days >= 1)) {
+            this.log("Ignoring COVERAGE_BACKFILL_EMPTY_DAYS: must be at least 1");
+            this.empty_days = COVERAGE_DEFAULTS.empty_days;
+        }
+        this.timeout_ms = env_num(env.COVERAGE_TIMEOUT_MS, COVERAGE_DEFAULTS.timeout_ms);
         this.pause_ms = env_num(env.COVERAGE_PAUSE_MS, COVERAGE_DEFAULTS.pause_ms);
         this.repair_days = env_num(env.COVERAGE_REPAIR_DAYS, COVERAGE_DEFAULTS.repair_days);
         this.rebuild = env.COVERAGE_REBUILD ?? "";
@@ -202,11 +261,13 @@ export class Coverage {
         this.newest = null;
         this.task_stop = null;
         this.task_info = null;
-        this.earliest = undefined;
         /* The detail stays in the log; status() reports only the code. */
         this.last_error = null;
         this.stopped = false;
         this.timers = new Set();
+        /* AbortControllers of the queries in flight, for stop(). */
+        this.inflight = new Set();
+        this.failures = 0;
         /* Backfill and repair chunks run one at a time on this chain. */
         this.chain = Promise.resolve();
     }
@@ -262,16 +323,28 @@ export class Coverage {
         return this.ids;
     }
 
-    /** Runs a query and collects its rows. */
-    rows(query) {
-        return new Promise((resolve, reject) => {
-            const out = [];
-            this.query_api.queryRows(query, {
-                next: (values, meta) => out.push(meta.toObject(values)),
-                error: reject,
-                complete: () => resolve(out),
-            });
-        });
+    /** Runs a query and collects its rows. After `timeout_ms`, or on
+     * stop(), it aborts the request, so InfluxDB stops the query too. */
+    async rows(query) {
+        if (this.stopped) throw new Error("stopped");
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(
+            new Error(`query timed out after ${Math.round(this.timeout_ms / 1000)} s`)),
+            this.timeout_ms);
+        timer.unref?.();
+        this.inflight.add(ctl);
+        try {
+            return await this.admin.query(this.org, query, { signal: ctl.signal });
+        }
+        catch (err) {
+            /* fetch rejects with its own AbortError; report why. */
+            throw ctl.signal.aborted && ctl.signal.reason instanceof Error
+                ? ctl.signal.reason : err;
+        }
+        finally {
+            clearTimeout(timer);
+            this.inflight.delete(ctl);
+        }
     }
 
     async read_marker() {
@@ -283,14 +356,16 @@ export class Coverage {
         this.marker = { ...state };
     }
 
-    /** The oldest raw point, or the configured start. null if the raw
-     * bucket is empty. */
-    async find_earliest() {
-        if (this.backfill_from != null) return this.backfill_from;
-        const rows = await this.rows(earliest_query({
-            raw_bucket: this.raw_bucket, min_time: this.min_time }));
-        const t = rows.length ? Date.parse(rows[0]._time) : NaN;
-        return Number.isNaN(t) ? null : t;
+    /** The oldest time the backfill summarises. */
+    floor() {
+        return Math.max(this.min_time, this.backfill_from ?? -Infinity);
+    }
+
+    /** The run of empty time that ends the backfill. With
+     * COVERAGE_BACKFILL_FROM set, the backfill walks all the way down
+     * to it instead. */
+    empty_ms() {
+        return this.backfill_from != null ? Infinity : this.empty_days * DAY;
     }
 
     /** Summarises one local day. The current day stops at the last
@@ -330,47 +405,61 @@ export class Coverage {
         await this.sleep(Math.max(this.pause_ms, elapsed));
     }
 
-    /** Backfills from the marker down to the oldest raw point. Resumes
-     * where it stopped; a chunk that fails is repeated on the next try. */
+    /** Backfills from the marker downwards, one local day per query,
+     * until it reaches the floor or a long enough run of days with no
+     * raw data. It never looks up the oldest raw point: that query reads
+     * every series over the whole history. Resumes where it stopped; a
+     * chunk that fails is repeated on the next try. */
     async backfill() {
-        let state = await this.read_marker();
+        let state = await step("reading the marker", () => this.read_marker());
         if (needs_rebuild(state, this.rebuild)) {
             state = fresh_state(this.now(), this.rebuild);
-            this.log("Starting the coverage backfill below %s",
-                new Date(state.upper).toISOString());
-            await this.write_marker(state);
+            this.log("Starting the coverage backfill below %s", day_iso(state.upper));
+            await step("writing the marker", () => this.write_marker(state));
         }
         this.marker = state;
         if (state.complete) return state;
 
-        const floor = await this.find_earliest();
-        this.earliest = floor;
+        const floor = this.floor();
+        const empty_ms = this.empty_ms();
+        const save = async (t0, changes) => {
+            state = { ...state, ...changes };
+            await step("writing the marker", () => this.write_marker(state));
+            await this.pause(this.now() - t0);
+        };
 
-        for (let chunk; !this.stopped && (chunk = next_chunk(state, floor)); ) {
+        for (let chunk; !this.stopped && (chunk = next_chunk(state, floor, empty_ms)); ) {
             const t0 = this.now();
-            const hours = await this.run_chunk(chunk);
-            let backfilled_to = chunk.start;
-
-            /* An empty day: jump to the end of the next day below it that
-             * has data, or to the floor if there is none. */
-            if (!hours && floor != null && floor < chunk.start) {
-                const rows = await this.rows(previous_query({
-                    raw_bucket: this.raw_bucket, start: floor, stop: chunk.start }));
-                const t = rows.length ? Date.parse(rows[0]._time) : NaN;
-                backfilled_to = Number.isNaN(t)
-                    ? floor_day(floor)
-                    : Math.min(chunk.start, next_bucket(floor_day(t), "1d"));
+            const hours = await step(`summarising the day from ${day_iso(chunk.start)}`,
+                () => this.run_chunk(chunk));
+            if (hours) {
+                await save(t0, { backfilled_to: chunk.start, oldest_data: chunk.start });
+                continue;
             }
 
-            state = { ...state, backfilled_to };
-            await this.write_marker(state);
-            await this.pause(this.now() - t0);
+            /* An empty day. Look for the newest data in a bounded window
+             * below it, and jump to the end of that day. If the window
+             * is empty, skip all of it and look in the next one down. */
+            await save(t0, { backfilled_to: chunk.start });
+            while (!this.stopped && next_chunk(state, floor, empty_ms)) {
+                const t1 = this.now();
+                const win = probe_window(state.backfilled_to, floor);
+                const rows = await step(
+                    `looking for data from ${day_iso(win.start)} to ${day_iso(win.stop)}`,
+                    () => this.rows(previous_query({ raw_bucket: this.raw_bucket, ...win })));
+                const t = rows.length ? Date.parse(rows[0]._time) : NaN;
+                const found = Number.isNaN(t) ? null : t;
+                await save(t1, { backfilled_to: after_probe(win, found) });
+                if (found != null) break;
+            }
         }
         if (this.stopped) return state;
 
         state = { ...state, complete: true };
-        await this.write_marker(state);
-        this.log("Coverage backfill complete");
+        await step("writing the marker", () => this.write_marker(state));
+        this.log("Coverage backfill complete: summarised down to %s; oldest data found %s",
+            day_iso(state.backfilled_to),
+            state.oldest_data == null ? "none" : day_iso(state.oldest_data));
         return state;
     }
 
@@ -380,20 +469,26 @@ export class Coverage {
         for (const chunk of repair_chunks(this.now(), this.repair_days)) {
             if (this.stopped) return;
             const t0 = this.now();
-            await this.run_chunk(chunk);
+            await step(`repairing the day from ${day_iso(chunk.start)}`,
+                () => this.run_chunk(chunk));
             await this.pause(this.now() - t0);
         }
         this.log("Coverage repair of %d days done", this.repair_days);
     }
 
-    /** Queues work on the chain, so chunks never run in parallel. */
+    /** Queues work on the chain, so chunks never run in parallel. A
+     * failure sets last_error; the caller logs it. */
     enqueue(name, fn) {
         const run = this.chain.then(() => this.stopped ? null : fn());
-        this.chain = run.catch(err => {
-            this.last_error = `${name}_failed`;
-            this.log("Coverage %s failed: %s", name, err.message);
-        });
+        this.chain = run.then(() => {}, () => { this.last_error = `${name}_failed`; });
         return run;
+    }
+
+    /** One log line for a failed backfill or repair. */
+    log_failure(name, err, retry_ms) {
+        const when = retry_ms == null ? "" : `; retrying in ${Math.round(retry_ms / MINUTE)} min`;
+        this.log("Coverage %s failed while %s: %s%s",
+            name, err.step ?? "starting", err.message, when);
     }
 
     /** Re-reads what the summary holds, for the read path. */
@@ -468,12 +563,13 @@ export class Coverage {
             summarisedTo: iso(s?.summary_to),
             recountHours: this.recount_hours,
             repairDays: this.repair_days,
+            backfillEmptyDays: this.empty_days,
             minTime: iso(this.min_time),
             backfill: this.marker ? {
                 complete: this.marker.complete,
                 backfilledTo: iso(this.marker.backfilled_to),
                 upper: iso(this.marker.upper),
-                earliestRaw: iso(this.earliest ?? null),
+                oldestData: iso(this.marker.oldest_data),
             } : null,
         };
     }
@@ -525,9 +621,13 @@ export class Coverage {
 
         if (this.backfill_enabled) {
             const backfill = () => this.enqueue("backfill", () => this.backfill())
-                .then(refresh, () => {
-                    /* Try again later; the marker keeps the progress. */
-                    this.at(15 * MINUTE, backfill);
+                .then(() => { this.failures = 0; return refresh(); }, err => {
+                    if (this.stopped) return;
+                    /* Try again later, waiting longer after each failure
+                     * in a row; the marker keeps the progress. */
+                    const wait = retry_delay(this.failures++);
+                    this.log_failure("backfill", err, wait);
+                    this.at(wait, backfill);
                 });
             backfill();
         }
@@ -535,16 +635,20 @@ export class Coverage {
         const schedule_repair = () => {
             const at = next_local_hour(this.now(), COVERAGE_DEFAULTS.repair_hour);
             this.at(at - this.now(), () => {
-                this.enqueue("repair", () => this.repair()).then(refresh, () => {});
+                this.enqueue("repair", () => this.repair()).then(refresh,
+                    err => this.stopped || this.log_failure("repair", err));
                 schedule_repair();
             });
         };
         if (this.repair_days > 0) schedule_repair();
     }
 
+    /** Stops the background work and aborts any query in flight. */
     stop() {
         this.stopped = true;
         for (const t of this.timers) { clearTimeout(t); clearInterval(t); }
         this.timers.clear();
+        for (const ctl of this.inflight) ctl.abort(new Error("stopped"));
+        this.inflight.clear();
     }
 }

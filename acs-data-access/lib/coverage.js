@@ -37,6 +37,18 @@ export const COVERAGE_DEFAULTS = {
     repair_hour: 3,
     /* Raw points before this are taken to be bad clocks and ignored. */
     min_time: Date.parse("2000-01-01T00:00:00Z"),
+    /* Below an empty day, the backfill looks this far down for the
+     * next data in one query. */
+    probe_days: 30,
+    /* The backfill stops after this many days in a row with no raw
+     * data below the oldest data it has found. */
+    empty_days: 365,
+    /* Time allowed for one backfill or repair query. */
+    timeout_ms: 10 * 60 * 1000,
+    /* Waits after a failed backfill: the first, then doubling up to
+     * the last. */
+    retry_ms: 15 * 60 * 1000,
+    max_retry_ms: 6 * 3600 * 1000,
 };
 
 export const MEASUREMENT = {
@@ -114,6 +126,11 @@ function birth_filter() {
 /* Hourly counts per device from the raw bucket, shaped for to(). The
  * range bounds are Flux expressions or Dates.
  *
+ * The count's window runs in UTC. The scripts set a local `location`
+ * for the daily sums, and InfluxDB does not run a windowed count in its
+ * storage engine under a non-UTC location: it would stream every raw
+ * point to Flux instead. Hours are the same in UTC and local time.
+ *
  * Hours the summary already holds in the range come back as 0 unless
  * they still have raw data, so a recount zeroes an hour that lost all
  * its data (for example after a delete). Reads skip zero counts. */
@@ -124,7 +141,8 @@ function hourly_counts({ raw_bucket, bucket, start, stop }) {
       |> filter(fn: (r) => r._field == "value")
       |> filter(fn: (r) => exists r.topLevelInstance and r.topLevelInstance != "")
       |> filter(fn: (r) => ${birth_filter()})
-      |> aggregateWindow(every: 1h, fn: count, createEmpty: false, timeSrc: "_start")
+      |> aggregateWindow(every: 1h, fn: count, createEmpty: false, timeSrc: "_start",
+                         location: timezone.utc)
       |> group(columns: ["topLevelInstance", "_time"])
       |> sum()
       |> map(fn: (r) => ({_time: r._time, _value: int(v: r._value), topLevelInstance: r.topLevelInstance}))
@@ -249,7 +267,10 @@ ${daily_sums(flux`from(bucket: ${bucket})
 }
 
 /** The newest raw data time in [start, stop), birth metadata excluded.
- * One row, or none. The backfill uses it to jump over empty days. */
+ * One row, or none. The backfill uses it to jump over empty days, always
+ * over a bounded window (COVERAGE_DEFAULTS.probe_days). `last()` straight
+ * after the filters runs inside the storage engine, so InfluxDB reads one
+ * block per series in the window and stops. */
 export function previous_query({ raw_bucket, start, stop }) {
     return String(flux`from(bucket: ${raw_bucket})
   |> range(start: ${new Date(start)}, stop: ${new Date(stop)})
@@ -259,17 +280,6 @@ export function previous_query({ raw_bucket, start, stop }) {
   |> keep(columns: ["_time"])
   |> group()
   |> max(column: "_time")`);
-}
-
-/** The time of the oldest point in the raw bucket. One row, or none. */
-export function earliest_query({ raw_bucket, min_time = 0 }) {
-    return String(flux`from(bucket: ${raw_bucket})
-  |> range(start: ${new Date(min_time)})
-  |> filter(fn: (r) => r._field == "value")
-  |> limit(n: 1)
-  |> keep(columns: ["_time"])
-  |> group()
-  |> min(column: "_time")`);
 }
 
 /** The newest hour in the summary, within the last `days`. One row, or
@@ -303,7 +313,11 @@ export function state_query({ bucket }) {
  *   upper          The local midnight the backfill started below. The
  *                  task covers everything after it.
  *   backfilled_to  Everything in [backfilled_to, upper) is summarised.
- *   complete       The backfill reached the oldest raw point.
+ *   complete       The backfill is done: it reached the floor, or a
+ *                  long enough run of days with no raw data.
+ *   oldest_data    The start of the oldest day with raw data that the
+ *                  backfill has found, or -1 if none yet. The run of
+ *                  empty days is counted from here.
  *   rule           RULE_VERSION when the backfill started.
  *   rebuild        The rebuild request that started it ("" if none).
  * ---------------------------------------------------------------
@@ -320,7 +334,9 @@ export function parse_state(rows) {
         complete: f.complete === true || f.complete === "true",
         rule: num(f.rule),
         rebuild: f.rebuild == null ? "" : String(f.rebuild),
+        oldest_data: num(f.oldest_data),
     };
+    if (state.oldest_data != null && state.oldest_data < 0) state.oldest_data = null;
     if (state.upper == null || state.backfilled_to == null) return null;
     return state;
 }
@@ -329,7 +345,8 @@ export function parse_state(rows) {
  * the current local day, which the task only partly covers. */
 export function fresh_state(now, rebuild = "") {
     const upper = next_bucket(floor_day(now), "1d");
-    return { upper, backfilled_to: upper, complete: false, rule: RULE_VERSION, rebuild };
+    return { upper, backfilled_to: upper, complete: false, rule: RULE_VERSION, rebuild,
+        oldest_data: null };
 }
 
 /** Whether a stored marker must be thrown away and the backfill run
@@ -340,13 +357,42 @@ export function needs_rebuild(state, rebuild = "") {
     return rebuild != "" && rebuild != state.rebuild;
 }
 
-/** The next chunk below the marker, or null when the backfill is done.
- * @param floor The oldest raw point time, or null if the bucket is empty. */
-export function next_chunk(state, floor) {
+/** The next chunk below the marker, or null when the backfill is done:
+ * it reached the floor, or `empty_ms` with no data below the oldest data
+ * found (or below `upper`, if it has found none).
+ * @param floor The oldest time to summarise (ms).
+ * @param empty_ms The run of empty time that ends the backfill, or
+ *   Infinity to walk all the way to the floor. */
+export function next_chunk(state, floor, empty_ms = Infinity) {
     if (state.complete) return null;
-    if (floor == null || state.backfilled_to <= floor) return null;
+    if (state.backfilled_to <= floor) return null;
+    const newest_seen = state.oldest_data ?? state.upper;
+    if (newest_seen - state.backfilled_to >= empty_ms) return null;
     const stop = state.backfilled_to;
     return { start: prev_day(stop), stop };
+}
+
+/** The window an emptiness probe covers below an empty day: up to
+ * `days` local days, never below the floor's day. */
+export function probe_window(below, floor, days = COVERAGE_DEFAULTS.probe_days) {
+    let start = below;
+    for (let i = 0; i < days && start > floor; i++) start = prev_day(start);
+    return { start: Math.max(start, floor_day(floor)), stop: below };
+}
+
+/** Where the marker moves after an empty day, given the probe below it.
+ * @param newest The newest raw data time in the probe window, or null.
+ * @returns The new backfilled_to: the end of the day holding `newest`,
+ *   or the bottom of the window if it is empty. */
+export function after_probe(window, newest) {
+    if (newest == null) return window.start;
+    return Math.min(window.stop, next_bucket(floor_day(newest), "1d"));
+}
+
+/** The wait before retry number `n` (0-based) after a failure. */
+export function retry_delay(n, first = COVERAGE_DEFAULTS.retry_ms,
+        max = COVERAGE_DEFAULTS.max_retry_ms) {
+    return Math.min(first * 2 ** Math.min(n, 30), max);
 }
 
 /** The days a repair covers: the `days` full local days before today,

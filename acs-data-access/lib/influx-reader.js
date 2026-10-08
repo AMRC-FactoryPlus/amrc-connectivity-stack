@@ -3,6 +3,7 @@ import { once } from "events";
 import pLimit from "p-limit";
 
 import { csv_escape, strip_metric_suffix } from "./utils.js";
+import { build_flux_query } from "./flux.js";
 
 const CSV_HEADER = "device,metric,timestamp,value,unit";
 
@@ -66,11 +67,11 @@ export class InfluxReader {
         writable,
         meta
     ) {
-        const query =
-            this.#buildFluxQuery(
-                source,
-                meta
-            );
+        const query = build_flux_query({
+            bucket: this.influx_bucket,
+            source,
+            filter: meta,
+        });
 
         this.log(
             "streaming",
@@ -101,55 +102,5 @@ export class InfluxReader {
         if (!writable.write(chunk)) {
             await once(writable, "drain");
         }
-    }
-
-
-    #buildFluxQuery(
-        source,
-        meta = {}
-    ) {
-        const start =
-            source.from ??
-            "1970-01-01T00:00:00Z";
-
-        const stop =
-            source.to ??
-            "2100-01-01T00:00:00Z";
-
-        const measurementFilter =
-            meta.measurement
-                ? `
-                |> filter(
-                    fn: (r) =>
-                        r._measurement ==
-                        "${meta.measurement}"
-                )
-            `
-                : "";
-
-        return `
-            from(bucket: "${this.influx_bucket}")
-
-            |> range(
-                start: time(v: "${start}"),
-                stop: time(v: "${stop}")
-            )
-
-            ${measurementFilter}
-
-            |> filter(
-                fn: (r) =>
-                    r.topLevelInstance ==
-                    "${source.device_uuid}"
-            )
-
-            |> keep(columns: [
-                "_time",
-                "_value",
-                "_measurement",
-                "device",
-                "unit"
-            ])
-        `;
     }
 }

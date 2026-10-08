@@ -102,12 +102,6 @@ const SUFFIX = {
 };
 const suffix = (t) => SUFFIX[t] ?? "s";
 
-/* Sparkplug_Type as written in the originMap. Doubles are given as
- * "DoubleLE" because ObjectTree's sparkplugTypeToSuffix strips a
- * trailing /(LE|BE)$/i, which turns a plain "Double" into "Doub" and
- * the ":s" measurement (a separate, pre-existing bug). */
-const configType = (t) => (t === "Double" ? "DoubleLE" : t);
-
 export function deviceUuid(i) { return id(`device:${i}`); }
 
 /** Deterministic pseudo-random value for (device, metric, point). */
@@ -144,7 +138,7 @@ export function device(i, wide = 0) {
     if (i % 10 === 3) top.push(["Model", "String", "static"]);
     for (let k = 0; k < wide; k++) top.push([`Wide_${String(k).padStart(4, "0")}`, "Double", "live"]);
     for (const [m, t, kind] of top) {
-        originMap[m] = { Sparkplug_Type: configType(t) };
+        originMap[m] = { Sparkplug_Type: t };
         series.push({ measurement: `${m}:${suffix(t)}`, path: "", type: t, kind });
     }
     series.push({ measurement: "Instance_UUID:s", path: "", type: "String", kind: "static" });
@@ -153,7 +147,7 @@ export function device(i, wide = 0) {
     for (const [sub, metrics] of Object.entries(SUBS)) {
         const obj = { Schema_UUID: SCHEMA[sub], Instance_UUID: inst(sub) };
         for (const [m, t, kind] of metrics) {
-            obj[m] = { Sparkplug_Type: configType(t) };
+            obj[m] = { Sparkplug_Type: t };
             series.push({ measurement: `${m}:${suffix(t)}`, path: sub, type: t, kind });
         }
         series.push({ measurement: "Instance_UUID:s", path: sub, type: "String", kind: "static" });

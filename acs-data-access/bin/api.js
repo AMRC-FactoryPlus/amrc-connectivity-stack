@@ -50,16 +50,13 @@ const influxReader = new InfluxReader({
 
 // The coverage summary: Data Access creates its bucket and InfluxDB
 // task on every start, then backfills and repairs it in the background.
+// Its queries go through InfluxAdmin, which can abort them: a backfill
+// day returns nothing until InfluxDB has written it, so they get a long
+// timeout (COVERAGE_TIMEOUT_MS), and a query that hits it is cancelled
+// in InfluxDB too.
 const coverage = new Coverage({
   debug,
   admin: new InfluxAdmin({ url: env.INFLUXDB_URL, token: env.INFLUXDB_TOKEN }),
-  // Its own client: a backfill day returns nothing until InfluxDB has
-  // written it, which can take longer than the default 10 s timeout.
-  query_api: new InfluxDB({
-    url: env.INFLUXDB_URL,
-    token: env.INFLUXDB_TOKEN,
-    timeout: Number(env.COVERAGE_TIMEOUT_MS) || 10 * 60 * 1000,
-  }).getQueryApi(env.INFLUXDB_ORG),
   org: env.INFLUXDB_ORG,
   raw_bucket: env.INFLUXDB_BUCKET,
   env,

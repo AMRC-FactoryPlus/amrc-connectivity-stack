@@ -215,6 +215,40 @@ dataAccess:
   image:
     repository: acs-data-access
   verbosity: "ALL,!service,!token"
+  # The coverage summary: hourly and daily data-arrival counts per device
+  # that timelines read instead of counting raw data. See
+  # docs/services/data-access.md#coverage-summary. Each setting is
+  # passed to Data Access as the COVERAGE_* variable named below.
+  coverage:
+    # -- (COVERAGE_ENABLED) Keep the coverage summary. false turns off
+    # its bucket and task provisioning, the backfill, the daily repair
+    # and coverage reads; timelines then count raw data.
+    enabled: true
+    # -- (COVERAGE_BACKFILL) Summarise the history already in InfluxDB,
+    # one day at a time from today backwards. false skips it.
+    backfill: true
+    # -- (COVERAGE_PAUSE_MS) Minimum pause between backfill or repair
+    # days, in milliseconds. The pause is also at least as long as the
+    # day took. Raise it to make the backfill gentler on InfluxDB.
+    pauseMs: 1000
+    # -- (COVERAGE_BACKFILL_EMPTY_DAYS) The backfill stops after this
+    # many days in a row with no raw data below the oldest data it has
+    # found. Raise it if your history has a longer gap.
+    backfillEmptyDays: 365
+    # -- (COVERAGE_BACKFILL_FROM) An ISO date-time the backfill stops at.
+    # When set, the backfill walks down to it whatever gaps it meets.
+    # Empty: stop after `backfillEmptyDays` empty days.
+    backfillFrom: ""
+    # -- (COVERAGE_TIMEOUT_MS) Time allowed for one backfill or repair
+    # query, in milliseconds. A query that runs over is cancelled in
+    # InfluxDB too.
+    timeoutMs: 600000
+    # -- (COVERAGE_REPAIR_DAYS) Full days the daily repair recounts at
+    # 03:00 Europe/London. 0 turns the repair off.
+    repairDays: 7
+    # -- (COVERAGE_REBUILD) Any new value starts the backfill again from
+    # today, once per value. Empty: no rebuild.
+    rebuild: ""
 
 openid:
   # -- Whether or not to deploy the Keycloak OIDC server

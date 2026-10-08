@@ -416,6 +416,50 @@ example `5m`, stops i3X at startup. A restart drops i3X subscriptions,
 and clients must create them again. On a site with long quiet periods
 in UNS traffic, raise `stallTimeout` or set it to `0`.
 
+### Datasets replace the Data Access page
+
+The Admin UI's Data Access page is replaced by **Datasets**, at
+`/datasets` (the old address redirects). It has a timeline of
+equipment, devices and runs, a list, a page per dataset with charts,
+a builder, one-metric compare across runs, an Add-ons page, and a
+full-screen kiosk at `/kiosk/<equipment>` for recording runs from a
+tablet next to a machine. A run is a time window over a piece of
+equipment; equipment is a group of devices.
+
+What changes on upgrade:
+
+- **New ConfigDB objects.** Four dataset metadata applications (tags,
+  equipment device labels, run metadata, and a recording held on the
+  server while it runs), a **Run** functional class, and a
+  **Dataset maker** client role. Service setup creates them.
+- **Administrators can now see datasets.** The Administrator role gets
+  every Data Access permission. Before, it had none, so an
+  administrator saw an empty list.
+- **Root and wildcard grants list every dataset.** The dataset lists
+  now follow the same rules as single permission checks.
+- **The Dataset maker role** holds what the Admin UI needs to make
+  datasets and record runs: create, read, include, use for a session
+  and edit every dataset, read every device's data, write dataset
+  names and metadata, and set a dataset's kind. It does not include
+  delete. Add people, and any kiosk tablet account, to this role.
+- **Data Access creates an InfluxDB bucket and task.** At startup it
+  creates the `acs_coverage` bucket and an hourly task, `acs-coverage`,
+  that counts points per device per hour. It then backfills the whole
+  history of the Sparkplug bucket, one day at a time with a pause
+  between days, and repairs the last 7 days each night. On a large
+  history the backfill takes hours; progress is reported at
+  `GET /v1/coverage/status`. Set `COVERAGE_ENABLED=false` on the
+  Data Access deployment to turn it off. Other settings are documented
+  in the Data Access service reference.
+- **New Data Access route `POST /v1/series`.** It returns, for a set of
+  devices or a dataset over a window, the number of points per device
+  per interval, the mean and point count per metric per interval, and
+  the newest data time per device. The Admin UI uses it for data
+  strips, charts and sparklines. Long windows read the coverage
+  summary.
+- **Dataset edits.** Editing a dataset's definition now checks the new
+  definition fully before removing anything (from #806).
+
 ### Other improvements
 
 ConfigDB:

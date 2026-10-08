@@ -43,9 +43,13 @@ export function clamp_view (v, max_to) {
     return { from: v.from - shift, to: max_to }
 }
 
-/** The view at a zoom, around the same centre. */
-export function zoom_view (v, zoom, width, max_to) {
+/**
+ * The view at a zoom. A view that ends at now (within 2% of its span)
+ * keeps ending at now, as the timeline does; any other keeps its centre.
+ */
+export function zoom_view (v, zoom, width, max_to, now = Date.now()) {
     const span = zoom_span(zoom, width)
+    if (Math.abs(v.to - now) <= (v.to - v.from) * 0.02) return { from: now - span, to: now }
     const c = (v.from + v.to) / 2
     return clamp_view({ from: c - span / 2, to: c + span / 2 }, max_to)
 }
@@ -69,11 +73,24 @@ export function pan_view (v, dx, width, max_to) {
     return clamp_view({ from: v.from + dt, to: v.to + dt }, max_to)
 }
 
-/** What the toolbar shows for a view: zoom, label and date input value. */
+/**
+ * What the toolbar shows for a view: the zoom (only when the span shown
+ * is that zoom's, within 15%; otherwise null and no zoom is lit), the
+ * centre label, the date input value and the span shown.
+ */
 export function view_labels (v, width, now = Date.now()) {
-    const zoom = nearest_zoom(v.to - v.from, width)
+    const span = v.to - v.from
+    const near = nearest_zoom(span, width)
+    const zoom = Math.abs(zoom_span(near, width) / span - 1) <= 0.15 ? near : null
     const c = (v.from + v.to) / 2
-    return { zoom, label: centre_label(zoom, c, now), dateValue: london_date_key(c) }
+    return { zoom, label: centre_label(near, c, now), dateValue: london_date_key(c), span: fmt_span(span) }
+}
+
+/** "24 h", "45 min", "3 days". */
+export function fmt_span (ms) {
+    if (ms < HOUR) return `${Math.max(1, Math.round(ms / MIN))} min`
+    if (ms < 48 * HOUR) return `${Math.round(ms / HOUR * 10) / 10} h`
+    return `${Math.round(ms / (24 * HOUR))} days`
 }
 
 /* ------------------------------------------------------------------

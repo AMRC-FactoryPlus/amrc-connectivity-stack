@@ -41,7 +41,8 @@
         <i class="fa-solid fa-chevron-right"></i>
         <span class="sr-only">Forward {{ stepLabel }}</span>
       </Button>
-      <Tabs :model-value="zoom" @update:model-value="z => emit('zoom', z)">
+      <!-- Manual activation: focus landing on a zoom must not change it. -->
+      <Tabs :model-value="zoom" activation-mode="manual" @update:model-value="z => z && z !== zoom && emit('zoom', z)">
         <TabsList>
           <TabsTrigger v-for="(z, id) in ZOOMS" :key="id" :value="id">{{ z.label }}</TabsTrigger>
         </TabsList>

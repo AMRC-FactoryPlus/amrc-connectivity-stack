@@ -90,11 +90,12 @@
       </Card>
 
       <div v-if="entries.length" class="flex flex-wrap items-center gap-2">
-        <TimelineToolbar :zoom="labels.zoom" :label="labels.label" :date-value="labels.dateValue" :now="data.now.value"
+        <TimelineToolbar :zoom="labels.zoom ?? ''" :label="labels.label" :date-value="labels.dateValue" :now="data.now.value"
                          :searchable="false" :step-text="stepText"
                          @go="t => setView(go_view(current, t, maxTo))"
                          @step="d => setView(step_view(current, d, maxTo))"
-                         @zoom="z => setView(zoom_view(current, z, chartW, maxTo))"/>
+                         @zoom="z => setView(zoom_view(current, z, chartW, maxTo, nowMs))"/>
+        <span class="text-xs text-slate-500">{{ labels.span }} shown</span>
         <Button v-if="view" size="sm" variant="ghost" @click="view = null">{{ win.windowless || win.recording != null ? 'Back to now' : 'Whole window' }}</Button>
       </div>
 

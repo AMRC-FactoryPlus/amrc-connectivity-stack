@@ -12,7 +12,7 @@ import {
     zoom_span, nearest_zoom, clamp_view, zoom_view, step_view, go_view, pan_view, view_labels,
     spark_range, default_spark_range, MIN_SPAN,
 } from '../src/lib/datasets/chart-view.js'
-import { live_mode, display_rows, sent_on_change, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
+import { dataset_window, live_mode, display_rows, sent_on_change, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -33,8 +33,8 @@ describe('the Data tab view', () => {
 
     it('zooms around the centre and never runs past the limit', () => {
         const v = { from: T0, to: T0 + 4 * HOUR }
-        expect(zoom_view(v, 'hours', 1200, Infinity)).toEqual({ from: T0 - 3 * HOUR, to: T0 + 7 * HOUR })
-        expect(zoom_view(v, 'hours', 1200, T0 + 5 * HOUR)).toEqual({ from: T0 - 5 * HOUR, to: T0 + 5 * HOUR })
+        expect(zoom_view(v, 'hours', 1200, Infinity, T0 + DAY)).toEqual({ from: T0 - 3 * HOUR, to: T0 + 7 * HOUR })
+        expect(zoom_view(v, 'hours', 1200, T0 + 5 * HOUR, T0 + DAY)).toEqual({ from: T0 - 5 * HOUR, to: T0 + 5 * HOUR })
         expect(clamp_view({ from: 0, to: 10 }, 20)).toEqual({ from: 0, to: 10 })
     })
 
@@ -45,6 +45,26 @@ describe('the Data tab view', () => {
         expect(go_view(v, T0 + DAY, Infinity)).toEqual({ from: T0 + DAY - HOUR / 2, to: T0 + DAY + HOUR / 2 })
         // Dragging right by half the width goes back half the span.
         expect(pan_view(v, 300, 600, Infinity)).toEqual({ from: T0 - HOUR / 2, to: T0 + HOUR / 2 })
+    })
+
+    it('opens a windowless dataset on the last 24 hours, ending at now', () => {
+        // 12:30 London (BST) is 11:30 UTC.
+        const now = Date.parse('2026-10-08T11:30:00.000Z')
+        const w = dataset_window({}, now)
+        expect(w).toMatchObject({ from: now - DAY, to: now, windowless: true })
+        // The toolbar says what the axis shows: 24 h, no zoom lit.
+        const l = view_labels(w, 960, now)
+        expect(l.zoom).toBe(null)
+        expect(l.span).toBe('24 h')
+        // Choosing Hours keeps the view ending at now.
+        const z = zoom_view(w, 'hours', 960, now, now)
+        expect(z).toEqual({ from: now - 8 * HOUR, to: now })
+        expect(view_labels(z, 960, now)).toMatchObject({ zoom: 'hours', span: '8 h' })
+    })
+
+    it('opens a finished window on the whole window', () => {
+        const w = dataset_window({ from: '2026-10-07T08:00:00.000Z', to: '2026-10-07T10:00:00.000Z' }, T0)
+        expect(w).toMatchObject({ from: T0 - DAY, to: T0 - DAY + 2 * HOUR, open: false })
     })
 
     it('labels the view like the timeline', () => {

@@ -76,9 +76,12 @@
           </div>
 
           <template v-for="row in shownRows" :key="row.key">
-            <DeviceLane v-if="row.kind === 'device'" :row="row" :track-width="range.width"/>
+            <DeviceLane v-if="row.kind === 'device'" :row="row" :track-width="range.width"
+                        :strip="data.deviceCells(row.device)" :last="data.lastOf(row.device)"
+                        :quiet="quietNote(row.device)" :now="now"/>
             <TimelineLane v-else :row="row" :track-width="range.width"
                           :blocks="row.kind === 'equipment' ? placed(row.uuid) : undefined"
+                          :strip="row.kind === 'equipment' && !row.open ? data.equipmentCells(row.uuid) : null"
                           @toggle="toggle"/>
           </template>
 
@@ -95,6 +98,10 @@
 
       <div v-if="query.trim() && !layout.matched" class="p-6 text-center text-sm text-gray-500">
         No equipment or devices match "{{ query.trim() }}".
+      </div>
+
+      <div v-if="data.error.value" class="text-xs text-red-700">
+        <i class="fa-solid fa-triangle-exclamation mr-1"></i>Data strips did not load. {{ data.error.value }}
       </div>
 
       <TimelineLegend/>
@@ -123,6 +130,8 @@ import TimelineLane from '@/components/Datasets/timeline/TimelineLane.vue'
 import DeviceLane from '@/components/Datasets/timeline/DeviceLane.vue'
 import SelectionCard from '@/components/Datasets/timeline/SelectionCard.vue'
 import TimelineLegend from '@/components/Datasets/timeline/TimelineLegend.vue'
+import { useTimelineData } from '@/components/Datasets/timeline/useTimelineData.js'
+import { device_status, quiet_note } from '@/lib/datasets/series.js'
 
 const ds = useDatasetsStore()
 const router = useRouter()
@@ -287,6 +296,29 @@ const blocksByEquipment = computed(() => {
 
 function placed (uuid) {
   return place_blocks(blocksByEquipment.value[uuid] ?? [], range.value, xWindow.value.x0, xWindow.value.x1, view.left)
+}
+
+/* ------------------------------------------------------------------
+ * Data: arrival strips at Hours zoom, and "quiet since" for every lane.
+ * ------------------------------------------------------------------ */
+
+const data = useTimelineData({ zoom, range, xWindow, rows: shownRows, eqDevices })
+
+/* The amber note on a quiet lane, from the time its data stopped. It
+ * stays in view when that time is off to the left, and is shown only
+ * with the strips. */
+function quietNote (device) {
+  if (!data.hours.value) return null
+  const last = data.lastOf(device)
+  if (last === undefined) return null
+  const row_status = ds.deviceByUuid[device]?.status ?? null
+  const st = device_status(row_status, last, now.value)
+  if (st.state === 'live' || (last != null && st.since == null)) return null
+  const r = range.value
+  const viewLeft = Math.max(0, view.left)
+  const x = last == null ? viewLeft : Math.max(viewLeft, x_of(Math.max(last, r.start), r))
+  if (nowX.value != null && x > nowX.value) return null
+  return { x, text: quiet_note(last, now.value) }
 }
 
 /* ------------------------------------------------------------------

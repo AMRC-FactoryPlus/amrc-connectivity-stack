@@ -83,7 +83,8 @@ export const useDatasetsStore = defineStore('datasets', {
 
         /**
          * Devices from the ConfigDB, with what the pages need:
-         * { uuid, name, sparkplug, address, site, area, metrics, status }.
+         * { uuid, name, sparkplug, address, site, area, metrics, originMap, status }.
+         * The origin map is kept for working out i3X IDs on demand.
          * Status is merged last, so a status poll does not re-walk every
          * origin map.
          */
@@ -111,6 +112,7 @@ export const useDatasetsStore = defineStore('datasets', {
                     site: String(h.Site?.Value ?? '').trim() || null,
                     area: String(h.Area?.Value ?? '').trim() || null,
                     metrics,
+                    originMap: om,
                 }
             })
         },

@@ -73,7 +73,12 @@
           </div>
         </Card>
 
-        <DevicesTable :record="record" :resolved="resolved" :labels="labels"/>
+        <DevicesTable :record="record" :resolved="resolved" :labels="labels"
+                      :series="data.series.value" :from="data.window.value.from" :to="data.axisTo.value"
+                      :loading="data.loading.value" :error="data.error.value" :count-note="data.countNote.value"/>
+
+        <PinnedCard :entries="pinned" :series="data.series.value" :from="data.window.value.from" :to="data.axisTo.value"
+                    :live="data.live.value" :error="data.error.value" @tab="t => $emit('tab', t)"/>
       </div>
 
       <!-- Side column. -->
@@ -115,6 +120,9 @@ import StatusPill from '../StatusPill.vue'
 import AddonsSummary from '../addons/AddonsSummary.vue'
 import RecordingsCard from './RecordingsCard.vue'
 import DevicesTable from './DevicesTable.vue'
+import PinnedCard from './PinnedCard.vue'
+import { usePins, pinned_entries } from './usePins.js'
+import { useDatasetSeries } from './useDatasetSeries.js'
 import IncludedIn from './IncludedIn.vue'
 
 const props = defineProps({
@@ -137,6 +145,12 @@ const isGroup = computed(() => props.record.kind === 'process' || props.record.k
 const items = computed(() => group_items(props.record, ds.byUuid))
 
 const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
+
+// Strips, quiet since and sparklines, from one request that stays live
+// in the same way as the Data tab charts.
+const pins = usePins(() => props.record.uuid)
+const pinned = computed(() => pinned_entries(pins.keys.value, ds.deviceByUuid))
+const data = useDatasetSeries(() => props.record, pinned, { points: 120, count: true, last: true })
 
 function duration (r) {
   return r?.from && r?.to ? fmt_duration(Date.parse(r.to) - Date.parse(r.from)) : '–'

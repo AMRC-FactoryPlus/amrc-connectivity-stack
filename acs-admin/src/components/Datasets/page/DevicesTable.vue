@@ -2,8 +2,9 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<!-- The devices a dataset covers: name with an online dot, site and
-     area, the equipment label and the number of historised metrics. -->
+<!-- The devices a dataset covers: name with a status dot, site and
+     area, the equipment label, the number of historised metrics, and a
+     strip of when data arrived across the dataset's window. -->
 <template>
   <Card class="overflow-hidden">
     <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -22,6 +23,7 @@
             <th class="px-4 py-2 font-medium">Device</th>
             <th class="px-4 py-2 font-medium">Label</th>
             <th class="px-4 py-2 text-right font-medium">Metrics</th>
+            <th class="px-4 py-2 font-medium">Data across the window</th>
           </tr>
         </thead>
         <tbody>
@@ -30,7 +32,9 @@
               <div class="flex items-center gap-2 font-medium" :title="row.name">
                 <i class="fa-solid fa-microchip fa-fw text-xs text-slate-500"></i>
                 <span class="truncate">{{ row.name }}</span>
-                <span :class="['size-1.5 shrink-0 rounded-full', row.dot]" :title="row.statusText"></span>
+                <span :class="['size-1.5 shrink-0 rounded-full', row.status.dot]" :title="row.status.label">
+                  <span class="sr-only">{{ row.status.label }}</span>
+                </span>
               </div>
               <div v-if="row.where" class="pl-6 text-xs text-slate-500">{{ row.where }}</div>
             </td>
@@ -38,9 +42,22 @@
               <span v-if="row.label" class="rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium">{{ row.label }}</span>
             </td>
             <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ row.metrics ?? '–' }}</td>
+            <td class="px-4 py-2.5">
+              <div class="relative h-2.5 rounded-sm bg-slate-50" :style="{ width: `${STRIP_W}px` }">
+                <span v-for="c in row.strip.cells" :key="c.x" class="absolute inset-y-0"
+                      :style="{ left: `${c.x}px`, width: `${c.w}px`, background: c.colour }"></span>
+              </div>
+              <div v-if="row.note.text" class="mt-0.5 text-xs" :class="row.note.cls">{{ row.note.text }}</div>
+            </td>
           </tr>
         </tbody>
       </table>
+    </div>
+    <div v-if="record.structure && countNote" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
+      <i class="fa-solid fa-circle-info mr-1"></i>{{ countNote }}
+    </div>
+    <div v-if="record.structure && error" class="border-t border-slate-200 px-4 py-2 text-xs text-red-700">
+      <i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ error }}
     </div>
     <div v-if="record.structure && unknown.length" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-eye-slash mr-1"></i>
@@ -51,30 +68,55 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useNow } from '@vueuse/core'
 import { Card } from '@/components/ui/card'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
+import { device_status, window_strip } from '@/lib/datasets/series.js'
 
 const props = defineProps({
   record: { type: Object, required: true },
   resolved: { type: Object, required: true },
   labels: { type: Object, default: () => ({}) },
+  // From useDatasetSeries, with counts and last; null while loading.
+  series: { type: Object, default: null },
+  from: { type: Number, default: null },
+  to: { type: Number, default: null },
+  loading: { type: Boolean, default: false },
+  error: { type: String, default: null },
+  countNote: { type: String, default: null },
 })
 
+const STRIP_W = 240
+const NO_STRIP = { cells: [], gaps: 0, any: false }
+
 const ds = useDatasetsStore()
+const now = useNow({ interval: 30 * 1000 })
 const unknown = computed(() => props.resolved.unknown.filter(u => u !== props.record.uuid || props.record.structure))
+
+function note (strip) {
+  if (props.error || props.countNote) return { text: '', cls: '' }
+  if (!props.series) return { text: props.loading ? 'Loading' : '', cls: 'text-slate-400' }
+  if (!strip.any) return { text: 'No data in this window', cls: 'text-amber-700' }
+  if (strip.gaps) return { text: `${strip.gaps} ${strip.gaps === 1 ? 'gap' : 'gaps'}`, cls: 'text-amber-700' }
+  return { text: 'No gaps', cls: 'text-slate-500' }
+}
 
 const rows = computed(() => props.resolved.device_datasets.map(dd => {
   const dev_uuid = ds.byUuid[dd]?.config?.source
   const dev = ds.deviceByUuid[dev_uuid]
-  const online = dev?.status?.online
+  const data = props.series?.devices[dev_uuid]
+  const strip = props.series && props.from != null && props.to != null
+    ? window_strip(data?.count ?? [], { from: props.from, to: props.to, width: STRIP_W, cell: 4 })
+    : NO_STRIP
   return {
     dd,
     name: dev?.name ?? ds.name(dd),
     where: [dev?.site, dev?.area].filter(Boolean).join(' · '),
     label: props.labels[dd] ?? null,
     metrics: dev?.metrics?.length ?? null,
-    dot: online == null ? 'bg-slate-300' : online ? 'bg-green-500' : 'bg-slate-400',
-    statusText: online == null ? 'Status not known' : online ? 'Online' : 'Offline',
+    status: device_status(dev?.status ?? null, data?.last, now.value.getTime()),
+    strip,
+    note: note(strip),
   }
 }))
 </script>

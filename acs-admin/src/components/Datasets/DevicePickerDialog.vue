@@ -11,7 +11,7 @@
     <DialogContent class="sm:max-w-[720px] flex flex-col gap-3 h-[75vh] overflow-hidden">
       <DialogHeader>
         <DialogTitle>Add devices</DialogTitle>
-        <DialogDescription>Choose the devices to include. Status comes from the Directory.</DialogDescription>
+        <DialogDescription>Choose the devices to include. Status comes from the Directory and the historian.</DialogDescription>
       </DialogHeader>
 
       <div class="relative">
@@ -85,7 +85,9 @@ import { ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
-import { fmt_time } from '@/lib/datasets/model.js'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { fetch_series } from '@/lib/datasets/api.js'
+import { device_status, series_request, LAST_LOOKBACK, LIMITS } from '@/lib/datasets/series.js'
 import { group_devices, text_match, equipment_by_device } from './builder/builder.js'
 
 const props = defineProps({
@@ -141,11 +143,44 @@ const groups = computed(() => {
   return out
 })
 
+/* "Quiet since" for the devices on screen, fetched once per dialog
+ * for each device as it is shown. */
+const sc = useServiceClientStore()
+const lasts = ref({})
+let asked = new Set()
+let lastTimer = null
+
+watch(() => props.open, v => {
+  if (v) { asked = new Set(); lasts.value = {} }
+})
+
+const shownUuids = computed(() => groups.value.flatMap(g => g.areas.flatMap(a => a.devices.map(d => d.uuid))))
+
+watch([shownUuids, () => props.open], () => {
+  clearTimeout(lastTimer)
+  if (!props.open) return
+  lastTimer = setTimeout(loadLasts, 300)
+})
+
+async function loadLasts () {
+  const want = shownUuids.value.filter(u => !asked.has(u)).slice(0, LIMITS.devices)
+  if (!want.length) return
+  for (const u of want) asked.add(u)
+  const to = Math.ceil(Date.now() / 3600e3) * 3600e3
+  try {
+    const s = await fetch_series(sc.client, series_request({ devices: want, from: to - 3600e3, to, every: '1h', last: LAST_LOOKBACK }))
+    const got = {}
+    for (const u of want) if (!s.denied.includes(u)) got[u] = s.devices[u]?.last ?? null
+    lasts.value = { ...lasts.value, ...got }
+  }
+  catch (err) {
+    // Status still shows online or offline from the Directory.
+    console.warn('Datasets: quiet since did not load', err)
+  }
+}
+
 function statusOf (d) {
-  if (!d.status) return { label: 'Status unknown', dot: 'bg-slate-300', text: 'text-slate-500' }
-  if (d.status.online) return { label: 'Online', dot: 'bg-green-500', text: 'text-green-700' }
-  const since = d.status.last_change ? ` since ${fmt_time(d.status.last_change)}` : ''
-  return { label: `Offline${since}`, dot: 'bg-slate-400', text: 'text-slate-500' }
+  return device_status(d.status, lasts.value[d.uuid])
 }
 
 function toggle (uuid) {

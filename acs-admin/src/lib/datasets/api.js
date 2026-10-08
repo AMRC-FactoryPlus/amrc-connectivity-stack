@@ -9,6 +9,7 @@
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { DA, STRUCTURE, KIND_BY_ID } from './constants.js'
 import { to_iso, validate_window, device_dataset_for, direct_sources, normalise_tags } from './model.js'
+import { parse_series, series_error } from './series.js'
 
 /** An error a page can show as it is. */
 export class DatasetError extends Error {
@@ -346,15 +347,20 @@ export async function delete_dataset (client, uuid) {
  * Data
  * ------------------------------------------------------------------ */
 
-async function data_response (client, uuid) {
+/**
+ * The CSV response. `metrics` (full metric names) limits it to those
+ * metrics; a Data Access without that filter answers 422.
+ */
+async function data_response (client, uuid, { metrics = null } = {}) {
     const [st, stream, , headers] = await client.DataAccess.fetch({
         url: `v1/data/${uuid}`,
         method: 'POST',
         accept: 'text/csv',
         response_type: 'stream',
-        body: {},
+        body: metrics ? { metrics } : {},
     })
     if (st === 403) throw new DatasetError('You do not have permission to read this dataset.', { status: st })
+    if (st === 422 && metrics) throw new DatasetError('Pinned-only download needs a newer Data Access.', { status: st })
     if (st !== 200) throw new DatasetError(`The download failed (HTTP ${st}).`, { status: st })
     return { stream, headers }
 }
@@ -365,9 +371,12 @@ export async function fetch_csv (client, uuid) {
     return await new Response(stream).text()
 }
 
-/** Download the whole dataset as a CSV file. */
-export async function download_csv (client, uuid, streamSaver) {
-    const { stream, headers } = await data_response(client, uuid)
+/**
+ * Download the dataset as a CSV file: all of it, or only `metrics`
+ * (full metric names) when given.
+ */
+export async function download_csv (client, uuid, streamSaver, { metrics = null } = {}) {
+    const { stream, headers } = await data_response(client, uuid, { metrics })
     const disposition = headers?.get?.('Content-Disposition') ?? ''
     const filename = /filename\*?=(?:UTF-8'')?("?)([^";]+)\1/i.exec(disposition)?.[2] ?? `${uuid}.csv`
     const out = streamSaver.createWriteStream(filename.replace(/[\/\\]/g, '_'))
@@ -384,6 +393,16 @@ export async function download_csv (client, uuid, streamSaver) {
         }
         await writer.close()
     }
+}
+
+/**
+ * POST v1/series with a body from series_request(). Returns the parsed
+ * answer, or throws a DatasetError people can read.
+ */
+export async function fetch_series (client, body) {
+    const [st, res] = await client.DataAccess.fetch({ url: 'v1/series', method: 'POST', body })
+    if (st !== 200) throw new DatasetError(series_error(st, res), { status: st, detail: res?.message })
+    return parse_series(res)
 }
 
 /* ------------------------------------------------------------------

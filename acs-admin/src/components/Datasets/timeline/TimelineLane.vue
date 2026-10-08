@@ -4,7 +4,8 @@
 
 <!-- One lane that is not a device: a group header (ongoing, other
      devices), a site and area heading, an ongoing dataset band, or a
-     piece of equipment with its recording blocks. The timeline places
+     piece of equipment with its recording blocks (and, when collapsed
+     at Hours zoom, a 3px strip of when its devices sent data). The timeline places
      it with `top`; the label cell stays pinned on the left. -->
 <template>
   <div class="absolute left-0 flex border-b border-slate-200"
@@ -42,6 +43,11 @@
           <span v-if="b.show_title" class="truncate font-semibold">{{ b.title }}</span>
           <span v-if="b.show_sub && b.sub" class="truncate opacity-80">{{ b.sub }}</span>
         </component>
+        <!-- Collapsed: a thin strip of when its devices sent data. -->
+        <template v-if="!row.open && strip">
+          <span v-for="c in strip" :key="c.x" class="pointer-events-none absolute bottom-0 h-[3px]"
+                :style="{ left: `${c.x}px`, width: `${c.w}px`, background: c.colour }"></span>
+        </template>
       </template>
     </div>
   </div>
@@ -58,6 +64,8 @@ const props = defineProps({
   trackWidth: { type: Number, required: true },
   // Placed blocks (place_blocks) for an equipment lane.
   blocks: { type: Array, default: () => [] },
+  // Data-arrival cells for a collapsed equipment row, or null.
+  strip: { type: Array, default: null },
 })
 const emit = defineEmits(['toggle'])
 

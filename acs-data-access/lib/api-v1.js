@@ -422,11 +422,32 @@ export class APIv1 {
   } 
   
 
-  async _update_dataset_config(principal, structure, config, dataset_uuid){ 
+  /** Checks a proposed config without writing anything.
+   *
+   * Runs the structure's own validation and the source permission
+   * checks. Throws a 422 or 403 APIError if the config is not
+   * acceptable. Call this before removing or changing any existing state,
+   * so that a rejected request leaves the dataset exactly as it was.
+   *
+   * @returns The handler for the structure.
+   */
+  async _check_dataset_config(principal, structure, config) {
     const handler = this._getHandler(structure);
-    
-    const ok2 = await handler.check_sources_permissions(principal, config);
-    if(!ok2) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
+    handler.validate_config(config);
+
+    const ok = await handler.check_sources_permissions(principal, config);
+    if(!ok) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
+
+    return handler;
+  }
+
+  /** Writes a dataset config and its subclass relationships.
+   *
+   * This only writes. The caller must have checked the config with
+   * `_check_dataset_config` first.
+   */
+  async _write_dataset_config(structure, config, dataset_uuid){ 
+    const handler = this._getHandler(structure);
 
     // Create new Dataset object
     if(!dataset_uuid){
@@ -469,8 +490,8 @@ export class APIv1 {
     );
     if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
-    const dataset_uuid = await this._update_dataset_config(
-      req.auth,
+    await this._check_dataset_config(req.auth, structure, config);
+    const dataset_uuid = await this._write_dataset_config(
       structure,
       config,
       null
@@ -509,8 +530,7 @@ export class APIv1 {
     const new_config = req.body.config;
     if(!new_config) return fail(this.log, 422, `Config not provided`);
 
-    const handler = this._getHandler(structure);
-    handler.validate_config(new_config);
+    this._getHandler(structure).validate_config(new_config);
 
     const ok = await this.auth.check_acl(
       req.auth,
@@ -528,29 +548,32 @@ export class APIv1 {
     const current_config = dataset.config; 
     const is_valid = current_structure !== Constants.Special.InvalidDataset;
 
+    if(is_valid && current_structure != structure)
+      return fail(this.log, 409, `Changing structure type is not allowed (current: ${current_structure}, new: ${structure})`); 
+
+    /* Check the new config completely before removing anything. Every
+     * rejection (422, 403) must happen here, so a rejected update leaves
+     * the old config and subclass relationships in place. */
+    const handler = await this._check_dataset_config(req.auth, structure, new_config);
+
     // for currently VALID dataset
     if(is_valid){
-      if(current_structure != structure) return fail(this.log, 409, `Changing structure type is not allowed (current: ${current_structure}, new: ${structure})`); 
-
       // remove all subclass relationships with current config sources
       await handler.remove_subclass_relationships(dataset_uuid, current_config)
     }
     // For currently INVALID dataset
     else{
-      // delete configs for all other structures
+      // delete configs for all other structures; a 404 means that
+      // structure had no entry, and any other error stops the update
       const all_structure_apps = Object.values(Constants.App);
 
       for(const s of all_structure_apps){
-        try{
-          await this.cdb.delete_config(s, dataset_uuid);
-        }catch(e){
-          ServiceError.check(404);
-        }
+        await this.cdb.delete_config(s, dataset_uuid)
+          .catch(ServiceError.check(404));
       }
     } 
 
-    const objectUuid = await this._update_dataset_config(
-      req.auth,
+    const objectUuid = await this._write_dataset_config(
       structure,
       new_config,
       dataset_uuid,

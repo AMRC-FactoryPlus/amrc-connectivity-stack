@@ -74,7 +74,7 @@
         </Card>
 
         <DevicesTable :record="record" :resolved="resolved" :labels="labels"
-                      :series="data.series.value" :from="data.window.value.from" :to="data.axisTo.value"
+                      :series="data.series.value" :strips="data.strips.value" :from="data.window.value.from" :to="data.axisTo.value"
                       :loading="data.loading.value" :error="data.error.value" :count-note="data.countNote.value"
                       :gaps="gaps"/>
 
@@ -123,7 +123,8 @@ import AddonsSummary from '../addons/AddonsSummary.vue'
 import RecordingsCard from './RecordingsCard.vue'
 import DevicesTable from './DevicesTable.vue'
 import PinnedCard from './PinnedCard.vue'
-import { usePins, pinned_entries } from './usePins.js'
+import { useDatasetPins } from './usePins.js'
+import { usable_windows, COVERAGE_NOTE } from '@/lib/datasets/series.js'
 import { useDatasetSeries } from './useDatasetSeries.js'
 import IncludedIn from './IncludedIn.vue'
 
@@ -150,26 +151,30 @@ const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d
 
 // Strips, quiet since and sparklines, from one request that stays live
 // in the same way as the Data tab charts.
-const pins = usePins(() => props.record.uuid)
-const pinned = computed(() => pinned_entries(pins.keys.value, ds.deviceByUuid))
+const { entries: pinned } = useDatasetPins(() => props.record, () => props.resolved)
 const data = useDatasetSeries(() => props.record, pinned, { points: 120, count: true, last: true })
 
 /* Gaps and coverage across the window, from the strip counts. Devices
- * the service would not show are left out. */
+ * the service would not show are left out. Time outside a device's
+ * windows, or not yet summarised, is neither data nor gap. */
 const gaps = computed(() => {
-  const s = data.series.value
+  const s = data.strips.value
   if (!s?.every || data.countNote.value || !props.record.structure) return null
-  const counts = {}
+  const from = data.window.value.from, to = data.axisTo.value
+  const counts = {}, windows = {}
   for (const d of props.resolved.devices) {
-    if (!s.denied.includes(d)) counts[d] = s.devices[d]?.count ?? []
+    if (s.denied.includes(d)) continue
+    counts[d] = s.devices[d]?.count ?? []
+    windows[d] = usable_windows(s.devices[d]?.windows?.length ? s.devices[d].windows : null, s.pending, from, to)
   }
   if (!Object.keys(counts).length) return null
-  return window_gaps(counts, { from: data.window.value.from, to: data.axisTo.value, every: s.every, now: s.asOf })
+  return window_gaps(counts, { from, to, every: s.every, now: s.asOf, windows })
 })
 
 const coverage = computed(() => {
   if (!props.record.structure) return { value: '–', sub: 'Needs edit access to see' }
-  if (data.countNote.value) return { value: '–', sub: 'Not available for windows over 14 days' }
+  if (data.countNote.value === COVERAGE_NOTE) return { value: '–', sub: 'Appears once the coverage summary has been built' }
+  if (data.countNote.value) return { value: '–', sub: 'Did not load' }
   if (data.error.value) return { value: '–', sub: 'Did not load' }
   if (!gaps.value) return { value: '–', sub: data.loading.value ? 'Loading' : '' }
   if (gaps.value.coverage == null) return { value: '–', sub: 'The window has not started' }

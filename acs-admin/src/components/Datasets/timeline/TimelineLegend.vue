@@ -22,7 +22,7 @@
             style="background: repeating-linear-gradient(135deg, #f8fafc 0 3px, #e2e8f0 3px 5px)"></span>Ongoing, no time window
     </span>
     <span class="inline-flex items-center gap-1.5">
-      <span class="inline-flex gap-px"><span class="h-2.5 w-[9px]" style="background: rgba(15,23,42,0.45)"></span><span class="h-2.5 w-[9px]" style="background: rgba(15,23,42,0.85)"></span></span>Data arrived (Hours zoom; darker is more)
+      <span class="inline-flex gap-px"><span class="h-2.5 w-[9px]" style="background: rgba(15,23,42,0.45)"></span><span class="h-2.5 w-[9px]" style="background: rgba(15,23,42,0.85)"></span></span>Data arrived (darker is more)
     </span>
     <span class="inline-flex items-center gap-1.5">
       <span class="size-2 rounded-full bg-green-500"></span>Live

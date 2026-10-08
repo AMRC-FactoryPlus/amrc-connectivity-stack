@@ -3,14 +3,15 @@
  */
 
 import { computed, onBeforeUnmount, ref, shallowRef, toValue, watch } from 'vue'
-import { useNow } from '@vueuse/core'
+import { useDocumentVisibility, useNow } from '@vueuse/core'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
 import { useI3xLive } from '@composables/useI3xLive.js'
 import {
-  LIMITS, STEP_MS, series_request, mean_entry, count_too_long,
-  dataset_window, window_is_live, bucket_start, bucket_end,
-  fold_live, tail_window, replace_tail, series_key,
+  LIMITS, STEP_MS, COVERAGE_NOTE, series_request, mean_entry, count_too_long,
+  dataset_window, window_is_live, bucket_start, bucket_end, mean_window,
+  fold_live_items, tail_window, replace_tail, coverage_every, coverage_not_ready,
+  stray_mean_device,
 } from '@/lib/datasets/series.js'
 
 const MAX_TAIL_MS = 5 * 60 * 1000
@@ -18,6 +19,12 @@ const MIN_TAIL_MS = 30 * 1000
 // Wait this long after a bucket closes, so late points have landed.
 const SETTLE_MS = 3 * 1000
 const RELOAD_DEBOUNCE_MS = 300
+// A window with no end moves its "now" forward this often.
+const ANCHOR_MS = 15 * 60 * 1000
+// Long-range strips for a live window are fetched again this often.
+const LONG_COUNT_MS = 10 * 60 * 1000
+// Buckets for a long-range strip: enough for gaps, cheap to read.
+const LONG_COUNT_BUCKETS = 1000
 
 /**
  * One dataset's data over its window, for the Data tab charts, the
@@ -30,6 +37,11 @@ const RELOAD_DEBOUNCE_MS = 300
  * 3. When a bucket closes, and at least every 5 minutes, refetch the
  *    newest two buckets and replace them.
  *
+ * Charts cover at most the most recent 400 days of the window. Strips
+ * for windows over 14 days come from the coverage summary in a request
+ * of their own, so the charts load even while the summary is being
+ * built. Nothing polls while the page is hidden.
+ *
  * @param record   ref or getter: the dataset record
  * @param entries  ref or getter: pinned_entries() to chart
  * @param opts     { points, count, last }
@@ -37,38 +49,58 @@ const RELOAD_DEBOUNCE_MS = 300
 export function useDatasetSeries (record, entries, { points = 300, count = false, last = false } = {}) {
   const sc = useServiceClientStore()
   const nowDate = useNow({ interval: 30 * 1000 })
+  const visibility = useDocumentVisibility()
+  const hidden = () => visibility.value === 'hidden'
 
   const series = shallowRef(null)
   const loading = ref(false)
   const error = ref(null)
-  // Why the strip is missing, when the window is too long for counts.
+  // Why the strip is missing, when there is a reason to say.
   const countNote = ref(null)
+  // Counts from the coverage summary, for windows over 14 days.
+  const longCounts = shallowRef(null)
 
-  // "Now" for a window with no end is fixed when the page opens, so
-  // store updates do not move it; live data then extends it.
-  const anchor = Date.now()
-  const win = computed(() => dataset_window(toValue(record), anchor))
+  // "Now" for a window with no end. It moves forward now and then, so
+  // a page left open keeps showing the most recent day; live data
+  // extends the axis in between.
+  const anchor = ref(Date.now())
+  const win = computed(() => dataset_window(toValue(record), anchor.value))
   const live = computed(() => window_is_live(win.value, nowDate.value.getTime()))
   // The end of the time axis: a window with no end grows with now.
   const axisTo = computed(() => win.value.open ? Math.max(win.value.to, nowDate.value.getTime()) : win.value.to)
 
-  const charted = computed(() => (toValue(entries) ?? []).slice(0, LIMITS.mean))
+  // Devices the service said are not in the dataset: left out of `mean`.
+  const stray = ref(new Set())
+  const charted = computed(() => (toValue(entries) ?? []).filter(e => !stray.value.has(e.device)).slice(0, LIMITS.mean))
   const capped = computed(() => Math.max(0, (toValue(entries) ?? []).length - LIMITS.mean))
   const means = computed(() => charted.value.map(e => mean_entry(e.device, { path: e.path, type: e.type })))
   const byElement = computed(() => new Map(charted.value.filter(e => e.elementId).map(e => [e.elementId, e])))
 
-  const wantCount = computed(() => count && !count_too_long(win.value.from, win.value.to))
+  const longWindow = computed(() => count_too_long(win.value.from, win.value.to))
+  // Counts ride along with the charts only for windows up to 14 days.
+  const wantCount = computed(() => count && !longWindow.value)
+  // Charts cover at most the last 400 days of the window.
+  const chartSpan = computed(() => means.value.length
+    ? mean_window(win.value.from, win.value.to)
+    : { from: win.value.from, to: win.value.to, clamped: false })
+  const meanNote = computed(() => chartSpan.value.clamped
+    ? 'Charts show the most recent 400 days of this window.'
+    : null)
 
   let gen = 0
   let timer = null
+  // Series key -> newest i3X time folded in. Kept across refetches.
+  let folded = new Map()
+
+  // A window with no end reaches to now when it loads.
+  const reqTo = () => win.value.open ? Math.max(win.value.to, Date.now()) : win.value.to
 
   function body (extra) {
     const rec = toValue(record)
     return series_request({
       dataset: rec.uuid,
-      from: win.value.from,
-      // A window with no end reaches to now when it loads.
-      to: win.value.open ? Math.max(win.value.to, Date.now()) : win.value.to,
+      from: chartSpan.value.from,
+      to: reqTo(),
       points,
       count: wantCount.value,
       mean: means.value,
@@ -81,14 +113,16 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
     const rec = toValue(record)
     clearTimeout(timer)
     const my = ++gen
+    folded = new Map()
     if (!rec?.uuid || (!means.value.length && !count && !last)) {
       series.value = null
       error.value = null
       return
     }
-    countNote.value = count && !wantCount.value
-      ? 'No data strip: windows longer than 14 days need a newer Data Access.'
-      : null
+    if (!longWindow.value) {
+      longCounts.value = null
+      countNote.value = null
+    }
     loading.value = true
     try {
       const s = await fetch_series(sc.client, body())
@@ -99,11 +133,46 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
     }
     catch (err) {
       if (my !== gen) return
+      // A pinned device left the dataset: chart the rest. Changing
+      // `means` loads again.
+      const d = stray_mean_device(err)
+      if (d && !stray.value.has(d)) {
+        stray.value = new Set([...stray.value, d])
+        return
+      }
       console.error('Datasets: series request failed', err)
       error.value = err?.message ?? 'The data did not load.'
     }
     finally {
       if (my === gen) loading.value = false
+    }
+    if (my === gen && count && longWindow.value) loadLongCounts()
+  }
+
+  /* Strips for a window over 14 days, from the coverage summary. */
+  let longGen = 0
+  let longAt = 0
+  async function loadLongCounts () {
+    const rec = toValue(record)
+    if (!rec?.uuid || !count || !longWindow.value) return
+    const my = ++longGen
+    const from = win.value.from, to = reqTo()
+    const every = coverage_every(from, to, { max: LONG_COUNT_BUCKETS })
+    longAt = Date.now()
+    try {
+      const s = await fetch_series(sc.client, series_request({ dataset: rec.uuid, from, to, every, count: true }))
+      if (my !== longGen) return
+      longCounts.value = s
+      countNote.value = null
+    }
+    catch (err) {
+      if (my !== longGen) return
+      longCounts.value = null
+      if (coverage_not_ready(err)) countNote.value = COVERAGE_NOTE
+      else {
+        console.warn('Datasets: long-range strips did not load', err)
+        countNote.value = err?.message ?? 'The data strips did not load.'
+      }
     }
   }
 
@@ -120,8 +189,11 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
   }
 
   async function refreshTail () {
+    clearTimeout(timer)
     const s = series.value
     if (!s) return
+    // Hidden: the visibility watch below starts again when it is seen.
+    if (hidden()) return
     const my = gen
     const now = Date.now()
     // An ongoing window moves its end along with now.
@@ -142,7 +214,9 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
       // The next refresh tries again; live values keep coming.
       console.warn('Datasets: refreshing the newest buckets failed', err)
     }
-    if (my === gen) plan()
+    if (my !== gen) return
+    plan()
+    if (count && longWindow.value && live.value && Date.now() - longAt > LONG_COUNT_MS) loadLongCounts()
   }
 
   /* Live values from i3X. Nothing opens until there are IDs to watch. */
@@ -157,20 +231,8 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
 
   function onValues (items) {
     const s = series.value
-    if (!s?.every) return
-    let changed = false
-    const metrics = { ...s.metrics }
-    for (const item of items) {
-      const e = byElement.value.get(item?.elementId)
-      if (!e) continue
-      const key = series_key(e.device, e.path)
-      const m = metrics[key] ?? { device: e.device, metric: e.path, type: null, unit: e.unit, points: [] }
-      const pts = fold_live(m.points, Date.parse(item.timestamp), item.value, s.every, s.asOf)
-      if (pts === m.points) continue
-      metrics[key] = { ...m, points: pts }
-      changed = true
-    }
-    if (changed) series.value = { ...s, metrics }
+    const next = fold_live_items(s, items, id => byElement.value.get(id), folded)
+    if (next !== s) series.value = next
   }
 
   let debounce = null
@@ -187,18 +249,39 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
   watch(live, () => { ensureLive(); plan() })
   watch(() => [...byElement.value.keys()].sort().join(','), ensureLive)
   watch(series, (s, old) => { if (s && !old) ensureLive() })
+  // Back in view: repair what was missed while hidden.
+  watch(visibility, v => { if (v === 'visible' && series.value && live.value) refreshTail() })
+
+  const anchorTimer = setInterval(() => {
+    if (hidden()) return
+    const w = win.value
+    if (w.windowless || w.open) anchor.value = Date.now()
+  }, ANCHOR_MS)
 
   onBeforeUnmount(() => {
     gen++
+    longGen++
     clearTimeout(timer)
     clearTimeout(debounce)
+    clearInterval(anchorTimer)
+  })
+
+  /* What a strip shows: counts with their windows, from the main
+   * answer or, for long windows, from the coverage summary. Null when
+   * there are none. */
+  const strips = computed(() => {
+    if (!count) return null
+    const s = longWindow.value ? longCounts.value : series.value
+    return s?.every ? s : null
   })
 
   return {
     series,
+    strips,
     loading,
     error,
     countNote,
+    meanNote,
     window: win,
     axisTo,
     live,

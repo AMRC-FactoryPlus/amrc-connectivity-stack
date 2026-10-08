@@ -4,8 +4,8 @@
 
 <!-- One device lane: the device's name, its status and its equipment
      label or metric count, and a track you drag across to select. The
-     timeline handles the drag for all lanes. At Hours zoom the track
-     shows when data arrived, and a quiet device gets an amber note from
+     timeline handles the drag for all lanes. The track shows when data
+     arrived, and a quiet device gets an amber note from
      the time its data stopped. -->
 <template>
   <div class="absolute left-0 flex border-b border-slate-200"
@@ -17,7 +17,7 @@
       <span v-if="status" class="size-2 shrink-0 rounded-full" :class="status.dot" :title="status.label">
         <span class="sr-only">{{ status.label }}</span>
       </span>
-      <span class="shrink-0 whitespace-nowrap text-[11px] text-gray-500">{{ row.tag }}</span>
+      <span class="shrink-0 whitespace-nowrap text-[11px] text-slate-500">{{ row.tag }}</span>
     </div>
     <div class="relative shrink-0 cursor-crosshair" :style="{ width: `${trackWidth}px` }">
       <slot name="strip" :strip="strip" :row="row">

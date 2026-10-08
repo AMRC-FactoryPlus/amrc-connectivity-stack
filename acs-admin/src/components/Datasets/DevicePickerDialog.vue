@@ -81,7 +81,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
@@ -145,16 +145,29 @@ const groups = computed(() => {
 })
 
 /* "Quiet since" and the sample rate over the last hour for the devices
- * on screen, fetched once per dialog for each device as it is shown. */
+ * on screen, fetched once per dialog for each device as it is shown.
+ * A device whose request failed is asked again on the next change or
+ * after a short wait. Answers from an earlier opening are dropped. */
 const RATE_EVERY = '5m'
+const RATE_STEP = 5 * 60e3
+const RETRY_MS = 15 * 1000
 const sc = useServiceClientStore()
 const lasts = ref({})
 const rates = ref({})
 let asked = new Set()
 let lastTimer = null
+let retryTimer = null
+let openGen = 0
 
 watch(() => props.open, v => {
+  openGen++
+  clearTimeout(retryTimer)
   if (v) { asked = new Set(); lasts.value = {}; rates.value = {} }
+})
+onBeforeUnmount(() => {
+  openGen++
+  clearTimeout(lastTimer)
+  clearTimeout(retryTimer)
 })
 
 const shownUuids = computed(() => groups.value.flatMap(g => g.areas.flatMap(a => a.devices.map(d => d.uuid))))
@@ -167,12 +180,15 @@ watch([shownUuids, () => props.open], () => {
 
 async function loadLasts () {
   const want = shownUuids.value.filter(u => !asked.has(u)).slice(0, LIMITS.devices)
-  if (!want.length) return
+  if (!want.length || !props.open) return
+  const my = openGen
   for (const u of want) asked.add(u)
-  const to = Math.ceil(Date.now() / 300e3) * 300e3
+  // The last hour of closed buckets, so no bucket is mostly empty.
+  const to = Math.floor(Date.now() / RATE_STEP) * RATE_STEP
   const from = to - 3600e3
   try {
     const s = await fetch_series(sc.client, series_request({ devices: want, from, to, every: RATE_EVERY, count: true, last: LAST_LOOKBACK }))
+    if (my !== openGen) return
     const got = {}, rate = {}
     for (const u of want) {
       if (s.denied.includes(u)) continue
@@ -185,8 +201,12 @@ async function loadLasts () {
     rates.value = { ...rates.value, ...rate }
   }
   catch (err) {
-    // Status still shows online or offline from the Directory.
+    if (my !== openGen) return
+    // Status still shows online or offline from the Directory. Ask again.
     console.warn('Datasets: quiet since did not load', err)
+    for (const u of want) asked.delete(u)
+    clearTimeout(retryTimer)
+    retryTimer = setTimeout(loadLasts, RETRY_MS)
   }
 }
 

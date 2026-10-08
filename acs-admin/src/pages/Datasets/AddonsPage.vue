@@ -11,7 +11,7 @@
       <RouterLink to="/datasets?view=list" class="inline-flex w-fit items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
         <i class="fa-solid fa-arrow-left text-[11px]"></i>Back
       </RouterLink>
-      <h1 class="mt-2 text-2xl font-semibold leading-[30px] tracking-tight text-gray-900">Add-ons</h1>
+      <h1 class="mt-2 text-2xl font-semibold leading-[30px] tracking-tight text-slate-900">Add-ons</h1>
       <p class="mt-2 max-w-[760px] text-slate-700">
         An add-on works something out from a dataset's data. It looks at which metrics a dataset holds and,
         if it can use them, adds a section to the dataset's Add-ons tab. Add-ons never change a dataset.
@@ -28,13 +28,13 @@
           <div class="mt-1 text-xs font-medium" :class="a.available ? 'text-green-600' : 'text-slate-500'">
             {{ a.available ? 'Available' : 'Coming later' }}
           </div>
-          <div class="text-xs text-gray-500">{{ a.applies }}</div>
+          <div class="text-xs text-slate-500">{{ a.applies }}</div>
         </div>
         <dl class="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
-          <dt class="text-gray-500">Needs</dt><dd>{{ a.needs }}</dd>
-          <dt class="text-gray-500">Also uses</dt><dd>{{ a.uses }}</dd>
-          <dt class="text-gray-500">Gives</dt><dd>{{ a.gives }}</dd>
-          <dt class="text-gray-500">Runs</dt><dd>{{ a.runs }}</dd>
+          <dt class="text-slate-500">Needs</dt><dd>{{ a.needs }}</dd>
+          <dt class="text-slate-500">Also uses</dt><dd>{{ a.uses }}</dd>
+          <dt class="text-slate-500">Gives</dt><dd>{{ a.gives }}</dd>
+          <dt class="text-slate-500">Runs</dt><dd>{{ a.runs }}</dd>
         </dl>
       </Card>
     </div>

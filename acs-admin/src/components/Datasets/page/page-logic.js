@@ -7,6 +7,7 @@
 
 import { STRUCTURE } from '@/lib/datasets/constants.js'
 import { direct_sources, included_in, fmt_window } from '@/lib/datasets/model.js'
+import { i3x_leaf_id, metric_label, split_key, chartable } from '@/lib/datasets/series.js'
 
 // The Data Access "Read dataset" permission, granted by Share.
 export const READ_DATASET = 'ec48462e-37eb-4f56-8efa-83d813e85559'
@@ -193,4 +194,48 @@ export function structure_type (structure) {
         case STRUCTURE.INVALID: return 'Invalid'
         default:                return 'Unknown'
     }
+}
+
+/* ------------------------------------------------------------------
+ * Pins
+ * ------------------------------------------------------------------ */
+
+/**
+ * Pins whose device is no longer in the dataset. `devices` are the
+ * dataset's resolved device UUIDs.
+ */
+export function stale_pins (keys, devices) {
+    const have = new Set(devices ?? [])
+    return keys.filter(k => !have.has(split_key(k)?.device))
+}
+
+/**
+ * What a chart or sparkline needs for each pin, from the device list:
+ * { key, device, path, type, unit, label, deviceName, elementId }.
+ * Pins for metrics that can no longer be charted are left out. When
+ * `devices` (the dataset's resolved device UUIDs) is given, pins for
+ * any other device are left out too: the service refuses a request
+ * that charts a device the dataset does not cover.
+ */
+export function pinned_entries (keys, deviceByUuid, devices = null) {
+    const have = devices ? new Set(devices) : null
+    const out = []
+    for (const key of keys) {
+        const { device, metric: path } = split_key(key)
+        if (have && !have.has(device)) continue
+        const dev = deviceByUuid[device]
+        const m = dev?.metrics?.find(x => x.path === path)
+        if (m && !chartable(m.type)) continue
+        out.push({
+            key,
+            device,
+            path,
+            type: m?.type ?? null,
+            unit: m?.unit ?? null,
+            label: metric_label(m?.name ?? path.split('/').pop()),
+            deviceName: dev?.name ?? device.slice(0, 8),
+            elementId: dev?.originMap ? i3x_leaf_id(dev.originMap, device, path) : null,
+        })
+    }
+    return out
 }

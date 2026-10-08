@@ -396,8 +396,8 @@ const noteFocused = ref(false)
 
 const savedNow = computed(() => saved.value && saved_is_current(saved.value, runs.value, now.value) ? saved.value : null)
 
-/* Data from the historian: the lane strip, which devices are sending
- * (polled every 20 s) and the gaps in the saved recording. */
+/* Data from the historian: the lane strip (polled every 20 s), which
+ * devices are sending (every 60 s) and the gaps in the saved recording. */
 const kdata = useKioskData(() => deviceUuids.value, () => savedNow.value)
 const sending = computed(() => kdata.lastsReady.value
   ? sending_summary(deviceList.value, kdata.lasts.value, now.value)

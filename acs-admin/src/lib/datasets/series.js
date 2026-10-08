@@ -143,9 +143,77 @@ export function window_is_live (w, now = Date.now()) {
     return w.from <= now && (w.open || w.to >= now)
 }
 
-/** Whether a count over this window needs the phase 2 summary. */
+/** Whether a count over this window needs the coverage summary. */
 export function count_too_long (from, to) {
     return to - from > LIMITS.count_span
+}
+
+/** Steps the coverage summary answers counts for, smallest first. */
+export const COVERAGE_STEPS = ['1h', '6h', '1d', '1w']
+
+/** What a strip shows while the coverage summary is still being built. */
+export const COVERAGE_NOTE = 'Long-range data strips appear once the coverage summary has been built.'
+
+/**
+ * How many buckets of `every` overlap [from, to). Stops counting above
+ * `cap`, which keeps calendar steps over long spans cheap.
+ */
+export function bucket_total (from, to, every, cap = Infinity) {
+    if (!(to > from) || !STEP_MS[every]) return 0
+    if (every !== '1d' && every !== '1w') {
+        const step = STEP_MS[every]
+        return Math.floor((to - 1) / step) - Math.floor(from / step) + 1
+    }
+    let n = 0
+    for (let t = bucket_start(from, every); t < to && n <= cap; t = bucket_end(t, every)) n++
+    return n
+}
+
+/**
+ * The smallest coverage step, from `min` up, that gives at most `max`
+ * buckets over [from, to). The largest step when none does.
+ */
+export function coverage_every (from, to, { min = '1h', max = LIMITS.buckets } = {}) {
+    const steps = COVERAGE_STEPS.slice(Math.max(0, COVERAGE_STEPS.indexOf(min)))
+    return steps.find(e => bucket_total(from, to, e, max) <= max) ?? steps[steps.length - 1]
+}
+
+/** The strip step each timeline zoom prefers: one cell is 10 to 26 px. */
+export const ZOOM_STRIP_EVERY = { hours: '5m', days: '1h', weeks: '6h', years: '1d' }
+
+/**
+ * The strip step for a zoom over the span in view. Hours zoom always
+ * uses 5 minutes (long spans are split into several requests). The
+ * other zooms use the coverage summary's steps, coarser when the
+ * preferred one would give more than `max` buckets.
+ */
+export function strip_every (zoom, from, to, max = LIMITS.buckets) {
+    const want = ZOOM_STRIP_EVERY[zoom] ?? '5m'
+    if (want === '5m') return want
+    return coverage_every(from, to, { min: want, max })
+}
+
+/** Whether an error from fetch_series says the coverage summary is not ready. */
+export function coverage_not_ready (err) {
+    return err?.status === 422 && /coverage summary/i.test(`${err?.detail ?? ''} ${err?.message ?? ''}`)
+}
+
+/**
+ * The mean device a 422 names as not in the dataset, or null. A pin
+ * can go stale when a device leaves a dataset.
+ */
+export function stray_mean_device (err) {
+    if (err?.status !== 422) return null
+    return /"mean" device ([0-9a-f-]{36}) is not in/i.exec(err?.detail ?? '')?.[1] ?? null
+}
+
+/**
+ * The span `mean` may cover: the whole window, or its most recent 400
+ * days. `clamped` says the start moved.
+ */
+export function mean_window (from, to) {
+    if (to - from <= LIMITS.mean_span) return { from, to, clamped: false }
+    return { from: to - LIMITS.mean_span, to, clamped: true }
 }
 
 /* ------------------------------------------------------------------
@@ -173,6 +241,10 @@ export function parse_series (body) {
         step: STEP_MS[every] ?? null,
         asOf: ms(body?.asOf) ?? Date.now(),
         source: body?.source ?? 'raw',
+        // Ranges the coverage summary has not reached yet.
+        pending: (Array.isArray(body?.pending) ? body.pending : [])
+            .map(r => Array.isArray(r) ? [ms(r[0]), ms(r[1])] : null)
+            .filter(r => r && Number.isFinite(r[0]) && Number.isFinite(r[1])),
         devices: {},
         metrics: {},
         denied: Array.isArray(body?.denied) ? body.denied : [],
@@ -211,7 +283,7 @@ export function series_error (status, body) {
         case 404: return 'The service cannot find this dataset.'
         case 413: return said ? `Too much at once: ${said}` : 'Too many devices or metrics for one request.'
         case 422:
-            if (/coverage/i.test(said ?? '')) return 'Data for windows over 14 days needs a newer Data Access.'
+            if (/coverage summary/i.test(said ?? '')) return COVERAGE_NOTE
             return said ?? 'The service refused the request.'
         case 503: return 'The historian is not reachable.'
         case 504: return 'The data took too long to load. Try a shorter window.'
@@ -279,6 +351,48 @@ export function fold_live (points, t, value, every, asOf) {
         out.splice(i + 1, 0, [b, v, 1])
     }
     return out
+}
+
+/** Whether an i3X quality can be charted. A value with no quality counts as good. */
+export function good_quality (quality) {
+    return quality == null || quality === 'Good'
+}
+
+/**
+ * Fold a batch of i3X items into a parsed series (design 2.7).
+ *
+ * `lookup(elementId)` gives { device, path, unit } or nothing.
+ * `folded` is a Map(series key -> newest time folded in) that the
+ * caller keeps across batches and refetches. A value is skipped when
+ * it is at or before any of: the series' asOf, the newest value
+ * already folded for that series, or its device's newest data time in
+ * the last answer. So an SSE replay, or a value that a refetch already
+ * counted, is never counted twice. Values whose quality is not good
+ * are not charted.
+ *
+ * Returns the new series, or the same object when nothing changed.
+ */
+export function fold_live_items (s, items, lookup, folded) {
+    if (!s?.every || !Array.isArray(items)) return s
+    let metrics = null
+    for (const item of items) {
+        if (!good_quality(item?.quality)) continue
+        const e = lookup(item?.elementId)
+        if (!e) continue
+        const t = Date.parse(item.timestamp)
+        if (!Number.isFinite(t)) continue
+        const key = series_key(e.device, e.path)
+        const last = s.devices?.[e.device]?.last
+        const floor = Math.max(s.asOf ?? -Infinity, folded.get(key) ?? -Infinity, typeof last === 'number' ? last : -Infinity)
+        if (t <= floor) continue
+        const m = (metrics ?? s.metrics)[key] ?? { device: e.device, metric: e.path, type: null, unit: e.unit ?? null, points: [] }
+        const pts = fold_live(m.points, t, item.value, s.every, floor)
+        if (pts === m.points) continue
+        metrics ??= { ...s.metrics }
+        metrics[key] = { ...m, points: pts }
+        folded.set(key, t)
+    }
+    return metrics ? { ...s, metrics } : s
 }
 
 /**
@@ -450,24 +564,46 @@ export function sum_counts (lists) {
 }
 
 /**
+ * The chunk each strip step is cached in. A chunk always starts on a
+ * bucket boundary: fixed lengths for steps that align to UTC, London
+ * weeks for days and weeks.
+ */
+export const STRIP_CHUNK = { '5m': HOUR, '1h': DAY, '6h': DAY, '1d': '1w', '1w': '1w' }
+
+// How long to wait before asking again for a range the coverage
+// summary has not reached yet.
+const PENDING_RETRY_MS = 5 * MIN
+
+/**
  * Remembers strip counts per device and bucket, so scrolling back does
- * not fetch again. Counts are kept in chunks (an hour by default). A
- * chunk fetched after it ended is final; one fetched while open is
- * fetched again once it has ended. The newest buckets are refreshed
- * by polling the tail.
+ * not fetch again. Counts are kept in chunks (STRIP_CHUNK). A chunk
+ * fetched after it ended is final; one fetched while open is fetched
+ * again once it has ended; one the coverage summary has not reached
+ * yet is fetched again after a few minutes. The newest buckets are
+ * refreshed by polling the tail.
  */
 export class StripCache {
-    constructor ({ every = '5m', chunk_ms = HOUR } = {}) {
+    constructor ({ every = '5m', chunk = null, chunk_ms = null } = {}) {
         this.every = every
         this.step = STEP_MS[every]
-        this.chunk_ms = chunk_ms
+        this.chunk = chunk ?? chunk_ms ?? STRIP_CHUNK[every] ?? HOUR
         this.counts = new Map()   // device -> Map(bucket start -> n)
-        this.loaded = new Map()   // device -> Map(chunk start -> final?)
+        // device -> Map(chunk start -> true when final, or the time
+        // from which to fetch it again)
+        this.loaded = new Map()
+    }
+
+    chunk_start (t) {
+        return typeof this.chunk === 'number' ? Math.floor(t / this.chunk) * this.chunk : bucket_start(t, this.chunk)
+    }
+
+    chunk_end (c) {
+        return typeof this.chunk === 'number' ? c + this.chunk : bucket_end(c, this.chunk)
     }
 
     chunks (from, to) {
         const out = []
-        for (let c = Math.floor(from / this.chunk_ms) * this.chunk_ms; c < to; c += this.chunk_ms) out.push(c)
+        for (let c = this.chunk_start(from); c < to; c = this.chunk_end(c)) out.push(c)
         return out
     }
 
@@ -483,16 +619,36 @@ export class StripCache {
         for (const d of devices) {
             const have = this.loaded.get(d)
             for (const c of chunks) {
-                const end = c + this.chunk_ms
                 const state = have?.get(c)
-                // Fetched while open and it has ended since: fetch again.
-                if (state === true || (state === false && end > now)) continue
+                if (state === true || (typeof state === 'number' && state > now)) continue
                 need.add(d)
                 lo = Math.min(lo, c)
-                hi = Math.max(hi, end)
+                hi = Math.max(hi, this.chunk_end(c))
             }
         }
         return need.size ? { devices: [...need], from: lo, to: hi } : null
+    }
+
+    /**
+     * Split [from, to) at chunk boundaries into pieces of at most
+     * `max` buckets each, so no request goes over the service's limit.
+     */
+    pieces (from, to, max = LIMITS.buckets) {
+        const out = []
+        let start = null, n = 0
+        for (const c of this.chunks(from, to)) {
+            const end = Math.min(this.chunk_end(c), to)
+            const k = bucket_total(Math.max(c, from), end, this.every)
+            if (start != null && n + k > max) {
+                out.push({ from: start, to: Math.max(c, from) })
+                start = null
+                n = 0
+            }
+            if (start == null) start = Math.max(c, from)
+            n += k
+        }
+        if (start != null) out.push({ from: start, to })
+        return out
     }
 
     /**
@@ -500,6 +656,7 @@ export class StripCache {
      * counts in the answer had no data then.
      */
     put (devices, from, to, series) {
+        const pending = series.pending ?? []
         for (const d of devices) {
             let m = this.counts.get(d)
             if (!m) this.counts.set(d, m = new Map())
@@ -508,8 +665,10 @@ export class StripCache {
             let have = this.loaded.get(d)
             if (!have) this.loaded.set(d, have = new Map())
             for (const c of this.chunks(from, to)) {
-                if (c < from || c + this.chunk_ms > to) continue
-                have.set(c, c + this.chunk_ms <= series.asOf)
+                const end = this.chunk_end(c)
+                if (c < from || end > to) continue
+                if (pending.some(([a, b]) => a < end && b > c)) have.set(c, series.asOf + PENDING_RETRY_MS)
+                else have.set(c, end <= series.asOf ? true : end)
             }
         }
     }
@@ -532,6 +691,25 @@ export class StripCache {
         this.counts.clear()
         this.loaded.clear()
     }
+}
+
+/**
+ * A device's windows less the ranges the coverage summary has not
+ * reached, so time with no answer yet is neither data nor a gap.
+ * `windows` null means the whole of [from, to).
+ */
+export function usable_windows (windows, pending, from, to) {
+    let spans = (windows ?? [[from, to]]).map(([a, b]) => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => a < b)
+    for (const [pa, pb] of pending ?? []) {
+        const next = []
+        for (const [a, b] of spans) {
+            if (pb <= a || pa >= b) { next.push([a, b]); continue }
+            if (pa > a) next.push([a, pa])
+            if (pb < b) next.push([pb, b])
+        }
+        spans = next
+    }
+    return spans
 }
 
 /* ------------------------------------------------------------------

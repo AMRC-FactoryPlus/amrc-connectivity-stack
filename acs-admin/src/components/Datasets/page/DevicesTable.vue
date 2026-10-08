@@ -64,7 +64,7 @@
     </div>
     <div v-if="record.structure && unknown.length" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-eye-slash mr-1"></i>
-      {{ unknown.length }} {{ unknown.length === 1 ? 'part of this dataset is' : 'parts of this dataset are' }} not visible to you, so the list may be incomplete.
+      {{ unknown.length }} {{ unknown.length === 1 ? 'part of this dataset is' : 'parts of this dataset are' }} not visible to you, so their devices are not listed.
     </div>
   </Card>
 </template>
@@ -81,8 +81,9 @@ const props = defineProps({
   record: { type: Object, required: true },
   resolved: { type: Object, required: true },
   labels: { type: Object, default: () => ({}) },
-  // From useDatasetSeries, with counts and last; null while loading.
+  // From useDatasetSeries: `series` for last, `strips` for counts.
   series: { type: Object, default: null },
+  strips: { type: Object, default: null },
   from: { type: Number, default: null },
   to: { type: Number, default: null },
   loading: { type: Boolean, default: false },
@@ -101,7 +102,7 @@ const unknown = computed(() => props.resolved.unknown.filter(u => u !== props.re
 
 function note (g) {
   if (props.error || props.countNote) return { text: '', cls: '' }
-  if (!props.series) return { text: props.loading ? 'Loading' : '', cls: 'text-slate-400' }
+  if (!props.strips) return { text: props.loading ? 'Loading' : '', cls: 'text-slate-400' }
   if (!g?.grid.length) return { text: '', cls: '' }
   if (!g.points) return { text: 'No data in this window', cls: 'text-amber-700' }
   if (g.gaps.length) return { text: gap_note(g.gaps), cls: 'text-amber-700' }
@@ -112,8 +113,9 @@ const rows = computed(() => props.resolved.device_datasets.map(dd => {
   const dev_uuid = ds.byUuid[dd]?.config?.source
   const dev = ds.deviceByUuid[dev_uuid]
   const data = props.series?.devices[dev_uuid]
-  const strip = props.series && props.from != null && props.to != null
-    ? window_strip(data?.count ?? [], { from: props.from, to: props.to, width: STRIP_W, cell: 4 })
+  const counts = props.strips?.devices[dev_uuid]?.count
+  const strip = props.strips && props.from != null && props.to != null
+    ? window_strip(counts ?? [], { from: props.from, to: props.to, width: STRIP_W, cell: 4 })
     : NO_STRIP
   const g = props.gaps?.devices[dev_uuid] ?? null
   return {
@@ -123,7 +125,7 @@ const rows = computed(() => props.resolved.device_datasets.map(dd => {
     label: props.labels[dd] ?? null,
     metrics: dev?.metrics?.length ?? null,
     status: device_status(dev?.status ?? null, data?.last, now.value.getTime()),
-    rate: g && props.series?.every ? fmt_rate(sample_rate(g, props.series.every, dev?.metrics?.length)) : '',
+    rate: g && props.strips?.every ? fmt_rate(sample_rate(g, props.strips.every, dev?.metrics?.length)) : '',
     strip,
     note: note(g),
   }

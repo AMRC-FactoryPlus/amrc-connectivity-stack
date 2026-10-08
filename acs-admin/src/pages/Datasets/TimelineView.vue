@@ -100,6 +100,9 @@
         No equipment or devices match "{{ query.trim() }}".
       </div>
 
+      <div v-if="data.stripNote.value" class="text-xs text-slate-500">
+        <i class="fa-solid fa-circle-info mr-1"></i>{{ data.stripNote.value }}
+      </div>
       <div v-if="data.error.value" class="text-xs text-red-700">
         <i class="fa-solid fa-triangle-exclamation mr-1"></i>Data strips did not load. {{ data.error.value }}
       </div>
@@ -300,7 +303,7 @@ function placed (uuid) {
 }
 
 /* ------------------------------------------------------------------
- * Data: arrival strips at Hours zoom, and "quiet since" for every lane.
+ * Data: arrival strips at every zoom, and "quiet since" for every lane.
  * ------------------------------------------------------------------ */
 
 const data = useTimelineData({ zoom, range, xWindow, rows: shownRows, eqDevices })
@@ -309,7 +312,7 @@ const data = useTimelineData({ zoom, range, xWindow, rows: shownRows, eqDevices 
  * stays in view when that time is off to the left, and is shown only
  * with the strips. */
 function quietNote (device) {
-  if (!data.hours.value) return null
+  if (!data.strips.value) return null
   const last = data.lastOf(device)
   if (last === undefined) return null
   const row_status = ds.deviceByUuid[device]?.status ?? null

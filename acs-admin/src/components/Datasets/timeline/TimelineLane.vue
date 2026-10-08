@@ -4,8 +4,8 @@
 
 <!-- One lane that is not a device: a group header (ongoing, other
      devices), a site and area heading, an ongoing dataset band, or a
-     piece of equipment with its recording blocks (and, when collapsed
-     at Hours zoom, a 3px strip of when its devices sent data). The timeline places
+     piece of equipment with its recording blocks (and, when collapsed,
+     a 3px strip of when its devices sent data). The timeline places
      it with `top`; the label cell stays pinned on the left. -->
 <template>
   <div class="absolute left-0 flex border-b border-slate-200"

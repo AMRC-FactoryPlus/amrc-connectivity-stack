@@ -15,7 +15,11 @@
     <!-- Metric picker. -->
     <Card class="flex w-full flex-col overflow-hidden md:sticky md:top-4 md:max-h-[calc(100vh-14rem)] md:w-[300px] md:shrink-0">
       <div class="border-b border-slate-200 p-3">
-        <Input v-model="query" icon="magnifying-glass" :placeholder="`Search ${total} metrics...`"/>
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400" aria-hidden="true"></i>
+          <input v-model="query" type="search" aria-label="Search metrics" :placeholder="`Search ${total} metrics...`"
+                 class="h-9 w-full rounded-md border border-slate-200 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-slate-950"/>
+        </div>
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div v-if="!devices.length" class="p-4 text-center text-sm text-slate-500">
@@ -31,12 +35,13 @@
           <label v-for="m in g.shown" :key="m.path"
                  class="flex items-center gap-2 px-3 py-1 text-[13px]"
                  :class="m.chartable ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default text-slate-400'"
-                 :title="m.chartable ? m.path : `${m.path} is text, so it cannot be charted`">
+                 :title="m.path">
             <input type="checkbox" class="size-3.5 shrink-0 accent-slate-900"
                    :checked="m.pinned" :disabled="!m.chartable"
                    @change="pins.toggle(g.device.uuid, m.path)"/>
             <span class="min-w-0 flex-1 truncate">{{ m.label }}</span>
-            <span v-if="m.unit" class="shrink-0 text-xs text-slate-400">{{ m.unit }}</span>
+            <span v-if="!m.chartable" class="shrink-0 text-xs text-slate-500">Text, not charted</span>
+            <span v-else-if="m.unit" class="shrink-0 text-xs text-slate-400">{{ m.unit }}</span>
           </label>
           <div v-if="g.more" class="px-3 pt-1 text-xs text-slate-500">
             {{ g.more }} more, search to find them
@@ -72,6 +77,10 @@
         <i class="fa-solid fa-triangle-exclamation mr-2"></i>{{ data.error.value }}
       </div>
 
+      <p v-if="data.meanNote.value" class="text-xs text-slate-500">
+        <i class="fa-solid fa-circle-info mr-1"></i>{{ data.meanNote.value }}
+      </p>
+
       <Card v-if="!entries.length" class="px-4 py-10 text-center text-sm text-slate-500">
         <i class="fa-solid fa-thumbtack mb-2 block text-slate-400"></i>
         Pin metrics on the left to chart them here.
@@ -94,7 +103,7 @@
             <div class="truncate text-[13px] font-semibold" :title="e.path">{{ e.label }}</div>
             <div class="truncate text-xs text-slate-500">{{ e.deviceName }}{{ unitOf(e) ? ` · ${unitOf(e)}` : '' }}</div>
           </div>
-          <div class="relative h-full min-w-0">
+          <div class="relative h-full min-w-0" role="img" :aria-label="describe(e)">
             <span v-for="t in ticks" :key="t.t" class="pointer-events-none absolute inset-y-0 w-px bg-slate-100"
                   :style="{ left: `${t.frac * 100}%` }"></span>
             <Skeleton v-if="!series && data.loading.value" class="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2"/>
@@ -103,7 +112,7 @@
             </div>
             <SeriesChart v-else-if="series" :points="pointsOf(e)" :every="series.every" :from="win.from" :to="axisTo" :unit="unitOf(e)"/>
           </div>
-          <button type="button" class="flex size-6 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+          <button type="button" class="flex size-8 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
                   :title="`Unpin ${e.label}`" @click="pins.unpin(e.key)">
             <i class="fa-solid fa-xmark text-xs"></i><span class="sr-only">Unpin {{ e.label }}</span>
           </button>
@@ -123,16 +132,15 @@ import { toast } from 'vue-sonner'
 import streamSaver from 'streamsaver'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import { fmt_window } from '@/lib/datasets/model.js'
+import { fmt_window, fmt_time } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
 import { axis_ticks, metric_label, chartable, series_key } from '@/lib/datasets/series.js'
 import { metric_total, filter_metrics } from './page-logic.js'
-import { usePins, pinned_entries } from './usePins.js'
+import { useDatasetPins } from './usePins.js'
 import { useDatasetSeries } from './useDatasetSeries.js'
 import SeriesChart from './SeriesChart.vue'
 
@@ -154,7 +162,7 @@ const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d
 const missing = computed(() => ds.devicesReady ? props.resolved.devices.length - devices.value.length : 0)
 const total = computed(() => metric_total(devices.value))
 
-const pins = usePins(() => props.record.uuid)
+const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved)
 
 // Pinned metrics always show; otherwise the first few, or the matches.
 const groups = computed(() => filter_metrics(devices.value, query.value).map(g => {
@@ -171,7 +179,6 @@ const groups = computed(() => filter_metrics(devices.value, query.value).map(g =
   return { device: g.device, shown, more: g.metrics.length - shown.length }
 }))
 
-const entries = computed(() => pinned_entries(pins.keys.value, ds.deviceByUuid))
 
 const data = useDatasetSeries(() => props.record, entries, { points: 300 })
 const series = computed(() => data.series.value)
@@ -186,6 +193,18 @@ const heading = computed(() => win.value.windowless
 
 const pointsOf = e => series.value?.metrics[e.key]?.points ?? []
 const unitOf = e => series.value?.metrics[e.key]?.unit ?? e.unit ?? ''
+
+const num = v => Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecision(4))
+
+/* The text alternative for a chart row: the metric and its newest value. */
+function describe (e) {
+  const name = `${e.label} on ${e.deviceName}`
+  if (!series.value) return `${name}: loading`
+  const last = pointsOf(e).at(-1)
+  if (!last) return `${name}: no data in this window`
+  const unit = unitOf(e)
+  return `${name}: latest ${num(last[1])}${unit ? ` ${unit}` : ''} at ${fmt_time(last[0])}`
+}
 
 const pinnedDownloading = ref(false)
 async function downloadPinned () {

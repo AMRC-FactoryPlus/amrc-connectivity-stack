@@ -50,7 +50,7 @@
       </div>
       <div v-if="hidden" class="text-xs text-slate-500">
         <i class="fa-solid fa-eye-slash mr-1"></i>
-        {{ hidden }} {{ hidden === 1 ? 'dataset does' : 'datasets do' }} not show you {{ hidden === 1 ? 'its' : 'their' }} devices, so the counts may be low.
+        {{ hidden }} {{ hidden === 1 ? 'dataset does' : 'datasets do' }} not show you {{ hidden === 1 ? 'its' : 'their' }} devices, so these counts are lower bounds.
       </div>
     </div>
 
@@ -82,6 +82,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
 import {
   series_request, window_strip, device_status, fmt_since, count_too_long,
+  coverage_every, coverage_not_ready, COVERAGE_NOTE, usable_windows,
   LAST_LOOKBACK, LIMITS, NO_WINDOW_SPAN,
 } from '@/lib/datasets/series.js'
 import { window_gaps, gap_note } from '@/lib/datasets/gaps.js'
@@ -137,41 +138,75 @@ const caption = computed(() => span.value.own
 const key = computed(() => props.window ? `${props.window.from}|${props.window.to}|${shown.value.join(',')}` : `-|${shown.value.join(',')}`)
 const allKey = computed(() => devices.value.map(d => d.uuid).join(','))
 
-watch([key, allKey], () => {
+watch(key, () => {
   clearTimeout(timer)
-  timer = setTimeout(load, DEBOUNCE_MS)
+  timer = setTimeout(loadStrips, DEBOUNCE_MS)
 }, { immediate: true })
-onBeforeUnmount(() => { gen++; clearTimeout(timer) })
 
-async function load () {
+// "Quiet since" looks back 30 days for every device, so it waits for
+// the list to settle and asks only for devices it has no recent answer for.
+const LASTS_DEBOUNCE_MS = 1500
+const LAST_MAX_AGE_MS = 3 * 60 * 1000
+const lastAt = new Map()
+let lastsTimer = null
+let lastsGen = 0
+watch(allKey, () => {
+  clearTimeout(lastsTimer)
+  lastsTimer = setTimeout(loadLasts, LASTS_DEBOUNCE_MS)
+}, { immediate: true })
+
+onBeforeUnmount(() => { gen++; lastsGen++; clearTimeout(timer); clearTimeout(lastsTimer) })
+
+async function loadStrips () {
   const my = ++gen
   span.value = current_span()
   const { from, to } = span.value
-  const now = Date.now()
   const list = shown.value
   counts.value = null
   stripNote.value = ''
   if (!list.length) return
+  if (from >= Date.now()) {
+    stripNote.value = 'The window has not started, so there is no data yet.'
+    return
+  }
+  // Windows over 14 days read the coverage summary.
+  const body = count_too_long(from, to)
+    ? { devices: list, from, to, every: coverage_every(from, to, { max: 120 }), count: true }
+    : { devices: list, from, to, points: 60, count: true }
   try {
-    if (from >= now) stripNote.value = 'The window has not started, so there is no data yet.'
-    else if (count_too_long(from, to)) stripNote.value = 'No data strips for windows over 14 days.'
-    else {
-      const s = await fetch_series(sc.client, series_request({ devices: list, from, to, points: 60, count: true }))
-      if (my !== gen) return
-      counts.value = s
-    }
-    const all = devices.value.map(d => d.uuid).slice(0, LIMITS.devices)
-    const hour = Math.ceil(now / 3600e3) * 3600e3
-    const l = await fetch_series(sc.client, series_request({ devices: all, from: hour - 3600e3, to: hour, every: '1h', last: LAST_LOOKBACK }))
+    const s = await fetch_series(sc.client, series_request(body))
     if (my !== gen) return
-    const got = {}
-    for (const u of all) if (!l.denied.includes(u)) got[u] = l.devices[u]?.last ?? null
-    lasts.value = got
+    counts.value = s
   }
   catch (err) {
     if (my !== gen) return
-    console.warn('Datasets: preview data did not load', err)
-    stripNote.value = 'The data strips did not load.'
+    if (coverage_not_ready(err)) stripNote.value = COVERAGE_NOTE
+    else {
+      console.warn('Datasets: preview data did not load', err)
+      stripNote.value = 'The data strips did not load.'
+    }
+  }
+}
+
+async function loadLasts () {
+  const my = ++lastsGen
+  const now = Date.now()
+  const all = devices.value.map(d => d.uuid)
+  const want = all.filter(u => !lastAt.has(u) || now - lastAt.get(u) > LAST_MAX_AGE_MS).slice(0, LIMITS.devices)
+  if (!want.length) return
+  for (const u of want) lastAt.set(u, now)
+  const hour = Math.ceil(now / 3600e3) * 3600e3
+  try {
+    const l = await fetch_series(sc.client, series_request({ devices: want, from: hour - 3600e3, to: hour, every: '1h', last: LAST_LOOKBACK }))
+    if (my !== lastsGen) return
+    const got = {}
+    for (const u of want) if (!l.denied.includes(u)) got[u] = l.devices[u]?.last ?? null
+    lasts.value = { ...lasts.value, ...got }
+  }
+  catch (err) {
+    for (const u of want) lastAt.delete(u)
+    if (my !== lastsGen) return
+    console.warn('Datasets: quiet since did not load', err)
   }
 }
 
@@ -179,8 +214,14 @@ const gaps = computed(() => {
   const s = counts.value
   if (!s?.every) return null
   const by = {}
-  for (const u of shown.value) if (!s.denied.includes(u)) by[u] = s.devices[u]?.count ?? []
-  return window_gaps(by, { from: span.value.from, to: span.value.to, every: s.every, now: s.asOf })
+  const windows = {}
+  for (const u of shown.value) {
+    if (s.denied.includes(u)) continue
+    by[u] = s.devices[u]?.count ?? []
+    // Ranges the coverage summary has not reached are neither data nor gap.
+    windows[u] = usable_windows(null, s.pending, span.value.from, span.value.to)
+  }
+  return window_gaps(by, { from: span.value.from, to: span.value.to, every: s.every, now: s.asOf, windows })
 })
 
 const preview = computed(() => shown.value.map(u => {

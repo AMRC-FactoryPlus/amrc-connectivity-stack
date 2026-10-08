@@ -46,21 +46,41 @@ export function normal_spacing (filled) {
     return Math.max(1, median(diffs))
 }
 
+/* How much of [a, b) falls inside the spans. */
+function overlap (a, b, spans) {
+    let n = 0
+    for (const [x, y] of spans) n += Math.max(0, Math.min(b, y) - Math.max(a, x))
+    return n
+}
+
 /**
  * One device's gaps over a window. A gap is a run of empty buckets
  * longer than the device's normal spacing, and at least 2 buckets
  * long. Runs before the first data and after the last count too.
  *
+ * `windows` ([[from, to]], optional) are the times the device belongs
+ * to the dataset. Buckets wholly outside them are neither data nor
+ * gap: they are left out of the grid, and a gap never runs across them.
+ *
  * Returns {
- *   grid,     bucket starts in the window (up to now)
+ *   grid,     bucket starts in the window (up to now, inside windows)
  *   empty,    Set of grid indexes inside a gap
+ *   emptyAt,  Set of bucket starts inside a gap
  *   gaps,     [{ from, to, i0, i1 }] with i1 exclusive
  *   points,   points counted in the window
  *   spacing,  normal spacing in buckets
+ *   sending,  ms of the window, inside windows and before now, in
+ *             buckets not in a gap. Partial first and last buckets
+ *             count only the part that has elapsed.
  * }
  */
-export function device_gaps (counts, { from, to, every, now = Infinity }) {
+export function device_gaps (counts, { from, to, every, now = Infinity, windows = null }) {
+    const end = Math.min(to, now)
+    const spans = (windows ?? [[from, to]])
+        .map(([a, b]) => [Math.max(a, from), Math.min(b, end)])
+        .filter(([a, b]) => a < b)
     const grid = bucket_grid(from, to, every, now)
+        .filter(t => spans.some(([a, b]) => t < b && bucket_end(t, every) > a))
     const index = new Map(grid.map((t, i) => [t, i]))
     const has = new Array(grid.length).fill(false)
     let points = 0
@@ -75,13 +95,16 @@ export function device_gaps (counts, { from, to, every, now = Infinity }) {
     has.forEach((h, i) => { if (h) filled.push(i) })
     const spacing = normal_spacing(filled)
 
+    // A run of empty buckets ends where the grid skips time outside the windows.
+    const joined = i => i > 0 && bucket_end(grid[i - 1], every) === grid[i]
+
     const gaps = []
     const empty = new Set()
     let i = 0
     while (i < grid.length) {
         if (has[i]) { i++; continue }
-        let j = i
-        while (j < grid.length && !has[j]) j++
+        let j = i + 1
+        while (j < grid.length && !has[j] && joined(j)) j++
         const k = j - i
         if (k >= 2 && k > spacing) {
             gaps.push({ from: grid[i], to: bucket_end(grid[j - 1], every), i0: i, i1: j })
@@ -89,19 +112,24 @@ export function device_gaps (counts, { from, to, every, now = Infinity }) {
         }
         i = j
     }
-    return { grid, empty, gaps, points, spacing }
+
+    let sending = 0
+    grid.forEach((t, x) => { if (!empty.has(x)) sending += overlap(t, bucket_end(t, every), spans) })
+
+    return { grid, empty, emptyAt: new Set([...empty].map(x => grid[x])), gaps, points, spacing, sending }
 }
 
 /**
  * Gaps across several devices over one window.
  *
- * A stretch where most devices (more than half, and at least two) are
- * in a gap at the same time counts as one gap for all of them, not one
- * per device. Device gaps that overlap such a stretch are folded into
- * it.
+ * A stretch where most devices (more than half of those inside their
+ * windows then, and at least two) are in a gap at the same time counts
+ * as one gap for all of them, not one per device. Device gaps that
+ * overlap such a stretch are folded into it.
  *
  * `counts` is { [device]: rows }. Every device in it is counted, with
- * missing or empty rows meaning no data.
+ * missing or empty rows meaning no data. `windows` is an optional
+ * { [device]: [[from, to]] }, as a dataset answer gives them.
  *
  * Returns {
  *   total,     gaps to report: shared stretches plus the rest
@@ -112,31 +140,35 @@ export function device_gaps (counts, { from, to, every, now = Infinity }) {
  *              when the window has not started
  * }
  */
-export function window_gaps (counts, { from, to, every, now = Infinity }) {
+export function window_gaps (counts, { from, to, every, now = Infinity, windows = null }) {
     const ids = Object.keys(counts ?? {})
     const devices = {}
-    for (const id of ids) devices[id] = device_gaps(counts[id], { from, to, every, now })
+    for (const id of ids) devices[id] = device_gaps(counts[id], { from, to, every, now, windows: windows?.[id] ?? null })
     const grid = bucket_grid(from, to, every, now)
+    const inGrid = Object.fromEntries(ids.map(id => [id, new Set(devices[id].grid)]))
 
     // Stretches most devices missed.
     const shared = []
-    if (ids.length >= 2) {
-        let start = null
-        for (let i = 0; i <= grid.length; i++) {
-            const missing = i < grid.length ? ids.filter(id => devices[id].empty.has(i)).length : 0
-            const most = missing * 2 > ids.length
-            if (most && start == null) start = i
-            if (!most && start != null) {
-                shared.push({ from: grid[start], to: bucket_end(grid[i - 1], every), i0: start, i1: i })
-                start = null
-            }
+    let start = null
+    for (let i = 0; i <= grid.length; i++) {
+        let most = false
+        if (i < grid.length) {
+            const t = grid[i]
+            const active = ids.filter(id => inGrid[id].has(t))
+            const missing = active.filter(id => devices[id].emptyAt.has(t)).length
+            most = active.length >= 2 && missing * 2 > active.length
+        }
+        if (most && start == null) start = i
+        if (!most && start != null) {
+            shared.push({ from: grid[start], to: bucket_end(grid[i - 1], every), i0: start, i1: i })
+            start = null
         }
     }
 
     const own = {}
     let total = shared.length
     for (const id of ids) {
-        own[id] = devices[id].gaps.filter(g => !shared.some(s => g.i0 < s.i1 && g.i1 > s.i0))
+        own[id] = devices[id].gaps.filter(g => !shared.some(s => g.from < s.to && g.to > s.from))
         total += own[id].length
     }
 
@@ -158,7 +190,7 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 export function selection_gap_line (total) {
     return total
         ? { text: `${plural(total, 'gap')} in this window`, dot: 'bg-amber-500', cls: 'text-amber-700' }
-        : { text: 'No gaps in this window', dot: 'bg-green-500', cls: 'text-gray-500' }
+        : { text: 'No gaps in this window', dot: 'bg-green-500', cls: 'text-slate-500' }
 }
 
 /** Minutes for a gap note: "4 min", "1h 20m". */
@@ -227,14 +259,16 @@ export function recording_gap_note (result, nameOf = d => d) {
 /**
  * Points per second for each metric of a device: the points in the
  * window over the time it was sending (buckets outside gaps), divided
- * by its number of metrics. Null when there is too little to tell.
+ * by its number of metrics. A partial first or last bucket counts only
+ * the time that has elapsed in it, so a steady rate reads the same at
+ * any moment. Null when there is too little to tell.
  * `g` is a device_gaps() result.
  */
 export function sample_rate (g, every, metrics = 1) {
     if (!g?.points) return null
     const step = STEP_MS[every]
     if (!step) return null
-    const sending = (g.grid.length - g.empty.size) * step
+    const sending = g.sending ?? (g.grid.length - g.empty.size) * step
     if (!(sending > 0)) return null
     return g.points / (sending / 1000) / Math.max(1, metrics || 1)
 }

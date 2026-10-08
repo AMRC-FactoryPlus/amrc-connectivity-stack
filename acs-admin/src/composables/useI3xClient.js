@@ -164,7 +164,7 @@ export function useI3xClient () {
      * stream, fetchEventSource's auto-reconnect will fail; the caller
      * should treat that as a signal to re-open the stream from scratch.
      */
-    async streamSubscription (clientId, subscriptionId, onMessage, onClose) {
+    async streamSubscription (clientId, subscriptionId, onMessage, onClose, opts = {}) {
       const client = c()
       const serviceUrl = await client.service_url(UUIDs.Service.i3x)
       const token = await client.Fetch.service_token(serviceUrl)
@@ -176,6 +176,7 @@ export function useI3xClient () {
         subscriptionId,
         onMessage,
         onClose,
+        opts,
       )
     },
   }

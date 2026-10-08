@@ -2,8 +2,12 @@
  * Copyright (c) University of Sheffield AMRC 2026.
  */
 
-import { computed, reactive, toValue } from 'vue'
-import { i3x_leaf_id, metric_label, series_key, split_key, chartable } from '@/lib/datasets/series.js'
+import { computed, reactive, toValue, watch } from 'vue'
+import { useDatasetsStore } from '@store/useDatasetsStore.js'
+import { series_key, split_key } from '@/lib/datasets/series.js'
+import { pinned_entries, stale_pins } from './page-logic.js'
+
+export { pinned_entries, stale_pins }
 
 /*
  * Pinned metrics per dataset, kept in this browser. Pins are series
@@ -53,32 +57,37 @@ export function usePins (uuid) {
       set(keys.value.includes(k) ? keys.value.filter(x => x !== k) : [...keys.value, k])
     },
     unpin (key) { set(keys.value.filter(x => x !== key)) },
+    /** Drop these keys without a word: used for pins that went stale. */
+    forget (list) {
+      const drop = new Set(list)
+      if (keys.value.some(k => drop.has(k))) set(keys.value.filter(k => !drop.has(k)))
+    },
     clear () { set([]) },
   }
 }
 
 /**
- * What a chart or sparkline needs for each pin, from the device list:
- * { key, device, path, type, unit, label, deviceName, elementId }.
- * Pins for metrics that can no longer be charted are left out.
+ * Pins and chart entries for a dataset page tab. Entries leave out
+ * pins for devices the dataset no longer covers, so one stale pin
+ * cannot make the whole request fail. Once the dataset's devices are
+ * fully known, those pins are forgotten.
+ *
+ * @param record   ref or getter: the dataset record
+ * @param resolved ref or getter: ds.devicesOf() for it
  */
-export function pinned_entries (keys, deviceByUuid) {
-  const out = []
-  for (const key of keys) {
-    const { device, metric: path } = split_key(key)
-    const dev = deviceByUuid[device]
-    const m = dev?.metrics?.find(x => x.path === path)
-    if (m && !chartable(m.type)) continue
-    out.push({
-      key,
-      device,
-      path,
-      type: m?.type ?? null,
-      unit: m?.unit ?? null,
-      label: metric_label(m?.name ?? path.split('/').pop()),
-      deviceName: dev?.name ?? device.slice(0, 8),
-      elementId: dev?.originMap ? i3x_leaf_id(dev.originMap, device, path) : null,
-    })
-  }
-  return out
+export function useDatasetPins (record, resolved) {
+  const ds = useDatasetsStore()
+  const pins = usePins(() => toValue(record)?.uuid)
+  // The dataset's devices, or null when the structure is hidden.
+  const devices = computed(() => toValue(record)?.structure ? (toValue(resolved)?.devices ?? []) : null)
+  const entries = computed(() => pinned_entries(pins.keys.value, ds.deviceByUuid, devices.value))
+
+  watch(() => [pins.keys.value, devices.value, ds.ready, toValue(resolved)?.unknown?.length ?? 0], () => {
+    // Forget only when every part of the dataset is known.
+    if (!devices.value?.length || !ds.ready || toValue(resolved)?.unknown?.length) return
+    const stale = stale_pins(pins.keys.value, devices.value)
+    if (stale.length) pins.forget(stale)
+  }, { immediate: true })
+
+  return { pins, entries }
 }

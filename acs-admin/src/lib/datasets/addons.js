@@ -29,7 +29,7 @@ export const ADDONS = [
         needs: 'A program or execution state metric.',
         uses: 'Nothing else.',
         gives: 'Cycle count, mean and spread of cycle durations, and idle time between cycles.',
-        runs: 'Not decided yet.',
+        runs: 'Not available yet.',
     },
     {
         id: 'quality',
@@ -39,7 +39,7 @@ export const ADDONS = [
         needs: 'Measurement metrics, for example a probe deviation in mm.',
         uses: 'Tolerances, entered once per metric.',
         gives: 'Pass and fail counts, the worst deviation and a deviation histogram.',
-        runs: 'Not decided yet.',
+        runs: 'Not available yet.',
     },
 ]
 

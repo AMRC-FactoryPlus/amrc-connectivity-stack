@@ -360,7 +360,7 @@ async function data_response (client, uuid, { metrics = null } = {}) {
         body: metrics ? { metrics } : {},
     })
     if (st === 403) throw new DatasetError('You do not have permission to read this dataset.', { status: st })
-    if (st === 422 && metrics) throw new DatasetError('Pinned-only download needs a newer Data Access.', { status: st })
+    if (st === 422 && metrics) throw new DatasetError('The service refused the pinned-only download.', { status: st })
     if (st !== 200) throw new DatasetError(`The download failed (HTTP ${st}).`, { status: st })
     return { stream, headers }
 }

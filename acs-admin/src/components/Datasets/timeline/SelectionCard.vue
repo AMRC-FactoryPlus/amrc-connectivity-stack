@@ -14,26 +14,26 @@
         <div class="text-sm font-semibold leading-5">
           {{ fmt_time(from, now) }} <span class="font-normal text-slate-400">to</span> {{ fmt_time(to, now) }}
         </div>
-        <div class="text-xs text-gray-500">
+        <div class="text-xs text-slate-500">
           {{ fmt_duration(to - from) }} · {{ summary.count }} {{ summary.count === 1 ? 'device' : 'devices' }} · {{ metric_count(summary.metrics) }}
         </div>
       </div>
       <Button variant="ghost" size="plain" class="-mr-1 -mt-0.5 h-6 px-1.5" title="Clear selection" @click="emit('close')">
-        <i class="fa-solid fa-xmark text-[11px] text-gray-500"></i>
+        <i class="fa-solid fa-xmark text-[11px] text-slate-500"></i>
         <span class="sr-only">Clear selection</span>
       </Button>
     </div>
     <div class="flex flex-col gap-1 px-3.5 py-2">
       <div v-for="d in summary.shown" :key="d.uuid"
-           class="flex items-center gap-2 overflow-hidden whitespace-nowrap text-[13px] text-gray-700">
+           class="flex items-center gap-2 overflow-hidden whitespace-nowrap text-[13px] text-slate-700">
         <i class="fa-solid fa-microchip fa-fw text-[11px] text-slate-500"></i>
         <span class="truncate" :title="d.name">{{ d.name }}</span>
       </div>
-      <div v-if="summary.more" class="pl-6 text-xs text-gray-500">and {{ summary.more }} more</div>
+      <div v-if="summary.more" class="pl-6 text-xs text-slate-500">and {{ summary.more }} more</div>
       <div v-if="gapLine" class="mt-0.5 flex items-center gap-1.5 text-xs" :class="gapLine.cls">
         <span class="size-1.5 shrink-0 rounded-full" :class="gapLine.dot"></span>{{ gapLine.text }}
       </div>
-      <div v-if="to > now" class="mt-0.5 text-xs text-gray-500">
+      <div v-if="to > now" class="mt-0.5 text-xs text-slate-500">
         <i class="fa-solid fa-clock text-[10px]"></i> Ends in the future. It fills in as data arrives.
       </div>
     </div>

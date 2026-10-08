@@ -147,7 +147,7 @@ describe('the answer', () => {
     it('explains failures', () => {
         expect(series_error(413, { message: 'at most 500 devices' })).toBe('Too much at once: at most 500 devices')
         expect(series_error(413)).toMatch(/Too many/)
-        expect(series_error(422, { message: 'Count over 14 days needs coverage summary' })).toMatch(/14 days/)
+        expect(series_error(422, { message: '"count" over more than 14 days needs the coverage summary, which is not available yet.' })).toBe('Long-range data strips appear once the coverage summary has been built.')
         expect(series_error(422, { message: 'Use every 1h or more' })).toBe('Use every 1h or more')
         expect(series_error(504)).toMatch(/too long/)
         expect(series_error(503)).toMatch(/historian/)
@@ -539,10 +539,10 @@ describe('calling the service (fake client)', async () => {
             .rejects.toMatchObject({ message: 'Too much at once: at most 500 devices' })
     })
 
-    it('asks for pinned metrics only, and explains an older Data Access', async () => {
+    it('asks for pinned metrics only, and says when the service refuses', async () => {
         const client = fake(422, { message: 'unknown field' })
         await expect(download_csv(client, DS, null, { metrics: ['A/B'] }))
-            .rejects.toMatchObject({ message: 'Pinned-only download needs a newer Data Access.' })
+            .rejects.toMatchObject({ message: 'The service refused the pinned-only download.' })
         expect(client.calls[0]).toMatchObject({ url: `v1/data/${DS}`, method: 'POST', body: { metrics: ['A/B'] } })
     })
 

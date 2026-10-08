@@ -12,8 +12,13 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
  * service-client). fetchEventSource reuses the same headers across
  * reconnects, so if the token expires mid-stream the reconnect will
  * fail — callers handling long-lived streams should plan a refresh.
+ *
+ * Without `onFail`, a failed connection is retried every second, as
+ * fetchEventSource does by default. With it, the first failure stops
+ * the stream and calls `onFail(err)`, so the caller decides when to
+ * try again.
  */
-export function openI3xStream (baseUrl, headers, clientId, subscriptionId, onMessage, onClose) {
+export function openI3xStream (baseUrl, headers, clientId, subscriptionId, onMessage, onClose, { onFail } = {}) {
   const ctrl = new AbortController()
 
   fetchEventSource(`${baseUrl}/subscriptions/stream`, {
@@ -36,6 +41,8 @@ export function openI3xStream (baseUrl, headers, clientId, subscriptionId, onMes
 
     onerror (err) {
       console.error('SSE stream error:', err)
+      // Throwing stops fetchEventSource retrying.
+      if (onFail) throw err
     },
 
     onclose () {
@@ -43,6 +50,8 @@ export function openI3xStream (baseUrl, headers, clientId, subscriptionId, onMes
     },
 
     openWhenHidden: true,
+  }).catch(err => {
+    if (!ctrl.signal.aborted) onFail?.(err)
   })
 
   return {

@@ -17,8 +17,8 @@ function client_id () {
 
 /**
  * Live values from an i3X subscription, for a set of leaf elementIds
- * that can change. `onValues` gets the stream's items:
- * [{ elementId, value, quality, timestamp }].
+ * that can change. `onValues` gets the stream's items as they come,
+ * quality included: [{ elementId, value, quality, timestamp }].
  *
  * Call `watch(ids)` whenever the set changes; an empty set closes the
  * subscription. If i3X is missing or the stream drops, it tries again
@@ -74,16 +74,20 @@ export function useI3xLive (onValues) {
       }
       if (!stream) {
         const sub = subscriptionId
-        stream = await i3x.streamSubscription(clientId, sub, items => {
-          if (!closed && Array.isArray(items)) onValues(items)
-        }, () => {
-          // The stream ended: start again with a new subscription.
+        // The stream ended or failed: start again with a new
+        // subscription in 30 s, not every second.
+        const ended = () => {
           if (subscriptionId !== sub) return
+          stream?.close()
           stream = null
           subscriptionId = null
           registered = new Set()
+          i3x.deleteSubscription(clientId, [sub]).catch(() => {})
           schedule()
-        })
+        }
+        stream = await i3x.streamSubscription(clientId, sub, items => {
+          if (!closed && Array.isArray(items)) onValues(items)
+        }, ended, { onFail: ended })
       }
     }
     catch (err) {

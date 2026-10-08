@@ -128,9 +128,11 @@
         </div>
       </Alert>
 
-      <OverviewTab v-if="tab === 'overview'" :record="rec" :resolved="resolved" :labels="labels" :ec="ec"
+      <!-- Keyed on the dataset, so moving to another one starts its
+           data afresh rather than showing the last one's. -->
+      <OverviewTab v-if="tab === 'overview'" :key="`overview-${rec.uuid}`" :record="rec" :resolved="resolved" :labels="labels" :ec="ec"
                    :grafana="grafana" :downloading="downloading" @tab="setTab" @download="download"/>
-      <DataTab v-else-if="tab === 'data'" :record="rec" :resolved="resolved" :downloading="downloading" @download="download"/>
+      <DataTab v-else-if="tab === 'data'" :key="`data-${rec.uuid}`" :record="rec" :resolved="resolved" :downloading="downloading" @download="download"/>
       <UseTab v-else-if="tab === 'use'" :record="rec" :grafana="grafana" :downloading="downloading" @download="download"/>
       <template v-else-if="tab === 'add-ons'">
         <EnergyCarbon :record="rec" :ec="ec"/>

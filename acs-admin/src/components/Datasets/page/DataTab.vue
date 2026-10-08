@@ -54,7 +54,7 @@
     </Card>
 
     <!-- Charts. -->
-    <div class="flex min-w-0 flex-[1_1_520px] flex-col gap-3">
+    <div ref="chartsEl" class="flex min-w-0 flex-[1_1_520px] flex-col gap-3">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="flex items-center gap-2 font-semibold">
@@ -91,6 +91,7 @@
         <div class="grid grid-cols-[200px_minmax(0,1fr)_32px] border-b border-slate-200">
           <div></div>
           <div class="relative h-7 text-[11px] text-slate-500">
+            <span v-if="future" class="pointer-events-none absolute inset-y-0 right-0" :style="{ left: `${future.frac * 100}%`, background: FUTURE_HATCH }"></span>
             <span v-for="t in ticks" :key="t.t" class="absolute top-1.5 -translate-x-1/2 whitespace-nowrap"
                   :class="t.major && 'font-semibold'" :style="{ left: `${t.frac * 100}%` }">{{ t.label }}</span>
           </div>
@@ -106,11 +107,16 @@
           <div class="relative h-full min-w-0" role="img" :aria-label="describe(e)">
             <span v-for="t in ticks" :key="t.t" class="pointer-events-none absolute inset-y-0 w-px bg-slate-100"
                   :style="{ left: `${t.frac * 100}%` }"></span>
+            <!-- The part of the window still to come, and now. -->
+            <template v-if="future">
+              <span class="pointer-events-none absolute inset-y-0 right-0" :style="{ left: `${future.frac * 100}%`, background: FUTURE_HATCH }"></span>
+              <span class="pointer-events-none absolute inset-y-0 z-10 w-px bg-slate-900" :style="{ left: `${future.frac * 100}%` }" title="Now"></span>
+            </template>
             <Skeleton v-if="!series && data.loading.value" class="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2"/>
-            <div v-else-if="series && !pointsOf(e).length" class="absolute inset-0 flex items-center text-xs text-slate-400">
+            <div v-else-if="series && !pointsOf(e).length && !tailOf(e).length" class="absolute inset-0 flex items-center text-xs text-slate-400">
               No data in this window
             </div>
-            <SeriesChart v-else-if="series" :points="pointsOf(e)" :every="series.every" :from="win.from" :to="axisTo" :unit="unitOf(e)"/>
+            <SeriesChart v-else-if="series" :points="pointsOf(e)" :tail="tailOf(e)" :every="series.every" :from="win.from" :to="axisTo" :unit="unitOf(e)"/>
           </div>
           <button type="button" class="flex size-8 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
                   :title="`Unpin ${e.label}`" @click="pins.unpin(e.key)">
@@ -128,6 +134,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import streamSaver from 'streamsaver'
 import { Card } from '@/components/ui/card'
@@ -138,7 +145,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fmt_window, fmt_time } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
-import { axis_ticks, metric_label, chartable, series_key } from '@/lib/datasets/series.js'
+import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since } from '@/lib/datasets/series.js'
 import { metric_total, filter_metrics } from './page-logic.js'
 import { useDatasetPins } from './usePins.js'
 import { useDatasetSeries } from './useDatasetSeries.js'
@@ -167,11 +174,12 @@ const { pins, entries } = useDatasetPins(() => props.record, () => props.resolve
 // Pinned metrics always show; otherwise the first few, or the matches.
 const groups = computed(() => filter_metrics(devices.value, query.value).map(g => {
   const limit = query.value.trim() ? MAX_MATCHES : FIRST
+  const labels = device_metric_labels(g.device.metrics)
   const shown = g.metrics
     .filter((m, i) => i < limit || pins.has(series_key(g.device.uuid, m.path)))
     .map(m => ({
       path: m.path,
-      label: metric_label(m.name),
+      label: labels.get(m.path),
       unit: m.unit,
       chartable: chartable(m.type),
       pinned: pins.has(series_key(g.device.uuid, m.path)),
@@ -180,18 +188,36 @@ const groups = computed(() => filter_metrics(devices.value, query.value).map(g =
 }))
 
 
-const data = useDatasetSeries(() => props.record, entries, { points: 300 })
+// Each chart is the charts column less its label and unpin columns.
+const LABEL_PX = 200 + 32
+const chartsEl = ref(null)
+const { width: chartsWidth } = useElementSize(chartsEl)
+const data = useDatasetSeries(() => props.record, entries, {
+  width: () => chartsWidth.value ? chartsWidth.value - LABEL_PX : 600,
+})
 const series = computed(() => data.series.value)
 const win = computed(() => data.window.value)
 
 const axisTo = computed(() => data.axisTo.value)
 const ticks = computed(() => axis_ticks(win.value.from, axisTo.value, 8))
 
-const heading = computed(() => win.value.windowless
-  ? 'Last 24 hours (this dataset has no time window)'
-  : fmt_window(props.record.from, props.record.to))
+const heading = computed(() => {
+  if (win.value.recording != null) return `Recording now, since ${fmt_since(win.value.recording)} (this will be saved as a run when it stops)`
+  if (win.value.windowless) return 'Last 24 hours (this dataset has no time window)'
+  return fmt_window(props.record.from, props.record.to)
+})
+
+// Same hatch as the timeline uses for time still to come.
+const FUTURE_HATCH = 'repeating-linear-gradient(135deg, rgba(241,245,249,0.7) 0 6px, rgba(248,250,252,0.7) 6px 12px)'
+// Where now falls on the axis, when the window ends after now.
+const future = computed(() => {
+  const now = data.now.value, from = win.value.from, to = axisTo.value
+  if (!(now > from && now < to)) return null
+  return { frac: (now - from) / (to - from) }
+})
 
 const pointsOf = e => series.value?.metrics[e.key]?.points ?? []
+const tailOf = e => series.value?.metrics[e.key]?.tail ?? []
 const unitOf = e => series.value?.metrics[e.key]?.unit ?? e.unit ?? ''
 
 const num = v => Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecision(4))
@@ -200,7 +226,7 @@ const num = v => Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecision(4))
 function describe (e) {
   const name = `${e.label} on ${e.deviceName}`
   if (!series.value) return `${name}: loading`
-  const last = pointsOf(e).at(-1)
+  const last = latest_point(series.value.metrics[e.key])
   if (!last) return `${name}: no data in this window`
   const unit = unitOf(e)
   return `${name}: latest ${num(last[1])}${unit ? ` ${unit}` : ''} at ${fmt_time(last[0])}`

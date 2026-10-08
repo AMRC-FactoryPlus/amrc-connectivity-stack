@@ -7,7 +7,7 @@
 
 import { STRUCTURE } from '@/lib/datasets/constants.js'
 import { direct_sources, included_in, fmt_window } from '@/lib/datasets/model.js'
-import { i3x_leaf_id, metric_label, split_key, chartable } from '@/lib/datasets/series.js'
+import { i3x_leaf_id, metric_label, device_metric_labels, split_key, chartable } from '@/lib/datasets/series.js'
 
 // The Data Access "Read dataset" permission, granted by Share.
 export const READ_DATASET = 'ec48462e-37eb-4f56-8efa-83d813e85559'
@@ -122,16 +122,33 @@ export function metric_total (devices) {
 export function filter_metrics (devices, query) {
     const words = (query ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
     return devices
-        .map(d => ({
-            device: d,
-            metrics: words.length
-                ? (d.metrics ?? []).filter(m => {
-                    const hay = `${m.path} ${m.name} ${m.unit ?? ''}`.toLowerCase()
-                    return words.every(w => hay.includes(w))
-                })
-                : (d.metrics ?? []),
-        }))
+        .map(d => {
+            const labels = device_metric_labels(d.metrics)
+            const metrics = picker_order(d.metrics ?? [])
+            return {
+                device: d,
+                metrics: words.length
+                    ? metrics.filter(m => {
+                        const hay = `${m.path} ${m.name} ${labels.get(m.path) ?? ''} ${m.unit ?? ''}`.toLowerCase()
+                        return words.every(w => hay.includes(w))
+                    })
+                    : metrics,
+            }
+        })
         .filter(g => !words.length || g.metrics.length)
+}
+
+// Groups that describe the device or drive it, not what it measures.
+const LAST_GROUPS = new Set(['Player_Controls', 'Device_Information'])
+
+/**
+ * A device's metrics in picker order: ones that can be charted first,
+ * then text, and anything under Player_Controls or Device_Information
+ * last. Otherwise the order stays as it was.
+ */
+export function picker_order (metrics) {
+    const rank = m => (LAST_GROUPS.has(String(m.path ?? '').split('/')[0]) ? 2 : 0) + (chartable(m.type) ? 0 : 1)
+    return metrics.map((m, i) => [rank(m), i, m]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2])
 }
 
 /* ------------------------------------------------------------------
@@ -232,7 +249,7 @@ export function pinned_entries (keys, deviceByUuid, devices = null) {
             path,
             type: m?.type ?? null,
             unit: m?.unit ?? null,
-            label: metric_label(m?.name ?? path.split('/').pop()),
+            label: device_metric_labels(dev?.metrics).get(path) ?? metric_label(m?.name ?? path.split('/').pop()),
             deviceName: dev?.name ?? device.slice(0, 8),
             elementId: dev?.originMap ? i3x_leaf_id(dev.originMap, device, path) : null,
         })

@@ -58,6 +58,24 @@ export function pick_every (from, to, points = 300) {
     return LADDER[LADDER.length - 1]
 }
 
+/** The fewest and most points a chart asks for, whatever its width. */
+export const CHART_POINTS = { min: 200, max: 1500 }
+
+/** Points for a chart `width` px wide: about one per pixel. */
+export function points_for_width (width) {
+    const w = Number.isFinite(width) && width > 0 ? Math.round(width) : CHART_POINTS.min
+    return Math.max(CHART_POINTS.min, Math.min(CHART_POINTS.max, w))
+}
+
+/**
+ * The finest ladder step for a chart `width` px wide over [from, to):
+ * about one bucket per pixel, and never more buckets than the service
+ * allows. 24 hours at 1,500 px gives 1 minute; an hour gives 10 s.
+ */
+export function every_for_width (from, to, width) {
+    return pick_every(from, to, Math.min(points_for_width(width), LIMITS.buckets - 1))
+}
+
 /** Split a list into pieces of at most `n`. */
 export function chunk (list, n) {
     const out = []
@@ -68,7 +86,7 @@ export function chunk (list, n) {
 /** The one-letter type the historian appends: d, i, u, b or s. */
 export function type_suffix (sparkplug_type) {
     // Strip a byte-order suffix (FloatLE, UInt32BE), but not the "le" of "Double".
-    const t = /^(.+?)(LE|BE)?$/.exec(String(sparkplug_type ?? ''))[1]
+    const t = /^(.*?)(LE|BE)?$/.exec(String(sparkplug_type ?? ''))[1]
     switch (t) {
         case 'Float': case 'Double': return 'd'
         case 'Int8': case 'Int16': case 'Int32': case 'Int64': return 'i'
@@ -125,11 +143,16 @@ export function series_request ({ devices = null, dataset = null, from, to, ever
 export const NO_WINDOW_SPAN = 24 * HOUR
 
 /**
- * The window a dataset page charts, in ms. A dataset with no time
- * window (or an open end) shows the last 24 hours up to now; `open`
- * says the end follows now.
+ * The window a dataset page charts, in ms. Equipment that is recording
+ * shows that recording, from its start up to now (`recording` is its
+ * start). A dataset with no time window (or an open end) shows the last
+ * 24 hours up to now; `open` says the end follows now.
  */
 export function dataset_window (rec, now = Date.now()) {
+    const started = rec?.recording?.startedAt ? Date.parse(rec.recording.startedAt) : null
+    if (Number.isFinite(started) && started < now) {
+        return { from: started, to: now, open: true, windowless: false, recording: started }
+    }
     const from = rec?.from ? Date.parse(rec.from) : null
     const to = rec?.to ? Date.parse(rec.to) : null
     if (from != null && to != null && from < to) return { from, to, open: false, windowless: false }
@@ -329,70 +352,73 @@ export function live_number (v) {
     return null
 }
 
-/**
- * Fold one live value into `[start, mean, n]` points (design 2.7).
- * Values at or before `asOf` are already in the series and are
- * ignored. A value in an existing bucket updates its mean with the n
- * weights; otherwise it opens a bucket with n = 1. Returns new points,
- * or the same array when nothing changed.
- */
-export function fold_live (points, t, value, every, asOf) {
-    const v = live_number(value)
-    if (v == null || !Number.isFinite(t) || t <= asOf || !STEP_MS[every]) return points
-    const b = bucket_start(t, every)
-    const out = points.slice()
-    let i = out.length - 1
-    while (i >= 0 && out[i][0] > b) i--
-    if (i >= 0 && out[i][0] === b) {
-        const [, mean, n] = out[i]
-        out[i] = [b, (mean * n + v) / (n + 1), n + 1]
-    }
-    else {
-        out.splice(i + 1, 0, [b, v, 1])
-    }
-    return out
-}
-
 /** Whether an i3X quality can be charted. A value with no quality counts as good. */
 export function good_quality (quality) {
     return quality == null || quality === 'Good'
 }
 
+/** How much raw live data a series keeps after its newest bucket. */
+export const LIVE_TAIL = { span: 10 * MIN, points: 2000 }
+
+/** Keep the newest LIVE_TAIL of a sorted raw tail. */
+function bound_tail (tail) {
+    if (!tail.length) return tail
+    const cut = tail[tail.length - 1][0] - LIVE_TAIL.span
+    let i = 0
+    while (i < tail.length && tail[i][0] < cut) i++
+    i = Math.max(i, tail.length - LIVE_TAIL.points)
+    return i ? tail.slice(i) : tail
+}
+
+/** The newest time a series already holds for a metric. */
+function live_floor (s, metrics, key, device) {
+    const last = s.devices?.[device]?.last
+    const tail = metrics?.[key]?.tail
+    return Math.max(
+        s.asOf ?? -Infinity,
+        tail?.length ? tail[tail.length - 1][0] : -Infinity,
+        typeof last === 'number' ? last : -Infinity,
+    )
+}
+
 /**
- * Fold a batch of i3X items into a parsed series (design 2.7).
+ * Add a batch of i3X items to a parsed series as raw live values
+ * (design 2.7). Each metric keeps a `tail` of [ms, value] rows after
+ * its buckets, drawn at full resolution, bounded by LIVE_TAIL.
  *
- * `lookup(elementId)` gives { device, path, unit } or nothing.
- * `folded` is a Map(series key -> newest time folded in) that the
- * caller keeps across batches and refetches. A value is skipped when
- * it is at or before any of: the series' asOf, the newest value
- * already folded for that series, or its device's newest data time in
- * the last answer. So an SSE replay, or a value that a refetch already
- * counted, is never counted twice. Values whose quality is not good
- * are not charted.
+ * `lookup(elementId)` gives { device, path, unit } or nothing. A value
+ * is skipped when it is at or before any of: the series' asOf (the
+ * buckets hold it), the newest raw value already kept for that series,
+ * or its device's newest data time in the last answer. So an SSE
+ * replay, or a value that a refetch already counted, is never counted
+ * twice. Values whose quality is not good are not charted.
  *
  * Returns the new series, or the same object when nothing changed.
  */
-export function fold_live_items (s, items, lookup, folded) {
+export function append_live_items (s, items, lookup) {
     if (!s?.every || !Array.isArray(items)) return s
     let metrics = null
+    const touched = new Set()
     for (const item of items) {
         if (!good_quality(item?.quality)) continue
         const e = lookup(item?.elementId)
         if (!e) continue
         const t = Date.parse(item.timestamp)
-        if (!Number.isFinite(t)) continue
+        const v = live_number(item.value)
+        if (!Number.isFinite(t) || v == null) continue
         const key = series_key(e.device, e.path)
-        const last = s.devices?.[e.device]?.last
-        const floor = Math.max(s.asOf ?? -Infinity, folded.get(key) ?? -Infinity, typeof last === 'number' ? last : -Infinity)
-        if (t <= floor) continue
-        const m = (metrics ?? s.metrics)[key] ?? { device: e.device, metric: e.path, type: null, unit: e.unit ?? null, points: [] }
-        const pts = fold_live(m.points, t, item.value, s.every, floor)
-        if (pts === m.points) continue
+        if (t <= live_floor(s, metrics ?? s.metrics, key, e.device)) continue
         metrics ??= { ...s.metrics }
-        metrics[key] = { ...m, points: pts }
-        folded.set(key, t)
+        const m = metrics[key] ?? { device: e.device, metric: e.path, type: null, unit: e.unit ?? null, points: [] }
+        // Copy a tail once per batch, then push onto the copy.
+        const tail = touched.has(key) ? m.tail : [...(m.tail ?? [])]
+        tail.push([t, v])
+        metrics[key] = { ...m, tail }
+        touched.add(key)
     }
-    return metrics ? { ...s, metrics } : s
+    if (!metrics) return s
+    for (const key of touched) metrics[key] = { ...metrics[key], tail: bound_tail(metrics[key].tail) }
+    return { ...s, metrics }
 }
 
 /**
@@ -409,11 +435,15 @@ export function tail_window (series, now = Date.now()) {
 
 /**
  * Put a refetched tail into a series: rows from `tail.from` on are
- * replaced. Returns a new series with the tail's asOf.
+ * replaced. Raw live values at or before the new asOf are now counted
+ * in the buckets, so they are dropped. Returns a new series with the
+ * tail's asOf.
  */
 export function replace_tail (series, tail) {
     const cut = tail.from
     const keep = rows => rows.filter(r => r[0] < cut)
+    const asOf = Math.max(series.asOf, tail.asOf)
+    const raw = rows => rows?.length ? rows.filter(r => r[0] > asOf) : rows
     // The tail asks for the same things, so anything it leaves out had
     // no data in the tail.
     const devices = {}
@@ -437,20 +467,48 @@ export function replace_tail (series, tail) {
             type: m?.type ?? old.type,
             points: [...keep(old.points), ...(m?.points ?? [])],
         }
+        if (old.tail) metrics[key].tail = raw(old.tail)
     }
-    return { ...series, devices, metrics, asOf: Math.max(series.asOf, tail.asOf) }
+    return { ...series, devices, metrics, asOf }
 }
 
-/** Points as chart pairs, with a null wherever a bucket is missing, so lines break at gaps. */
-export function chart_pairs (points, every) {
+/** Raw live values further apart than this break the line. */
+export const TAIL_GAP_MS = MIN
+
+/** Whether two neighbouring raw values have a gap between them. */
+const raw_gap = (a, b, step) => b - a > Math.max(step, TAIL_GAP_MS)
+
+/**
+ * Points as chart pairs, with a null wherever a bucket is missing, so
+ * lines break at gaps. Raw live values (`tail`, [ms, value] rows) follow
+ * the buckets at full resolution.
+ */
+export function chart_pairs (points, every, tail = []) {
     const out = []
+    const step = STEP_MS[every] ?? 0
     let prev = null
     for (const [t, v] of points) {
         if (prev != null && t > bucket_end(prev, every) + 1) out.push([bucket_end(prev, every), null])
         out.push([t, v])
         prev = t
     }
+    // From the buckets into the raw values: a gap if a whole bucket is missing.
+    let last = prev == null ? null : bucket_end(prev, every)
+    for (const [t, v] of tail ?? []) {
+        if (prev != null && t < prev) continue
+        if (last != null && raw_gap(last, t, step)) out.push([last, null])
+        out.push([t, v])
+        last = t
+    }
     return out
+}
+
+/** A metric's newest value as [ms, value]: the newest raw value, or the newest bucket. */
+export function latest_point (m) {
+    const raw = m?.tail?.at(-1)
+    if (raw) return raw
+    const b = m?.points?.at(-1)
+    return b ? [b[0], b[1]] : null
 }
 
 /** Smallest and largest mean. */
@@ -465,23 +523,36 @@ export function extent (points) {
 
 /**
  * An SVG path for a sparkline `w` by `h` over [from, to]. Each bucket
- * is drawn at its middle; a missing bucket breaks the line.
+ * is drawn at its middle; a missing bucket breaks the line. Raw live
+ * values (`tail`) follow at their own times, never left of the last
+ * bucket drawn.
  */
-export function sparkline_path (points, { from, to, w, h, every, pad = 2 }) {
-    const ext = extent(points)
+export function sparkline_path (points, { from, to, w, h, every, pad = 2, tail = [] }) {
+    const raw = (tail ?? []).filter(([t]) => t >= from && t <= to)
+    const ext = extent([...points, ...raw])
     if (!ext || to <= from) return ''
     const [lo, hi] = ext
     const step = STEP_MS[every] ?? 0
-    const x = t => ((t + step / 2 - from) / (to - from)) * w
+    const xt = t => Math.max(0, Math.min(w, ((t - from) / (to - from)) * w))
     const y = v => hi === lo ? h / 2 : pad + (1 - (v - lo) / (hi - lo)) * (h - 2 * pad)
     const r = n => Math.round(n * 10) / 10
     let d = ''
     let prev = null
+    let x0 = 0
     for (const [t, v] of points) {
         if (t < from - step || t > to) continue
         const gap = prev == null || t > bucket_end(prev, every) + 1
-        d += `${gap ? 'M' : 'L'}${r(Math.max(0, Math.min(w, x(t))))} ${r(y(v))}`
+        x0 = xt(t + step / 2)
+        d += `${gap ? 'M' : 'L'}${r(x0)} ${r(y(v))}`
         prev = t
+    }
+    let last = prev == null ? null : bucket_end(prev, every)
+    for (const [t, v] of raw) {
+        if (prev != null && t < prev) continue
+        const gap = last == null || raw_gap(last, t, step)
+        x0 = Math.max(x0, xt(t))
+        d += `${gap ? 'M' : 'L'}${r(x0)} ${r(y(v))}`
+        last = t
     }
     // A single point is a dot, drawn as a short line.
     return d.includes('L') || !d ? d : `${d}h1`
@@ -850,10 +921,102 @@ export function i3x_leaf_id (originMap, device, path) {
 export function metric_label (name) {
     const words = String(name ?? '').split(/[_\s]+/).filter(Boolean)
     return words.map((w, i) => {
-        if (w.length > 1 && w === w.toUpperCase()) return w
+        // Capitals (RMS, X, S1) stay as they are.
+        if (w === w.toUpperCase() && /[A-Z]/.test(w)) return w
         const lower = w.toLowerCase()
         return i === 0 ? lower[0].toUpperCase() + lower.slice(1) : lower
     }).join(' ')
+}
+
+/* "Axes" -> "Axis", "Spindles" -> "Spindle", "Batteries" -> "Battery". */
+function singular (word) {
+    if (/^axes$/i.test(word)) return word.slice(0, -2) + 'is'
+    if (/ies$/i.test(word)) return word.slice(0, -3) + 'y'
+    return word.slice(0, -1)
+}
+
+/* A folder that holds several of one thing: "Axes", "Spindles". */
+const is_collection = seg => seg.length > 3 && /[^s]s$/i.test(seg) && !/_/.test(seg)
+
+/*
+ * Words for the kept segments of one path. A kept segment whose parent
+ * is a collection gets the singular as a qualifier: "X" under "Axes"
+ * reads "X axis", "S1" under "Spindles" reads "Spindle S1".
+ */
+function label_words (segs, kept) {
+    const out = []
+    for (const i of kept) {
+        const seg = segs[i]
+        const parent = segs[i - 1]
+        if (i < segs.length - 1 && parent && !kept.includes(i - 1) && is_collection(parent)) {
+            const one = singular(parent)
+            out.push(seg.length === 1 ? `${seg}_${one}` : `${one}_${seg}`)
+        }
+        else out.push(seg)
+    }
+    return out.join('_')
+}
+
+/**
+ * Labels for one device's metrics: Map(full path -> label). A label is
+ * metric_label() of the last segment, unless two metrics would share
+ * it; then each of those adds the path segments that tell them apart.
+ * Segments close to the leaf that do not help (Base_Axis) are left out
+ * again when the labels stay unique. So Axes/X/Base_Axis/Load,
+ * Axes/Y/Base_Axis/Load and Spindles/S1/Load read "X axis load",
+ * "Y axis load" and "Spindle S1 load".
+ */
+export function metric_labels (paths) {
+    const list = [...new Set((paths ?? []).map(p => String(p ?? '')))]
+    const segs = new Map(list.map(p => [p, p.split('/').filter(Boolean)]))
+    // Kept segment indexes per path, always ending with the leaf.
+    const kept = new Map(list.map(p => [p, [Math.max(0, segs.get(p).length - 1)]]))
+    const text = p => metric_label(label_words(segs.get(p), kept.get(p)))
+    const clashes = () => {
+        const by = new Map()
+        for (const p of list) {
+            const k = text(p).toLowerCase()
+            by.set(k, [...(by.get(k) ?? []), p])
+        }
+        return [...by.values()].filter(g => g.length > 1)
+    }
+    const unique = () => new Set(list.map(p => text(p).toLowerCase())).size === list.length
+    // Add segments, nearest the leaf first, until every label is unique.
+    const groups = []
+    for (let round = 0; round < 64; round++) {
+        const found = clashes()
+        let grew = false
+        for (const g of found) {
+            groups.push(g)
+            for (const p of g) {
+                const k = kept.get(p)
+                if (k[0] > 0) { kept.set(p, [k[0] - 1, ...k]); grew = true }
+            }
+        }
+        if (!grew) break
+    }
+    // Leave out segments that do not help, for a whole group at once,
+    // nearest the leaf first: Base_Axis in Axes/X/Base_Axis/Load.
+    for (const g of groups.reverse()) {
+        for (let pos = 1; g.every(p => kept.get(p).length > pos);) {
+            const before = g.map(p => [p, kept.get(p)])
+            for (const [p, k] of before) kept.set(p, k.filter((_, j) => j !== k.length - 1 - pos))
+            if (unique()) continue
+            for (const [p, k] of before) kept.set(p, k)
+            pos++
+        }
+    }
+    return new Map(list.map(p => [p, text(p)]))
+}
+
+const label_cache = new WeakMap()
+
+/** metric_labels() for a device's metric list ({ path }), remembered per list. */
+export function device_metric_labels (metrics) {
+    if (!Array.isArray(metrics)) return new Map()
+    let m = label_cache.get(metrics)
+    if (!m) label_cache.set(metrics, m = metric_labels(metrics.map(x => x.path)))
+    return m
 }
 
 const TICK_STEPS = [MIN, 5 * MIN, 10 * MIN, 15 * MIN, 30 * MIN, HOUR, 2 * HOUR, 3 * HOUR, 6 * HOUR, 12 * HOUR]

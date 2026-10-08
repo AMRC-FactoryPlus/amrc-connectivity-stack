@@ -10,8 +10,8 @@ import { useI3xLive } from '@composables/useI3xLive.js'
 import {
   LIMITS, STEP_MS, COVERAGE_NOTE, series_request, mean_entry, count_too_long,
   dataset_window, window_is_live, bucket_start, bucket_end, mean_window,
-  fold_live_items, tail_window, replace_tail, coverage_every, coverage_not_ready,
-  stray_mean_device,
+  append_live_items, tail_window, replace_tail, coverage_every, coverage_not_ready,
+  stray_mean_device, every_for_width,
 } from '@/lib/datasets/series.js'
 
 const MAX_TAIL_MS = 5 * 60 * 1000
@@ -19,6 +19,8 @@ const MIN_TAIL_MS = 30 * 1000
 // Wait this long after a bucket closes, so late points have landed.
 const SETTLE_MS = 3 * 1000
 const RELOAD_DEBOUNCE_MS = 300
+// A chart width that changes the bucket size loads again after this.
+const RESIZE_DEBOUNCE_MS = 500
 // A window with no end moves its "now" forward this often.
 const ANCHOR_MS = 15 * 60 * 1000
 // Long-range strips for a live window are fetched again this often.
@@ -31,11 +33,13 @@ const LONG_COUNT_BUCKETS = 1000
  * Overview sparklines and the devices table strips. The one place the
  * live rules (design 2.7) live, so charts and sparklines cannot drift:
  *
- * 1. Load history from POST v1/series (mean and n per bucket).
- * 2. While the window holds now, fold i3X values newer than asOf into
- *    the newest bucket, opening buckets as needed.
+ * 1. Load history from POST v1/series (mean and n per bucket), with
+ *    about one bucket per pixel of chart width.
+ * 2. While the window holds now, keep i3X values newer than asOf as a
+ *    raw tail per metric, drawn at full resolution after the buckets.
  * 3. When a bucket closes, and at least every 5 minutes, refetch the
- *    newest two buckets and replace them.
+ *    newest two buckets and replace them. Raw values the refetched
+ *    buckets now count are dropped from the tail.
  *
  * Charts cover at most the most recent 400 days of the window. Strips
  * for windows over 14 days come from the coverage summary in a request
@@ -44,11 +48,13 @@ const LONG_COUNT_BUCKETS = 1000
  *
  * @param record   ref or getter: the dataset record
  * @param entries  ref or getter: pinned_entries() to chart
- * @param opts     { points, count, last }
+ * @param opts     { width, count, last }: `width` is a ref or getter
+ *                 for the chart's width in px, which sets the bucket size
  */
-export function useDatasetSeries (record, entries, { points = 300, count = false, last = false } = {}) {
+export function useDatasetSeries (record, entries, { width = 600, count = false, last = false } = {}) {
   const sc = useServiceClientStore()
-  const nowDate = useNow({ interval: 30 * 1000 })
+  // Ticks every second, so a live axis reaches now as values arrive.
+  const nowDate = useNow({ interval: 1000 })
   const visibility = useDocumentVisibility()
   const hidden = () => visibility.value === 'hidden'
 
@@ -83,14 +89,14 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
   const chartSpan = computed(() => means.value.length
     ? mean_window(win.value.from, win.value.to)
     : { from: win.value.from, to: win.value.to, clamped: false })
+  // About one bucket per pixel of chart width.
+  const every = computed(() => every_for_width(chartSpan.value.from, win.value.to, toValue(width)))
   const meanNote = computed(() => chartSpan.value.clamped
     ? 'Charts show the most recent 400 days of this window.'
     : null)
 
   let gen = 0
   let timer = null
-  // Series key -> newest i3X time folded in. Kept across refetches.
-  let folded = new Map()
 
   // A window with no end reaches to now when it loads.
   const reqTo = () => win.value.open ? Math.max(win.value.to, Date.now()) : win.value.to
@@ -101,7 +107,7 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
       dataset: rec.uuid,
       from: chartSpan.value.from,
       to: reqTo(),
-      points,
+      every: every.value,
       count: wantCount.value,
       mean: means.value,
       last: last ? '30d' : null,
@@ -113,7 +119,6 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
     const rec = toValue(record)
     clearTimeout(timer)
     const my = ++gen
-    folded = new Map()
     if (!rec?.uuid || (!means.value.length && !count && !last)) {
       series.value = null
       error.value = null
@@ -204,7 +209,6 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
         from: t.from,
         to,
         every: s.every,
-        points: null,
         last: last ? '1d' : null,
       }))
       if (my !== gen || !series.value) return
@@ -231,7 +235,7 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
 
   function onValues (items) {
     const s = series.value
-    const next = fold_live_items(s, items, id => byElement.value.get(id), folded)
+    const next = append_live_items(s, items, id => byElement.value.get(id))
     if (next !== s) series.value = next
   }
 
@@ -246,6 +250,13 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
     },
     { immediate: true },
   )
+  // A new chart width that changes the bucket size loads again, once
+  // the resizing has settled.
+  watch(every, (e, old) => {
+    if (e === old || !toValue(record)?.uuid) return
+    clearTimeout(debounce)
+    debounce = setTimeout(load, RESIZE_DEBOUNCE_MS)
+  })
   watch(live, () => { ensureLive(); plan() })
   watch(() => [...byElement.value.keys()].sort().join(','), ensureLive)
   watch(series, (s, old) => { if (s && !old) ensureLive() })
@@ -284,6 +295,7 @@ export function useDatasetSeries (record, entries, { points = 300, count = false
     meanNote,
     window: win,
     axisTo,
+    now: computed(() => nowDate.value.getTime()),
     live,
     capped,
     reload: load,

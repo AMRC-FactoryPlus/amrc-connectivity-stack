@@ -2,9 +2,10 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<!-- One metric's mean per bucket as a thin line with no axes or grid,
-     from `from` to `to`, so rows stacked under one shared axis line
-     up. Gaps in the data break the line. Hover shows the value. -->
+<!-- One metric's mean per bucket, then its raw live values, as a thin
+     line with no axes or grid, from `from` to `to`, so rows stacked
+     under one shared axis line up. Gaps in the data break the line.
+     Hover shows the value. -->
 <template>
   <VChart class="h-full w-full" :option="option" autoresize/>
 </template>
@@ -27,6 +28,8 @@ const VChart = defineAsyncComponent(() =>
 const props = defineProps({
   // [[bucket start ms, mean, n]]
   points: { type: Array, required: true },
+  // Raw live values after the buckets: [[ms, value]]
+  tail: { type: Array, default: () => [] },
   every: { type: String, required: true },
   from: { type: Number, required: true },
   to: { type: Number, required: true },
@@ -52,8 +55,8 @@ const option = computed(() => ({
   },
   series: [{
     type: 'line',
-    data: chart_pairs(props.points, props.every),
-    showSymbol: props.points.length < 3,
+    data: chart_pairs(props.points, props.every, props.tail),
+    showSymbol: props.points.length + props.tail.length < 3,
     symbolSize: 3,
     connectNulls: false,
     lineStyle: { color: '#0f172a', width: 1.25 },

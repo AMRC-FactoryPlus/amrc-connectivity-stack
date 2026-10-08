@@ -4,7 +4,7 @@
 
 /**
  * Series for the Datasets pages: the POST v1/series request and
- * answer, live values folded into charts, data strips, "quiet since"
+ * answer, refetching the newest buckets, data strips, "quiet since"
  * and the i3X leaf IDs that live values arrive under.
  */
 
@@ -15,7 +15,7 @@ import {
     LADDER, STEP_MS, I3X_UUID_NAMESPACE, QUIET_AFTER_MS,
     pick_every, chunk, type_suffix, chartable, series_key, split_key, mean_entry,
     series_request, count_too_long, dataset_window, window_is_live, NO_WINDOW_SPAN, parse_series, series_error,
-    bucket_start, bucket_end, live_number, fold_live, tail_window, replace_tail,
+    bucket_start, bucket_end, live_number, tail_window, replace_tail,
     chart_pairs, extent, sparkline_path,
     density_alpha, density_colour, bucket_cells, bin_counts, window_strip, sum_counts, StripCache,
     fmt_since, device_status, quiet_note,
@@ -185,41 +185,7 @@ describe('buckets', () => {
     })
 })
 
-describe('live values', () => {
-    const asOf = T0 + 12 * MIN
-    const pts = [[T0, 10, 2], [T0 + 10 * MIN, 4, 3]]
-
-    it('folds a value into the newest bucket with the n weights', () => {
-        const out = fold_live(pts, T0 + 13 * MIN, 8, '5m', asOf)
-        expect(out).toEqual([[T0, 10, 2], [T0 + 10 * MIN, 5, 4]])
-        expect(pts[1]).toEqual([T0 + 10 * MIN, 4, 3])
-    })
-
-    it('opens a new bucket', () => {
-        const out = fold_live(pts, T0 + 16 * MIN, 7, '5m', asOf)
-        expect(out.at(-1)).toEqual([T0 + 15 * MIN, 7, 1])
-        expect(out).toHaveLength(3)
-    })
-
-    it('ignores values the series already holds', () => {
-        expect(fold_live(pts, asOf, 99, '5m', asOf)).toBe(pts)
-        expect(fold_live(pts, T0 + MIN, 99, '5m', asOf)).toBe(pts)
-    })
-
-    it('ignores values that cannot be charted', () => {
-        expect(fold_live(pts, T0 + 13 * MIN, 'text', '5m', asOf)).toBe(pts)
-    })
-
-    it('starts an empty series', () => {
-        expect(fold_live([], T0 + 13 * MIN, true, '5m', asOf)).toEqual([[T0 + 10 * MIN, 1, 1]])
-    })
-
-    it('fills a missing bucket between others in time order', () => {
-        const sparse = [[T0, 1, 1], [T0 + 20 * MIN, 3, 1]]
-        const out = fold_live(sparse, T0 + 16 * MIN, 2, '5m', T0 + 14 * MIN)
-        expect(out.map(p => p[0])).toEqual([T0, T0 + 15 * MIN, T0 + 20 * MIN])
-    })
-
+describe('refetching the newest buckets', () => {
     it('refetches the two newest buckets', () => {
         const s = { from: T0, to: T0 + 24 * HOUR, every: '5m' }
         expect(tail_window(s, T0 + 12 * MIN)).toEqual({ from: T0 + 5 * MIN, to: T0 + 24 * HOUR })

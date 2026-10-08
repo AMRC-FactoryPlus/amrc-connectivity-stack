@@ -78,8 +78,10 @@
                       :loading="data.loading.value" :error="data.error.value" :count-note="data.countNote.value"
                       :gaps="gaps"/>
 
-        <PinnedCard :entries="pinned" :series="data.series.value" :from="data.window.value.from" :to="data.axisTo.value"
-                    :live="data.live.value" :error="data.error.value" @tab="t => $emit('tab', t)"/>
+        <div ref="pinnedEl">
+          <PinnedCard :entries="pinned" :series="data.series.value" :from="data.window.value.from" :to="sparkTo"
+                      :live="data.live.value" :so-far="soFar" :error="data.error.value" @tab="t => $emit('tab', t)"/>
+        </div>
       </div>
 
       <!-- Side column. -->
@@ -109,9 +111,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNow } from '@vueuse/core'
+import { useNow, useElementSize } from '@vueuse/core'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
@@ -151,8 +153,24 @@ const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d
 
 // Strips, quiet since and sparklines, from one request that stays live
 // in the same way as the Data tab charts.
+// The sparklines fill the pinned card less its label and value
+// columns (PinnedCard), which sets the bucket size. The same request
+// carries every device's strip counts, so it stays at most 800 buckets.
+const SPARK_CHROME_PX = 220 + 96 + 56
+const SPARK_MAX_PX = 800
+const pinnedEl = ref(null)
+const { width: pinnedWidth } = useElementSize(pinnedEl)
 const { entries: pinned } = useDatasetPins(() => props.record, () => props.resolved)
-const data = useDatasetSeries(() => props.record, pinned, { points: 120, count: true, last: true })
+const data = useDatasetSeries(() => props.record, pinned, {
+  width: () => pinnedWidth.value ? Math.min(SPARK_MAX_PX, pinnedWidth.value - SPARK_CHROME_PX) : 400,
+  count: true,
+  last: true,
+})
+// Sparklines run up to now, so the line fills its width while the
+// window is still filling in.
+const sparkTo = computed(() => Math.min(data.axisTo.value, data.now.value))
+const soFar = computed(() => data.live.value && !data.window.value.windowless)
+
 
 /* Gaps and coverage across the window, from the strip counts. Devices
  * the service would not show are left out. Time outside a device's

@@ -5,7 +5,7 @@
 /**
  * Review fixes for the Datasets pages: stale pins, the 400 day chart
  * limit, request splitting, live duplicates and quality, dataset
- * windows in gaps, the sample rate at any moment, and long-zoom strips
+ * windows in gaps, the data rate at any moment, and long-zoom strips
  * from the coverage summary.
  */
 
@@ -13,9 +13,9 @@ import { describe, it, expect } from 'vitest'
 import {
     LIMITS, STEP_MS, COVERAGE_NOTE, StripCache, bucket_start, bucket_end, bucket_total,
     coverage_every, strip_every, coverage_not_ready, stray_mean_device, mean_window,
-    fold_live_items, good_quality, usable_windows, parse_series, series_error, series_key,
+    append_live_items, good_quality, usable_windows, parse_series, series_error, series_key,
 } from '../src/lib/datasets/series.js'
-import { device_gaps, window_gaps, sample_rate, fmt_rate } from '../src/lib/datasets/gaps.js'
+import { device_gaps, window_gaps, data_rate, fmt_rate } from '../src/lib/datasets/gaps.js'
 import { pinned_entries, stale_pins } from '../src/components/Datasets/page/page-logic.js'
 
 const D1 = 'aaaaaaaa-0000-4000-8000-000000000001'
@@ -104,39 +104,29 @@ describe('live values (4)', () => {
     })
     const item = (t, value, quality = 'Good') => ({ elementId: 'e1', value, quality, timestamp: new Date(t).toISOString() })
 
-    it('folds a value newer than asOf', () => {
-        const folded = new Map()
-        const s = fold_live_items(base(), [item(T0 + 3 * MIN, 40)], lookup, folded)
-        expect(s.metrics[key].points).toEqual([[T0, 20, 3]])
-        expect(folded.get(key)).toBe(T0 + 3 * MIN)
+    it('keeps a value newer than asOf as a raw tail, not in the buckets', () => {
+        const s = append_live_items(base(), [item(T0 + 3 * MIN, 40)], lookup)
+        expect(s.metrics[key].points).toEqual([[T0, 10, 2]])
+        expect(s.metrics[key].tail).toEqual([[T0 + 3 * MIN, 40]])
     })
 
     it('does not count an SSE replay twice', () => {
-        const folded = new Map()
-        let s = fold_live_items(base(), [item(T0 + 3 * MIN, 40)], lookup, folded)
-        const again = fold_live_items(s, [item(T0 + 3 * MIN, 40), item(T0 + 2.5 * MIN, 99)], lookup, folded)
+        const s = append_live_items(base(), [item(T0 + 3 * MIN, 40)], lookup)
+        const again = append_live_items(s, [item(T0 + 3 * MIN, 40), item(T0 + 2.5 * MIN, 99)], lookup)
         expect(again).toBe(s)
-    })
-
-    it('keeps the floor across a refetch', () => {
-        const folded = new Map()
-        let s = fold_live_items(base(), [item(T0 + 3 * MIN, 40)], lookup, folded)
-        // A refetch counted that value already and answered before it arrived again.
-        s = { ...s, asOf: T0 + 2.5 * MIN, metrics: { [key]: { ...s.metrics[key], points: [[T0, 20, 3]] } } }
-        expect(fold_live_items(s, [item(T0 + 3 * MIN, 40)], lookup, folded)).toBe(s)
     })
 
     it('skips values at or before the device\'s newest data time', () => {
         const s = base()
         s.devices[D1].last = T0 + 4 * MIN
-        expect(fold_live_items(s, [item(T0 + 4 * MIN, 40)], lookup, new Map())).toBe(s)
-        expect(fold_live_items(s, [item(T0 + 4 * MIN + 1, 40)], lookup, new Map())).not.toBe(s)
+        expect(append_live_items(s, [item(T0 + 4 * MIN, 40)], lookup)).toBe(s)
+        expect(append_live_items(s, [item(T0 + 4 * MIN + 1, 40)], lookup)).not.toBe(s)
     })
 
     it('does not chart values of bad or uncertain quality', () => {
         const s = base()
-        expect(fold_live_items(s, [item(T0 + 3 * MIN, 40, 'Bad')], lookup, new Map())).toBe(s)
-        expect(fold_live_items(s, [item(T0 + 3 * MIN, 40, 'Uncertain')], lookup, new Map())).toBe(s)
+        expect(append_live_items(s, [item(T0 + 3 * MIN, 40, 'Bad')], lookup)).toBe(s)
+        expect(append_live_items(s, [item(T0 + 3 * MIN, 40, 'Uncertain')], lookup)).toBe(s)
         expect(good_quality(undefined)).toBe(true)
         expect(good_quality('Good')).toBe(true)
     })
@@ -190,7 +180,7 @@ describe('dataset windows in gaps (5)', () => {
     })
 })
 
-describe('sample rate at any moment (6)', () => {
+describe('data rate at any moment (6)', () => {
     // A 1 Hz device with one metric, counted in 5 minute buckets over
     // the last hour, with `now` part way through a bucket.
     function one_hz (now) {
@@ -204,12 +194,12 @@ describe('sample rate at any moment (6)', () => {
     }
 
     for (const offset of [0, 7 * SEC, 2 * MIN + 13 * SEC, 4 * MIN + 59 * SEC]) {
-        it(`reads 1 Hz ${offset / SEC} s into a bucket`, () => {
+        it(`reads 1 point/s ${offset / SEC} s into a bucket`, () => {
             const now = T0 + offset
             const { counts, from, to } = one_hz(now)
             const g = device_gaps(counts, { from, to, every: '5m', now })
-            expect(sample_rate(g, '5m', 1)).toBeCloseTo(1, 2)
-            expect(fmt_rate(sample_rate(g, '5m', 1))).toBe('1 Hz')
+            expect(data_rate(g, '5m')).toBeCloseTo(1, 2)
+            expect(fmt_rate(data_rate(g, '5m'))).toBe('1 point/s')
         })
     }
 })

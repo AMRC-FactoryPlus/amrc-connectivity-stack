@@ -24,16 +24,20 @@
     </div>
     <template v-else>
       <div v-for="e in shown" :key="e.key" class="flex items-center gap-3 border-b border-slate-100 px-4 py-2 last:border-b-0">
-        <div class="min-w-0 flex-1">
+        <div class="w-[220px] min-w-0 shrink-0">
           <div class="truncate text-[13px] font-semibold" :title="e.path">{{ e.label }}</div>
           <div class="truncate text-xs text-slate-500">{{ e.deviceName }}</div>
         </div>
-        <svg :width="W" :height="H" :viewBox="`0 0 ${W} ${H}`" class="shrink-0" aria-hidden="true">
-          <path v-if="e.path_d" :d="e.path_d" fill="none" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round"/>
-          <line v-else-if="series" x1="0" :y1="H / 2" :x2="W" :y2="H / 2" stroke="#e2e8f0" stroke-dasharray="3 3"/>
+        <!-- Drawn in a W by H box and stretched to fill the row. -->
+        <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="min-w-[240px] flex-1" :style="{ height: `${H}px` }" aria-hidden="true">
+          <path v-if="e.path_d" :d="e.path_d" fill="none" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          <line v-else-if="series" x1="0" :y1="H / 2" :x2="W" :y2="H / 2" stroke="#e2e8f0" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
         </svg>
         <div class="w-24 shrink-0 text-right text-[13px] tabular-nums">
-          <template v-if="e.latest != null">{{ e.latest }}<span v-if="e.unit" class="ml-1 text-xs text-slate-500">{{ e.unit }}</span></template>
+          <template v-if="e.latest != null">
+            {{ e.latest }}<span v-if="e.unit" class="ml-1 text-xs text-slate-500">{{ e.unit }}</span>
+            <div v-if="soFar" class="text-[11px] text-slate-400">so far</div>
+          </template>
           <span v-else-if="series" class="text-xs text-slate-400">No data</span>
           <i v-else class="fa-solid fa-circle-notch animate-spin text-xs text-slate-400"></i>
         </div>
@@ -50,7 +54,7 @@
 import { computed } from 'vue'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { sparkline_path } from '@/lib/datasets/series.js'
+import { sparkline_path, latest_point } from '@/lib/datasets/series.js'
 
 const props = defineProps({
   // pinned_entries()
@@ -60,11 +64,14 @@ const props = defineProps({
   from: { type: Number, required: true },
   to: { type: Number, required: true },
   live: { type: Boolean, default: false },
+  // The window is still filling in: the sparklines end at now.
+  soFar: { type: Boolean, default: false },
   error: { type: String, default: null },
 })
 defineEmits(['tab'])
 
-const W = 160
+// The drawing box; the SVG stretches it to the row's width.
+const W = 1000
 const H = 28
 const MAX = 8
 
@@ -73,11 +80,11 @@ const num = v => Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecision(4))
 const shown = computed(() => props.entries.slice(0, MAX).map(e => {
   const m = props.series?.metrics[e.key]
   const pts = m?.points ?? []
-  const last = pts.at(-1)
+  const last = latest_point(m)
   return {
     ...e,
     unit: m?.unit ?? e.unit,
-    path_d: props.series ? sparkline_path(pts, { from: props.from, to: props.to, w: W, h: H, every: props.series.every }) : '',
+    path_d: props.series ? sparkline_path(pts, { from: props.from, to: props.to, w: W, h: H, every: props.series.every, tail: m?.tail ?? [] }) : '',
     latest: last ? num(last[1]) : null,
   }
 }))

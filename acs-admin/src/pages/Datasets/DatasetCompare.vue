@@ -102,7 +102,7 @@
           <button v-for="m in shownMetrics" :key="m.key" type="button" role="tab"
                   class="max-w-xs truncate rounded px-2.5 py-1 text-sm transition-colors duration-150"
                   :class="m.key === metric ? 'bg-slate-900 text-slate-50' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-                  :aria-selected="m.key === metric" :title="m.label" @click="metric = m.key">
+                  :aria-selected="m.key === metric" :title="m.title" @click="metric = m.key">
             {{ m.label }}
           </button>
           <span v-if="!shownMetrics.length" class="text-sm text-slate-500">No metrics match.</span>
@@ -142,6 +142,7 @@ import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { display_name, fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { fetch_csv } from '@/lib/datasets/api.js'
+import { metric_labels } from '@/lib/datasets/series.js'
 import { parse_csv } from '@/lib/datasets/energy.js'
 import {
   metric_series, common_metrics, is_numeric, align, downsample, line_style, group_problem,
@@ -240,25 +241,39 @@ const runRows = computed(() => ids.value.map(uuid => {
  * Metrics and lines
  * ------------------------------------------------------------------ */
 
-function metric_label (s) {
-  const dev = ds.deviceBySparkplug[s.device]?.name ?? s.device
-  return dev ? `${dev} / ${s.metric}` : s.metric
+function device_name (s) {
+  return ds.deviceBySparkplug[s.device]?.name ?? s.device
 }
 
-// Metrics every loaded run has. Numeric ones first.
+// Metrics every loaded run has. Numeric ones first. Labels are short
+// and readable; the full path shows on hover.
 const metrics = computed(() => {
   const maps = ready.value.map(id => loads[id].metrics)
-  return common_metrics(maps)
+  const keys = common_metrics(maps)
+  const paths = new Map()
+  for (const key of keys) {
+    const s = maps[0].get(key)
+    paths.set(s.device, [...(paths.get(s.device) ?? []), s.metric])
+  }
+  const labels = new Map([...paths].map(([d, list]) => [d, metric_labels(list)]))
+  return keys
     .map(key => {
       const s = maps[0].get(key)
-      return { key, label: metric_label(s), numeric: maps.every(m => is_numeric(m.get(key))) }
+      const dev = device_name(s)
+      const short = labels.get(s.device)?.get(s.metric) ?? s.metric
+      return {
+        key,
+        label: dev ? `${dev} / ${short}` : short,
+        title: dev ? `${dev} / ${s.metric}` : s.metric,
+        numeric: maps.every(m => is_numeric(m.get(key))),
+      }
     })
     .sort((a, b) => (b.numeric - a.numeric) || a.label.localeCompare(b.label))
 })
 
 const shownMetrics = computed(() => {
   const q = metricSearch.value.trim().toLowerCase()
-  return q ? metrics.value.filter(m => m.label.toLowerCase().includes(q)) : metrics.value
+  return q ? metrics.value.filter(m => `${m.label} ${m.title}`.toLowerCase().includes(q)) : metrics.value
 })
 
 // Keep the chosen metric while it is still offered.

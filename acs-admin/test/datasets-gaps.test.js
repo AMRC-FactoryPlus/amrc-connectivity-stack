@@ -3,7 +3,7 @@
  */
 
 /**
- * Gaps, coverage and sample rate from v1/series counts, and how many
+ * Gaps, coverage and data rate from v1/series counts, and how many
  * datasets an add-on applies to.
  */
 
@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest'
 import {
     bucket_grid, normal_spacing, device_gaps, window_gaps,
     selection_gap_line, gap_note, fmt_coverage, coverage_sub, recording_gap_note,
-    sample_rate, fmt_rate,
+    data_rate, fmt_rate,
 } from '../src/lib/datasets/gaps.js'
 import { ADDONS, addon_applies_count, applies_text } from '../src/lib/datasets/addons.js'
 import { sending_summary, fmt_ago } from '../src/lib/datasets/kiosk.js'
@@ -205,38 +205,39 @@ describe('words', () => {
     })
 })
 
-describe('sample rate', () => {
-    it('is points per second per metric while sending', () => {
-        // 300 points per 5 minutes = 1 per second.
+describe('data rate', () => {
+    it('is the device total, points per second while sending', () => {
+        // 300 points per 5 minutes = 1 per second, whatever the metric count.
         const g = device_gaps(rows(range(0, 12)), W)
-        expect(sample_rate(g, '5m', 1)).toBeCloseTo(1)
-        expect(sample_rate(g, '5m', 4)).toBeCloseTo(0.25)
+        expect(data_rate(g, '5m')).toBeCloseTo(1)
     })
 
     it('leaves out the time in gaps', () => {
         const g = device_gaps(rows([...range(0, 3), ...range(6, 12)]), W)
-        expect(sample_rate(g, '5m', 1)).toBeCloseTo(1)
+        expect(data_rate(g, '5m')).toBeCloseTo(1)
     })
 
     it('is null with no data', () => {
-        expect(sample_rate(device_gaps([], W), '5m')).toBeNull()
+        expect(data_rate(device_gaps([], W), '5m')).toBeNull()
     })
 
-    it('formats as Hz, per minute or per hour', () => {
-        expect(fmt_rate(1)).toBe('1 Hz')
-        expect(fmt_rate(2.5)).toBe('2.5 Hz')
-        expect(fmt_rate(0.98)).toBe('1 Hz')
-        expect(fmt_rate(4 / 60)).toBe('4/min')
-        expect(fmt_rate(6 / 3600)).toBe('6/h')
-        expect(fmt_rate(1 / 86400)).toBe('Under 1/h')
+    it('formats as points per second, minute or hour', () => {
+        expect(fmt_rate(6)).toBe('6 points/s')
+        expect(fmt_rate(1)).toBe('1 point/s')
+        expect(fmt_rate(2.5)).toBe('2.5 points/s')
+        expect(fmt_rate(0.98)).toBe('59 points/min')
+        expect(fmt_rate(4 / 60)).toBe('4 points/min')
+        expect(fmt_rate(1 / 60)).toBe('1 point/min')
+        expect(fmt_rate(6 / 3600)).toBe('6 points/h')
+        expect(fmt_rate(1 / 86400)).toBe('Under 1 point/h')
         expect(fmt_rate(0)).toBe('')
         expect(fmt_rate(null)).toBe('')
     })
 
-    it('reads 4 per minute from a slow device', () => {
-        // 20 points per 5 minutes on one metric.
+    it('reads 4 points a minute from a slow device', () => {
+        // 20 points per 5 minutes.
         const g = device_gaps(rows(range(0, 12), 20), W)
-        expect(fmt_rate(sample_rate(g, '5m', 1))).toBe('4/min')
+        expect(fmt_rate(data_rate(g, '5m'))).toBe('4 points/min')
     })
 })
 

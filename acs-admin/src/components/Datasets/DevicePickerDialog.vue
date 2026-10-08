@@ -88,7 +88,7 @@ import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
 import { device_status, series_request, LAST_LOOKBACK, LIMITS } from '@/lib/datasets/series.js'
-import { device_gaps, sample_rate, fmt_rate } from '@/lib/datasets/gaps.js'
+import { device_gaps, data_rate, fmt_rate } from '@/lib/datasets/gaps.js'
 import { group_devices, text_match, equipment_by_device } from './builder/builder.js'
 
 const props = defineProps({
@@ -144,7 +144,7 @@ const groups = computed(() => {
   return out
 })
 
-/* "Quiet since" and the sample rate over the last hour for the devices
+/* "Quiet since" and the data rate over the last hour for the devices
  * on screen, fetched once per dialog for each device as it is shown.
  * A device whose request failed is asked again on the next change or
  * after a short wait. Answers from an earlier opening are dropped. */
@@ -194,8 +194,7 @@ async function loadLasts () {
       if (s.denied.includes(u)) continue
       got[u] = s.devices[u]?.last ?? null
       const g = device_gaps(s.devices[u]?.count ?? [], { from, to, every: RATE_EVERY, now: s.asOf })
-      const dev = ds.deviceByUuid[u]
-      rate[u] = fmt_rate(sample_rate(g, RATE_EVERY, dev?.metrics?.length))
+      rate[u] = fmt_rate(data_rate(g, RATE_EVERY))
     }
     lasts.value = { ...lasts.value, ...got }
     rates.value = { ...rates.value, ...rate }

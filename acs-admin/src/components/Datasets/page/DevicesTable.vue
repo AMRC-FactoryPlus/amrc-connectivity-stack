@@ -4,7 +4,7 @@
 
 <!-- The devices a dataset covers: name with a status dot, site and
      area, the equipment label, the number of historised metrics, the
-     sample rate, and a strip of when data arrived across the dataset's
+     data rate, and a strip of when data arrived across the dataset's
      window with a note on any gaps. -->
 <template>
   <Card class="overflow-hidden">
@@ -24,7 +24,7 @@
             <th class="px-4 py-2 font-medium">Device</th>
             <th class="px-4 py-2 font-medium">Label</th>
             <th class="px-4 py-2 text-right font-medium">Metrics</th>
-            <th class="px-4 py-2 font-medium" title="Average points per second or minute for each metric, while the device was sending">Sample rate</th>
+            <th class="px-4 py-2 font-medium" title="Points the device sent across all its metrics, per second or minute, while it was sending">Data rate</th>
             <th class="px-4 py-2 font-medium">Data across the window</th>
           </tr>
         </thead>
@@ -75,7 +75,7 @@ import { useNow } from '@vueuse/core'
 import { Card } from '@/components/ui/card'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { device_status, window_strip } from '@/lib/datasets/series.js'
-import { gap_note, sample_rate, fmt_rate } from '@/lib/datasets/gaps.js'
+import { gap_note, data_rate, fmt_rate } from '@/lib/datasets/gaps.js'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -125,7 +125,7 @@ const rows = computed(() => props.resolved.device_datasets.map(dd => {
     label: props.labels[dd] ?? null,
     metrics: dev?.metrics?.length ?? null,
     status: device_status(dev?.status ?? null, data?.last, now.value.getTime()),
-    rate: g && props.strips?.every ? fmt_rate(sample_rate(g, props.strips.every, dev?.metrics?.length)) : '',
+    rate: g && props.strips?.every ? fmt_rate(data_rate(g, props.strips.every)) : '',
     strip,
     note: note(g),
   }

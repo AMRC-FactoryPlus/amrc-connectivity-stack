@@ -231,6 +231,19 @@ async function write_metadata (client, uuid, spec) {
 }
 
 /**
+ * The "<name> (devices)" union the builder made for a session, or null.
+ * It counts as the session's own only while nothing else includes it;
+ * otherwise editing or deleting it would change those datasets too.
+ */
+export function own_helper (rec, byUuid) {
+    if (rec?.structure !== STRUCTURE.SESSION) return null
+    const src = byUuid?.[rec.config?.source]
+    if (src?.structure !== STRUCTURE.UNION || src.name !== `${rec.name} (devices)`) return null
+    const shared = Object.values(byUuid).some(o => o.uuid !== rec.uuid && direct_sources(o).includes(src.uuid))
+    return shared ? null : src
+}
+
+/**
  * Which parts of an existing dataset the builder can change in place.
  * A dataset's structure type cannot change, and editing an invalid one
  * makes the service delete config entries, so neither is offered.
@@ -243,10 +256,7 @@ export function edit_shape (rec, byUuid) {
     if (rec.structure === STRUCTURE.SESSION) {
         const src = byUuid[rec.config?.source]
         // A session over its own "(devices)" union: edit that union's items.
-        // Only if nothing else includes that union, or editing it would
-        // change those datasets too.
-        const own = src?.structure === STRUCTURE.UNION && src.name === `${rec.name} (devices)`
-            && Object.values(byUuid).every(o => o.uuid === rec.uuid || !direct_sources(o).includes(src.uuid))
+        const own = !!own_helper(rec, byUuid)
         return {
             ok: true,
             has_window: true,
@@ -341,6 +351,56 @@ export async function delete_dataset (client, uuid) {
     if (st === 409) return { ok: false, referrers: (body?.referrers ?? []).map(r => r.dataset) }
     if (st === 403) return { ok: false, reason: 'You do not have permission to delete this dataset.' }
     return { ok: false, reason: `The service refused (HTTP ${st}).` }
+}
+
+/**
+ * What deleting `rec` takes: the dataset, then its own device list
+ * (own_helper) when it has one. { order: [uuid], helper: record|null }
+ */
+export function delete_plan (rec, byUuid) {
+    const helper = own_helper(rec, byUuid)
+    return { order: helper ? [rec.uuid, helper.uuid] : [rec.uuid], helper }
+}
+
+/**
+ * For a delete of `rec` refused because `referrers` include it: the
+ * one session whose own device list `rec` is, or null. Deleting that
+ * session first lets this one go.
+ */
+export function helper_owner (rec, referrers, byUuid) {
+    if (referrers?.length !== 1) return null
+    const owner = byUuid?.[referrers[0]]
+    return owner && own_helper(owner, byUuid)?.uuid === rec?.uuid ? owner : null
+}
+
+/**
+ * Waits before asking again when a delete is refused only because of a
+ * dataset deleted a moment ago. Data Access learns of deletes from
+ * ConfigDB a little later, so its check can still see that one.
+ */
+export const DELETE_RETRY_MS = [500, 1000, 2000, 3000, 4000]
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Delete datasets in order, stopping at the first refusal. A refusal
+ * that names only datasets this call already deleted is retried after
+ * each of `retry` waits; `onWait(uuid)` is called before each wait.
+ * { ok, deleted: [uuid], failed: uuid|null, referrers, reason }
+ */
+export async function delete_in_order (client, order, { retry = DELETE_RETRY_MS, wait = sleep, onWait = () => {} } = {}) {
+    const deleted = []
+    for (const uuid of order) {
+        let res = await delete_dataset(client, uuid)
+        for (let i = 0; !res.ok && i < retry.length && res.referrers?.length && res.referrers.every(r => deleted.includes(r)); i++) {
+            onWait(uuid)
+            await wait(retry[i])
+            res = await delete_dataset(client, uuid)
+        }
+        if (!res.ok) return { ...res, ok: false, deleted, failed: uuid }
+        deleted.push(uuid)
+    }
+    return { ok: true, deleted, failed: null }
 }
 
 /* ------------------------------------------------------------------

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) University of Sheffield AMRC 2026.
  *
- * Gaps, coverage and sample rate, worked out from the arrival counts
+ * Gaps, coverage and data rate, worked out from the arrival counts
  * that POST v1/series returns (sparse [bucket start, n] rows per
  * device). Used by the timeline selection card, the dataset page, the
  * builder preview, the device picker and the kiosk.
@@ -253,24 +253,24 @@ export function recording_gap_note (result, nameOf = d => d) {
 }
 
 /* ------------------------------------------------------------------
- * Sample rate
+ * Data rate
  * ------------------------------------------------------------------ */
 
 /**
- * Points per second for each metric of a device: the points in the
- * window over the time it was sending (buckets outside gaps), divided
- * by its number of metrics. A partial first or last bucket counts only
- * the time that has elapsed in it, so a steady rate reads the same at
- * any moment. Null when there is too little to tell.
- * `g` is a device_gaps() result.
+ * Points per second for a whole device: the points in the window over
+ * the time it was sending (buckets outside gaps). Counts are per
+ * device, not per metric, so this is the device's total rate. A
+ * partial first or last bucket counts only the time that has elapsed
+ * in it, so a steady rate reads the same at any moment. Null when
+ * there is too little to tell. `g` is a device_gaps() result.
  */
-export function sample_rate (g, every, metrics = 1) {
+export function data_rate (g, every) {
     if (!g?.points) return null
     const step = STEP_MS[every]
     if (!step) return null
     const sending = g.sending ?? (g.grid.length - g.empty.size) * step
     if (!(sending > 0)) return null
-    return g.points / (sending / 1000) / Math.max(1, metrics || 1)
+    return g.points / (sending / 1000)
 }
 
 function nice (v) {
@@ -278,11 +278,16 @@ function nice (v) {
     return String(r)
 }
 
-/** "1 Hz", "2.5 Hz", "4/min", "6/h", "Under 1/h", or "" for none. */
+const pts = v => `${nice(v)} ${nice(v) === '1' ? 'point' : 'points'}`
+
+/**
+ * "6 points/s" from 60 a minute up, "360 points/min", "6 points/h",
+ * "Under 1 point/h", or "" for none.
+ */
 export function fmt_rate (pps) {
     if (!(pps > 0)) return ''
-    if (pps >= 0.95) return `${nice(pps)} Hz`
-    if (pps * 60 >= 0.95) return `${nice(pps * 60)}/min`
-    if (pps * 3600 >= 0.95) return `${nice(pps * 3600)}/h`
-    return 'Under 1/h'
+    if (pps * 60 >= 59.5) return `${pts(pps)}/s`
+    if (pps * 60 >= 0.95) return `${pts(pps * 60)}/min`
+    if (pps * 3600 >= 0.95) return `${pts(pps * 3600)}/h`
+    return 'Under 1 point/h'
 }

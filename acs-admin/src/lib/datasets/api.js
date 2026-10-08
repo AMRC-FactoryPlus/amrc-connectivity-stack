@@ -374,7 +374,8 @@ export async function update_from_spec (client, rec, spec, byUuid) {
 export async function delete_dataset (client, uuid, { timeout = DELETE_TIMEOUT_MS } = {}) {
     let timer = null
     const late = new Promise(resolve => { timer = setTimeout(() => resolve(null), timeout) })
-    const answer = await Promise.race([client.DataAccess.fetch(`v1/delete/${uuid}`), late]).finally(() => clearTimeout(timer))
+    // Never from the browser's cache: each try must reach the service.
+    const answer = await Promise.race([client.DataAccess.fetch({ url: `v1/delete/${uuid}`, cache: 'no-store' }), late]).finally(() => clearTimeout(timer))
     if (!answer) return { ok: false, timedOut: true, reason: 'The service did not answer in time. Check the dataset list before trying again.' }
     const [st, body] = answer
     if (st === 200 || st === 204 || st === 404) return { ok: true }
@@ -410,14 +411,33 @@ export const DELETE_TIMEOUT_MS = 15 * 1000
  * Whether a dataset still exists, as far as you can tell: false only
  * when Data Access answers 404 for its metadata.
  */
-export async function dataset_exists (client, uuid) {
+export async function dataset_exists (client, uuid, { timeout = EXISTS_TIMEOUT_MS } = {}) {
+    let timer = null
+    const late = new Promise(resolve => { timer = setTimeout(() => resolve(null), timeout) })
     try {
-        const [st] = await client.DataAccess.fetch(`v1/metadata/${uuid}`)
-        return st !== 404
+        const answer = await Promise.race([client.DataAccess.fetch({ url: `v1/metadata/${uuid}`, cache: 'no-store' }), late])
+        // No answer in time: assume it is still there.
+        return answer ? answer[0] !== 404 : true
     }
     catch {
         return true
     }
+    finally {
+        clearTimeout(timer)
+    }
+}
+
+/** How long a check that a dataset exists may take. */
+export const EXISTS_TIMEOUT_MS = 5 * 1000
+
+/**
+ * The referrers of a refused delete that still hold it back: less the
+ * ones known to be gone, and less those that were in the store when
+ * the refusal came (`seen`) but are not any more (deleted elsewhere).
+ * Ones you cannot see stay.
+ */
+export function remaining_referrers (referrers, { gone = [], seen = [], byUuid = {} } = {}) {
+    return (referrers ?? []).filter(r => !gone.includes(r) && !(seen.includes(r) && !byUuid[r]))
 }
 
 /**
@@ -449,7 +469,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
  */
 export async function delete_in_order (client, order, {
     retry = DELETE_RETRY_MS, wait = sleep, onWait = () => {}, gone = async () => false,
-    timeout = DELETE_TIMEOUT_MS, cancelled = () => false,
+    timeout = DELETE_TIMEOUT_MS, cancelled = () => false, log = () => {},
 } = {}) {
     const deleted = []
     const dead = new Set()
@@ -457,19 +477,27 @@ export async function delete_in_order (client, order, {
         if (!refs?.length) return false
         for (const r of refs) {
             if (deleted.includes(r) || dead.has(r)) continue
-            if (await gone(r)) dead.add(r)
+            log('checking whether referrer is gone', r)
+            const g = await gone(r)
+            log('referrer gone?', r, g)
+            if (g) dead.add(r)
             else return false
         }
         return true
     }
     for (const uuid of order) {
         if (cancelled()) return { ok: false, cancelled: true, deleted, failed: uuid, gone: [...dead] }
+        log('delete', uuid)
         let res = await delete_dataset(client, uuid, { timeout })
+        log('delete answered', uuid, res)
         for (let i = 0; !res.ok && i < retry.length && await all_gone(res.referrers); i++) {
             if (cancelled()) return { ok: false, cancelled: true, deleted, failed: uuid, gone: [...dead] }
             onWait(uuid)
+            log('waiting before retry', uuid, retry[i])
             await wait(retry[i])
+            log('retry delete', uuid, i + 1)
             res = await delete_dataset(client, uuid, { timeout })
+            log('retry answered', uuid, res)
         }
         if (!res.ok) return { ...res, ok: false, deleted, failed: uuid, gone: [...deleted, ...dead] }
         deleted.push(uuid)

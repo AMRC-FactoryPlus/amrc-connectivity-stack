@@ -259,7 +259,7 @@ describe('deleting safely', () => {
     it('retries when the only referrer no longer exists', async () => {
         const answers = [[409, { referrers: [{ dataset: SESSION }] }], [409, { referrers: [{ dataset: SESSION }] }], [200, null]]
         const sent = []
-        const client = { DataAccess: { fetch: async path => { sent.push(path); return answers.shift() } } }
+        const client = { DataAccess: { fetch: async opts => { sent.push(opts.url); return answers.shift() } } }
         const res = await delete_in_order(client, [HELPER], { wait: async () => {}, gone: async r => r === SESSION })
         expect(res.ok).toBe(true)
         expect(sent).toEqual([`v1/delete/${HELPER}`, `v1/delete/${HELPER}`, `v1/delete/${HELPER}`])
@@ -284,5 +284,15 @@ describe('deleting safely', () => {
     it('reads a 404 for the metadata as gone', async () => {
         expect(await dataset_exists({ DataAccess: { fetch: async () => [404] } }, SESSION)).toBe(false)
         expect(await dataset_exists({ DataAccess: { fetch: async () => [403] } }, SESSION)).toBe(true)
+    })
+})
+
+describe('deletes reach the service', () => {
+    it('never answers a delete or existence check from the browser cache', async () => {
+        const seen = []
+        const client = { DataAccess: { fetch: async opts => { seen.push(opts); return [204, null] } } }
+        await delete_in_order(client, ['x'])
+        await dataset_exists(client, 'x')
+        expect(seen.map(o => o.cache)).toEqual(['no-store', 'no-store'])
     })
 })

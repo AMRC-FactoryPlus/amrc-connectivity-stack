@@ -9,8 +9,8 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-    zoom_span, nearest_zoom, at_now, to_now, CHART_ZOOMS, clamp_view, zoom_view, step_view, go_view, pan_view, view_labels,
-    spark_range, default_spark_range, MIN_SPAN,
+    zoom_span, nearest_zoom, at_now, to_now, CHART_ZOOMS, fmt_view_range, fmt_length, fmt_selection, inside_x, clamp_view, zoom_view, step_view, go_view, pan_view, view_labels,
+    spark_range, default_spark_range, MIN_SPAN, SPARK_RANGES,
 } from '../src/lib/datasets/chart-view.js'
 import { ZOOMS } from '../src/lib/datasets/model.js'
 import { dataset_window, chart_pairs, sparkline_path, y_range, gap_joins, live_mode, display_rows, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
@@ -319,5 +319,70 @@ describe('Data tab fixes: y axis, history edge, faint joins', () => {
         // The join starts at the held value; drawn as steps, it stays at 4 across the gap.
         expect(joins[0][1]).toBe(4)
         expect(joins[1][0]).toBe(T0 + MIN)
+    })
+})
+
+describe('words while dragging', () => {
+    // 12:41:10 London (BST) on Thu 8 Oct 2026.
+    const t = Date.parse('2026-10-08T11:41:10.000Z')
+
+    it('gives the range at the zoom precision, in London time', () => {
+        expect(fmt_view_range(t, t + 5 * MIN, 'seconds')).toBe('Thu 8 Oct 12:41:10 to 12:46:10')
+        expect(fmt_view_range(t, t + HOUR, 'minutes')).toBe('Thu 8 Oct 12:41:10 to 13:41:10')
+        expect(fmt_view_range(t, t + 8 * HOUR, 'hours')).toBe('Thu 8 Oct 12:41 to 20:41')
+        expect(fmt_view_range(t, t + 14 * HOUR, 'hours')).toBe('Thu 8 Oct 12:41 to Fri 9 Oct 02:41')
+        expect(fmt_view_range(t, t + 2 * DAY, 'days')).toBe('Thu 8 Oct to Sat 10 Oct')
+        expect(fmt_view_range(t, t + HOUR, 'weeks')).toBe('Thu 8 Oct')
+    })
+
+    it('gives a length in words', () => {
+        expect(fmt_length(95 * MIN)).toBe('1 h 35 min')
+        expect(fmt_length(2 * HOUR)).toBe('2 h')
+        expect(fmt_length(45 * MIN)).toBe('45 min')
+        expect(fmt_length(30 * SEC)).toBe('30 s')
+        expect(fmt_length(DAY + 3 * HOUR)).toBe('1 day 3 h')
+        expect(fmt_length(2 * DAY)).toBe('2 days')
+    })
+
+    it('describes a selection being dragged, either way', () => {
+        const a = Date.parse('2026-10-08T11:05:00.000Z')
+        expect(fmt_selection(a, a + 95 * MIN)).toBe('12:05 to 13:40, 1 h 35 min')
+        expect(fmt_selection(a + 95 * MIN, a)).toBe('12:05 to 13:40, 1 h 35 min')
+        expect(fmt_selection(a, a + DAY)).toBe('Thu 8 Oct 12:05 to Fri 9 Oct 12:05, 1 day')
+    })
+
+    it('keeps a tooltip inside its box', () => {
+        expect(inside_x(0, 400)).toEqual({ left: 0, shift: 0 })
+        expect(inside_x(400, 400)).toEqual({ left: 400, shift: 100 })
+        expect(inside_x(-20, 400)).toEqual({ left: 0, shift: 0 })
+        expect(inside_x(200, 400)).toEqual({ left: 200, shift: 50 })
+    })
+})
+
+describe('fine sparkline spans', () => {
+    const now = Date.parse('2026-10-08T11:30:00.000Z')
+    const open = { from: now - 3 * DAY, to: now, open: true, windowless: false }
+
+    it('offers 1 min and 5 min first, ending at now, in 10 s buckets that stream', () => {
+        expect(SPARK_RANGES.slice(0, 3).map(r => r.label)).toEqual(['1 min', '5 min', '15 min'])
+        for (const [id, span] of [['1m', MIN], ['5m', 5 * MIN]]) {
+            const r = spark_range(id, open, now)
+            expect(r).toEqual({ from: now - span, to: now })
+            const every = every_for_width(r.from, r.to, 800)
+            expect(every).toBe('10s')
+            expect(live_mode(r, every, now).stream).toBe(true)
+        }
+        expect(default_spark_range(open, now)).toBe('24h')
+    })
+
+    it('draws the raw values over the 10 s buckets on a sparkline', () => {
+        const buckets = Array.from({ length: 6 }, (_, i) => [now - MIN + i * 10 * SEC, 1, 10])
+        const raw = Array.from({ length: 20 }, (_, i) => [now - 20 * SEC + i * SEC, 2 + (i % 2)])
+        const { rows } = display_rows({ points: buckets, tail: raw }, '10s', { until: now })
+        // Buckets until the raw values begin, then every raw value.
+        expect(rows.filter(r => r[0] >= now - 20 * SEC)).toEqual(raw)
+        expect(rows[0]).toEqual([now - MIN, 1])
+        const d = sparkline_path(rows, { from: now - MIN, to: now, w: 600, h: 20, step: true })
+        expect(d.match(/V/g).length).toBeGreaterThan(10)
     })
 })

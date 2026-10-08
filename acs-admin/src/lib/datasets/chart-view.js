@@ -9,7 +9,7 @@
  * Nothing here talks to a service. Tested in test/datasets-chart-view.test.js.
  */
 
-import { ZOOMS, centre_label, london_date_key } from './model.js'
+import { ZOOMS, centre_label, london_date_key, fmt_clock, fmt_day } from './model.js'
 
 const MIN = 60 * 1000
 const HOUR = 60 * MIN
@@ -133,6 +133,9 @@ export function fmt_span (ms) {
 
 /** The sparkline spans, shortest first. `null` is the whole window. */
 export const SPARK_RANGES = [
+    // These two use 10 s buckets with the raw live values over them.
+    { id: '1m', label: '1 min', span: MIN },
+    { id: '5m', label: '5 min', span: 5 * MIN },
     { id: '15m', label: '15 min', span: 15 * MIN },
     { id: '1h', label: '1 h', span: HOUR },
     { id: '6h', label: '6 h', span: 6 * HOUR },
@@ -155,4 +158,57 @@ export function spark_range (id, w, now = Date.now()) {
 /** The default choice: the whole window once it has finished, else the last 24 h. */
 export function default_spark_range (w, now = Date.now()) {
     return !w.windowless && !w.open && w.to <= now ? 'window' : '24h'
+}
+
+/* ------------------------------------------------------------------
+ * Words while dragging
+ * ------------------------------------------------------------------ */
+
+/**
+ * A range for the drag tooltip, at the zoom's precision, London time:
+ * seconds at Seconds and Minutes ("Thu 8 Oct 12:41:10 to 12:46:10"),
+ * minutes at Hours ("Thu 8 Oct 12:41 to 20:41"), dates at Days and
+ * beyond ("Thu 8 Oct to Sat 10 Oct"). The second date shows only when
+ * it differs.
+ */
+export function fmt_view_range (from, to, zoom) {
+    const sameDay = london_date_key(from) === london_date_key(to)
+    if (zoom === 'days' || zoom === 'weeks' || zoom === 'years') {
+        return sameDay ? fmt_day(from) : `${fmt_day(from)} to ${fmt_day(to)}`
+    }
+    const secs = zoom === 'seconds' || zoom === 'minutes'
+    const end = sameDay ? fmt_clock(to, secs) : `${fmt_day(to)} ${fmt_clock(to, secs)}`
+    return `${fmt_day(from)} ${fmt_clock(from, secs)} to ${end}`
+}
+
+/** "1 h 35 min", "45 min", "30 s", "2 days 3 h". */
+export function fmt_length (ms) {
+    const s = Math.round(Math.max(0, ms) / 1000)
+    if (s < 60) return `${s} s`
+    const m = Math.round(s / 60)
+    if (m < 60) return `${m} min`
+    const h = Math.floor(m / 60), rm = m % 60
+    if (h < 24) return rm ? `${h} h ${rm} min` : `${h} h`
+    const d = Math.floor(h / 24), rh = h % 24
+    return `${d} ${d === 1 ? 'day' : 'days'}${rh ? ` ${rh} h` : ''}`
+}
+
+/** A selection being dragged: "12:05 to 13:40, 1 h 35 min". */
+export function fmt_selection (from, to) {
+    const a = Math.min(from, to), b = Math.max(from, to)
+    const sameDay = london_date_key(a) === london_date_key(b)
+    const span = sameDay
+        ? `${fmt_clock(a)} to ${fmt_clock(b)}`
+        : `${fmt_day(a)} ${fmt_clock(a)} to ${fmt_day(b)} ${fmt_clock(b)}`
+    return `${span}, ${fmt_length(b - a)}`
+}
+
+/**
+ * Where a tooltip goes along a box `width` wide, at `x`: its left edge
+ * at x, shifted left by the same share of its own width, so it never
+ * leaves the box.
+ */
+export function inside_x (x, width) {
+    const cx = Math.max(0, Math.min(width, x))
+    return { left: cx, shift: width > 0 ? (cx / width) * 100 : 0 }
 }

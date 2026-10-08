@@ -577,11 +577,12 @@ export function extent (points) {
  * display_rows() rows ([ms, value|null]). A null breaks the line. With
  * `step`, each value holds until the next one (step after).
  */
-export function sparkline_path (rows, { from, to, w, h, step = false, pad = 2 }) {
+export function sparkline_path (rows, { from, to, w, h, step = false, pad = 2, range = null }) {
     const shown = rows.filter(([t]) => t <= to)
-    const ext = extent(shown.filter(r => r[1] != null))
-    if (!ext || to <= from) return ''
-    const [lo, hi] = ext
+    // Fitted to the values in view (and the one carried in from the left).
+    const fit = range ?? y_range(shown, from, to, 0)
+    if (!fit || to <= from) return ''
+    const lo = fit.min, hi = fit.max
     const x = t => Math.max(0, Math.min(w, ((t - from) / (to - from)) * w))
     const y = v => hi === lo ? h / 2 : pad + (1 - (v - lo) / (hi - lo)) * (h - 2 * pad)
     const r = n => Math.round(n * 10) / 10

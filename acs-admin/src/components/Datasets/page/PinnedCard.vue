@@ -42,6 +42,7 @@
         <!-- Drawn in a W by H box and stretched to fill the row. -->
         <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="min-w-[240px] flex-1" :style="{ height: `${H}px` }" aria-hidden="true">
           <title>{{ e.path }}</title>
+          <path v-if="e.joins_d" :d="e.joins_d" fill="none" stroke="#0f172a" stroke-opacity="0.35" stroke-dasharray="3 3" stroke-width="1.25" vector-effect="non-scaling-stroke"/>
           <path v-if="e.path_d" :d="e.path_d" fill="none" stroke="#0f172a" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
           <line v-else-if="series" x1="0" :y1="H / 2" :x2="W" :y2="H / 2" stroke="#e2e8f0" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
         </svg>
@@ -66,7 +67,7 @@
 import { computed } from 'vue'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { sparkline_path, latest_point } from '@/lib/datasets/series.js'
+import { sparkline_path, latest_point, y_range, gap_joins } from '@/lib/datasets/series.js'
 import { SPARK_RANGES } from '@/lib/datasets/chart-view.js'
 
 const props = defineProps({
@@ -98,11 +99,16 @@ const num = v => Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecision(4))
 const shown = computed(() => props.entries.slice(0, MAX).map(e => {
   const m = props.series?.metrics[e.key]
   const d = props.series && props.display ? props.display(e.key) : { rows: [], step: false }
+  // One y range for the line and its joins, from the values in view.
+  const fit = y_range(d.rows, props.from, props.to, 0.05)
+  const joins = gap_joins(d.rows)
   const last = latest_point(m)
   return {
     ...e,
     unit: m?.unit ?? e.unit,
-    path_d: d.rows.length ? sparkline_path(d.rows, { from: props.from, to: props.to, w: W, h: H, step: d.step }) : '',
+    path_d: d.rows.length ? sparkline_path(d.rows, { from: props.from, to: props.to, w: W, h: H, step: d.step, range: fit }) : '',
+    // Gaps, joined faintly as a held value.
+    joins_d: joins.length ? sparkline_path(joins, { from: props.from, to: props.to, w: W, h: H, step: d.step, range: fit }) : '',
     latest: last ? num(last[1]) : null,
   }
 }))

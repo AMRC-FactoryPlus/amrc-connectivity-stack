@@ -73,6 +73,9 @@
             <div v-if="nowX != null" class="absolute inset-y-0 z-[4] w-0.5 bg-slate-900" :style="{ left: `${nowX}px` }"></div>
             <div v-if="selection" class="absolute z-[5] rounded border-2 border-dashed border-slate-900 bg-slate-900/[.06]"
                  :style="{ top: `${selection.top}px`, height: `${selection.height}px`, left: `${selX.left}px`, width: `${Math.max(2, selX.right - selX.left)}px` }"></div>
+            <!-- While dragging: start, end and length, beside the edge being dragged. -->
+            <div v-if="selection && sel?.dragging && selX.right > selX.left" class="absolute z-[6] whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs text-white shadow"
+                 :style="selTipStyle">{{ selTip }}</div>
           </div>
 
           <template v-for="row in shownRows" :key="row.key">
@@ -113,6 +116,7 @@
 </template>
 
 <script setup>
+import { fmt_selection } from '@/lib/datasets/chart-view.js'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useEventListener, useNow, useResizeObserver } from '@vueuse/core'
@@ -336,6 +340,21 @@ const selection = computed(() => resolve_selection(sel.value, layout.value.rows)
 const selX = computed(() => selection.value
   ? { left: x_of(selection.value.from, range.value), right: x_of(selection.value.to, range.value) }
   : { left: 0, right: 0 })
+// The drag tooltip: at the edge being dragged, above the selection
+// (below it near the top), kept inside the track in view.
+const selTip = computed(() => selection.value ? fmt_selection(selection.value.from, selection.value.to) : '')
+const selTipStyle = computed(() => {
+  const s = selection.value
+  if (!s) return {}
+  const rightEdge = (sel.value?.t1 ?? 0) >= (sel.value?.t0 ?? 0)
+  const x = rightEdge ? selX.value.right : selX.value.left
+  const right = view.left + view.width - LABEL_W
+  // About the tooltip's width, so one opening rightwards stays in view.
+  const room = rightEdge ? 0 : 260
+  const left = Math.max(view.left + (rightEdge ? 260 : 0), Math.min(x, right - room))
+  const top = s.top >= 28 ? s.top - 26 : s.top + s.height + 4
+  return { left: `${left}px`, top: `${top}px`, transform: rightEdge ? 'translateX(-100%)' : 'none' }
+})
 const summary = computed(() => selection_summary(selection.value?.devices ?? [], ds.deviceByUuid))
 
 /* Gaps in the selection, from the strip counts. Only at Hours zoom,

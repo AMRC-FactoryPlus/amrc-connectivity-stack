@@ -104,9 +104,14 @@
         </Button>
       </div>
 
-      <Card v-if="entries.length" class="touch-pan-y select-none overflow-hidden"
+      <Card v-if="entries.length" ref="chartCard" class="relative touch-pan-y select-none overflow-hidden"
             :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
             @pointerdown="startDrag" @wheel="onWheel">
+        <!-- While dragging: the range that will be in view. -->
+        <div v-if="dragTip" class="pointer-events-none absolute z-30 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs text-white shadow"
+             :style="{ left: `${dragTip.left}px`, top: `${dragTip.top}px`, transform: `translateX(-${dragTip.shift}%)` }">
+          {{ dragText }}
+        </div>
         <!-- Shared time axis. Drag or scroll sideways to move along it. -->
         <div class="grid grid-cols-[200px_minmax(0,1fr)_32px] border-b border-slate-200">
           <div></div>
@@ -170,7 +175,7 @@ import { metric_total, filter_metrics } from './page-logic.js'
 import { useDatasetPins } from './usePins.js'
 import { useChartSeries } from './useChartSeries.js'
 import TimelineToolbar from '../timeline/TimelineToolbar.vue'
-import { go_view, step_view, zoom_view, pan_view, view_labels, at_now, clamp_view, zoom_span, nearest_zoom, fmt_span, CHART_ZOOMS } from '@/lib/datasets/chart-view.js'
+import { go_view, step_view, zoom_view, pan_view, view_labels, fmt_view_range, inside_x, at_now, clamp_view, zoom_span, nearest_zoom, fmt_span, CHART_ZOOMS } from '@/lib/datasets/chart-view.js'
 import SeriesChart from './SeriesChart.vue'
 
 const props = defineProps({
@@ -299,10 +304,22 @@ const shown = computed(() => {
 /* Drag or scroll sideways to move along the time axis. */
 const dragging = ref(false)
 let dragX = null
+const chartCard = ref(null)
+// Where the drag tooltip sits in the card.
+const dragTip = ref(null)
+const dragText = computed(() => fmt_view_range(current.value.from, current.value.to, zoom.value))
+function placeTip (ev) {
+  const el = chartCard.value?.$el ?? chartCard.value
+  const r = el?.getBoundingClientRect?.()
+  if (!r) return
+  const { left, shift } = inside_x(ev.clientX - r.left, r.width)
+  dragTip.value = { left, shift, top: Math.max(4, Math.min(r.height - 28, ev.clientY - r.top - 32)) }
+}
 function startDrag (ev) {
   if (ev.button !== 0 || ev.target.closest('button')) return
   dragX = ev.clientX
   dragging.value = true
+  placeTip(ev)
   window.addEventListener('pointermove', onDrag)
   window.addEventListener('pointerup', stopDrag)
   window.addEventListener('pointercancel', stopDrag)
@@ -313,10 +330,12 @@ function onDrag (ev) {
   if (!dx) return
   dragX = ev.clientX
   setView(pan_view(base.value, dx, chartW.value, maxTo.value))
+  placeTip(ev)
 }
 function stopDrag () {
   dragX = null
   dragging.value = false
+  dragTip.value = null
   window.removeEventListener('pointermove', onDrag)
   window.removeEventListener('pointerup', stopDrag)
   window.removeEventListener('pointercancel', stopDrag)

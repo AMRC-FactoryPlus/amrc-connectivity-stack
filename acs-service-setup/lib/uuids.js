@@ -464,6 +464,10 @@ export const DataAccess = {
         UnionComponents: "1c4ca454-de38-44d9-92fb-aa5218bfa257",
         SessionLimits: "8754c000-3778-4ae6-b2b8-bbcd959bb775",
         MESIdentifiers: "af178f0c-3b1e-44f2-9724-5cf06e8fd056",
+        Tags: "c95e372e-2fbe-45b9-9937-3235f94e22a3",
+        EquipmentLabels: "dfc3983b-658c-4099-b76a-01ce7c18bde1",
+        RunMetadata: "2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a",
+        Recording: "cf3f6103-0f0e-4839-953a-ad2cedc78c30",
     },
 
     Class: {
@@ -476,6 +480,7 @@ export const DataAccess = {
         WorkOrder: "b416e44c-c57e-4486-9431-64c425f1b2c6",
         Product: "4a089748-b26b-4f12-8f1a-164bfba97809",
         Operation: "bd0354eb-b8f7-4bd9-8407-0588e545603c",
+        Run: "3c866b35-66a1-4cb8-8db2-dae284883cf8",
         MES: "2c691583-89fe-4421-bf2c-64e34e663711"
     },
 
@@ -483,6 +488,7 @@ export const DataAccess = {
         DatasetGroup: "17e37253-8626-4031-b217-28c6a03e91c1",
         DatasetRoleGroup: "56c52f70-0649-4962-8526-9ec9d1c85ca4",
         FunctionalDatasetGroup: "86e5b048-e956-4820-939e-3abf3eda4e03", 
+        DatasetMaker: "b7aa3036-fc1f-4869-b0f5-50f28b028905",
     }, 
     
     Service: {

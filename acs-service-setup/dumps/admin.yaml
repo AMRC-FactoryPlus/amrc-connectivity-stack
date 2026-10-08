@@ -1,5 +1,5 @@
 # Grant appropriate permissions to the Administrator group
-#-REQUIRE: auth sparkplug uns
+#-REQUIRE: auth sparkplug uns data-access
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -102,5 +102,8 @@ grants:
     !u ACS.PermGroup.Directory: null
     !u ACS.PermGroup.Git: null
     !u Files.Perm.All: null
+    # Every dataset, including deleting. The Data Access lists honour
+    # this wildcard grant.
+    !u DataAccess.Perm.All: null
     # Cluster admins land as Grafana org Admin by default.
     !u Grafana.Perm.Admin: null

@@ -35,6 +35,8 @@ export const COVERAGE_DEFAULTS = {
     repair_days: 7,
     /* The daily repair runs at this local hour. */
     repair_hour: 3,
+    /* Raw points before this are taken to be bad clocks and ignored. */
+    min_time: Date.parse("2000-01-01T00:00:00Z"),
 };
 
 export const MEASUREMENT = {
@@ -110,27 +112,52 @@ function birth_filter() {
 }
 
 /* Hourly counts per device from the raw bucket, shaped for to(). The
- * range bounds are Flux expressions or Dates. */
-function hourly_counts({ raw_bucket, start, stop }) {
-    return flux`from(bucket: ${raw_bucket})
-  |> range(start: ${start}, stop: ${stop})
-  |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => exists r.topLevelInstance and r.topLevelInstance != "")
-  |> filter(fn: (r) => ${birth_filter()})
-  |> aggregateWindow(every: 1h, fn: count, createEmpty: false, timeSrc: "_start")
+ * range bounds are Flux expressions or Dates.
+ *
+ * Hours the summary already holds in the range come back as 0 unless
+ * they still have raw data, so a recount zeroes an hour that lost all
+ * its data (for example after a delete). Reads skip zero counts. */
+function hourly_counts({ raw_bucket, bucket, start, stop }) {
+    return flux`union(tables: [
+    from(bucket: ${raw_bucket})
+      |> range(start: ${start}, stop: ${stop})
+      |> filter(fn: (r) => r._field == "value")
+      |> filter(fn: (r) => exists r.topLevelInstance and r.topLevelInstance != "")
+      |> filter(fn: (r) => ${birth_filter()})
+      |> aggregateWindow(every: 1h, fn: count, createEmpty: false, timeSrc: "_start")
+      |> group(columns: ["topLevelInstance", "_time"])
+      |> sum()
+      |> map(fn: (r) => ({_time: r._time, _value: int(v: r._value), topLevelInstance: r.topLevelInstance}))
+      |> group(),
+    ${existing_zeros({ bucket, measurement: MEASUREMENT.hourly, start, stop })},
+  ])
   |> group(columns: ["topLevelInstance", "_time"])
   |> sum()
   |> map(fn: (r) => ({_time: r._time, _measurement: ${MEASUREMENT.hourly}, _field: "count",
-                      _value: int(v: r._value), topLevelInstance: r.topLevelInstance}))
+                      _value: r._value, topLevelInstance: r.topLevelInstance}))
   |> group(columns: ["_measurement", "_field", "topLevelInstance"])`;
 }
 
+/* The summary's existing points in a range, each as a 0 count. */
+function existing_zeros({ bucket, measurement, start, stop }) {
+    return flux`from(bucket: ${bucket})
+      |> range(start: ${start}, stop: ${stop})
+      |> filter(fn: (r) => r._measurement == ${measurement} and r._field == "count")
+      |> map(fn: (r) => ({_time: r._time, _value: 0, topLevelInstance: r.topLevelInstance}))
+      |> group()`;
+}
+
 /* Daily sums per device from a stream of hourly rows. Days are local
- * calendar days (the script sets the location). */
-function daily_sums(stream) {
-    return flux`${stream}
-  |> keep(columns: ["_time", "_value", "topLevelInstance"])
-  |> map(fn: (r) => ({r with _time: date.truncate(t: r._time, unit: 1d)}))
+ * calendar days (the script sets the location). Existing daily points
+ * in [start, stop) come back as 0 unless an hour feeds them. */
+function daily_sums(stream, { bucket, start, stop }) {
+    return flux`union(tables: [
+    ${stream}
+      |> map(fn: (r) => ({_time: date.truncate(t: r._time, unit: 1d), _value: r._value,
+                          topLevelInstance: r.topLevelInstance}))
+      |> group(),
+    ${existing_zeros({ bucket, measurement: MEASUREMENT.daily, start, stop })},
+  ])
   |> group(columns: ["topLevelInstance", "_time"])
   |> sum()
   |> map(fn: (r) => ({_time: r._time, _measurement: ${MEASUREMENT.daily}, _field: "count",
@@ -157,6 +184,7 @@ export function task_script(opts) {
         throw new RangeError("recount_hours must be an integer from 1 to 48");
     const recount = fluxExpression(`${hours}h`);
     const to = to_bucket(bucket, org);
+    const v = fluxExpression;
 
     return zone_header() + String(flux`
 option task = {name: ${task}, every: 1h, offset: 5m}
@@ -165,7 +193,7 @@ stop = date.truncate(t: now(), unit: 1h)
 start = date.sub(d: ${recount}, from: stop)
 day_start = date.truncate(t: start, unit: 1d)
 
-hourly = ${hourly_counts({ raw_bucket, start: fluxExpression("start"), stop: fluxExpression("stop") })}
+hourly = ${hourly_counts({ raw_bucket, bucket, start: v("start"), stop: v("stop") })}
 
 hourly |> ${to}
 
@@ -175,7 +203,8 @@ older = from(bucket: ${bucket})
   |> filter(fn: (r) => r._time < start)
   |> keep(columns: ["_time", "_value", "topLevelInstance"])
 
-${daily_sums(flux`union(tables: [older, hourly |> keep(columns: ["_time", "_value", "topLevelInstance"])])`)}
+${daily_sums(flux`union(tables: [older, hourly |> keep(columns: ["_time", "_value", "topLevelInstance"])])`,
+    { bucket, start: v("day_start"), stop: v("stop") })}
   |> ${to}
 `);
 }
@@ -186,20 +215,56 @@ ${daily_sums(flux`union(tables: [older, hourly |> keep(columns: ["_time", "_valu
  * Repeating a chunk overwrites its own points. */
 export function chunk_script({ raw_bucket, bucket, org, start, stop }) {
     const to = to_bucket(bucket, org);
+    const a = new Date(start), b = new Date(stop);
     return zone_header() + location() + String(flux`
-hourly = ${hourly_counts({ raw_bucket, start: new Date(start), stop: new Date(stop) })}
+hourly = ${hourly_counts({ raw_bucket, bucket, start: a, stop: b })}
 
 hourly |> ${to}
 
-${daily_sums(fluxExpression("hourly"))}
+${daily_sums(fluxExpression("hourly"), { bucket, start: a, stop: b })}
   |> ${to}
 `);
 }
 
-/** The time of the oldest point in the raw bucket. One row, or none. */
-export function earliest_query({ raw_bucket }) {
+/** Hourly counts only, for [start, stop). The backfill uses this, one
+ * hour at a time, for a day too large to count in one query. */
+export function hours_script({ raw_bucket, bucket, org, start, stop }) {
+    return zone_header() + location() + String(flux`
+${hourly_counts({ raw_bucket, bucket, start: new Date(start), stop: new Date(stop) })}
+  |> ${to_bucket(bucket, org)}
+`);
+}
+
+/** The daily sums for the local day [start, stop), from the hourly
+ * counts already in the summary. */
+export function day_script({ bucket, org, start, stop }) {
+    const a = new Date(start), b = new Date(stop);
+    return zone_header() + location() + String(flux`
+${daily_sums(flux`from(bucket: ${bucket})
+      |> range(start: ${a}, stop: ${b})
+      |> filter(fn: (r) => r._measurement == ${MEASUREMENT.hourly} and r._field == "count")`,
+    { bucket, start: a, stop: b })}
+  |> ${to_bucket(bucket, org)}
+`);
+}
+
+/** The newest raw data time in [start, stop), birth metadata excluded.
+ * One row, or none. The backfill uses it to jump over empty days. */
+export function previous_query({ raw_bucket, start, stop }) {
     return String(flux`from(bucket: ${raw_bucket})
-  |> range(start: 0)
+  |> range(start: ${new Date(start)}, stop: ${new Date(stop)})
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => ${birth_filter()})
+  |> last()
+  |> keep(columns: ["_time"])
+  |> group()
+  |> max(column: "_time")`);
+}
+
+/** The time of the oldest point in the raw bucket. One row, or none. */
+export function earliest_query({ raw_bucket, min_time = 0 }) {
+    return String(flux`from(bucket: ${raw_bucket})
+  |> range(start: ${new Date(min_time)})
   |> filter(fn: (r) => r._field == "value")
   |> limit(n: 1)
   |> keep(columns: ["_time"])
@@ -213,6 +278,7 @@ export function newest_query({ bucket, days = 30 }) {
     return String(flux`from(bucket: ${bucket})
   |> range(start: ${fluxExpression(`-${Number(days)}d`)})
   |> filter(fn: (r) => r._measurement == ${MEASUREMENT.hourly} and r._field == "count")
+  |> filter(fn: (r) => r._value > 0)
   |> last()
   |> keep(columns: ["_time"])
   |> group()
@@ -375,11 +441,13 @@ export function intersect(windows, spans) {
 }
 
 /** Splits summary windows into the spans read from `coverage_daily`
- * (whole local days) and from hourly `coverage`. Hourly spans are
- * widened to whole hours, since the summary has nothing finer.
- * @returns {hourly: [[a,b]], daily: [[a,b]]} */
+ * (whole local days), from hourly `coverage` (whole hours), and from
+ * raw data (the part-hours at each window edge). The summary has
+ * nothing finer than an hour, so this keeps counts inside the
+ * requested (and granted) windows, with the same numbers as raw data.
+ * @returns {hourly: [[a,b]], daily: [[a,b]], raw: [[a,b]]} */
 export function split_coverage(windows, every) {
-    const hourly = [], daily = [];
+    const hourly = [], daily = [], raw = [];
     const push = (list, a, b) => {
         if (a >= b) return;
         const prev = list[list.length - 1];
@@ -388,21 +456,27 @@ export function split_coverage(windows, every) {
     };
 
     for (const [a0, b0] of windows) {
-        const a = floor_hour(a0), b = ceil_hour(b0);
-        if (!DAILY_STEPS.has(every)) {
-            push(hourly, a, b);
+        const a = ceil_hour(a0), b = floor_hour(b0);
+        if (a >= b) {
+            push(raw, a0, b0);
             continue;
         }
-        const d0 = ceil_day(a), d1 = floor_day(b);
-        if (d0 < d1) {
-            push(hourly, a, d0);
-            push(daily, d0, d1);
-            push(hourly, d1, b);
-        }
-        else
+        push(raw, a0, a);
+        if (!DAILY_STEPS.has(every))
             push(hourly, a, b);
+        else {
+            const d0 = ceil_day(a), d1 = floor_day(b);
+            if (d0 < d1) {
+                push(hourly, a, d0);
+                push(daily, d0, d1);
+                push(hourly, d1, b);
+            }
+            else
+                push(hourly, a, b);
+        }
+        push(raw, b, b0);
     }
-    return { hourly, daily };
+    return { hourly, daily, raw };
 }
 
 
@@ -454,6 +528,7 @@ export function coverage_query({ bucket, measurement, devices, spans, every }) {
     return read_zone_header(every) + String(flux`from(bucket: ${bucket})
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._measurement == ${measurement} and r._field == "count")
+  |> filter(fn: (r) => r._value > 0)
   |> filter(fn: (r) => ${dev})${times}${agg}
   |> group()
   |> keep(columns: ["topLevelInstance", "_time", "_value"])`);

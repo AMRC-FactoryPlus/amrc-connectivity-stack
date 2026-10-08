@@ -18,6 +18,17 @@ import {
     coverage_query,
 } from "./coverage.js";
 
+/* Sorts spans and merges those that overlap or touch. */
+function merge_spans(spans) {
+    const out = [];
+    for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
+        const prev = out[out.length - 1];
+        if (prev && a <= prev[1]) prev[1] = Math.max(prev[1], b);
+        else out.push([a, b]);
+    }
+    return out;
+}
+
 /** Why a series request stopped early. */
 export class SeriesAbort extends Error {
     constructor(reason) {
@@ -59,11 +70,11 @@ export class SeriesReader {
      * ready, the summary answers the hours it holds and raw data answers
      * the rest (the newest hours, and old hours the backfill has not
      * reached, if they fit within the raw count limit).
+     * @param state The coverage state read once for this request.
      * @returns {counts: Map, source, pending: [[a, b]]} */
-    async counts(req, groups, signal) {
+    async counts(req, groups, signal, state) {
         const { every } = req;
         const bucket = this.bucket;
-        const state = this.coverage_state();
 
         if (!this.uses_coverage(req, state)) {
             const parts = await Promise.all(groups.map(g =>
@@ -74,14 +85,19 @@ export class SeriesReader {
         const plan = plan_count({ from: req.from, to: req.to, state });
         const cov_bucket = this.coverage.bucket;
         const queries = [];
+        let edge_raw = false;
         for (const g of groups) {
-            const raw = intersect(g.windows, plan.raw);
+            const { hourly, daily, raw: edges } = plan.coverage
+                ? split_coverage(intersect(g.windows, [plan.coverage]), every)
+                : { hourly: [], daily: [], raw: [] };
+
+            /* Raw parts of the plan, plus the part-hours at window edges
+             * that the summary cannot answer. */
+            if (edges.length) edge_raw = true;
+            const raw = merge_spans([...intersect(g.windows, plan.raw), ...edges]);
             if (raw.length)
                 queries.push(count_query({ bucket, every, devices: g.devices, windows: raw }));
 
-            if (!plan.coverage) continue;
-            const { hourly, daily } = split_coverage(
-                intersect(g.windows, [plan.coverage]), every);
             for (const [measurement, spans] of [
                 [MEASUREMENT.hourly, hourly], [MEASUREMENT.daily, daily],
             ]) {
@@ -95,7 +111,7 @@ export class SeriesReader {
         const parts = await Promise.all(queries.map(q => this.query_rows(q, signal)));
         return {
             counts: shape_counts(parts.flat(), every),
-            source: plan_source(plan),
+            source: edge_raw && plan.raw.length == 0 ? "mixed" : plan_source(plan),
             pending: plan.pending,
         };
     }
@@ -134,19 +150,44 @@ export class SeriesReader {
         }));
     }
 
+    /** The newest data time per device. For a dataset, only data
+     * inside the device's windows (and the lookback) counts, so `last`
+     * never shows data outside what the dataset grants. */
+    async last(req, windows, groups, as_of, signal) {
+        const bucket = this.bucket;
+        const start = as_of - req.last.lookback;
+
+        if (!req.dataset) {
+            const devices = [...windows.keys()];
+            if (!devices.length) return new Map();
+            return shape_last(await this.query_rows(
+                last_query({ bucket, devices, start }), signal));
+        }
+
+        const parts = await Promise.all(groups.map(g => {
+            const ws = intersect(g.windows, [[start, Infinity]]);
+            return ws.length
+                ? this.query_rows(last_query({ bucket, devices: g.devices, start, windows: ws }), signal)
+                : [];
+        }));
+        return shape_last(parts.flat());
+    }
+
     /** Runs the queries a parsed request needs.
      * @param req The output of parse_request.
      * @param windows Map of permitted device UUID to its windows.
      * @param as_of The request time in ms.
      * @param signal An AbortSignal.
+     * @param state The coverage state, read once for the request (by
+     *   default, read now).
      * @returns {counts: Map|null, source, pending, metrics: Array, last: Map|null}
      */
-    async run(req, windows, as_of, signal) {
+    async run(req, windows, as_of, signal, state = this.coverage_state()) {
         const { every } = req;
         const bucket = this.bucket;
         const groups = group_by_windows(windows);
 
-        const counts = req.count ? this.counts(req, groups, signal) : null;
+        const counts = req.count ? this.counts(req, groups, signal, state) : null;
 
         const mean_rows = Promise.all(groups.map(g => {
             const in_group = new Set(g.devices);
@@ -157,12 +198,7 @@ export class SeriesReader {
             return query ? this.query_rows(query, signal) : [];
         }));
 
-        const devices = [...windows.keys()];
-        const last = req.last && devices.length
-            ? this.query_rows(last_query({
-                bucket, devices, start: as_of - req.last.lookback,
-            }), signal).then(shape_last)
-            : null;
+        const last = req.last ? this.last(req, windows, groups, as_of, signal) : null;
 
         const [c, m, l] = await Promise.all([counts, mean_rows, last]);
         return {

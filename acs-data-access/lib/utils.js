@@ -55,3 +55,22 @@ export function minDate(a, b) {
     : b
 }
 
+
+
+/** Express error middleware for request bodies the JSON parser
+ * refused. It answers in the same JSON shape as the series route's
+ * errors, instead of the generic 500 text reply. Other errors pass on. */
+export function body_errors(err, req, res, next) {
+    if (res.headersSent) return next(err);
+    if (err?.type == "entity.parse.failed")
+        return res.status(400).json({
+            error: "bad_request", message: "The body is not valid JSON." });
+    if (err?.type == "entity.too.large")
+        return res.status(413).json({
+            error: "too_large", message: "The body is too large.",
+            ...(err.limit ? { limit: err.limit } : {}) });
+    if (err?.type == "encoding.unsupported" || err?.type == "charset.unsupported")
+        return res.status(415).json({
+            error: "unsupported_media_type", message: err.message });
+    return next(err);
+}

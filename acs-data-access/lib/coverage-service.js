@@ -12,10 +12,12 @@
 
 import {
     COVERAGE_DEFAULTS, MEASUREMENT,
-    task_script, chunk_script, earliest_query, newest_query, state_query,
+    task_script, chunk_script, hours_script, day_script,
+    earliest_query, newest_query, state_query, previous_query,
     parse_state, fresh_state, needs_rebuild, next_chunk, repair_chunks,
-    floor_hour, next_local_hour,
+    floor_hour, floor_day, next_local_hour,
 } from "./coverage.js";
+import { next_bucket } from "./series.js";
 
 const HOUR = 3600 * 1000;
 const MINUTE = 60 * 1000;
@@ -61,7 +63,9 @@ export class InfluxAdmin {
         if (res.status == 404 && method == "GET") return null;
         if (!res.ok)
             throw new InfluxApiError(method, path, res.status, await res.text());
-        return res.status == 204 ? {} : await res.json();
+        if (res.status == 204) return {};
+        const text_out = await res.text();
+        return text_out ? JSON.parse(text_out) : {};
     }
 
     async org_id(name) {
@@ -87,9 +91,17 @@ export class InfluxAdmin {
         } });
     }
 
-    async find_task(org_id, name) {
+    /** Every task with this name, oldest first. */
+    async find_tasks(org_id, name) {
         const res = await this.call("GET", "/api/v2/tasks", { query: { orgID: org_id, name } });
-        return res?.tasks?.find(t => t.name == name) ?? null;
+        return (res?.tasks ?? [])
+            .filter(t => t.name == name)
+            .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))
+                || String(a.id).localeCompare(String(b.id)));
+    }
+
+    delete_task(id) {
+        return this.call("DELETE", `/api/v2/tasks/${encodeURIComponent(id)}`);
     }
 
     create_task(org_id, flux, description) {
@@ -177,6 +189,13 @@ export class Coverage {
         this.pause_ms = env_num(env.COVERAGE_PAUSE_MS, COVERAGE_DEFAULTS.pause_ms);
         this.repair_days = env_num(env.COVERAGE_REPAIR_DAYS, COVERAGE_DEFAULTS.repair_days);
         this.rebuild = env.COVERAGE_REBUILD ?? "";
+        /* Raw points before this are ignored (bad device clocks). */
+        this.min_time = env.COVERAGE_MIN_TIME
+            ? Date.parse(env.COVERAGE_MIN_TIME) : COVERAGE_DEFAULTS.min_time;
+        if (Number.isNaN(this.min_time)) {
+            this.log("Ignoring COVERAGE_MIN_TIME: not a date");
+            this.min_time = COVERAGE_DEFAULTS.min_time;
+        }
 
         this.ids = null;
         this.marker = null;
@@ -215,13 +234,22 @@ export class Coverage {
         }
 
         const flux = this.task_flux();
-        let task = await admin.find_task(org_id, this.task_name);
-        if (!task) {
+        let tasks = await admin.find_tasks(org_id, this.task_name);
+        if (!tasks.length) {
             this.log("Creating task %s", this.task_name);
-            task = await admin.create_task(org_id, flux,
+            await admin.create_task(org_id, flux,
                 "ACS coverage summary. Managed by Data Access: edits are replaced on restart.");
+            /* Another replica may have created one at the same time. */
+            tasks = await admin.find_tasks(org_id, this.task_name);
         }
-        else if (task.flux != flux) {
+        /* Keep the oldest task and delete any duplicates. */
+        let [task, ...extra] = tasks;
+        if (!task) throw new Error(`Task ${this.task_name} was not created`);
+        for (const t of extra) {
+            this.log("Deleting duplicate task %s (%s)", this.task_name, t.id);
+            await admin.delete_task(t.id);
+        }
+        if (task.flux != flux) {
             this.log("Updating the Flux of task %s", this.task_name);
             task = await admin.update_task(task.id, flux);
         }
@@ -258,20 +286,40 @@ export class Coverage {
      * bucket is empty. */
     async find_earliest() {
         if (this.backfill_from != null) return this.backfill_from;
-        const rows = await this.rows(earliest_query({ raw_bucket: this.raw_bucket }));
+        const rows = await this.rows(earliest_query({
+            raw_bucket: this.raw_bucket, min_time: this.min_time }));
         const t = rows.length ? Date.parse(rows[0]._time) : NaN;
         return Number.isNaN(t) ? null : t;
     }
 
     /** Summarises one local day. The current day stops at the last
      * closed hour: the task counts the hours after that, and a partial
-     * hour in the summary would undercount. */
+     * hour in the summary would undercount. If the day is too large for
+     * one query, it counts the day an hour at a time, then sums it.
+     * @returns The number of hours with data. */
     async run_chunk({ start, stop: day_end }) {
         const stop = Math.min(day_end, floor_hour(this.now()));
-        if (start >= stop) return;
-        await this.rows(chunk_script({
-            raw_bucket: this.raw_bucket, bucket: this.bucket, org: this.org, start, stop,
-        }));
+        if (start >= stop) return 0;
+        const opts = { raw_bucket: this.raw_bucket, bucket: this.bucket, org: this.org };
+        const with_data = rows => rows.filter(r =>
+            r._measurement == MEASUREMENT.hourly && Number(r._value) > 0).length;
+
+        try {
+            return with_data(await this.rows(chunk_script({ ...opts, start, stop })));
+        }
+        catch (err) {
+            if (this.stopped) throw err;
+            this.log("Coverage day %s failed (%s); counting it by the hour",
+                new Date(start).toISOString(), err.message);
+        }
+
+        let hours = 0;
+        for (let h = start; h < stop && !this.stopped; h += HOUR)
+            hours += with_data(await this.rows(hours_script({
+                ...opts, start: h, stop: Math.min(h + HOUR, stop) })));
+        if (this.stopped) throw new Error("stopped");
+        await this.rows(day_script({ ...opts, start, stop }));
+        return hours;
     }
 
     /* Waits after a chunk, at least as long as the chunk took, so the
@@ -299,8 +347,21 @@ export class Coverage {
 
         for (let chunk; !this.stopped && (chunk = next_chunk(state, floor)); ) {
             const t0 = this.now();
-            await this.run_chunk(chunk);
-            state = { ...state, backfilled_to: chunk.start };
+            const hours = await this.run_chunk(chunk);
+            let backfilled_to = chunk.start;
+
+            /* An empty day: jump to the end of the next day below it that
+             * has data, or to the floor if there is none. */
+            if (!hours && floor != null && floor < chunk.start) {
+                const rows = await this.rows(previous_query({
+                    raw_bucket: this.raw_bucket, start: floor, stop: chunk.start }));
+                const t = rows.length ? Date.parse(rows[0]._time) : NaN;
+                backfilled_to = Number.isNaN(t)
+                    ? floor_day(floor)
+                    : Math.min(chunk.start, next_bucket(floor_day(t), "1d"));
+            }
+
+            state = { ...state, backfilled_to };
             await this.write_marker(state);
             await this.pause(this.now() - t0);
         }
@@ -393,6 +454,9 @@ export class Coverage {
             newestHour: iso(this.newest),
             summarisedTo: iso(s?.summary_to),
             stale: this.enabled ? this.stale() : null,
+            recountHours: this.recount_hours,
+            repairDays: this.repair_days,
+            minTime: iso(this.min_time),
             backfill: this.marker ? {
                 complete: this.marker.complete,
                 backfilledTo: iso(this.marker.backfilled_to),

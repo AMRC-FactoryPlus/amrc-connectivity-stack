@@ -388,9 +388,10 @@ export class APIv1 {
   async series(req, res) {
     try {
       const as_of = Date.now();
-      const parsed = parse_request(req.body, as_of, {
-        coverage: this.seriesReader.coverage_state() != null,
-      });
+      /* Read the coverage state once, so validation and the queries
+       * agree on it. */
+      const coverage = this.seriesReader.coverage_state();
+      const parsed = parse_request(req.body, as_of, { coverage: coverage != null });
 
       const scope = parsed.dataset
         ? await this.series_dataset_scope(req.auth, parsed)
@@ -402,7 +403,7 @@ export class APIv1 {
         mean: parsed.mean.filter(m => scope.windows.has(m.device)),
       };
 
-      const result = await this.series_run(res, run, scope.windows, as_of);
+      const result = await this.series_run(res, run, scope.windows, as_of, coverage);
       if (!result) return;
 
       const iso = t => new Date(t).toISOString();
@@ -511,7 +512,7 @@ export class APIv1 {
 
   /** Runs the series queries under the timeout, and aborts them if the
    * client goes away. Returns undefined if the client has gone. */
-  async series_run(res, parsed, windows, as_of) {
+  async series_run(res, parsed, windows, as_of, coverage) {
     const ctl = this.seriesReader.controller();
     const on_close = () => {
       if (!res.writableEnded) ctl.abort(new SeriesAbort("client closed"));
@@ -519,7 +520,7 @@ export class APIv1 {
     res.on("close", on_close);
 
     try {
-      return await this.seriesReader.run(parsed, windows, as_of, ctl.signal);
+      return await this.seriesReader.run(parsed, windows, as_of, ctl.signal, coverage);
     }
     catch (err) {
       const reason = ctl.signal.aborted ? ctl.signal.reason?.reason : null;

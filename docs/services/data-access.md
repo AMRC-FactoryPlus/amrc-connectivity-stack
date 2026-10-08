@@ -228,7 +228,7 @@ Field | Rule
 `points` | Target number of buckets, 1 to 2000, default 300. Used only when `every` is absent: the server picks the smallest step that gives at most `points` buckets.
 `count` | `true` to return per-device point counts. Birth metadata (`Schema_UUID` and `Instance_UUID`) does not count.
 `mean` | Metrics to return means for. `metric` is the full Sparkplug metric name, for example `Axes/X/Load`. `type` is optional: `d`, `i`, `u`, `b` or `s`. Without `type`, the server reads every numeric type (`d`, `i`, `u`) of the metric and merges them into one series, weighted by `n`. Booleans are read only with `type: "b"`, as 0 and 1. Strings have no mean: `type: "s"` returns empty `points`. In a device request, each `mean` device must also be in `devices`.
-`last` | `true`, or `{"lookback": "<n>m|h|d|w"}` (default `30d`, maximum `90d`), to return each device's newest data time. Birth metadata does not count.
+`last` | `true`, or `{"lookback": "<n>m|h|d|w"}` (default `30d`, maximum `90d`), to return each device's newest data time. Birth metadata does not count. In a dataset request, only data inside the device's windows counts, and a device whose windows all end before the lookback gets `null`.
 
 Steps up to `6h` align to UTC. `1d` and `1w` buckets start at midnight
 and on Monday in Europe/London, so a day is 23 or 25 hours long on the
@@ -323,16 +323,16 @@ disconnects.
 
 Status | When
 ---|---
-`400` | The body is not a JSON object.
+`400` | The body is not valid JSON, or not a JSON object.
 `403` | No `Read dataset` on the dataset, or every device denied.
 `404` | The dataset does not exist or is invalid.
-`413` | Too many devices or `mean` metrics. The body names the limit.
+`413` | Too many devices or `mean` metrics, or the body is too large. The body names the limit.
 `422` | Both or neither of `devices` and `dataset`; a bad UUID, date or `every`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit; a `mean` device outside the request or the dataset.
 `503` | InfluxDB is unreachable.
 `504` | The queries took longer than the query time limit.
 
-`413` and `422` responses have a JSON body with `error` and `message`
-fields.
+`400`, `413` and `422` responses have a JSON body with `error` and
+`message` fields.
 
 ### `GET v1/coverage/status`
 
@@ -351,6 +351,9 @@ read it; it holds no data.
   "newestHour": "2026-10-08T08:00:00.000Z",
   "summarisedTo": "2026-10-08T09:00:00.000Z",
   "stale": false,
+  "recountHours": 6,
+  "repairDays": 7,
+  "minTime": "2000-01-01T00:00:00.000Z",
   "backfill": {
     "complete": true,
     "backfilledTo": "2024-03-01T00:00:00.000Z",
@@ -528,13 +531,18 @@ Helm hook. If InfluxDB is unreachable, Data Access retries with backoff
 and the series route counts raw data meanwhile.
 
 The task runs every hour at 5 minutes past. Each run recounts the last
-6 closed hours and overwrites them, which absorbs late data from
-batching and short store-and-forward. It then rewrites the daily sums
-for the days those hours touch.
+6 closed hours (`COVERAGE_RECOUNT_HOURS`) and overwrites them, which
+absorbs late data from batching and short store-and-forward. It then
+rewrites the daily sums for the days those hours touch. A recount writes
+0 for an hour or day the summary holds that no longer has any raw data,
+and reads skip zeros.
 
 The **backfill** summarises one Europe/London day at a time, from today
 back to the oldest raw point. After each day it writes the marker, so a
 restart resumes where it stopped, and a day that failed runs again.
+A day with no data makes the backfill jump to the next older day that
+has data, so gaps in history cost one query each. If a day is too large
+to count in one query, it is counted an hour at a time and then summed.
 It runs one query at a time, outside the series route's limiter, and
 waits after each day at least as long as that day took (and at least
 `COVERAGE_PAUSE_MS`), so it uses no more than half of one query slot.
@@ -542,7 +550,7 @@ In production-sized history, expect about a second of query time per
 day of history.
 
 The **daily repair** runs at 03:00 Europe/London. It re-summarises the
-last 7 full days, to catch store-and-forward data that arrived after the
+last 7 full days (`COVERAGE_REPAIR_DAYS`), to catch store-and-forward data that arrived after the
 task's 6-hour recount.
 
 ### How the series route uses it
@@ -555,8 +563,10 @@ ready:
 * The hours after the newest summarised hour come from raw data.
 * Hours older than the backfill marker come from raw data if all the
   raw parts fit within 14 days. Otherwise they are listed in `pending`.
-* The summary has nothing finer than an hour, so a window edge inside
-  an hour counts that whole hour.
+* The summary has nothing finer than an hour, so the part-hour at a
+  window edge (the request window, or a dataset window) comes from raw
+  data. Counts never include time outside the window, and match raw
+  counts.
 
 Sub-hour steps always count raw data, with the 14-day limit.
 
@@ -575,17 +585,20 @@ Variable | Default | Meaning
 `COVERAGE_BACKFILL_FROM` | (oldest raw point) | An ISO date-time the backfill stops at.
 `COVERAGE_PAUSE_MS` | `1000` | Minimum pause between backfill and repair days.
 `COVERAGE_REPAIR_DAYS` | `7` | Full days the daily repair covers. `0` turns it off.
-`COVERAGE_REBUILD` | (empty) | Any new value starts the backfill again from today. Data Access records the value, so the rebuild runs once per value. A rebuild overwrites hours that have data; it does not remove hours that no longer have any.
+`COVERAGE_MIN_TIME` | `2000-01-01T00:00:00Z` | Raw points before this are taken to be bad device clocks: the backfill ignores them.
+`COVERAGE_TIMEOUT_MS` | `600000` | Time allowed for one backfill or repair query. The summary has its own InfluxDB client for this.
+`COVERAGE_REBUILD` | (empty) | Any new value starts the backfill again from today. Data Access records the value, so the rebuild runs once per value.
 
 ### Caveats
 
 * If raw data is deleted from the raw bucket, the summary still counts
-  it. The daily repair covers only 7 days, and a recount writes only
-  hours that still have data. To rebuild from scratch, delete the
+  it until those hours are recounted. The task recounts 6 hours and the
+  daily repair 7 days. To rebuild from scratch, delete the
   `acs_coverage` bucket and restart Data Access: it creates the bucket
   and backfills again.
 * If two Data Access replicas run, both backfill. The writes are
-  idempotent, so this costs only duplicate work.
+  idempotent, so this costs only duplicate work. If both create the
+  task at once, each start keeps the oldest task and deletes the others.
 * Task run logs stay in the `_tasks` bucket for 3 days. Use
   `GET v1/coverage/status`, or `influx task run list`, to see failures.
 

@@ -167,13 +167,15 @@ export function bucket_count(from, to, every, cap = Infinity) {
 }
 
 /** The smallest ladder step that gives at most `points` buckets, or the
- * largest step if none does. */
-export function choose_every(from, to, points) {
-    for (const [every] of LADDER) {
+ * largest step if none does.
+ * @param only Optional set of steps to choose from. */
+export function choose_every(from, to, points, only = null) {
+    const steps = LADDER.map(l => l[0]).filter(e => !only || only.has(e));
+    for (const every of steps) {
         if (bucket_count(from, to, every, points) <= points)
             return every;
     }
-    return LADDER[LADDER.length - 1][0];
+    return steps[steps.length - 1];
 }
 
 
@@ -288,8 +290,11 @@ export function parse_request(body, now = Date.now(), opts = {}) {
             throw invalid(`"points" must be an integer from 1 to ${LIMITS.buckets}.`);
         points = body.points;
     }
+    /* Counts over more than 14 days need the coverage summary, which
+     * has nothing finer than an hour: choose only from its steps. */
     if (every == null)
-        every = choose_every(from, to, points);
+        every = choose_every(from, to, points,
+            body.count === true && to - from > LIMITS.count_span ? COVERAGE_STEPS : null);
 
     if (bucket_count(from, to, every, LIMITS.buckets) > LIMITS.buckets) {
         const suggest = choose_every(from, to, LIMITS.buckets);
@@ -513,10 +518,15 @@ export function mean_query({ bucket, metrics, windows, every }) {
 }
 
 /** The newest data time per device within the lookback. _value is
- * dropped before the merge so mixed types do not collide. */
-export function last_query({ bucket, devices, start }) {
+ * dropped before the merge so mixed types do not collide.
+ * @param windows Optional [[a, b]]: only data inside them counts (a
+ *   dataset's windows). Without them, the range runs to now. */
+export function last_query({ bucket, devices, start, windows = null }) {
+    const range = windows
+        ? flux`range(start: ${new Date(windows[0][0])}, stop: ${new Date(windows[windows.length - 1][1])})${time_filter(windows)}`
+        : flux`range(start: ${new Date(start)})`;
     return String(flux`from(bucket: ${bucket})
-  |> range(start: ${new Date(start)})
+  |> ${range}
   |> filter(fn: (r) => ${device_filter(devices)})
   |> filter(fn: (r) => r._field == "value")
   |> filter(fn: (r) => ${birth_filter()})

@@ -49,7 +49,7 @@ function fake_admin({ bucket = false, task = null } = {}) {
         calls,
         fields,
         buckets: bucket ? [{ id: "b1", name: "acs_coverage" }] : [],
-        tasks: task ? [{ id: "t1", name: "acs-coverage", status: "active", ...task }] : [],
+        tasks: task ? [{ id: "t1", name: "acs-coverage", status: "active", createdAt: "1", ...task }] : [],
         runs: [],
         async org_id(name) { calls.push(["org_id", name]); return "o1"; },
         async find_bucket(org, name) {
@@ -62,15 +62,22 @@ function fake_admin({ bucket = false, task = null } = {}) {
             this.buckets.push(b);
             return b;
         },
-        async find_task(org, name) {
-            calls.push(["find_task", org, name]);
-            return this.tasks.find(t => t.name == name) ?? null;
+        async find_tasks(org, name) {
+            calls.push(["find_tasks", org, name]);
+            return this.tasks.filter(t => t.name == name)
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
         },
         async create_task(org, flux) {
             calls.push(["create_task", org]);
-            const t = { id: "t1", name: "acs-coverage", status: "active", flux };
+            const t = { id: `t${this.tasks.length + 1}`, name: "acs-coverage",
+                status: "active", flux, createdAt: String(this.tasks.length + 1) };
             this.tasks.push(t);
             return t;
+        },
+        async delete_task(id) {
+            calls.push(["delete_task", id]);
+            this.tasks = this.tasks.filter(t => t.id != id);
+            return {};
         },
         async update_task(id, flux) {
             calls.push(["update_task", id]);
@@ -96,27 +103,45 @@ function fake_admin({ bucket = false, task = null } = {}) {
     return admin;
 }
 
-/* A fake query API. It answers the marker, earliest-point and newest-
- * hour queries, records chunk scripts, and can fail chosen chunks. */
-function fake_query_api(admin, { earliest = null, newest = null, fail_on = () => false } = {}) {
+/* A fake query API. It answers the marker, earliest-point, previous-
+ * point and newest-hour queries, and records the chunks it is asked to
+ * summarise: "day" (a whole-day chunk), "hours" (an hour-by-hour
+ * fallback) and "sum" (the day's sum after the fallback).
+ * @param has_data (start) => whether a chunk starting there has data.
+ * @param fail_on (chunk, kind) => whether that chunk fails. */
+function fake_query_api(admin, {
+    earliest = null, newest = null, has_data = () => true, fail_on = () => false,
+    previous = null,
+} = {}) {
     const chunks = [];
+    const all = [];
     return {
         chunks,
+        all,
         queryRows(query, consumer) {
             setImmediate(() => {
                 let rows = [];
+                const range = /range\(start: (\S+?), stop: (\S+?)\)/.exec(query);
                 if (query.includes(MEASUREMENT.state))
                     rows = [...admin.fields].map(([_field, _value]) => ({ _field, _value }));
                 else if (query.includes("limit(n: 1)"))
                     rows = earliest == null ? [] : [{ _time: iso(earliest) }];
+                else if (query.includes("max(column") && query.includes(`from(bucket: "default")`)) {
+                    const t = previous?.(T(range[2]));
+                    rows = t == null ? [] : [{ _time: iso(t) }];
+                }
                 else if (query.includes("max(column"))
                     rows = newest == null ? [] : [{ _time: iso(newest) }];
                 else if (query.includes("to(bucket")) {
-                    const m = /range\(start: (\S+), stop: (\S+)\)/.exec(query);
-                    const chunk = { start: T(m[1].replace(/,$/, "")), stop: T(m[2].replace(/\)$/, "")) };
-                    if (fail_on(chunk))
+                    const kind = !query.includes(`from(bucket: "default")`) ? "sum"
+                        : query.includes(MEASUREMENT.daily) ? "day" : "hours";
+                    const chunk = { start: T(range[1]), stop: T(range[2]) };
+                    all.push({ ...chunk, kind });
+                    if (fail_on(chunk, kind))
                         return consumer.error(new Error("chunk failed"));
-                    chunks.push(chunk);
+                    if (kind == "day") chunks.push(chunk);
+                    if (kind != "sum" && has_data(chunk.start))
+                        rows = [{ _measurement: MEASUREMENT.hourly, _value: 5 }];
                 }
                 for (const r of rows) consumer.next(r, { toObject: v => v });
                 consumer.complete();
@@ -166,8 +191,20 @@ describe("provisioning", () => {
         const { cov } = make_coverage({ admin });
         await cov.ensure();
         expect(admin.calls.map(c => c[0])).toEqual(
-            ["org_id", "find_bucket", "find_task", "update_task"]);
+            ["org_id", "find_bucket", "find_tasks", "update_task"]);
         expect(admin.tasks[0].flux).toBe(cov.task_flux());
+    });
+
+    test("keeps the oldest of duplicate tasks and deletes the rest", async () => {
+        const { cov: probe } = make_coverage();
+        const admin = fake_admin({ bucket: true, task: { flux: probe.task_flux() } });
+        admin.tasks.push({ id: "t9", name: "acs-coverage", status: "active",
+            flux: probe.task_flux(), createdAt: "9" });
+        const { cov } = make_coverage({ admin });
+        const ids = await cov.ensure();
+        expect(ids.task_id).toBe("t1");
+        expect(admin.calls).toContainEqual(["delete_task", "t9"]);
+        expect(admin.tasks.map(t => t.id)).toEqual(["t1"]);
     });
 
     test("leaves an inactive task inactive", async () => {
@@ -280,7 +317,7 @@ describe("backfill", () => {
         const bad = T("2026-10-05T23:00:00Z");
         let failing = true;
         const first = make_coverage({ admin, now, earliest,
-            fail_on: c => failing && c.start == bad });
+            fail_on: c => failing && c.start >= bad && c.start < bad + DAY });
         await first.cov.ensure();
         await expect(first.cov.backfill()).rejects.toThrow("chunk failed");
         expect(first.query_api.chunks).toHaveLength(2);
@@ -295,6 +332,46 @@ describe("backfill", () => {
         expect(second.query_api.chunks.map(c => iso(c.start))).toEqual([
             "2026-10-05T23:00:00.000Z", "2026-10-04T23:00:00.000Z"]);
         expect(admin.fields.get("complete")).toBe(true);
+    });
+
+    test("jumps over empty days to the next day with data", async () => {
+        const early = T("2026-06-01T08:00:00Z");
+        const with_data = T("2026-09-10T12:00:00Z");
+        const { cov, query_api, admin } = make_coverage({ now, earliest: early,
+            has_data: start => start >= T("2026-10-07T00:00:00Z")
+                || (start <= with_data && with_data < start + DAY) || start < early,
+            previous: stop => stop > with_data ? with_data : early });
+        await cov.ensure();
+        await cov.backfill();
+        const days = query_api.chunks.map(c => iso(c.start));
+        /* Today, the empty day before, then straight to the day with
+         * data, the empty day below it, then the oldest day. */
+        expect(days).toEqual([
+            "2026-10-07T23:00:00.000Z", "2026-10-06T23:00:00.000Z",
+            "2026-09-09T23:00:00.000Z",
+            "2026-09-08T23:00:00.000Z", "2026-05-31T23:00:00.000Z"]);
+        expect(admin.fields.get("complete")).toBe(true);
+    });
+
+    test("a day too large for one query is counted by the hour", async () => {
+        const { cov, query_api } = make_coverage({ now, earliest: T("2026-10-08T07:30:00Z"),
+            fail_on: (c, kind) => kind == "day" });
+        await cov.ensure();
+        const state = await cov.backfill();
+        const kinds = query_api.all.map(c => c.kind);
+        /* 00:00 to 10:00 London on the first day: 11 hours from 23:00 UTC. */
+        expect(kinds.filter(k => k == "hours")).toHaveLength(11);
+        expect(kinds[kinds.length - 1]).toBe("sum");
+        expect(state.complete).toBe(true);
+    });
+
+    test("ignores raw points before COVERAGE_MIN_TIME", async () => {
+        const { cov } = make_coverage({ env: { COVERAGE_MIN_TIME: "2020-01-01T00:00:00Z" } });
+        const seen = [];
+        cov.rows = async q => { seen.push(q); return []; };
+        await cov.find_earliest();
+        expect(seen[0]).toContain("range(start: 2020-01-01T00:00:00.000Z)");
+        expect(cov.status().minTime).toBe("2020-01-01T00:00:00.000Z");
     });
 
     test("a complete backfill does nothing on restart", async () => {
@@ -412,8 +489,21 @@ describe("Flux for the summary", () => {
         const f = chunk_script({ ...opts,
             start: T("2026-10-06T23:00:00Z"), stop: T("2026-10-07T23:00:00Z") });
         expect(f).toContain("range(start: 2026-10-06T23:00:00.000Z, stop: 2026-10-07T23:00:00.000Z)");
-        expect(f).not.toContain(`from(bucket: "acs_coverage")`);
+        /* The summary is read only for its existing points, as zeros. */
+        expect(f.match(/from\(bucket: "default"\)/g)).toHaveLength(1);
+        expect(f.match(/_value: 0,/g)).toHaveLength(2);
         expect(f.match(/to\(bucket/g)).toHaveLength(2);
+    });
+
+    test("recounts zero the hours and days that lost all their data", () => {
+        for (const f of [task_script(opts), chunk_script({ ...opts, start: 0, stop: HOUR })]) {
+            expect(f).toMatch(/r\._measurement == "coverage" and r\._field == "count"\)\n\s+\|> map\(fn: \(r\) => \(\{_time: r\._time, _value: 0/);
+            expect(f).toMatch(/r\._measurement == "coverage_daily" and r\._field == "count"\)\n\s+\|> map\(fn: \(r\) => \(\{_time: r\._time, _value: 0/);
+        }
+        /* Reads skip the zeros. */
+        const q = coverage_query({ bucket: "acs_coverage", measurement: "coverage", devices: [D1],
+            spans: [[0, HOUR]], every: "1h" });
+        expect(q).toContain("r._value > 0");
     });
 
     test("hostile bucket and org names are escaped", () => {
@@ -498,20 +588,29 @@ describe("read planning", () => {
             [T("2026-10-08T23:00:00Z"), T("2026-10-09T00:00:00Z")]]);
     });
 
-    test("daily steps read whole London days from coverage_daily and edges from hourly", () => {
-        const { hourly, daily } = split_coverage(
+    test("daily steps: whole London days from coverage_daily, whole hours from coverage, part-hours raw", () => {
+        const { hourly, daily, raw } = split_coverage(
             [[T("2026-10-05T10:20:00Z"), T("2026-10-08T10:00:00Z")]], "1d");
         expect(daily).toEqual([[T("2026-10-05T23:00:00Z"), T("2026-10-07T23:00:00Z")]]);
         expect(hourly).toEqual([
-            [T("2026-10-05T10:00:00Z"), T("2026-10-05T23:00:00Z")],
+            [T("2026-10-05T11:00:00Z"), T("2026-10-05T23:00:00Z")],
             [T("2026-10-07T23:00:00Z"), T("2026-10-08T10:00:00Z")]]);
+        expect(raw).toEqual([[T("2026-10-05T10:20:00Z"), T("2026-10-05T11:00:00Z")]]);
     });
 
-    test("hourly steps widen windows to whole hours", () => {
-        const { hourly, daily } = split_coverage(
+    test("part-hours at window edges come from raw data, never widened", () => {
+        const { hourly, daily, raw } = split_coverage(
             [[T("2026-10-05T10:20:00Z"), T("2026-10-05T12:10:00Z")]], "6h");
         expect(daily).toEqual([]);
-        expect(hourly).toEqual([[T("2026-10-05T10:00:00Z"), T("2026-10-05T13:00:00Z")]]);
+        expect(hourly).toEqual([[T("2026-10-05T11:00:00Z"), T("2026-10-05T12:00:00Z")]]);
+        expect(raw).toEqual([
+            [T("2026-10-05T10:20:00Z"), T("2026-10-05T11:00:00Z")],
+            [T("2026-10-05T12:00:00Z"), T("2026-10-05T12:10:00Z")]]);
+
+        /* A window inside one hour is all raw. */
+        const inside = split_coverage([[T("2026-10-05T10:20:00Z"), T("2026-10-05T10:40:00Z")]], "1h");
+        expect(inside).toEqual({ hourly: [], daily: [],
+            raw: [[T("2026-10-05T10:20:00Z"), T("2026-10-05T10:40:00Z")]] });
     });
 
     test("London day helpers across the October change", () => {
@@ -640,6 +739,30 @@ describe("series route with the coverage summary", () => {
         const res2 = await post(off.api, { devices: [D1], count: true, every: "1h",
             from: iso(now_hour - DAY), to: iso(now_hour) });
         expect(res2.body.source).toBe("raw");
+    });
+
+    test("unaligned window edges are counted from raw data, inside the window", async () => {
+        const from = now_hour - 5 * DAY + 20 * 60 * 1000;
+        const { api, seen } = route({ state, rows: () => [] });
+        const res = await post(api, { devices: [D1], count: true, every: "1h",
+            from: iso(from), to: iso(now_hour - 4 * DAY) });
+        expect(res.body.source).toBe("mixed");
+        const raw = seen.find(q => q.includes(`from(bucket: "default")`));
+        expect(raw).toContain(`range(start: ${iso(from)}, stop: ${iso(from + 40 * 60 * 1000)})`);
+        const cov = seen.find(q => q.includes(`from(bucket: "acs_coverage")`));
+        expect(cov).toContain(`range(start: ${iso(from + 40 * 60 * 1000)}, stop: ${iso(now_hour - 4 * DAY)})`);
+    });
+
+    test("the coverage state is read once per request", async () => {
+        let reads = 0;
+        const { api } = route({ state, rows: () => [] });
+        api.seriesReader.coverage = { bucket: "acs_coverage",
+            read_state: () => (reads++ == 0 ? state : null) };
+        const res = await post(api, { devices: [D1], count: true, every: "1d",
+            from: iso(now_hour - 100 * DAY), to: iso(now_hour - 10 * DAY) });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.source).toBe("coverage");
+        expect(reads).toBe(1);
     });
 
     test("the status route reports the summary", async () => {

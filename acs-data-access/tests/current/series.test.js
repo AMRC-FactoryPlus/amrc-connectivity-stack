@@ -14,6 +14,7 @@ import { APIv1 } from "../../lib/api-v1.js";
 import { DataFlow } from "../../lib/dataflow.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
 import { SeriesReader, SeriesAbort } from "../../lib/series-reader.js";
+import { body_errors } from "../../lib/utils.js";
 import {
     SeriesError, parse_request, bucket_start, next_bucket, bucket_count,
     choose_every, merge_windows, group_by_windows, split_metric,
@@ -549,6 +550,88 @@ describe("series route permissions", () => {
             mean: [{ device: D2, metric: "A" }] });
         expect(res.statusCode).toBe(422);
         expect(res.body.error).toBe("invalid_request");
+    });
+});
+
+describe("dataset last follows the dataset windows", () => {
+    const req = { ...base, last: true, every: "1h" };
+    const { devices, ...rest } = req;
+
+    test("last is clipped to the device's windows", async () => {
+        const datasets = {
+            [DS]: { structure: Constants.App.SessionLimits, config: {
+                source: D3, from: "2026-10-08T06:00:00.000Z", to: "2026-10-08T12:00:00.000Z" } },
+            [D3]: { structure: Constants.App.SparkplugSrc, config: { source: D1 } },
+        };
+        const { api, query_api } = make_api({ read: [DS], datasets,
+            rows: { last: () => [{ topLevelInstance: D1, _time: "2026-10-08T11:59:00Z" }] } });
+        const res = await call(api, USER, { ...rest, dataset: DS, last: { lookback: "90d" } });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.devices[D1].last).toBe("2026-10-08T11:59:00.000Z");
+        const q = query_api.seen.find(q => q.includes("max(column"));
+        expect(q).toContain("range(start: 2026-10-08T06:00:00.000Z, stop: 2026-10-08T12:00:00.000Z)");
+    });
+
+    test("a device whose windows are outside the lookback gets null and no query", async () => {
+        const datasets = {
+            [DS]: { structure: Constants.App.SessionLimits, config: {
+                source: D3, from: "2020-01-01T00:00:00.000Z", to: "2020-01-02T00:00:00.000Z" } },
+            [D3]: { structure: Constants.App.SparkplugSrc, config: { source: D1 } },
+        };
+        const { api, query_api } = make_api({ read: [DS], datasets });
+        const res = await call(api, USER, { dataset: DS, last: true, every: "1h",
+            from: "2020-01-01T00:00:00.000Z", to: "2020-01-02T00:00:00.000Z" });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.devices[D1].last).toBe(null);
+        expect(query_api.seen.filter(q => q.includes("max(column"))).toEqual([]);
+    });
+
+    test("a device request is not clipped to the request window", async () => {
+        const { api, query_api } = make_api({ rows: { last: () => [] } });
+        await call(api, ROOT, req);
+        const q = query_api.seen.find(q => q.includes("max(column"));
+        expect(q).not.toContain("stop:");
+    });
+});
+
+describe("choosing a step for long counts", () => {
+    test("counts over 14 days choose only from the coverage steps", () => {
+        const body = { devices: [D1], from: "2026-09-10T00:00:00.000Z",
+            to: "2026-09-30T00:00:00.000Z", points: 2000 };
+        expect(parse_request(body).every).toBe("15m");
+        expect(parse_request({ ...body, count: true }, Date.now(), { coverage: true }).every).toBe("1h");
+        expect(choose_every(T(body.from), T(body.to), 2000,
+            new Set(["1h", "6h", "1d", "1w"]))).toBe("1h");
+    });
+});
+
+describe("request body errors", () => {
+    const res_for = () => ({
+        headersSent: false, statusCode: null, body: null,
+        status(s) { this.statusCode = s; return this; },
+        json(b) { this.body = b; return this; },
+    });
+
+    test("malformed JSON is a 400 JSON body", () => {
+        const res = res_for();
+        body_errors(Object.assign(new Error("Unexpected token"), { type: "entity.parse.failed", status: 400 }),
+            {}, res, () => { throw new Error("passed on"); });
+        expect(res.statusCode).toBe(400);
+        expect(res.body).toMatchObject({ error: "bad_request" });
+    });
+
+    test("an oversized body is a 413 JSON body", () => {
+        const res = res_for();
+        body_errors({ type: "entity.too.large", limit: 102400 }, {}, res, () => {});
+        expect(res.statusCode).toBe(413);
+        expect(res.body).toMatchObject({ error: "too_large", limit: 102400 });
+    });
+
+    test("other errors pass on", () => {
+        let passed = null;
+        const err = new Error("x");
+        body_errors(err, {}, res_for(), e => { passed = e; });
+        expect(passed).toBe(err);
     });
 });
 

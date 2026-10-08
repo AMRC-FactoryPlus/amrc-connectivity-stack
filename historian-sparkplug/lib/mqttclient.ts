@@ -9,7 +9,11 @@ import {logger} from "../bin/ingester.js";
 import Long from "long";
 import {InfluxDB, Point} from '@influxdata/influxdb-client'
 import {Agent} from 'http'
-import {StallWatchdog, parseStallTimeout, subscriptionOutcome} from "./watchdog.js";
+import {
+    ConnectionWatchdog, StallWatchdog, describeConnectionChange,
+    describeConnectionTimeout, parseConnectTimeout, parseStallTimeout,
+    subscriptionOutcome,
+} from "./watchdog.js";
 
 let dotenv: any = null;
 try {
@@ -47,6 +51,11 @@ if (!flushInterval) {
 /* Exit if no Sparkplug message arrives for this long. See
  * lib/watchdog.ts. */
 const stallTimeoutMs: number = parseStallTimeout(process.env.STALL_TIMEOUT);
+
+/* Exit if the MQTT client is not connected with a granted
+ * subscription for this long, whatever the traffic. See
+ * lib/watchdog.ts. */
+const connectTimeoutMs: number = parseConnectTimeout(process.env.CONNECT_TIMEOUT);
 
 let i = 0;
 
@@ -100,6 +109,7 @@ export default class MQTTClient {
     private aliasResolver = {};
     private birthDebounce = {};
     private watchdog: StallWatchdog;
+    private connWatchdog: ConnectionWatchdog;
 
     constructor({e}: MQTTClientConstructorParams) {
         this.serviceClient = e.serviceClient;
@@ -110,6 +120,16 @@ export default class MQTTClient {
                 `🚨 No Sparkplug messages received for ${Math.round(idle / 1000)}s ` +
                 `(STALL_TIMEOUT ${stallTimeoutMs / 1000}s). The MQTT connection ` +
                 `or subscription is not working. Exiting so the pod is restarted.`),
+        });
+        this.connWatchdog = new ConnectionWatchdog({
+            timeoutMs: connectTimeoutMs,
+            onChange: (state, prev, unhealthyMs) => {
+                const msg = describeConnectionChange(state, prev, unhealthyMs, connectTimeoutMs);
+                if (state === "disconnected") logger.warn(`🔗 ${msg}`);
+                else logger.info(`🔗 ${msg}`);
+            },
+            onTimeout: (state, unhealthyMs) =>
+                fatal(`🚨 ${describeConnectionTimeout(state, unhealthyMs, connectTimeoutMs)}`),
         });
     }
 
@@ -149,6 +169,15 @@ export default class MQTTClient {
 
     async run() {
 
+        /* Start the connection watchdog before we ask for a client:
+         * finding the broker and getting Kerberos credentials can
+         * hang too. */
+        if (this.connWatchdog.enabled)
+            logger.info(`⏱️ Connection watchdog: exits if not connected to the broker with a granted subscription for ${connectTimeoutMs / 1000}s`);
+        else
+            logger.warn("⏱️ Connection watchdog disabled (CONNECT_TIMEOUT=0)");
+        this.connWatchdog.start();
+
         const mqtt = await this.serviceClient.mqtt_client({
             /* We subscribe ourselves on every connect and check the
              * SUBACK each time. MQTT.js's own resubscribe sends the
@@ -165,6 +194,11 @@ export default class MQTTClient {
         mqtt.on("close", this.on_close.bind(this));
         mqtt.on("reconnect", this.on_reconnect.bind(this));
         mqtt.on("offline", this.on_offline.bind(this));
+        /* Any of these means we have no working connection. Failed
+         * reconnect attempts repeat them; the watchdog ignores the
+         * repeats. "end" means the client will never reconnect. */
+        for (const ev of ["close", "offline", "end"])
+            mqtt.on(ev, () => this.connWatchdog.disconnected());
 
         /* Once armed by the first message, the watchdog covers every
          * way of data stopping: failing to reconnect, and being
@@ -192,6 +226,8 @@ export default class MQTTClient {
             logger.warn("⚠️ Connection closed before subscribing; will subscribe on the next connect");
             return;
         }
+        /* The SUBACK must match this connection. */
+        const session = this.connWatchdog.connected();
         this.mqtt.subscribe('spBv1.0/#', (err, granted) => {
             /* A refused subscription (e.g. 0x87 Not authorized) leaves
              * us connected but receiving nothing. The broker fixes
@@ -204,11 +240,13 @@ export default class MQTTClient {
             }
             if (outcome.status === "unconfirmed") {
                 /* e.g. the connection closed before the SUBACK. We
-                 * subscribe again on the next connect; the watchdog
-                 * catches it if data stops for good. */
+                 * subscribe again on the next connect. If no
+                 * subscription is granted within CONNECT_TIMEOUT, the
+                 * connection watchdog exits. */
                 logger.warn("⚠️ Sparkplug subscription not confirmed: %s", outcome.detail);
                 return;
             }
+            this.connWatchdog.subscribed(session);
             logger.info("✅ Subscribed to entire Factory+ namespace");
         });
         this.resetInterval();

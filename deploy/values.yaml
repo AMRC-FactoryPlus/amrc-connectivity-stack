@@ -449,6 +449,15 @@ unsIngesters:
     # flowed does cause a restart: raise the value on sites with long
     # quiet periods, or set it to 0 to disable the check.
     stallTimeout: 600
+    # -- Exit (so Kubernetes restarts the pod) if the MQTT client has not
+    # been connected to the broker with a granted subscription for this
+    # many seconds, counted from startup or from when the connection or
+    # subscription was lost. This catches a client that never connects,
+    # or stops reconnecting, even on a site with no traffic. A connected
+    # and subscribed client is healthy however quiet the broker is. The
+    # default allows for a broker and KDC restart during an upgrade. Set
+    # it to 0 to disable the check.
+    connectTimeout: 300
 
 visualiser:
   enabled: true
@@ -484,6 +493,15 @@ historians:
     # the value on sites with long quiet periods, or set it to 0 to
     # disable the check.
     stallTimeout: 600
+    # -- Exit (so Kubernetes restarts the pod) if the MQTT client has not
+    # been connected to the broker with a granted subscription for this
+    # many seconds, counted from startup or from when the connection or
+    # subscription was lost. This catches a client that never connects,
+    # or stops reconnecting, even on a site with no traffic. A connected
+    # and subscribed client is healthy however quiet the broker is. The
+    # default allows for a broker and KDC restart during an upgrade. Set
+    # it to 0 to disable the check.
+    connectTimeout: 300
     image:
       # -- The repository of the UNS Historian component
       repository: historian-uns
@@ -505,6 +523,15 @@ historians:
     # flowed does cause a restart: raise the value on sites with long
     # quiet periods, or set it to 0 to disable the check.
     stallTimeout: 600
+    # -- Exit (so Kubernetes restarts the pod) if the MQTT client has not
+    # been connected to the broker with a granted subscription for this
+    # many seconds, counted from startup or from when the connection or
+    # subscription was lost. This catches a client that never connects,
+    # or stops reconnecting, even on a site with no traffic. A connected
+    # and subscribed client is healthy however quiet the broker is. The
+    # default allows for a broker and KDC restart during an upgrade. Set
+    # it to 0 to disable the check.
+    connectTimeout: 300
     image:
       # -- The repository of the Warehouse component
       repository: historian-sparkplug

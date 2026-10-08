@@ -188,3 +188,15 @@ describe('pick_meters with power-only meters', () => {
         expect(energy_applies({ from: 'a', to: 'b' }, [{ metrics: [{ name: 'Active_Power_Total', unit: 'kW' }] }]).state).toBe('applies')
     })
 })
+
+describe('fmt_amount', () => {
+    it('keeps small figures readable and large ones tidy', async () => {
+        const { fmt_amount } = await import('../src/components/Datasets/addons/energy-logic.js')
+        expect(fmt_amount(0.0477)).toBe('0.0477')
+        expect(fmt_amount(0.01013)).toBe('0.0101')
+        expect(fmt_amount(1.794)).toBe('1.79')
+        expect(fmt_amount(12.34)).toBe('12.3')
+        expect(fmt_amount(1234.5)).toBe('1,235')
+        expect(fmt_amount(0)).toBe('0')
+    })
+})

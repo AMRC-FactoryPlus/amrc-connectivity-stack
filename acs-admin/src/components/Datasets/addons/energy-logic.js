@@ -87,6 +87,22 @@ export function pick_meters (series, labelled = new Set()) {
     return { meters, source: preferred.length ? 'label' : 'all' }
 }
 
+/**
+ * A kWh or kg figure for people. Small values keep three significant
+ * figures, so a short run reads 0.0477 kWh rather than 0.0.
+ */
+export function fmt_amount (v) {
+    const n = Number(v ?? 0)
+    if (!Number.isFinite(n)) return '–'
+    if (n === 0) return '0'
+    const a = Math.abs(n)
+    const opts = a >= 100 ? { maximumFractionDigits: 0 }
+        : a >= 10 ? { minimumFractionDigits: 1, maximumFractionDigits: 1 }
+        : a >= 1 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+        : { maximumSignificantDigits: 3 }
+    return n.toLocaleString('en-GB', opts)
+}
+
 /** The best grid intensity series, or null. */
 export function pick_intensity (series) {
     return find_intensity_series(series)[0] ?? null

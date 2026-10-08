@@ -42,6 +42,7 @@
 import { computed } from 'vue'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { fmt_amount } from './energy-logic.js'
 
 const props = defineProps({ ec: { type: Object, required: true } })
 defineEmits(['open'])
@@ -49,5 +50,5 @@ defineEmits(['open'])
 const applies = computed(() => ['applies', 'unknown'].includes(props.ec.applies.value.state))
 const state = computed(() => props.ec.state.value)
 const r = computed(() => props.ec.result.value)
-const one = v => (v ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const one = fmt_amount
 </script>

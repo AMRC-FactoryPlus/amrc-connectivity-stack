@@ -13,7 +13,7 @@
           <i class="fa-solid fa-bolt text-slate-500"></i>Energy and carbon
         </div>
         <p class="mt-1 text-sm text-slate-500">
-          Energy from the dataset's energy registers, and the carbon that energy stands for.
+          Energy from the dataset's energy registers or active power, and the carbon that energy stands for.
         </p>
       </div>
       <div class="flex items-center gap-3">
@@ -43,7 +43,7 @@
           Large datasets can take a while.
         </div>
         <div v-if="ec.applies.value.state === 'unknown'" class="mt-1 text-slate-500">
-          The device details are not available, so the energy registers are found from the data.
+          The device details are not available, so the energy registers and power are found from the data.
         </div>
         <div v-if="filling" class="mt-1 text-amber-700">
           <i class="fa-solid fa-hourglass-half mr-1"></i>The window has not ended. The figures cover the data so far.
@@ -54,7 +54,7 @@
 
     <div v-else-if="ec.state.value === 'loading'" class="flex items-center gap-3 px-5 py-8 text-sm text-slate-700">
       <i class="fa-solid fa-circle-notch animate-spin text-slate-400"></i>
-      Downloading the dataset and reading the energy registers.
+      Downloading the dataset and reading the energy registers and power.
     </div>
 
     <div v-else-if="ec.state.value === 'error'" class="flex flex-wrap items-start justify-between gap-4 px-5 py-6">
@@ -196,7 +196,7 @@ import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { CARBON } from '@/lib/datasets/constants.js'
 import { half_hour_rows } from '@/lib/datasets/energy.js'
 import { fmt_window, fmt_time, fmt_clock } from '@/lib/datasets/model.js'
-import { meter_key } from './energy-logic.js'
+import { meter_key, fmt_amount } from './energy-logic.js'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -217,8 +217,8 @@ const confidenceDot = computed(() => ({
 })[r.value?.confidence] ?? 'bg-slate-400')
 
 const key = meter_key
-const kwh = v => (v ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-const kg = v => (v ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const kwh = fmt_amount
+const kg = fmt_amount
 const pct = v => `${Math.round((v ?? 0) * 100)}%`
 
 function halfHour (t) {

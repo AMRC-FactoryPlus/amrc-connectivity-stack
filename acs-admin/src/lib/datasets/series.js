@@ -523,40 +523,234 @@ export function extent (points) {
 }
 
 /**
- * An SVG path for a sparkline `w` by `h` over [from, to]. Each bucket
- * is drawn at its middle; a missing bucket breaks the line. Raw live
- * values (`tail`) follow at their own times, never left of the last
- * bucket drawn.
+ * An SVG path for a sparkline `w` by `h` over [from, to], from
+ * display_rows() rows ([ms, value|null]). A null breaks the line. With
+ * `step`, each value holds until the next one (step after).
  */
-export function sparkline_path (points, { from, to, w, h, every, pad = 2, tail = [] }) {
-    const raw = (tail ?? []).filter(([t]) => t >= from && t <= to)
-    const ext = extent([...points, ...raw])
+export function sparkline_path (rows, { from, to, w, h, step = false, pad = 2 }) {
+    const shown = rows.filter(([t]) => t <= to)
+    const ext = extent(shown.filter(r => r[1] != null))
     if (!ext || to <= from) return ''
     const [lo, hi] = ext
-    const step = STEP_MS[every] ?? 0
-    const xt = t => Math.max(0, Math.min(w, ((t - from) / (to - from)) * w))
+    const x = t => Math.max(0, Math.min(w, ((t - from) / (to - from)) * w))
     const y = v => hi === lo ? h / 2 : pad + (1 - (v - lo) / (hi - lo)) * (h - 2 * pad)
     const r = n => Math.round(n * 10) / 10
     let d = ''
     let prev = null
-    let x0 = 0
-    for (const [t, v] of points) {
-        if (t < from - step || t > to) continue
-        const gap = prev == null || t > bucket_end(prev, every) + 1
-        x0 = xt(t + step / 2)
-        d += `${gap ? 'M' : 'L'}${r(x0)} ${r(y(v))}`
-        prev = t
-    }
-    let last = prev == null ? null : bucket_end(prev, every)
-    for (const [t, v] of raw) {
-        if (prev != null && t < prev) continue
-        const gap = last == null || raw_gap(last, t, step)
-        x0 = Math.max(x0, xt(t))
-        d += `${gap ? 'M' : 'L'}${r(x0)} ${r(y(v))}`
-        last = t
+    for (const [t, v] of shown) {
+        if (v == null) { prev = null; continue }
+        if (prev == null) d += `M${r(x(t))} ${r(y(v))}`
+        else if (step) d += `H${r(x(t))}V${r(y(v))}`
+        else d += `L${r(x(t))} ${r(y(v))}`
+        prev = v
     }
     // A single point is a dot, drawn as a short line.
-    return d.includes('L') || !d ? d : `${d}h1`
+    return /[LHV]/.test(d) || !d ? d : `${d}h1`
+}
+
+/* ------------------------------------------------------------------
+ * Values sent on change
+ * ------------------------------------------------------------------ */
+
+/**
+ * Whether a metric is sent on change rather than on a clock: in more
+ * than one in ten of the buckets where its device sent data, this
+ * metric sent nothing.
+ */
+export function sent_on_change (points, every, active, until = Infinity) {
+    if (!active || !points.length) return false
+    const have = new Set(points.map(p => p[0]))
+    const end = Number.isFinite(until) ? until : bucket_end(points[points.length - 1][0], every)
+    let busy = 0, missing = 0
+    for (let t = points[0][0], i = 0; t < end && i < 20000; t = bucket_end(t, every), i++) {
+        if (!active(t)) continue
+        busy++
+        if (!have.has(t)) missing++
+    }
+    return busy > 0 && missing > busy / 10
+}
+
+/**
+ * What a chart or sparkline draws for one metric: [ms, value|null]
+ * rows and whether to draw them as steps.
+ *
+ * A metric sent on a clock is drawn as before: bucket means, broken
+ * where a bucket is missing, then its raw live values.
+ *
+ * A metric sent on change (sent_on_change) holds its last value across
+ * buckets with no value, as long as its device sent something in them
+ * (`active(bucket start)`), and is drawn as steps. The line breaks only
+ * where the device sent nothing at all, and the hold stops at `until`
+ * (now, or the device's newest data). Raw live values follow, and the
+ * last one holds to `until` too.
+ */
+export function display_rows (m, every, { active = null, until = Infinity } = {}) {
+    const pts = m?.points ?? []
+    const tail = m?.tail ?? []
+    if (!STEP_MS[every]) return { rows: [], step: false }
+    if (!sent_on_change(pts, every, active, until)) return { rows: chart_pairs(pts, every, tail), step: false }
+
+    const rows = []
+    const means = new Map(pts.map(p => [p[0], p[1]]))
+    let last = null
+    const end = Number.isFinite(until) ? until : bucket_end(pts[pts.length - 1][0], every)
+    for (let t = pts[0][0], i = 0; t < end && i < 20000; t = bucket_end(t, every), i++) {
+        if (means.has(t)) {
+            last = means.get(t)
+            rows.push([t, last])
+        }
+        else if (active(t)) {
+            if (last != null) rows.push([t, last])
+        }
+        else if (rows.length && rows[rows.length - 1][1] != null) {
+            rows.push([t, null])
+        }
+    }
+    // Raw live values after the buckets.
+    const after = rows.length ? rows[rows.length - 1][0] : -Infinity
+    for (const [rt, v] of tail) {
+        if (rt <= after || rt > until) continue
+        rows.push([rt, v])
+        last = v
+    }
+    // Hold the last value up to `until`.
+    if (last != null && Number.isFinite(until) && rows.length && rows[rows.length - 1][1] != null && until > rows[rows.length - 1][0]) {
+        rows.push([until, last])
+    }
+    return { rows, step: true }
+}
+
+/* ------------------------------------------------------------------
+ * Live, at the zoom in view
+ * ------------------------------------------------------------------ */
+
+/** The coarsest bucket that still streams each value as it arrives. */
+export const STREAM_MAX_STEP = 30 * SEC
+
+/** How often a view that includes now refetches its newest bucket, at most. */
+export const TAIL_REFRESH_MS = 5 * MIN
+
+/**
+ * How a view of [from, to] behaves at this bucket size:
+ *   live:   the view includes now and keeps updating (the badge)
+ *   stream: values are drawn as they arrive, from an i3X subscription,
+ *           only for buckets of 30 s or less
+ *   hint:   at coarser buckets, how often the line moves
+ * `window_live` says the dataset's own window takes live values.
+ */
+export function live_mode ({ from, to }, every, now, window_live = true) {
+    const step = STEP_MS[every] ?? Infinity
+    const live = !!window_live && from <= now && to >= now - step
+    const stream = live && step <= STREAM_MAX_STEP
+    let hint = null
+    if (live && !stream) hint = `Updates every ${fmt_every(Math.min(step, TAIL_REFRESH_MS))}`
+    return { live, stream, hint }
+}
+
+function fmt_every (ms) {
+    if (ms < MIN) return `${Math.round(ms / SEC)} s`
+    if (ms < HOUR) return `${Math.round(ms / MIN)} min`
+    return `${Math.round(ms / HOUR)} h`
+}
+
+/* ------------------------------------------------------------------
+ * A cache of chart data
+ * ------------------------------------------------------------------ */
+
+/**
+ * Bucket means (and device counts, for knowing when a device sent
+ * anything) for one bucket size, kept in chunks so panning back costs
+ * nothing. A chunk fetched after it ended is final; the newest buckets
+ * are refreshed with put(..., { final: false }).
+ */
+export class SeriesCache {
+    constructor (every) {
+        this.every = every
+        this.step = STEP_MS[every]
+        const chunk = every === '1d' || every === '1w' ? '1w' : 250 * this.step
+        this.book = new StripCache({ every, chunk })
+        this.metrics = new Map()   // key -> Map(bucket start -> [mean, n])
+        this.meta = new Map()      // key -> { device, metric, unit, type }
+        this.counts = new Map()    // device -> Map(bucket start -> n)
+        this.counted = []          // [[from, to]] ranges with counts
+        this.asOf = -Infinity
+    }
+
+    /** The range to fetch to show [from, to), or null. */
+    missing (from, to, now = Date.now()) {
+        return this.book.missing(['*'], from, to, now)
+    }
+
+    pieces (from, to, max = LIMITS.buckets - 1) {
+        return this.book.pieces(from, to, max)
+    }
+
+    /**
+     * Store an answer for [from, to). `keys` are the metrics asked for;
+     * one the answer leaves out had no data then. With `final` false
+     * the chunks are not marked as loaded (a refresh of the newest
+     * buckets).
+     */
+    put (from, to, s, { keys = [], final = true, counted = false } = {}) {
+        const inside = t => t >= from && t < to
+        for (const key of new Set([...keys, ...Object.keys(s.metrics ?? {})])) {
+            let m = this.metrics.get(key)
+            if (!m) this.metrics.set(key, m = new Map())
+            for (const t of [...m.keys()]) if (inside(t)) m.delete(t)
+            const got = s.metrics?.[key]
+            if (!got) continue
+            for (const [t, mean, n] of got.points) if (inside(t)) m.set(t, [mean, n])
+            const old = this.meta.get(key)
+            this.meta.set(key, { device: got.device, metric: got.metric, unit: got.unit ?? old?.unit ?? null, type: got.type ?? old?.type ?? null })
+        }
+        if (counted) {
+            for (const [d, dev] of Object.entries(s.devices ?? {})) {
+                let c = this.counts.get(d)
+                if (!c) this.counts.set(d, c = new Map())
+                for (const t of [...c.keys()]) if (inside(t)) c.delete(t)
+                for (const [t, n] of dev.count ?? []) if (inside(t) && n > 0) c.set(t, n)
+            }
+            this.counted.push([from, to])
+        }
+        if (final) this.book.put(['*'], from, to, s)
+        if (Number.isFinite(s.asOf)) this.asOf = Math.max(this.asOf, s.asOf)
+    }
+
+    /** Whether device counts cover [from, to). */
+    has_counts (from, to) {
+        const spans = this.counted.slice().sort((a, b) => a[0] - b[0])
+        let at = from
+        for (const [a, b] of spans) {
+            if (a > at) break
+            at = Math.max(at, b)
+            if (at >= to) return true
+        }
+        return at >= to
+    }
+
+    /** A parsed-series view of [from, to) for these keys. */
+    view (from, to, keys) {
+        const metrics = {}
+        for (const key of keys) {
+            const m = this.metrics.get(key)
+            const meta = this.meta.get(key) ?? { ...split_key(key), unit: null, type: null }
+            const points = m ? [...m].filter(([t]) => t >= from && t < to).map(([t, [mean, n]]) => [t, mean, n]).sort((a, b) => a[0] - b[0]) : []
+            metrics[key] = { device: meta.device, metric: meta.metric, unit: meta.unit, type: meta.type, points }
+        }
+        return { from, to, every: this.every, step: this.step, asOf: this.asOf, metrics }
+    }
+
+    /** Whether a device sent anything in the bucket starting at t. */
+    active (device, t) {
+        return (this.counts.get(device)?.get(t) ?? 0) > 0
+    }
+
+    /** The end of a device's newest bucket with data, or null. */
+    newest (device) {
+        let top = null
+        for (const t of this.counts.get(device)?.keys() ?? []) if (top == null || t > top) top = t
+        return top == null ? null : bucket_end(top, this.every)
+    }
 }
 
 /* ------------------------------------------------------------------

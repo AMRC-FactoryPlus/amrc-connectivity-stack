@@ -234,17 +234,22 @@ describe('charts and sparklines', () => {
     })
 
     it('draws a sparkline with gaps', () => {
-        const pts = [[T0, 0, 1], [T0 + 5 * MIN, 10, 1], [T0 + 20 * MIN, 5, 1]]
-        const d = sparkline_path(pts, { from: T0, to: T0 + 30 * MIN, w: 120, h: 24, every: '5m', pad: 2 })
+        const rows = chart_pairs([[T0, 0, 1], [T0 + 5 * MIN, 10, 1], [T0 + 20 * MIN, 5, 1]], '5m')
+        const d = sparkline_path(rows, { from: T0, to: T0 + 30 * MIN, w: 120, h: 24, pad: 2 })
         expect(d.match(/M/g)).toHaveLength(2)
-        expect(d.startsWith('M10 22')).toBe(true)
-        expect(d).toContain('L30 2')
-        expect(sparkline_path([], { from: T0, to: T0 + HOUR, w: 100, h: 20, every: '5m' })).toBe('')
+        expect(d.startsWith('M0 22')).toBe(true)
+        expect(d).toContain('L20 2')
+        expect(sparkline_path([], { from: T0, to: T0 + HOUR, w: 100, h: 20 })).toBe('')
     })
 
     it('draws a flat line in the middle', () => {
-        const d = sparkline_path([[T0, 4, 1], [T0 + 5 * MIN, 4, 1]], { from: T0, to: T0 + 10 * MIN, w: 100, h: 20, every: '5m' })
-        expect(d).toBe('M25 10L75 10')
+        const d = sparkline_path([[T0, 4], [T0 + 5 * MIN, 4]], { from: T0, to: T0 + 10 * MIN, w: 100, h: 20 })
+        expect(d).toBe('M0 10L50 10')
+    })
+
+    it('draws steps for a value sent on change', () => {
+        const d = sparkline_path([[T0, 0], [T0 + 5 * MIN, 10]], { from: T0, to: T0 + 10 * MIN, w: 100, h: 20, step: true, pad: 0 })
+        expect(d).toBe('M0 20H50V0')
     })
 })
 

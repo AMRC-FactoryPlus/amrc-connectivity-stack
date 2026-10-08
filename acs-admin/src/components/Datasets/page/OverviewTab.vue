@@ -81,8 +81,9 @@
                       :gaps="gaps"/>
 
         <div ref="pinnedEl">
-          <PinnedCard :entries="pinned" :series="data.series.value" :from="data.window.value.from" :to="sparkTo"
-                      :live="data.live.value" :so-far="soFar" :error="data.error.value" @tab="t => $emit('tab', t)"/>
+          <PinnedCard :entries="pinned" :series="spark.series.value" :display="spark.display" :from="sparkRange.from" :to="sparkRange.to"
+                      :live="spark.live.value" :hint="spark.hint.value" :so-far="soFar" :error="spark.error.value"
+                      :range-id="sparkId" @range="id => sparkChoice = id" @tab="t => $emit('tab', t)"/>
         </div>
       </div>
 
@@ -130,6 +131,8 @@ import PinnedCard from './PinnedCard.vue'
 import { useDatasetPins } from './usePins.js'
 import { usable_windows, COVERAGE_NOTE } from '@/lib/datasets/series.js'
 import { useDatasetSeries } from './useDatasetSeries.js'
+import { useChartSeries } from './useChartSeries.js'
+import { spark_range, default_spark_range } from '@/lib/datasets/chart-view.js'
 import IncludedIn from './IncludedIn.vue'
 
 const props = defineProps({
@@ -153,25 +156,28 @@ const items = computed(() => group_items(props.record, ds.byUuid))
 
 const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
 
-// Strips, quiet since and sparklines, from one request that stays live
-// in the same way as the Data tab charts.
-// The sparklines fill the pinned card less its label and value
-// columns (PinnedCard), which sets the bucket size. The same request
-// carries every device's strip counts, so it stays at most 800 buckets.
+// Strips, coverage and quiet since, across the dataset's window. Strips
+// are 240 px wide, so about that many buckets.
+const STRIP_PX = 240
+const { entries: pinned } = useDatasetPins(() => props.record, () => props.resolved)
+const data = useDatasetSeries(() => props.record, [], { width: STRIP_PX, count: true, last: true })
+
+// Sparklines: the pinned metrics over the chosen span, ending at now (or
+// the window's end), so the line fills its width with the data so far.
+// They fill the pinned card less its label and value columns
+// (PinnedCard), which sets the bucket size.
 const SPARK_CHROME_PX = 220 + 96 + 56
-const SPARK_MAX_PX = 800
 const pinnedEl = ref(null)
 const { width: pinnedWidth } = useElementSize(pinnedEl)
-const { entries: pinned } = useDatasetPins(() => props.record, () => props.resolved)
-const data = useDatasetSeries(() => props.record, pinned, {
-  width: () => pinnedWidth.value ? Math.min(SPARK_MAX_PX, pinnedWidth.value - SPARK_CHROME_PX) : 400,
-  count: true,
-  last: true,
+const sparkChoice = ref(null)
+const sparkId = computed(() => sparkChoice.value ?? default_spark_range(data.window.value, data.now.value))
+const spark = useChartSeries(() => props.record, pinned, {
+  view: () => spark_range(sparkId.value, data.window.value, data.now.value),
+  width: () => pinnedWidth.value ? Math.max(200, pinnedWidth.value - SPARK_CHROME_PX) : 400,
 })
-// Sparklines run up to now, so the line fills its width while the
-// window is still filling in.
-const sparkTo = computed(() => Math.min(data.axisTo.value, data.now.value))
-const soFar = computed(() => data.live.value && !data.window.value.windowless)
+const sparkRange = computed(() => spark.range.value)
+// The window is still filling in.
+const soFar = computed(() => spark.live.value && !data.window.value.windowless)
 
 
 /* Gaps and coverage across the window, from the strip counts. Devices

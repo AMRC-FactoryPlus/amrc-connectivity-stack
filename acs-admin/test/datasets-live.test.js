@@ -85,10 +85,10 @@ describe('live tail', () => {
         ])
     })
 
-    it('draws the tail on a sparkline, never left of the last bucket', () => {
-        const d = sparkline_path([[T0, 0, 1]], { from: T0, to: T0 + 2 * MIN, w: 120, h: 20, every: '1m', tail: [[T0 + 10 * SEC, 10], [T0 + 50 * SEC, 5]] })
-        // Bucket at its middle (30 s = x 30), then the raw values.
-        expect(d).toBe('M30 18L30 2L50 10')
+    it('draws the tail on a sparkline after the buckets', () => {
+        const rows = chart_pairs([[T0, 0, 1]], '1m', [[T0 + 10 * SEC, 10], [T0 + 50 * SEC, 5]])
+        const d = sparkline_path(rows, { from: T0, to: T0 + 2 * MIN, w: 120, h: 20 })
+        expect(d).toBe('M0 18L10 2L50 10')
     })
 })
 

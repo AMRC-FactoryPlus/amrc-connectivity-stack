@@ -3,9 +3,11 @@
   -->
 
 <!-- The Data tab: a metric picker on the left and, on the right, one
-     chart row per pinned metric over the dataset's window, all on one
-     time axis. History comes from Data Access; while the window holds
-     now, i3X values extend it live (useDatasetSeries). -->
+     chart row per pinned metric, all on one time axis. The toolbar,
+     dragging and sideways scrolling move the view; it starts on the
+     dataset's window. History comes from Data Access; while the view
+     includes now it keeps updating, and at fine zoom i3X values extend
+     it as they arrive (useChartSeries). -->
 <template>
   <div v-if="!record.structure" class="py-8 text-center text-sm text-slate-500">
     Structure is visible to people who can edit this dataset, so the metric list is not available.
@@ -62,6 +64,7 @@
             <span v-if="data.live.value && entries.length" class="inline-flex items-center gap-1 text-xs font-normal text-green-700">
               <span class="size-1.5 rounded-full bg-green-500"></span>Live
             </span>
+            <span v-if="data.live.value && entries.length && data.hint.value" class="text-xs font-normal text-slate-400">{{ data.hint.value }}</span>
           </div>
           <div class="text-[13px] text-slate-500">Pinned metrics change this view and the CSV download. They do not change the dataset.</div>
         </div>
@@ -86,8 +89,19 @@
         Pin metrics on the left to chart them here.
       </Card>
 
-      <Card v-else class="overflow-hidden">
-        <!-- Shared time axis. -->
+      <div v-if="entries.length" class="flex flex-wrap items-center gap-2">
+        <TimelineToolbar :zoom="labels.zoom" :label="labels.label" :date-value="labels.dateValue" :now="data.now.value"
+                         :searchable="false" :step-text="stepText"
+                         @go="t => setView(go_view(current, t, maxTo))"
+                         @step="d => setView(step_view(current, d, maxTo))"
+                         @zoom="z => setView(zoom_view(current, z, chartW, maxTo))"/>
+        <Button v-if="view" size="sm" variant="ghost" @click="view = null">{{ win.windowless || win.recording != null ? 'Back to now' : 'Whole window' }}</Button>
+      </div>
+
+      <Card v-if="entries.length" class="touch-pan-y select-none overflow-hidden"
+            :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
+            @pointerdown="startDrag" @wheel="onWheel">
+        <!-- Shared time axis. Drag or scroll sideways to move along it. -->
         <div class="grid grid-cols-[200px_minmax(0,1fr)_32px] border-b border-slate-200">
           <div></div>
           <div class="relative h-7 text-[11px] text-slate-500">
@@ -113,10 +127,10 @@
               <span class="pointer-events-none absolute inset-y-0 z-10 w-px bg-slate-900" :style="{ left: `${future.frac * 100}%` }" title="Now"></span>
             </template>
             <Skeleton v-if="!series && data.loading.value" class="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2"/>
-            <div v-else-if="series && !pointsOf(e).length && !tailOf(e).length" class="absolute inset-0 flex items-center text-xs text-slate-400">
-              No data in this window
+            <div v-else-if="series && !shown[e.key]?.rows.length" class="absolute inset-0 flex items-center text-xs text-slate-400">
+              {{ data.loading.value ? 'Loading' : 'No data in this view' }}
             </div>
-            <SeriesChart v-else-if="series" :points="pointsOf(e)" :tail="tailOf(e)" :every="series.every" :from="win.from" :to="axisTo" :unit="unitOf(e)"/>
+            <SeriesChart v-else-if="series" :rows="shown[e.key].rows" :step="shown[e.key].step" :from="current.from" :to="current.to" :unit="unitOf(e)"/>
           </div>
           <button type="button" class="flex size-8 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
                   :title="`Unpin ${e.label}`" @click="pins.unpin(e.key)">
@@ -133,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { useElementSize, refDebounced } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import streamSaver from 'streamsaver'
@@ -142,13 +156,15 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import { fmt_window, fmt_time } from '@/lib/datasets/model.js'
+import { fmt_window, fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
 import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since } from '@/lib/datasets/series.js'
 import { metric_total, filter_metrics } from './page-logic.js'
 import { useDatasetPins } from './usePins.js'
-import { useDatasetSeries } from './useDatasetSeries.js'
+import { useChartSeries } from './useChartSeries.js'
+import TimelineToolbar from '../timeline/TimelineToolbar.vue'
+import { go_view, step_view, zoom_view, pan_view, view_labels } from '@/lib/datasets/chart-view.js'
 import SeriesChart from './SeriesChart.vue'
 
 const props = defineProps({
@@ -201,14 +217,74 @@ const groups = computed(() => {
 const LABEL_PX = 200 + 32
 const chartsEl = ref(null)
 const { width: chartsWidth } = useElementSize(chartsEl)
-const data = useDatasetSeries(() => props.record, entries, {
-  width: () => chartsWidth.value ? chartsWidth.value - LABEL_PX : 600,
+const chartW = computed(() => chartsWidth.value ? Math.max(200, chartsWidth.value - LABEL_PX) : 600)
+
+/* The range in view. Null shows the dataset's window (for one with no
+ * window, the last 24 hours; while recording, this recording). Moving
+ * it sets a range; a range that ends at now keeps ending at now. */
+const view = ref(null)
+const data = useChartSeries(() => props.record, entries, {
+  view: () => view.value ? effective(view.value) : null,
+  width: chartW,
 })
 const series = computed(() => data.series.value)
 const win = computed(() => data.window.value)
+const nowMs = computed(() => data.now.value)
 
-const axisTo = computed(() => data.axisTo.value)
-const ticks = computed(() => axis_ticks(win.value.from, axisTo.value, 8))
+function effective (v) {
+  return v.follow ? { from: nowMs.value - v.span, to: nowMs.value } : v
+}
+const current = computed(() => view.value ? effective(view.value) : { from: win.value.from, to: win.value.to })
+// A view can run up to now, or to the end of a window that ends later.
+const maxTo = computed(() => Math.max(nowMs.value, win.value.to))
+
+function setView (v) {
+  const span = v.to - v.from
+  const n = Date.now()
+  view.value = Math.abs(v.to - n) <= span * 0.02 ? { follow: true, span } : { from: v.from, to: v.to }
+}
+
+const labels = computed(() => view_labels(current.value, chartW.value, nowMs.value))
+const stepText = computed(() => `${fmt_duration(current.value.to - current.value.from)}`)
+const ticks = computed(() => axis_ticks(current.value.from, current.value.to, 8))
+
+// What each chart draws, worked out once per change.
+const shown = computed(() => {
+  void series.value
+  return Object.fromEntries(entries.value.map(e => [e.key, data.display(e.key)]))
+})
+
+/* Drag or scroll sideways to move along the time axis. */
+const dragging = ref(false)
+let dragX = null
+function startDrag (ev) {
+  if (ev.button !== 0 || ev.target.closest('button')) return
+  dragX = ev.clientX
+  dragging.value = true
+  window.addEventListener('pointermove', onDrag)
+  window.addEventListener('pointerup', stopDrag)
+  window.addEventListener('pointercancel', stopDrag)
+}
+function onDrag (ev) {
+  if (dragX == null) return
+  const dx = ev.clientX - dragX
+  if (!dx) return
+  dragX = ev.clientX
+  setView(pan_view(current.value, dx, chartW.value, maxTo.value))
+}
+function stopDrag () {
+  dragX = null
+  dragging.value = false
+  window.removeEventListener('pointermove', onDrag)
+  window.removeEventListener('pointerup', stopDrag)
+  window.removeEventListener('pointercancel', stopDrag)
+}
+onBeforeUnmount(stopDrag)
+function onWheel (ev) {
+  if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY)) return
+  ev.preventDefault()
+  setView(pan_view(current.value, -ev.deltaX, chartW.value, maxTo.value))
+}
 
 const heading = computed(() => {
   if (win.value.recording != null) return `Recording now, since ${fmt_since(win.value.recording)} (this will be saved as a run when it stops)`
@@ -218,15 +294,13 @@ const heading = computed(() => {
 
 // Same hatch as the timeline uses for time still to come.
 const FUTURE_HATCH = 'repeating-linear-gradient(135deg, rgba(241,245,249,0.7) 0 6px, rgba(248,250,252,0.7) 6px 12px)'
-// Where now falls on the axis, when the window ends after now.
+// Where now falls on the axis, when the view runs past now.
 const future = computed(() => {
-  const now = data.now.value, from = win.value.from, to = axisTo.value
+  const now = nowMs.value, { from, to } = current.value
   if (!(now > from && now < to)) return null
   return { frac: (now - from) / (to - from) }
 })
 
-const pointsOf = e => series.value?.metrics[e.key]?.points ?? []
-const tailOf = e => series.value?.metrics[e.key]?.tail ?? []
 const unitOf = e => series.value?.metrics[e.key]?.unit ?? e.unit ?? ''
 
 const num = v => Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecision(4))
@@ -236,7 +310,7 @@ function describe (e) {
   const name = `${e.label} on ${e.deviceName}`
   if (!series.value) return `${name}: loading`
   const last = latest_point(series.value.metrics[e.key])
-  if (!last) return `${name}: no data in this window`
+  if (!last) return `${name}: no data in this view`
   const unit = unitOf(e)
   return `${name}: latest ${num(last[1])}${unit ? ` ${unit}` : ''} at ${fmt_time(last[0])}`
 }

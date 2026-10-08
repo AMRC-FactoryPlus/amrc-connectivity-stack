@@ -2,10 +2,10 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<!-- One metric's mean per bucket, then its raw live values, as a thin
-     line with no axes or grid, from `from` to `to`, so rows stacked
-     under one shared axis line up. Gaps in the data break the line.
-     Hover shows the value. -->
+<!-- One metric as a thin line with no axes or grid, from `from` to
+     `to`, so rows stacked under one shared axis line up. Draws
+     display_rows(): bucket means and raw live values, as steps for a
+     metric sent on change. A null breaks the line. Hover shows the value. -->
 <template>
   <VChart class="h-full w-full" :option="option" autoresize/>
 </template>
@@ -17,7 +17,6 @@ import { LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { fmt_time } from '@/lib/datasets/model.js'
-import { chart_pairs } from '@/lib/datasets/series.js'
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent])
 
@@ -26,11 +25,10 @@ const VChart = defineAsyncComponent(() =>
 )
 
 const props = defineProps({
-  // [[bucket start ms, mean, n]]
-  points: { type: Array, required: true },
-  // Raw live values after the buckets: [[ms, value]]
-  tail: { type: Array, default: () => [] },
-  every: { type: String, required: true },
+  // display_rows(): [[ms, value|null]]
+  rows: { type: Array, required: true },
+  // Hold each value until the next (a metric sent on change).
+  step: { type: Boolean, default: false },
   from: { type: Number, required: true },
   to: { type: Number, required: true },
   unit: { type: String, default: '' },
@@ -55,8 +53,9 @@ const option = computed(() => ({
   },
   series: [{
     type: 'line',
-    data: chart_pairs(props.points, props.every, props.tail),
-    showSymbol: props.points.length + props.tail.length < 3,
+    data: props.rows,
+    step: props.step ? 'end' : false,
+    showSymbol: props.rows.length < 3,
     symbolSize: 3,
     connectNulls: false,
     lineStyle: { color: '#0f172a', width: 1.25 },

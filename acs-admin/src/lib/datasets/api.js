@@ -371,8 +371,12 @@ export async function update_from_spec (client, rec, spec, byUuid) {
  * Delete a dataset. Data Access refuses (409) while other datasets
  * include it, and lists them; that list comes back as `referrers`.
  */
-export async function delete_dataset (client, uuid) {
-    const [st, body] = await client.DataAccess.fetch(`v1/delete/${uuid}`)
+export async function delete_dataset (client, uuid, { timeout = DELETE_TIMEOUT_MS } = {}) {
+    let timer = null
+    const late = new Promise(resolve => { timer = setTimeout(() => resolve(null), timeout) })
+    const answer = await Promise.race([client.DataAccess.fetch(`v1/delete/${uuid}`), late]).finally(() => clearTimeout(timer))
+    if (!answer) return { ok: false, timedOut: true, reason: 'The service did not answer in time. Check the dataset list before trying again.' }
+    const [st, body] = answer
     if (st === 200 || st === 204 || st === 404) return { ok: true }
     if (st === 409) return { ok: false, referrers: (body?.referrers ?? []).map(r => r.dataset) }
     if (st === 403) return { ok: false, reason: 'You do not have permission to delete this dataset.' }
@@ -399,6 +403,32 @@ export function helper_owner (rec, referrers, byUuid) {
     return owner && own_helper(owner, byUuid)?.uuid === rec?.uuid ? owner : null
 }
 
+/** How long one delete may take before it counts as failed. */
+export const DELETE_TIMEOUT_MS = 15 * 1000
+
+/**
+ * Whether a dataset still exists, as far as you can tell: false only
+ * when Data Access answers 404 for its metadata.
+ */
+export async function dataset_exists (client, uuid) {
+    try {
+        const [st] = await client.DataAccess.fetch(`v1/metadata/${uuid}`)
+        return st !== 404
+    }
+    catch {
+        return true
+    }
+}
+
+/**
+ * The session whose own device list `rec` is, from the datasets you
+ * can see, or null. Delete that first, then this.
+ */
+export function owner_of_helper (rec, byUuid) {
+    if (rec?.structure !== STRUCTURE.UNION) return null
+    return Object.values(byUuid ?? {}).find(o => own_helper(o, byUuid)?.uuid === rec.uuid) ?? null
+}
+
 /**
  * Waits before asking again when a delete is refused only because of a
  * dataset deleted a moment ago. Data Access learns of deletes from
@@ -409,24 +439,42 @@ export const DELETE_RETRY_MS = [500, 1000, 2000, 3000, 4000]
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 /**
- * Delete datasets in order, stopping at the first refusal. A refusal
- * that names only datasets this call already deleted is retried after
+ * Delete datasets in order, stopping at the first refusal or failure.
+ * A refusal that names only datasets that are gone (deleted by this
+ * call, or ones `gone(uuid)` says no longer exist) is retried after
  * each of `retry` waits; `onWait(uuid)` is called before each wait.
- * { ok, deleted: [uuid], failed: uuid|null, referrers, reason }
+ * `cancelled()` stops between steps.
+ * { ok, deleted: [uuid], failed: uuid|null, referrers, gone: [uuid], reason }
+ * where `gone` lists the referrers that no longer exist.
  */
-export async function delete_in_order (client, order, { retry = DELETE_RETRY_MS, wait = sleep, onWait = () => {} } = {}) {
+export async function delete_in_order (client, order, {
+    retry = DELETE_RETRY_MS, wait = sleep, onWait = () => {}, gone = async () => false,
+    timeout = DELETE_TIMEOUT_MS, cancelled = () => false,
+} = {}) {
     const deleted = []
+    const dead = new Set()
+    const all_gone = async refs => {
+        if (!refs?.length) return false
+        for (const r of refs) {
+            if (deleted.includes(r) || dead.has(r)) continue
+            if (await gone(r)) dead.add(r)
+            else return false
+        }
+        return true
+    }
     for (const uuid of order) {
-        let res = await delete_dataset(client, uuid)
-        for (let i = 0; !res.ok && i < retry.length && res.referrers?.length && res.referrers.every(r => deleted.includes(r)); i++) {
+        if (cancelled()) return { ok: false, cancelled: true, deleted, failed: uuid, gone: [...dead] }
+        let res = await delete_dataset(client, uuid, { timeout })
+        for (let i = 0; !res.ok && i < retry.length && await all_gone(res.referrers); i++) {
+            if (cancelled()) return { ok: false, cancelled: true, deleted, failed: uuid, gone: [...dead] }
             onWait(uuid)
             await wait(retry[i])
-            res = await delete_dataset(client, uuid)
+            res = await delete_dataset(client, uuid, { timeout })
         }
-        if (!res.ok) return { ...res, ok: false, deleted, failed: uuid }
+        if (!res.ok) return { ...res, ok: false, deleted, failed: uuid, gone: [...deleted, ...dead] }
         deleted.push(uuid)
     }
-    return { ok: true, deleted, failed: null }
+    return { ok: true, deleted, failed: null, gone: [...dead] }
 }
 
 /* ------------------------------------------------------------------

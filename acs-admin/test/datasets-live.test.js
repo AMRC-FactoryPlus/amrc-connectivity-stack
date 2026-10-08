@@ -16,7 +16,7 @@ import {
 } from '../src/lib/datasets/series.js'
 import { picker_order } from '../src/components/Datasets/page/page-logic.js'
 import { STRUCTURE } from '../src/lib/datasets/constants.js'
-import { own_helper, edit_shape, delete_plan, helper_owner, delete_in_order } from '../src/lib/datasets/api.js'
+import { own_helper, edit_shape, delete_plan, helper_owner, delete_in_order, owner_of_helper, dataset_exists } from '../src/lib/datasets/api.js'
 
 const D1 = 'aaaaaaaa-0000-4000-8000-000000000001'
 const SEC = 1000
@@ -208,7 +208,7 @@ describe('deleting a dataset with its own device list', () => {
         const client = fake([[204, null], [409, { referrers: [{ dataset: SESSION }] }], [409, { referrers: [{ dataset: SESSION }] }], [200, null]])
         const waits = []
         const res = await delete_in_order(client, [SESSION, HELPER], { wait: async ms => { waits.push(ms) } })
-        expect(res).toEqual({ ok: true, deleted: [SESSION, HELPER], failed: null })
+        expect(res).toEqual({ ok: true, deleted: [SESSION, HELPER], failed: null, gone: [] })
         expect(waits).toEqual([500, 1000])
         expect(client.calls).toHaveLength(4)
     })
@@ -227,5 +227,62 @@ describe('deleting a dataset with its own device list', () => {
         const res = await delete_in_order(fake(answers), [SESSION, HELPER], { wait: async () => {} })
         expect(res.ok).toBe(false)
         expect(res.failed).toBe(HELPER)
+    })
+})
+
+describe('deleting safely', () => {
+    const SESSION = 'cccccccc-0000-4000-8000-000000000001'
+    const HELPER = 'cccccccc-0000-4000-8000-000000000002'
+    const byUuid = () => ({
+        [SESSION]: { uuid: SESSION, name: 'Trial', structure: STRUCTURE.SESSION, config: { source: HELPER } },
+        [HELPER]: { uuid: HELPER, name: 'Trial (devices)', structure: STRUCTURE.UNION, config: [D1] },
+    })
+
+    it('always deletes the session before its device list', () => {
+        const b = byUuid()
+        expect(delete_plan(b[SESSION], b).order).toEqual([SESSION, HELPER])
+        // Opened from the device list: the session is found up front, so
+        // nothing is sent for the device list first.
+        expect(owner_of_helper(b[HELPER], b)).toBe(b[SESSION])
+        expect(owner_of_helper(b[SESSION], b)).toBe(null)
+    })
+
+    it('gives up on a delete that never answers', async () => {
+        const client = { DataAccess: { fetch: () => new Promise(() => {}) } }
+        const res = await delete_in_order(client, [SESSION, HELPER], { timeout: 10 })
+        expect(res.ok).toBe(false)
+        expect(res.timedOut).toBe(true)
+        expect(res.failed).toBe(SESSION)
+        expect(res.deleted).toEqual([])
+    })
+
+    it('retries when the only referrer no longer exists', async () => {
+        const answers = [[409, { referrers: [{ dataset: SESSION }] }], [409, { referrers: [{ dataset: SESSION }] }], [200, null]]
+        const sent = []
+        const client = { DataAccess: { fetch: async path => { sent.push(path); return answers.shift() } } }
+        const res = await delete_in_order(client, [HELPER], { wait: async () => {}, gone: async r => r === SESSION })
+        expect(res.ok).toBe(true)
+        expect(sent).toEqual([`v1/delete/${HELPER}`, `v1/delete/${HELPER}`, `v1/delete/${HELPER}`])
+    })
+
+    it('does not retry while a referrer still exists, and says which are gone', async () => {
+        const OTHER = 'cccccccc-0000-4000-8000-000000000009'
+        const client = { DataAccess: { fetch: async () => [409, { referrers: [{ dataset: SESSION }, { dataset: OTHER }] }] } }
+        const res = await delete_in_order(client, [HELPER], { wait: async () => {}, gone: async r => r === SESSION })
+        expect(res.ok).toBe(false)
+        expect(res.gone).toEqual([SESSION])
+    })
+
+    it('stops when cancelled', async () => {
+        let n = 0
+        const client = { DataAccess: { fetch: async () => { n++; return [204, null] } } }
+        const res = await delete_in_order(client, [SESSION, HELPER], { cancelled: () => n > 0 })
+        expect(res.cancelled).toBe(true)
+        expect(n).toBe(1)
+    })
+
+    it('reads a 404 for the metadata as gone', async () => {
+        expect(await dataset_exists({ DataAccess: { fetch: async () => [404] } }, SESSION)).toBe(false)
+        expect(await dataset_exists({ DataAccess: { fetch: async () => [403] } }, SESSION)).toBe(true)
     })
 })

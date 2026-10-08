@@ -90,7 +90,12 @@ function fakeInflux(tree: ObjectTree) {
 /** A fake MQTT client whose events the test fires. */
 function fakeMqtt() {
     const handlers = new Map<string, Function>();
-    const mqtt = { subscribe: jest.fn(), on: (ev: string, fn: Function) => handlers.set(ev, fn) };
+    /* The broker grants every subscription at once. */
+    const mqtt = {
+        connected: true,
+        subscribe: jest.fn((_t: string, cb?: Function) => cb?.(null, [{ topic: "UNS/v1/#", qos: 0 }])),
+        on: (ev: string, fn: Function) => handlers.set(ev, fn),
+    };
     return {
         fplus: { mqtt_client: async () => mqtt, debug: { bound: () => () => {} } },
         connect: () => handlers.get("connect")!(),

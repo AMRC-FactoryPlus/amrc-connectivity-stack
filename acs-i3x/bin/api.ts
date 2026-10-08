@@ -10,6 +10,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { routes } from "../lib/routes.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { ValueCache } from "../lib/value-cache.js";
+import { parseConnectTimeout, parseStallTimeout } from "../lib/watchdog.js";
 import { History } from "../lib/history.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
 import { I3xRag } from "../lib/rag/i3x-rag.js";
@@ -67,6 +68,12 @@ const valueCache = new ValueCache({
     // Values kept from InfluxDB are refreshed the same way while
     // connected: their devices may not publish to the UNS.
     refreshInterval: positiveInt("I3X_INFLUX_REFRESH_MS", 300_000),
+    // Exit, so Kubernetes restarts the pod, if UNS messages stop once
+    // they have started (STALL_TIMEOUT), or if MQTT is not connected
+    // with a granted subscription (CONNECT_TIMEOUT). In seconds; 0
+    // disables. See lib/watchdog.ts.
+    stallTimeout: parseStallTimeout(env.STALL_TIMEOUT),
+    connectTimeout: parseConnectTimeout(env.CONNECT_TIMEOUT),
 });
 
 // History module (InfluxDB)

@@ -383,6 +383,39 @@ MQTT.js releases, which report the refusal in a different form. Before,
 such a refusal was logged as "not confirmed" and the service kept
 running.
 
+### i3X resubscribes to the UNS after a broker restart
+
+After the MQTT broker restarted while i3X kept running, i3X reconnected
+but its UNS subscription was not re-established. No UNS message
+reached it again. Current values then changed only on the 5-minute
+InfluxDB refresh, and i3X subscriptions received no live updates,
+until i3X was restarted.
+
+i3X now uses the same fixes as the historians and the UNS ingester:
+
+* It subscribes to `UNS/v1/#` itself on every connect and checks the
+  broker's answer each time, instead of relying on the MQTT library's
+  automatic resubscribe. If the broker refuses the subscription, i3X
+  exits, so Kubernetes restarts it.
+* Once UNS data has started to flow, i3X exits if no UNS message
+  arrives for `stallTimeout` seconds (default 600). Any message under
+  `UNS/v1/` counts. A site with no UNS traffic at all does not restart.
+* i3X exits if it has not been connected to the broker with a granted
+  subscription for `connectTimeout` seconds (default 300), counted
+  from startup or from the moment it lost its connection or
+  subscription.
+
+```yaml
+i3x:
+  stallTimeout: 600
+  connectTimeout: 300
+```
+
+Set a value to `0` to turn that check off. An invalid value, for
+example `5m`, stops i3X at startup. A restart drops i3X subscriptions,
+and clients must create them again. On a site with long quiet periods
+in UNS traffic, raise `stallTimeout` or set it to `0`.
+
 ### Other improvements
 
 ConfigDB:

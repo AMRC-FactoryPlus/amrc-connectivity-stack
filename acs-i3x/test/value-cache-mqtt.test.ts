@@ -12,6 +12,11 @@
 import { EventEmitter } from "node:events";
 import { jest, describe, it, expect, afterEach } from "@jest/globals";
 import { ValueCache } from "../lib/value-cache.js";
+import { I3xStore } from "../lib/store.js";
+
+/** The meta key ValueCache records the time values were current in.
+ * It is written only while live. */
+const CURRENT_UNTIL = "values_current_until";
 
 type SubackCb = (err: any, granted: any) => void;
 
@@ -45,6 +50,10 @@ function fakeMqtt() {
         message(topic = "UNS/v1/Ent/Edge/dev/Temp") {
             mqtt.emit("message", topic, Buffer.from("{}"), {});
         },
+        /** A packet that is not a message, such as a ping response. */
+        ping() {
+            mqtt.emit("packetreceive", { cmd: "pingresp" });
+        },
     };
 }
 
@@ -61,15 +70,22 @@ const GRANTED = [{ topic: "UNS/v1/#", qos: 0 }];
 
 async function setup(opts: { stallTimeout?: number; connectTimeout?: number } = {}) {
     const fatal = jest.fn<(msg: string) => void>();
+    const store = new I3xStore();
     const cache = new ValueCache({
         objectTree: mockTree() as any,
         staleThreshold: 300_000,
+        store,
         fatal,
+        subscribeRetry: 5_000,
+        currentInterval: 1_000,
         ...opts,
     });
     const f = fakeMqtt();
     await cache.init(f.fplus);
-    return { cache, fatal, ...f };
+    /** True once the cache has recorded its values as current, which
+     * it does only while live. */
+    const recordedCurrent = () => store.getMeta(CURRENT_UNTIL) !== undefined;
+    return { cache, fatal, store, recordedCurrent, ...f };
 }
 
 afterEach(() => {
@@ -150,7 +166,7 @@ describe("ValueCache MQTT subscription", () => {
         f.suback(null, []);
         expect(f.fatal).not.toHaveBeenCalled();
         expect(warn).toHaveBeenCalledWith(
-            expect.stringMatching(/not confirmed/), "no SUBACK entries returned");
+            expect.stringMatching(/not confirmed/), "no SUBACK entries returned", 5);
     });
 
     it("logs a connection closed before the SUBACK as unconfirmed", async () => {
@@ -159,7 +175,81 @@ describe("ValueCache MQTT subscription", () => {
         f.connect();
         f.suback(new Error("Connection closed"), undefined);
         expect(f.fatal).not.toHaveBeenCalled();
-        expect(warn).toHaveBeenCalledWith(expect.stringMatching(/not confirmed/), "Connection closed");
+        expect(warn).toHaveBeenCalledWith(expect.stringMatching(/not confirmed/), "Connection closed", 5);
+    });
+
+    it("subscribes again on the same connection after an unconfirmed SUBACK", async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const f = await setup();
+        f.connect();
+        f.suback(null, []);
+        expect(f.mqtt.subscribes).toHaveLength(1);
+        jest.advanceTimersByTime(4_999);
+        expect(f.mqtt.subscribes).toHaveLength(1);
+        jest.advanceTimersByTime(1);
+        expect(f.mqtt.subscribes).toHaveLength(2);
+        f.suback(null, GRANTED);
+        expect(f.recordedCurrent()).toBe(true);
+    });
+
+    it("does not retry on a connection that has since closed", async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const f = await setup();
+        f.connect();
+        f.suback(null, []);
+        f.close();
+        jest.advanceTimersByTime(60_000);
+        expect(f.mqtt.subscribes).toHaveLength(1);
+        /* The next connect subscribes. */
+        f.connect();
+        expect(f.mqtt.subscribes).toHaveLength(2);
+    });
+});
+
+describe("ValueCache goes live only on a granted SUBACK", () => {
+    it("is not live after connect alone", async () => {
+        jest.useFakeTimers();
+        const f = await setup();
+        f.connect();
+        jest.advanceTimersByTime(10_000);
+        expect(f.recordedCurrent()).toBe(false);
+        f.suback(null, GRANTED);
+        expect(f.recordedCurrent()).toBe(true);
+    });
+
+    it("is not live after an unconfirmed SUBACK", async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const f = await setup();
+        f.connect();
+        f.suback(null, []);
+        jest.advanceTimersByTime(4_000);
+        expect(f.recordedCurrent()).toBe(false);
+    });
+
+    it("is not live after a refused SUBACK", async () => {
+        jest.useFakeTimers();
+        const f = await setup();
+        f.connect();
+        f.suback(Object.assign(new Error("Not authorized"), { code: 0x87 }), GRANTED);
+        jest.advanceTimersByTime(10_000);
+        expect(f.recordedCurrent()).toBe(false);
+    });
+
+    it("ignores a granted SUBACK from an earlier connection", async () => {
+        jest.useFakeTimers();
+        const f = await setup();
+        f.connect();
+        const first = f.mqtt.subscribes[0];
+        f.close();
+        f.connect();
+        first.cb(null, GRANTED);
+        jest.advanceTimersByTime(10_000);
+        expect(f.recordedCurrent()).toBe(false);
+        f.suback(null, GRANTED);
+        expect(f.recordedCurrent()).toBe(true);
     });
 });
 
@@ -205,6 +295,29 @@ describe("ValueCache stall watchdog", () => {
         expect(f.fatal).toHaveBeenCalledTimes(1);
     });
 
+    it("records the values as current only up to the last UNS message", async () => {
+        /* Ping responses keep the link looking alive while no UNS
+         * message arrives. The catch-up after the restart must cover
+         * that silent period. */
+        jest.useFakeTimers();
+        const f = await setup({ stallTimeout: 10_000 });
+        f.connect();
+        f.suback(null, GRANTED);
+        f.message();
+        const lastMessage = Date.now();
+        for (let n = 0; n < 15; n++) {
+            jest.advanceTimersByTime(1_000);
+            f.ping();
+        }
+        expect(f.fatal).toHaveBeenCalledTimes(1);
+        expect(Number(f.store.getMeta(CURRENT_UNTIL))).toBeLessThanOrEqual(lastMessage);
+        /* Not moved on again afterwards. */
+        jest.advanceTimersByTime(5_000);
+        f.ping();
+        jest.advanceTimersByTime(5_000);
+        expect(Number(f.store.getMeta(CURRENT_UNTIL))).toBeLessThanOrEqual(lastMessage);
+    });
+
     it("is off by default", async () => {
         jest.useFakeTimers();
         const f = await setup();
@@ -221,7 +334,7 @@ describe("ValueCache connection watchdog", () => {
         const f = await setup({ connectTimeout: 10_000 });
         jest.advanceTimersByTime(12_000);
         expect(f.fatal).toHaveBeenCalledTimes(1);
-        expect(f.fatal.mock.calls[0][0]).toMatch(/not connected to the MQTT broker/);
+        expect(f.fatal.mock.calls[0][0]).toMatch(/no MQTT connection with a granted UNS subscription/);
     });
 
     it("fires if connected but the subscription is never granted", async () => {
@@ -232,7 +345,42 @@ describe("ValueCache connection watchdog", () => {
         f.suback(null, []);
         jest.advanceTimersByTime(12_000);
         expect(f.fatal).toHaveBeenCalledTimes(1);
-        expect(f.fatal.mock.calls[0][0]).toMatch(/no subscription has been granted/);
+        expect(f.fatal.mock.calls[0][0]).toMatch(/no MQTT connection with a granted UNS subscription/);
+    });
+
+    it("fires if a connection stays open with unconfirmed SUBACKs", async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const f = await setup({ connectTimeout: 10_000 });
+        f.connect();
+        for (let n = 0; n < 3; n++) {
+            f.suback(null, []);
+            jest.advanceTimersByTime(5_000);
+        }
+        expect(f.mqtt.subscribes.length).toBeGreaterThan(1);
+        expect(f.fatal).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts the client as disconnected on offline", async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const f = await setup({ connectTimeout: 10_000 });
+        f.connect();
+        f.suback(null, GRANTED);
+        f.mqtt.emit("offline");
+        jest.advanceTimersByTime(12_000);
+        expect(f.fatal).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts the client as disconnected on end", async () => {
+        jest.useFakeTimers();
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const f = await setup({ connectTimeout: 10_000 });
+        f.connect();
+        f.suback(null, GRANTED);
+        f.mqtt.emit("end");
+        jest.advanceTimersByTime(12_000);
+        expect(f.fatal).toHaveBeenCalledTimes(1);
     });
 
     it("does not fire while connected and subscribed, however quiet", async () => {

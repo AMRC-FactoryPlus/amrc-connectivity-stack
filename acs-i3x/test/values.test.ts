@@ -179,7 +179,7 @@ describe("UNS values", () => {
         expect(s.valueCache.size()).toBe(1);
 
         const handlers = new Map<string, Function>();
-        const mqtt = { connected: true, subscribe: () => {}, on: (ev: string, fn: Function) => handlers.set(ev, fn) };
+        const mqtt = { connected: true, subscribe: (_t: string, cb?: Function) => cb?.(null, [{ topic: "UNS/v1/#", qos: 0 }]), on: (ev: string, fn: Function) => handlers.set(ev, fn) };
         await s.valueCache.init({ mqtt_client: async () => mqtt, debug: { bound: () => () => {} } });
         // init starts empty: the earlier run may have missed messages.
         expect(s.valueCache.size()).toBe(0);
@@ -196,7 +196,7 @@ describe("UNS message errors", () => {
     it("are logged and dropped, not thrown out of the MQTT handler", async () => {
         const s = setup();
         const handlers = new Map<string, Function>();
-        const mqtt = { connected: true, subscribe: () => {}, on: (ev: string, fn: Function) => handlers.set(ev, fn) };
+        const mqtt = { connected: true, subscribe: (_t: string, cb?: Function) => cb?.(null, [{ topic: "UNS/v1/#", qos: 0 }]), on: (ev: string, fn: Function) => handlers.set(ev, fn) };
         await s.valueCache.init({ mqtt_client: async () => mqtt, debug: { bound: () => () => {} } });
         const err = jest.spyOn(console, "error").mockImplementation(() => {});
         const add = jest.spyOn(s.tree, "addCompositionFromUns")
@@ -409,7 +409,7 @@ describe("database errors while writing values", () => {
         });
         try {
             const handlers = new Map<string, Function>();
-            const mqtt = { connected: true, subscribe: () => {}, on: (ev: string, fn: Function) => handlers.set(ev, fn) };
+            const mqtt = { connected: true, subscribe: (_t: string, cb?: Function) => cb?.(null, [{ topic: "UNS/v1/#", qos: 0 }]), on: (ev: string, fn: Function) => handlers.set(ev, fn) };
             await expect(s.valueCache.init({ mqtt_client: async () => mqtt, debug: { bound: () => () => {} } }))
                 .resolves.toBe(s.valueCache);
             handlers.get("connect")!();

@@ -779,6 +779,30 @@ describe("ObjectTree", () => {
             return tree;
         }
 
+        it("maps each Sparkplug type to the historian's measurement suffix", async () => {
+            const tree = await emptyTree();
+            const leaf = (id: string, type: string) =>
+                ({ Schema_UUID: "schema-leaf", Instance_UUID: id, Sparkplug_Type: type });
+            tree.addDevice("dev-T", mkDevInfo("dev-T", "Device T", {
+                Plain_Double: leaf("m-double", "Double"),
+                Double_LE: leaf("m-doublele", "DoubleLE"),
+                Plain_Float: leaf("m-float", "Float"),
+                Int_BE: leaf("m-int", "Int32BE"),
+                Unsigned: leaf("m-uint", "UInt16LE"),
+                Flag: leaf("m-bool", "Boolean"),
+                Text: leaf("m-text", "String"),
+            }), { name: "Device T" });
+
+            const suffix = (id: string) => tree.getMetricMeta(id)?.typeSuffix;
+            expect(suffix("m-double")).toBe("d");
+            expect(suffix("m-doublele")).toBe("d");
+            expect(suffix("m-float")).toBe("d");
+            expect(suffix("m-int")).toBe("i");
+            expect(suffix("m-uint")).toBe("u");
+            expect(suffix("m-bool")).toBe("b");
+            expect(suffix("m-text")).toBe("s");
+        });
+
         it("addDevice places the device under its ISA-95 hierarchy", async () => {
             const tree = await emptyTree();
             tree.addDevice("dev-A", mkDevInfo("dev-A", "Device A"), { name: "Device A" });

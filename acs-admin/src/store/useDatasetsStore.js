@@ -23,6 +23,10 @@ const LINGER_MS = 30 * 1000
 // The device and node stores are shared with the rest of the app and
 // have no stop, so start them once.
 let subStoresStarted = false
+// A failed search subscription is tried again after this long.
+const RESUBSCRIBE_MS = 15 * 1000
+const retryTimers = new Set()
+let onVisible = null
 
 export const useDatasetsStore = defineStore('datasets', {
     state: () => ({
@@ -136,44 +140,78 @@ export const useDatasetsStore = defineStore('datasets', {
             this.lingerTimer = null
             if (this.running) return
             this.running = true
-            await serviceClientReady()
-            // Every page may have left while we waited.
-            if (!this.running) return
-            const client = useServiceClientStore().client
-            const da = client.DataAccess
+            try {
+                await serviceClientReady()
+                // Every page may have left while we waited.
+                if (!this.running) return
 
-            if (!subStoresStarted) {
-                subStoresStarted = true
-                useDeviceStore().start()
-                useNodeStore().start()
+                if (!subStoresStarted) {
+                    subStoresStarted = true
+                    useDeviceStore().start()
+                    useNodeStore().start()
+                }
+
+                this.subscribe('metadata', da => da.search_metadata(), {
+                    next: map => {
+                        this.metadata = map ? map.valueSeq().toArray().map(m => m?.toJS ? m.toJS() : m) : []
+                        this.metadataReady = true
+                        this.error = null
+                    },
+                    error: err => {
+                        console.error('Datasets: metadata search failed', err)
+                        this.error = 'Could not load datasets from the Data Access service.'
+                        this.metadataReady = true
+                    },
+                })
+                this.subscribe('structure', da => da.search_structure(), {
+                    next: map => {
+                        this.structures = map
+                            ? map.entrySeq().map(([uuid, v]) => ({ ...(v?.toJS ? v.toJS() : v), uuid })).toArray()
+                            : []
+                        this.structureReady = true
+                    },
+                    error: err => {
+                        console.error('Datasets: structure search failed', err)
+                        this.structureReady = true
+                    },
+                })
+
+                this.pollStatus()
+                // Directory status is polled only while the page is seen.
+                this.statusTimer = setInterval(() => {
+                    if (document.visibilityState !== 'hidden') this.pollStatus()
+                }, STATUS_POLL_MS)
+                onVisible = () => { if (document.visibilityState === 'visible' && this.running) this.pollStatus() }
+                document.addEventListener('visibilitychange', onVisible)
             }
+            catch (err) {
+                // Let the next page that needs the store start it again.
+                console.error('Datasets: the store did not start', err)
+                this.error = 'Could not load datasets from the Data Access service.'
+                this.running = false
+            }
+        },
 
-            this.subs.push(da.search_metadata().subscribe({
-                next: map => {
-                    this.metadata = map ? map.valueSeq().toArray().map(m => m?.toJS ? m.toJS() : m) : []
-                    this.metadataReady = true
-                },
+        /**
+         * Subscribe to a Data Access search. A subscription that fails
+         * is tried again after a while, for as long as the store runs.
+         */
+        subscribe (name, make, { next, error }) {
+            // `let`: an error can arrive before subscribe() returns.
+            let sub = null
+            sub = make(useServiceClientStore().client.DataAccess).subscribe({
+                next,
                 error: err => {
-                    console.error('Datasets: metadata search failed', err)
-                    this.error = 'Could not load datasets from the Data Access service.'
-                    this.metadataReady = true
+                    error(err)
+                    if (sub) this.subs = this.subs.filter(x => x !== sub)
+                    const retry = setTimeout(() => {
+                        retryTimers.delete(retry)
+                        if (this.running) this.subscribe(name, make, { next, error })
+                    }, RESUBSCRIBE_MS)
+                    retryTimers.add(retry)
                 },
-            }))
-            this.subs.push(da.search_structure().subscribe({
-                next: map => {
-                    this.structures = map
-                        ? map.entrySeq().map(([uuid, v]) => ({ ...(v?.toJS ? v.toJS() : v), uuid })).toArray()
-                        : []
-                    this.structureReady = true
-                },
-                error: err => {
-                    console.error('Datasets: structure search failed', err)
-                    this.structureReady = true
-                },
-            }))
-
-            this.pollStatus()
-            this.statusTimer = setInterval(() => this.pollStatus(), STATUS_POLL_MS)
+            })
+            if (!sub.closed) this.subs.push(sub)
         },
 
         stop () {
@@ -186,6 +224,10 @@ export const useDatasetsStore = defineStore('datasets', {
             if (this.users > 0) return
             for (const s of this.subs) s.unsubscribe()
             clearInterval(this.statusTimer)
+            for (const t of retryTimers) clearTimeout(t)
+            retryTimers.clear()
+            if (onVisible) document.removeEventListener('visibilitychange', onVisible)
+            onVisible = null
             this.$reset()
         },
 

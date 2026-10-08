@@ -455,6 +455,11 @@ function isUuid (s) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 }
 
+// What earlier save attempts made, so a retry after a part-way failure
+// carries on from there instead of making the same datasets again.
+const createdDevices = {}
+const createProgress = {}
+
 async function save () {
   touched.value = true
   if (problemList.value.length || saving.value) return
@@ -468,7 +473,7 @@ async function save () {
     let map = {}
     if (need.length) {
       try {
-        map = await ensure_device_datasets(client, need, ds.byUuid, u => ds.deviceByUuid[u]?.name ?? null)
+        map = await ensure_device_datasets(client, need, ds.byUuid, u => ds.deviceByUuid[u]?.name ?? null, createdDevices)
       }
       catch (err) {
         if (err instanceof DatasetError) throw err
@@ -495,7 +500,7 @@ async function save () {
       router.push(`/datasets/${record.value.uuid}`)
     }
     else {
-      const uuid = await create_from_spec(client, spec)
+      const uuid = await create_from_spec(client, spec, createProgress)
       toast.success('Dataset created')
       router.push(`/datasets/${uuid}`)
     }

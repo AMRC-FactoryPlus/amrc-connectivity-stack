@@ -9,7 +9,7 @@
  * Nothing here talks to a service. Tested in test/datasets-gaps.test.js.
  */
 
-import { STEP_MS, bucket_start, bucket_end } from './series.js'
+import { STEP_MS, bucket_start, bucket_end, bucket_total } from './series.js'
 import { fmt_clock, fmt_duration } from './model.js'
 
 /**
@@ -124,8 +124,9 @@ export function device_gaps (counts, { from, to, every, now = Infinity, windows 
  *
  * A stretch where most devices (more than half of those inside their
  * windows then, and at least two) are in a gap at the same time counts
- * as one gap for all of them, not one per device. Device gaps that
- * overlap such a stretch are folded into it.
+ * as one gap for all of them, not one per device. The part of a device
+ * gap inside such a stretch is folded into it; what is left outside
+ * still counts when it is long enough to be a gap on its own.
  *
  * `counts` is { [device]: rows }. Every device in it is counted, with
  * missing or empty rows meaning no data. `windows` is an optional
@@ -135,7 +136,7 @@ export function device_gaps (counts, { from, to, every, now = Infinity, windows 
  *   total,     gaps to report: shared stretches plus the rest
  *   shared,    [{ from, to }] stretches most devices missed
  *   devices,   { [device]: device_gaps() result }
- *   own,       { [device]: gaps not folded into a shared stretch }
+ *   own,       { [device]: gaps, or parts of gaps, outside the shared stretches }
  *   coverage,  share of device buckets not in a gap (0 to 1), or null
  *              when the window has not started
  * }
@@ -165,10 +166,29 @@ export function window_gaps (counts, { from, to, every, now = Infinity, windows 
         }
     }
 
+    // A device's gaps less the shared stretches. What is left of a
+    // longer outage still counts, if it would count as a gap on its own.
     const own = {}
     let total = shared.length
     for (const id of ids) {
-        own[id] = devices[id].gaps.filter(g => !shared.some(s => g.from < s.to && g.to > s.from))
+        const counts_as_gap = (a, b) => {
+            const k = bucket_total(a, b, every)
+            return k >= 2 && k > devices[id].spacing
+        }
+        own[id] = devices[id].gaps.flatMap(g => {
+            let pieces = [{ from: g.from, to: g.to }]
+            for (const sh of shared) {
+                pieces = pieces.flatMap(p => {
+                    if (sh.to <= p.from || sh.from >= p.to) return [p]
+                    const out = []
+                    if (sh.from > p.from) out.push({ from: p.from, to: sh.from })
+                    if (sh.to < p.to) out.push({ from: sh.to, to: p.to })
+                    return out
+                })
+            }
+            if (pieces.length === 1 && pieces[0].from === g.from && pieces[0].to === g.to) return [g]
+            return pieces.filter(p => counts_as_gap(p.from, p.to))
+        })
         total += own[id].length
     }
 

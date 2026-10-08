@@ -60,11 +60,14 @@ export function useKioskData (devices, saved) {
   }
 
   let lastGen = 0
+  // Devices the service will not show us. They have no "quiet since",
+  // and do not make every poll fall back to the long lookback.
+  let denied = new Set()
   async function pollLasts () {
     const l = list()
     const my = ++lastGen
     if (!l.length) { lasts.value = {}; lastsReady.value = false; return }
-    const known = lastsReady.value && l.every(d => d in lasts.value)
+    const known = lastsReady.value && l.every(d => d in lasts.value || denied.has(d))
     const hour = Math.ceil(Date.now() / 3600e3) * 3600e3
     try {
       const s = await fetch_series(sc.client, series_request({
@@ -72,8 +75,9 @@ export function useKioskData (devices, saved) {
       }))
       if (my !== lastGen) return
       const got = {}
+      denied = new Set(s.denied)
       for (const d of l) {
-        if (s.denied.includes(d)) continue
+        if (denied.has(d)) continue
         const t = s.devices[d]?.last ?? null
         got[d] = t == null && known ? (lasts.value[d] ?? null) : t
       }

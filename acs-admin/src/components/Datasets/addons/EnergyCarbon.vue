@@ -122,6 +122,7 @@
             {{ pct(r.coverage) }} of the window has readings.
             <template v-if="r.estimated_kwh > 0">{{ kwh(r.estimated_kwh) }} kWh at the window edges is estimated from the nearest readings.</template>
             {{ r.bad_segments ? `${r.bad_segments} bad ${r.bad_segments === 1 ? 'reading' : 'readings'} left out.` : 'No bad readings.' }}
+            <template v-if="r.unit_guessed"><span class="text-amber-700">A meter has no unit, so its unit is guessed and confidence is low.</span></template>
           </div>
         </div>
       </div>
@@ -139,7 +140,11 @@
           <Checkbox :model-value="ec.ticked.value.has(key(m))" @update:model-value="ec.toggle(m)"/>
           <span class="font-medium">{{ deviceName(m.device) }}</span>
           <span class="truncate font-mono text-xs text-slate-500" :title="m.metric">{{ m.metric }}</span>
-          <span class="ml-auto text-xs text-slate-400">{{ m.from_power ? `${m.unit || 'power'}, integrated over time` : (m.unit || 'no unit') }}</span>
+          <span class="ml-auto text-right text-xs text-slate-400">
+            {{ m.from_power ? `${m.unit || 'power'}, integrated over time` : (m.unit || 'no unit') }}
+            <span v-if="m.unit_guessed" class="text-amber-700"> · Unit guessed as {{ m.from_power ? 'kW' : 'kWh' }}</span>
+            <span v-if="m.held_ms > 0" class="block">Reports on change, so the last value is held across quiet stretches</span>
+          </span>
         </label>
         <div class="text-xs text-slate-500">
           <i class="fa-solid fa-leaf mr-1"></i>

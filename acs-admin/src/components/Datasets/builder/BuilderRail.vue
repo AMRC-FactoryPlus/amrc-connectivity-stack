@@ -198,7 +198,8 @@ async function loadLasts () {
   const hour = Math.ceil(now / 3600e3) * 3600e3
   try {
     const l = await fetch_series(sc.client, series_request({ devices: want, from: hour - 3600e3, to: hour, every: '1h', last: LAST_LOOKBACK }))
-    if (my !== lastsGen) return
+    // A newer request took over: these were not stored, so ask again next time.
+    if (my !== lastsGen) { for (const u of want) lastAt.delete(u); return }
     const got = {}
     for (const u of want) if (!l.denied.includes(u)) got[u] = l.devices[u]?.last ?? null
     lasts.value = { ...lasts.value, ...got }

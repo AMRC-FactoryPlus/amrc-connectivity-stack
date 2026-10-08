@@ -2,15 +2,14 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<!-- Void the recording in progress: it is thrown away and no dataset
-     is made. The reason is asked for so the operator stops to think;
-     the record is deleted, so the reason is not stored. -->
+<!-- Void the recording in progress: it stops, is saved as a run and
+     marked void with the reason, so it stays on the lane as voided. -->
 <template>
   <Dialog :open="open" @update:open="v => !v && !busy && emit('close')">
     <DialogContent class="text-base sm:max-w-xl">
       <DialogHeader>
         <DialogTitle class="text-xl">Void this recording?</DialogTitle>
-        <DialogDescription>This recording is thrown away. No dataset is saved.</DialogDescription>
+        <DialogDescription>The recording stops and is kept as a voided run, with the reason you choose.</DialogDescription>
       </DialogHeader>
       <div class="flex flex-col gap-2">
         <span class="text-sm font-medium text-slate-700">Reason</span>

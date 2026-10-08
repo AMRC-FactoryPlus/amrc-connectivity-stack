@@ -59,7 +59,9 @@
               <tbody>
                 <tr v-for="id in items" :key="id" class="cursor-pointer border-t border-slate-100 hover:bg-slate-50" @click="router.push(`/datasets/${id}`)">
                   <td class="px-4 py-2 font-medium">
-                    {{ ds.byUuid[id] ? ds.name(id) : 'A dataset you cannot see' }}
+                    <RouterLink :to="`/datasets/${id}`" class="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950" @click.stop>
+                      {{ ds.byUuid[id] ? ds.name(id) : 'A dataset you cannot see' }}
+                    </RouterLink>
                     <StatusPill v-if="ds.byUuid[id]" :record="ds.byUuid[id]" class="ml-2"/>
                     <div v-if="ds.byUuid[id]?.tags?.length" class="text-xs font-normal text-slate-500">
                       <span v-for="t in ds.byUuid[id].tags" :key="t">#{{ t }} </span>
@@ -183,7 +185,7 @@ const gaps = computed(() => {
   for (const d of props.resolved.devices) {
     if (s.denied.includes(d)) continue
     counts[d] = s.devices[d]?.count ?? []
-    windows[d] = usable_windows(s.devices[d]?.windows?.length ? s.devices[d].windows : null, s.pending, from, to)
+    windows[d] = usable_windows(s.devices[d]?.windows ?? null, s.pending, from, to)
   }
   if (!Object.keys(counts).length) return null
   return window_gaps(counts, { from, to, every: s.every, now: s.asOf, windows })

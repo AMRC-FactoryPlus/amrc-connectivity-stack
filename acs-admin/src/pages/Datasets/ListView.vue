@@ -117,7 +117,8 @@
                         @update:model-value="v => tick(row.r.uuid, v)"/>
             </td>
             <td class="px-4 py-2.5 max-w-xs">
-              <div class="truncate font-medium text-slate-950" :title="row.name">{{ row.name }}</div>
+              <RouterLink :to="`/datasets/${row.r.uuid}`" class="block truncate font-medium text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
+                          :title="row.name" @click.stop>{{ row.name }}</RouterLink>
               <TagChips v-if="row.r.tags.length" :tags="row.r.tags" class="mt-1"/>
             </td>
             <td class="px-4 py-2.5"><KindBadge :kind="row.r.kind"/></td>

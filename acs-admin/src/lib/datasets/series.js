@@ -249,7 +249,7 @@ const ms = t => t == null ? null : (typeof t === 'number' ? t : Date.parse(t))
  * Turn a response into ms times and sorted arrays:
  * {
  *   from, to, every, step, asOf, source,
- *   devices: { uuid: { windows: [[ms, ms]], count: [[ms, n]], last: ms|null|undefined } },
+ *   devices: { uuid: { windows: [[ms, ms]] | null, count: [[ms, n]], last: ms|null|undefined } },
  *   metrics: { key: { device, metric, type, unit, points: [[ms, mean, n]] } },
  *   denied: [uuid],
  * }
@@ -274,7 +274,8 @@ export function parse_series (body) {
     }
     for (const [uuid, d] of Object.entries(body?.devices ?? {})) {
         out.devices[uuid] = {
-            windows: (d?.windows ?? []).map(([a, b]) => [ms(a), ms(b)]),
+            // Null when the answer gave none (a devices request); [] means none overlap.
+            windows: Array.isArray(d?.windows) ? d.windows.map(([a, b]) => [ms(a), ms(b)]) : null,
             count: sorted_rows(d?.count),
             last: d && 'last' in d ? ms(d.last) : undefined,
         }

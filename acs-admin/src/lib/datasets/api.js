@@ -25,6 +25,7 @@ export class DatasetError extends Error {
 function why (err) {
     const st = err?.status
     if (st === 403) return 'You do not have permission for this.'
+    if (st === 404) return 'The dataset no longer exists. Someone may have deleted it.'
     if (st === 409) return 'Another dataset includes this one.'
     if (st === 422) return 'The service refused the definition.'
     return err?.message ?? 'Something went wrong.'
@@ -121,14 +122,19 @@ async function delete_quietly (client, app, uuid) {
 /**
  * Make sure each device has a device dataset, creating missing ones
  * with the device's name. Returns { [device uuid]: dataset uuid }.
+ *
+ * `created` ({ [device uuid]: dataset uuid }) remembers what earlier
+ * attempts made. The caller keeps it across retries, so a retry after a
+ * part-way failure reuses those datasets instead of making them again.
  */
-export async function ensure_device_datasets (client, devices, byUuid, nameOf = () => null) {
+export async function ensure_device_datasets (client, devices, byUuid, nameOf = () => null, created = {}) {
     const out = {}
     for (const dev of devices) {
-        const existing = device_dataset_for(dev, byUuid)
+        const existing = device_dataset_for(dev, byUuid) ?? created[dev]
         if (existing) { out[dev] = existing; continue }
         const uuid = await client.DataAccess.create_dataset(STRUCTURE.DEVICE, { source: dev })
         if (!uuid) throw new DatasetError(`Could not make a dataset for device ${nameOf(dev) ?? dev}.`)
+        created[dev] = uuid
         const name = nameOf(dev)
         if (name) await set_name(client, uuid, name)
         out[dev] = uuid
@@ -174,8 +180,13 @@ export function plan (spec) {
  * Several items with a window make two datasets: a union of the items,
  * and a session over it. The session is the one that gets the name,
  * kind and metadata; the union is named after it.
+ *
+ * `progress` remembers what an earlier attempt made ({ key, union,
+ * session }). The caller keeps it across retries of the same items and
+ * window, so a retry after a part-way failure carries on from there
+ * instead of making the datasets again.
  */
-export async function create_from_spec (client, spec) {
+export async function create_from_spec (client, spec, progress = {}) {
     if (!spec.name?.trim()) throw new DatasetError('Give the dataset a name.')
     if (!spec.items?.length) throw new DatasetError('Add at least one device or dataset.')
     if (spec.window) {
@@ -183,25 +194,40 @@ export async function create_from_spec (client, spec) {
         if (bad) throw new DatasetError(bad)
     }
 
-    const saved = []
+    // Another set of items or window: start again.
+    const key = JSON.stringify([spec.items, spec.window ? [to_iso(spec.window.from), to_iso(spec.window.to)] : null])
+    if (progress.key !== key) {
+        progress.key = key
+        progress.union = null
+        progress.session = null
+    }
+    const saved = [progress.union, progress.session].filter(Boolean)
     try {
         let source = spec.items.length === 1 ? spec.items[0] : null
         if (spec.items.length > 1 || !spec.window) {
-            source = await client.DataAccess.create_dataset(STRUCTURE.UNION, spec.items)
-            if (!source) throw new DatasetError('The service did not return the new dataset.')
-            saved.push(source)
+            source = progress.union
+            if (!source) {
+                source = await client.DataAccess.create_dataset(STRUCTURE.UNION, spec.items)
+                if (!source) throw new DatasetError('The service did not return the new dataset.')
+                progress.union = source
+                saved.push(source)
+            }
             await set_name(client, source, spec.window ? `${spec.name.trim()} (devices)` : spec.name.trim())
         }
 
         let uuid = source
         if (spec.window) {
-            uuid = await client.DataAccess.create_dataset(STRUCTURE.SESSION, {
-                source,
-                from: to_iso(spec.window.from),
-                to: to_iso(spec.window.to),
-            })
-            if (!uuid) throw new DatasetError('The service did not return the new dataset.')
-            saved.push(uuid)
+            uuid = progress.session
+            if (!uuid) {
+                uuid = await client.DataAccess.create_dataset(STRUCTURE.SESSION, {
+                    source,
+                    from: to_iso(spec.window.from),
+                    to: to_iso(spec.window.to),
+                })
+                if (!uuid) throw new DatasetError('The service did not return the new dataset.')
+                progress.session = uuid
+                saved.push(uuid)
+            }
             await set_name(client, uuid, spec.name.trim())
         }
 
@@ -493,19 +519,36 @@ export async function start_recording (client, equipment, { by, operator, tags, 
     return rec
 }
 
-/** Change tags, note or operator while recording. */
+/** The Recording entry and its ETag, or [null, null] when there is none. */
+export async function read_recording (client, equipment_uuid) {
+    const [rec, etag] = await client.ConfigDB.get_config_with_etag(DA.App.Recording, equipment_uuid) ?? []
+    return [rec ?? null, etag ?? null]
+}
+
+// ConfigDB's If-Match takes the quoted ETag; without one, any revision.
+const match = etag => etag ? `"${etag}"` : '*'
+
+// How many times a write bound to an ETag reads again after a 412.
+const RECORDING_TRIES = 3
+
+/**
+ * Change tags, note or operator while recording. The change is bound
+ * to the entry as read: if another screen wrote in between, it reads
+ * again and applies the change to that, so neither edit is lost and a
+ * stopped recording is never brought back.
+ */
 export async function update_recording (client, equipment_uuid, change) {
-    const current = await client.ConfigDB.get_config(DA.App.Recording, equipment_uuid)
-    if (!current) throw new DatasetError('This recording has already stopped.')
-    const next = change(structuredClone(current)) ?? current
-    const patch = merge_patch_of(current, next)
-    if (!Object.keys(patch).length) return current
-    // Patch only the changed fields, and only while the recording exists,
-    // so an edit can neither undo a stop nor bring a stopped one back.
-    const st = await cdb_write(client, { method: 'PATCH', app: DA.App.Recording, obj: equipment_uuid, body: patch, merge: true, ifMatch: '*' })
-    if (st === 412) throw new DatasetError('This recording has already stopped.', { status: st })
-    if (st !== 204) throw cdb_fail('The change was not saved.', st)
-    return next
+    for (let i = 0; i < RECORDING_TRIES; i++) {
+        const [current, etag] = await read_recording(client, equipment_uuid)
+        if (!current || current.stoppedAt) throw new DatasetError('This recording has already stopped.', { status: 404 })
+        const next = change(structuredClone(current)) ?? current
+        const patch = merge_patch_of(current, next)
+        if (!Object.keys(patch).length) return current
+        const st = await cdb_write(client, { method: 'PATCH', app: DA.App.Recording, obj: equipment_uuid, body: patch, merge: true, ifMatch: match(etag) })
+        if (st === 204) return next
+        if (st !== 412) throw cdb_fail('The change was not saved.', st)
+    }
+    throw new DatasetError('Another screen keeps changing this recording. Try again.', { status: 412 })
 }
 
 /** A readable default name for a run. */
@@ -523,19 +566,34 @@ export function run_name (equipment_name, startedAt, reference = null) {
  * Safe to call again after a failure: the stop time is kept.
  */
 export async function stop_recording (client, equipment, { stoppedAt, by, startedAt } = {}) {
-    let rec = await client.ConfigDB.get_config(DA.App.Recording, equipment.uuid)
-    if (!rec) throw new DatasetError('There is no recording to stop.', { status: 404 })
-    // A stop kept while offline belongs to one recording. If another has
-    // started since, leave the new one alone.
-    if (startedAt != null && Date.parse(rec.startedAt) !== new Date(startedAt).getTime()) {
-        throw new DatasetError('That recording was already stopped elsewhere.', { status: 409 })
-    }
-    if (!rec.stoppedAt) {
-        const stop = { stoppedAt: to_iso(stoppedAt ?? Date.now()), stoppedBy: by ?? null }
-        const st = await cdb_write(client, { method: 'PATCH', app: DA.App.Recording, obj: equipment.uuid, body: stop, merge: true, ifMatch: '*' })
-        if (st === 412) throw new DatasetError('There is no recording to stop.', { status: 404 })
-        if (st !== 204) throw cdb_fail('The stop was not saved.', st)
-        rec = { ...rec, ...stop }
+    // Claim the stop with a write bound to the entry as read, so two
+    // screens cannot both stop it and save two runs. The claim also
+    // sets the stop time the first time.
+    let rec = null
+    for (let i = 0; ; i++) {
+        const [cur, etag] = await read_recording(client, equipment.uuid)
+        if (!cur) {
+            throw new DatasetError(rec ? 'This recording was saved on another screen.' : 'There is no recording to stop.', { status: 404 })
+        }
+        // A stop kept while offline belongs to one recording. If another has
+        // started since, leave the new one alone.
+        if (startedAt != null && Date.parse(cur.startedAt) !== new Date(startedAt).getTime()) {
+            throw new DatasetError('That recording was already stopped elsewhere.', { status: 409 })
+        }
+        // Not stopped when first read, stopped now: another screen did it.
+        if (rec && cur.stoppedAt) {
+            throw new DatasetError(`This recording was stopped on another screen${cur.stoppedBy ? ` by ${cur.stoppedBy}` : ''}.`, { status: 409 })
+        }
+        const claim = cur.stoppedAt
+            ? { savingAt: to_iso(Date.now()) }
+            : { stoppedAt: to_iso(stoppedAt ?? Date.now()), stoppedBy: by ?? null, savingAt: to_iso(Date.now()) }
+        const st = await cdb_write(client, { method: 'PATCH', app: DA.App.Recording, obj: equipment.uuid, body: claim, merge: true, ifMatch: match(etag) })
+        if (st === 204) { rec = { ...cur, ...claim }; break }
+        if (st !== 412) throw cdb_fail('The stop was not saved.', st)
+        // Changed since we read it. Already stopped: another screen is
+        // saving it. Otherwise (an edit), read again and see what happened.
+        if (cur.stoppedAt || i + 1 >= RECORDING_TRIES) throw new DatasetError('This recording is being saved on another screen.', { status: 409 })
+        rec = cur
     }
     const from = Date.parse(rec.startedAt)
     let to = Date.parse(rec.stoppedAt)
@@ -581,13 +639,31 @@ export async function stop_recording (client, equipment, { stoppedAt, by, starte
         stoppedBy: rec.stoppedBy,
         resumes: rec.resumes ?? undefined,
     }))
+    // A resumed recording replaces the run it resumes: make sure that one is void.
+    if (rec.resumes) {
+        await attempt('earlier run', async () => {
+            if (!await void_resumed(client, rec.resumes, rec.stoppedBy, VOID_TRIES)) throw new Error('not marked void')
+        })
+    }
     await attempt('recording', () => delete_quietly(client, DA.App.Recording, equipment.uuid))
     return { run, name, from, to, problems }
 }
 
-/** Throw away a recording without saving a run. */
-export async function discard_recording (client, equipment_uuid) {
-    await delete_quietly(client, DA.App.Recording, equipment_uuid)
+/**
+ * Throw away a recording without saving a run. Bound to the recording
+ * that started at `startedAt` (when given) and to the entry as read,
+ * so it cannot remove one another screen has just stopped or started.
+ */
+export async function discard_recording (client, equipment_uuid, { startedAt = null } = {}) {
+    const [rec, etag] = await read_recording(client, equipment_uuid)
+    if (!rec) return
+    if (startedAt != null && Date.parse(rec.startedAt) !== new Date(startedAt).getTime()) {
+        throw new DatasetError('That recording has already ended.', { status: 409 })
+    }
+    if (rec.stoppedAt) throw new DatasetError('This recording was stopped on another screen.', { status: 409 })
+    const st = await cdb_write(client, { method: 'DELETE', app: DA.App.Recording, obj: equipment_uuid, ifMatch: match(etag) })
+    if (st === 412) throw new DatasetError('This recording changed on another screen. Check it and try again.', { status: 409 })
+    if (st !== 204 && st !== 200 && st !== 404) throw cdb_fail('The recording was not removed.', st)
 }
 
 /** Void or restore a run. The dataset is kept; void is advisory. */
@@ -609,8 +685,32 @@ export async function resume_run (client, equipment, run, { by, operator, tags, 
         startedAt: Date.parse(run.from),
         resumes: run.uuid,
     })
-    await set_void(client, run.uuid, { by, reason: 'Resumed' })
+    // The recording now carries on. If the old run cannot be voided now,
+    // stop_recording voids it (the recording's `resumes`) when it saves.
+    await void_resumed(client, run.uuid, by, VOID_TRIES)
     return rec
+}
+
+const VOID_TRIES = 3
+
+/**
+ * Void a run that a recording resumes, unless it is void already. Tries
+ * `tries` times; returns whether it is now void.
+ */
+export async function void_resumed (client, uuid, by, tries = 1) {
+    for (let i = 0; i < tries; i++) {
+        try {
+            await update_run_meta(client, uuid, m => {
+                if (!m.void) m.void = { at: to_iso(Date.now()), by: by ?? null, reason: 'Resumed' }
+                return m
+            })
+            return true
+        }
+        catch (err) {
+            if (i + 1 >= tries) console.warn('Datasets: the resumed run was not voided yet', err)
+        }
+    }
+    return false
 }
 
 /**

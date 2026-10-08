@@ -25,7 +25,7 @@
         <div v-if="!devices.length" class="p-4 text-center text-sm text-slate-500">
           {{ resolved.devices.length ? 'The device details are still loading.' : 'This dataset covers no devices.' }}
         </div>
-        <div v-else-if="!groups.length" class="p-4 text-center text-sm text-slate-500">No metric matches "{{ query }}".</div>
+        <div v-else-if="!groups.length" class="p-4 text-center text-sm text-slate-500">No metric matches "{{ search }}".</div>
         <div v-for="g in groups" :key="g.device.uuid" class="border-b border-slate-100 py-2 last:border-b-0">
           <div class="flex items-center justify-between gap-2 px-3 pb-1 text-[13px]">
             <span class="truncate font-semibold" :title="g.device.name">{{ g.device.name }}</span>
@@ -44,7 +44,7 @@
             <span v-else-if="m.unit" class="shrink-0 text-xs text-slate-400">{{ m.unit }}</span>
           </label>
           <div v-if="g.more" class="px-3 pt-1 text-xs text-slate-500">
-            {{ g.more }} more, search to find them
+            {{ g.more }} more, {{ search.trim() ? 'narrow the search to see them' : 'search to find them' }}
           </div>
         </div>
       </div>
@@ -134,7 +134,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useElementSize } from '@vueuse/core'
+import { useElementSize, refDebounced } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import streamSaver from 'streamsaver'
 import { Card } from '@/components/ui/card'
@@ -164,6 +164,10 @@ const MAX_MATCHES = 50
 const ds = useDatasetsStore()
 const sc = useServiceClientStore()
 const query = ref('')
+// Filter once typing pauses, not on every key.
+const search = refDebounced(query, 200)
+// At most this many metric rows render at once, across all devices.
+const MAX_ROWS = 300
 
 const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
 const missing = computed(() => ds.devicesReady ? props.resolved.devices.length - devices.value.length : 0)
@@ -171,21 +175,26 @@ const total = computed(() => metric_total(devices.value))
 
 const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved)
 
-// Pinned metrics always show; otherwise the first few, or the matches.
-const groups = computed(() => filter_metrics(devices.value, query.value).map(g => {
-  const limit = query.value.trim() ? MAX_MATCHES : FIRST
-  const labels = device_metric_labels(g.device.metrics)
-  const shown = g.metrics
-    .filter((m, i) => i < limit || pins.has(series_key(g.device.uuid, m.path)))
-    .map(m => ({
-      path: m.path,
-      label: labels.get(m.path),
-      unit: m.unit,
-      chartable: chartable(m.type),
-      pinned: pins.has(series_key(g.device.uuid, m.path)),
-    }))
-  return { device: g.device, shown, more: g.metrics.length - shown.length }
-}))
+// Pinned metrics always show; otherwise the first few, or the matches,
+// up to MAX_ROWS in all.
+const groups = computed(() => {
+  let room = MAX_ROWS
+  return filter_metrics(devices.value, search.value).map(g => {
+    const limit = Math.max(0, Math.min(room, search.value.trim() ? MAX_MATCHES : FIRST))
+    const labels = device_metric_labels(g.device.metrics)
+    const shown = g.metrics
+      .filter((m, i) => i < limit || pins.has(series_key(g.device.uuid, m.path)))
+      .map(m => ({
+        path: m.path,
+        label: labels.get(m.path),
+        unit: m.unit,
+        chartable: chartable(m.type),
+        pinned: pins.has(series_key(g.device.uuid, m.path)),
+      }))
+    room -= shown.length
+    return { device: g.device, shown, more: g.metrics.length - shown.length }
+  })
+})
 
 
 // Each chart is the charts column less its label and unpin columns.

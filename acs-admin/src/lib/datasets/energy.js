@@ -88,7 +88,8 @@ export function find_energy_series (series, { devices } = {}) {
         if (/active/i.test(s.metric)) score += 2
         if (/total|delivered|import/i.test(s.metric)) score += 2
         if (/returned|export|reactive|apparent/i.test(s.metric)) score -= 5
-        out.push({ ...s, scale: scale ?? 1, score })
+        // No unit: read as kWh, and say it was guessed.
+        out.push({ ...s, scale: scale ?? 1, unit_guessed: scale == null, score })
     }
     return out.sort((a, b) => b.score - a.score)
 }
@@ -113,7 +114,8 @@ export function find_power_series (series) {
         if (scale != null) score += 4
         if (/active/i.test(s.metric)) score += 2
         if (/total/i.test(s.metric)) score += 2
-        out.push({ ...s, power_scale: scale ?? 1, score })
+        // No unit: read as kW, and say it was guessed.
+        out.push({ ...s, power_scale: scale ?? 1, unit_guessed: scale == null, score })
     }
     return out.sort((a, b) => b.score - a.score)
 }
@@ -134,23 +136,49 @@ export function power_gap_limit (points) {
 }
 
 /**
+ * Whether a power series looks reported by exception: its longest
+ * interval is far longer than its typical one, and long intervals are
+ * common (at least one in ten is over twice the typical one). Such a
+ * meter is quiet while the load is steady, so a silence means "no
+ * change", not "no data". A meter that sends on a clock and then stops
+ * for a while has one long interval among many regular ones, and is
+ * not treated this way.
+ */
+export function reports_by_exception (points) {
+    if (points.length < 3) return false
+    const dts = []
+    for (let i = 1; i < points.length; i++) dts.push(points[i].t - points[i - 1].t)
+    const sorted = dts.slice().sort((a, b) => a - b)
+    const median = sorted[sorted.length >> 1]
+    if (!(median > 0) || sorted[sorted.length - 1] <= 10 * median) return false
+    return dts.filter(d => d > 2 * median).length >= dts.length / 10
+}
+
+/**
  * Turn a power series into a cumulative register in kWh, by the
  * trapezium rule between readings. Readings further apart than the
  * series' gap limit add nothing, and register_at will not interpolate
  * across them, so a silence is reported as missing rather than guessed.
+ * A meter that reports by exception holds its last value across a
+ * silence of up to MAX_GAP_MS instead (`held_ms` says how much).
  */
 export function power_to_register (s) {
     const pts = s.points
     const max_gap = power_gap_limit(pts)
+    const held = reports_by_exception(pts)
     const out = []
     // Silences longer than the limit: no energy is counted across them,
     // and the coverage leaves them out.
     const gaps = []
-    let kwh = 0
+    let kwh = 0, held_ms = 0
     for (let i = 0; i < pts.length; i++) {
         if (i > 0) {
             const dt = pts[i].t - pts[i - 1].t
-            if (dt > max_gap) gaps.push({ from: pts[i - 1].t, to: pts[i].t })
+            if (dt > max_gap && held && dt <= CARBON.MAX_GAP_MS) {
+                kwh += Math.max(0, pts[i - 1].v * s.power_scale) * dt / 3600e3
+                held_ms += dt
+            }
+            else if (dt > max_gap) gaps.push({ from: pts[i - 1].t, to: pts[i].t })
             else {
                 const kw = (pts[i].v + pts[i - 1].v) / 2 * s.power_scale
                 kwh += Math.max(0, kw) * dt / 3600e3
@@ -158,7 +186,11 @@ export function power_to_register (s) {
         }
         out.push({ t: pts[i].t, v: kwh })
     }
-    return { device: s.device, metric: s.metric, unit: s.unit, scale: 1, from_power: true, max_gap: CARBON.MAX_GAP_MS, gaps, points: out }
+    return {
+        device: s.device, metric: s.metric, unit: s.unit, scale: 1, from_power: true,
+        unit_guessed: !!s.unit_guessed, held, held_ms,
+        max_gap: CARBON.MAX_GAP_MS, gaps, points: out,
+    }
 }
 
 /** Grid intensity series (gCO2/kWh). */
@@ -299,18 +331,23 @@ export function energy_and_carbon ({ meters, intensity = null, from, to }) {
         segments.push(seg)
     }
     const coverage = to > from ? covered_ms / (to - from) : 0
-    const intensity_coverage = kwh > 0 ? (kwh - kwh_no_intensity) / kwh : 0
+    // No energy: nothing lacks an intensity.
+    const intensity_coverage = kwh > 0 ? (kwh - kwh_no_intensity) / kwh : (intensity ? 1 : null)
+    // A meter with no unit was read as kWh or kW: never more than low.
+    const unit_guessed = meters.some(m => m.unit_guessed)
+    const conf = confidence(coverage, intensity ? intensity_coverage : null)
     return {
         kwh,
         kg_fixed: kwh * CARBON.FIXED_FACTOR,
-        kg_grid: intensity && kwh_no_intensity < kwh ? kg_grid : null,
+        kg_grid: !intensity ? null : kwh > 0 ? (kwh_no_intensity < kwh ? kg_grid : null) : 0,
         kwh_no_intensity,
         // Energy extrapolated past the first or last reading at an edge.
         estimated_kwh,
         coverage,
         intensity_coverage,
         bad_segments: bad,
-        confidence: confidence(coverage, intensity ? intensity_coverage : null),
+        unit_guessed,
+        confidence: unit_guessed ? 'low' : conf,
         segments,
     }
 }

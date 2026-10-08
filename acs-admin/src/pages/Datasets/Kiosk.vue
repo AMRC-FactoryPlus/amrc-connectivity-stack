@@ -266,7 +266,7 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { REFERENCE_TYPES } from '@/lib/datasets/constants.js'
 import { display_name, fmt_clock, fmt_duration, fmt_elapsed, normalise_tags, to_iso } from '@/lib/datasets/model.js'
 import {
-  start_recording, update_recording, stop_recording, discard_recording, resume_run, add_past_run, run_name,
+  start_recording, update_recording, stop_recording, resume_run, add_past_run, run_name, set_void,
 } from '@/lib/datasets/api.js'
 import {
   derive_phase, saved_is_current, resume_left, fmt_minutes_left, is_network_error,
@@ -701,10 +701,21 @@ function correctStart (ms) {
     'The start time was not changed.')
 }
 
-function voidRecording () {
+/* Void: stop and save the run, then mark it void with the reason, so
+ * it stays on the lane as voided and the reason is kept. */
+function voidRecording (reason) {
+  const startedAt = recording.value?.startedAt ?? null
   return dialogWrite(async () => {
-    await discard_recording(client(), eqUuid.value)
-    toast.success('Recording voided', { description: 'No dataset was saved.' })
+    const res = await stop_recording(client(), eq.value, { stoppedAt: Date.now(), by: by(), startedAt })
+    try {
+      await set_void(client(), res.run, { by: by(), reason })
+    }
+    catch (err) {
+      // The run is saved but not marked void: say so, and leave it to be voided from its page.
+      wrote()
+      throw new Error(`The run "${res.name}" was saved but not marked void. Open it to void it.`)
+    }
+    toast.success('Recording voided', { description: 'The run is kept and marked void.' })
   }, 'The recording was not voided.')
 }
 

@@ -444,9 +444,13 @@ function stopDrag () {
 }
 onBeforeUnmount(stopDrag)
 
+// Escape clears the selection, and then does nothing else: caught
+// first (capture), so the app's Escape-for-fullscreen does not also run.
 useEventListener(window, 'keydown', e => {
-  if (e.key === 'Escape' && sel.value) sel.value = null
-})
+  if (e.key !== 'Escape' || !sel.value) return
+  sel.value = null
+  e.stopPropagation()
+}, { capture: true })
 
 // A search or a change in the lanes can remove the selected rows.
 watch(query, () => { sel.value = null })

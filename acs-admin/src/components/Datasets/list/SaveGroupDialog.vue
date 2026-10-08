@@ -82,6 +82,9 @@ function close () {
   if (!busy.value) open_.value = false
 }
 
+// What an earlier attempt made, so a retry does not make it again.
+const progress = {}
+
 async function save () {
   if (!name.value.trim()) return
   busy.value = true
@@ -94,7 +97,7 @@ async function save () {
       items: items.value,
       window: null,
       createdBy: sc.username,
-    })
+    }, progress)
     toast.success(`${kind.value === 'part' ? 'Part' : 'Process'} saved`)
     open_.value = false
     emit('saved', uuid)

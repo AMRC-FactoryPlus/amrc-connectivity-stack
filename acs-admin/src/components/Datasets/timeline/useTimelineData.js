@@ -74,6 +74,11 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
     return [...out].sort()
   })
 
+  // Devices with a lane of their own in view. Only these show "quiet
+  // since", so only these need the 30 day newest-data lookup; devices
+  // under collapsed equipment get theirs when it is opened.
+  const laneDevices = computed(() => [...new Set(toValue(rows).filter(r => r.kind === 'device').map(r => r.device))].sort())
+
   // The stretch of time in view, with the buffer either side.
   const span = computed(() => {
     const r = toValue(range), w = toValue(xWindow)
@@ -132,7 +137,7 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
 
   async function loadLasts (force = false) {
     const now = Date.now()
-    const stale = devices.value.filter(d => force || !lastAt.has(d) || now - lastAt.get(d) > LAST_MAX_AGE_MS)
+    const stale = laneDevices.value.filter(d => force || !lastAt.has(d) || now - lastAt.get(d) > LAST_MAX_AGE_MS)
     if (!stale.length) return
     for (const d of stale) lastAt.set(d, now)
     const to = bucket_start(now, '1h') + STEP_MS['1h']
@@ -191,7 +196,7 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
     debounce = setTimeout(() => run([loadStrips, loadSelection, () => loadLasts()]), DEBOUNCE_MS)
   }
 
-  watch([devices, span, every], schedule, { immediate: true })
+  watch([devices, laneDevices, span, every], schedule, { immediate: true })
 
   // Ask the coverage summary again after a while.
   let coverageTimer = null

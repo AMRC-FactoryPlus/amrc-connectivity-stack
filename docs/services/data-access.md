@@ -190,6 +190,138 @@ gets `422` with a JSON body `{ "error": "<reason>" }`. Every filter
 value is escaped as a Flux string literal before it is placed in the
 query.
 
+### `POST v1/series`
+
+Returns bucketed data for timelines and charts, for a set of devices or
+one dataset, over a time window. Per bucket, it returns:
+
+* `count`: the number of data points each device wrote.
+* `mean` and `n`: the mean and number of points of chosen metrics.
+* `last`: the time of each device's newest data point.
+
+The route reads the raw InfluxDB bucket (`INFLUXDB_BUCKET`).
+
+#### Request
+
+```json
+{
+  "devices": ["<device UUID>", "<device UUID>"],
+  "from": "2026-10-08T00:00:00.000Z",
+  "to": "2026-10-09T00:00:00.000Z",
+  "every": "15m",
+  "count": true,
+  "mean": [
+    { "device": "<device UUID>", "metric": "Supply/Active_Power_Total" },
+    { "device": "<device UUID>", "metric": "Axes/X/Load", "type": "d" }
+  ],
+  "last": { "lookback": "30d" }
+}
+```
+
+Field | Rule
+---|---
+`devices` / `dataset` | Give exactly one. `devices` is a list of device UUIDs (the Sparkplug `topLevelInstance` tag). `dataset` is one dataset UUID.
+`from`, `to` | ISO 8601 date-times, `from` before `to`. Required. `to` may be in the future.
+`every` | Bucket size. One of `10s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `6h`, `1d`, `1w`. Optional.
+`points` | Target number of buckets, 1 to 2000, default 300. Used only when `every` is absent: the server picks the smallest step that gives at most `points` buckets.
+`count` | `true` to return per-device point counts. Birth metadata (`Schema_UUID` and `Instance_UUID`) does not count.
+`mean` | Metrics to return means for. `metric` is the full Sparkplug metric name, for example `Axes/X/Load`. `type` is optional: `d`, `i`, `u`, `b` or `s`. Without `type`, the server reads every numeric type (`d`, `i`, `u`) of the metric and merges them into one series, weighted by `n`. Booleans are read only with `type: "b"`, as 0 and 1. Strings have no mean: `type: "s"` returns empty `points`. In a device request, each `mean` device must also be in `devices`.
+`last` | `true`, or `{"lookback": "<n>m|h|d|w"}` (default `30d`, maximum `90d`), to return each device's newest data time. Birth metadata does not count.
+
+Steps up to `6h` align to UTC. `1d` and `1w` buckets start at midnight
+and on Monday in Europe/London, so a day is 23 or 25 hours long on the
+days the clocks change.
+
+#### Response
+
+```json
+{
+  "from": "2026-10-08T00:00:00.000Z",
+  "to": "2026-10-09T00:00:00.000Z",
+  "every": "15m",
+  "asOf": "2026-10-08T07:56:10.412Z",
+  "source": "raw",
+  "devices": {
+    "<device UUID>": {
+      "windows": [["2026-10-08T00:00:00.000Z", "2026-10-09T00:00:00.000Z"]],
+      "count": [[1791417600000, 4537], [1791418500000, 5478]],
+      "last": "2026-10-08T07:55:54.302Z"
+    }
+  },
+  "metrics": [
+    {
+      "device": "<device UUID>",
+      "metric": "Supply/Active_Power_Total",
+      "type": "d",
+      "unit": "kW",
+      "points": [[1791417600000, 8.383, 191]]
+    }
+  ],
+  "denied": []
+}
+```
+
+* Bucket times are epoch milliseconds of the bucket start.
+* Arrays are sparse. A bucket with no data is absent.
+* `points` rows are `[start, mean, n]`. `n` is the number of raw points
+  in the bucket. A client can fold a live value `v` into the newest
+  bucket with `mean = (mean * n + v) / (n + 1)`.
+* `count` is present only when requested. `last` is present only when
+  requested, and is `null` when the device has no data in the lookback.
+* `windows` is present only for a dataset request. It lists the disjoint
+  time ranges, within the request window, in which the device belongs to
+  the dataset. Counts and means cover only these ranges.
+* `type` is the requested type, or the type of the newest point. `unit`
+  is the `unit` tag of the newest point.
+* `asOf` is the server time when the query ran. A bucket that ends after
+  `asOf` is partial.
+* `source` is always `raw` in this version.
+* `denied` lists requested devices the caller may not read.
+
+The response has `Cache-Control: private, max-age=300` when `to` is more
+than two buckets before `asOf`, and `no-store` otherwise.
+
+#### Permissions
+
+* A dataset request needs `Read dataset` on the dataset. It then covers
+  every device of the dataset, within the dataset's windows, as for
+  `POST v1/data/:uuid`.
+* A device request needs `Use Sparkplug data` on each device. Root and
+  wildcard grants apply. Devices without the grant are listed in
+  `denied` and left out. The request fails only when every device is
+  denied.
+* `mean` and `last` entries follow the check of their device.
+
+#### Limits and errors
+
+Limit | Value
+---|---
+Devices per request (or per dataset) | 500
+`mean` metrics per request | 50
+Buckets per series | 2000
+Span for `count` | 14 days
+Span for `mean` | 400 days
+`last` lookback | 90 days
+Query time | 30 seconds (`SERIES_TIMEOUT_MS`)
+Concurrent queries | 4 (`SERIES_CONCURRENCY`)
+
+The series route has its own query limiter, so a long `POST v1/data`
+export does not delay it. The server cancels the queries when the client
+disconnects.
+
+Status | When
+---|---
+`400` | The body is not a JSON object.
+`403` | No `Read dataset` on the dataset, or every device denied.
+`404` | The dataset does not exist or is invalid.
+`413` | Too many devices or `mean` metrics. The body names the limit.
+`422` | Both or neither of `devices` and `dataset`; a bad UUID, date or `every`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit; a `mean` device outside the request or the dataset.
+`503` | InfluxDB is unreachable.
+`504` | The queries took longer than the query time limit.
+
+`413` and `422` responses have a JSON body with `error` and `message`
+fields.
+
 ### `GET v1/structure`
 
 Returns the JSON array of dataset UUIDs the caller has `Edit dataset`
@@ -278,11 +410,11 @@ also be granted plural, against a group.
 
 Permission | UUID | Targets | Grants
 ---|---|---|---
-`Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid` and `v1/data/:uuid`
+`Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/data/:uuid` and `v1/series` for the dataset
 `Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT) and inclusion in the `v1/structure` list
 `Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`Sparkplug source` / `Union components` / `Session limits`) | Creating a dataset of that structure via `POST v1/structure`
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`
-`Use Sparkplug data` (`UseSparkplug`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Sparkplug Device/Node | Referencing it as a `Sparkplug source`
+`Use Sparkplug data` (`UseSparkplug`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Sparkplug Device/Node | Referencing it as a `Sparkplug source`, and reading it through `v1/series`
 `Use for session` (`UseForSession`) | `c089b9a9-06cd-4211-94fc-9ad52a759987` | Dataset | Referencing it as a `Session limits` source
 `Include in union` (`IncludeInUnion`) | `94d51085-af83-4796-8059-fcd578e3f572` | Dataset | Referencing it as a `Union components` member
 

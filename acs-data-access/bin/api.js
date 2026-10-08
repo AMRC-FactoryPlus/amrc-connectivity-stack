@@ -13,6 +13,7 @@ import {DataFlow} from '../lib/dataflow.js';
 import { APIv1 } from '../lib/api-v1.js';
 import {DataAccessNotify} from '../lib/notify.js';
 import { InfluxReader } from '../lib/influx-reader.js';
+import { SeriesReader } from '../lib/series-reader.js';
 
 const { env } = process;
 
@@ -45,12 +46,24 @@ const influxReader = new InfluxReader({
   influx_bucket: env.INFLUXDB_BUCKET,
 })
 
+// The series route has its own limiter and timeout, separate from the
+// CSV export, so a long download does not stall the timeline.
+const seriesReader = new SeriesReader({
+  debug,
+  influx_client: influxClient,
+  influx_org: env.INFLUXDB_ORG,
+  influx_bucket: env.INFLUXDB_BUCKET,
+  concurrency: env.SERIES_CONCURRENCY,
+  timeout_ms: env.SERIES_TIMEOUT_MS,
+});
+
 const apiv1 = new APIv1({ 
   data,
   debug,
   auth: fplus.Auth,
   cdb: fplus.ConfigDB,
-  influxReader
+  influxReader,
+  seriesReader,
 });
 
 const api = await new WebAPI({

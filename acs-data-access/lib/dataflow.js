@@ -42,18 +42,32 @@ export class DataFlow {
    * ---------------------------------------------------
    */
 
-  filter_allowed_datasets(principal, permission) {
-    const acls = this.auth.watch_acl_with_perm(
-      principal,
-      permission
+  /* Which datasets a principal holds a permission on, as a predicate.
+   *
+   * Auth passes the root principal and wildcard grants on every single
+   * check, so the lists must agree: root, or a grant on the wildcard
+   * target, allows every dataset. Otherwise only the grant targets do. */
+  watch_allowed(principal, permission) {
+    if (this.auth.root_principal && principal == this.auth.root_principal)
+      return rx.of(() => true);
+
+    return this.auth.watch_acl_with_perm(principal, permission).pipe(
+      rx.map(targets =>
+        targets.has(UUIDs.Special.Null)
+          ? () => true
+          : id => targets.has(id))
     );
+  }
+
+  filter_allowed_datasets(principal, permission) {
+    const allowed = this.watch_allowed(principal, permission);
 
     return source => source.pipe(
-      rx.combineLatestWith(acls),
+      rx.combineLatestWith(allowed),
 
-      rx.map(([datasets, targets]) =>
+      rx.map(([datasets, ok]) =>
         datasets.filter(
-          (_, datasetId) => targets.has(datasetId)
+          (_, datasetId) => ok(datasetId)
         )
       )
     );
@@ -144,22 +158,16 @@ export class DataFlow {
   ) {
     return rx.combineLatest([
       this.parts,
-      this.auth.watch_acl_with_perm(
-        principal,
-        permission
-      )
+      this.watch_allowed(principal, permission)
     ]).pipe(
-      rx.map(([partsMap, allowedParts]) => {
+      rx.map(([partsMap, ok]) => {
         const parts =
           partsMap.get(dataset_uuid);
 
         if (!parts)
           return [];
 
-        return parts.filter(
-          partId =>
-            allowedParts.has(partId)
-        );
+        return parts.filter(partId => ok(partId));
       }),
 
       rxu.shareLatest()

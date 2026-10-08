@@ -58,6 +58,10 @@ objects:
       name: "MES operation"
       subclassOf:
         - !u DataAccess.Class.MESDataset
+    !u DataAccess.Class.Run:
+      name: "Run"
+      subclassOf:
+        - !u DataAccess.Class.MESDataset
 
 # These are in core-apps for now, as they were previously R1 and are
 # preventing the Application upgrade to R2. Once all installations are
@@ -95,13 +99,38 @@ objects:
 
   !u DataAccess.App.DatasetMetadata:
     !u DataAccess.App.MESIdentifiers:
-      name: "MES identifiers"  
+      name: "MES identifiers"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    # The apps below hold metadata written by the Admin UI. They are
+    # members of Dataset metadata so the service passes them through,
+    # but they are deliberately not in the service's own constants: an
+    # edit to an invalid dataset deletes the entries of every app listed
+    # there, and these must survive that.
+    !u DataAccess.App.Tags:
+      name: "Dataset tags"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u DataAccess.App.EquipmentLabels:
+      name: "Equipment device labels"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u DataAccess.App.RunMetadata:
+      name: "Run metadata"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u DataAccess.App.Recording:
+      name: "Recording in progress"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
 
   !u UUIDs.Class.Special:
     !u DataAccess.Special.InvalidDataset:
       name: "Structurally invalid dataset"
+
+  !u Auth.Class.ClientRole:
+    !u DataAccess.Group.DatasetMaker:
+      name: "Dataset maker"
 
 # Permissions
   !u Auth.Class.ServicePerms:
@@ -160,6 +189,38 @@ grants:
     !u ConfigDB.Perm.ReadSubclasses:
       !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.DeleteObject:
+      !u DataAccess.Class.Dataset: true
+
+  # Everything the Admin UI needs to make datasets and record runs as
+  # the signed-in user. It is broad, and applies to every dataset, not
+  # only a member's own: a member can edit any dataset's definition,
+  # overwrite any dataset's tags, run details and recordings, set any
+  # dataset's kind, read data from any device, and (through Info write)
+  # rename any object. It does not include deleting datasets.
+  !u DataAccess.Group.DatasetMaker:
+    !u DataAccess.Perm.CreateDataset:
+      !u DataAccess.App.DatasetDefinition: true
+    !u DataAccess.Perm.UseSparkplug:
+      !u UUIDs.Class.Device: true
+    !u DataAccess.Perm.ReadDataset:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.IncludeInUnion:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.UseForSession:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.EditDataset:
+      !u DataAccess.Class.Dataset: true
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u DataAccess.App.DatasetMetadata: true
+      !u UUIDs.App.Info: false
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u DataAccess.App.DatasetMetadata: true
+      !u UUIDs.App.Info: false
+    # Setting a kind adds the dataset to a class: ConfigDB checks the
+    # class (WriteMembers) and the dataset (WriteMemberships).
+    !u ConfigDB.Perm.WriteMembers:
+      !u DataAccess.Group.FunctionalDatasetGroup: true
+    !u ConfigDB.Perm.WriteMemberships:
       !u DataAccess.Class.Dataset: true
 
 

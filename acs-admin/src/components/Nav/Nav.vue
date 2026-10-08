@@ -83,8 +83,8 @@ const sidebarNavItems: Item[] = [
     auth: true
   },
   {
-    title: 'Data Access',
-    href: '/data-access',
+    title: 'Datasets',
+    href: '/datasets',
     icon: 'database',
     auth: true
   }

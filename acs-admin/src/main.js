@@ -53,7 +53,12 @@ import ObjectPage from "@pages/ConfigDB/Objects/ObjectPage.vue";
 import Files from "@pages/Files/Files.vue";
 import Bridges from "@pages/Bridges/Bridges.vue";
 import ISA95 from "@pages/ISA95/ISA95.vue";
-import DataAccess from '@pages/DataAccess/DataAccess.vue';
+import Datasets from '@pages/Datasets/Datasets.vue';
+import DatasetPage from '@pages/Datasets/DatasetPage.vue';
+import DatasetBuilder from '@pages/Datasets/DatasetBuilder.vue';
+import DatasetCompare from '@pages/Datasets/DatasetCompare.vue';
+import DatasetAddons from '@pages/Datasets/AddonsPage.vue';
+import Kiosk from '@pages/Datasets/Kiosk.vue';
 
 // Create an event bus
 window.events = mitt()
@@ -239,10 +244,64 @@ const routes = [
   },
   {
     path: '/data-access',
-    component: DataAccess,
+    redirect: '/datasets',
+  },
+  {
+    path: '/datasets',
+    component: Datasets,
     meta: {
-      name: 'Data Access',
+      name: 'Datasets',
       icon: 'database'
+    }
+  },
+  {
+    path: '/datasets/new',
+    component: DatasetBuilder,
+    meta: {
+      name: 'Datasets',
+      icon: 'database'
+    }
+  },
+  {
+    path: '/datasets/compare',
+    component: DatasetCompare,
+    meta: {
+      name: 'Datasets',
+      icon: 'database'
+    }
+  },
+  {
+    path: '/datasets/add-ons',
+    component: DatasetAddons,
+    meta: {
+      name: 'Datasets',
+      icon: 'database'
+    }
+  },
+  {
+    path: '/datasets/:uuid/edit',
+    component: DatasetBuilder,
+    meta: {
+      name: 'Datasets',
+      icon: 'database'
+    }
+  },
+  {
+    path: '/datasets/:uuid/:tab?',
+    component: DatasetPage,
+    meta: {
+      name: 'Datasets',
+      icon: 'database'
+    }
+  },
+  {
+    // Full screen, for a tablet next to the equipment.
+    path: '/kiosk/:equipment?',
+    component: Kiosk,
+    meta: {
+      name: 'Kiosk',
+      icon: 'tablet-screen-button',
+      kiosk: true,
     }
   }
 ]

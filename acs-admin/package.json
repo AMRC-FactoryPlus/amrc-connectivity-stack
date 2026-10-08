@@ -60,6 +60,7 @@
     "pinia-plugin-persist": "^1.0.0",
     "postcss": "^8.5.1",
     "process": "^0.11.10",
+    "qrcode": "^1.5.4",
     "reka-ui": "^2.2.1",
     "rxjs": "^7.8.2",
     "semver": "^7.8.5",

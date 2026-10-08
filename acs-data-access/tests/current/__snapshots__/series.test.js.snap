@@ -1,0 +1,59 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Flux builders > count query excludes birth metadata and counts before summing 1`] = `
+"from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
+  |> filter(fn: (r) => r.topLevelInstance == "11111111-1111-1111-1111-111111111111" or r.topLevelInstance == "22222222-2222-2222-2222-222222222222")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r._measurement != "Schema_UUID:s" and r._measurement != "Instance_UUID:s")
+  |> aggregateWindow(every: 15m, fn: count, createEmpty: false, timeSrc: "_start")
+  |> group(columns: ["topLevelInstance", "_time"])
+  |> sum()
+  |> group()
+  |> keep(columns: ["topLevelInstance", "_time", "_value"])"
+`;
+
+exports[`Flux builders > hostile metric names are escaped as Flux strings 1`] = `
+"data = from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "A\\\\B\\"" and (r._measurement == "Na\\"me \\\${x}\\") or r._measurement =~ \\".*\\" or (\\":d"))))
+  |> group(columns: ["topLevelInstance", "path", "_measurement"])
+
+data |> aggregateWindow(every: 5m, fn: mean, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "_value"]) |> yield(name: "mean")
+data |> aggregateWindow(every: 5m, fn: count, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "_value"]) |> yield(name: "n")
+data |> last()
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "unit"]) |> yield(name: "unit")
+"
+`;
+
+exports[`Flux builders > last query drops _value before merging 1`] = `
+"from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z)
+  |> filter(fn: (r) => r.topLevelInstance == "11111111-1111-1111-1111-111111111111" or r.topLevelInstance == "22222222-2222-2222-2222-222222222222")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r._measurement != "Schema_UUID:s" and r._measurement != "Instance_UUID:s")
+  |> last()
+  |> keep(columns: ["topLevelInstance", "_time"])
+  |> group(columns: ["topLevelInstance"])
+  |> max(column: "_time")
+  |> group()"
+`;
+
+exports[`Flux builders > mean query: numeric suffixes without type, one with type, empty path 1`] = `
+"data = from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "Axes/X" and (r._measurement == "Load:d" or r._measurement == "Load:i" or r._measurement == "Load:u")) or (r.topLevelInstance == "22222222-2222-2222-2222-222222222222" and (not exists r.path or r.path == "") and (r._measurement == "Top:i"))))
+  |> group(columns: ["topLevelInstance", "path", "_measurement"])
+
+data |> aggregateWindow(every: 5m, fn: mean, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "_value"]) |> yield(name: "mean")
+data |> aggregateWindow(every: 5m, fn: count, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "_value"]) |> yield(name: "n")
+data |> last()
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "unit"]) |> yield(name: "unit")
+"
+`;

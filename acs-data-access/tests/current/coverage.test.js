@@ -10,7 +10,9 @@
 import * as rx from "rxjs";
 import { describe, expect, test } from "vitest";
 
+import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { APIv1 } from "../../lib/api-v1.js";
+import { DataAccess as Constants } from "../../lib/constants.js";
 import { DataFlow } from "../../lib/dataflow.js";
 import { SeriesReader } from "../../lib/series-reader.js";
 import { parse_request, LIMITS } from "../../lib/series.js";
@@ -633,7 +635,8 @@ describe("read planning", () => {
  */
 
 /* A coverage stand-in for the reader: only read_state and bucket. */
-const ready = state => ({ bucket: "acs_coverage", read_state: () => state, status: () => ({ ready: true }) });
+const ready = state => ({ bucket: "acs_coverage", read_state: () => state,
+    status: ({ detail }) => ({ ready: true, detail }) });
 
 function route({ state, rows }) {
     const seen = [];
@@ -649,7 +652,8 @@ function route({ state, rows }) {
     const flow = Object.create(DataFlow.prototype);
     flow.auth = { root_principal: ROOT, watch_acl_with_perm: () => rx.of(new Set()) };
     flow.datasets = rx.of(new Map());
-    const api = new APIv1({ data: flow, debug, auth: { check_acl: async () => true }, cdb: {} });
+    const api = new APIv1({ data: flow, debug, cdb: {}, auth: {
+        check_acl: async () => true, fetch_acl: async () => () => true } });
     api.seriesReader = new SeriesReader({ debug, influx_bucket: "default", query_api,
         coverage: state === undefined ? null : ready(state) });
     return { api, seen };
@@ -769,12 +773,51 @@ describe("series route with the coverage summary", () => {
         const { api } = route({ state });
         const res = res_stub();
         await api.coverage_status({ auth: ROOT }, res);
-        expect(res.body).toEqual({ ready: true });
+        expect(res.body).toEqual({ ready: true, detail: true });
 
         const none = route({ state: undefined, rows: () => [] });
         const res2 = res_stub();
         await none.api.coverage_status({ auth: ROOT }, res2);
         expect(res2.body).toEqual({ enabled: false });
+    });
+
+    test("the status route shows the bounds only to a caller who may read every device", async () => {
+        const { api } = route({ state });
+        const asked = [];
+        api.auth.check_acl = async (principal, perm, target, wild) => {
+            asked.push([perm, target, wild]);
+            return false;
+        };
+        const res = res_stub();
+        await api.coverage_status({ auth: "user@EXAMPLE.ORG" }, res);
+        expect(res.body).toEqual({ ready: true, detail: false });
+        expect(asked).toEqual([[Constants.Perm.UseSparkplug, UUIDs.Special.Null, true]]);
+
+        api.auth.check_acl = async () => { throw new Error("Auth down"); };
+        const res2 = res_stub();
+        await api.coverage_status({ auth: "user@EXAMPLE.ORG" }, res2);
+        expect(res2.body.detail).toBe(false);
+    });
+});
+
+describe("coverage status", () => {
+    test("without detail, holds no bounds and no error text", async () => {
+        const { cov } = make_coverage({ earliest: T("2026-10-08T01:00:00Z"),
+            newest: T("2026-10-08T09:00:00Z") });
+        await cov.ensure();
+        await cov.backfill();
+        await cov.refresh();
+        await cov.enqueue("repair", async () => { throw new Error("secret detail from InfluxDB"); })
+            .catch(() => {});
+
+        const pub = cov.status({ detail: false });
+        expect(Object.keys(pub).sort()).toEqual(["enabled", "error", "ready", "stale"]);
+        expect(pub.error).toBe("repair_failed");
+
+        const full = cov.status();
+        expect(full.error).toBe("repair_failed");
+        expect(full.newestHour).toBe("2026-10-08T09:00:00.000Z");
+        expect(JSON.stringify(full)).not.toContain("secret detail");
     });
 });
 

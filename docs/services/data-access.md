@@ -67,7 +67,13 @@ this special UUID as `structure` and omits `config`.
 
 ## ConfigDB objects
 
-All UUIDs below are defined in `lib/constants.js`.
+`acs-service-setup` creates these objects; `acs-service-setup/lib/uuids.js`
+defines every UUID below. The service's own `lib/constants.js` holds
+only the ones the service uses. The four metadata apps marked * are
+deliberately not in `lib/constants.js`: an edit to an invalid dataset
+deletes the entries of every app listed there, and these must survive
+that. They are members of `Dataset metadata`, so `v1/metadata` passes
+them through.
 
 Kind | Name | UUID
 ---|---|---
@@ -81,6 +87,7 @@ Class | `Work order` | `b416e44c-c57e-4486-9431-64c425f1b2c6`
 Class | `Product` | `4a089748-b26b-4f12-8f1a-164bfba97809`
 Class | `Operation` | `bd0354eb-b8f7-4bd9-8407-0588e545603c`
 Class | `MES` | `2c691583-89fe-4421-bf2c-64e34e663711`
+Class | `Run` (a subclass of `MES dataset`) | `3c866b35-66a1-4cb8-8db2-dae284883cf8`
 Group | `Dataset group` | `17e37253-8626-4031-b217-28c6a03e91c1`
 Group | `Dataset role group` | `56c52f70-0649-4962-8526-9ec9d1c85ca4`
 Group | `Structural dataset type` | `70ff7bea-bb2d-48c2-88fd-4f7a79b1aa3c`
@@ -91,8 +98,21 @@ Application | `Sparkplug source` | `f5d550c4-2831-11f1-b0b0-83fda3035799`
 Application | `Union components` | `1c4ca454-de38-44d9-92fb-aa5218bfa257`
 Application | `Session limits` | `8754c000-3778-4ae6-b2b8-bbcd959bb775`
 Application | `MES identifiers` | `af178f0c-3b1e-44f2-9724-5cf06e8fd056`
+Application | `Dataset tags` * | `c95e372e-2fbe-45b9-9937-3235f94e22a3`
+Application | `Equipment device labels` * | `dfc3983b-658c-4099-b76a-01ce7c18bde1`
+Application | `Run metadata` * | `2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a`
+Application | `Recording in progress` * | `cf3f6103-0f0e-4839-953a-ad2cedc78c30`
+Client role | `Dataset maker` | `b7aa3036-fc1f-4869-b0f5-50f28b028905`
 Service function | `Data Access service` | `06cee697-29d3-4972-9479-bc392e24946e`
 Special | Structurally invalid dataset | `696396a0-2831-11f1-9b12-33d63b8c5115`
+
+The Admin UI writes the four metadata apps. `Dataset maker` holds what
+the Admin UI needs to make datasets and record runs as the signed-in
+user. The grants apply to every dataset, not only a member's own: a
+member can edit any dataset's definition, overwrite any dataset's tags,
+run details and recordings, set any dataset's kind, read data from any
+device, and rename any object. The role does not include deleting
+datasets.
 
 
 ## HTTP API (`v1`)
@@ -273,6 +293,10 @@ days the clocks change.
 * `windows` is present only for a dataset request. It lists the disjoint
   time ranges, within the request window, in which the device belongs to
   the dataset. Counts and means cover only these ranges.
+* For a dataset request, `last` is the newest data inside the device's
+  dataset windows, within the lookback. It is not limited to the
+  request window, so a device that is still in the dataset reports its
+  newest data even when `to` is in the past.
 * `type` is the requested type, or the type of the newest point. `unit`
   is the `unit` tag of the newest point.
 * `asOf` is the server time when the query ran. A bucket that ends after
@@ -298,7 +322,9 @@ otherwise.
   every device of the dataset, within the dataset's windows, as for
   `POST v1/data/:uuid`.
 * A device request needs `Use Sparkplug data` on each device. Root and
-  wildcard grants apply. Devices without the grant are listed in
+  wildcard grants apply. The caller may be a Kerberos principal or a
+  JWT caller identified by principal UUID. A principal the Auth service
+  has no ACL for is denied every device. Devices without the grant are listed in
   `denied` and left out. The request fails only when every device is
   denied.
 * `mean` and `last` entries follow the check of their device.
@@ -308,18 +334,23 @@ otherwise.
 Limit | Value
 ---|---
 Devices per request (or per dataset) | 500
+Distinct window sets per dataset request | 100
 `mean` metrics per request | 50
 Buckets per series | 2000
 Span for `count` below `1h` | 14 days
 Span for `count` at `1h` or coarser | 10 years with the coverage summary ready; 14 days without it
 Span for `mean` | 400 days
 `last` lookback | 90 days
-Query time | 30 seconds (`SERIES_TIMEOUT_MS`)
+Time for one request, permission checks and waiting included | 60 seconds (`SERIES_TIMEOUT_MS`)
+Time for one query, from when it starts running | 30 seconds (`SERIES_QUERY_TIMEOUT_MS`)
 Concurrent queries | 4 (`SERIES_CONCURRENCY`)
+Queries waiting to run, across all requests | 400 (`SERIES_MAX_QUEUE`)
 
 The series route has its own query limiter, so a long `POST v1/data`
-export does not delay it. The server cancels the queries when the client
-disconnects.
+export does not delay it. Devices of a dataset that share the same
+windows run as one set of queries, so the window-set limit bounds the
+queries one request makes. The server cancels the queries when the
+client disconnects.
 
 Status | When
 ---|---
@@ -327,9 +358,9 @@ Status | When
 `403` | No `Read dataset` on the dataset, or every device denied.
 `404` | The dataset does not exist or is invalid.
 `413` | Too many devices or `mean` metrics, or the body is too large. The body names the limit.
-`422` | Both or neither of `devices` and `dataset`; a bad UUID, date or `every`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit; a `mean` device outside the request or the dataset.
-`503` | InfluxDB is unreachable.
-`504` | The queries took longer than the query time limit.
+`422` | Both or neither of `devices` and `dataset`; a bad UUID, date or `every`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit; a `mean` device outside the request or the dataset; a dataset with more than 100 distinct window sets.
+`503` | InfluxDB or the Auth service is unreachable, or too many queries are waiting. The last case has `Retry-After: 5`.
+`504` | The request or one of its queries took longer than its time limit.
 
 `400`, `413` and `422` responses have a JSON body with `error` and
 `message` fields.
@@ -337,12 +368,17 @@ Status | When
 ### `GET v1/coverage/status`
 
 Returns the state of the coverage summary. Any authenticated client may
-read it; it holds no data.
+read `enabled`, `ready`, `stale` and `error`. The other fields describe
+data across all devices, such as how far back the raw bucket goes, so
+they are included only for a caller with `Use Sparkplug data` on every
+device (a wildcard grant).
 
 ```json
 {
   "enabled": true,
   "ready": true,
+  "stale": false,
+  "error": null,
   "bucket": "acs_coverage",
   "task": {
     "name": "acs-coverage", "id": "<task ID>", "status": "active",
@@ -350,7 +386,6 @@ read it; it holds no data.
   },
   "newestHour": "2026-10-08T08:00:00.000Z",
   "summarisedTo": "2026-10-08T09:00:00.000Z",
-  "stale": false,
   "recountHours": 6,
   "repairDays": 7,
   "minTime": "2000-01-01T00:00:00.000Z",
@@ -359,14 +394,14 @@ read it; it holds no data.
     "backfilledTo": "2024-03-01T00:00:00.000Z",
     "upper": "2026-10-08T23:00:00.000Z",
     "earliestRaw": "2024-03-01T09:12:40.000Z"
-  },
-  "error": null
+  }
 }
 ```
 
 `stale` is `true` when the newest summarised hour is more than 3 hours
-old. Data Access also logs a warning then. `error` is the last
-provisioning, backfill or repair failure, or `null`.
+old. Data Access also logs a warning then. `error` is `null`, or a code
+for the last failure: `provisioning_failed`, `backfill_failed` or
+`repair_failed`. The Data Access log has the detail.
 
 ### `GET v1/structure`
 
@@ -600,7 +635,8 @@ Variable | Default | Meaning
   idempotent, so this costs only duplicate work. If both create the
   task at once, each start keeps the oldest task and deletes the others.
 * Task run logs stay in the `_tasks` bucket for 3 days. Use
-  `GET v1/coverage/status`, or `influx task run list`, to see failures.
+  `GET v1/coverage/status`, the Data Access log, or `influx task run
+  list`, to see failures.
 
 ## Known gaps
 

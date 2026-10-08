@@ -46,7 +46,7 @@ exports[`Flux builders > mean query: numeric suffixes without type, one with typ
 "data = from(bucket: "default")
   |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
   |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "Axes/X" and (r._measurement == "Load:d" or r._measurement == "Load:i" or r._measurement == "Load:u")) or (r.topLevelInstance == "22222222-2222-2222-2222-222222222222" and r.path == "" and (r._measurement == "Top:i"))))
+  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "Axes/X" and (r._measurement == "Load:d" or r._measurement == "Load:i" or r._measurement == "Load:u")) or (r.topLevelInstance == "22222222-2222-2222-2222-222222222222" and (not exists r.path or r.path == "") and (r._measurement == "Top:i"))))
   |> group(columns: ["topLevelInstance", "path", "_measurement"])
 
 data |> aggregateWindow(every: 5m, fn: mean, createEmpty: false, timeSrc: "_start")

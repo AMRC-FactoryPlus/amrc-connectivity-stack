@@ -43,7 +43,12 @@ export class SeriesReader {
      * @param opts.influx_org The InfluxDB org.
      * @param opts.influx_bucket The raw data bucket.
      * @param opts.concurrency Queries to run at once (default 4).
-     * @param opts.timeout_ms Time allowed for one request (default 30 s).
+     * @param opts.query_timeout_ms Time allowed for one query, counted
+     *   from when it starts running, not while it waits (default 30 s).
+     * @param opts.timeout_ms Time allowed for one request, waiting
+     *   included (default 60 s).
+     * @param opts.max_queue Queries that may wait for a slot, across
+     *   all requests (default 400). More fail with 503.
      * @param opts.coverage A Coverage, or null to count raw data only.
      */
     constructor(opts) {
@@ -52,7 +57,9 @@ export class SeriesReader {
         this.query_api = opts.query_api
             ?? opts.influx_client.getQueryApi(opts.influx_org);
         this.limit = pLimit(Number(opts.concurrency) || 4);
-        this.timeout_ms = Number(opts.timeout_ms) || 30000;
+        this.query_timeout_ms = Number(opts.query_timeout_ms) || 30000;
+        this.timeout_ms = Number(opts.timeout_ms) || 60000;
+        this.max_queue = Number(opts.max_queue) || 400;
         this.coverage = opts.coverage ?? null;
     }
 
@@ -127,44 +134,59 @@ export class SeriesReader {
     }
 
     /** Runs one Flux query and collects its rows as objects. Rows carry
-     * a `result` column naming their yield. */
+     * a `result` column naming their yield. The query's own timeout
+     * starts when it gets a slot. If too many queries are waiting, it
+     * fails with SeriesAbort("busy") without queueing. */
     query_rows(query, signal) {
+        if (this.limit.pendingCount >= this.max_queue)
+            return Promise.reject(new SeriesAbort("busy"));
+
         return this.limit(() => new Promise((resolve, reject) => {
             if (signal.aborted) return reject(signal.reason);
 
             const rows = [];
             let cancellable;
-            const on_abort = () => {
-                cancellable?.cancel();
-                reject(signal.reason);
+            const finish = () => {
+                clearTimeout(timer);
+                signal.removeEventListener("abort", on_abort);
             };
+            const stop = reason => {
+                finish();
+                cancellable?.cancel();
+                reject(reason);
+            };
+            const on_abort = () => stop(signal.reason);
+            const timer = setTimeout(
+                () => stop(new SeriesAbort("timeout")), this.query_timeout_ms);
             signal.addEventListener("abort", on_abort, { once: true });
-            const done = () => signal.removeEventListener("abort", on_abort);
 
             this.query_api.queryRows(query, {
                 next: (values, meta) => rows.push(meta.toObject(values)),
-                error: err => { done(); reject(err); },
-                complete: () => { done(); resolve(rows); },
+                error: err => { finish(); reject(err); },
+                complete: () => { finish(); resolve(rows); },
                 useCancellable: c => { cancellable = c; },
             });
         }));
     }
 
     /** The newest data time per device. For a dataset, only data
-     * inside the device's windows (and the lookback) counts, so `last`
-     * never shows data outside what the dataset grants. */
-    async last(req, windows, groups, as_of, signal) {
+     * inside the device's source windows (and the lookback) counts, so
+     * `last` never shows data outside what the dataset grants. These
+     * windows are not clipped to the request, so a live device shows
+     * its newest data even when the request ends earlier.
+     * @param last_windows Map of device UUID to its unclipped windows. */
+    async last(req, last_windows, as_of, signal) {
         const bucket = this.bucket;
         const start = as_of - req.last.lookback;
 
         if (!req.dataset) {
-            const devices = [...windows.keys()];
+            const devices = [...last_windows.keys()];
             if (!devices.length) return new Map();
             return shape_last(await this.query_rows(
                 last_query({ bucket, devices, start }), signal));
         }
 
-        const parts = await Promise.all(groups.map(g => {
+        const parts = await Promise.all(group_by_windows(last_windows).map(g => {
             const ws = intersect(g.windows, [[start, Infinity]]);
             return ws.length
                 ? this.query_rows(last_query({ bucket, devices: g.devices, start, windows: ws }), signal)
@@ -180,9 +202,12 @@ export class SeriesReader {
      * @param signal An AbortSignal.
      * @param state The coverage state, read once for the request (by
      *   default, read now).
+     * @param last_windows For a dataset, the device windows `last` may
+     *   read, not clipped to the request (by default, `windows`).
      * @returns {counts: Map|null, source, pending, metrics: Array, last: Map|null}
      */
-    async run(req, windows, as_of, signal, state = this.coverage_state()) {
+    async run(req, windows, as_of, signal, state = this.coverage_state(),
+            last_windows = windows) {
         const { every } = req;
         const bucket = this.bucket;
         const groups = group_by_windows(windows);
@@ -198,7 +223,7 @@ export class SeriesReader {
             return query ? this.query_rows(query, signal) : [];
         }));
 
-        const last = req.last ? this.last(req, windows, groups, as_of, signal) : null;
+        const last = req.last ? this.last(req, last_windows, as_of, signal) : null;
 
         const [c, m, l] = await Promise.all([counts, mean_rows, last]);
         return {

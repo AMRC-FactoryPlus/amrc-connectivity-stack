@@ -74,6 +74,8 @@ const seriesReader = new SeriesReader({
   influx_bucket: env.INFLUXDB_BUCKET,
   concurrency: env.SERIES_CONCURRENCY,
   timeout_ms: env.SERIES_TIMEOUT_MS,
+  query_timeout_ms: env.SERIES_QUERY_TIMEOUT_MS,
+  max_queue: env.SERIES_MAX_QUEUE,
   coverage: coverage.enabled ? coverage : null,
 });
 

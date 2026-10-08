@@ -447,8 +447,8 @@ What changes on upgrade:
   that counts points per device per hour. It then backfills the whole
   history of the Sparkplug bucket, one day at a time with a pause
   between days, and repairs the last 7 days each night. On a large
-  history the backfill takes hours; progress is reported at
-  `GET /v1/coverage/status`. Set `COVERAGE_ENABLED=false` on the
+  history the backfill takes hours; `GET /v1/coverage/status` reports
+  progress to callers with `Use Sparkplug data` on every device. Set `COVERAGE_ENABLED=false` on the
   Data Access deployment to turn it off. Other settings are documented
   in the Data Access service reference.
 - **New Data Access route `POST /v1/series`.** It returns, for a set of

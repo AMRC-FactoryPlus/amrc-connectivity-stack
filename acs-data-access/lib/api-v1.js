@@ -7,6 +7,7 @@ import express from "express";
 import { Map as IMap, Seq as ISeq, merge } from "immutable";
 import * as rx from "rxjs";
 
+import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid, valid_datetime, parse_download_filter } from "./validate.js";
@@ -16,10 +17,25 @@ import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
 import {
-  SeriesError, parse_request, merge_windows, cache_control,
+  SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
   LIMITS as SeriesLimits,
 } from "./series.js";
 import { SeriesAbort } from "./series-reader.js";
+
+
+/** Settles with `promise`, or rejects with the signal's reason if the
+ * signal aborts first. The work behind `promise` is not cancelled. */
+function abortable(promise, signal) {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const on_abort = () => reject(signal.reason);
+    signal.addEventListener("abort", on_abort, { once: true });
+    const done = () => signal.removeEventListener("abort", on_abort);
+    promise.then(
+      v => { done(); resolve(v); },
+      e => { done(); reject(e); });
+  });
+}
 
 export class APIv1 {
   constructor(opts) {
@@ -386,6 +402,14 @@ export class APIv1 {
    * every device is denied.
    */
   async series(req, res) {
+    /* One time limit covers the whole request: the permission lookups
+     * as well as the queries. */
+    const ctl = this.seriesReader.controller();
+    const on_close = () => {
+      if (!res.writableEnded) ctl.abort(new SeriesAbort("client closed"));
+    };
+    res.on("close", on_close);
+
     try {
       const as_of = Date.now();
       /* Read the coverage state once, so validation and the queries
@@ -393,9 +417,18 @@ export class APIv1 {
       const coverage = this.seriesReader.coverage_state();
       const parsed = parse_request(req.body, as_of, { coverage: coverage != null });
 
-      const scope = parsed.dataset
-        ? await this.series_dataset_scope(req.auth, parsed)
-        : await this.series_device_scope(req.auth, parsed);
+      const scope = await abortable(parsed.dataset
+        ? this.series_dataset_scope(req.auth, parsed, as_of)
+        : this.series_device_scope(req.auth, parsed), ctl.signal);
+
+      /* Each distinct window set is its own set of queries. */
+      const groups = Math.max(
+        group_by_windows(scope.windows).length,
+        group_by_windows(scope.last_windows).length);
+      if (groups > SeriesLimits.groups)
+        throw new SeriesError(422, "invalid_request",
+          `The dataset's devices have more than ${SeriesLimits.groups} distinct window sets.`,
+          { limit: SeriesLimits.groups });
 
       /* `mean` and `last` entries inherit the check of their device. */
       const run = {
@@ -403,8 +436,8 @@ export class APIv1 {
         mean: parsed.mean.filter(m => scope.windows.has(m.device)),
       };
 
-      const result = await this.series_run(res, run, scope.windows, as_of, coverage);
-      if (!result) return;
+      const result = await this.seriesReader.run(
+        run, scope.windows, as_of, ctl.signal, coverage, scope.last_windows);
 
       const iso = t => new Date(t).toISOString();
       const devices = {};
@@ -439,23 +472,89 @@ export class APIv1 {
         this.log(`Series request refused: ${err.message}`);
         return res.status(err.status).json(err.body());
       }
-      throw err;
+      return this.series_failed(err, ctl, res);
+    }
+    finally {
+      ctl.done();
+      res.off("close", on_close);
     }
   }
 
-  /** GET. The state of the coverage summary: the task, the newest
-   * summarised hour and the backfill. Any authenticated client may read
-   * it; it holds no data. */
+  /** Turns a failed series request into a response, or rethrows.
+   * Returns undefined if the client has gone. */
+  series_failed(err, ctl, res) {
+    const reason = err instanceof SeriesAbort ? err.reason
+      : ctl.signal.aborted ? ctl.signal.reason?.reason : null;
+
+    /* Cancel the sibling queries of the one that failed. */
+    ctl.abort(new SeriesAbort("failed"));
+
+    if (reason == "client closed") {
+      this.log(`Series client went away; queries cancelled`);
+      return;
+    }
+    if (reason == "timeout")
+      return fail(this.log, 504, `Series query timed out`);
+    if (reason == "busy") {
+      res.set("Retry-After", "5");
+      return fail(this.log, 503, `Too many series queries waiting`);
+    }
+
+    /* A 4xx from InfluxDB means we sent a bad query: that is our bug. */
+    if (err?.name == "HttpError" && err.statusCode < 500) {
+      this.log("Series query rejected by InfluxDB: %s", err.message);
+      return fail(this.log, 500, `Series query failed`);
+    }
+    if (err?.name == "HttpError" || err?.name == "RequestTimedOutError"
+        || typeof err?.code == "string") {
+      this.log("InfluxDB unavailable: %s", err.message);
+      return fail(this.log, 503, `InfluxDB unavailable`);
+    }
+    throw err;
+  }
+
+  /** GET. The state of the coverage summary. Any authenticated client
+   * may read whether it is ready, stale or failing, as an error code;
+   * the log has the detail. The bucket bounds and the task describe
+   * data across all devices, so only a caller with UseSparkplug on
+   * every device (a wildcard grant) sees them. */
   async coverage_status(req, res) {
     const coverage = this.seriesReader?.coverage;
     if (!coverage)
       return res.status(200).json({ enabled: false });
-    return res.status(200).json(coverage.status());
+    const detail = await this.may_read_all_devices(req.auth);
+    return res.status(200).json(coverage.status({ detail }));
+  }
+
+  /** Whether the principal has UseSparkplug on every device. Gives up
+   * (false) after 5 s, or if the ACL cannot be read. */
+  async may_read_all_devices(principal) {
+    let timer;
+    const timeout = new Promise(resolve => {
+      timer = setTimeout(() => resolve(false), 5000);
+    });
+    const check = this.auth.check_acl(
+      principal, Constants.Perm.UseSparkplug, UUIDs.Special.Null, true)
+      .catch(err => {
+        this.log("Can't read the ACL for %s: %s", principal, err.message);
+        return false;
+      });
+    try {
+      return await Promise.race([check, timeout]);
+    }
+    finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Permission and windows for a dataset request. Reading a dataset
-   * grants reading its devices within the dataset's windows. */
-  async series_dataset_scope(principal, parsed) {
+   * grants reading its devices within the dataset's windows.
+   *
+   * `windows` are clipped to the request, for counts and means.
+   * `last_windows` are not: they end at their source's end, or at
+   * `as_of` for an open source, so `last` shows the newest data the
+   * dataset grants even when the request ends earlier. */
+  async series_dataset_scope(principal, parsed, as_of) {
     const ok = await this.auth.check_acl(
       principal,
       Constants.Perm.ReadDataset,
@@ -483,22 +582,39 @@ export class APIv1 {
         `"mean" device ${stray.device} is not in the dataset.`);
 
     const windows = new Map();
-    for (const [device, list] of by_device)
+    const last_windows = new Map();
+    for (const [device, list] of by_device) {
       windows.set(device, merge_windows(list, parsed.from, parsed.to));
+      last_windows.set(device, merge_windows(list, -Infinity, as_of));
+    }
 
-    return { windows, denied: [] };
+    return { windows, last_windows, denied: [] };
   }
 
-  /** Permission and windows for a device request. One ACL lookup gives
-   * a predicate that honours root and wildcard grants. */
+  /** Permission and windows for a device request. One ACL fetch gives
+   * a check that honours root and wildcard grants. `fetch_acl` takes a
+   * Kerberos UPN or a principal UUID (from a JWT). An ACL the Auth
+   * service refuses (an unknown principal) denies every device. */
   async series_device_scope(principal, parsed) {
-    const allowed = await rx.firstValueFrom(
-      this.data.watch_allowed(principal, Constants.Perm.UseSparkplug));
+    let acl;
+    try {
+      acl = await this.auth.fetch_acl(principal);
+    }
+    catch (err) {
+      /* A ServiceError carries the Auth status; 0 means unreachable. */
+      const st = err?.status;
+      if (!(Number.isInteger(st) && st >= 400 && st < 500)) {
+        this.log("Can't read the ACL for %s: %s", principal, err.message);
+        return fail(this.log, 503, `Auth service unavailable`);
+      }
+      this.log("Auth refused the ACL for %s: %s", principal, err.status);
+      acl = () => false;
+    }
 
     const windows = new Map();
     const denied = [];
     for (const device of parsed.devices) {
-      if (allowed(device))
+      if (acl(Constants.Perm.UseSparkplug, device, true))
         windows.set(device, [[parsed.from, parsed.to]]);
       else
         denied.push(device);
@@ -507,49 +623,7 @@ export class APIv1 {
     if (!windows.size)
       return fail(this.log, 403, `No UseSparkplug permission on any requested device`);
 
-    return { windows, denied };
-  }
-
-  /** Runs the series queries under the timeout, and aborts them if the
-   * client goes away. Returns undefined if the client has gone. */
-  async series_run(res, parsed, windows, as_of, coverage) {
-    const ctl = this.seriesReader.controller();
-    const on_close = () => {
-      if (!res.writableEnded) ctl.abort(new SeriesAbort("client closed"));
-    };
-    res.on("close", on_close);
-
-    try {
-      return await this.seriesReader.run(parsed, windows, as_of, ctl.signal, coverage);
-    }
-    catch (err) {
-      const reason = ctl.signal.aborted ? ctl.signal.reason?.reason : null;
-      if (reason == "timeout")
-        return fail(this.log, 504, `Series query timed out`);
-      if (reason == "client closed") {
-        this.log(`Series client went away; queries cancelled`);
-        return;
-      }
-
-      /* Cancel the sibling queries of the one that failed. */
-      ctl.abort(new SeriesAbort("failed"));
-
-      /* A 4xx from InfluxDB means we sent a bad query: that is our bug. */
-      if (err?.name == "HttpError" && err.statusCode < 500) {
-        this.log("Series query rejected by InfluxDB: %s", err.message);
-        return fail(this.log, 500, `Series query failed`);
-      }
-      if (err?.name == "HttpError" || err?.name == "RequestTimedOutError"
-          || typeof err?.code == "string") {
-        this.log("InfluxDB unavailable: %s", err.message);
-        return fail(this.log, 503, `InfluxDB unavailable`);
-      }
-      throw err;
-    }
-    finally {
-      ctl.done();
-      res.off("close", on_close);
-    }
+    return { windows, last_windows: windows, denied };
   }
 
   /** GET. 

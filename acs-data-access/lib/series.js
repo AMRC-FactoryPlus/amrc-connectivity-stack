@@ -40,6 +40,7 @@ export const TIME_ZONE = "Europe/London";
 
 export const LIMITS = {
     devices: 500,
+    groups: 100,
     mean: 50,
     buckets: 2000,
     default_points: 300,
@@ -460,9 +461,17 @@ export function count_query({ bucket, devices, windows, every }) {
   |> keep(columns: ["topLevelInstance", "_time", "_value"])`);
 }
 
+/* InfluxDB stores no empty tags, so a top-level metric (empty path)
+ * has no path column at all, and `r.path == ""` never matches it. */
+function path_clause(path) {
+    return path == ""
+        ? fluxExpression(`(not exists r.path or r.path == "")`)
+        : flux`r.path == ${path}`;
+}
+
 function metric_clause(m, types) {
     const names = join(types.map(t => flux`r._measurement == ${`${m.name}:${t}`}`), "or");
-    return flux`(r.topLevelInstance == ${m.device} and r.path == ${m.path} and (${names}))`;
+    return flux`(r.topLevelInstance == ${m.device} and ${path_clause(m.path)} and (${names}))`;
 }
 
 const KEEP = `["topLevelInstance", "path", "_measurement", "_time", "_value"]`;

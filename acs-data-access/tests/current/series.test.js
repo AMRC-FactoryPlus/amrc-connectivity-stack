@@ -7,7 +7,7 @@
  */
 
 import * as rx from "rxjs";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { APIv1 } from "../../lib/api-v1.js";
@@ -16,6 +16,7 @@ import { DataAccess as Constants } from "../../lib/constants.js";
 import { SeriesReader, SeriesAbort } from "../../lib/series-reader.js";
 import { body_errors } from "../../lib/utils.js";
 import {
+    LIMITS as SeriesLimits,
     SeriesError, parse_request, bucket_start, next_bucket, bucket_count,
     choose_every, merge_windows, group_by_windows, split_metric,
     count_query, mean_query, last_query,
@@ -281,7 +282,8 @@ describe("Flux builders", () => {
         ] });
         expect(q).toMatchSnapshot();
         expect(q).toContain(`r.path == "Axes/X" and (r._measurement == "Load:d" or r._measurement == "Load:i" or r._measurement == "Load:u")`);
-        expect(q).toContain(`r.path == "" and (r._measurement == "Top:i")`);
+        /* InfluxDB drops empty tags: a top-level metric has no path. */
+        expect(q).toContain(`(not exists r.path or r.path == "") and (r._measurement == "Top:i")`);
         expect(q).not.toContain(":b");
         expect(q).not.toContain("toFloat");
         expect(q).toContain(`yield(name: "mean")`);
@@ -425,20 +427,27 @@ function fake_query_api(rows = {}) {
     };
 }
 
-/* grants: principal -> targets for UseSparkplug. */
-function make_api({ grants = {}, read = [], datasets = {}, rows, query_api } = {}) {
+/* grants: principal -> targets for UseSparkplug. A principal named in
+ * `refused` gets that status from Auth; `acl` replaces fetch_acl. */
+function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
+        refused = {}, acl } = {}) {
     const flow = Object.create(DataFlow.prototype);
-    flow.auth = {
-        root_principal: ROOT,
-        watch_acl_with_perm: (principal, perm) => rx.of(new Set(
-            perm == Constants.Perm.UseSparkplug ? grants[principal] ?? [] : [])),
-    };
     flow.datasets = rx.of(new Map(Object.entries(datasets)));
+
+    const fetch_acl = acl ?? (async principal => {
+        if (principal == ROOT) return () => true;
+        if (refused[principal] != null)
+            throw Object.assign(new Error("Failed to read ACL"), { status: refused[principal] });
+        const targets = grants[principal] ?? [];
+        return (perm, target, wild) => perm == Constants.Perm.UseSparkplug
+            && (targets.includes(target) || (wild && targets.includes(UUIDs.Special.Null)));
+    });
 
     const api = new APIv1({
         data: flow,
         debug,
         auth: {
+            fetch_acl,
             check_acl: async (principal, perm, target) =>
                 principal == ROOT || (perm == Constants.Perm.ReadDataset && read.includes(target)),
         },
@@ -553,9 +562,114 @@ describe("series route permissions", () => {
     });
 });
 
+describe("series route principals", () => {
+    const PU = "55555555-5555-4555-8555-555555555555";
+    const req = { ...base, devices: [D1, D2], count: true, every: "1h" };
+
+    test("a JWT caller's principal UUID is checked through fetch_acl", async () => {
+        const asked = [];
+        const { api } = make_api({ rows: { count: count_rows },
+            acl: async p => { asked.push(p);
+                return (perm, target) => perm == Constants.Perm.UseSparkplug && target == D1; } });
+        const res = await call(api, PU, req);
+        expect(res.statusCode).toBe(200);
+        expect(asked).toEqual([PU]);
+        expect(res.body.denied).toEqual([D2]);
+    });
+
+    test("a principal Auth has no ACL for is denied, not left waiting", async () => {
+        const { api, query_api } = make_api({ refused: { [PU]: 404 } });
+        expect((await call(api, PU, req)).statusCode).toBe(403);
+        expect(query_api.seen).toEqual([]);
+    });
+
+    test("503 when Auth cannot be reached", async () => {
+        const { api } = make_api({ refused: { [PU]: 0 } });
+        expect((await call(api, PU, req)).statusCode).toBe(503);
+    });
+
+    test("the request time limit covers the permission lookup", async () => {
+        const { api, query_api } = make_api({ acl: () => new Promise(() => {}) });
+        api.seriesReader.timeout_ms = 20;
+        expect((await call(api, PU, req)).statusCode).toBe(504);
+        expect(query_api.seen).toEqual([]);
+    });
+});
+
+describe("series fan-out limits", () => {
+    test("422 when a dataset has more distinct window sets than the limit", async () => {
+        const n = SeriesLimits.groups + 1;
+        const dev = i => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+        const parts = Array.from({ length: n }, (_, i) => `10000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
+        const datasets = {
+            [DS]: { structure: Constants.App.UnionComponents, config: parts },
+        };
+        const src = i => `20000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+        parts.forEach((p, i) => {
+            const day = String(1 + (i % 28)).padStart(2, "0");
+            const hour = String(Math.floor(i / 28)).padStart(2, "0");
+            datasets[p] = { structure: Constants.App.SessionLimits, config: {
+                source: src(i), from: `2026-09-${day}T${hour}:00:00.000Z`,
+                to: `2026-09-${day}T${hour}:30:00.000Z` } };
+            datasets[src(i)] = { structure: Constants.App.SparkplugSrc, config: { source: dev(i) } };
+        });
+        const { api, query_api } = make_api({ read: [DS], datasets });
+        const res = await call(api, USER, { dataset: DS, last: true, every: "1d",
+            from: "2026-09-01T00:00:00.000Z", to: "2026-09-30T00:00:00.000Z" });
+        expect(res.statusCode).toBe(422);
+        expect(res.body).toMatchObject({ error: "invalid_request", limit: SeriesLimits.groups });
+        expect(query_api.seen).toEqual([]);
+    });
+
+    test("503 with Retry-After when too many queries are waiting", async () => {
+        const hang = { queryRows: (q, consumer) => consumer.useCancellable({ cancel() {} }) };
+        const { api } = make_api({ query_api: hang });
+        const reader = api.seriesReader;
+        reader.max_queue = 1;
+        reader.limit.concurrency = 1;
+        const ctl = new AbortController();
+        const first = reader.query_rows("a", ctl.signal).catch(() => {});
+        const second = reader.query_rows("b", ctl.signal).catch(() => {});
+        const res = fake_res();
+        await expect(api.series({ auth: ROOT, body: { ...base, count: true, every: "1h" } }, res))
+            .rejects.toMatchObject({ status: 503 });
+        expect(res.headers["Retry-After"]).toBe("5");
+        ctl.abort(new SeriesAbort("test"));
+        await Promise.all([first, second]);
+    });
+
+    test("a query's own timeout starts when it gets a slot", async () => {
+        let release;
+        const seen = [];
+        const qa = { queryRows: (q, consumer) => {
+            seen.push(q);
+            if (q == "slow") { release = () => consumer.complete(); return; }
+            consumer.useCancellable({ cancel() {} });
+        } };
+        const reader = new SeriesReader({ debug, influx_bucket: "default", query_api: qa,
+            concurrency: 1, query_timeout_ms: 30 });
+        const ctl = new AbortController();
+        const slow = reader.query_rows("slow", ctl.signal);
+        const waiting = reader.query_rows("hang", ctl.signal);
+        /* The first query holds the slot past the second's own limit. */
+        await new Promise(r => setTimeout(r, 20));
+        release();
+        await slow;
+        const t0 = Date.now();
+        await expect(waiting).rejects.toMatchObject({ reason: "timeout" });
+        expect(Date.now() - t0).toBeGreaterThanOrEqual(20);
+        expect(seen).toEqual(["slow", "hang"]);
+    });
+});
+
 describe("dataset last follows the dataset windows", () => {
     const req = { ...base, last: true, every: "1h" };
     const { devices, ...rest } = req;
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(T("2026-10-09T00:00:00Z"));
+    });
+    afterEach(() => vi.useRealTimers());
 
     test("last is clipped to the device's windows", async () => {
         const datasets = {
@@ -570,6 +684,40 @@ describe("dataset last follows the dataset windows", () => {
         expect(res.body.devices[D1].last).toBe("2026-10-08T11:59:00.000Z");
         const q = query_api.seen.find(q => q.includes("max(column"));
         expect(q).toContain("range(start: 2026-10-08T06:00:00.000Z, stop: 2026-10-08T12:00:00.000Z)");
+    });
+
+    test("last is not clipped to the request, so a live device shows its newest data", async () => {
+        /* A Sparkplug source dataset: open at both ends. */
+        const datasets = {
+            [DS]: { structure: Constants.App.SparkplugSrc, config: { source: D1 } },
+        };
+        const { api, query_api } = make_api({ read: [DS], datasets,
+            rows: { last: () => [{ topLevelInstance: D1, _time: "2026-10-08T23:59:00Z" }] } });
+        const res = await call(api, USER, { dataset: DS, last: true, count: true, every: "1h",
+            from: "2026-10-02T00:00:00.000Z", to: "2026-10-03T00:00:00.000Z" });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.devices[D1].last).toBe("2026-10-08T23:59:00.000Z");
+        expect(res.body.devices[D1].windows).toEqual([
+            ["2026-10-02T00:00:00.000Z", "2026-10-03T00:00:00.000Z"]]);
+        /* The last query runs over the lookback up to now... */
+        const q = query_api.seen.find(q => q.includes("max(column"));
+        expect(q).toContain("range(start: 2026-09-09T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)");
+        /* ...while the counts keep to the request. */
+        const c = query_api.seen.find(q => q.includes("fn: count"));
+        expect(c).toContain("range(start: 2026-10-02T00:00:00.000Z, stop: 2026-10-03T00:00:00.000Z)");
+    });
+
+    test("last stays inside a closed source window that ends after the request", async () => {
+        const datasets = {
+            [DS]: { structure: Constants.App.SessionLimits, config: {
+                source: D3, from: "2026-10-01T00:00:00.000Z", to: "2026-10-05T00:00:00.000Z" } },
+            [D3]: { structure: Constants.App.SparkplugSrc, config: { source: D1 } },
+        };
+        const { api, query_api } = make_api({ read: [DS], datasets, rows: { last: () => [] } });
+        await call(api, USER, { dataset: DS, last: true, every: "1h",
+            from: "2026-10-02T00:00:00.000Z", to: "2026-10-03T00:00:00.000Z" });
+        const q = query_api.seen.find(q => q.includes("max(column"));
+        expect(q).toContain("range(start: 2026-10-01T00:00:00.000Z, stop: 2026-10-05T00:00:00.000Z)");
     });
 
     test("a device whose windows are outside the lookback gets null and no query", async () => {

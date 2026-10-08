@@ -203,6 +203,7 @@ export class Coverage {
         this.task_stop = null;
         this.task_info = null;
         this.earliest = undefined;
+        /* The detail stays in the log; status() reports only the code. */
         this.last_error = null;
         this.stopped = false;
         this.timers = new Set();
@@ -389,7 +390,7 @@ export class Coverage {
     enqueue(name, fn) {
         const run = this.chain.then(() => this.stopped ? null : fn());
         this.chain = run.catch(err => {
-            this.last_error = `${name}: ${err.message}`;
+            this.last_error = `${name}_failed`;
             this.log("Coverage %s failed: %s", name, err.message);
         });
         return run;
@@ -443,17 +444,28 @@ export class Coverage {
         return s == null || this.now() - s.summary_to > 3 * HOUR;
     }
 
-    status() {
+    /** The state for GET /v1/coverage/status. `error` is a code such
+     * as "backfill_failed"; the log has the detail.
+     * @param detail Whether to include the bucket bounds and the task.
+     *   They describe data across all devices, so the route shows them
+     *   only to callers who may read every device. */
+    status({ detail = true } = {}) {
         const s = this.read_state();
-        const iso = t => t == null || !Number.isFinite(t) ? null : new Date(t).toISOString();
-        return {
+        const out = {
             enabled: this.enabled,
             ready: s != null,
+            stale: this.enabled ? this.stale() : null,
+            error: this.last_error,
+        };
+        if (!detail) return out;
+
+        const iso = t => t == null || !Number.isFinite(t) ? null : new Date(t).toISOString();
+        return {
+            ...out,
             bucket: this.bucket,
             task: this.task_info ? { name: this.task_name, ...this.task_info } : null,
             newestHour: iso(this.newest),
             summarisedTo: iso(s?.summary_to),
-            stale: this.enabled ? this.stale() : null,
             recountHours: this.recount_hours,
             repairDays: this.repair_days,
             minTime: iso(this.min_time),
@@ -463,7 +475,6 @@ export class Coverage {
                 upper: iso(this.marker.upper),
                 earliestRaw: iso(this.earliest ?? null),
             } : null,
-            error: this.last_error,
         };
     }
 
@@ -494,7 +505,7 @@ export class Coverage {
                 break;
             }
             catch (err) {
-                this.last_error = `provisioning: ${err.message}`;
+                this.last_error = "provisioning_failed";
                 this.log("Coverage provisioning failed, retrying in %ds: %s",
                     wait / 1000, err.message);
                 await this.sleep(wait);

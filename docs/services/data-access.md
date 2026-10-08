@@ -388,15 +388,21 @@ device (a wildcard grant).
   "summarisedTo": "2026-10-08T09:00:00.000Z",
   "recountHours": 6,
   "repairDays": 7,
+  "backfillEmptyDays": 365,
   "minTime": "2000-01-01T00:00:00.000Z",
   "backfill": {
     "complete": true,
-    "backfilledTo": "2024-03-01T00:00:00.000Z",
+    "backfilledTo": "2023-02-28T00:00:00.000Z",
     "upper": "2026-10-08T23:00:00.000Z",
-    "earliestRaw": "2024-03-01T09:12:40.000Z"
+    "oldestData": "2024-03-01T00:00:00.000Z"
   }
 }
 ```
+
+`backfill.oldestData` is the start of the oldest Europe/London day with
+raw data that the backfill has found so far, or `null` if it has found
+none. `backfilledTo` can be up to `backfillEmptyDays` below it, because
+the backfill stops only after that many empty days.
 
 `stale` is `true` when the newest summarised hour is more than 3 hours
 old. Data Access also logs a warning then. `error` is `null`, or a code
@@ -573,16 +579,45 @@ rewrites the daily sums for the days those hours touch. A recount writes
 and reads skip zeros.
 
 The **backfill** summarises one Europe/London day at a time, from today
-back to the oldest raw point. After each day it writes the marker, so a
-restart resumes where it stopped, and a day that failed runs again.
-A day with no data makes the backfill jump to the next older day that
-has data, so gaps in history cost one query each. If a day is too large
-to count in one query, it is counted an hour at a time and then summed.
+backwards. After each day it writes the marker, so a restart resumes
+where it stopped, and a day that failed runs again. If a day is too
+large to count in one query, it is counted an hour at a time and then
+summed.
+
+The backfill never looks up the oldest raw point, because that query
+reads every series over the whole history. Instead, when a day has no
+data, it looks for the newest data in the 30 days below that day, with
+one `last()` query that InfluxDB runs in its storage engine. If it
+finds data, it jumps to that day. If not, it skips the 30 days and
+looks in the next 30. It stops when it has seen 365 days in a row with
+no data (`COVERAGE_BACKFILL_EMPTY_DAYS`) below the oldest data it has
+found, or when it reaches `COVERAGE_BACKFILL_FROM` or
+`COVERAGE_MIN_TIME`. So every backfill query covers one day or 30
+days, and its cost does not grow with the length of the history.
+
+Raw data below a gap of more than 365 days, such as a few points from a
+device with a wrong clock, is not summarised. To summarise it, raise
+`COVERAGE_BACKFILL_EMPTY_DAYS`, or set `COVERAGE_BACKFILL_FROM` to a
+date below it: the backfill then walks down to that date whatever gaps
+it meets.
+
 It runs one query at a time, outside the series route's limiter, and
 waits after each day at least as long as that day took (and at least
 `COVERAGE_PAUSE_MS`), so it uses no more than half of one query slot.
 In production-sized history, expect about a second of query time per
 day of history.
+
+Each backfill or repair query has a time limit (`COVERAGE_TIMEOUT_MS`,
+10 minutes by default). A query that runs over is cancelled: Data
+Access closes the connection, and InfluxDB stops the query. Stopping
+Data Access cancels its query in the same way.
+
+If the backfill fails, Data Access logs one line that names the step
+that failed (for example `Coverage backfill failed while summarising the
+day from 2026-10-01T23:00:00.000Z: query timed out after 600 s;
+retrying in 15 min`). It tries again after 15 minutes, then 30
+minutes, 1 hour, 2 hours and 4 hours, and then every 6 hours, until a
+run succeeds. The marker keeps the progress between tries.
 
 The **daily repair** runs at 03:00 Europe/London. It re-summarises the
 last 7 full days (`COVERAGE_REPAIR_DAYS`), to catch store-and-forward data that arrived after the
@@ -608,7 +643,31 @@ Sub-hour steps always count raw data, with the 14-day limit.
 ### Settings
 
 All settings are environment variables on the Data Access deployment.
-The defaults need no change.
+The defaults need no change. The Helm chart sets the main ones from
+`dataAccess.coverage` values, so a change survives an upgrade:
+
+Helm value | Variable | Default
+---|---|---
+`dataAccess.coverage.enabled` | `COVERAGE_ENABLED` | `true`
+`dataAccess.coverage.backfill` | `COVERAGE_BACKFILL` | `true`
+`dataAccess.coverage.pauseMs` | `COVERAGE_PAUSE_MS` | `1000`
+`dataAccess.coverage.backfillEmptyDays` | `COVERAGE_BACKFILL_EMPTY_DAYS` | `365`
+`dataAccess.coverage.backfillFrom` | `COVERAGE_BACKFILL_FROM` | (empty)
+`dataAccess.coverage.timeoutMs` | `COVERAGE_TIMEOUT_MS` | `600000`
+`dataAccess.coverage.repairDays` | `COVERAGE_REPAIR_DAYS` | `7`
+`dataAccess.coverage.rebuild` | `COVERAGE_REBUILD` | (empty)
+
+For example, to pause the backfill on a busy InfluxDB while keeping
+the hourly task and coverage reads:
+
+```yaml
+dataAccess:
+  coverage:
+    backfill: false
+```
+
+Do not set these variables with `kubectl set env`: the next Helm
+upgrade replaces them.
 
 Variable | Default | Meaning
 ---|---|---
@@ -617,11 +676,12 @@ Variable | Default | Meaning
 `COVERAGE_TASK` | `acs-coverage` | The InfluxDB task name.
 `COVERAGE_RECOUNT_HOURS` | `6` | Closed hours each task run recounts (1 to 48).
 `COVERAGE_BACKFILL` | `true` | `false` skips the backfill. The summary is then not used until a marker exists.
-`COVERAGE_BACKFILL_FROM` | (oldest raw point) | An ISO date-time the backfill stops at.
+`COVERAGE_BACKFILL_FROM` | (empty) | An ISO date-time the backfill stops at. When set, the backfill walks down to it whatever gaps it meets, and `COVERAGE_BACKFILL_EMPTY_DAYS` does not apply.
+`COVERAGE_BACKFILL_EMPTY_DAYS` | `365` | The backfill stops after this many days in a row with no raw data below the oldest data it has found.
 `COVERAGE_PAUSE_MS` | `1000` | Minimum pause between backfill and repair days.
 `COVERAGE_REPAIR_DAYS` | `7` | Full days the daily repair covers. `0` turns it off.
 `COVERAGE_MIN_TIME` | `2000-01-01T00:00:00Z` | Raw points before this are taken to be bad device clocks: the backfill ignores them.
-`COVERAGE_TIMEOUT_MS` | `600000` | Time allowed for one backfill or repair query. The summary has its own InfluxDB client for this.
+`COVERAGE_TIMEOUT_MS` | `600000` | Time allowed for one backfill or repair query. A query that runs over is cancelled in InfluxDB too.
 `COVERAGE_REBUILD` | (empty) | Any new value starts the backfill again from today. Data Access records the value, so the rebuild runs once per value.
 
 ### Caveats

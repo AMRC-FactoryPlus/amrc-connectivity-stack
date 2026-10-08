@@ -462,6 +462,54 @@ What changes on upgrade:
 - **Dataset edits.** Editing a dataset's definition now checks the new
   definition fully before removing anything (from #806).
 
+### Upgrading: the coverage backfill no longer reads the whole raw bucket
+
+Before this fix, the coverage backfill in Data Access first looked up
+the oldest point in the Sparkplug bucket. That query read every point
+of every series over the whole history. On an installation with
+several years of history and high series cardinality it ran past its
+10-minute timeout. InfluxDB kept running it after Data Access gave up,
+with high CPU and memory use, and Data Access started it again every
+15 minutes. The backfill never summarised a day.
+
+Now:
+
+- **No whole-history query.** The backfill walks back from today one
+  day at a time. Below an empty day it looks for data in the 30 days
+  below with one `last()` query that runs inside InfluxDB's storage
+  engine. It stops after 365 days in a row with no data below the
+  oldest data it has found (`COVERAGE_BACKFILL_EMPTY_DAYS`).
+- **Day counts run in the storage engine.** The hourly count in the
+  backfill and in the hourly InfluxDB task now runs its window in UTC,
+  which lets InfluxDB count in storage instead of streaming every raw
+  point to Flux. Hours are the same in UTC and Europe/London, so the
+  counts do not change. Data Access updates the task's Flux on start.
+- **Timeouts cancel the query.** When a backfill or repair query runs
+  past `COVERAGE_TIMEOUT_MS`, or Data Access stops, Data Access closes
+  the connection and InfluxDB drops the query.
+- **Backoff.** After a failure the backfill waits 15 minutes, then 30
+  minutes, 1, 2 and 4 hours, then 6 hours between tries. Each failure
+  is one log line that names the step that failed.
+- **Helm values.** `dataAccess.coverage` sets the coverage settings:
+  `enabled`, `backfill`, `pauseMs`, `backfillEmptyDays`,
+  `backfillFrom`, `timeoutMs`, `repairDays` and `rebuild`. Use these
+  instead of `kubectl set env`, which the next upgrade undoes.
+
+What to do on upgrade:
+
+- If you set `COVERAGE_*` variables on the Data Access deployment by
+  hand (for example `COVERAGE_BACKFILL=false` to stop the load), move
+  them to `dataAccess.coverage` values. The chart now sets these
+  variables, so the upgrade replaces hand-set values.
+- The backfill resumes from its marker. A backfill that never
+  summarised a day starts from today.
+- Raw data below a gap of more than 365 days is no longer summarised.
+  To include it, raise `dataAccess.coverage.backfillEmptyDays` or set
+  `dataAccess.coverage.backfillFrom`.
+- `GET /v1/coverage/status` reports `backfill.oldestData` (the oldest
+  day with data the backfill has found) instead of
+  `backfill.earliestRaw`, and adds `backfillEmptyDays`.
+
 ### Other improvements
 
 ConfigDB:

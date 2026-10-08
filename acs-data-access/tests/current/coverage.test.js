@@ -8,7 +8,7 @@
  */
 
 import * as rx from "rxjs";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { APIv1 } from "../../lib/api-v1.js";
@@ -22,6 +22,7 @@ import {
     task_script, chunk_script, coverage_query,
     plan_count, plan_source, split_coverage, intersect,
     fresh_state, needs_rebuild, next_chunk, repair_chunks, parse_state,
+    probe_window, after_probe, retry_delay, previous_query,
     floor_day, ceil_day, prev_day, next_local_hour,
 } from "../../lib/coverage.js";
 
@@ -105,57 +106,68 @@ function fake_admin({ bucket = false, task = null } = {}) {
     return admin;
 }
 
-/* A fake query API. It answers the marker, earliest-point, previous-
- * point and newest-hour queries, and records the chunks it is asked to
+/* A fake for InfluxAdmin.query. It answers the marker, previous-point
+ * and newest-hour queries, and records the chunks it is asked to
  * summarise: "day" (a whole-day chunk), "hours" (an hour-by-hour
- * fallback) and "sum" (the day's sum after the fallback).
- * @param has_data (start) => whether a chunk starting there has data.
+ * fallback) and "sum" (the day's sum after the fallback), and the
+ * windows it is asked to probe for data ("probes").
+ *
+ * By default raw data runs without a break from `earliest` to now (none
+ * at all if it is null).
+ * @param has_data (start, stop) => whether a chunk has data.
+ * @param previous (start, stop) => the newest data time in a probe
+ *   window, or null.
  * @param fail_on (chunk, kind) => whether that chunk fails. */
 function fake_query_api(admin, {
-    earliest = null, newest = null, has_data = () => true, fail_on = () => false,
-    previous = null,
+    earliest = null, newest = null, fail_on = () => false,
+    has_data = (a, b) => earliest != null && b > earliest,
+    previous = (a, b) => earliest != null && b > earliest ? b - 1 : null,
 } = {}) {
     const chunks = [];
+    const probes = [];
     const all = [];
+    const queries = [];
     return {
         chunks,
+        probes,
         all,
-        queryRows(query, consumer) {
-            setImmediate(() => {
-                let rows = [];
-                const range = /range\(start: (\S+?), stop: (\S+?)\)/.exec(query);
-                if (query.includes(MEASUREMENT.state))
-                    rows = [...admin.fields].map(([_field, _value]) => ({ _field, _value }));
-                else if (query.includes("limit(n: 1)"))
-                    rows = earliest == null ? [] : [{ _time: iso(earliest) }];
-                else if (query.includes("max(column") && query.includes(`from(bucket: "default")`)) {
-                    const t = previous?.(T(range[2]));
-                    rows = t == null ? [] : [{ _time: iso(t) }];
-                }
-                else if (query.includes("max(column"))
-                    rows = newest == null ? [] : [{ _time: iso(newest) }];
-                else if (query.includes("to(bucket")) {
-                    const kind = !query.includes(`from(bucket: "default")`) ? "sum"
-                        : query.includes(MEASUREMENT.daily) ? "day" : "hours";
-                    const chunk = { start: T(range[1]), stop: T(range[2]) };
-                    all.push({ ...chunk, kind });
-                    if (fail_on(chunk, kind))
-                        return consumer.error(new Error("chunk failed"));
-                    if (kind == "day") chunks.push(chunk);
-                    if (kind != "sum" && has_data(chunk.start))
-                        rows = [{ _measurement: MEASUREMENT.hourly, _value: 5 }];
-                }
-                for (const r of rows) consumer.next(r, { toObject: v => v });
-                consumer.complete();
-            });
+        queries,
+        async query(org, query, { signal } = {}) {
+            queries.push(query);
+            await new Promise(r => setImmediate(r));
+            if (signal?.aborted) throw signal.reason;
+            const range = /range\(start: (\S+?), stop: (\S+?)\)/.exec(query);
+            if (query.includes(MEASUREMENT.state))
+                return [...admin.fields].map(([_field, _value]) => ({ _field, _value }));
+            if (query.includes("max(column") && query.includes(`from(bucket: "default")`)) {
+                const w = { start: T(range[1]), stop: T(range[2]) };
+                probes.push(w);
+                const t = previous(w.start, w.stop);
+                return t == null ? [] : [{ _time: iso(t) }];
+            }
+            if (query.includes("max(column"))
+                return newest == null ? [] : [{ _time: iso(newest) }];
+            if (query.includes("to(bucket")) {
+                const kind = !query.includes(`from(bucket: "default")`) ? "sum"
+                    : query.includes(MEASUREMENT.daily) ? "day" : "hours";
+                const chunk = { start: T(range[1]), stop: T(range[2]) };
+                all.push({ ...chunk, kind });
+                if (fail_on(chunk, kind)) throw new Error("chunk failed");
+                if (kind == "day") chunks.push(chunk);
+                if (kind != "sum" && has_data(chunk.start, chunk.stop))
+                    return [{ _measurement: MEASUREMENT.hourly, _value: 5 }];
+            }
+            return [];
         },
     };
 }
 
-function make_coverage({ admin = fake_admin(), env = {}, now = T("2026-10-08T10:30:00Z"), ...q } = {}) {
+function make_coverage({ admin = fake_admin(), env = {}, now = T("2026-10-08T10:30:00Z"),
+        log = () => {}, ...q } = {}) {
     const query_api = fake_query_api(admin, q);
+    admin.query = query_api.query;
     const cov = new Coverage({
-        debug, admin, query_api, org: "default", raw_bucket: "default",
+        debug: { bound: () => log }, admin, org: "default", raw_bucket: "default",
         env, now: () => now, sleep: async () => {},
     });
     return { cov, admin, query_api };
@@ -285,6 +297,151 @@ describe("InfluxAdmin", () => {
 });
 
 
+describe("InfluxAdmin.query", () => {
+    const csv = [
+        "#datatype,string,long,dateTime:RFC3339",
+        "#group,false,false,false",
+        "#default,_result,,",
+        ",result,table,_time",
+        ",,0,2026-10-01T10:00:00Z",
+        "",
+    ].join("\r\n");
+    const body = text => (async function* () {
+        const bytes = new TextEncoder().encode(text);
+        /* Split the body so rows cross chunk boundaries. */
+        for (let i = 0; i < bytes.length; i += 7) yield bytes.slice(i, i + 7);
+    })();
+
+    test("posts the Flux with the annotated CSV dialect and parses the rows", async () => {
+        const seen = [];
+        const fetch = async (url, init) => {
+            seen.push({ url, ...init });
+            return { ok: true, status: 200, body: body(csv) };
+        };
+        const admin = new InfluxAdmin({ url: "http://influx", token: "secret", fetch });
+        const ctl = new AbortController();
+        const rows = await admin.query("my org", "from(bucket: \"x\")", { signal: ctl.signal });
+        expect(rows).toEqual([{ result: "_result", table: 0, _time: "2026-10-01T10:00:00Z" }]);
+        expect(seen[0].url).toBe("http://influx/api/v2/query?org=my+org");
+        expect(seen[0].signal).toBe(ctl.signal);
+        expect(seen[0].headers.Authorization).toBe("Token secret");
+        const sent = JSON.parse(seen[0].body);
+        expect(sent.query).toBe("from(bucket: \"x\")");
+        expect(sent.dialect.annotations).toEqual(["datatype", "group", "default"]);
+    });
+
+    test("an error status throws without the token", async () => {
+        const fetch = async () => ({ ok: false, status: 400, text: async () => "bad flux" });
+        const admin = new InfluxAdmin({ url: "http://influx", token: "secret", fetch });
+        const err = await admin.query("o", "x").catch(e => e);
+        expect(err.statusCode).toBe(400);
+        expect(err.message).toContain("bad flux");
+        expect(err.message).not.toContain("secret");
+    });
+});
+
+/* An admin whose queries never answer until aborted, like a query
+ * InfluxDB is still running. It records each request's signal. */
+function hanging_admin() {
+    const admin = fake_admin();
+    admin.signals = [];
+    admin.query = (org, flux, { signal }) => new Promise((_, reject) => {
+        admin.signals.push(signal);
+        signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    });
+    return admin;
+}
+
+describe("cancelling queries", () => {
+    test("a query that times out is aborted, so InfluxDB drops it", async () => {
+        const admin = hanging_admin();
+        const cov = new Coverage({ debug, admin, org: "default", raw_bucket: "default",
+            env: { COVERAGE_TIMEOUT_MS: "20" } });
+        const err = await cov.rows("from(bucket: \"default\")").catch(e => e);
+        expect(err.message).toBe("query timed out after 0 s");
+        expect(admin.signals).toHaveLength(1);
+        expect(admin.signals[0].aborted).toBe(true);
+        expect(cov.inflight.size).toBe(0);
+    });
+
+    test("stop() aborts the query in flight and ends the backfill", async () => {
+        const admin = hanging_admin();
+        const cov = new Coverage({ debug, admin, org: "default", raw_bucket: "default", env: {} });
+        cov.ids = { org_id: "o1" };
+        const run = cov.backfill().catch(e => e);
+        await new Promise(r => setImmediate(r));
+        expect(admin.signals).toHaveLength(1);
+        cov.stop();
+        expect(admin.signals[0].aborted).toBe(true);
+        expect((await run).message).toBe("stopped");
+        await expect(cov.rows("x")).rejects.toThrow("stopped");
+    });
+
+    test("the default timeout is ten minutes", () => {
+        const { cov } = make_coverage();
+        expect(cov.timeout_ms).toBe(10 * 60 * 1000);
+    });
+});
+
+describe("failures", () => {
+    test("retries back off from 15 minutes to 6 hours", () => {
+        const MIN = 60 * 1000;
+        expect([0, 1, 2, 3, 4, 5, 6, 50].map(n => retry_delay(n) / MIN))
+            .toEqual([15, 30, 60, 120, 240, 360, 360, 360]);
+    });
+
+    test("a failing backfill waits longer each time and logs one line with the step", async () => {
+        const lines = [];
+        const log = (...args) => lines.push(args);
+        const { cov, query_api } = make_coverage({ log, earliest: T("2026-10-01T00:00:00Z"),
+            fail_on: (c, kind) => true });
+        cov.repair_days = 0;
+        cov.refresh = async () => {};
+        const waits = [];
+        cov.at = (ms, fn) => waits.push({ ms, fn });
+        cov.every = () => {};
+
+        await cov.run();
+        for (let i = 0; i < 4; i++) {
+            await vi.waitFor(() => expect(waits).toHaveLength(i + 1));
+            if (i < 3) waits[i].fn();
+        }
+        cov.stop();
+        expect(waits.map(w => w.ms / 60000)).toEqual([15, 30, 60, 120]);
+
+        const failed = lines.filter(l => String(l[0]).startsWith("Coverage %s failed") && l[1] == "backfill");
+        expect(failed).toHaveLength(4);
+        expect(failed[0]).toEqual(["Coverage %s failed while %s: %s%s", "backfill",
+            "summarising the day from 2026-10-07T23:00:00.000Z", "chunk failed",
+            "; retrying in 15 min"]);
+        expect(cov.status().error).toBe("backfill_failed");
+        /* Each failed day was tried whole, then hour by hour; nothing
+         * else ran. */
+        expect(query_api.all.every(c => c.kind != "sum")).toBe(true);
+    });
+
+    test("a success resets the backoff", async () => {
+        let fail = true;
+        const { cov } = make_coverage({ earliest: T("2026-10-07T00:00:00Z"),
+            fail_on: () => fail });
+        cov.repair_days = 0;
+        cov.refresh = async () => {};
+        const waits = [];
+        cov.at = (ms, fn) => waits.push({ ms, fn });
+        cov.every = () => {};
+        await cov.run();
+        await vi.waitFor(() => expect(waits).toHaveLength(1));
+        waits[0].fn();
+        await vi.waitFor(() => expect(waits).toHaveLength(2));
+        expect(cov.failures).toBe(2);
+        fail = false;
+        waits[1].fn();
+        await vi.waitFor(() => expect(cov.failures).toBe(0));
+        cov.stop();
+    });
+});
+
+
 /*
  * ---------------------------------------------------------------
  * Backfill and repair
@@ -294,24 +451,104 @@ describe("InfluxAdmin", () => {
 describe("backfill", () => {
     const now = T("2026-10-08T10:30:00Z");
     const earliest = T("2026-10-05T13:00:00Z");
+    const days = list => list.map(c => iso(c.start));
 
-    test("starts with today and works back to the oldest point", async () => {
+    test("starts with today and works back to the oldest data", async () => {
         const { cov, admin, query_api } = make_coverage({ now, earliest });
         await cov.ensure();
         const state = await cov.backfill();
 
         /* London days: midnight is 23:00 UTC in October. Today stops at
-         * the last closed hour. */
+         * the last closed hour. Below the oldest day there is one empty
+         * day, then only probes. */
         expect(query_api.chunks.map(c => [iso(c.start), iso(c.stop)])).toEqual([
             ["2026-10-07T23:00:00.000Z", "2026-10-08T10:00:00.000Z"],
             ["2026-10-06T23:00:00.000Z", "2026-10-07T23:00:00.000Z"],
             ["2026-10-05T23:00:00.000Z", "2026-10-06T23:00:00.000Z"],
             ["2026-10-04T23:00:00.000Z", "2026-10-05T23:00:00.000Z"],
+            ["2026-10-03T23:00:00.000Z", "2026-10-04T23:00:00.000Z"],
         ]);
         expect(state.complete).toBe(true);
         expect(admin.fields.get("complete")).toBe(true);
-        expect(admin.fields.get("backfilled_to")).toBe(T("2026-10-04T23:00:00Z"));
+        expect(admin.fields.get("oldest_data")).toBe(T("2026-10-04T23:00:00Z"));
         expect(admin.fields.get("rule")).toBe(RULE_VERSION);
+        expect(cov.status().backfill.oldestData).toBe("2026-10-04T23:00:00.000Z");
+    });
+
+    test("stops after a year of empty days below the oldest data", async () => {
+        const { cov, admin, query_api } = make_coverage({ now, earliest });
+        await cov.ensure();
+        await cov.backfill();
+        const oldest = T("2026-10-04T23:00:00Z");
+        const to = admin.fields.get("backfilled_to");
+        expect(oldest - to).toBeGreaterThanOrEqual(365 * DAY);
+        expect(oldest - to).toBeLessThan(400 * DAY);
+        /* 13 probes of 30 days cover the year; none goes further. */
+        expect(query_api.probes).toHaveLength(13);
+        expect(query_api.probes[0].stop).toBe(T("2026-10-03T23:00:00Z"));
+    });
+
+    test("never queries the whole history: every query has a bounded range", async () => {
+        const { cov, query_api } = make_coverage({ now, earliest });
+        await cov.ensure();
+        await cov.backfill();
+        for (const p of query_api.probes)
+            expect(p.stop - p.start).toBeLessThanOrEqual(31 * DAY);
+        for (const c of query_api.all)
+            expect(c.stop - c.start).toBeLessThanOrEqual(25 * HOUR);
+        /* The raw bucket is never read from the start of time. */
+        const raw = query_api.queries.filter(q => q.includes(`from(bucket: "default")`));
+        expect(raw.some(q => /range\(start: (0|2000-01-01T00:00:00.000Z)[,)]/.test(q))).toBe(false);
+        expect(raw.some(q => q.includes("limit(n: 1)"))).toBe(false);
+    });
+
+    test("an empty-run setting changes where it stops", async () => {
+        const { cov, query_api } = make_coverage({ now, earliest,
+            env: { COVERAGE_BACKFILL_EMPTY_DAYS: "60" } });
+        await cov.ensure();
+        await cov.backfill();
+        expect(query_api.probes).toHaveLength(2);
+        expect(cov.status().backfillEmptyDays).toBe(60);
+    });
+
+    test("finds data below a gap shorter than the empty run", async () => {
+        /* Data now, then a 200-day gap, then a month of older data. */
+        const gap_to = T("2026-03-01T00:00:00Z"), old_from = T("2026-02-01T00:00:00Z");
+        const in_data = (a, b) => b > T("2026-10-08T00:00:00Z") || (b > old_from && a < gap_to);
+        const { cov, admin, query_api } = make_coverage({ now,
+            has_data: in_data,
+            previous: (a, b) => b > T("2026-10-08T00:00:00Z") ? b - 1
+                : a < gap_to && b > old_from ? Math.min(b, gap_to) - 1 : null });
+        await cov.ensure();
+        await cov.backfill();
+        const d = days(query_api.chunks);
+        expect(d.slice(0, 2)).toEqual(["2026-10-07T23:00:00.000Z", "2026-10-06T23:00:00.000Z"]);
+        /* The probes jump straight to the last day before the gap. */
+        expect(d[2]).toBe("2026-02-28T00:00:00.000Z");
+        expect(admin.fields.get("oldest_data")).toBe(T("2026-02-01T00:00:00Z"));
+        expect(admin.fields.get("complete")).toBe(true);
+    });
+
+    test("leaves data below a longer gap, unless COVERAGE_BACKFILL_FROM reaches it", async () => {
+        /* Data now, and a stray day 500 days ago (a bad device clock). */
+        const stray = T("2025-05-26T12:00:00Z");
+        const in_stray = (a, b) => a <= stray && stray < b;
+        const opts = { now,
+            has_data: (a, b) => b > T("2026-10-08T00:00:00Z") || in_stray(a, b),
+            previous: (a, b) => b > T("2026-10-08T00:00:00Z") ? b - 1
+                : in_stray(a, b) ? stray : null };
+
+        const plain = make_coverage(opts);
+        await plain.cov.ensure();
+        await plain.cov.backfill();
+        expect(days(plain.query_api.chunks)).not.toContain("2025-05-25T23:00:00.000Z");
+        expect(plain.admin.fields.get("complete")).toBe(true);
+
+        const from = make_coverage({ ...opts, env: { COVERAGE_BACKFILL_FROM: "2025-05-01T00:00:00Z" } });
+        await from.cov.ensure();
+        await from.cov.backfill();
+        expect(days(from.query_api.chunks)).toContain("2025-05-25T23:00:00.000Z");
+        expect(from.admin.fields.get("backfilled_to")).toBeLessThanOrEqual(T("2025-05-01T00:00:00Z"));
     });
 
     test("resumes from the marker after a restart and repeats a failed chunk", async () => {
@@ -321,7 +558,9 @@ describe("backfill", () => {
         const first = make_coverage({ admin, now, earliest,
             fail_on: c => failing && c.start >= bad && c.start < bad + DAY });
         await first.cov.ensure();
-        await expect(first.cov.backfill()).rejects.toThrow("chunk failed");
+        const err = await first.cov.backfill().catch(e => e);
+        expect(err.message).toBe("chunk failed");
+        expect(err.step).toBe("summarising the day from 2026-10-05T23:00:00.000Z");
         expect(first.query_api.chunks).toHaveLength(2);
         expect(admin.fields.get("backfilled_to")).toBe(T("2026-10-06T23:00:00Z"));
         expect(admin.fields.get("complete")).toBe(false);
@@ -331,49 +570,68 @@ describe("backfill", () => {
         const second = make_coverage({ admin, now: now + 3 * HOUR, earliest });
         await second.cov.ensure();
         await second.cov.backfill();
-        expect(second.query_api.chunks.map(c => iso(c.start))).toEqual([
-            "2026-10-05T23:00:00.000Z", "2026-10-04T23:00:00.000Z"]);
+        expect(days(second.query_api.chunks)).toEqual([
+            "2026-10-05T23:00:00.000Z", "2026-10-04T23:00:00.000Z", "2026-10-03T23:00:00.000Z"]);
         expect(admin.fields.get("complete")).toBe(true);
+    });
+
+    test("a restart in the middle of an empty run keeps the count", async () => {
+        const { cov, admin } = make_coverage({ now, earliest });
+        await cov.ensure();
+        await cov.backfill();
+        /* Pretend the process stopped 300 days into the empty run. */
+        const oldest = admin.fields.get("oldest_data");
+        admin.fields.set("complete", false);
+        admin.fields.set("backfilled_to", oldest - 300 * DAY);
+        const again = make_coverage({ admin, now, earliest });
+        await again.cov.ensure();
+        await again.cov.backfill();
+        /* One empty day, then probes for the 65 days left. */
+        expect(again.query_api.chunks).toHaveLength(1);
+        expect(again.query_api.probes).toHaveLength(3);
     });
 
     test("jumps over empty days to the next day with data", async () => {
         const early = T("2026-06-01T08:00:00Z");
         const with_data = T("2026-09-10T12:00:00Z");
-        const { cov, query_api, admin } = make_coverage({ now, earliest: early,
-            has_data: start => start >= T("2026-10-07T00:00:00Z")
-                || (start <= with_data && with_data < start + DAY) || start < early,
-            previous: stop => stop > with_data ? with_data : early });
+        const at = (a, b, t) => a <= t && t < b;
+        const { cov, query_api, admin } = make_coverage({ now,
+            has_data: (a, b) => b > T("2026-10-08T00:00:00Z") || at(a, b, with_data) || at(a, b, early),
+            previous: (a, b) => b > T("2026-10-08T00:00:00Z") ? b - 1
+                : at(a, b, with_data) ? with_data : at(a, b, early) ? early : null });
         await cov.ensure();
         await cov.backfill();
-        const days = query_api.chunks.map(c => iso(c.start));
         /* Today, the empty day before, then straight to the day with
-         * data, the empty day below it, then the oldest day. */
-        expect(days).toEqual([
+         * data, the empty day below it, then the oldest day and the
+         * empty day below that. */
+        expect(days(query_api.chunks)).toEqual([
             "2026-10-07T23:00:00.000Z", "2026-10-06T23:00:00.000Z",
-            "2026-09-09T23:00:00.000Z",
-            "2026-09-08T23:00:00.000Z", "2026-05-31T23:00:00.000Z"]);
+            "2026-09-09T23:00:00.000Z", "2026-09-08T23:00:00.000Z",
+            "2026-05-31T23:00:00.000Z", "2026-05-30T23:00:00.000Z"]);
+        expect(admin.fields.get("oldest_data")).toBe(T("2026-05-31T23:00:00Z"));
         expect(admin.fields.get("complete")).toBe(true);
     });
 
     test("a day too large for one query is counted by the hour", async () => {
+        const today = T("2026-10-07T23:00:00Z");
         const { cov, query_api } = make_coverage({ now, earliest: T("2026-10-08T07:30:00Z"),
-            fail_on: (c, kind) => kind == "day" });
+            fail_on: (c, kind) => kind == "day" && c.start >= today });
         await cov.ensure();
         const state = await cov.backfill();
-        const kinds = query_api.all.map(c => c.kind);
+        const kinds = query_api.all.filter(c => c.start >= today).map(c => c.kind);
         /* 00:00 to 10:00 London on the first day: 11 hours from 23:00 UTC. */
-        expect(kinds.filter(k => k == "hours")).toHaveLength(11);
-        expect(kinds[kinds.length - 1]).toBe("sum");
+        expect(kinds).toEqual(["day", ...Array(11).fill("hours"), "sum"]);
         expect(state.complete).toBe(true);
     });
 
-    test("ignores raw points before COVERAGE_MIN_TIME", async () => {
-        const { cov } = make_coverage({ env: { COVERAGE_MIN_TIME: "2020-01-01T00:00:00Z" } });
-        const seen = [];
-        cov.rows = async q => { seen.push(q); return []; };
-        await cov.find_earliest();
-        expect(seen[0]).toContain("range(start: 2020-01-01T00:00:00.000Z)");
-        expect(cov.status().minTime).toBe("2020-01-01T00:00:00.000Z");
+    test("never summarises raw points before COVERAGE_MIN_TIME", async () => {
+        const { cov, admin, query_api } = make_coverage({ now, earliest: T("2020-01-01T00:00:00Z"),
+            env: { COVERAGE_MIN_TIME: "2026-10-01T00:00:00Z" } });
+        await cov.ensure();
+        await cov.backfill();
+        expect(days(query_api.chunks).at(-1)).toBe("2026-09-30T23:00:00.000Z");
+        expect(admin.fields.get("complete")).toBe(true);
+        expect(cov.status().minTime).toBe("2026-10-01T00:00:00.000Z");
     });
 
     test("a complete backfill does nothing on restart", async () => {
@@ -384,6 +642,7 @@ describe("backfill", () => {
         await again.cov.ensure();
         await again.cov.backfill();
         expect(again.query_api.chunks).toEqual([]);
+        expect(again.query_api.probes).toEqual([]);
     });
 
     test("stops at COVERAGE_BACKFILL_FROM", async () => {
@@ -391,15 +650,18 @@ describe("backfill", () => {
             env: { COVERAGE_BACKFILL_FROM: "2026-10-07T12:00:00Z" } });
         await cov.ensure();
         await cov.backfill();
-        expect(query_api.chunks.map(c => iso(c.start))).toEqual([
+        expect(days(query_api.chunks)).toEqual([
             "2026-10-07T23:00:00.000Z", "2026-10-06T23:00:00.000Z"]);
     });
 
-    test("an empty raw bucket completes at once", async () => {
-        const { cov, query_api } = make_coverage({ now, earliest: null });
+    test("an empty raw bucket completes after a year of cheap probes", async () => {
+        const { cov, query_api, admin } = make_coverage({ now, earliest: null });
         await cov.ensure();
         expect((await cov.backfill()).complete).toBe(true);
-        expect(query_api.chunks).toEqual([]);
+        expect(query_api.chunks).toHaveLength(1);
+        expect(query_api.probes).toHaveLength(13);
+        expect(admin.fields.get("oldest_data")).toBe(-1);
+        expect(cov.status().backfill.oldestData).toBe(null);
     });
 
     test("a new rebuild request or count rule starts again", () => {
@@ -419,21 +681,48 @@ describe("backfill", () => {
             env: { COVERAGE_REBUILD: "2026-10-09" } });
         await again.cov.ensure();
         await again.cov.backfill();
-        expect(again.query_api.chunks).toHaveLength(5);
+        expect(again.query_api.chunks).toHaveLength(6);
         expect(admin.fields.get("rebuild")).toBe("2026-10-09");
     });
 
-    test("next_chunk and parse_state", () => {
+    test("next_chunk, probe_window, after_probe and parse_state", () => {
         const s = { upper: T("2026-10-08T23:00:00Z"), backfilled_to: T("2026-10-07T23:00:00Z"),
-            complete: false, rule: 1, rebuild: "" };
-        expect(next_chunk(s, earliest)).toEqual({
+            complete: false, rule: 1, rebuild: "", oldest_data: null };
+        const floor = T("2000-01-01T00:00:00Z");
+        expect(next_chunk(s, floor)).toEqual({
             start: T("2026-10-06T23:00:00Z"), stop: T("2026-10-07T23:00:00Z") });
         expect(next_chunk(s, T("2026-10-08T00:00:00Z"))).toBe(null);
-        expect(next_chunk({ ...s, complete: true }, earliest)).toBe(null);
+        expect(next_chunk({ ...s, complete: true }, floor)).toBe(null);
+        /* The empty run counts from the oldest data, or from upper. */
+        expect(next_chunk(s, floor, DAY)).toBe(null);
+        expect(next_chunk(s, floor, 2 * DAY)).not.toBe(null);
+        expect(next_chunk({ ...s, oldest_data: T("2026-10-08T23:00:00Z") + 5 * DAY }, floor, 2 * DAY))
+            .toBe(null);
+
+        /* 30 London days, across the clock change, and never below the
+         * floor's day. */
+        const w = probe_window(T("2026-11-10T00:00:00Z"), floor);
+        expect(iso(w.start)).toBe("2026-10-10T23:00:00.000Z");
+        expect(probe_window(T("2026-11-10T00:00:00Z"), T("2026-11-05T12:00:00Z")).start)
+            .toBe(T("2026-11-05T00:00:00Z"));
+        expect(after_probe(w, null)).toBe(w.start);
+        expect(iso(after_probe(w, T("2026-10-20T10:00:00Z")))).toBe("2026-10-20T23:00:00.000Z");
+
         expect(parse_state([])).toBe(null);
         expect(parse_state([{ _field: "upper", _value: 5 }, { _field: "backfilled_to", _value: "4" },
             { _field: "complete", _value: "true" }])).toMatchObject({
-            upper: 5, backfilled_to: 4, complete: true });
+            upper: 5, backfilled_to: 4, complete: true, oldest_data: null });
+        expect(parse_state([{ _field: "upper", _value: 5 }, { _field: "backfilled_to", _value: 4 },
+            { _field: "oldest_data", _value: -1 }]).oldest_data).toBe(null);
+    });
+
+    test("the probe is a pushed-down last() over its window only", () => {
+        const q = previous_query({ raw_bucket: "default",
+            start: T("2026-09-01T00:00:00Z"), stop: T("2026-10-01T00:00:00Z") });
+        expect(q).toContain("range(start: 2026-09-01T00:00:00.000Z, stop: 2026-10-01T00:00:00.000Z)");
+        /* last() must follow the filters directly, so InfluxDB runs it
+         * in the storage engine. */
+        expect(q).toMatch(/filter\(fn: \(r\) => r\._measurement != "Schema_UUID:s"[^\n]*\)\n  \|> last\(\)/);
     });
 
     test("repair covers the last 7 full London days, newest first", async () => {

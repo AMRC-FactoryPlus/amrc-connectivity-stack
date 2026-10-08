@@ -54,6 +54,8 @@ export const MAX_METRICS = 100;
 export const MAX_METRIC_LENGTH = 512;
 
 const CONTROL_rx = /[\u0000-\u001f\u007f]/;
+/* The datatype suffix the historian appends to measurement names. */
+const SUFFIX_rx = /:[iudbs]$/;
 
 /* Returns an error message, or null if the selector is acceptable. */
 function metric_selector_error(value, field) {
@@ -101,6 +103,11 @@ export function parse_download_filter(body) {
 
             if (m.startsWith("/") || m.endsWith("/") || m.includes("//"))
                 return { error: `metrics[${i}] has an empty path segment` };
+
+            if (SUFFIX_rx.test(m))
+                return { error: `metrics[${i}] ends in a datatype suffix; `
+                    + "selectors never include the :i/:u/:d/:b/:s suffix, "
+                    + "every suffix is matched" };
         }
 
         return { filter: { metrics: [...new Set(metrics)] } };

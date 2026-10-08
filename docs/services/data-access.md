@@ -158,18 +158,21 @@ The request body is optional. An empty or absent body exports everything
 in the dataset. The body can contain one of these filters:
 
 * **`metrics`** (array of strings): export only the listed metrics.
-  Each entry is a metric selector:
+  The service reads one Influx bucket (`INFLUXDB_BUCKET`, by default the
+  Sparkplug historian's bucket), so these rules describe how the
+  Sparkplug historian stores points. Each entry is a metric selector:
   * An entry that contains `/` is a full Sparkplug metric path, for
     example `Axis/X/Position`. It matches points whose `path` tag is
     `Axis/X` and whose measurement name is `Position` (with any
-    datatype suffix). The historians write the part of the metric name
-    before the last `/` as the `path` tag and the part after it as the
-    measurement.
+    datatype suffix). The Sparkplug historian writes the part of the
+    metric name before the last `/` as the `path` tag and the part after
+    it as the measurement.
   * An entry without `/`, for example `Position`, matches that metric
     name at any path, including metrics at the top level of the
     device.
   * Names never include the `:x` datatype suffix; every suffix is
-    matched.
+    matched. An entry that ends in `:i`, `:u`, `:d`, `:b` or `:s` is
+    rejected with `422`.
   * A point is exported if it matches any entry.
 
   The list must have between 1 and 100 entries. Each entry must be a
@@ -179,6 +182,8 @@ in the dataset. The body can contain one of these filters:
 * **`measurement`** (string, **deprecated**): export only the one Influx
   `_measurement` that exactly equals this value. The value must include
   the datatype suffix, for example `Position:d`. Use `metrics` instead.
+  An absent, `null` or empty `measurement` is ignored. Any other
+  non-string value is rejected with `422`.
 
 A request that sends both filters, or a filter that breaks these rules,
 gets `422` with a JSON body `{ "error": "<reason>" }`. Every filter

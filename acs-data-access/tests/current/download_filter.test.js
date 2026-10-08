@@ -195,12 +195,30 @@ describe("parse_download_filter", () => {
     ["a trailing slash", { metrics: ["A/"] }],
     ["a double slash", { metrics: ["A//B"] }],
     ["both fields", { metrics: ["A"], measurement: "A:d" }],
+    ["a name with a suffix", { metrics: ["Position:d"] }],
+    ["a path with a suffix", { metrics: ["Axis/X/Position:s"] }],
+    ["a later entry with a suffix", { metrics: ["A", "B:i"] }],
     ["a non-string measurement", { measurement: 7 }],
     ["an array measurement", { measurement: ["A"] }],
     ["an overlong measurement", { measurement: "x".repeat(MAX_METRIC_LENGTH + 1) }],
     ["a measurement with a newline", { measurement: "a\nb" }],
   ])("rejects %s", (_, body) => {
     expect(parse_download_filter(body).error).toEqual(expect.any(String));
+  });
+
+  test("explains a suffixed selector", () => {
+    expect(parse_download_filter({ metrics: ["Position:d"] }).error)
+      .toMatch(/metrics\[0\].*suffix/);
+  });
+
+  test.each(["Ratio:x", "Mode:", "a:b/Name", "Position:dd", "Clock:12"])(
+    "accepts %j, which is not a suffix", m => {
+      expect(parse_download_filter({ metrics: [m] }).error).toBeUndefined();
+    });
+
+  test("ignores an empty measurement next to metrics", () => {
+    expect(parse_download_filter({ metrics: ["A"], measurement: "" }))
+      .toEqual({ filter: { metrics: ["A"] } });
   });
 
   test("accepts exactly the maximum", () => {
@@ -289,6 +307,14 @@ async function post(api, body) {
 }
 
 describe("dataset_data", () => {
+  test("returns 422 for a suffixed selector", async () => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, { metrics: ["Folder/Temp:d"] });
+    expect(res.code).toBe(422);
+    expect(res.body.error).toMatch(/suffix/);
+    expect(queries).toEqual([]);
+  });
+
   test("returns 422 with a reason for an invalid filter", async () => {
     const { api, queries } = make_api();
     const { res } = await post(api, { metrics: [42] });

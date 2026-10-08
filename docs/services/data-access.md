@@ -199,7 +199,9 @@ one dataset, over a time window. Per bucket, it returns:
 * `mean` and `n`: the mean and number of points of chosen metrics.
 * `last`: the time of each device's newest data point.
 
-The route reads the raw InfluxDB bucket (`INFLUXDB_BUCKET`).
+The route reads the raw InfluxDB bucket (`INFLUXDB_BUCKET`). Counts
+at `1h` or coarser read the coverage summary instead, when it is ready
+(see [Coverage summary](#coverage-summary)).
 
 #### Request
 
@@ -275,11 +277,20 @@ days the clocks change.
   is the `unit` tag of the newest point.
 * `asOf` is the server time when the query ran. A bucket that ends after
   `asOf` is partial.
-* `source` is always `raw` in this version.
+* `source` says where the counts came from: `raw` (the raw bucket),
+  `coverage` (the coverage summary) or `mixed` (the summary, plus the
+  newest hours, or hours the backfill has not reached, from raw data).
+  Means and `last` always come from raw data.
+* `pending` is present only when part of the window has no counts yet,
+  because the backfill has not reached it and it is too long to count
+  from raw data. It lists those ranges as `[from, to]` ISO pairs. A
+  client can show "still building history" for them and ask again
+  later.
 * `denied` lists requested devices the caller may not read.
 
 The response has `Cache-Control: private, max-age=300` when `to` is more
-than two buckets before `asOf`, and `no-store` otherwise.
+than two buckets before `asOf` and nothing is pending, and `no-store`
+otherwise.
 
 #### Permissions
 
@@ -299,7 +310,8 @@ Limit | Value
 Devices per request (or per dataset) | 500
 `mean` metrics per request | 50
 Buckets per series | 2000
-Span for `count` | 14 days
+Span for `count` below `1h` | 14 days
+Span for `count` at `1h` or coarser | 10 years with the coverage summary ready; 14 days without it
 Span for `mean` | 400 days
 `last` lookback | 90 days
 Query time | 30 seconds (`SERIES_TIMEOUT_MS`)
@@ -321,6 +333,37 @@ Status | When
 
 `413` and `422` responses have a JSON body with `error` and `message`
 fields.
+
+### `GET v1/coverage/status`
+
+Returns the state of the coverage summary. Any authenticated client may
+read it; it holds no data.
+
+```json
+{
+  "enabled": true,
+  "ready": true,
+  "bucket": "acs_coverage",
+  "task": {
+    "name": "acs-coverage", "id": "<task ID>", "status": "active",
+    "last_run": { "status": "success", "scheduledFor": "2026-10-08T09:00:00Z", "finishedAt": "2026-10-08T09:05:01Z" }
+  },
+  "newestHour": "2026-10-08T08:00:00.000Z",
+  "summarisedTo": "2026-10-08T09:00:00.000Z",
+  "stale": false,
+  "backfill": {
+    "complete": true,
+    "backfilledTo": "2024-03-01T00:00:00.000Z",
+    "upper": "2026-10-08T23:00:00.000Z",
+    "earliestRaw": "2024-03-01T09:12:40.000Z"
+  },
+  "error": null
+}
+```
+
+`stale` is `true` when the newest summarised hour is more than 3 hours
+old. Data Access also logs a warning then. `error` is the last
+provisioning, backfill or repair failure, or `null`.
 
 ### `GET v1/structure`
 
@@ -444,6 +487,107 @@ plain-HTTP path. `metadata_search`/`structure_search` build their child
 list from `allowed_valid_dataset_uuids`/`allowed_all_dataset_uuids`
 respectively, matching the GET-list endpoints' permission and validity
 filtering.
+
+## Coverage summary
+
+Timelines show, for each device, how much data arrived in each hour,
+day or week. Counting the raw bucket over months is slow, so Data
+Access keeps a small summary in its own InfluxDB bucket.
+
+### What it holds
+
+The bucket `acs_coverage` never expires and has 30-day shard groups. It
+holds:
+
+Measurement | Field | Tags | One point per
+---|---|---|---
+`coverage` | `count` (integer) | `topLevelInstance` | device per hour with data
+`coverage_daily` | `count` (integer) | `topLevelInstance` | device per Europe/London day with data
+`coverage_state` | backfill marker | none | (one point at time 0)
+
+The count rule is the same as `POST v1/series` uses on raw data: every
+point of the `value` field counts, except birth metadata
+(`Schema_UUID:s` and `Instance_UUID:s`). Each series is counted on its
+own and the counts are summed per device. Device names are not stored,
+because a renamed device would split its series.
+
+### How it is kept up to date
+
+On every start, Data Access:
+
+1. Creates the bucket if it is missing.
+2. Creates the InfluxDB task `acs-coverage` if it is missing, or
+   replaces its Flux if it differs from the version this image ships.
+   Data Access uses its existing InfluxDB token (`INFLUXDB_TOKEN`), so
+   the task runs as the owner of that token. An inactive task is left
+   inactive.
+3. Starts the backfill, then schedules the daily repair.
+
+A fresh install and an upgrade both get the summary this way, with no
+Helm hook. If InfluxDB is unreachable, Data Access retries with backoff
+and the series route counts raw data meanwhile.
+
+The task runs every hour at 5 minutes past. Each run recounts the last
+6 closed hours and overwrites them, which absorbs late data from
+batching and short store-and-forward. It then rewrites the daily sums
+for the days those hours touch.
+
+The **backfill** summarises one Europe/London day at a time, from today
+back to the oldest raw point. After each day it writes the marker, so a
+restart resumes where it stopped, and a day that failed runs again.
+It runs one query at a time, outside the series route's limiter, and
+waits after each day at least as long as that day took (and at least
+`COVERAGE_PAUSE_MS`), so it uses no more than half of one query slot.
+In production-sized history, expect about a second of query time per
+day of history.
+
+The **daily repair** runs at 03:00 Europe/London. It re-summarises the
+last 7 full days, to catch store-and-forward data that arrived after the
+task's 6-hour recount.
+
+### How the series route uses it
+
+When `count` is requested at `1h`, `6h`, `1d` or `1w` and the summary is
+ready:
+
+* `1h` and `6h` read `coverage`. `1d` and `1w` read `coverage_daily` for
+  whole days, and `coverage` for part-days at the edges of the window.
+* The hours after the newest summarised hour come from raw data.
+* Hours older than the backfill marker come from raw data if all the
+  raw parts fit within 14 days. Otherwise they are listed in `pending`.
+* The summary has nothing finer than an hour, so a window edge inside
+  an hour counts that whole hour.
+
+Sub-hour steps always count raw data, with the 14-day limit.
+
+### Settings
+
+All settings are environment variables on the Data Access deployment.
+The defaults need no change.
+
+Variable | Default | Meaning
+---|---|---
+`COVERAGE_ENABLED` | `true` | `false` turns off provisioning, backfill, repair and coverage reads.
+`COVERAGE_BUCKET` | `acs_coverage` | The summary bucket.
+`COVERAGE_TASK` | `acs-coverage` | The InfluxDB task name.
+`COVERAGE_RECOUNT_HOURS` | `6` | Closed hours each task run recounts (1 to 48).
+`COVERAGE_BACKFILL` | `true` | `false` skips the backfill. The summary is then not used until a marker exists.
+`COVERAGE_BACKFILL_FROM` | (oldest raw point) | An ISO date-time the backfill stops at.
+`COVERAGE_PAUSE_MS` | `1000` | Minimum pause between backfill and repair days.
+`COVERAGE_REPAIR_DAYS` | `7` | Full days the daily repair covers. `0` turns it off.
+`COVERAGE_REBUILD` | (empty) | Any new value starts the backfill again from today. Data Access records the value, so the rebuild runs once per value. A rebuild overwrites hours that have data; it does not remove hours that no longer have any.
+
+### Caveats
+
+* If raw data is deleted from the raw bucket, the summary still counts
+  it. The daily repair covers only 7 days, and a recount writes only
+  hours that still have data. To rebuild from scratch, delete the
+  `acs_coverage` bucket and restart Data Access: it creates the bucket
+  and backfills again.
+* If two Data Access replicas run, both backfill. The writes are
+  idempotent, so this costs only duplicate work.
+* Task run logs stay in the `_tasks` bucket for 3 days. Use
+  `GET v1/coverage/status`, or `influx task run list`, to see failures.
 
 ## Known gaps
 

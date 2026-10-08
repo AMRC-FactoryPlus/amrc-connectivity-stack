@@ -11,8 +11,12 @@ import pLimit from "p-limit";
 import {
     count_query, mean_query, last_query,
     shape_counts, shape_means, shape_last,
-    group_by_windows,
+    group_by_windows, COVERAGE_STEPS,
 } from "./series.js";
+import {
+    MEASUREMENT, plan_count, plan_source, intersect, split_coverage,
+    coverage_query,
+} from "./coverage.js";
 
 /** Why a series request stopped early. */
 export class SeriesAbort extends Error {
@@ -29,6 +33,7 @@ export class SeriesReader {
      * @param opts.influx_bucket The raw data bucket.
      * @param opts.concurrency Queries to run at once (default 4).
      * @param opts.timeout_ms Time allowed for one request (default 30 s).
+     * @param opts.coverage A Coverage, or null to count raw data only.
      */
     constructor(opts) {
         this.log = opts.debug.bound("series");
@@ -37,6 +42,62 @@ export class SeriesReader {
             ?? opts.influx_client.getQueryApi(opts.influx_org);
         this.limit = pLimit(Number(opts.concurrency) || 4);
         this.timeout_ms = Number(opts.timeout_ms) || 30000;
+        this.coverage = opts.coverage ?? null;
+    }
+
+    /** What the coverage summary holds, or null if it is not ready. */
+    coverage_state() {
+        return this.coverage?.read_state() ?? null;
+    }
+
+    /** Whether counts for this request can read the summary. */
+    uses_coverage(req, state = this.coverage_state()) {
+        return req.count && state != null && COVERAGE_STEPS.has(req.every);
+    }
+
+    /** Counts per device per bucket. At 1h or coarser, with the summary
+     * ready, the summary answers the hours it holds and raw data answers
+     * the rest (the newest hours, and old hours the backfill has not
+     * reached, if they fit within the raw count limit).
+     * @returns {counts: Map, source, pending: [[a, b]]} */
+    async counts(req, groups, signal) {
+        const { every } = req;
+        const bucket = this.bucket;
+        const state = this.coverage_state();
+
+        if (!this.uses_coverage(req, state)) {
+            const parts = await Promise.all(groups.map(g =>
+                this.query_rows(count_query({ bucket, every, ...g }), signal)));
+            return { counts: shape_counts(parts.flat(), every), source: "raw", pending: [] };
+        }
+
+        const plan = plan_count({ from: req.from, to: req.to, state });
+        const cov_bucket = this.coverage.bucket;
+        const queries = [];
+        for (const g of groups) {
+            const raw = intersect(g.windows, plan.raw);
+            if (raw.length)
+                queries.push(count_query({ bucket, every, devices: g.devices, windows: raw }));
+
+            if (!plan.coverage) continue;
+            const { hourly, daily } = split_coverage(
+                intersect(g.windows, [plan.coverage]), every);
+            for (const [measurement, spans] of [
+                [MEASUREMENT.hourly, hourly], [MEASUREMENT.daily, daily],
+            ]) {
+                const q = coverage_query({
+                    bucket: cov_bucket, measurement, devices: g.devices, spans, every,
+                });
+                if (q) queries.push(q);
+            }
+        }
+
+        const parts = await Promise.all(queries.map(q => this.query_rows(q, signal)));
+        return {
+            counts: shape_counts(parts.flat(), every),
+            source: plan_source(plan),
+            pending: plan.pending,
+        };
     }
 
     /** Returns an AbortController that aborts after the timeout. */
@@ -78,18 +139,14 @@ export class SeriesReader {
      * @param windows Map of permitted device UUID to its windows.
      * @param as_of The request time in ms.
      * @param signal An AbortSignal.
-     * @returns {counts: Map|null, metrics: Array, last: Map|null}
+     * @returns {counts: Map|null, source, pending, metrics: Array, last: Map|null}
      */
     async run(req, windows, as_of, signal) {
         const { every } = req;
         const bucket = this.bucket;
         const groups = group_by_windows(windows);
 
-        const counts = req.count
-            ? Promise.all(groups.map(g =>
-                this.query_rows(count_query({ bucket, every, ...g }), signal)))
-                .then(parts => shape_counts(parts.flat(), every))
-            : null;
+        const counts = req.count ? this.counts(req, groups, signal) : null;
 
         const mean_rows = Promise.all(groups.map(g => {
             const in_group = new Set(g.devices);
@@ -109,7 +166,9 @@ export class SeriesReader {
 
         const [c, m, l] = await Promise.all([counts, mean_rows, last]);
         return {
-            counts: c,
+            counts: c?.counts ?? null,
+            source: c?.source ?? "raw",
+            pending: c?.pending ?? [],
             metrics: shape_means(m.flat(), req.mean, every),
             last: l ?? (req.last ? new Map() : null),
         };

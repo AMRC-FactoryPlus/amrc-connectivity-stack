@@ -57,6 +57,9 @@ export class APIv1 {
     api.route("/series")
       .post(this.series.bind(this));
 
+    api.route("/coverage/status")
+      .get(this.coverage_status.bind(this));
+
     api.route("/structure")
       .get(this.structure_list.bind(this))
       .post(this.structure_create.bind(this));
@@ -384,8 +387,10 @@ export class APIv1 {
    */
   async series(req, res) {
     try {
-      const parsed = parse_request(req.body);
       const as_of = Date.now();
+      const parsed = parse_request(req.body, as_of, {
+        coverage: this.seriesReader.coverage_state() != null,
+      });
 
       const scope = parsed.dataset
         ? await this.series_dataset_scope(req.auth, parsed)
@@ -413,13 +418,16 @@ export class APIv1 {
         devices[device] = out;
       }
 
-      res.set("Cache-Control", cache_control(parsed, as_of));
+      /* Pending ranges fill in as the backfill runs: do not cache them. */
+      const pending = result.pending.map(([a, b]) => [iso(a), iso(b)]);
+      res.set("Cache-Control", pending.length ? "no-store" : cache_control(parsed, as_of));
       return res.status(200).json({
         from: iso(parsed.from),
         to: iso(parsed.to),
         every: parsed.every,
         asOf: iso(as_of),
-        source: "raw",
+        source: result.source,
+        ...(pending.length ? { pending } : {}),
         devices,
         metrics: result.metrics,
         denied: scope.denied,
@@ -432,6 +440,16 @@ export class APIv1 {
       }
       throw err;
     }
+  }
+
+  /** GET. The state of the coverage summary: the task, the newest
+   * summarised hour and the backfill. Any authenticated client may read
+   * it; it holds no data. */
+  async coverage_status(req, res) {
+    const coverage = this.seriesReader?.coverage;
+    if (!coverage)
+      return res.status(200).json({ enabled: false });
+    return res.status(200).json(coverage.status());
   }
 
   /** Permission and windows for a dataset request. Reading a dataset

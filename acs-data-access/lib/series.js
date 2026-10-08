@@ -44,11 +44,15 @@ export const LIMITS = {
     buckets: 2000,
     default_points: 300,
     count_span: 14 * DAY,
+    coverage_span: 3653 * DAY,
     mean_span: 400 * DAY,
     last_lookback: 90 * DAY,
     default_lookback: "30d",
     metric_length: 1024,
 };
+
+/** Steps whose counts the coverage summary can answer. */
+export const COVERAGE_STEPS = new Set(["1h", "6h", "1d", "1w"]);
 
 /* Birth metadata the historian writes on every rebirth. These are not
  * data, so they never count as data arriving. */
@@ -238,8 +242,10 @@ function parse_mean(list) {
 }
 
 /** Checks a request body. Returns a normalised request, or throws a
- * SeriesError. Times are epoch milliseconds. */
-export function parse_request(body, now = Date.now()) {
+ * SeriesError. Times are epoch milliseconds.
+ * @param opts.coverage Whether the coverage summary is ready. Counts at
+ *   1h or coarser may then span up to 10 years instead of 14 days. */
+export function parse_request(body, now = Date.now(), opts = {}) {
     if (body == null || typeof body != "object" || Array.isArray(body))
         throw new SeriesError(400, "bad_request", "The body must be a JSON object.");
 
@@ -305,10 +311,18 @@ export function parse_request(body, now = Date.now()) {
         last = { lookback: parse_lookback(body.last) };
     }
 
-    if (count && to - from > LIMITS.count_span)
-        throw invalid(
-            `"count" over more than 14 days needs the coverage summary, which is not available yet.`,
-            { limit: "14d" });
+    if (count && to - from > LIMITS.count_span) {
+        if (!COVERAGE_STEPS.has(every))
+            throw invalid(
+                `"count" over more than 14 days needs "every" of 1h or more.`,
+                { limit: "14d" });
+        if (!opts.coverage)
+            throw invalid(
+                `"count" over more than 14 days needs the coverage summary, which is not available yet.`,
+                { limit: "14d" });
+        if (to - from > LIMITS.coverage_span)
+            throw invalid(`"count" spans may be at most 10 years.`, { limit: "3653d" });
+    }
     if (mean.length && to - from > LIMITS.mean_span)
         throw invalid(`"mean" spans may be at most 400 days.`, { limit: "400d" });
 

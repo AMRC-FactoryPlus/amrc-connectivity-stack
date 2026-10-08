@@ -14,6 +14,7 @@ import { APIv1 } from '../lib/api-v1.js';
 import {DataAccessNotify} from '../lib/notify.js';
 import { InfluxReader } from '../lib/influx-reader.js';
 import { SeriesReader } from '../lib/series-reader.js';
+import { Coverage, InfluxAdmin } from '../lib/coverage-service.js';
 
 const { env } = process;
 
@@ -46,6 +47,17 @@ const influxReader = new InfluxReader({
   influx_bucket: env.INFLUXDB_BUCKET,
 })
 
+// The coverage summary: Data Access creates its bucket and InfluxDB
+// task on every start, then backfills and repairs it in the background.
+const coverage = new Coverage({
+  debug,
+  admin: new InfluxAdmin({ url: env.INFLUXDB_URL, token: env.INFLUXDB_TOKEN }),
+  query_api: influxClient.getQueryApi(env.INFLUXDB_ORG),
+  org: env.INFLUXDB_ORG,
+  raw_bucket: env.INFLUXDB_BUCKET,
+  env,
+});
+
 // The series route has its own limiter and timeout, separate from the
 // CSV export, so a long download does not stall the timeline.
 const seriesReader = new SeriesReader({
@@ -55,6 +67,7 @@ const seriesReader = new SeriesReader({
   influx_bucket: env.INFLUXDB_BUCKET,
   concurrency: env.SERIES_CONCURRENCY,
   timeout_ms: env.SERIES_TIMEOUT_MS,
+  coverage: coverage.enabled ? coverage : null,
 });
 
 const apiv1 = new APIv1({ 
@@ -101,6 +114,10 @@ notify.run();
 
 debug.log("app", "Running Data Access WebAPI")
 api.run();
+
+/* In the background: the series route counts raw data until the
+ * summary is ready. */
+coverage.run();
 
 
 

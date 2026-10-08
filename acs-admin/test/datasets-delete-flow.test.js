@@ -186,4 +186,31 @@ describe('deleting a session and its device list', () => {
         await p
         expect(flow.busy.value).toBe(false)
     })
+
+    it('Try again sends a new request after one that never settled', async () => {
+        fill_store(ds, recs().filter(r => r.uuid === HELPER).map(r => ({ ...r, name: 'Spare devices' })))
+        const sent = []
+        const svc = {
+            DataAccess: {
+                fetch: opts => {
+                    sent.push(opts)
+                    // The first delete never answers; later ones do.
+                    if (sent.length === 1) return new Promise(() => {})
+                    return Promise.resolve([200, null])
+                },
+            },
+        }
+        const deleted = []
+        const flow = createDeleteFlow({ ds, client: () => svc, notify: { deleted: u => deleted.push(u) }, options: { ...fast, timeout: 5 } })
+        flow.open(ds.byUuid[HELPER])
+        await flow.retry()
+        expect(flow.error.value).toMatch(/did not answer in time/)
+        expect(flow.busy.value).toBe(false)
+        await flow.retry()
+        expect(sent).toHaveLength(2)
+        // Each try is its own URL, so it cannot join the one still pending.
+        expect(sent[0].url).toBe(sent[1].url)
+        expect(sent[0].query.attempt).not.toBe(sent[1].query.attempt)
+        expect(deleted).toEqual([HELPER])
+    })
 })

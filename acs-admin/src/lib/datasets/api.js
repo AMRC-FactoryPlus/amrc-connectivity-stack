@@ -374,8 +374,13 @@ export async function update_from_spec (client, rec, spec, byUuid) {
 export async function delete_dataset (client, uuid, { timeout = DELETE_TIMEOUT_MS } = {}) {
     let timer = null
     const late = new Promise(resolve => { timer = setTimeout(() => resolve(null), timeout) })
-    // Never from the browser's cache: each try must reach the service.
-    const answer = await Promise.race([client.DataAccess.fetch({ url: `v1/delete/${uuid}`, cache: 'no-store' }), late]).finally(() => clearTimeout(timer))
+    // Each try is its own request: never from the browser's cache, and
+    // a distinct URL (the service ignores `attempt`), so it cannot join
+    // an earlier request to the same URL that never settled.
+    const answer = await Promise.race([
+        client.DataAccess.fetch({ url: `v1/delete/${uuid}`, query: { attempt: String(++delete_attempt) }, cache: 'no-store' }),
+        late,
+    ]).finally(() => clearTimeout(timer))
     if (!answer) return { ok: false, timedOut: true, reason: 'The service did not answer in time. Check the dataset list before trying again.' }
     const [st, body] = answer
     if (st === 200 || st === 204 || st === 404) return { ok: true }
@@ -404,6 +409,9 @@ export function helper_owner (rec, referrers, byUuid) {
     return owner && own_helper(owner, byUuid)?.uuid === rec?.uuid ? owner : null
 }
 
+// Numbers each delete request, so no two share a URL.
+let delete_attempt = 0
+
 /** How long one delete may take before it counts as failed. */
 export const DELETE_TIMEOUT_MS = 15 * 1000
 
@@ -415,7 +423,7 @@ export async function dataset_exists (client, uuid, { timeout = EXISTS_TIMEOUT_M
     let timer = null
     const late = new Promise(resolve => { timer = setTimeout(() => resolve(null), timeout) })
     try {
-        const answer = await Promise.race([client.DataAccess.fetch({ url: `v1/metadata/${uuid}`, cache: 'no-store' }), late])
+        const answer = await Promise.race([client.DataAccess.fetch({ url: `v1/metadata/${uuid}`, query: { attempt: String(++delete_attempt) }, cache: 'no-store' }), late])
         // No answer in time: assume it is still there.
         return answer ? answer[0] !== 404 : true
     }

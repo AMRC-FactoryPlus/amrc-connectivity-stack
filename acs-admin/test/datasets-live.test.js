@@ -294,5 +294,7 @@ describe('deletes reach the service', () => {
         await delete_in_order(client, ['x'])
         await dataset_exists(client, 'x')
         expect(seen.map(o => o.cache)).toEqual(['no-store', 'no-store'])
+        // Distinct URLs, so neither can join a request still in flight.
+        expect(seen[0].query.attempt).not.toBe(seen[1].query.attempt)
     })
 })

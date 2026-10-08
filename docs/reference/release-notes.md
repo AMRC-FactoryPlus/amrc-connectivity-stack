@@ -416,10 +416,12 @@ example `5m`, stops i3X at startup. A restart drops i3X subscriptions,
 and clients must create them again. On a site with long quiet periods
 in UNS traffic, raise `stallTimeout` or set it to `0`.
 
-### Datasets replace the Data Access page
+### Data Access grows into Datasets
 
-The Admin UI's Data Access page is replaced by **Datasets**, at
-`/datasets` (the old address redirects). It has a timeline of
+The Admin UI's Data Access page grows into **Datasets**, at
+`/datasets`. It keeps the page's dataset model (devices, unions and
+sessions over the Data Access service) and builds on it.
+`/data-access` opens Datasets. Datasets adds a timeline of
 equipment, devices and runs, a list, a page per dataset with charts,
 a builder, one-metric compare across runs, an Add-ons page, and a
 full-screen kiosk at `/kiosk/<equipment>` for recording runs from a

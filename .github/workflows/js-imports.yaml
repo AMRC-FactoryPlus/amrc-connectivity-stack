@@ -7,6 +7,7 @@ name: JS import check
 on:
   pull_request:
     branches:
+      - dev
       - main
       - testing/v4
 

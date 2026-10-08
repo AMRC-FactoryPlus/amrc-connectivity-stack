@@ -15,6 +15,7 @@
   - [Object Model](./configDB/object-model.md)
 - Development
   - [Contributor Guidelines](./development/contributor-guidelines.md)
+  - [Making a Release](./development/releasing.md)
 - Concepts
   - Dynamic Deployment
   - [Index](concepts/dyn-deploy/index.md)

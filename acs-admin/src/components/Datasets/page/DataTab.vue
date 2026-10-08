@@ -91,13 +91,17 @@
 
       <div v-if="entries.length" class="flex flex-wrap items-center gap-2">
         <TimelineToolbar :zoom="labels.zoom ?? ''" :label="labels.label" :date-value="labels.dateValue" :now="data.now.value"
-                         :searchable="false" :minutes="true" :step-text="stepText"
+                         :searchable="false" :fine="true" :step-text="stepText"
                          @go="t => setView(go_view(current, t, maxTo))"
                          @step="d => setView(step_view(current, d, maxTo))"
                          @zoom="z => setView(zoom_view(current, z, chartW, maxTo, nowMs, { live: takesLive, window: win }))"/>
         <span class="text-xs text-slate-500">{{ labels.span }} shown</span>
-        <Button v-if="takesLive && !at_now(current, nowMs, stepMs)" size="sm" variant="ghost" @click="setView(to_now(current, Date.now()))">Back to now</Button>
-        <Button v-else-if="!takesLive && view" size="sm" variant="ghost" @click="view = null">Whole window</Button>
+        <Button v-if="takesLive && !at_now(current, nowMs, stepMs)" size="sm" variant="outline" class="ml-auto" @click="setView(to_now(current, Date.now()))">
+          <i class="fa-solid fa-forward-step mr-2"></i>Back to now
+        </Button>
+        <Button v-else-if="!takesLive && view" size="sm" variant="outline" class="ml-auto" @click="view = null">
+          <i class="fa-solid fa-arrows-left-right-to-line mr-2"></i>Whole window
+        </Button>
       </div>
 
       <Card v-if="entries.length" class="touch-pan-y select-none overflow-hidden"

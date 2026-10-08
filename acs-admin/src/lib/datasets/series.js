@@ -481,25 +481,29 @@ const raw_gap = (a, b, step) => b - a > Math.max(step, TAIL_GAP_MS)
 
 /**
  * Points as chart pairs, with a null wherever a bucket is missing, so
- * lines break at gaps. Raw live values (`tail`, [ms, value] rows) follow
- * the buckets at full resolution.
+ * lines break at gaps. Raw live values (`tail`, [ms, value] rows) draw
+ * at full resolution over the buckets: a bucket holding any raw value
+ * gives way to them, and the rest of the buckets stay.
  */
 export function chart_pairs (points, every, tail = []) {
-    const out = []
     const step = STEP_MS[every] ?? 0
+    const raw = tail ?? []
+    const covered = new Set(raw.map(([t]) => bucket_start(t, every)))
+    const items = [
+        ...points.filter(p => !covered.has(p[0])).map(([t, v]) => [t, v, true]),
+        ...raw.map(([t, v]) => [t, v, false]),
+    ].sort((a, b) => a[0] - b[0])
+    const out = []
     let prev = null
-    for (const [t, v] of points) {
-        if (prev != null && t > bucket_end(prev, every) + 1) out.push([bucket_end(prev, every), null])
+    for (const [t, v, bucket] of items) {
+        if (prev) {
+            const end = prev.bucket ? bucket_end(prev.t, every) : prev.t
+            // Bucket to bucket: any missing bucket. Otherwise a silence.
+            const gap = prev.bucket && bucket ? t > end + 1 : raw_gap(end, t, step)
+            if (gap) out.push([end, null])
+        }
         out.push([t, v])
-        prev = t
-    }
-    // From the buckets into the raw values: a gap if a whole bucket is missing.
-    let last = prev == null ? null : bucket_end(prev, every)
-    for (const [t, v] of tail ?? []) {
-        if (prev != null && t < prev) continue
-        if (last != null && raw_gap(last, t, step)) out.push([last, null])
-        out.push([t, v])
-        last = t
+        prev = { t, bucket }
     }
     return out
 }
@@ -588,13 +592,16 @@ export function display_rows (m, every, { active = null, until = Infinity } = {}
     const pts = m?.points ?? []
     const tail = m?.tail ?? []
     if (!STEP_MS[every]) return { rows: [], step: false }
+    if (!pts.length && tail.length) return { rows: chart_pairs([], every, tail), step: false }
     if (!sent_on_change(pts, every, active, until)) return { rows: chart_pairs(pts, every, tail), step: false }
 
     const rows = []
     const means = new Map(pts.map(p => [p[0], p[1]]))
     let last = null
     const end = Number.isFinite(until) ? until : bucket_end(pts[pts.length - 1][0], every)
-    for (let t = pts[0][0], i = 0; t < end && i < 20000; t = bucket_end(t, every), i++) {
+    // Buckets up to the first raw value; the raw values draw from there.
+    const rawFrom = tail.length ? bucket_start(tail[0][0], every) : Infinity
+    for (let t = pts[0][0], i = 0; t < Math.min(end, rawFrom) && i < 20000; t = bucket_end(t, every), i++) {
         if (means.has(t)) {
             last = means.get(t)
             rows.push([t, last])
@@ -606,10 +613,10 @@ export function display_rows (m, every, { active = null, until = Infinity } = {}
             rows.push([t, null])
         }
     }
-    // Raw live values after the buckets.
+    // Raw live values, at full resolution.
     const after = rows.length ? rows[rows.length - 1][0] : -Infinity
     for (const [rt, v] of tail) {
-        if (rt <= after || rt > until) continue
+        if (rt <= after || rt > end) continue
         rows.push([rt, v])
         last = v
     }

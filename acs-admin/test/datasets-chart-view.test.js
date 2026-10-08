@@ -13,7 +13,7 @@ import {
     spark_range, default_spark_range, MIN_SPAN,
 } from '../src/lib/datasets/chart-view.js'
 import { ZOOMS } from '../src/lib/datasets/model.js'
-import { dataset_window, live_mode, display_rows, sent_on_change, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
+import { dataset_window, chart_pairs, live_mode, display_rows, sent_on_change, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -108,7 +108,7 @@ describe('zoom and Back to now', () => {
     })
 
     it('has a Minutes zoom of about an hour that streams live', () => {
-        expect(Object.keys(CHART_ZOOMS)[0]).toBe('minutes')
+        expect(Object.keys(CHART_ZOOMS)[1]).toBe('minutes')
         expect(zoom_span('minutes', 1000)).toBe(HOUR)
         const v = zoom_view({ from: now - DAY, to: now }, 'minutes', 1000, now, now, { live: true })
         const every = every_for_width(v.from, v.to, 1000)
@@ -117,8 +117,32 @@ describe('zoom and Back to now', () => {
         expect(view_labels(v, 1000, now).zoom).toBe('minutes')
     })
 
-    it('leaves the main timeline without Minutes', () => {
+    it('leaves the main timeline without Seconds or Minutes', () => {
         expect('minutes' in ZOOMS).toBe(false)
+        expect('seconds' in ZOOMS).toBe(false)
+    })
+
+    it('has a Seconds zoom of about 5 minutes, first, in 10 s buckets', () => {
+        expect(Object.keys(CHART_ZOOMS)[0]).toBe('seconds')
+        expect(zoom_span('seconds', 1000)).toBe(5 * MIN)
+        const v = zoom_view({ from: now - HOUR, to: now }, 'seconds', 1000, now, now, { live: true })
+        expect(v).toEqual({ from: now - 5 * MIN, to: now })
+        expect(every_for_width(v.from, v.to, 1000)).toBe('10s')
+        expect(view_labels(v, 1000, now)).toMatchObject({ zoom: 'seconds', span: '5 min' })
+        // Back to now keeps the 5 minutes.
+        expect(to_now(step_view(v, -1, now), now)).toEqual(v)
+    })
+
+    it('draws raw values over 10 s buckets, and buckets alone further back', () => {
+        const buckets = Array.from({ length: 30 }, (_, i) => [now - 5 * MIN + i * 10 * SEC, i, 10])
+        const raw = Array.from({ length: 60 }, (_, i) => [now - MIN + i * SEC, 100 + i])
+        const rows = chart_pairs(buckets, '10s', raw)
+        // The last minute is raw, one point a second; before it, buckets.
+        expect(rows.filter(r => r[0] >= now - MIN)).toEqual(raw)
+        expect(rows.filter(r => r[0] < now - MIN)).toHaveLength(24)
+        // Panned back past the raw values: the buckets still draw.
+        const back = display_rows({ points: buckets.slice(0, 12), tail: raw }, '10s', { until: now - 3 * MIN })
+        expect(back.rows.filter(r => r[0] < now - 3 * MIN).length).toBe(12)
     })
 })
 

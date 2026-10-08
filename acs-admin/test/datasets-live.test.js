@@ -77,18 +77,18 @@ describe('live tail', () => {
         expect(append_live_items(out, [item(T0 + 60 * SEC, 2)], lookup)).toBe(out)
     })
 
-    it('draws the tail after the buckets, breaking at a long silence', () => {
+    it('draws raw values over the buckets they fall in, breaking at a long silence', () => {
         const pts = [[T0, 1, 1], [T0 + MIN, 2, 1]]
         const tail = [[T0 + 70 * SEC, 3], [T0 + 71 * SEC, 4], [T0 + 5 * MIN, 5]]
         expect(chart_pairs(pts, '1m', tail)).toEqual([
-            [T0, 1], [T0 + MIN, 2], [T0 + 70 * SEC, 3], [T0 + 71 * SEC, 4], [T0 + 71 * SEC, null], [T0 + 5 * MIN, 5],
+            [T0, 1], [T0 + 70 * SEC, 3], [T0 + 71 * SEC, 4], [T0 + 71 * SEC, null], [T0 + 5 * MIN, 5],
         ])
     })
 
-    it('draws the tail on a sparkline after the buckets', () => {
+    it('draws the tail on a sparkline', () => {
         const rows = chart_pairs([[T0, 0, 1]], '1m', [[T0 + 10 * SEC, 10], [T0 + 50 * SEC, 5]])
         const d = sparkline_path(rows, { from: T0, to: T0 + 2 * MIN, w: 120, h: 20 })
-        expect(d).toBe('M0 18L10 2L50 10')
+        expect(d).toBe('M10 2L50 18')
     })
 })
 

@@ -78,14 +78,14 @@ const props = defineProps({
   now: { type: Number, required: true },
   // Show the search box (the timeline does; the Data tab charts do not).
   searchable: { type: Boolean, default: true },
-  // Offer the Minutes zoom (the Data tab charts; not the timeline).
-  minutes: { type: Boolean, default: false },
+  // Offer the Seconds and Minutes zooms (the Data tab charts; not the timeline).
+  fine: { type: Boolean, default: false },
   // What the arrows move by, when not the zoom's own step.
   stepText: { type: String, default: null },
 })
 const emit = defineEmits(['go', 'step', 'zoom', 'update:search'])
 
-const zooms = computed(() => props.minutes ? CHART_ZOOMS : ZOOMS)
+const zooms = computed(() => props.fine ? CHART_ZOOMS : ZOOMS)
 const dateOpen = ref(false)
 const quick = computed(() => quick_dates(props.now))
 

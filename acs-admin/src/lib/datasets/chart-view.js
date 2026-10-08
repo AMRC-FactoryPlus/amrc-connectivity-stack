@@ -15,14 +15,17 @@ const MIN = 60 * 1000
 const HOUR = 60 * MIN
 
 /** The shortest span a chart shows. */
-export const MIN_SPAN = 10 * MIN
+export const MIN_SPAN = 2 * MIN
 
 /**
- * The Data tab's zooms: the timeline's, with Minutes before Hours. At
- * 1,000 px an hour, a typical chart width shows about an hour, in
- * buckets of 30 s or less, so values stream live.
+ * The Data tab's zooms: the timeline's, with Seconds and Minutes before
+ * Hours. At 1,000 px a typical chart shows about 5 minutes (Seconds) or
+ * an hour (Minutes), in buckets of 30 s or less, so values stream live.
+ * Data Access's smallest bucket is 10 s; at Seconds the raw live values
+ * draw over the buckets.
  */
 export const CHART_ZOOMS = {
+    seconds: { label: 'Seconds', px_per_hour: 12000 },
     minutes: { label: 'Minutes', px_per_hour: 1000 },
     ...ZOOMS,
 }
@@ -113,7 +116,7 @@ export function view_labels (v, width, now = Date.now()) {
     const near = nearest_zoom(span, width)
     const zoom = Math.abs(zoom_span(near, width) / span - 1) <= 0.15 ? near : null
     const c = (v.from + v.to) / 2
-    return { zoom, label: centre_label(near === 'minutes' ? 'hours' : near, c, now), dateValue: london_date_key(c), span: fmt_span(span) }
+    return { zoom, label: centre_label(near === 'minutes' || near === 'seconds' ? 'hours' : near, c, now), dateValue: london_date_key(c), span: fmt_span(span) }
 }
 
 /** "24 h", "45 min", "3 days". */

@@ -32,7 +32,9 @@ const LOAD_DEBOUNCE_MS = 300
  *    each closes (at least every 5 minutes): the line keeps moving at
  *    any zoom.
  * 3. Only when buckets are 30 s or less, i3X values are drawn as they
- *    arrive (a raw tail per metric). Otherwise nothing is subscribed.
+ *    arrive (a raw tail per metric, the last 10 minutes), over the
+ *    buckets they fall in. Otherwise nothing is subscribed. A raw value
+ *    is kept once: the newest kept time is the floor for the next.
  * 4. Metrics sent on change hold their value between changes while the
  *    device is sending (display_rows).
  *
@@ -119,7 +121,6 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
         const ans = await fetch_series(sc.client, request(p.from, p.to, e))
         if (my !== gen) return
         cache.put(p.from, p.to, ans, { keys: keys.value, counted: !count_too_long(p.from, p.to) })
-        trimTails(cache.asOf)
         tick.value++
       }
       error.value = null
@@ -165,22 +166,12 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
       const ans = await fetch_series(sc.client, request(from, to, e))
       if (my !== gen || cache !== caches.get(e)) return
       cache.put(from, to, ans, { keys: keys.value, final: false, counted: true })
-      trimTails(cache.asOf)
       tick.value++
     }
     catch (err) {
       console.warn('Datasets: refreshing the newest buckets failed', err)
     }
     if (my === gen) plan()
-  }
-
-  /* Raw values the buckets now count are dropped from the tails. */
-  function trimTails (asOf) {
-    const t = tails.value
-    if (!(asOf > t.asOf)) return
-    const metrics = {}
-    for (const [k, m] of Object.entries(t.metrics)) metrics[k] = { ...m, tail: (m.tail ?? []).filter(r => r[0] > asOf) }
-    tails.value = { ...t, asOf, metrics }
   }
 
   /* i3X, only while streaming. */

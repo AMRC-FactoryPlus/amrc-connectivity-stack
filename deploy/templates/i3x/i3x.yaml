@@ -120,6 +120,10 @@ spec:
               value: {{ .Values.i3x.catchUp.maxGapMs | int | toString | quote }}
             - name: I3X_INFLUX_REFRESH_MS
               value: {{ .Values.i3x.catchUp.refreshMs | int | toString | quote }}
+            - name: STALL_TIMEOUT
+              value: {{ .Values.i3x.stallTimeout | default 0 | quote }}
+            - name: CONNECT_TIMEOUT
+              value: {{ .Values.i3x.connectTimeout | default 0 | quote }}
             {{- if and (not .Values.i3x.mcp.enabled) (gt (int .Values.i3x.maxHeapMB) 0) }}
             - name: NODE_OPTIONS
               value: "--max-old-space-size={{ int .Values.i3x.maxHeapMB }}"

@@ -30,6 +30,13 @@ import { deriveQuality } from "./quality.js";
 import { toI3xVqt } from "./mapping.js";
 import { I3xStore } from "./store.js";
 import { Slicer } from "./slicer.js";
+import {
+    ConnectionWatchdog, StallWatchdog, describeConnectionChange,
+    describeConnectionTimeout, subscriptionOutcome,
+} from "./watchdog.js";
+
+/** The UNS topics i3X subscribes to. */
+const UNS_TOPIC = "UNS/v1/#";
 
 interface ValueCacheOpts {
     objectTree: ObjectTreeLike;
@@ -66,6 +73,31 @@ interface ValueCacheOpts {
      * to the UNS, so nothing else would replace them. Default 5 min.
      */
     refreshInterval?: number;
+    /**
+     * Exit if no UNS message arrives for this many ms, once the first
+     * one has arrived (see watchdog.ts). 0, the default, disables it.
+     */
+    stallTimeout?: number;
+    /**
+     * Exit if the MQTT client has not been connected with a granted
+     * subscription for this many ms (see watchdog.ts). 0, the default,
+     * disables it.
+     */
+    connectTimeout?: number;
+    /**
+     * Called when the process cannot recover by itself: the broker
+     * refused the subscription, or a watchdog fired. Defaults to
+     * logging the message and exiting 1, so Kubernetes restarts the
+     * pod. For tests.
+     */
+    fatal?: (msg: string) => void;
+}
+
+/* Log, then exit non-zero so Kubernetes restarts the pod. The short
+ * delay gives the log line a chance to reach stderr. */
+function exitProcess(msg: string): void {
+    console.error(`ValueCache: ${msg}`);
+    setTimeout(() => process.exit(1), 500);
 }
 
 /**
@@ -282,6 +314,14 @@ export class ValueCache {
     /** Connected and caught up: every UNS message is being seen, so the
      * stored values can be recorded as current. */
     private live = false;
+    private fatal: (msg: string) => void;
+    private stallTimeout: number;
+    private connectTimeout: number;
+    /** Fires if UNS messages stop, once they have started. */
+    private stallWatchdog: StallWatchdog;
+    /** Fires if the MQTT client stays without a granted
+     * subscription. */
+    private connWatchdog: ConnectionWatchdog;
 
     constructor(opts: ValueCacheOpts) {
         this.objectTree = opts.objectTree;
@@ -296,6 +336,27 @@ export class ValueCache {
         this.catchUpRetryDelays = opts.catchUpRetryDelays ?? [5_000, 15_000, 45_000];
         this.currentInterval = opts.currentInterval ?? 5_000;
         this.refreshInterval = opts.refreshInterval ?? 300_000;
+        this.fatal = opts.fatal ?? exitProcess;
+        const stallTimeout = this.stallTimeout = opts.stallTimeout ?? 0;
+        const connectTimeout = this.connectTimeout = opts.connectTimeout ?? 0;
+        this.stallWatchdog = new StallWatchdog({
+            timeoutMs: stallTimeout,
+            onArm: () => this.log(`stall watchdog armed: first UNS message received; exit if none for ${stallTimeout / 1000}s`),
+            onStall: idle => this.fatal(
+                `No UNS messages received for ${Math.round(idle / 1000)}s ` +
+                `(STALL_TIMEOUT ${stallTimeout / 1000}s). The MQTT connection ` +
+                `or subscription is not working. Exiting so the pod is restarted.`),
+        });
+        this.connWatchdog = new ConnectionWatchdog({
+            timeoutMs: connectTimeout,
+            onChange: (state, prev, unhealthyMs) => {
+                const msg = describeConnectionChange(state, prev, unhealthyMs, connectTimeout);
+                if (state === "disconnected") console.warn(`ValueCache: ${msg}`);
+                else this.log(msg);
+            },
+            onTimeout: (state, unhealthyMs) =>
+                this.fatal(describeConnectionTimeout(state, unhealthyMs, connectTimeout)),
+        });
         /* A failed group commit loses the values written in its batch,
          * so a stored value may no longer be the last one. Forget them
          * all, as after an MQTT reconnect. */
@@ -321,12 +382,29 @@ export class ValueCache {
          * until the catch-up has checked them, or start empty. */
         this.distrust("at start");
 
+        /* Start the connection watchdog before we ask for a client:
+         * finding the broker and getting Kerberos credentials can hang
+         * too. */
+        if (this.connWatchdog.enabled)
+            this.log(`connection watchdog: exits if not connected to the broker with a granted subscription for ${this.connectTimeout / 1000}s`);
+        else
+            this.log("connection watchdog disabled (CONNECT_TIMEOUT=0)");
+        this.connWatchdog.start();
+
         this.log("requesting MQTT client from ServiceClient");
-        const mqtt = await fplus.mqtt_client();
-        this.log("MQTT client obtained, subscribing to UNS/v1/#");
-        mqtt.subscribe("UNS/v1/#");
+        const mqtt = await fplus.mqtt_client({
+            /* We subscribe ourselves on every connect and check the
+             * SUBACK each time. MQTT.js's own resubscribe sends the
+             * SUBSCRIBE with no callback, so we cannot see whether the
+             * subscription is in effect after a reconnect. */
+            resubscribe: false,
+        });
+        this.log("MQTT client obtained; subscribing to %s on each connect", UNS_TOPIC);
         mqtt.on("message", (topic: string, payload: Buffer, packet: any) => {
             this.lastRx = Date.now();
+            /* Any message on the subscription counts: it proves the
+             * connection and subscription work. */
+            this.stallWatchdog.touch();
             try {
                 this.onUnsMessage(topic, payload, packet);
             } catch (err) {
@@ -343,9 +421,12 @@ export class ValueCache {
              * stored value may no longer be the last one. */
             if (connected) this.distrust("after an MQTT reconnect");
             connected = true;
-            /* The subscription is in place (mqtt.js renews it on each
-             * connect), so every message from now on is seen: start the
-             * catch-up, which reads InfluxDB only after the margin. */
+            this.subscribeUns(mqtt);
+            /* Every message from the SUBACK on is seen. Start the
+             * catch-up, which reads InfluxDB only after the margin, so
+             * it covers the moment before the subscription took
+             * effect. If no subscription is granted, the connection
+             * watchdog exits. */
             if (this.needsClear) return;    // the retry goes live
             if (this.trustAbove > 0) this.startCatchUp();
             else this.goLive();
@@ -354,8 +435,18 @@ export class ValueCache {
         mqtt.on("error", (err: any) => {
             console.error("ValueCache: MQTT error:", err);
         });
+        /* Each of offline, end and close means we have no working
+         * connection. Failed reconnect attempts repeat them; the
+         * watchdog ignores the repeats. "end" means the client will
+         * never reconnect. */
+        mqtt.on("offline", () => {
+            console.warn("ValueCache: MQTT client offline");
+            this.connWatchdog.disconnected();
+        });
+        mqtt.on("end", () => this.connWatchdog.disconnected());
         mqtt.on("close", () => {
             this.log("MQTT connection closed");
+            this.connWatchdog.disconnected();
             /* Fix the time the values were last current: the last
              * packet received, not now. */
             if (this.live) this.recordCurrent();
@@ -375,9 +466,59 @@ export class ValueCache {
             }, this.refreshInterval);
             this.refreshTimer.unref?.();
         }
+        /* Once armed by the first message, the stall watchdog covers
+         * every way of UNS data stopping: failing to reconnect, and
+         * being connected with no working subscription. It does not
+         * arm on a site with no traffic, so quiet sites don't
+         * restart. */
+        if (this.stallWatchdog.enabled)
+            this.log(`stall watchdog: arms on the first UNS message, then exits if none arrives for ${this.stallTimeout / 1000}s`);
+        else
+            this.log("stall watchdog disabled (STALL_TIMEOUT=0)");
+        this.stallWatchdog.start();
+
         this.ready = true;
-        this.log("initialised and subscribed");
+        this.log("initialised");
         return this;
+    }
+
+    /**
+     * Subscribe to the UNS on a new connection and check the SUBACK.
+     * The client is created with resubscribe off, so nothing else
+     * subscribes for us.
+     */
+    private subscribeUns(mqtt: any): void {
+        /* If the connection has already dropped again, skip: MQTT.js
+         * would queue the SUBSCRIBE and send it on the next connect,
+         * on top of the one we send then. */
+        if (!mqtt.connected) {
+            console.warn("ValueCache: MQTT connection closed before subscribing; will subscribe on the next connect");
+            return;
+        }
+        /* The SUBACK must match this connection. */
+        const session = this.connWatchdog.connected();
+        this.log("subscribing to %s", UNS_TOPIC);
+        mqtt.subscribe(UNS_TOPIC, (err: any, granted: any) => {
+            const outcome = subscriptionOutcome(err, granted);
+            /* A refused subscription (e.g. 0x87 Not authorized) leaves
+             * us connected but receiving nothing. The broker fixes the
+             * ACL at connect time, so retrying on this connection will
+             * not help. Exit and start again. */
+            if (outcome.status === "refused") {
+                this.fatal(`Broker refused the UNS subscription: ${outcome.detail}`);
+                return;
+            }
+            if (outcome.status === "unconfirmed") {
+                /* e.g. the connection closed before the SUBACK. We
+                 * subscribe again on the next connect. If no
+                 * subscription is granted within CONNECT_TIMEOUT, the
+                 * connection watchdog exits. */
+                console.warn("ValueCache: UNS subscription not confirmed: %s", outcome.detail);
+                return;
+            }
+            this.connWatchdog.subscribed(session);
+            this.log("subscribed to %s", UNS_TOPIC);
+        });
     }
 
     /* ---- MQTT message handler ---- */

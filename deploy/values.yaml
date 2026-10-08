@@ -639,6 +639,25 @@ i3x:
     # while connected: the same query over the time since the last
     # refresh. Devices that do not publish to the UNS change only there.
     refreshMs: 300000
+  # -- Exit (so Kubernetes restarts the pod) if no UNS message has been
+  # received for this many seconds, once data has started to flow.
+  # This catches an i3X whose live values stop updating and do not
+  # recover, for example after a broker or KDC restart. Any message
+  # under UNS/v1/ counts. The check arms on the first message, so a
+  # site with no traffic at all does not restart. A gap in traffic
+  # longer than this after data has flowed does cause a restart, which
+  # also drops i3X subscriptions: raise the value on sites with long
+  # quiet periods, or set it to 0 to disable the check.
+  stallTimeout: 600
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has not
+  # been connected to the broker with a granted subscription for this
+  # many seconds, counted from startup or from when the connection or
+  # subscription was lost. This catches a client that never connects,
+  # or stops reconnecting, even on a site with no traffic. A connected
+  # and subscribed client is healthy however quiet the broker is. The
+  # default allows for a broker and KDC restart during an upgrade. Set
+  # it to 0 to disable the check.
+  connectTimeout: 300
 
 admin:
   # -- Whether or not to enable the Admin component

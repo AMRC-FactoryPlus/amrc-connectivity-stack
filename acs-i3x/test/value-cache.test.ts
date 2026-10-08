@@ -369,10 +369,12 @@ describe("ValueCache", () => {
     /* ---- init ---- */
 
     describe("init", () => {
-        it("subscribes to UNS/v1/# on the MQTT client", async () => {
+        it("subscribes to UNS/v1/# on the MQTT client when it connects", async () => {
+            const handlers = new Map<string, Function>();
             const mockMqtt = {
+                connected: true,
                 subscribe: jest.fn<any>(),
-                on: jest.fn<any>(),
+                on: (ev: string, fn: Function) => handlers.set(ev, fn),
             };
             const fplus = {
                 mqtt_client: jest.fn<any>().mockResolvedValue(mockMqtt),
@@ -380,8 +382,10 @@ describe("ValueCache", () => {
             };
 
             await cache.init(fplus);
+            expect(mockMqtt.subscribe).not.toHaveBeenCalled();
+            handlers.get("connect")!();
 
-            expect(mockMqtt.subscribe).toHaveBeenCalledWith("UNS/v1/#");
+            expect(mockMqtt.subscribe).toHaveBeenCalledWith("UNS/v1/#", expect.any(Function));
         });
 
         it("registers a message handler on the MQTT client", async () => {

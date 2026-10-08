@@ -57,6 +57,7 @@ import Datasets from '@pages/Datasets/Datasets.vue';
 import DatasetPage from '@pages/Datasets/DatasetPage.vue';
 import DatasetBuilder from '@pages/Datasets/DatasetBuilder.vue';
 import DatasetCompare from '@pages/Datasets/DatasetCompare.vue';
+import DatasetAddons from '@pages/Datasets/AddonsPage.vue';
 import Kiosk from '@pages/Datasets/Kiosk.vue';
 
 // Create an event bus
@@ -264,6 +265,14 @@ const routes = [
   {
     path: '/datasets/compare',
     component: DatasetCompare,
+    meta: {
+      name: 'Datasets',
+      icon: 'database'
+    }
+  },
+  {
+    path: '/datasets/add-ons',
+    component: DatasetAddons,
     meta: {
       name: 'Datasets',
       icon: 'database'

@@ -90,7 +90,7 @@
           <Teleport to="body">
             <SelectionCard v-if="selection && !sel.dragging" class="fixed z-50"
                            :style="{ top: `${cardPos.top}px`, left: `${cardPos.left}px` }"
-                           :from="selection.from" :to="selection.to" :summary="summary" :now="now"
+                           :from="selection.from" :to="selection.to" :summary="summary" :now="now" :gaps="selGaps"
                            @close="sel = null" @make="makeDataset"/>
           </Teleport>
         </div>
@@ -129,6 +129,7 @@ import TimelineToolbar from '@/components/Datasets/timeline/TimelineToolbar.vue'
 import TimelineLane from '@/components/Datasets/timeline/TimelineLane.vue'
 import DeviceLane from '@/components/Datasets/timeline/DeviceLane.vue'
 import SelectionCard from '@/components/Datasets/timeline/SelectionCard.vue'
+import { window_gaps } from '@/lib/datasets/gaps.js'
 import TimelineLegend from '@/components/Datasets/timeline/TimelineLegend.vue'
 import { useTimelineData } from '@/components/Datasets/timeline/useTimelineData.js'
 import { device_status, quiet_note } from '@/lib/datasets/series.js'
@@ -333,6 +334,25 @@ const selX = computed(() => selection.value
   ? { left: x_of(selection.value.from, range.value), right: x_of(selection.value.to, range.value) }
   : { left: 0, right: 0 })
 const summary = computed(() => selection_summary(selection.value?.devices ?? [], ds.deviceByUuid))
+
+/* Gaps in the selection, from the strip counts. Only at Hours zoom,
+ * where the counts exist; null leaves the line out. */
+const selKey = computed(() => {
+  const s = selection.value
+  return s && !sel.value?.dragging ? `${s.devices.join(',')}|${s.from}|${s.to}` : ''
+})
+watch(selKey, () => {
+  const s = selection.value
+  if (selKey.value) data.ensure(s.devices, s.from, s.to)
+  else data.ensure([], 0, 0)
+})
+const selGaps = computed(() => {
+  const s = selection.value
+  if (!selKey.value || s.from >= now.value) return null
+  const got = data.countsFor(s.devices, s.from, s.to)
+  if (!got) return null
+  return window_gaps(got.counts, { from: s.from, to: s.to, every: got.every, now: now.value }).total
+})
 
 /* Where the selection card goes on screen: beside the selection, on
  * whichever side has room in the window, and kept inside the window.

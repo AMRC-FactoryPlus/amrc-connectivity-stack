@@ -25,6 +25,9 @@
         <Switch v-model="showDevices"/>
         Show device datasets
       </label>
+      <Button variant="ghost" size="sm" as-child>
+        <RouterLink to="/datasets/add-ons"><i class="fa-solid fa-puzzle-piece mr-1.5"></i>About add-ons</RouterLink>
+      </Button>
       <div class="ml-auto"><slot name="actions"/></div>
     </div>
 

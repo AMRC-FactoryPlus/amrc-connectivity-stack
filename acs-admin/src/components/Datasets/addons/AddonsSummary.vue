@@ -3,12 +3,16 @@
   -->
 
 <!-- The Add-ons card in the Overview side column: one line for energy
-     and carbon, or a note that no add-ons apply. -->
+     and carbon, or a note that no add-ons apply. Open goes to the
+     Add-ons tab, or to the Add-ons page when none apply. -->
 <template>
   <Card class="flex flex-col gap-2.5 p-4">
     <div class="flex items-center justify-between">
       <span class="font-semibold">Add-ons</span>
-      <Button variant="link" size="sm" class="h-auto p-0" @click="$emit('open')">Open</Button>
+      <Button v-if="applies" variant="link" size="sm" class="h-auto p-0" @click="$emit('open')">Open</Button>
+      <Button v-else variant="link" size="sm" class="h-auto p-0" as-child>
+        <RouterLink to="/datasets/add-ons">About add-ons</RouterLink>
+      </Button>
     </div>
 
     <div v-if="!applies" class="text-sm text-slate-500">

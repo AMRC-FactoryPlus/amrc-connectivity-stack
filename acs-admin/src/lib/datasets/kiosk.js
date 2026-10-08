@@ -11,6 +11,7 @@
 
 import { RESUME_WINDOW_MS } from './constants.js'
 import { london_date_key, london_local_to_ms } from './model.js'
+import { QUIET_AFTER_MS, fmt_since } from './series.js'
 
 /* ------------------------------------------------------------------
  * Phase
@@ -297,4 +298,45 @@ export function suggest_tags (runs = [], allTags = [], exclude = [], max = 6) {
         out.push(t)
     }
     return out
+}
+
+/* ------------------------------------------------------------------
+ * Devices sending data
+ * ------------------------------------------------------------------ */
+
+/**
+ * Which of the equipment's devices are sending data, from each
+ * device's newest data time. `lasts` is { uuid: ms | null }; a device
+ * missing from it is not known and is not counted as quiet.
+ * Returns { total, sending, quiet: [{ name, last }], text, warn, last }.
+ */
+export function sending_summary (devices = [], lasts = {}, now = Date.now(), quiet_after = QUIET_AFTER_MS) {
+    const total = devices.length
+    let sending = 0
+    let newest = null
+    const quiet = []
+    for (const d of devices) {
+        const last = lasts[d.uuid]
+        if (last != null && (newest == null || last > newest)) newest = last
+        if (last === undefined) continue
+        if (last != null && now - last <= quiet_after) sending++
+        else quiet.push({ name: d.name, last })
+    }
+    let text
+    if (!total) text = 'No devices on this equipment'
+    else if (sending === total) text = total === 1 ? 'The device is sending data' : `All ${total} devices sending data`
+    else text = `${sending} of ${total} ${total === 1 ? 'device' : 'devices'} sending data`
+    const warn = quiet.map(q => q.last == null
+        ? `${q.name}: no data in the last 30 days`
+        : `${q.name}: no data since ${fmt_since(q.last, now)}`).join(' · ')
+    return { total, sending, quiet, text, warn, last: newest }
+}
+
+/** "2 s ago", "4 min ago", or "at 08:51" for anything older than an hour. */
+export function fmt_ago (t, now = Date.now()) {
+    if (t == null) return ''
+    const s = Math.max(0, Math.round((now - t) / 1000))
+    if (s < 60) return `${s} s ago`
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`
+    return `at ${fmt_since(t, now)}`
 }

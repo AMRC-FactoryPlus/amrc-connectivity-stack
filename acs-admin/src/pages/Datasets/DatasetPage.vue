@@ -137,6 +137,7 @@
         <p class="text-xs text-slate-500">
           Add-ons work figures out from a dataset's data. Energy and carbon is the only one so far.
           Results are not stored, so they are worked out again each time you open this page.
+          <RouterLink to="/datasets/add-ons" class="font-medium text-slate-900 underline-offset-4 hover:underline">About add-ons</RouterLink>
         </p>
       </template>
       <StructureTab v-else-if="tab === 'structure'" :record="rec" @delete="deleteDialog?.open(rec)"/>

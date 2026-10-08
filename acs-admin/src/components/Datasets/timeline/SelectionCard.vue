@@ -3,7 +3,8 @@
   -->
 
 <!-- The card beside a timeline selection: the window, how many devices
-     and metrics, and Make dataset, which opens the builder pre-filled.
+     and metrics, any gaps in the data (at Hours zoom), and Make
+     dataset, which opens the builder pre-filled.
      There is no CSV button: a CSV needs a saved dataset. -->
 <template>
   <div data-no-drag role="dialog" aria-label="Selection"
@@ -29,6 +30,9 @@
         <span class="truncate" :title="d.name">{{ d.name }}</span>
       </div>
       <div v-if="summary.more" class="pl-6 text-xs text-gray-500">and {{ summary.more }} more</div>
+      <div v-if="gapLine" class="mt-0.5 flex items-center gap-1.5 text-xs" :class="gapLine.cls">
+        <span class="size-1.5 shrink-0 rounded-full" :class="gapLine.dot"></span>{{ gapLine.text }}
+      </div>
       <div v-if="to > now" class="mt-0.5 text-xs text-gray-500">
         <i class="fa-solid fa-clock text-[10px]"></i> Ends in the future. It fills in as data arrives.
       </div>
@@ -42,16 +46,21 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
+import { selection_gap_line } from '@/lib/datasets/gaps.js'
 
-defineProps({
+const props = defineProps({
   from: { type: Number, required: true },
   to: { type: Number, required: true },
   // selection_summary() result.
   summary: { type: Object, required: true },
   now: { type: Number, required: true },
+  // Gaps in the window, or null when not known (zooms other than Hours).
+  gaps: { type: Number, default: null },
 })
+const gapLine = computed(() => props.gaps == null ? null : selection_gap_line(props.gaps))
 const emit = defineEmits(['close', 'make'])
 </script>

@@ -61,15 +61,18 @@
 
     <template v-else>
       <div class="shrink-0 px-6 pt-5">
-        <KioskLane :runs="runs" :recording="recording" :saved-run="savedNow?.run ?? null" :now="now"/>
+        <KioskLane :runs="runs" :recording="recording" :saved-run="savedNow?.run ?? null" :now="now" :data="kdata.lane.value"/>
       </div>
 
       <!-- Ready -->
       <section v-if="phase === 'ready'" :class="PANEL">
         <div>
           <h1 class="text-[30px] font-semibold leading-9 tracking-tight">Ready to record</h1>
-          <p class="mt-0.5 text-gray-500">{{ devices.text }}</p>
-          <p v-if="devices.offline.length" class="mt-1 text-[15px] text-amber-700">
+          <p class="mt-0.5 text-gray-500">{{ sending ? sending.text : devices.text }}</p>
+          <p v-if="sending?.warn" class="mt-1 text-[15px] text-amber-700">
+            <i class="fa-solid fa-circle-exclamation mr-1"></i>{{ sending.warn }}. You can still record.
+          </p>
+          <p v-else-if="!sending && devices.offline.length" class="mt-1 text-[15px] text-amber-700">
             <i class="fa-solid fa-circle-exclamation mr-1"></i>{{ offlineText }}. You can still record.
           </p>
         </div>
@@ -102,10 +105,16 @@
           <div class="text-right text-[15px] leading-[22px] text-gray-700">
             <div>{{ run_name(eqName, startedAt, recording.reference) }}</div>
             <div class="text-gray-500">Started {{ fmt_clock(startedAt, true) }}<template v-if="recording.operator"> by {{ recording.operator }}</template></div>
-            <div class="text-gray-500">{{ devices.text }}</div>
+            <div class="text-gray-500">
+              <template v-if="sending">{{ sending.text }}<template v-if="sending.last != null"> · last data {{ fmt_ago(sending.last, now) }}</template></template>
+              <template v-else>{{ devices.text }}</template>
+            </div>
           </div>
         </div>
-        <p v-if="devices.offline.length" class="text-[15px] text-amber-700">
+        <p v-if="sending?.warn" class="text-[15px] text-amber-700">
+          <i class="fa-solid fa-circle-exclamation mr-1"></i>{{ sending.warn }}
+        </p>
+        <p v-else-if="!sending && devices.offline.length" class="text-[15px] text-amber-700">
           <i class="fa-solid fa-circle-exclamation mr-1"></i>{{ offlineText }}
         </p>
         <div class="grid gap-4 md:grid-cols-2">
@@ -192,7 +201,13 @@
                 <i class="fa-solid fa-tag text-[10px] text-gray-500"></i>{{ t }}
               </span>
             </div>
-            <span class="whitespace-nowrap text-gray-700">{{ savedNow.devices }} {{ savedNow.devices === 1 ? 'device' : 'devices' }}</span>
+            <div class="flex flex-wrap items-center gap-3 text-gray-700">
+              <span class="whitespace-nowrap">{{ savedNow.devices }} {{ savedNow.devices === 1 ? 'device' : 'devices' }}</span>
+              <span v-if="savedGap?.gap" class="inline-flex items-center gap-1.5 text-amber-700">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-amber-500"></span>{{ savedGap.text }}
+              </span>
+              <span v-else-if="savedGap" class="whitespace-nowrap text-green-600">No gaps</span>
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
@@ -257,10 +272,12 @@ import {
   derive_phase, saved_is_current, resume_left, fmt_minutes_left, is_network_error,
   read_pending, write_pending, clear_pending, read_saved, write_saved,
   read_operator, write_operator, read_operators, write_operators, remember_name,
-  device_summary, main_area, suggest_tags,
+  device_summary, main_area, suggest_tags, sending_summary, fmt_ago,
 } from '@/lib/datasets/kiosk.js'
 import KioskChoose from '@components/Datasets/kiosk/KioskChoose.vue'
 import KioskLane from '@components/Datasets/kiosk/KioskLane.vue'
+import { useKioskData } from '@components/Datasets/kiosk/useKioskData.js'
+import { recording_gap_note } from '@/lib/datasets/gaps.js'
 import KioskTags from '@components/Datasets/kiosk/KioskTags.vue'
 import KioskOperatorField from '@components/Datasets/kiosk/KioskOperatorField.vue'
 import KioskOperatorDialog from '@components/Datasets/kiosk/KioskOperatorDialog.vue'
@@ -378,6 +395,16 @@ const recNote = ref('')
 const noteFocused = ref(false)
 
 const savedNow = computed(() => saved.value && saved_is_current(saved.value, runs.value, now.value) ? saved.value : null)
+
+/* Data from the historian: the lane strip, which devices are sending
+ * (polled every 20 s) and the gaps in the saved recording. */
+const kdata = useKioskData(() => deviceUuids.value, () => savedNow.value)
+const sending = computed(() => kdata.lastsReady.value
+  ? sending_summary(deviceList.value, kdata.lasts.value, now.value)
+  : null)
+const savedGap = computed(() => savedNow.value && kdata.savedGaps.value
+  ? recording_gap_note(kdata.savedGaps.value, u => ds.deviceByUuid[u]?.name ?? u.slice(0, 8))
+  : null)
 
 const phase = computed(() => derive_phase({
   equipment: eq.value ? eqUuid.value : null,

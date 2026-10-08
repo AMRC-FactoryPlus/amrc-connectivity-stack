@@ -50,7 +50,7 @@
               <div class="min-w-0 flex-1">
                 <div class="truncate font-medium" :title="d.name">{{ d.name }}</div>
                 <div class="truncate text-xs text-slate-500">
-                  {{ d.metrics.length }} {{ d.metrics.length === 1 ? 'metric' : 'metrics' }}<template v-if="inEquipment[d.uuid]"> · In {{ inEquipment[d.uuid].join(', ') }}</template>
+                  {{ d.metrics.length }} {{ d.metrics.length === 1 ? 'metric' : 'metrics' }}<template v-if="rates[d.uuid]"> · {{ rates[d.uuid] }}</template><template v-if="inEquipment[d.uuid]"> · In {{ inEquipment[d.uuid].join(', ') }}</template>
                 </div>
               </div>
               <span v-if="have.has(d.uuid)" class="text-xs text-slate-500">Added</span>
@@ -88,6 +88,7 @@ import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
 import { device_status, series_request, LAST_LOOKBACK, LIMITS } from '@/lib/datasets/series.js'
+import { device_gaps, sample_rate, fmt_rate } from '@/lib/datasets/gaps.js'
 import { group_devices, text_match, equipment_by_device } from './builder/builder.js'
 
 const props = defineProps({
@@ -143,15 +144,17 @@ const groups = computed(() => {
   return out
 })
 
-/* "Quiet since" for the devices on screen, fetched once per dialog
- * for each device as it is shown. */
+/* "Quiet since" and the sample rate over the last hour for the devices
+ * on screen, fetched once per dialog for each device as it is shown. */
+const RATE_EVERY = '5m'
 const sc = useServiceClientStore()
 const lasts = ref({})
+const rates = ref({})
 let asked = new Set()
 let lastTimer = null
 
 watch(() => props.open, v => {
-  if (v) { asked = new Set(); lasts.value = {} }
+  if (v) { asked = new Set(); lasts.value = {}; rates.value = {} }
 })
 
 const shownUuids = computed(() => groups.value.flatMap(g => g.areas.flatMap(a => a.devices.map(d => d.uuid))))
@@ -166,12 +169,20 @@ async function loadLasts () {
   const want = shownUuids.value.filter(u => !asked.has(u)).slice(0, LIMITS.devices)
   if (!want.length) return
   for (const u of want) asked.add(u)
-  const to = Math.ceil(Date.now() / 3600e3) * 3600e3
+  const to = Math.ceil(Date.now() / 300e3) * 300e3
+  const from = to - 3600e3
   try {
-    const s = await fetch_series(sc.client, series_request({ devices: want, from: to - 3600e3, to, every: '1h', last: LAST_LOOKBACK }))
-    const got = {}
-    for (const u of want) if (!s.denied.includes(u)) got[u] = s.devices[u]?.last ?? null
+    const s = await fetch_series(sc.client, series_request({ devices: want, from, to, every: RATE_EVERY, count: true, last: LAST_LOOKBACK }))
+    const got = {}, rate = {}
+    for (const u of want) {
+      if (s.denied.includes(u)) continue
+      got[u] = s.devices[u]?.last ?? null
+      const g = device_gaps(s.devices[u]?.count ?? [], { from, to, every: RATE_EVERY, now: s.asOf })
+      const dev = ds.deviceByUuid[u]
+      rate[u] = fmt_rate(sample_rate(g, RATE_EVERY, dev?.metrics?.length))
+    }
     lasts.value = { ...lasts.value, ...got }
+    rates.value = { ...rates.value, ...rate }
   }
   catch (err) {
     // Status still shows online or offline from the Directory.

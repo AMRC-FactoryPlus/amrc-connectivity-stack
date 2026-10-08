@@ -31,7 +31,7 @@
           <div v-for="s in stats" :key="s.label" class="min-w-0 border-r border-slate-200 px-4 py-3 last:border-r-0">
             <div class="text-xs text-slate-500">{{ s.label }}</div>
             <div class="truncate text-xl font-semibold tabular-nums tracking-tight" :title="s.value">{{ s.value }}</div>
-            <div class="text-xs text-slate-500">{{ s.sub }}</div>
+            <div class="truncate text-xs" :class="s.subCls ?? 'text-slate-500'" :title="s.sub">{{ s.sub }}</div>
           </div>
         </Card>
 
@@ -75,7 +75,8 @@
 
         <DevicesTable :record="record" :resolved="resolved" :labels="labels"
                       :series="data.series.value" :from="data.window.value.from" :to="data.axisTo.value"
-                      :loading="data.loading.value" :error="data.error.value" :count-note="data.countNote.value"/>
+                      :loading="data.loading.value" :error="data.error.value" :count-note="data.countNote.value"
+                      :gaps="gaps"/>
 
         <PinnedCard :entries="pinned" :series="data.series.value" :from="data.window.value.from" :to="data.axisTo.value"
                     :live="data.live.value" :error="data.error.value" @tab="t => $emit('tab', t)"/>
@@ -115,6 +116,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { fmt_time, fmt_window, fmt_duration, fmt_elapsed } from '@/lib/datasets/model.js'
+import { window_gaps, fmt_coverage, coverage_sub } from '@/lib/datasets/gaps.js'
 import { metric_total, group_items } from './page-logic.js'
 import StatusPill from '../StatusPill.vue'
 import AddonsSummary from '../addons/AddonsSummary.vue'
@@ -152,6 +154,29 @@ const pins = usePins(() => props.record.uuid)
 const pinned = computed(() => pinned_entries(pins.keys.value, ds.deviceByUuid))
 const data = useDatasetSeries(() => props.record, pinned, { points: 120, count: true, last: true })
 
+/* Gaps and coverage across the window, from the strip counts. Devices
+ * the service would not show are left out. */
+const gaps = computed(() => {
+  const s = data.series.value
+  if (!s?.every || data.countNote.value || !props.record.structure) return null
+  const counts = {}
+  for (const d of props.resolved.devices) {
+    if (!s.denied.includes(d)) counts[d] = s.devices[d]?.count ?? []
+  }
+  if (!Object.keys(counts).length) return null
+  return window_gaps(counts, { from: data.window.value.from, to: data.axisTo.value, every: s.every, now: s.asOf })
+})
+
+const coverage = computed(() => {
+  if (!props.record.structure) return { value: '–', sub: 'Needs edit access to see' }
+  if (data.countNote.value) return { value: '–', sub: 'Not available for windows over 14 days' }
+  if (data.error.value) return { value: '–', sub: 'Did not load' }
+  if (!gaps.value) return { value: '–', sub: data.loading.value ? 'Loading' : '' }
+  if (gaps.value.coverage == null) return { value: '–', sub: 'The window has not started' }
+  const sub = coverage_sub(gaps.value, d => ds.deviceByUuid[d]?.name ?? d.slice(0, 8))
+  return { value: fmt_coverage(gaps.value.coverage), sub: sub.text, subCls: sub.cls }
+})
+
 function duration (r) {
   return r?.from && r?.to ? fmt_duration(Date.parse(r.to) - Date.parse(r.from)) : '–'
 }
@@ -161,11 +186,11 @@ const stats = computed(() => {
   const out = []
   if (recording.value) out.push({ label: 'Recording for', value: elapsed.value, sub: `Since ${fmt_time(recording.value.startedAt)}` })
   else if (r.from && r.to) out.push({ label: 'Window', value: duration(r), sub: fmt_window(r.from, r.to) })
-  else out.push({ label: 'Window', value: 'Ongoing', sub: 'No time window' })
+  else out.push({ label: 'Window', value: 'Ongoing', sub: data.window.value.windowless ? 'No time window. Coverage shows the last 24 hours.' : 'No time window' })
   const known = r.structure != null
   out.push({ label: 'Devices', value: known ? String(props.resolved.devices.length) : '–', sub: known ? (props.resolved.unknown.length ? 'Some parts are hidden from you' : 'Covered by this dataset') : 'Needs edit access to see' })
   out.push({ label: 'Metrics', value: known ? String(metric_total(devices.value)) : '–', sub: 'Recorded to the historian' })
-  out.push({ label: 'Made by', value: r.created_by ?? 'Unknown', sub: r.created_via === 'kiosk' ? 'From the kiosk' : r.created_via === 'desk' ? 'From the Admin UI' : '' })
+  out.push({ label: 'Coverage', ...coverage.value })
   return out
 })
 </script>

@@ -3,8 +3,9 @@
   -->
 
 <!-- The devices a dataset covers: name with a status dot, site and
-     area, the equipment label, the number of historised metrics, and a
-     strip of when data arrived across the dataset's window. -->
+     area, the equipment label, the number of historised metrics, the
+     sample rate, and a strip of when data arrived across the dataset's
+     window with a note on any gaps. -->
 <template>
   <Card class="overflow-hidden">
     <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -23,6 +24,7 @@
             <th class="px-4 py-2 font-medium">Device</th>
             <th class="px-4 py-2 font-medium">Label</th>
             <th class="px-4 py-2 text-right font-medium">Metrics</th>
+            <th class="px-4 py-2 font-medium" title="Average points per second or minute for each metric, while the device was sending">Sample rate</th>
             <th class="px-4 py-2 font-medium">Data across the window</th>
           </tr>
         </thead>
@@ -42,6 +44,7 @@
               <span v-if="row.label" class="rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium">{{ row.label }}</span>
             </td>
             <td class="px-4 py-2.5 text-right tabular-nums text-slate-700">{{ row.metrics ?? '–' }}</td>
+            <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-slate-700">{{ row.rate || '–' }}</td>
             <td class="px-4 py-2.5">
               <div class="relative h-2.5 rounded-sm bg-slate-50" :style="{ width: `${STRIP_W}px` }">
                 <span v-for="c in row.strip.cells" :key="c.x" class="absolute inset-y-0"
@@ -72,6 +75,7 @@ import { useNow } from '@vueuse/core'
 import { Card } from '@/components/ui/card'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { device_status, window_strip } from '@/lib/datasets/series.js'
+import { gap_note, sample_rate, fmt_rate } from '@/lib/datasets/gaps.js'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -84,6 +88,8 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: null },
   countNote: { type: String, default: null },
+  // window_gaps() over the window, or null.
+  gaps: { type: Object, default: null },
 })
 
 const STRIP_W = 240
@@ -93,12 +99,13 @@ const ds = useDatasetsStore()
 const now = useNow({ interval: 30 * 1000 })
 const unknown = computed(() => props.resolved.unknown.filter(u => u !== props.record.uuid || props.record.structure))
 
-function note (strip) {
+function note (g) {
   if (props.error || props.countNote) return { text: '', cls: '' }
   if (!props.series) return { text: props.loading ? 'Loading' : '', cls: 'text-slate-400' }
-  if (!strip.any) return { text: 'No data in this window', cls: 'text-amber-700' }
-  if (strip.gaps) return { text: `${strip.gaps} ${strip.gaps === 1 ? 'gap' : 'gaps'}`, cls: 'text-amber-700' }
-  return { text: 'No gaps', cls: 'text-slate-500' }
+  if (!g?.grid.length) return { text: '', cls: '' }
+  if (!g.points) return { text: 'No data in this window', cls: 'text-amber-700' }
+  if (g.gaps.length) return { text: gap_note(g.gaps), cls: 'text-amber-700' }
+  return { text: 'Complete', cls: 'text-slate-500' }
 }
 
 const rows = computed(() => props.resolved.device_datasets.map(dd => {
@@ -108,6 +115,7 @@ const rows = computed(() => props.resolved.device_datasets.map(dd => {
   const strip = props.series && props.from != null && props.to != null
     ? window_strip(data?.count ?? [], { from: props.from, to: props.to, width: STRIP_W, cell: 4 })
     : NO_STRIP
+  const g = props.gaps?.devices[dev_uuid] ?? null
   return {
     dd,
     name: dev?.name ?? ds.name(dd),
@@ -115,8 +123,9 @@ const rows = computed(() => props.resolved.device_datasets.map(dd => {
     label: props.labels[dd] ?? null,
     metrics: dev?.metrics?.length ?? null,
     status: device_status(dev?.status ?? null, data?.last, now.value.getTime()),
+    rate: g && props.series?.every ? fmt_rate(sample_rate(g, props.series.every, dev?.metrics?.length)) : '',
     strip,
-    note: note(strip),
+    note: note(g),
   }
 }))
 </script>

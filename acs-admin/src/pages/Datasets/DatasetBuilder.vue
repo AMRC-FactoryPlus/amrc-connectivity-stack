@@ -216,7 +216,8 @@
       </div>
 
       <!-- Rail -->
-      <BuilderRail class="min-w-0 flex-[1_1_300px] lg:sticky lg:top-4" :items="form.items" :rows="storeRows"/>
+      <BuilderRail class="min-w-0 flex-[1_1_300px] lg:sticky lg:top-4" :items="form.items" :rows="storeRows"
+                   :window="isoWindow"/>
     </div>
 
     <DevicePickerDialog v-model:open="devicePicker" :added="addedDevices" @add="addDevices"/>

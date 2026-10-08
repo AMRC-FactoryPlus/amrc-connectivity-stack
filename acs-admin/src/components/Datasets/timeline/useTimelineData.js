@@ -73,6 +73,8 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
 
   let busy = false
   let again = false
+  // The selection whose counts are wanted, loaded with the strips.
+  let selRange = null
 
   async function loadStrips () {
     if (!hours.value) return
@@ -138,6 +140,7 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
     clearTimeout(debounce)
     debounce = setTimeout(() => run(async () => {
       await loadStrips()
+      await loadSelection()
       await loadLasts()
     }), DEBOUNCE_MS)
   }
@@ -148,6 +151,7 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
     await pollTail()
     // Hours that have ended since they were fetched, and old "quiet since".
     await loadStrips()
+    await loadSelection()
     await loadLasts()
   }), POLL_MS)
 
@@ -175,10 +179,45 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
     return bucket_cells(sum_counts(lists), { range: r, every: EVERY, x0: w.x0, x1: w.x1 })
   }
 
+  /* Counts for a selection: fetch what the cache lacks, then hand
+   * back each device's rows. */
+  async function loadRange (list, from, to) {
+    if (!hours.value || !list.length) return
+    const now = Date.now()
+    const need = cache.missing(list, from, Math.min(to, now + STEP), now)
+    if (!need) return
+    for (const [part, s] of await request(need.devices, { from: need.from, to: need.to, every: EVERY, count: true })) {
+      cache.put(part, need.from, need.to, s)
+    }
+    tick.value++
+  }
+
+  /** Load counts for these devices over [from, to), at Hours zoom. */
+  function ensure (list, from, to) {
+    selRange = list?.length ? { list, from, to } : null
+    if (hours.value && selRange) schedule()
+  }
+
+  async function loadSelection () {
+    if (selRange) await loadRange(selRange.list, selRange.from, selRange.to)
+  }
+
+  /**
+   * Counts for these devices over [from, to), as { device: rows } plus
+   * the bucket size, or null at other zooms or while any are missing.
+   */
+  function countsFor (list, from, to) {
+    void tick.value
+    if (!hours.value || !list.length) return null
+    const now = Date.now()
+    if (cache.missing(list, from, Math.min(to, now + STEP), now)) return null
+    return { every: EVERY, counts: Object.fromEntries(list.map(d => [d, cache.get(d, from - STEP, to)])) }
+  }
+
   /** A device's newest data time: ms, null for none in 30 days, undefined if not known. */
   function lastOf (device) {
     return lasts.value[device]
   }
 
-  return { hours, deviceCells, equipmentCells, lastOf, error }
+  return { hours, deviceCells, equipmentCells, lastOf, ensure, countsFor, error }
 }

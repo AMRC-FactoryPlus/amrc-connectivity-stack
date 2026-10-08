@@ -9,7 +9,7 @@ import * as rx from "rxjs";
 
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
-import { valid_uuid, valid_datetime } from "./validate.js";
+import { valid_uuid, valid_datetime, parse_download_filter } from "./validate.js";
 import { fail, maxDate, minDate } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
@@ -297,8 +297,17 @@ export class APIv1 {
   }
 
 
-  /** POST. Queries all possible Influx suffixes, combines the measuremenets and returns actual data from a dataset. 
+  /** POST. Queries all possible Influx suffixes, combines the measurements and returns actual data from a dataset.
    * Empty POST body requests all dataset measurements.
+   *
+   * Optional body fields (see docs/services/data-access.md):
+   *   metrics - array of metric selectors. A selector containing `/` is a
+   *     full Sparkplug metric path (`Folder/Sub/Name`) and matches only
+   *     that metric at that path. A selector without `/` matches that
+   *     metric name at any path. Names never include the Influx :x suffix.
+   *   measurement - deprecated; a single exact Influx _measurement
+   *     (including its :x suffix). Use metrics instead.
+   * Invalid filters get a 422 with a JSON `{ error }` body.
    * @param {*} req 
    * @param {*} res 
    * @returns CSV with columns:
@@ -314,6 +323,12 @@ export class APIv1 {
 
     if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid dataset uuid`);
 
+    const { filter: meta, error } = parse_download_filter(req.body);
+    if (error) {
+      this.log(`Rejecting download of ${dataset_uuid}: ${error}`);
+      return res.status(422).json({ error });
+    }
+
     const ok = await this.auth.check_acl(
         req.auth,
         Constants.Perm.ReadDataset,
@@ -322,10 +337,6 @@ export class APIv1 {
     );
 
     if (!ok) return fail(this.log, 403, `Unauthorised to read ${dataset_uuid}`);
-
-    const meta = req.body?.measurement 
-      ? { measurement: req.body?.measurement } 
-      : undefined;
 
     try {
         // Resolve dataset tree

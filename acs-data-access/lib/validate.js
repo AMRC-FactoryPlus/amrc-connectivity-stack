@@ -48,3 +48,69 @@ export function valid_datetime(datetime_str){
     // 3. Ensure it matches the original string (prevents date rolling like Feb 30 -> Mar 2)
     return new Date(timestamp).toISOString() === datetime_str;
 }
+
+/* Limits on the metric filter in a download request body. */
+export const MAX_METRICS = 100;
+export const MAX_METRIC_LENGTH = 512;
+
+const CONTROL_rx = /[\u0000-\u001f\u007f]/;
+
+/* Returns an error message, or null if the selector is acceptable. */
+function metric_selector_error(value, field) {
+    if (typeof value !== "string")
+        return `${field} must be a string`;
+    if (value.length === 0)
+        return `${field} must not be empty`;
+    if (value.length > MAX_METRIC_LENGTH)
+        return `${field} is longer than ${MAX_METRIC_LENGTH} characters`;
+    if (CONTROL_rx.test(value))
+        return `${field} contains control characters`;
+    return null;
+}
+
+/** Validate the optional filter in a `POST v1/data/:uuid` body.
+ *
+ * Accepts `{ metrics: [string] }` or the deprecated `{ measurement:
+ * string }`, not both. An absent, null or empty `measurement` is
+ * ignored, as before.
+ *
+ * @returns `{ filter }` on success, where `filter` is undefined for an
+ * unfiltered export, or `{ error }` describing why the body is invalid.
+ */
+export function parse_download_filter(body) {
+    if (body == null) return { filter: undefined };
+    if (typeof body !== "object" || Array.isArray(body))
+        return { error: "Request body must be a JSON object" };
+
+    const { metrics, measurement } = body;
+    const has_measurement = measurement != null && measurement !== "";
+
+    if (metrics !== undefined) {
+        if (has_measurement)
+            return { error: "Use either metrics or measurement, not both" };
+        if (!Array.isArray(metrics))
+            return { error: "metrics must be an array of strings" };
+        if (metrics.length === 0)
+            return { error: "metrics must not be empty" };
+        if (metrics.length > MAX_METRICS)
+            return { error: `metrics has more than ${MAX_METRICS} entries` };
+
+        for (const [i, m] of metrics.entries()) {
+            const err = metric_selector_error(m, `metrics[${i}]`);
+            if (err) return { error: err };
+
+            if (m.startsWith("/") || m.endsWith("/") || m.includes("//"))
+                return { error: `metrics[${i}] has an empty path segment` };
+        }
+
+        return { filter: { metrics: [...new Set(metrics)] } };
+    }
+
+    if (has_measurement) {
+        const err = metric_selector_error(measurement, "measurement");
+        if (err) return { error: err };
+        return { filter: { measurement } };
+    }
+
+    return { filter: undefined };
+}

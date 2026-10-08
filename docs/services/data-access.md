@@ -136,20 +136,54 @@ Requires `Read dataset` on `:uuid`. Resolves the dataset's structure
 tree recursively into a flat list of `{ device, from, to }` triples
 (one per Sparkplug source contributing to the dataset, with time bounds
 intersected down through any enclosing sessions), then streams the
-result back as a **ZIP archive** (`application/zip`), one CSV per
-Sparkplug device named `<device-uuid>.csv`. Each CSV is the raw line
-output of an Influx Flux query filtered on `topLevelInstance ==
-"<device-uuid>"` and the resolved time range, keeping the columns
-`_time`, `_value`, `_measurement`, `device`, `unit` — this is Influx's
-own column naming, not the normalised `device`/`metric`/`timestamp`/
-`value`/`unit` CSV described in the original design, and metric names
-still carry Influx's `:x` datatype suffix.
+result back as a **single CSV file** (`text/csv`, named
+`<dataset-uuid>.csv`). Each source is read with an Influx Flux query
+filtered on `topLevelInstance == "<device-uuid>"` and the resolved time
+range, and all sources are written into the same file. The columns are,
+in this order:
 
-The request body is optional. If it contains a `measurement` property,
-the export is restricted to that one Influx `_measurement` across all
-devices; this is not part of the original design but is the only
-filtering currently available. An empty or absent body exports
-everything in the dataset.
+Column | Content
+--- | ---
+`device` | The Sparkplug device the point came from
+`metric` | The metric name, without Influx's `:x` datatype suffix
+`timestamp` | ISO 8601 timestamp
+`value` | The data value
+`unit` | The engineering unit, if the metric has one
+
+The CSV has no metric path column. Two metrics with the same name under
+different folders appear with the same `metric` value. Use a full-path
+`metrics` selector (below) to export only one of them.
+
+The request body is optional. An empty or absent body exports everything
+in the dataset. The body can contain one of these filters:
+
+* **`metrics`** (array of strings): export only the listed metrics.
+  Each entry is a metric selector:
+  * An entry that contains `/` is a full Sparkplug metric path, for
+    example `Axis/X/Position`. It matches points whose `path` tag is
+    `Axis/X` and whose measurement name is `Position` (with any
+    datatype suffix). The historians write the part of the metric name
+    before the last `/` as the `path` tag and the part after it as the
+    measurement.
+  * An entry without `/`, for example `Position`, matches that metric
+    name at any path, including metrics at the top level of the
+    device.
+  * Names never include the `:x` datatype suffix; every suffix is
+    matched.
+  * A point is exported if it matches any entry.
+
+  The list must have between 1 and 100 entries. Each entry must be a
+  non-empty string of at most 512 characters, with no control
+  characters and no empty path segment (no leading, trailing or
+  doubled `/`). Duplicate entries are ignored.
+* **`measurement`** (string, **deprecated**): export only the one Influx
+  `_measurement` that exactly equals this value. The value must include
+  the datatype suffix, for example `Position:d`. Use `metrics` instead.
+
+A request that sends both filters, or a filter that breaks these rules,
+gets `422` with a JSON body `{ "error": "<reason>" }`. Every filter
+value is escaped as a Flux string literal before it is placed in the
+query.
 
 ### `GET v1/structure`
 
@@ -280,12 +314,10 @@ Compared to the original design notes for this service:
 
 * **No date filtering on `GET v1/metadata`.** The `from`/`to` query
   parameters are not read.
-* **Dataset download is a ZIP of per-device raw Influx CSV**, not the
-  single normalised `device`/`metric`/`timestamp`/`value`/`unit` CSV the
-  design describes; Influx's `:x` type suffix on metric names is not
-  stripped, and the only filter available is an exact `measurement`
-  match (no per-device/schema/metric filtering, no datatype filtering,
-  no subsampling).
+* **Dataset download filtering is limited to metrics.** The download
+  can be restricted to a list of metric paths or names, but there is no
+  per-device, schema or datatype filtering and no subsampling. The CSV
+  has no metric path column.
 * **`Session limits` requires both `from` and `to`** — an open-ended
   session (design says "if either is omitted the interval is
   open-ended") is rejected with `422`.

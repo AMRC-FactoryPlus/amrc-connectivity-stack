@@ -84,7 +84,11 @@
       <div v-if="!r" class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         Tick at least one meter below to see figures.
       </div>
-      <div v-else class="grid grid-cols-1 overflow-hidden rounded-lg border border-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+      <div v-if="r && ec.until.value" class="mb-3 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+        <i class="fa-solid fa-hourglass-half mt-0.5 text-slate-400"></i>
+        <span>The window is still filling in. These figures cover up to the newest reading, {{ fmt_clock(ec.until.value, true) }}. Calculate again to include newer data.</span>
+      </div>
+      <div v-if="r" class="grid grid-cols-1 overflow-hidden rounded-lg border border-slate-200 sm:grid-cols-2 xl:grid-cols-4">
         <div class="border-b border-slate-200 px-4 py-3 sm:border-r xl:border-b-0">
           <div class="text-xs text-slate-500">Energy</div>
           <div class="text-xl font-semibold tabular-nums tracking-tight">{{ kwh(r.kwh) }} kWh</div>

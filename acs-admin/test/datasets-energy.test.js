@@ -150,7 +150,8 @@ describe('review fixes', () => {
         const r = energy_and_carbon({ meters: [{ device: 'M', metric: 'E', scale: 1, points: dense(from, to) }], from, to })
         expect(r.kwh).toBeCloseTo(15, 6)
         expect(r.coverage).toBe(1)
-        expect(r.estimated_kwh).toBeCloseTo(15, 6)
+        // One minute at each edge is extrapolated, at 1 kWh a minute.
+        expect(r.estimated_kwh).toBeCloseTo(2, 6)
     })
 
     it('covers a two-hour run in full', () => {
@@ -203,5 +204,34 @@ describe('meters that report power only', () => {
         const pts = [{ t: T0, v: 1000 }, { t: T0 + 3 * 3600e3, v: 1000 }]
         const reg = power_to_register(find_power_series([{ device: 'M', metric: 'Power', unit: 'W', points: pts }])[0])
         expect(reg.points[1].v).toBe(0)
+    })
+})
+
+describe('estimated energy at the edges', () => {
+    it('counts only the extrapolated sliver, not the whole segment', () => {
+        // Readings every second from 1 s after the start: 1 s of 60 kW is estimated.
+        const pts = []
+        for (let t = T0 + 1000, v = 0; t <= T0 + 30 * MIN; t += 1000, v += 60 / 3600) pts.push({ t, v })
+        const r = energy_and_carbon({ meters: [{ device: 'M', metric: 'E', scale: 1, points: pts }], from: T0, to: T0 + 30 * MIN })
+        expect(r.kwh).toBeCloseTo(30, 3)
+        expect(r.estimated_kwh).toBeCloseTo(60 / 3600, 6)
+    })
+})
+
+describe('gaps in power data', () => {
+    it('does not bridge a minute and a half without readings at 1 s', async () => {
+        const { power_to_register } = await import('../src/lib/datasets/energy.js')
+        const pts = []
+        for (let t = T0; t <= T0 + 10 * MIN; t += 1000) {
+            if (t > T0 + 4 * MIN && t < T0 + 4 * MIN + 90e3) continue
+            pts.push({ t, v: 60 })
+        }
+        const reg = power_to_register({ device: 'M', metric: 'Active_Power_Total', unit: 'kW', power_scale: 1, points: pts })
+        expect(reg.gaps).toHaveLength(1)
+        const r = energy_and_carbon({ meters: [reg], from: T0, to: T0 + 10 * MIN })
+        // 90 s of the 10 minutes has no readings: no energy is invented
+        // for it, and the coverage says so.
+        expect(r.kwh).toBeCloseTo(60 * 510 / 3600, 6)
+        expect(r.coverage).toBeCloseTo(0.85, 6)
     })
 })

@@ -119,26 +119,46 @@ export function find_power_series (series) {
 }
 
 /**
+ * The longest silence to bridge for a power series: five times its
+ * typical reading interval, at least a minute and at most MAX_GAP_MS.
+ * Power read every second that stops for a minute and a half has lost
+ * data; a straight line across the gap would invent energy.
+ */
+export function power_gap_limit (points) {
+    const dts = []
+    for (let i = 1; i < points.length; i++) dts.push(points[i].t - points[i - 1].t)
+    if (!dts.length) return CARBON.MAX_GAP_MS
+    dts.sort((a, b) => a - b)
+    const median = dts[dts.length >> 1]
+    return Math.min(CARBON.MAX_GAP_MS, Math.max(60 * 1000, 5 * median))
+}
+
+/**
  * Turn a power series into a cumulative register in kWh, by the
- * trapezium rule between readings. Readings more than MAX_GAP_MS apart
- * add nothing, and register_at will not interpolate across them, so a
- * silence is reported as missing rather than guessed.
+ * trapezium rule between readings. Readings further apart than the
+ * series' gap limit add nothing, and register_at will not interpolate
+ * across them, so a silence is reported as missing rather than guessed.
  */
 export function power_to_register (s) {
     const pts = s.points
+    const max_gap = power_gap_limit(pts)
     const out = []
+    // Silences longer than the limit: no energy is counted across them,
+    // and the coverage leaves them out.
+    const gaps = []
     let kwh = 0
     for (let i = 0; i < pts.length; i++) {
         if (i > 0) {
             const dt = pts[i].t - pts[i - 1].t
-            if (dt <= CARBON.MAX_GAP_MS) {
+            if (dt > max_gap) gaps.push({ from: pts[i - 1].t, to: pts[i].t })
+            else {
                 const kw = (pts[i].v + pts[i - 1].v) / 2 * s.power_scale
                 kwh += Math.max(0, kw) * dt / 3600e3
             }
         }
         out.push({ t: pts[i].t, v: kwh })
     }
-    return { device: s.device, metric: s.metric, unit: s.unit, scale: 1, from_power: true, points: out }
+    return { device: s.device, metric: s.metric, unit: s.unit, scale: 1, from_power: true, max_gap: CARBON.MAX_GAP_MS, gaps, points: out }
 }
 
 /** Grid intensity series (gCO2/kWh). */
@@ -178,9 +198,10 @@ export function interpolate_at (points, t) {
  * reading, the value is extrapolated at the rate of the nearest two
  * readings and marked estimated.
  *
- * @returns {{v:number, estimated:boolean}|null}
+ * @returns {{v:number, estimated:boolean, extra:number}|null} where
+ *   `extra` is the part of the value that was extrapolated.
  */
-export function register_at (points, t) {
+export function register_at (points, t, max_gap = CARBON.MAX_GAP_MS) {
     const n = points.length
     if (!n) return null
     const first = points[0], last = points[n - 1]
@@ -189,9 +210,9 @@ export function register_at (points, t) {
         const [a, b] = t < first.t ? [points[0], points[1]] : [points[n - 2], points[n - 1]]
         const step = b.t - a.t
         const dist = t < first.t ? first.t - t : t - last.t
-        if (step <= 0 || step > CARBON.MAX_GAP_MS || dist > Math.min(step, CARBON.MAX_EDGE_MS)) return null
+        if (step <= 0 || step > max_gap || dist > Math.min(step, CARBON.MAX_EDGE_MS)) return null
         const rate = Math.max(0, (b.v - a.v) / step)
-        return { v: t < first.t ? first.v - rate * dist : last.v + rate * dist, estimated: true }
+        return { v: t < first.t ? first.v - rate * dist : last.v + rate * dist, estimated: true, extra: rate * dist }
     }
     let lo = 0, hi = n - 1
     while (hi - lo > 1) {
@@ -200,10 +221,10 @@ export function register_at (points, t) {
         else hi = mid
     }
     const a = points[lo], b = points[hi]
-    if (a.t === t) return { v: a.v, estimated: false }
-    if (b.t === t) return { v: b.v, estimated: false }
-    if (b.t - a.t > CARBON.MAX_GAP_MS) return null
-    return { v: a.v + (b.v - a.v) * (t - a.t) / (b.t - a.t), estimated: false }
+    if (a.t === t) return { v: a.v, estimated: false, extra: 0 }
+    if (b.t === t) return { v: b.v, estimated: false, extra: 0 }
+    if (b.t - a.t > max_gap) return null
+    return { v: a.v + (b.v - a.v) * (t - a.t) / (b.t - a.t), estimated: false, extra: 0 }
 }
 
 /** The last value at or before t, if no older than hold. */
@@ -241,21 +262,30 @@ export function energy_and_carbon ({ meters, intensity = null, from, to }) {
     let kwh = 0, kwh_no_intensity = 0, kg_grid = 0, covered_ms = 0, bad = 0, estimated_kwh = 0
     for (let i = 0; i < edges.length - 1; i++) {
         const start = edges[i], end = edges[i + 1]
-        let seg_kwh = 0, ok = meters.length > 0, estimated = false
+        let seg_kwh = 0, ok = meters.length > 0, estimated = false, seg_extra = 0
         for (const m of meters) {
-            const a = register_at(m.points, start)
-            const b = register_at(m.points, end)
+            const a = register_at(m.points, start, m.max_gap)
+            const b = register_at(m.points, end, m.max_gap)
             if (a == null || b == null) { ok = false; break }
             const d = (b.v - a.v) * m.scale
             if (d < 0 || d > CARBON.MAX_KWH_PER_HALF_HOUR) { ok = false; bad++; break }
             if (a.estimated || b.estimated) estimated = true
+            seg_extra += (a.extra + b.extra) * m.scale
             seg_kwh += d
         }
-        const seg = { start, end, covered: ok, estimated: ok && estimated, kwh: ok ? seg_kwh : null, intensity: null, kg_fixed: null, kg_grid: null }
+        // Time inside the segment that a power meter has no readings for.
+        let missing_ms = 0
+        if (ok) for (const m of meters) {
+            let ms = 0
+            for (const g of m.gaps ?? []) ms += Math.max(0, Math.min(end, g.to) - Math.max(start, g.from))
+            missing_ms = Math.max(missing_ms, ms)
+        }
+        const seg = { start, end, covered: ok, missing_ms, estimated: ok && estimated, kwh: ok ? seg_kwh : null, intensity: null, kg_fixed: null, kg_grid: null }
         if (ok) {
-            covered_ms += end - start
+            covered_ms += end - start - missing_ms
             kwh += seg_kwh
-            if (estimated) estimated_kwh += seg_kwh
+            // Only the extrapolated part, not the whole segment.
+            if (estimated) estimated_kwh += Math.min(seg_kwh, seg_extra)
             seg.kg_fixed = seg_kwh * CARBON.FIXED_FACTOR
             const hh = Math.floor(start / HALF_HOUR) * HALF_HOUR
             const g = intensity ? held_at(intensity, hh, CARBON.INTENSITY_HOLD_MS) ?? held_at(intensity, start, CARBON.INTENSITY_HOLD_MS) : null
@@ -275,7 +305,7 @@ export function energy_and_carbon ({ meters, intensity = null, from, to }) {
         kg_fixed: kwh * CARBON.FIXED_FACTOR,
         kg_grid: intensity && kwh_no_intensity < kwh ? kg_grid : null,
         kwh_no_intensity,
-        // Energy in segments that rely on an edge estimate.
+        // Energy extrapolated past the first or last reading at an edge.
         estimated_kwh,
         coverage,
         intensity_coverage,

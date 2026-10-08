@@ -133,7 +133,9 @@ function toMeta(r: any): MetricMeta {
 
 /** Map Sparkplug_Type to InfluxDB measurement type suffix. */
 function sparkplugTypeToSuffix(spType: string): string {
-    const t = spType.replace(/(LE|BE)$/i, "");
+    /* Case-sensitive: with /i the "le" of "Double" is taken for a
+     * byte-order suffix, and a plain Double maps to "s". */
+    const t = spType.replace(/(LE|BE)$/, "");
     switch (t) {
         case "Float": case "Double": return "d";
         case "Int8": case "Int16": case "Int32": case "Int64": return "i";

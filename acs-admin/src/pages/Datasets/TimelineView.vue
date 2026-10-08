@@ -58,7 +58,7 @@
         </div>
 
         <!-- Lanes -->
-        <div class="relative" :style="{ height: `${layout.height}px`, width: `${fullWidth}px` }"
+        <div ref="lanes" class="relative" :style="{ height: `${layout.height}px`, width: `${fullWidth}px` }"
              @pointerdown="onPointerDown">
           <!-- Gridlines, future, now and selection sit over the track. -->
           <div class="pointer-events-none absolute inset-y-0" :style="{ left: `${LABEL_W}px`, width: `${range.width}px` }">
@@ -82,10 +82,14 @@
                           @toggle="toggle"/>
           </template>
 
-          <SelectionCard v-if="selection && !sel.dragging" class="absolute z-20"
-                         :style="{ top: `${selection.top}px`, left: `${LABEL_W + cardLeft}px` }"
-                         :from="selection.from" :to="selection.to" :summary="summary" :now="now"
-                         @close="sel = null" @make="makeDataset"/>
+          <!-- On the page, not in the frame, so the frame's scroll area
+               cannot clip it. -->
+          <Teleport to="body">
+            <SelectionCard v-if="selection && !sel.dragging" class="fixed z-50"
+                           :style="{ top: `${cardPos.top}px`, left: `${cardPos.left}px` }"
+                           :from="selection.from" :to="selection.to" :summary="summary" :now="now"
+                           @close="sel = null" @make="makeDataset"/>
+          </Teleport>
         </div>
       </div>
 
@@ -298,14 +302,33 @@ const selX = computed(() => selection.value
   : { left: 0, right: 0 })
 const summary = computed(() => selection_summary(selection.value?.devices ?? [], ds.deviceByUuid))
 
-// Beside the selection, on whichever side has room in the view.
-const cardLeft = computed(() => {
-  const CARD = 300, GAP = 12
-  const lo = view.left + 8
-  const hi = Math.max(lo, view.left + view.width - LABEL_W - CARD - 8)
-  let x = selX.value.right + GAP
-  if (x > hi) x = selX.value.left - GAP - CARD
-  return Math.max(lo, Math.min(hi, x))
+/* Where the selection card goes on screen: beside the selection, on
+ * whichever side has room in the window, and kept inside the window.
+ * It follows the frame's scroll (view) and the page's (winTick). */
+const lanes = ref(null)
+const winTick = ref(0)
+const bumpWin = () => { winTick.value++ }
+window.addEventListener('scroll', bumpWin, { passive: true, capture: true })
+window.addEventListener('resize', bumpWin, { passive: true })
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', bumpWin, { capture: true })
+  window.removeEventListener('resize', bumpWin)
+})
+const cardPos = computed(() => {
+  void view.left; void view.top; void winTick.value
+  const CARD_W = 300, CARD_H = 260, GAP = 12, EDGE = 8
+  const el = lanes.value
+  if (!el || !selection.value) return { left: 0, top: 0 }
+  const r = el.getBoundingClientRect()
+  const right = r.left + LABEL_W + selX.value.right + GAP
+  const left = r.left + LABEL_W + selX.value.left - GAP - CARD_W
+  const maxX = window.innerWidth - CARD_W - EDGE
+  const x = right <= maxX ? right : left >= EDGE ? left : maxX
+  const y = r.top + selection.value.top
+  return {
+    left: Math.max(EDGE, Math.min(maxX, x)),
+    top: Math.max(EDGE, Math.min(window.innerHeight - CARD_H - EDGE, y)),
+  }
 })
 
 function pointer (e) {

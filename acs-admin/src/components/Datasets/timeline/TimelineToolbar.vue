@@ -9,8 +9,10 @@
 <template>
   <div class="flex flex-wrap items-center justify-between gap-2">
     <div class="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="sm" @click="emit('go', quick.today)">Today</Button>
-      <Button variant="outline" size="sm" @click="emit('go', quick.yesterday)">Yesterday</Button>
+      <template v-if="!fine">
+        <Button variant="outline" size="sm" @click="emit('go', quick.today)">Today</Button>
+        <Button variant="outline" size="sm" @click="emit('go', quick.yesterday)">Yesterday</Button>
+      </template>
       <Button variant="ghost" size="icon" :title="`Back ${stepLabel}`" @click="emit('step', -1)">
         <i class="fa-solid fa-chevron-left"></i>
         <span class="sr-only">Back {{ stepLabel }}</span>
@@ -78,7 +80,8 @@ const props = defineProps({
   now: { type: Number, required: true },
   // Show the search box (the timeline does; the Data tab charts do not).
   searchable: { type: Boolean, default: true },
-  // Offer the Seconds and Minutes zooms (the Data tab charts; not the timeline).
+  // The Data tab charts: offer the Seconds and Minutes zooms, and leave
+  // out the Today and Yesterday buttons. The timeline keeps its own.
   fine: { type: Boolean, default: false },
   // What the arrows move by, when not the zoom's own step.
   stepText: { type: String, default: null },

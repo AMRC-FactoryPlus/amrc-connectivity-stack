@@ -516,6 +516,52 @@ export function latest_point (m) {
     return b ? [b[0], b[1]] : null
 }
 
+/**
+ * The faint joins across gaps in chart rows: for each break (a null)
+ * between two real points, a segment from the point before to the
+ * point after, then a null so segments stay apart. Nothing joins past
+ * the newest point or before the first.
+ */
+export function gap_joins (rows) {
+    const out = []
+    let last = null
+    let broken = false
+    for (const r of rows) {
+        if (r[1] == null) { if (last) broken = true; continue }
+        if (broken && last) out.push([last[0], last[1]], [r[0], r[1]], [r[0], null])
+        broken = false
+        last = r
+    }
+    return out
+}
+
+/**
+ * The y range for chart rows in view [from, to]: the values inside it,
+ * and the value carried in from before `from` (the line enters from
+ * the left at that height), padded by `pad` of the range each side. A
+ * flat line gets a band of 10% of its value (or 1) around it. Null
+ * when nothing is in view.
+ */
+export function y_range (rows, from, to, pad = 0.1) {
+    let lo = Infinity, hi = -Infinity
+    let carried = null
+    for (const [t, v] of rows) {
+        if (t < from) { carried = v; continue }
+        if (t > to) break
+        if (v == null) continue
+        if (v < lo) lo = v
+        if (v > hi) hi = v
+    }
+    if (carried != null) { lo = Math.min(lo, carried); hi = Math.max(hi, carried) }
+    if (!(lo <= hi)) return null
+    if (lo === hi) {
+        const band = Math.abs(lo) * 0.1 || 1
+        return { min: lo - band, max: hi + band }
+    }
+    const p = (hi - lo) * pad
+    return { min: lo - p, max: hi + p }
+}
+
 /** Smallest and largest mean. */
 export function extent (points) {
     let lo = Infinity, hi = -Infinity
@@ -553,76 +599,60 @@ export function sparkline_path (rows, { from, to, w, h, step = false, pad = 2 })
 }
 
 /* ------------------------------------------------------------------
- * Values sent on change
+ * What a chart draws
  * ------------------------------------------------------------------ */
 
 /**
- * Whether a metric is sent on change rather than on a clock: in more
- * than one in ten of the buckets where its device sent data, this
- * metric sent nothing.
- */
-export function sent_on_change (points, every, active, until = Infinity) {
-    if (!active || !points.length) return false
-    const have = new Set(points.map(p => p[0]))
-    const end = Number.isFinite(until) ? until : bucket_end(points[points.length - 1][0], every)
-    let busy = 0, missing = 0
-    for (let t = points[0][0], i = 0; t < end && i < 20000; t = bucket_end(t, every), i++) {
-        if (!active(t)) continue
-        busy++
-        if (!have.has(t)) missing++
-    }
-    return busy > 0 && missing > busy / 10
-}
-
-/**
  * What a chart or sparkline draws for one metric: [ms, value|null]
- * rows and whether to draw them as steps.
+ * rows, always drawn as steps (hold, then jump). Sparkplug reports by
+ * exception, so a value holds until the next one: nothing is
+ * interpolated.
  *
- * A metric sent on a clock is drawn as before: bucket means, broken
- * where a bucket is missing, then its raw live values.
- *
- * A metric sent on change (sent_on_change) holds its last value across
- * buckets with no value, as long as its device sent something in them
- * (`active(bucket start)`), and is drawn as steps. The line breaks only
- * where the device sent nothing at all, and the hold stops at `until`
- * (now, or the device's newest data). Raw live values follow, and the
- * last one holds to `until` too.
+ * Each bucket's mean is a flat level across its bucket. A bucket with
+ * no value holds the last value while the device sent something then
+ * (`active(bucket start)`); where the device sent nothing at all the
+ * line breaks (a null), and the chart joins the break faintly. Raw
+ * live values (`tail`) take over from the bucket they fall in, at full
+ * resolution. The first row may come from before the view, so the
+ * value carries in from the left edge. The newest bucket's level ends
+ * at its own end, or at `until` (now) if sooner; the newest raw value
+ * ends at its own time.
  */
 export function display_rows (m, every, { active = null, until = Infinity } = {}) {
     const pts = m?.points ?? []
-    const tail = m?.tail ?? []
-    if (!STEP_MS[every]) return { rows: [], step: false }
-    if (!pts.length && tail.length) return { rows: chart_pairs([], every, tail), step: false }
-    if (!sent_on_change(pts, every, active, until)) return { rows: chart_pairs(pts, every, tail), step: false }
-
+    const tail = (m?.tail ?? []).filter(([t]) => t <= until)
+    if (!STEP_MS[every]) return { rows: [], step: true }
+    const busy = active ?? (() => true)
     const rows = []
-    const means = new Map(pts.map(p => [p[0], p[1]]))
-    let last = null
-    const end = Number.isFinite(until) ? until : bucket_end(pts[pts.length - 1][0], every)
-    // Buckets up to the first raw value; the raw values draw from there.
     const rawFrom = tail.length ? bucket_start(tail[0][0], every) : Infinity
-    for (let t = pts[0][0], i = 0; t < Math.min(end, rawFrom) && i < 20000; t = bucket_end(t, every), i++) {
-        if (means.has(t)) {
-            last = means.get(t)
-            rows.push([t, last])
+    let last = null
+    if (pts.length) {
+        const means = new Map(pts.map(p => [p[0], p[1]]))
+        const lastBucket = bucket_end(pts[pts.length - 1][0], every)
+        const end = Math.min(Number.isFinite(until) ? until : lastBucket, rawFrom)
+        for (let t = pts[0][0], i = 0; t < end && i < 20000; t = bucket_end(t, every), i++) {
+            if (means.has(t)) {
+                last = means.get(t)
+                rows.push([t, last])
+            }
+            else if (busy(t)) {
+                if (last != null) rows.push([t, last])
+            }
+            else if (rows.length && rows[rows.length - 1][1] != null) {
+                rows.push([t, null])
+            }
         }
-        else if (active(t)) {
-            if (last != null) rows.push([t, last])
-        }
-        else if (rows.length && rows[rows.length - 1][1] != null) {
-            rows.push([t, null])
+        // The newest level ends with its bucket (or now), unless raw values follow.
+        const top = rows[rows.length - 1]
+        if (!tail.length && top && top[1] != null) {
+            const close = Math.min(bucket_end(top[0], every), until)
+            if (close > top[0]) rows.push([close, top[1]])
         }
     }
-    // Raw live values, at full resolution.
     const after = rows.length ? rows[rows.length - 1][0] : -Infinity
-    for (const [rt, v] of tail) {
-        if (rt <= after || rt > end) continue
-        rows.push([rt, v])
-        last = v
-    }
-    // Hold the last value up to `until`.
-    if (last != null && Number.isFinite(until) && rows.length && rows[rows.length - 1][1] != null && until > rows[rows.length - 1][0]) {
-        rows.push([until, last])
+    for (const [t, v] of tail) {
+        if (t <= after) continue
+        rows.push([t, v])
     }
     return { rows, step: true }
 }
@@ -681,6 +711,24 @@ export class SeriesCache {
         this.counts = new Map()    // device -> Map(bucket start -> n)
         this.counted = []          // [[from, to]] ranges with counts
         this.asOf = -Infinity
+        // Everything up to this time has been fetched, without a hole,
+        // at the newest edge. A chunk still open when fetched is only
+        // complete up to here; later answers that start at or before it
+        // move it on.
+        this.through = -Infinity
+    }
+
+    /**
+     * The stretch at the newest edge not fetched since the open chunk
+     * was loaded, up to `to`, or null. This happens when the view
+     * leaves this bucket size for a while and the newest buckets were
+     * refreshed for another one.
+     */
+    stale (to, now = Date.now()) {
+        if (!Number.isFinite(this.through)) return null
+        const end = Math.min(to, now)
+        if (end <= this.through + this.step) return null
+        return { from: bucket_start(this.through, this.every), to: bucket_end(bucket_start(end, this.every), this.every) }
     }
 
     /** The range to fetch to show [from, to), or null. */
@@ -720,7 +768,13 @@ export class SeriesCache {
             this.counted.push([from, to])
         }
         if (final) this.book.put(['*'], from, to, s)
-        if (Number.isFinite(s.asOf)) this.asOf = Math.max(this.asOf, s.asOf)
+        if (Number.isFinite(s.asOf)) {
+            this.asOf = Math.max(this.asOf, s.asOf)
+            // An answer that reaches its asOf moves the edge on, if it
+            // starts at or before the edge (or sets it the first time).
+            const reaches = s.asOf >= from && s.asOf <= to + this.step
+            if (reaches && (this.through === -Infinity || from <= this.through)) this.through = Math.max(this.through, s.asOf)
+        }
     }
 
     /** Whether device counts cover [from, to). */

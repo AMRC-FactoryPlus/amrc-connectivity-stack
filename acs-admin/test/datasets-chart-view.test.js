@@ -13,7 +13,7 @@ import {
     spark_range, default_spark_range, MIN_SPAN,
 } from '../src/lib/datasets/chart-view.js'
 import { ZOOMS } from '../src/lib/datasets/model.js'
-import { dataset_window, chart_pairs, live_mode, display_rows, sent_on_change, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
+import { dataset_window, chart_pairs, sparkline_path, y_range, gap_joins, live_mode, display_rows, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -53,14 +53,30 @@ describe('the Data tab view', () => {
         const now = Date.parse('2026-10-08T11:30:00.000Z')
         const w = dataset_window({}, now)
         expect(w).toMatchObject({ from: now - DAY, to: now, windowless: true })
-        // The toolbar says what the axis shows: 24 h, no zoom lit.
-        const l = view_labels(w, 960, now)
-        expect(l.zoom).toBe(null)
-        expect(l.span).toBe('24 h')
         // Choosing Hours keeps the view ending at now.
         const z = zoom_view(w, 'hours', 960, now, now, { live: true })
         expect(z).toEqual({ from: now - 8 * HOUR, to: now })
-        expect(view_labels(z, 960, now)).toMatchObject({ zoom: 'hours', span: '8 h' })
+        expect(view_labels(z, 960, now, 'hours')).toMatchObject({ zoom: 'hours', span: '8 h' })
+    })
+
+    it('always lights one zoom: the default is the zoom nearest 24 h, at its own span', () => {
+        const now = Date.parse('2026-10-08T11:30:00.000Z')
+        const zoom = nearest_zoom(DAY, 960)
+        expect(zoom).toBe('days')
+        const span = zoom_span(zoom, 960)
+        const v = { from: now - span, to: now }
+        const l = view_labels(v, 960, now, zoom)
+        expect(l.zoom).toBe('days')
+        // Any span lights a zoom, never none.
+        expect(view_labels({ from: now - 3 * HOUR, to: now }, 960, now).zoom).toBeTruthy()
+    })
+
+    it('labels the day the view ends on, up to Days, and the week or month beyond', () => {
+        const now = Date.parse('2026-10-08T11:30:00.000Z')
+        const days = view_labels({ from: now - 40 * HOUR, to: now }, 960, now, 'days')
+        expect(days.label).toMatch(/^Today, Thu 8 Oct/)
+        expect(view_labels({ from: now - HOUR, to: now }, 960, now, 'minutes').label).toMatch(/^Today/)
+        expect(view_labels({ from: now - 20 * DAY, to: now }, 960, now, 'weeks').label).toMatch(/^Week of/)
     })
 
     it('opens a finished window on the whole window', () => {
@@ -191,7 +207,6 @@ describe('values sent on change', () => {
 
     it('draws continuous steps across buckets with no value', () => {
         const m = { points: [[T0, 8000, 1], [T0 + 4 * MIN, 6000, 1]] }
-        expect(sent_on_change(m.points, every, active, T0 + 10 * MIN)).toBe(true)
         const { rows, step } = display_rows(m, every, { active, until: T0 + 10 * MIN })
         expect(step).toBe(true)
         expect(rows.every(r => r[1] != null)).toBe(true)
@@ -207,18 +222,21 @@ describe('values sent on change', () => {
         expect(rows).toContainEqual([T0 + 6 * MIN, 5])
     })
 
-    it('holds a live value until now', () => {
+    it('ends the newest raw value at its own time, not at now', () => {
         const m = { points: [[T0, 1, 1]], tail: [[T0 + 9 * MIN + 30 * SEC, 2]] }
         const { rows } = display_rows(m, every, { active, until: T0 + 9 * MIN + 50 * SEC })
-        expect(rows.at(-2)).toEqual([T0 + 9 * MIN + 30 * SEC, 2])
-        expect(rows.at(-1)).toEqual([T0 + 9 * MIN + 50 * SEC, 2])
+        expect(rows.at(-1)).toEqual([T0 + 9 * MIN + 30 * SEC, 2])
     })
 
-    it('draws a metric sent on a clock as before', () => {
+    it('draws a linear-looking metric as steps: each bucket a flat level', () => {
         const pts = Array.from({ length: 10 }, (_, i) => [T0 + i * MIN, i, 60])
         const { rows, step } = display_rows({ points: pts }, every, { active, until: T0 + 10 * MIN })
-        expect(step).toBe(false)
-        expect(rows).toHaveLength(10)
+        expect(step).toBe(true)
+        // One level per bucket, and the newest closes at its bucket end.
+        expect(rows).toHaveLength(11)
+        expect(rows.at(-1)).toEqual([T0 + 10 * MIN, 9])
+        const d = sparkline_path(rows, { from: T0, to: T0 + 10 * MIN, w: 100, h: 20, step, pad: 0 })
+        expect(d).not.toMatch(/L/)
     })
 })
 
@@ -248,5 +266,58 @@ describe('the chart cache', () => {
         c.put(T0, T0 + 20 * SEC, answer(T0, T0 + 20 * SEC, T0 + 15 * SEC), { keys: [key], final: false })
         expect(c.missing(T0, T0 + 20 * SEC, T0 + HOUR)).not.toBe(null)
         expect(c.asOf).toBe(T0 + 15 * SEC)
+    })
+})
+
+describe('Data tab fixes: y axis, history edge, faint joins', () => {
+    it('fits the y axis to the points in view only', () => {
+        const rows = [[T0 - HOUR, 1000], [T0 - MIN, 50], [T0, 10], [T0 + MIN, 20], [T0 + HOUR, -500]]
+        const r = y_range(rows, T0, T0 + 10 * MIN)
+        // 50 is carried in from the left edge; 1000 and -500 are outside.
+        expect(r.min).toBeCloseTo(10 - 4)
+        expect(r.max).toBeCloseTo(50 + 4)
+        expect(y_range([[T0, 5], [T0 + MIN, 5]], T0, T0 + MIN)).toEqual({ min: 4.5, max: 5.5 })
+        expect(y_range([[T0, 0]], T0, T0 + MIN)).toEqual({ min: -1, max: 1 })
+        expect(y_range([[T0 - DAY, 3]], T0, T0 + MIN)).toEqual({ min: 2.7, max: 3.3 })
+        expect(y_range([], T0, T0 + MIN)).toBe(null)
+    })
+
+    it('fetches the newest stretch again after the view used another bucket size', () => {
+        const c = new SeriesCache('10s')
+        const key = series_key(D1, 'A')
+        // Loaded at 12:30 (the open chunk is complete to here).
+        const t1 = T0 + 30 * MIN
+        c.put(t1 - 20 * MIN, t1 + 10 * MIN, { asOf: t1, devices: {}, metrics: { [key]: { device: D1, metric: 'A', points: [] } } }, { keys: [key] })
+        expect(c.stale(t1, t1)).toBe(null)
+        // Ten minutes later, with no refreshes at 10 s since: 12:30 to now is missing.
+        const now = t1 + 10 * MIN
+        expect(c.stale(now, now)).toEqual({ from: t1, to: now + 10 * SEC })
+        // Fetching that stretch catches the edge up.
+        c.put(t1, now + 10 * SEC, { asOf: now, devices: {}, metrics: {} }, { keys: [key], final: false })
+        expect(c.stale(now, now)).toBe(null)
+    })
+
+    it('holds an on-change value in from the left edge', () => {
+        const active = () => true
+        const { rows, step } = display_rows({ points: [[T0 - 5 * MIN, 7, 1], [T0 + 2 * MIN, 8, 1], [T0 + 2 * MIN + 10 * SEC, 8, 1]] }, '10s', { active, until: T0 + 4 * MIN })
+        expect(step).toBe(true)
+        // The value before the view carries across its left edge.
+        expect(rows.find(r => r[0] === T0)).toEqual([T0, 7])
+    })
+
+    it('joins a gap faintly between two real points, and nothing past the newest', () => {
+        const rows = [[T0, 1], [T0 + 10 * SEC, 2], [T0 + 20 * SEC, null], [T0 + 50 * SEC, 3], [T0 + MIN, null]]
+        expect(gap_joins(rows)).toEqual([[T0 + 10 * SEC, 2], [T0 + 50 * SEC, 3], [T0 + 50 * SEC, null]])
+        expect(gap_joins([[T0, 1], [T0 + MIN, null]])).toEqual([])
+    })
+
+    it('holds a step value across the gap', () => {
+        const busy = t => t < T0 + 30 * SEC || t >= T0 + MIN
+        const { rows, step } = display_rows({ points: [[T0, 4, 1], [T0 + MIN + 30 * SEC, 6, 1]] }, '10s', { active: busy, until: T0 + 2 * MIN })
+        expect(step).toBe(true)
+        const joins = gap_joins(rows)
+        // The join starts at the held value; drawn as steps, it stays at 4 across the gap.
+        expect(joins[0][1]).toBe(4)
+        expect(joins[1][0]).toBe(T0 + MIN)
     })
 })

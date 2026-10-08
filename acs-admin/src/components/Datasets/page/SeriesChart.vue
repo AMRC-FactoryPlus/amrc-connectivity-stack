@@ -17,6 +17,7 @@ import { LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { fmt_time } from '@/lib/datasets/model.js'
+import { y_range, gap_joins } from '@/lib/datasets/series.js'
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent])
 
@@ -41,12 +42,15 @@ const option = computed(() => ({
   animation: false,
   grid: { left: 0, right: 0, top: 6, bottom: 6 },
   xAxis: { type: 'time', min: props.from, max: props.to, show: false },
-  yAxis: { type: 'value', scale: true, show: false },
+  // Fitted to the points in view, not to everything cached.
+  yAxis: { type: 'value', scale: true, show: false, ...(y_range(props.rows, props.from, props.to) ?? {}) },
   tooltip: {
     trigger: 'axis',
+    // Keep the tooltip inside the chart, so the card does not clip it.
+    confine: true,
     axisPointer: { type: 'line', lineStyle: { color: '#94a3b8' } },
     formatter: params => {
-      const p = params?.find(x => x.value?.[1] != null)
+      const p = params?.find(x => x.seriesIndex === 0 && x.value?.[1] != null)
       if (!p) return ''
       return `${esc(fmt_time(p.value[0]))}<br>${esc(num(p.value[1]))}${props.unit ? ` ${esc(props.unit)}` : ''}`
     },
@@ -61,6 +65,17 @@ const option = computed(() => ({
     lineStyle: { color: '#0f172a', width: 1.25 },
     itemStyle: { color: '#0f172a' },
     emphasis: { disabled: true },
+  }, {
+    // Gaps, joined faintly so the line reads on.
+    type: 'line',
+    data: gap_joins(props.rows),
+    step: props.step ? 'end' : false,
+    showSymbol: false,
+    connectNulls: false,
+    silent: true,
+    lineStyle: { color: '#0f172a', width: 1.25, opacity: 0.35, type: 'dashed' },
+    emphasis: { disabled: true },
+    tooltip: { show: false },
   }],
 }))
 </script>

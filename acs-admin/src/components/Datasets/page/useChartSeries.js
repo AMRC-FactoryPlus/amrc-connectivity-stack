@@ -10,7 +10,7 @@ import { useI3xLive } from '@composables/useI3xLive.js'
 import {
   LIMITS, STEP_MS, SeriesCache, series_request, mean_entry, count_too_long,
   dataset_window, window_is_live, bucket_start, bucket_end, every_for_width,
-  append_live_items, display_rows, live_mode, stray_mean_device, TAIL_REFRESH_MS,
+  append_live_items, display_rows, live_mode, stray_mean_device, TAIL_REFRESH_MS, bucket_total,
 } from '@/lib/datasets/series.js'
 
 // Buckets fetched before the view, so a value that holds from earlier
@@ -114,13 +114,22 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     const from = range.value.from - LEAD_BUCKETS * s
     const n = Date.now()
     const need = cache.missing(from, Math.min(range.value.to, n + s), n)
-    if (!need) { plan(); return }
+    // The newest edge, if it went stale while another bucket size was in view.
+    const gap = cache.stale(range.value.to, n)
+    if (!need && !gap) { plan(); return }
     loading.value = true
     try {
-      for (const p of cache.pieces(need.from, need.to)) {
+      for (const p of need ? cache.pieces(need.from, need.to) : []) {
         const ans = await fetch_series(sc.client, request(p.from, p.to, e))
         if (my !== gen) return
         cache.put(p.from, p.to, ans, { keys: keys.value, counted: !count_too_long(p.from, p.to) })
+        tick.value++
+      }
+      const edge = cache.stale(range.value.to, Date.now())
+      for (const p of edge ? cache.pieces(edge.from, edge.to) : []) {
+        const ans = await fetch_series(sc.client, request(p.from, p.to, e))
+        if (my !== gen) return
+        cache.put(p.from, p.to, ans, { keys: keys.value, final: false, counted: !count_too_long(p.from, p.to) })
         tick.value++
       }
       error.value = null
@@ -161,7 +170,11 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     const cache = cacheFor(e)
     const n = Date.now()
     const cur = bucket_start(n, e)
-    const from = bucket_start(cur - 1, e), to = bucket_end(cur, e)
+    // The two newest buckets, or from the edge if it fell behind.
+    const behind = cache.stale(n, n)
+    const from = Math.max(range.value.from - LEAD_BUCKETS * STEP_MS[e], Math.min(bucket_start(cur - 1, e), behind?.from ?? Infinity))
+    const to = bucket_end(cur, e)
+    if (bucket_total(from, to, e) > LIMITS.buckets - 1) { load(); return }
     try {
       const ans = await fetch_series(sc.client, request(from, to, e))
       if (my !== gen || cache !== caches.get(e)) return

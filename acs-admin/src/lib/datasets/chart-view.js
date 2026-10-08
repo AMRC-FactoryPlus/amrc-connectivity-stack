@@ -36,10 +36,10 @@ export function zoom_span (zoom, width) {
     return Math.max(MIN_SPAN, (Math.max(200, width || 0) / z.px_per_hour) * HOUR)
 }
 
-/** The timeline zoom whose span is closest to `span` at this width. */
-export function nearest_zoom (span, width) {
+/** The zoom whose span is closest to `span` at this width. */
+export function nearest_zoom (span, width, zooms = CHART_ZOOMS) {
     let best = null, gap = Infinity
-    for (const id of Object.keys(CHART_ZOOMS)) {
+    for (const id of Object.keys(zooms)) {
         const d = Math.abs(Math.log(zoom_span(id, width) / span))
         if (d < gap) { gap = d; best = id }
     }
@@ -107,16 +107,17 @@ export function pan_view (v, dx, width, max_to) {
 }
 
 /**
- * What the toolbar shows for a view: the zoom (only when the span shown
- * is that zoom's, within 15%; otherwise null and no zoom is lit), the
- * centre label, the date input value and the span shown.
+ * What the toolbar shows for a view: the zoom (the one given, else the
+ * nearest), the label and the date input value. The label follows the
+ * zoom: up to Days it names the day the view ends on ("Today, Thu 8
+ * Oct"); Weeks and Years name the week or month at the centre.
  */
-export function view_labels (v, width, now = Date.now()) {
-    const span = v.to - v.from
-    const near = nearest_zoom(span, width)
-    const zoom = Math.abs(zoom_span(near, width) / span - 1) <= 0.15 ? near : null
+export function view_labels (v, width, now = Date.now(), zoom = null) {
+    const z = zoom ?? nearest_zoom(v.to - v.from, width)
     const c = (v.from + v.to) / 2
-    return { zoom, label: centre_label(near === 'minutes' || near === 'seconds' ? 'hours' : near, c, now), dateValue: london_date_key(c), span: fmt_span(span) }
+    const daily = z === 'seconds' || z === 'minutes' || z === 'hours' || z === 'days'
+    const at = daily ? Math.min(v.to, now) : c
+    return { zoom: z, label: centre_label(daily ? 'hours' : z, at, now), dateValue: london_date_key(at), span: fmt_span(v.to - v.from) }
 }
 
 /** "24 h", "45 min", "3 days". */

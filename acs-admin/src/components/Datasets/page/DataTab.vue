@@ -4,8 +4,9 @@
 
 <!-- The Data tab: a metric picker on the left and, on the right, one
      chart row per pinned metric, all on one time axis. The toolbar,
-     dragging and sideways scrolling move the view; it starts on the
-     dataset's window. History comes from Data Access; while the view
+     dragging and sideways scrolling move the view; one zoom is always
+     lit. A live dataset starts at the zoom nearest 24 hours, ending at
+     now; a finished one on its whole window. Values draw as steps. History comes from Data Access; while the view
      includes now it keeps updating, and at fine zoom i3X values extend
      it as they arrive (useChartSeries). -->
 <template>
@@ -92,14 +93,13 @@
       <div v-if="entries.length" class="flex flex-wrap items-center gap-2">
         <TimelineToolbar :zoom="labels.zoom ?? ''" :label="labels.label" :date-value="labels.dateValue" :now="data.now.value"
                          :searchable="false" :fine="true" :step-text="stepText"
-                         @go="t => setView(go_view(current, t, maxTo))"
-                         @step="d => setView(step_view(current, d, maxTo))"
-                         @zoom="z => setView(zoom_view(current, z, chartW, maxTo, nowMs, { live: takesLive, window: win }))"/>
-        <span class="text-xs text-slate-500">{{ labels.span }} shown</span>
-        <Button v-if="takesLive && !at_now(current, nowMs, stepMs)" size="sm" variant="outline" class="ml-auto" @click="setView(to_now(current, Date.now()))">
+                         @go="t => setView(go_view(base, t, maxTo))"
+                         @step="d => setView(step_view(base, d, maxTo))"
+                         @zoom="setZoom"/>
+        <Button v-if="takesLive && !at_now(current, nowMs, stepMs)" size="sm" variant="outline" class="ml-auto" @click="backToNow">
           <i class="fa-solid fa-forward-step mr-2"></i>Back to now
         </Button>
-        <Button v-else-if="!takesLive && view" size="sm" variant="outline" class="ml-auto" @click="view = null">
+        <Button v-else-if="!takesLive && !wholeWindow" size="sm" variant="outline" class="ml-auto" @click="wholeWindowAgain">
           <i class="fa-solid fa-arrows-left-right-to-line mr-2"></i>Whole window
         </Button>
       </div>
@@ -170,7 +170,7 @@ import { metric_total, filter_metrics } from './page-logic.js'
 import { useDatasetPins } from './usePins.js'
 import { useChartSeries } from './useChartSeries.js'
 import TimelineToolbar from '../timeline/TimelineToolbar.vue'
-import { go_view, step_view, zoom_view, pan_view, view_labels, at_now, to_now } from '@/lib/datasets/chart-view.js'
+import { go_view, step_view, zoom_view, pan_view, view_labels, at_now, clamp_view, zoom_span, nearest_zoom, fmt_span, CHART_ZOOMS } from '@/lib/datasets/chart-view.js'
 import SeriesChart from './SeriesChart.vue'
 
 const props = defineProps({
@@ -225,38 +225,69 @@ const chartsEl = ref(null)
 const { width: chartsWidth } = useElementSize(chartsEl)
 const chartW = computed(() => chartsWidth.value ? Math.max(200, chartsWidth.value - LABEL_PX) : 600)
 
-/* The range in view. Null shows the dataset's window (for one with no
- * window, the last 24 hours; while recording, this recording). Moving
- * it sets a range; a range that ends at now keeps ending at now. */
-const view = ref(null)
+/* The view: one zoom (always one lit), and where it sits. A dataset
+ * that takes live data starts on the zoom nearest 24 hours, ending at
+ * now; a finished window starts on the whole window. Every control
+ * keeps the zoom's span, which follows the chart width. */
+const DAY_MS = 24 * 3600e3
+const zoomSel = ref(null)
+// Null: the default. { follow: true }: ends at now. { centre }: fixed.
+const pos = ref(null)
 const data = useChartSeries(() => props.record, entries, {
-  view: () => view.value ? effective(view.value) : null,
+  view: () => current.value,
   width: chartW,
 })
 const series = computed(() => data.series.value)
 const win = computed(() => data.window.value)
 const nowMs = computed(() => data.now.value)
 
-function effective (v) {
-  return v.follow ? { from: nowMs.value - v.span, to: nowMs.value } : v
-}
-const current = computed(() => view.value ? effective(view.value) : { from: win.value.from, to: win.value.to })
 // The dataset takes live data: no window, or one that includes now.
 // Then a zoom change goes to now.
 const takesLive = computed(() => win.value.windowless || win.value.open || (win.value.from <= nowMs.value && win.value.to >= nowMs.value))
-// One bucket, the tolerance for "ends at now".
-const stepMs = computed(() => STEP_MS[data.every.value] ?? 0)
+const zoom = computed(() => zoomSel.value
+  ?? nearest_zoom(takesLive.value ? DAY_MS : win.value.to - win.value.from, chartW.value, CHART_ZOOMS))
+const span = computed(() => zoom_span(zoom.value, chartW.value))
+// A finished window, not moved yet: shown whole.
+const wholeWindow = computed(() => !takesLive.value && pos.value == null)
 // A view can run up to now, or to the end of a window that ends later.
 const maxTo = computed(() => Math.max(nowMs.value, win.value.to))
+// One bucket, the tolerance for "ends at now".
+const stepMs = computed(() => STEP_MS[data.every.value] ?? 0)
 
+const current = computed(() => {
+  if (wholeWindow.value) return { from: win.value.from, to: win.value.to }
+  const p = pos.value ?? { follow: true }
+  if (p.follow) return { from: nowMs.value - span.value, to: nowMs.value }
+  return clamp_view({ from: p.centre - span.value / 2, to: p.centre + span.value / 2 }, maxTo.value)
+})
+// The current view at the zoom's span, for the controls to move.
+const base = computed(() => {
+  if (!wholeWindow.value) return current.value
+  const c = (win.value.from + win.value.to) / 2
+  return { from: c - span.value / 2, to: c + span.value / 2 }
+})
+
+/* Place a range from the view helpers, keeping the zoom. */
 function setView (v) {
-  const span = v.to - v.from
-  const n = Date.now()
-  view.value = Math.abs(v.to - n) <= span * 0.02 ? { follow: true, span } : { from: v.from, to: v.to }
+  zoomSel.value = zoom.value
+  pos.value = takesLive.value && at_now(v, Date.now(), stepMs.value) ? { follow: true } : { centre: (v.from + v.to) / 2 }
+}
+function setZoom (z) {
+  const v = zoom_view(base.value, z, chartW.value, maxTo.value, Date.now(), { live: takesLive.value, window: win.value })
+  zoomSel.value = z
+  pos.value = takesLive.value ? { follow: true } : { centre: (v.from + v.to) / 2 }
+}
+function backToNow () {
+  zoomSel.value = zoom.value
+  pos.value = { follow: true }
+}
+function wholeWindowAgain () {
+  zoomSel.value = null
+  pos.value = null
 }
 
-const labels = computed(() => view_labels(current.value, chartW.value, nowMs.value))
-const stepText = computed(() => `${fmt_duration(current.value.to - current.value.from)}`)
+const labels = computed(() => view_labels(current.value, chartW.value, nowMs.value, zoom.value))
+const stepText = computed(() => fmt_span(span.value))
 const ticks = computed(() => axis_ticks(current.value.from, current.value.to, 8))
 
 // What each chart draws, worked out once per change.
@@ -281,7 +312,7 @@ function onDrag (ev) {
   const dx = ev.clientX - dragX
   if (!dx) return
   dragX = ev.clientX
-  setView(pan_view(current.value, dx, chartW.value, maxTo.value))
+  setView(pan_view(base.value, dx, chartW.value, maxTo.value))
 }
 function stopDrag () {
   dragX = null
@@ -294,12 +325,12 @@ onBeforeUnmount(stopDrag)
 function onWheel (ev) {
   if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY)) return
   ev.preventDefault()
-  setView(pan_view(current.value, -ev.deltaX, chartW.value, maxTo.value))
+  setView(pan_view(base.value, -ev.deltaX, chartW.value, maxTo.value))
 }
 
 const heading = computed(() => {
   if (win.value.recording != null) return `Recording now, since ${fmt_since(win.value.recording)} (this will be saved as a run when it stops)`
-  if (win.value.windowless) return 'Last 24 hours (this dataset has no time window)'
+  if (win.value.windowless) return 'No time window'
   return fmt_window(props.record.from, props.record.to)
 })
 

@@ -91,12 +91,13 @@
 
       <div v-if="entries.length" class="flex flex-wrap items-center gap-2">
         <TimelineToolbar :zoom="labels.zoom ?? ''" :label="labels.label" :date-value="labels.dateValue" :now="data.now.value"
-                         :searchable="false" :step-text="stepText"
+                         :searchable="false" :minutes="true" :step-text="stepText"
                          @go="t => setView(go_view(current, t, maxTo))"
                          @step="d => setView(step_view(current, d, maxTo))"
-                         @zoom="z => setView(zoom_view(current, z, chartW, maxTo, nowMs))"/>
+                         @zoom="z => setView(zoom_view(current, z, chartW, maxTo, nowMs, { live: takesLive, window: win }))"/>
         <span class="text-xs text-slate-500">{{ labels.span }} shown</span>
-        <Button v-if="view" size="sm" variant="ghost" @click="view = null">{{ win.windowless || win.recording != null ? 'Back to now' : 'Whole window' }}</Button>
+        <Button v-if="takesLive && !at_now(current, nowMs, stepMs)" size="sm" variant="ghost" @click="setView(to_now(current, Date.now()))">Back to now</Button>
+        <Button v-else-if="!takesLive && view" size="sm" variant="ghost" @click="view = null">Whole window</Button>
       </div>
 
       <Card v-if="entries.length" class="touch-pan-y select-none overflow-hidden"
@@ -160,12 +161,12 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fmt_window, fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
-import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since } from '@/lib/datasets/series.js'
+import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since, STEP_MS } from '@/lib/datasets/series.js'
 import { metric_total, filter_metrics } from './page-logic.js'
 import { useDatasetPins } from './usePins.js'
 import { useChartSeries } from './useChartSeries.js'
 import TimelineToolbar from '../timeline/TimelineToolbar.vue'
-import { go_view, step_view, zoom_view, pan_view, view_labels } from '@/lib/datasets/chart-view.js'
+import { go_view, step_view, zoom_view, pan_view, view_labels, at_now, to_now } from '@/lib/datasets/chart-view.js'
 import SeriesChart from './SeriesChart.vue'
 
 const props = defineProps({
@@ -236,6 +237,11 @@ function effective (v) {
   return v.follow ? { from: nowMs.value - v.span, to: nowMs.value } : v
 }
 const current = computed(() => view.value ? effective(view.value) : { from: win.value.from, to: win.value.to })
+// The dataset takes live data: no window, or one that includes now.
+// Then a zoom change goes to now.
+const takesLive = computed(() => win.value.windowless || win.value.open || (win.value.from <= nowMs.value && win.value.to >= nowMs.value))
+// One bucket, the tolerance for "ends at now".
+const stepMs = computed(() => STEP_MS[data.every.value] ?? 0)
 // A view can run up to now, or to the end of a window that ends later.
 const maxTo = computed(() => Math.max(nowMs.value, win.value.to))
 

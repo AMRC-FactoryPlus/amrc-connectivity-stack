@@ -9,9 +9,10 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-    zoom_span, nearest_zoom, clamp_view, zoom_view, step_view, go_view, pan_view, view_labels,
+    zoom_span, nearest_zoom, at_now, to_now, CHART_ZOOMS, clamp_view, zoom_view, step_view, go_view, pan_view, view_labels,
     spark_range, default_spark_range, MIN_SPAN,
 } from '../src/lib/datasets/chart-view.js'
+import { ZOOMS } from '../src/lib/datasets/model.js'
 import { dataset_window, live_mode, display_rows, sent_on_change, SeriesCache, every_for_width, series_key } from '../src/lib/datasets/series.js'
 
 const SEC = 1000
@@ -57,7 +58,7 @@ describe('the Data tab view', () => {
         expect(l.zoom).toBe(null)
         expect(l.span).toBe('24 h')
         // Choosing Hours keeps the view ending at now.
-        const z = zoom_view(w, 'hours', 960, now, now)
+        const z = zoom_view(w, 'hours', 960, now, now, { live: true })
         expect(z).toEqual({ from: now - 8 * HOUR, to: now })
         expect(view_labels(z, 960, now)).toMatchObject({ zoom: 'hours', span: '8 h' })
     })
@@ -77,6 +78,47 @@ describe('the Data tab view', () => {
     it('asks for buckets to suit the span and width', () => {
         expect(every_for_width(T0, T0 + 10 * HOUR, 1200)).toBe('30s')
         expect(every_for_width(T0, T0 + 50 * HOUR, 1300)).toBe('5m')
+    })
+})
+
+describe('zoom and Back to now', () => {
+    const now = Date.parse('2026-10-08T11:30:00.000Z')
+
+    it('goes to now on a zoom change while the dataset takes live data', () => {
+        const past = { from: now - 3 * DAY, to: now - 2 * DAY }
+        expect(zoom_view(past, 'hours', 960, now, now, { live: true })).toEqual({ from: now - 8 * HOUR, to: now })
+    })
+
+    it('zooms a finished window around its centre, inside the window', () => {
+        const window = { from: now - 3 * DAY, to: now - DAY }
+        const v = { ...window }
+        expect(zoom_view(v, 'hours', 960, now, now, { window })).toEqual({ from: now - 2 * DAY - 4 * HOUR, to: now - 2 * DAY + 4 * HOUR })
+        const edge = { from: now - 3 * DAY, to: now - 3 * DAY + HOUR }
+        expect(zoom_view(edge, 'hours', 960, now, now, { window })).toEqual({ from: now - 3 * DAY, to: now - 3 * DAY + 8 * HOUR })
+    })
+
+    it('offers Back to now only when the view does not end at now, and keeps the span', () => {
+        const v = { from: now - HOUR, to: now }
+        expect(at_now(v, now, 10 * SEC)).toBe(true)
+        // A live view a few seconds behind still counts as at now.
+        expect(at_now(v, now + 5 * SEC, 10 * SEC)).toBe(true)
+        const back = step_view(v, -1, now)
+        expect(at_now(back, now, 10 * SEC)).toBe(false)
+        expect(to_now(back, now)).toEqual({ from: now - HOUR, to: now })
+    })
+
+    it('has a Minutes zoom of about an hour that streams live', () => {
+        expect(Object.keys(CHART_ZOOMS)[0]).toBe('minutes')
+        expect(zoom_span('minutes', 1000)).toBe(HOUR)
+        const v = zoom_view({ from: now - DAY, to: now }, 'minutes', 1000, now, now, { live: true })
+        const every = every_for_width(v.from, v.to, 1000)
+        expect(every).toBe('10s')
+        expect(live_mode(v, every, now).stream).toBe(true)
+        expect(view_labels(v, 1000, now).zoom).toBe('minutes')
+    })
+
+    it('leaves the main timeline without Minutes', () => {
+        expect('minutes' in ZOOMS).toBe(false)
     })
 })
 

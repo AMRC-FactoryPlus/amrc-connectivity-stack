@@ -44,7 +44,7 @@
       <!-- Manual activation: focus landing on a zoom must not change it. -->
       <Tabs :model-value="zoom" activation-mode="manual" @update:model-value="z => z && z !== zoom && emit('zoom', z)">
         <TabsList>
-          <TabsTrigger v-for="(z, id) in ZOOMS" :key="id" :value="id">{{ z.label }}</TabsTrigger>
+          <TabsTrigger v-for="(z, id) in zooms" :key="id" :value="id">{{ z.label }}</TabsTrigger>
         </TabsList>
       </Tabs>
     </div>
@@ -66,6 +66,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ZOOMS } from '@/lib/datasets/model.js'
+import { CHART_ZOOMS } from '@/lib/datasets/chart-view.js'
 import { quick_dates, date_input_to_ms } from '@/lib/datasets/timeline.js'
 
 const props = defineProps({
@@ -77,11 +78,14 @@ const props = defineProps({
   now: { type: Number, required: true },
   // Show the search box (the timeline does; the Data tab charts do not).
   searchable: { type: Boolean, default: true },
+  // Offer the Minutes zoom (the Data tab charts; not the timeline).
+  minutes: { type: Boolean, default: false },
   // What the arrows move by, when not the zoom's own step.
   stepText: { type: String, default: null },
 })
 const emit = defineEmits(['go', 'step', 'zoom', 'update:search'])
 
+const zooms = computed(() => props.minutes ? CHART_ZOOMS : ZOOMS)
 const dateOpen = ref(false)
 const quick = computed(() => quick_dates(props.now))
 

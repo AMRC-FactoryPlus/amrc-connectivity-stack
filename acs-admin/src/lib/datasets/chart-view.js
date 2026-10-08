@@ -17,16 +17,26 @@ const HOUR = 60 * MIN
 /** The shortest span a chart shows. */
 export const MIN_SPAN = 10 * MIN
 
-/** How many ms one chart width shows at a timeline zoom. */
+/**
+ * The Data tab's zooms: the timeline's, with Minutes before Hours. At
+ * 1,000 px an hour, a typical chart width shows about an hour, in
+ * buckets of 30 s or less, so values stream live.
+ */
+export const CHART_ZOOMS = {
+    minutes: { label: 'Minutes', px_per_hour: 1000 },
+    ...ZOOMS,
+}
+
+/** How many ms one chart width shows at a zoom. */
 export function zoom_span (zoom, width) {
-    const z = ZOOMS[zoom] ?? ZOOMS.hours
+    const z = CHART_ZOOMS[zoom] ?? ZOOMS.hours
     return Math.max(MIN_SPAN, (Math.max(200, width || 0) / z.px_per_hour) * HOUR)
 }
 
 /** The timeline zoom whose span is closest to `span` at this width. */
 export function nearest_zoom (span, width) {
     let best = null, gap = Infinity
-    for (const id of Object.keys(ZOOMS)) {
+    for (const id of Object.keys(CHART_ZOOMS)) {
         const d = Math.abs(Math.log(zoom_span(id, width) / span))
         if (d < gap) { gap = d; best = id }
     }
@@ -44,14 +54,34 @@ export function clamp_view (v, max_to) {
 }
 
 /**
- * The view at a zoom. A view that ends at now (within 2% of its span)
- * keeps ending at now, as the timeline does; any other keeps its centre.
+ * The view at a zoom. While the dataset takes live data (`live`: no
+ * window, or a window that includes now), any zoom change ends the view
+ * at now. A finished window zooms around the centre, kept inside the
+ * window (`window`: { from, to }) when it fits.
  */
-export function zoom_view (v, zoom, width, max_to, now = Date.now()) {
+export function zoom_view (v, zoom, width, max_to, now = Date.now(), { live = false, window = null } = {}) {
     const span = zoom_span(zoom, width)
-    if (Math.abs(v.to - now) <= (v.to - v.from) * 0.02) return { from: now - span, to: now }
+    if (live) return { from: now - span, to: now }
     const c = (v.from + v.to) / 2
-    return clamp_view({ from: c - span / 2, to: c + span / 2 }, max_to)
+    let out = clamp_view({ from: c - span / 2, to: c + span / 2 }, max_to)
+    if (window && span <= window.to - window.from) {
+        if (out.from < window.from) out = { from: window.from, to: window.from + span }
+        if (out.to > window.to) out = { from: window.to - span, to: window.to }
+    }
+    return out
+}
+
+/**
+ * Whether a view ends at now, within one bucket (`step`) or 1% of its
+ * span, so a live view that has just moved on still counts.
+ */
+export function at_now (v, now, step = 0) {
+    return Math.abs(v.to - now) <= Math.max(step, (v.to - v.from) * 0.01)
+}
+
+/** The same span, moved to end at now. */
+export function to_now (v, now) {
+    return { from: now - (v.to - v.from), to: now }
 }
 
 /** One view width back (-1) or forward (+1). */
@@ -83,7 +113,7 @@ export function view_labels (v, width, now = Date.now()) {
     const near = nearest_zoom(span, width)
     const zoom = Math.abs(zoom_span(near, width) / span - 1) <= 0.15 ? near : null
     const c = (v.from + v.to) / 2
-    return { zoom, label: centre_label(near, c, now), dateValue: london_date_key(c), span: fmt_span(span) }
+    return { zoom, label: centre_label(near === 'minutes' ? 'hours' : near, c, now), dateValue: london_date_key(c), span: fmt_span(span) }
 }
 
 /** "24 h", "45 min", "3 days". */

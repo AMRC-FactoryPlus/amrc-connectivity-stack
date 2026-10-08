@@ -158,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, watch, onBeforeUnmount } from 'vue'
 import { useElementSize, refDebounced } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import streamSaver from 'streamsaver'
@@ -238,8 +238,11 @@ const DAY_MS = 24 * 3600e3
 const zoomSel = ref(null)
 // Null: the default. { follow: true }: ends at now. { centre }: fixed.
 const pos = ref(null)
+// The view the series loads. `current` is defined below and itself reads
+// the series' window, so it is passed through a ref kept in step with it.
+const viewRef = shallowRef(null)
 const data = useChartSeries(() => props.record, entries, {
-  view: () => current.value,
+  view: () => viewRef.value,
   width: chartW,
 })
 const series = computed(() => data.series.value)
@@ -265,6 +268,7 @@ const current = computed(() => {
   if (p.follow) return { from: nowMs.value - span.value, to: nowMs.value }
   return clamp_view({ from: p.centre - span.value / 2, to: p.centre + span.value / 2 }, maxTo.value)
 })
+watch(current, v => { viewRef.value = v }, { immediate: true, flush: 'sync' })
 // The current view at the zoom's span, for the controls to move.
 const base = computed(() => {
   if (!wholeWindow.value) return current.value

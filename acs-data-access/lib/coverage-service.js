@@ -12,19 +12,20 @@
  * Every query here is bounded: one local day, or a fixed window below
  * an empty day. None reads the whole raw bucket. Each one runs over
  * fetch() with an AbortController, so a timeout or stop() closes the
- * connection and InfluxDB drops the query.
+ * connection, and InfluxDB can cancel the query.
  */
 
 import {
     chunksToLinesIterable, linesToRowsIterable,
 } from "@influxdata/influxdb-client";
+import { Agent, fetch as undici_fetch } from "undici";
 
 import {
     COVERAGE_DEFAULTS, MEASUREMENT,
     task_script, chunk_script, hours_script, day_script,
     newest_query, state_query, previous_query,
     parse_state, fresh_state, needs_rebuild, next_chunk, repair_chunks,
-    probe_window, after_probe, retry_delay,
+    probe_window, after_probe, retry_delay, written_hours,
     floor_hour, next_local_hour,
 } from "./coverage.js";
 
@@ -32,7 +33,39 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+/** Waits `ms`, or less if `signal` aborts. */
+function sleep(ms, signal) {
+    return new Promise(resolve => {
+        if (signal?.aborted) return resolve();
+        const timer = setTimeout(done, ms);
+        function done() {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", done);
+            resolve();
+        }
+        signal?.addEventListener("abort", done, { once: true });
+    });
+}
+
+/* Undici's own limits on waiting for headers and between body chunks
+ * (300 s by default) would end a long query before its own timeout: a
+ * backfill day sends no headers until InfluxDB has finished it. The
+ * query's AbortController enforces the real limit. */
+const UNDICI_SLACK_MS = 60 * 1000;
+const MIN_UNDICI_MS = 300 * 1000;
+
+/** Undici's headers and body timeout for queries up to `timeout_ms`. */
+export function undici_limit_ms(timeout_ms) {
+    return Math.max(MIN_UNDICI_MS, Number(timeout_ms || 0) + UNDICI_SLACK_MS);
+}
+
+/** An error message short enough for one log line. */
+export function short_message(err, max = 300) {
+    const cause = err?.cause;
+    const detail = cause ? ` (${cause.code ?? cause.message ?? cause})` : "";
+    const text = `${err?.message ?? err}${detail}`;
+    return text.length > max ? text.slice(0, max - 3) + "..." : text;
+}
 
 /* The annotated CSV the query rows are parsed from. */
 const DIALECT = {
@@ -69,12 +102,21 @@ export class InfluxAdmin {
     /**
      * @param opts.url The InfluxDB URL.
      * @param opts.token An API token. The token never appears in logs.
-     * @param opts.fetch A fetch function (for tests).
+     * @param opts.fetch A fetch function (for tests). The default is
+     *   undici's fetch with a dispatcher whose timeouts allow for
+     *   `timeout_ms`.
+     * @param opts.timeout_ms The longest query this admin runs.
      */
     constructor(opts) {
         this.url = String(opts.url).replace(/\/+$/, "");
         this.token = opts.token;
-        this.fetch = opts.fetch ?? globalThis.fetch;
+        if (opts.fetch)
+            this.fetch = opts.fetch;
+        else {
+            const limit = undici_limit_ms(opts.timeout_ms);
+            const dispatcher = new Agent({ headersTimeout: limit, bodyTimeout: limit });
+            this.fetch = (url, init) => undici_fetch(url, { ...init, dispatcher });
+        }
     }
 
     async call(method, path, { query, json, text } = {}) {
@@ -152,9 +194,14 @@ export class InfluxAdmin {
     }
 
     /** Runs a Flux query and returns its rows as objects. Aborting
-     * `signal` closes the HTTP connection, which makes InfluxDB cancel
-     * the query. (The client library's own timeout does not: it reports
-     * the error but leaves the request open.) */
+     * `signal` closes the HTTP connection, so InfluxDB can cancel the
+     * query. (The client library's own timeout does not: it reports the
+     * error but leaves the request open.)
+     *
+     * InfluxDB reports an error that happens after it has started the
+     * response as an extra table with `error` and `reference` columns,
+     * under status 200. That throws here, so a failed query is never
+     * taken for an empty one. */
     async query(org, flux, { signal } = {}) {
         const res = await this.fetch(this.url + "/api/v2/query?" + new URLSearchParams({ org }), {
             method: "POST",
@@ -170,8 +217,13 @@ export class InfluxAdmin {
             throw new InfluxApiError("POST", "/api/v2/query", res.status, await res.text());
         const out = [];
         for await (const { values, tableMeta } of
-                linesToRowsIterable(chunksToLinesIterable(res.body)))
-            out.push(tableMeta.toObject(values));
+                linesToRowsIterable(chunksToLinesIterable(res.body))) {
+            const row = tableMeta.toObject(values);
+            if ("error" in row)
+                throw new InfluxApiError("POST", "/api/v2/query", res.status,
+                    `query failed: ${row.error}`);
+            out.push(row);
+        }
         return out;
     }
 
@@ -245,6 +297,10 @@ export class Coverage {
             this.empty_days = COVERAGE_DEFAULTS.empty_days;
         }
         this.timeout_ms = env_num(env.COVERAGE_TIMEOUT_MS, COVERAGE_DEFAULTS.timeout_ms);
+        /* A day that keeps failing is given up after this long, even
+         * when each query keeps within timeout_ms (the hourly fallback
+         * runs up to 25 of them). */
+        this.chunk_deadline_ms = 3 * this.timeout_ms;
         this.pause_ms = env_num(env.COVERAGE_PAUSE_MS, COVERAGE_DEFAULTS.pause_ms);
         this.repair_days = env_num(env.COVERAGE_REPAIR_DAYS, COVERAGE_DEFAULTS.repair_days);
         this.rebuild = env.COVERAGE_REBUILD ?? "";
@@ -267,6 +323,8 @@ export class Coverage {
         this.timers = new Set();
         /* AbortControllers of the queries in flight, for stop(). */
         this.inflight = new Set();
+        /* Aborts the pauses and backoff waits on stop(). */
+        this.stopping = new AbortController();
         this.failures = 0;
         /* Backfill and repair chunks run one at a time on this chain. */
         this.chain = Promise.resolve();
@@ -323,14 +381,19 @@ export class Coverage {
         return this.ids;
     }
 
-    /** Runs a query and collects its rows. After `timeout_ms`, or on
-     * stop(), it aborts the request, so InfluxDB stops the query too. */
-    async rows(query) {
+    /** Runs a query and collects its rows. After `timeout_ms`, at the
+     * `deadline` (ms, from this.now()) if that is sooner, or on stop(),
+     * it aborts the request, so InfluxDB can stop the query too. */
+    async rows(query, { deadline = Infinity } = {}) {
         if (this.stopped) throw new Error("stopped");
+        const left = deadline - this.now();
+        if (left <= 0) throw new Error("the day ran past its deadline");
+        const ms = Math.min(this.timeout_ms, left);
         const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(
-            new Error(`query timed out after ${Math.round(this.timeout_ms / 1000)} s`)),
-            this.timeout_ms);
+        const timer = setTimeout(() => ctl.abort(ms < this.timeout_ms
+            ? new Error("the day ran past its deadline")
+            : new Error(`query timed out after ${Math.round(this.timeout_ms / 1000)} s`)),
+            ms);
         timer.unref?.();
         this.inflight.add(ctl);
         try {
@@ -371,30 +434,30 @@ export class Coverage {
     /** Summarises one local day. The current day stops at the last
      * closed hour: the task counts the hours after that, and a partial
      * hour in the summary would undercount. If the day is too large for
-     * one query, it counts the day an hour at a time, then sums it.
+     * one query, it counts the day an hour at a time, then sums it. The
+     * whole day must finish within chunk_deadline_ms.
      * @returns The number of hours with data. */
     async run_chunk({ start, stop: day_end }) {
         const stop = Math.min(day_end, floor_hour(this.now()));
         if (start >= stop) return 0;
         const opts = { raw_bucket: this.raw_bucket, bucket: this.bucket, org: this.org };
-        const with_data = rows => rows.filter(r =>
-            r._measurement == MEASUREMENT.hourly && Number(r._value) > 0).length;
+        const deadline = this.now() + this.chunk_deadline_ms;
 
         try {
-            return with_data(await this.rows(chunk_script({ ...opts, start, stop })));
+            return written_hours(await this.rows(chunk_script({ ...opts, start, stop }), { deadline }));
         }
         catch (err) {
             if (this.stopped) throw err;
             this.log("Coverage day %s failed (%s); counting it by the hour",
-                new Date(start).toISOString(), err.message);
+                new Date(start).toISOString(), short_message(err));
         }
 
         let hours = 0;
         for (let h = start; h < stop && !this.stopped; h += HOUR)
-            hours += with_data(await this.rows(hours_script({
-                ...opts, start: h, stop: Math.min(h + HOUR, stop) })));
+            hours += written_hours(await this.rows(hours_script({
+                ...opts, start: h, stop: Math.min(h + HOUR, stop) }), { deadline }));
         if (this.stopped) throw new Error("stopped");
-        await this.rows(day_script({ ...opts, start, stop }));
+        await this.rows(day_script({ ...opts, start, stop }), { deadline });
         return hours;
     }
 
@@ -402,7 +465,7 @@ export class Coverage {
      * backfill uses at most half of one query slot. */
     async pause(elapsed) {
         if (this.stopped) return;
-        await this.sleep(Math.max(this.pause_ms, elapsed));
+        await this.sleep(Math.max(this.pause_ms, elapsed), this.stopping.signal);
     }
 
     /** Backfills from the marker downwards, one local day per query,
@@ -488,12 +551,16 @@ export class Coverage {
     log_failure(name, err, retry_ms) {
         const when = retry_ms == null ? "" : `; retrying in ${Math.round(retry_ms / MINUTE)} min`;
         this.log("Coverage %s failed while %s: %s%s",
-            name, err.step ?? "starting", err.message, when);
+            name, err.step ?? "starting", short_message(err), when);
     }
 
     /** Re-reads what the summary holds, for the read path. */
     async refresh() {
-        const rows = await this.rows(newest_query({ bucket: this.bucket }));
+        /* Most of the time the newest hour is recent: look back two
+         * days, and 30 only if that finds nothing. */
+        let rows = await this.rows(newest_query({ bucket: this.bucket, days: 2 }));
+        if (!rows.length)
+            rows = await this.rows(newest_query({ bucket: this.bucket, days: 30 }));
         const t = rows.length ? Date.parse(rows[0]._time) : NaN;
         this.newest = Number.isNaN(t) ? null : t;
 
@@ -519,6 +586,17 @@ export class Coverage {
         if (!this.marker) this.marker = await this.read_marker();
     }
 
+    /** Where the summary's coverage starts. A backfill that reached
+     * its floor covers all time: nothing older is ever counted. One
+     * that stopped after a long empty run covers only down to where it
+     * stopped; older raw data may exist below the gap, so reads of it
+     * fall back to raw data or are reported pending. */
+    covered_from() {
+        const m = this.marker;
+        if (m.complete && m.backfilled_to <= this.floor()) return -Infinity;
+        return m.backfilled_to;
+    }
+
     /** What the read path may use, or null if the summary is not ready.
      * @returns {covered_from, summary_to} in ms. */
     read_state() {
@@ -528,7 +606,7 @@ export class Coverage {
             .filter(t => t != null);
         if (!candidates.length) return null;
         return {
-            covered_from: this.marker.complete ? -Infinity : this.marker.backfilled_to,
+            covered_from: this.covered_from(),
             summary_to: Math.min(Math.max(...candidates), now_hour),
         };
     }
@@ -603,8 +681,8 @@ export class Coverage {
             catch (err) {
                 this.last_error = "provisioning_failed";
                 this.log("Coverage provisioning failed, retrying in %ds: %s",
-                    wait / 1000, err.message);
-                await this.sleep(wait);
+                    wait / 1000, short_message(err));
+                await this.sleep(wait, this.stopping.signal);
             }
         }
         if (this.stopped) return;
@@ -615,7 +693,7 @@ export class Coverage {
                     this.log("Coverage summary is stale: newest hour %s",
                         this.status().summarisedTo);
             })
-            .catch(err => this.log("Coverage refresh failed: %s", err.message));
+            .catch(err => this.log("Coverage refresh failed: %s", short_message(err)));
         await refresh();
         this.every(5 * MINUTE, refresh);
 
@@ -646,6 +724,7 @@ export class Coverage {
     /** Stops the background work and aborts any query in flight. */
     stop() {
         this.stopped = true;
+        this.stopping.abort();
         for (const t of this.timers) { clearTimeout(t); clearInterval(t); }
         this.timers.clear();
         for (const ctl of this.inflight) ctl.abort(new Error("stopped"));

@@ -401,8 +401,11 @@ device (a wildcard grant).
 
 `backfill.oldestData` is the start of the oldest Europe/London day with
 raw data that the backfill has found so far, or `null` if it has found
-none. `backfilledTo` can be up to `backfillEmptyDays` below it, because
-the backfill stops only after that many empty days.
+none. `backfilledTo` is where the summary's coverage ends. It can be up
+to about `backfillEmptyDays` below `oldestData`, because the backfill
+stops only after that many empty days. Reads older than `backfilledTo`
+never come from the summary (see
+[How the series route uses it](#how-the-series-route-uses-it)).
 
 `stale` is `true` when the newest summarised hour is more than 3 hours
 old. Data Access also logs a warning then. `error` is `null`, or a code
@@ -604,13 +607,18 @@ it meets.
 It runs one query at a time, outside the series route's limiter, and
 waits after each day at least as long as that day took (and at least
 `COVERAGE_PAUSE_MS`), so it uses no more than half of one query slot.
-In production-sized history, expect about a second of query time per
-day of history.
+The time a day takes grows with the number of raw points in that day.
+On a test bucket with 7,000 series and a few points per series per
+hour, one day took under a second. Dense days take longer. A 30-day
+search below an empty day took about half a second.
 
 Each backfill or repair query has a time limit (`COVERAGE_TIMEOUT_MS`,
-10 minutes by default). A query that runs over is cancelled: Data
-Access closes the connection, and InfluxDB stops the query. Stopping
-Data Access cancels its query in the same way.
+10 minutes by default). When a query runs over, or Data Access stops,
+Data Access closes the connection. InfluxDB is expected to cancel a
+query whose client has gone; this has not yet been confirmed on a
+cluster. A day counted hour by hour must also finish within three
+times `COVERAGE_TIMEOUT_MS` in total, or the backfill gives it up and
+tries again later.
 
 If the backfill fails, Data Access logs one line that names the step
 that failed (for example `Coverage backfill failed while summarising the
@@ -633,6 +641,11 @@ ready:
 * The hours after the newest summarised hour come from raw data.
 * Hours older than the backfill marker come from raw data if all the
   raw parts fit within 14 days. Otherwise they are listed in `pending`.
+  This also applies after a backfill that stopped on a run of empty
+  days: everything below where it stopped (`backfill.backfilledTo`) is
+  read from raw data or listed in `pending`, never as zero from the
+  summary. Only a backfill that reached `COVERAGE_BACKFILL_FROM` or
+  `COVERAGE_MIN_TIME` covers all older time.
 * The summary has nothing finer than an hour, so the part-hour at a
   window edge (the request window, or a dataset window) comes from raw
   data. Counts never include time outside the window, and match raw
@@ -666,8 +679,19 @@ dataAccess:
     backfill: false
 ```
 
-Do not set these variables with `kubectl set env`: the next Helm
-upgrade replaces them.
+With the backfill off, the summary is not used until a backfill has
+written its marker, so timelines count raw data and long spans show as
+`pending`. If a backfill had already started, the summary is used down
+to where it got to, and older spans stay `pending` until you turn the
+backfill on again. It then resumes where it stopped.
+
+The chart always sets `COVERAGE_ENABLED`, `COVERAGE_BACKFILL`,
+`COVERAGE_PAUSE_MS`, `COVERAGE_BACKFILL_EMPTY_DAYS`, `COVERAGE_TIMEOUT_MS`
+and `COVERAGE_REPAIR_DAYS`, and sets `COVERAGE_BACKFILL_FROM` and
+`COVERAGE_REBUILD` when they are not empty. Do not set these with
+`kubectl set env`: the next Helm upgrade replaces them. The chart does
+not set `COVERAGE_BUCKET`, `COVERAGE_TASK`, `COVERAGE_RECOUNT_HOURS` or
+`COVERAGE_MIN_TIME`; their defaults need no change.
 
 Variable | Default | Meaning
 ---|---|---
@@ -681,7 +705,7 @@ Variable | Default | Meaning
 `COVERAGE_PAUSE_MS` | `1000` | Minimum pause between backfill and repair days.
 `COVERAGE_REPAIR_DAYS` | `7` | Full days the daily repair covers. `0` turns it off.
 `COVERAGE_MIN_TIME` | `2000-01-01T00:00:00Z` | Raw points before this are taken to be bad device clocks: the backfill ignores them.
-`COVERAGE_TIMEOUT_MS` | `600000` | Time allowed for one backfill or repair query. A query that runs over is cancelled in InfluxDB too.
+`COVERAGE_TIMEOUT_MS` | `600000` | Time allowed for one backfill or repair query. Data Access then closes the connection, so InfluxDB can cancel the query. A day counted hour by hour has three times this in total.
 `COVERAGE_REBUILD` | (empty) | Any new value starts the backfill again from today. Data Access records the value, so the rebuild runs once per value.
 
 ### Caveats

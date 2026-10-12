@@ -484,9 +484,20 @@ Now:
   which lets InfluxDB count in storage instead of streaming every raw
   point to Flux. Hours are the same in UTC and Europe/London, so the
   counts do not change. Data Access updates the task's Flux on start.
-- **Timeouts cancel the query.** When a backfill or repair query runs
-  past `COVERAGE_TIMEOUT_MS`, or Data Access stops, Data Access closes
-  the connection and InfluxDB drops the query.
+- **Timeouts close the connection.** When a backfill or repair query
+  runs past `COVERAGE_TIMEOUT_MS`, or Data Access stops, Data Access
+  closes the connection, so InfluxDB can cancel the query. A day counted
+  hour by hour has three times that limit in total. Waits between days
+  end at once when Data Access stops.
+- **Failed queries are not taken for empty ones.** An error that
+  InfluxDB reports after it has started its response now fails the
+  query, instead of reading as a day with no data.
+- **Less data back from InfluxDB.** Backfill and repair queries now
+  return a count of what they wrote, not every written row.
+- **Coverage ends where the backfill stopped.** If the backfill stopped
+  after a run of empty days, reads below that point count raw data or
+  report `pending`. Before, a finished backfill made all older time
+  read as zero from the summary.
 - **Backoff.** After a failure the backfill waits 15 minutes, then 30
   minutes, 1, 2 and 4 hours, then 6 hours between tries. Each failure
   is one log line that names the step that failed.
@@ -497,12 +508,24 @@ Now:
 
 What to do on upgrade:
 
-- If you set `COVERAGE_*` variables on the Data Access deployment by
-  hand (for example `COVERAGE_BACKFILL=false` to stop the load), move
-  them to `dataAccess.coverage` values. The chart now sets these
-  variables, so the upgrade replaces hand-set values.
-- The backfill resumes from its marker. A backfill that never
-  summarised a day starts from today.
+- If you turned the backfill off by hand (`COVERAGE_BACKFILL=false` on
+  the Data Access deployment), set `dataAccess.coverage.backfill: false`
+  in your values **before** you upgrade. The chart now sets
+  `COVERAGE_ENABLED`, `COVERAGE_BACKFILL`, `COVERAGE_PAUSE_MS`,
+  `COVERAGE_BACKFILL_EMPTY_DAYS`, `COVERAGE_TIMEOUT_MS` and
+  `COVERAGE_REPAIR_DAYS`, and `COVERAGE_BACKFILL_FROM` and
+  `COVERAGE_REBUILD` when they are not empty, so the upgrade replaces
+  hand-set values of these. Move any of them you set by hand to
+  `dataAccess.coverage`. The chart does not manage `COVERAGE_BUCKET`,
+  `COVERAGE_TASK`, `COVERAGE_RECOUNT_HOURS` or `COVERAGE_MIN_TIME`.
+- Expect the backfill to start, or resume, as soon as Data Access
+  starts: one query at a time, each followed by a pause at least as
+  long, so it uses at most about half of one InfluxDB query slot until
+  it finishes. To defer it, upgrade with `backfill: false` and set it to
+  `true` later, or raise `pauseMs` to slow it down.
+- The backfill resumes from its marker. A marker written by an earlier
+  version counts its run of empty days from where it got to. A
+  backfill that never summarised a day starts from today.
 - Raw data below a gap of more than 365 days is no longer summarised.
   To include it, raise `dataAccess.coverage.backfillEmptyDays` or set
   `dataAccess.coverage.backfillFrom`.

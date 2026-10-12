@@ -240,8 +240,8 @@ dataAccess:
     # Empty: stop after `backfillEmptyDays` empty days.
     backfillFrom: ""
     # -- (COVERAGE_TIMEOUT_MS) Time allowed for one backfill or repair
-    # query, in milliseconds. A query that runs over is cancelled in
-    # InfluxDB too.
+    # query, in milliseconds. Data Access then closes the connection, so
+    # InfluxDB can cancel the query.
     timeoutMs: 600000
     # -- (COVERAGE_REPAIR_DAYS) Full days the daily repair recounts at
     # 03:00 Europe/London. 0 turns the repair off.

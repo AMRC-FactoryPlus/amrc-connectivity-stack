@@ -123,6 +123,31 @@ function birth_filter() {
         .join(" and "));
 }
 
+/* The raw points the summary counts: the `value` field of a device's
+ * metrics, birth metadata excluded. The count and the probe use the
+ * same filters, so a probe never finds points that the count ignores.
+ * InfluxDB evaluates all of these in its storage engine. */
+function raw_points({ raw_bucket, start, stop }) {
+    return flux`from(bucket: ${raw_bucket})
+      |> range(start: ${start}, stop: ${stop})
+      |> filter(fn: (r) => r._field == "value")
+      |> filter(fn: (r) => exists r.topLevelInstance and r.topLevelInstance != "")
+      |> filter(fn: (r) => ${birth_filter()})`;
+}
+
+/* Ends a written stream with one small row: how many rows it wrote, or
+ * with `nonzero`, how many had a count above 0. to() passes every
+ * written row on, and without this they would all stream back to Data
+ * Access. */
+function written(name, { nonzero = false } = {}) {
+    const keep = nonzero ? flux`
+  |> filter(fn: (r) => r._value > 0)` : fluxExpression("");
+    return flux`${keep}
+  |> group()
+  |> count()
+  |> yield(name: ${name})`;
+}
+
 /* Hourly counts per device from the raw bucket, shaped for to(). The
  * range bounds are Flux expressions or Dates.
  *
@@ -136,11 +161,7 @@ function birth_filter() {
  * its data (for example after a delete). Reads skip zero counts. */
 function hourly_counts({ raw_bucket, bucket, start, stop }) {
     return flux`union(tables: [
-    from(bucket: ${raw_bucket})
-      |> range(start: ${start}, stop: ${stop})
-      |> filter(fn: (r) => r._field == "value")
-      |> filter(fn: (r) => exists r.topLevelInstance and r.topLevelInstance != "")
-      |> filter(fn: (r) => ${birth_filter()})
+    ${raw_points({ raw_bucket, start, stop })}
       |> aggregateWindow(every: 1h, fn: count, createEmpty: false, timeSrc: "_start",
                          location: timezone.utc)
       |> group(columns: ["topLevelInstance", "_time"])
@@ -230,18 +251,28 @@ ${daily_sums(flux`union(tables: [older, hourly |> keep(columns: ["_time", "_valu
 /** The Flux for one backfill or repair chunk: one local day [start,
  * stop). It writes the hourly counts and the day's sum, both computed
  * from the same raw stream, so nothing depends on the order of writes.
- * Repeating a chunk overwrites its own points. */
+ * Repeating a chunk overwrites its own points. It returns two rows at
+ * most: `hours` (hours with data) and `days` (daily points written).
+ * See written_hours(). */
 export function chunk_script({ raw_bucket, bucket, org, start, stop }) {
     const to = to_bucket(bucket, org);
     const a = new Date(start), b = new Date(stop);
     return zone_header() + location() + String(flux`
 hourly = ${hourly_counts({ raw_bucket, bucket, start: a, stop: b })}
 
-hourly |> ${to}
+hourly |> ${to}${written("hours", { nonzero: true })}
 
 ${daily_sums(fluxExpression("hourly"), { bucket, start: a, stop: b })}
-  |> ${to}
+  |> ${to}${written("days")}
 `);
+}
+
+/** The number of hours with data from the rows of chunk_script() or
+ * hours_script(). */
+export function written_hours(rows) {
+    return rows
+        .filter(r => r.result == "hours")
+        .reduce((n, r) => n + Number(r._value ?? 0), 0);
 }
 
 /** Hourly counts only, for [start, stop). The backfill uses this, one
@@ -249,7 +280,7 @@ ${daily_sums(fluxExpression("hourly"), { bucket, start: a, stop: b })}
 export function hours_script({ raw_bucket, bucket, org, start, stop }) {
     return zone_header() + location() + String(flux`
 ${hourly_counts({ raw_bucket, bucket, start: new Date(start), stop: new Date(stop) })}
-  |> ${to_bucket(bucket, org)}
+  |> ${to_bucket(bucket, org)}${written("hours", { nonzero: true })}
 `);
 }
 
@@ -262,7 +293,7 @@ ${daily_sums(flux`from(bucket: ${bucket})
       |> range(start: ${a}, stop: ${b})
       |> filter(fn: (r) => r._measurement == ${MEASUREMENT.hourly} and r._field == "count")`,
     { bucket, start: a, stop: b })}
-  |> ${to_bucket(bucket, org)}
+  |> ${to_bucket(bucket, org)}${written("days")}
 `);
 }
 
@@ -272,10 +303,7 @@ ${daily_sums(flux`from(bucket: ${bucket})
  * after the filters runs inside the storage engine, so InfluxDB reads one
  * block per series in the window and stops. */
 export function previous_query({ raw_bucket, start, stop }) {
-    return String(flux`from(bucket: ${raw_bucket})
-  |> range(start: ${new Date(start)}, stop: ${new Date(stop)})
-  |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => ${birth_filter()})
+    return String(flux`${raw_points({ raw_bucket, start: new Date(start), stop: new Date(stop) })}
   |> last()
   |> keep(columns: ["_time"])
   |> group()
@@ -283,12 +311,13 @@ export function previous_query({ raw_bucket, start, stop }) {
 }
 
 /** The newest hour in the summary, within the last `days`. One row, or
- * none. */
+ * none. A recount writes 0 for an hour that lost its data, and that
+ * hour still counts as summarised. There is no filter on _value: it
+ * would stop InfluxDB running last() in its storage engine. */
 export function newest_query({ bucket, days = 30 }) {
     return String(flux`from(bucket: ${bucket})
   |> range(start: ${fluxExpression(`-${Number(days)}d`)})
   |> filter(fn: (r) => r._measurement == ${MEASUREMENT.hourly} and r._field == "count")
-  |> filter(fn: (r) => r._value > 0)
   |> last()
   |> keep(columns: ["_time"])
   |> group()
@@ -317,7 +346,9 @@ export function state_query({ bucket }) {
  *                  long enough run of days with no raw data.
  *   oldest_data    The start of the oldest day with raw data that the
  *                  backfill has found, or -1 if none yet. The run of
- *                  empty days is counted from here.
+ *                  empty days is counted from here. A marker written
+ *                  before this field existed has none; parse_state()
+ *                  then takes backfilled_to, so the run starts there.
  *   rule           RULE_VERSION when the backfill started.
  *   rebuild        The rebuild request that started it ("" if none).
  * ---------------------------------------------------------------
@@ -337,6 +368,10 @@ export function parse_state(rows) {
         oldest_data: num(f.oldest_data),
     };
     if (state.oldest_data != null && state.oldest_data < 0) state.oldest_data = null;
+    /* An older marker: count the empty run from where it got to, not
+     * from `upper`, or a long walk would end at once. */
+    if (!("oldest_data" in f) && state.backfilled_to != null)
+        state.oldest_data = state.backfilled_to;
     if (state.upper == null || state.backfilled_to == null) return null;
     return state;
 }

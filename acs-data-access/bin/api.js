@@ -15,6 +15,7 @@ import {DataAccessNotify} from '../lib/notify.js';
 import { InfluxReader } from '../lib/influx-reader.js';
 import { SeriesReader } from '../lib/series-reader.js';
 import { Coverage, InfluxAdmin } from '../lib/coverage-service.js';
+import { COVERAGE_DEFAULTS } from '../lib/coverage.js';
 import { body_errors } from '../lib/utils.js';
 
 const { env } = process;
@@ -52,11 +53,15 @@ const influxReader = new InfluxReader({
 // task on every start, then backfills and repairs it in the background.
 // Its queries go through InfluxAdmin, which can abort them: a backfill
 // day returns nothing until InfluxDB has written it, so they get a long
-// timeout (COVERAGE_TIMEOUT_MS), and a query that hits it is cancelled
-// in InfluxDB too.
+// timeout (COVERAGE_TIMEOUT_MS). A query that hits it is aborted, which
+// closes the connection so InfluxDB can cancel it.
 const coverage = new Coverage({
   debug,
-  admin: new InfluxAdmin({ url: env.INFLUXDB_URL, token: env.INFLUXDB_TOKEN }),
+  admin: new InfluxAdmin({
+    url: env.INFLUXDB_URL,
+    token: env.INFLUXDB_TOKEN,
+    timeout_ms: Number(env.COVERAGE_TIMEOUT_MS) || COVERAGE_DEFAULTS.timeout_ms,
+  }),
   org: env.INFLUXDB_ORG,
   raw_bucket: env.INFLUXDB_BUCKET,
   env,

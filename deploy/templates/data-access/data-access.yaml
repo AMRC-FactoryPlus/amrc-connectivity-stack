@@ -85,9 +85,13 @@ spec:
             - name: COVERAGE_BACKFILL_FROM
               value: {{ . | quote }}
             {{- end }}
-            {{- with .rebuild }}
+            {{- /* 0 and false are valid rebuild values, and a large number
+                   must not render as 1e+07. */}}
+            {{- $rebuild := .rebuild }}
+            {{- if kindIs "float64" $rebuild }}{{ $rebuild = int64 $rebuild }}{{ end }}
+            {{- if and (not (kindIs "invalid" $rebuild)) (ne (toString $rebuild) "") }}
             - name: COVERAGE_REBUILD
-              value: {{ . | toString | quote }}
+              value: {{ $rebuild | toString | quote }}
             {{- end }}
             {{- end }}
           volumeMounts:

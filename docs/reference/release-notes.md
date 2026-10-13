@@ -406,6 +406,49 @@ MQTT.js releases, which report the refusal in a different form. Before,
 such a refusal was logged as "not confirmed" and the service kept
 running.
 
+### Core services restart when their MQTT client stops trying
+
+ConfigDB, the Directory, Command Escalation, Git and the Monitor had no
+check on their MQTT connection. If the MQTT client stopped trying to
+reconnect, for example after the broker refused a connection, the
+service kept running and answering HTTP requests, but sent and received
+nothing over MQTT until someone restarted it.
+
+Each of these services now exits, so Kubernetes restarts it, if its MQTT
+client has had no connection to the broker, and has made no attempt to
+connect, for `mqttWatchdogTimeout` seconds (default 300). The time
+counts from startup, or from the moment the client lost its connection
+or last tried to connect.
+
+Unlike `connectTimeout` on the historians, this check does not restart
+a client that keeps trying to reconnect, however long the broker is
+down. A restart would not bring the broker back, and these services
+also serve HTTP: almost every other service needs ConfigDB and the
+Directory. Restarting them every five minutes during a broker outage
+would take their APIs down too, and Kubernetes' growing restart
+back-off could keep them down for minutes after the broker came back.
+
+```yaml
+configdb:
+  mqttWatchdogTimeout: 300
+directory:
+  mqttWatchdogTimeout: 300
+cmdesc:
+  mqttWatchdogTimeout: 300
+git:
+  mqttWatchdogTimeout: 300
+monitor:
+  mqttWatchdogTimeout: 300
+```
+
+Set a value to `0` to turn the check off for that service. An invalid
+value, for example `5m`, stops the service at startup.
+
+The check is part of the service client library, which turns it on for
+every MQTT client it creates when given the `mqtt_watchdog_timeout`
+option or the `MQTT_WATCHDOG_TIMEOUT` environment variable. It is off
+unless one of these is set, and never runs in a browser.
+
 ### i3X resubscribes to the UNS after a broker restart
 
 After the MQTT broker restarted while i3X kept running, i3X reconnected

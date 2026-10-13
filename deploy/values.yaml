@@ -141,6 +141,13 @@ directory:
   # tags, so they still appear. Set this to "1" to log everything, for
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has had
+  # no connection to the broker, and has made no attempt to connect, for
+  # this many seconds. This catches a client that has stopped trying,
+  # which otherwise leaves the service running with no MQTT connection
+  # until someone restarts it. A client that keeps retrying while the
+  # broker is down is not restarted. Set it to 0 to disable the check.
+  mqttWatchdogTimeout: 300
 
 configdb:
   # -- Whether or not to enable the Configuration Store component
@@ -160,6 +167,13 @@ configdb:
   # tags, so they still appear. Set this to "1" to log everything, for
   # example while debugging.
   verbosity: "ALL,!query,!acl,!notify-msg"
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has had
+  # no connection to the broker, and has made no attempt to connect, for
+  # this many seconds. This catches a client that has stopped trying,
+  # which otherwise leaves the service running with no MQTT connection
+  # until someone restarts it. A client that keeps retrying while the
+  # broker is down is not restarted. Set it to 0 to disable the check.
+  mqttWatchdogTimeout: 300
   bodyLimit: 100kb
   # -- Resource requests and limits for the `webapi` container. The
   # default is empty, which leaves the pod BestEffort: first in line for
@@ -209,6 +223,13 @@ monitor:
   image:
     repository: acs-monitor
   verbosity: "ALL,!service,!token"
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has had
+  # no connection to the broker, and has made no attempt to connect, for
+  # this many seconds. This catches a client that has stopped trying,
+  # which otherwise leaves the service running with no MQTT connection
+  # until someone restarts it. A client that keeps retrying while the
+  # broker is down is not restarted. Set it to 0 to disable the check.
+  mqttWatchdogTimeout: 300
 
 dataAccess:
   enabled: true
@@ -473,6 +494,13 @@ cmdesc:
     repository: acs-cmdesc
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 1
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has had
+  # no connection to the broker, and has made no attempt to connect, for
+  # this many seconds. This catches a client that has stopped trying,
+  # which otherwise leaves the service running with no MQTT connection
+  # until someone restarts it. A client that keeps retrying while the
+  # broker is down is not restarted. Set it to 0 to disable the check.
+  mqttWatchdogTimeout: 300
 
 historians:
   uns:
@@ -543,6 +571,13 @@ git:
     repository: acs-git
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: "ALL,!service,!token"
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has had
+  # no connection to the broker, and has made no attempt to connect, for
+  # this many seconds. This catches a client that has stopped trying,
+  # which otherwise leaves the service running with no MQTT connection
+  # until someone restarts it. A client that keeps retrying while the
+  # broker is down is not restarted. Set it to 0 to disable the check.
+  mqttWatchdogTimeout: 300
 
 clusterManager:
   # -- Whether or not to enable the Cluster Manager component

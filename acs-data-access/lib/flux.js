@@ -72,15 +72,40 @@ export function metrics_predicate(metrics) {
     return clauses.join("\n                        or ");
 }
 
+/* The most sub-device metrics ORed into one Flux filter. A sub-device
+ * with more is read with several queries. */
+export const MAX_SUBSET_CLAUSES = 100;
+
+/** Build the Flux predicate body for a sub-device's resolved metrics.
+ *
+ * Unlike a selector, a null path here means the device root, where the
+ * historians write no `path` tag at all.
+ *
+ * @param {object[]} metrics `{ path, name }` from resolve_metric.
+ * @returns {string} A boolean Flux expression over `r`.
+ */
+export function subset_predicate(metrics) {
+    const clauses = metrics.map(({ path, name }) => {
+        const by_name = measurement_clause(name);
+
+        if (path == null) return `(not exists r.path and ${by_name})`;
+        return `(r.path == ${flux_string(path)} and ${by_name})`;
+    });
+
+    return clauses.join("\n                        or ");
+}
+
 /** Build the Flux query that exports one device source.
  *
  * @param {object} opts
  * @param {string} opts.bucket Influx bucket name.
  * @param {object} opts.source `{ device_uuid, from, to }`.
  * @param {object} [opts.filter] `{ metrics }` or `{ measurement }`.
+ * @param {object[]} [opts.subset] Sub-device metrics to restrict the
+ *   source to, as `{ path, name }`. Applied as well as `filter`.
  * @returns {string} The Flux query.
  */
-export function build_flux_query({ bucket, source, filter = {} }) {
+export function build_flux_query({ bucket, source, filter = {}, subset }) {
     const start = source.from ?? "1970-01-01T00:00:00Z";
     const stop = source.to ?? "2100-01-01T00:00:00Z";
 
@@ -104,6 +129,15 @@ export function build_flux_query({ bucket, source, filter = {} }) {
         `;
     }
 
+    const subsetFilter = subset
+        ? `
+            |> filter(
+                fn: (r) =>
+                        ${subset_predicate(subset)}
+            )
+        `
+        : "";
+
     return `
             from(bucket: ${flux_string(bucket)})
 
@@ -113,6 +147,8 @@ export function build_flux_query({ bucket, source, filter = {} }) {
             )
 
             ${metricFilter}
+
+            ${subsetFilter}
 
             |> filter(
                 fn: (r) =>
@@ -128,4 +164,25 @@ export function build_flux_query({ bucket, source, filter = {} }) {
                 "unit"
             ])
         `;
+}
+
+/** Build the Flux queries that export one resolved source.
+ *
+ * A whole-device source has no `metrics` and is one query. A sub-device
+ * source lists its resolved metrics; it is read in chunks of
+ * MAX_SUBSET_CLAUSES, and an empty list reads nothing.
+ *
+ * @param {object} opts As build_flux_query, without `subset`.
+ * @returns {string[]} The Flux queries; empty if there is nothing to read.
+ */
+export function build_flux_queries({ bucket, source, filter = {} }) {
+    const { metrics } = source;
+    if (!metrics) return [build_flux_query({ bucket, source, filter })];
+
+    const queries = [];
+    for (let i = 0; i < metrics.length; i += MAX_SUBSET_CLAUSES) {
+        const subset = metrics.slice(i, i + MAX_SUBSET_CLAUSES);
+        queries.push(build_flux_query({ bucket, source, filter, subset }));
+    }
+    return queries;
 }

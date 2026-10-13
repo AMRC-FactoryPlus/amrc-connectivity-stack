@@ -12,14 +12,15 @@ measurements); the service itself is stateless.
 A dataset is a ConfigDB object in the `Dataset` class
 (`c31d3cbd-01cd-4833-8014-c4512aef1e5c`). What data a dataset actually
 contains is defined by exactly one config entry, filed under one of
-three **structural applications**. The application the entry is filed
+four **structural applications**. The application the entry is filed
 under determines the dataset's structure; the Data Access service
-inspects which of the three apps has an entry for a given dataset to
+inspects which of the four apps has an entry for a given dataset to
 decide how to resolve it.
 
 Structural app | UUID | `config` shape
 ---|---|---
 `Sparkplug source` | `f5d550c4-2831-11f1-b0b0-83fda3035799` | `{ "source": "<Sparkplug Device/Node UUID>" }`
+`Sub-device` | `7f7d40cc-4075-4f06-90cf-aa6261d68f18` | `{ "source": "<Sparkplug Device UUID>", "metrics": [{ "instance": "<Instance_UUID>", "metric": "<path>" }, ...] }`
 `Union components` | `1c4ca454-de38-44d9-92fb-aa5218bfa257` | `["<dataset UUID>", ...]`
 `Session limits` | `8754c000-3778-4ae6-b2b8-bbcd959bb775` | `{ "source": "<dataset UUID>", "from": "<ISO datetime>", "to": "<ISO datetime>" }`
 
@@ -28,6 +29,43 @@ Structural app | UUID | `config` shape
 Identifies all measurements published by a given Sparkplug Device or
 Node. Measurements are located in Influx by matching the `topLevelInstance`
 tag against this UUID.
+
+### Sub-device
+
+Selects specific metrics from one Sparkplug Device. Each entry in
+`metrics` names a metric relative to an object in the device's origin
+map (its `DeviceInformation` config):
+
+* `instance` is the `Instance_UUID` of the metric's nearest enclosing
+  object, or the device UUID for a metric with none.
+* `metric` is the path from that object to the metric, without the
+  Influx type suffix, e.g. `Position/Actual`. It can include plain
+  folders that have no `Instance_UUID` of their own.
+
+`GET v1/sparkplug-sources/:uuid/metrics` lists the references a device
+offers. Up to 500 metrics may be listed, with no duplicates.
+
+When creating or updating a dataset, an entry may instead give the full
+Sparkplug metric name, as `{ "path": "Axes/X/Position/Actual" }`. The
+service looks the path up in the device's current origin map and stores
+the equivalent `{ "instance", "metric" }` entry, so the stored config
+(and `GET v1/structure/:uuid`) always uses the `instance` form. A path
+must name a metric recorded to the historian; anything else is rejected
+with `422` and nothing is created. The two forms can be mixed in one
+request.
+
+When the dataset is read, each `instance` is looked up in the device's
+current origin map, and the metric is located in Influx by the `path`
+tag (everything before the last `/` of the full metric name) and
+`_measurement`. The historian's `bottomLevelInstance` tag is not used:
+it is wrong for many series. Because references hold an
+`Instance_UUID`, renaming an object in the origin map does not break
+them. A reference whose instance is no longer in the origin map, most
+often after the device's schema is changed, reads nothing; it never
+widens the read to the whole device.
+
+The admin UI's Datasets pages do not create or edit `Sub-device`
+datasets yet; use the API.
 
 ### Union components
 
@@ -53,8 +91,8 @@ including dates that don't round-trip through `Date.parse`/`toISOString`
 ### Structurally invalid datasets
 
 A dataset is **structurally invalid** if it has no structural config
-entry, more than one (entries under two or more of the three apps at
-once), or its structure cannot be resolved (e.g. a `Session limits` or
+entry, more than one (entries under two or more of the structural apps
+at once), or its structure cannot be resolved (e.g. a `Session limits` or
 `Union components` entry whose `source`/components point at a missing
 or itself-invalid dataset, or a circular reference). Invalid datasets
 are represented internally with the special UUID
@@ -95,6 +133,7 @@ Group | `Functional dataset group` | `86e5b048-e956-4820-939e-3abf3eda4e03`
 Application | `Dataset definition` | `eae2d4ae-164d-4dc6-b646-7e0320057bd9`
 Application | `Dataset metadata` | `e3b9fd2c-9de1-470b-9675-739e2a55b77f`
 Application | `Sparkplug source` | `f5d550c4-2831-11f1-b0b0-83fda3035799`
+Application | `Sub-device` | `7f7d40cc-4075-4f06-90cf-aa6261d68f18`
 Application | `Union components` | `1c4ca454-de38-44d9-92fb-aa5218bfa257`
 Application | `Session limits` | `8754c000-3778-4ae6-b2b8-bbcd959bb775`
 Application | `MES identifiers` | `af178f0c-3b1e-44f2-9724-5cf06e8fd056`
@@ -154,12 +193,16 @@ subclass of a functional class (e.g. a hypothetical `MES work order` ⊂
 
 Requires `Read dataset` on `:uuid`. Resolves the dataset's structure
 tree recursively into a flat list of `{ device, from, to }` triples
-(one per Sparkplug source contributing to the dataset, with time bounds
-intersected down through any enclosing sessions), then streams the
+(one per `Sparkplug source` or `Sub-device` contributing to the
+dataset, with time bounds intersected down through any enclosing
+sessions), then streams the
 result back as a **single CSV file** (`text/csv`, named
 `<dataset-uuid>.csv`). Each source is read with an Influx Flux query
 filtered on `topLevelInstance == "<device-uuid>"` and the resolved time
-range, and all sources are written into the same file. The columns are,
+range, and all sources are written into the same file. A `Sub-device`
+source also filters on its resolved metrics, as well as on any filter
+in the request; one with more than 100 metrics is read with several
+queries. The columns are,
 in this order:
 
 Column | Content
@@ -328,6 +371,13 @@ otherwise.
   `denied` and left out. The request fails only when every device is
   denied.
 * `mean` and `last` entries follow the check of their device.
+* In a dataset request, a `mean` metric on a device the dataset reaches
+  through a `Sub-device` must be one of that sub-device's metrics, or
+  the request gets `422`. If the device is in the dataset more than
+  once, the sources that include the metric (whole-device sources
+  include every metric) must cover all of the device's windows. Counts
+  and `last` are per device, so for a sub-device they cover the whole
+  device.
 
 #### Limits and errors
 
@@ -403,6 +453,26 @@ old. Data Access also logs a warning then. `error` is `null`, or a code
 for the last failure: `provisioning_failed`, `backfill_failed` or
 `repair_failed`. The Data Access log has the detail.
 
+### `GET v1/sparkplug-sources/:uuid/metrics`
+
+Requires `Use Sparkplug data` on the device `:uuid`. Returns the metrics
+a `Sub-device` dataset can select, read from the device's origin map.
+Only metrics with `Record_To_Historian` set are listed, since nothing
+else reaches Influx. A device with no origin map returns `[]`.
+
+Property | Meaning
+---|---
+`instance` | `Instance_UUID` of the nearest enclosing object (the device UUID if none); store as the reference's `instance`
+`metric` | Path from that object to the metric; store as the reference's `metric`
+`path` | Full Sparkplug metric name; can be sent back as a `{ "path" }` entry instead of `instance` + `metric`
+`type` | Sparkplug type
+`unit` | Engineering unit, if any
+`documentation` | Description, if any
+
+The service needs `ReadConfig` on `DeviceInformation`
+(`a98ffed5-c613-4e70-bfd3-efeee250ade5`) for this endpoint and to read
+`Sub-device` datasets; `dumps/data-access.yaml` grants it.
+
 ### `GET v1/structure`
 
 Returns the JSON array of dataset UUIDs the caller has `Edit dataset`
@@ -433,6 +503,25 @@ On success, creates a new `Dataset` object, writes the config entry
 under `structure`, records the corresponding subclass relationship(s),
 and returns the new dataset's UUID as a JSON string.
 
+Once those checks pass, a `Sub-device` config's `{ "path" }` entries
+are converted to `{ "instance", "metric" }` (see
+[Sub-device](#sub-device)); a path that does not resolve returns `422`.
+
+For example, a `Sub-device` dataset named by path:
+
+```json
+{
+    "structure": "7f7d40cc-4075-4f06-90cf-aa6261d68f18",
+    "config": {
+        "source": "<device UUID>",
+        "metrics": [
+            { "path": "Axes/X/Position/Actual" },
+            { "path": "Switch_Closed" }
+        ]
+    }
+}
+```
+
 ### `PUT v1/structure/:uuid`
 
 Body is the same shape as `POST v1/structure`; `uuid` may be included
@@ -443,14 +532,15 @@ but must match the path if present. Requires `Edit dataset` on `:uuid`.
   type to another via `PUT` returns `409`. The old source's subclass
   relationship(s) are removed before the new one is written.
 * If the dataset is currently **invalid**, any existing config entries
-  under any of the three structural apps are deleted (404s from a
-  missing entry are ignored) and the new config is written; no old
-  subclass relationships are touched, since an invalid dataset by
-  definition doesn't have a coherent one.
+  under any of the structural apps are deleted (404s from a missing
+  entry are ignored) and the new config is written; no old subclass
+  relationships are touched, since an invalid dataset by definition
+  doesn't have a coherent one.
 
 In both cases, only the per-source permission for the new config's
 source(s) is checked — `PUT` does **not** re-check `Create dataset` on
-the structural app the way `POST` does.
+the structural app the way `POST` does. `Sub-device` path entries are
+converted as for `POST`, before anything is removed.
 
 ### `GET v1/delete/:uuid`
 
@@ -493,9 +583,9 @@ Permission | UUID | Targets | Grants
 ---|---|---|---
 `Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/data/:uuid` and `v1/series` for the dataset
 `Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT) and inclusion in the `v1/structure` list
-`Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`Sparkplug source` / `Union components` / `Session limits`) | Creating a dataset of that structure via `POST v1/structure`
+`Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`Sparkplug source` / `Sub-device` / `Union components` / `Session limits`) | Creating a dataset of that structure via `POST v1/structure`
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`
-`Use Sparkplug data` (`UseSparkplug`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Sparkplug Device/Node | Referencing it as a `Sparkplug source`, and reading it through `v1/series`
+`Use Sparkplug data` (`UseSparkplug`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Sparkplug Device/Node | Referencing it as a `Sparkplug source` or `Sub-device` source, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
 `Use for session` (`UseForSession`) | `c089b9a9-06cd-4211-94fc-9ad52a759987` | Dataset | Referencing it as a `Session limits` source
 `Include in union` (`IncludeInUnion`) | `94d51085-af83-4796-8059-fcd578e3f572` | Dataset | Referencing it as a `Union components` member
 
@@ -648,6 +738,15 @@ Compared to the original design notes for this service:
   can be restricted to a list of metric paths or names, but there is no
   per-device, schema or datatype filtering and no subsampling. The CSV
   has no metric path column.
+* **`Sub-device` history across renames.** A reference is read using
+  the metric's current path, so points recorded before an enclosing
+  object was renamed are not returned.
+* **`Sub-device` references break on schema changes.** Changing a
+  device's schema regenerates its sub-object `Instance_UUID`s, and
+  references to the old ones read nothing until the dataset is edited.
+* **Overlapping sources are not deduplicated.** A union containing both
+  a `Sparkplug source` and a `Sub-device` of the same device returns
+  the selected metrics twice.
 * **`Session limits` requires both `from` and `to`** — an open-ended
   session (design says "if either is omitted the interval is
   open-ended") is rejected with `422`.

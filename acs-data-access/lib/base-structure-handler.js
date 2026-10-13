@@ -8,6 +8,17 @@ export class BaseStructureHandler {
 
   validate_config(config) {}
   check_source_permission(principal, config) {}
+
+  /** Converts a validated config to the form that is stored.
+   *
+   * Called on create and update, after the source permission check and
+   * before the config is written to ConfigDB. Structures that accept only
+   * one form return the config unchanged.
+   *
+   * @param config A config that has passed validate_config.
+   * @returns The config to store.
+   */
+  async normalise_config(config) { return config; }
   resolve(ctx) {}
   create_subclass_relationships(datasetUuid, config) {}
   remove_subclass_relationships(datasetUuid, config) {}

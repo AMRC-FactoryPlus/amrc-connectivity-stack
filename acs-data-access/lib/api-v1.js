@@ -14,8 +14,10 @@ import { valid_uuid, valid_datetime, parse_download_filter } from "./validate.js
 import { fail, maxDate, minDate } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
+import { SparkplugSubsetHandler } from "./sparkplug-subset-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
+import { walk_origin_map } from "./origin-map.js";
 import {
   SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
   LIMITS as SeriesLimits,
@@ -49,6 +51,9 @@ export class APIv1 {
     this.handlers = {
       [Constants.App.SparkplugSrc]:
         new SparkplugSourcesHandler(this),
+
+      [Constants.App.SparkplugSubset]:
+        new SparkplugSubsetHandler(this),
 
       [Constants.App.SessionLimits]:
         new SessionLimitsHandler(this),
@@ -89,6 +94,9 @@ export class APIv1 {
 
     api.route("/session-sources")
       .get(this.session_sources_list.bind(this));
+
+    api.route("/sparkplug-sources/:uuid/metrics")
+      .get(this.sparkplug_source_metrics.bind(this));
 
     api.route("/delete/:uuid")
       .get(this.delete_dataset.bind(this));
@@ -588,6 +596,21 @@ export class APIv1 {
       last_windows.set(device, merge_windows(list, -Infinity, as_of));
     }
 
+    /* A sub-device source grants only its own metrics. Means are read
+     * over the device's windows, so the sources that grant a `mean`
+     * metric must cover all of them. Counts and last times are per
+     * device, so they cover the whole device. */
+    const grants = (s, m) => !s.metrics
+      || s.metrics.some(g => (g.path ?? "") == m.path && g.name == m.name);
+    const outside = parsed.mean.find(m => {
+      const granting = by_device.get(m.device).filter(s => grants(s, m));
+      const covered = merge_windows(granting, parsed.from, parsed.to);
+      return JSON.stringify(covered) != JSON.stringify(windows.get(m.device));
+    });
+    if (outside)
+      throw new SeriesError(422, "invalid_request",
+        `"mean" metric ${outside.metric} of device ${outside.device} is not in the dataset.`);
+
     return { windows, last_windows, denied: [] };
   }
 
@@ -658,6 +681,36 @@ export class APIv1 {
     return res.status(200).json(uuids);
   }
 
+  /** GET. Lists the metrics of a Sparkplug device that a Sub-device
+   * dataset can select. Requires USE_SPARKPLUG on the device.
+   * Only metrics recorded to the historian are listed, as nothing else
+   * can be read back. A device with no origin map has an empty list.
+   * @returns array of objects:
+              * instance {UUID} - Instance_UUID of the nearest enclosing object
+              * metric {string} - path from that object to the metric
+              * path {string} - full Sparkplug metric name, for display
+              * type {string} - Sparkplug type
+              * unit {string} - engineering unit (if any)
+              * documentation {string} - description (if any)
+   */
+  async sparkplug_source_metrics(req, res){
+    const device = req.params.uuid;
+    if (!valid_uuid(device)) return fail(this.log, 422, `Device uuid ${device} is invalid.`);
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.UseSparkplug,
+      device,
+      true,
+    );
+    if (!ok) return fail(this.log, 403, `You don't have permission to use Sparkplug data from ${device}.`);
+
+    const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
+    const { metrics } = walk_origin_map(info?.originMap, device);
+
+    return res.status(200).json(metrics);
+  }
+
   /** GET. Fetches structural definition of dataset
    * Requires EDIT permission on the dataset
    * READONLY clients can't see this structure
@@ -698,11 +751,13 @@ export class APIv1 {
   /** Checks a proposed config without writing anything.
    *
    * Runs the structure's own validation and the source permission
-   * checks. Throws a 422 or 403 APIError if the config is not
-   * acceptable. Call this before removing or changing any existing state,
-   * so that a rejected request leaves the dataset exactly as it was.
+   * checks, then converts the config to the form that is stored. Throws
+   * a 422 or 403 APIError if the config is not acceptable. Call this
+   * before removing or changing any existing state, so that a rejected
+   * request leaves the dataset exactly as it was.
    *
-   * @returns The handler for the structure.
+   * @returns {{handler, config}} The handler for the structure, and the
+   *   config to store.
    */
   async _check_dataset_config(principal, structure, config) {
     const handler = this._getHandler(structure);
@@ -711,13 +766,17 @@ export class APIv1 {
     const ok = await handler.check_sources_permissions(principal, config);
     if(!ok) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
 
-    return handler;
+    /* After the permission check: normalising can report what a source
+     * contains, which only a principal allowed to use it may learn. */
+    const stored = await handler.normalise_config(config);
+
+    return { handler, config: stored };
   }
 
   /** Writes a dataset config and its subclass relationships.
    *
    * This only writes. The caller must have checked the config with
-   * `_check_dataset_config` first.
+   * `_check_dataset_config` first, and pass the config it returned.
    */
   async _write_dataset_config(structure, config, dataset_uuid){ 
     const handler = this._getHandler(structure);
@@ -763,10 +822,10 @@ export class APIv1 {
     );
     if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
-    await this._check_dataset_config(req.auth, structure, config);
+    const checked = await this._check_dataset_config(req.auth, structure, config);
     const dataset_uuid = await this._write_dataset_config(
       structure,
-      config,
+      checked.config,
       null
     );
 
@@ -827,7 +886,8 @@ export class APIv1 {
     /* Check the new config completely before removing anything. Every
      * rejection (422, 403) must happen here, so a rejected update leaves
      * the old config and subclass relationships in place. */
-    const handler = await this._check_dataset_config(req.auth, structure, new_config);
+    const { handler, config: stored_config } =
+      await this._check_dataset_config(req.auth, structure, new_config);
 
     // for currently VALID dataset
     if(is_valid){
@@ -848,7 +908,7 @@ export class APIv1 {
 
     const objectUuid = await this._write_dataset_config(
       structure,
-      new_config,
+      stored_config,
       dataset_uuid,
     );
 

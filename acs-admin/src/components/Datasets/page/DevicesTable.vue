@@ -62,6 +62,10 @@
     <div v-if="record.structure && error" class="border-t border-slate-200 px-4 py-2 text-xs text-red-700">
       <i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ error }}
     </div>
+    <div v-if="record.structure && subDevices" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
+      <i class="fa-solid fa-filter mr-1"></i>
+      {{ subDevices }} {{ subDevices === 1 ? 'part of this dataset is a sub-device' : 'parts of this dataset are sub-devices' }}, with only chosen metrics of a device. They are not shown here, but the CSV download includes them.
+    </div>
     <div v-if="record.structure && unknown.length" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-eye-slash mr-1"></i>
       {{ unknown.length }} {{ unknown.length === 1 ? 'part of this dataset is' : 'parts of this dataset are' }} not visible to you, so their devices are not listed.
@@ -99,6 +103,7 @@ const NO_STRIP = { cells: [], gaps: 0, any: false }
 const ds = useDatasetsStore()
 const now = useNow({ interval: 30 * 1000 })
 const unknown = computed(() => props.resolved.unknown.filter(u => u !== props.record.uuid || props.record.structure))
+const subDevices = computed(() => props.resolved.sub_devices?.length ?? 0)
 
 function note (g) {
   if (props.error || props.countNote) return { text: '', cls: '' }

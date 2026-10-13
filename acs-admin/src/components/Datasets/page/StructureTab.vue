@@ -78,6 +78,7 @@ function icon (row) {
   if (row.invalid) return 'fa-triangle-exclamation text-red-500'
   if (row.unknown) return 'fa-eye-slash text-amber-600'
   if (row.structure === STRUCTURE.DEVICE) return 'fa-microchip text-slate-500'
+  if (row.structure === STRUCTURE.SUBSET) return 'fa-filter text-slate-500'
   if (row.structure === STRUCTURE.UNION) return 'fa-layer-group text-slate-500'
   if (row.structure === STRUCTURE.SESSION) return 'fa-clock text-slate-500'
   return 'fa-database text-slate-500'

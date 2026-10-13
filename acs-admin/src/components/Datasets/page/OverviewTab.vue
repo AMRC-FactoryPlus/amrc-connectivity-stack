@@ -219,7 +219,11 @@ const stats = computed(() => {
   else if (r.from && r.to) out.push({ label: 'Window', value: duration(r), sub: fmt_window(r.from, r.to) })
   else out.push({ label: 'Window', value: 'Ongoing', sub: data.window.value.windowless ? 'No time window. Coverage shows the last 24 hours.' : 'No time window' })
   const known = r.structure != null
-  out.push({ label: 'Devices', value: known ? String(props.resolved.devices.length) : '–', sub: known ? (props.resolved.unknown.length ? 'Some parts are hidden from you' : 'Covered by this dataset') : 'Needs edit access to see' })
+  const subs = props.resolved.sub_devices?.length ?? 0
+  const devices_sub = props.resolved.unknown.length ? 'Some parts are hidden from you'
+    : subs ? `Plus ${subs} ${subs === 1 ? 'sub-device' : 'sub-devices'}, not shown`
+    : 'Covered by this dataset'
+  out.push({ label: 'Devices', value: known ? String(props.resolved.devices.length) : '–', sub: known ? devices_sub : 'Needs edit access to see' })
   out.push({ label: 'Metrics', value: known ? String(metric_total(devices.value)) : '–', sub: 'Recorded to the historian' })
   out.push({ label: 'Coverage', ...coverage.value })
   return out

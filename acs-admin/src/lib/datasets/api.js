@@ -278,6 +278,7 @@ export function edit_shape (rec, byUuid) {
     if (!rec?.editable) return { ok: false, reason: 'You cannot edit this dataset.' }
     if (rec.invalid) return { ok: false, reason: 'The service reports this dataset as invalid. Duplicate it instead.' }
     if (rec.structure === STRUCTURE.DEVICE) return { ok: false, reason: 'A device dataset always covers one device.' }
+    if (rec.structure === STRUCTURE.SUBSET) return { ok: false, reason: 'A sub-device dataset can only be changed through the Data Access API.' }
     if (rec.structure === STRUCTURE.UNION) return { ok: true, has_window: false, items_uuid: rec.uuid, items: rec.config ?? [] }
     if (rec.structure === STRUCTURE.SESSION) {
         const src = byUuid[rec.config?.source]

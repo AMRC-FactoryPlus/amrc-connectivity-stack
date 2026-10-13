@@ -80,6 +80,19 @@ describe('structure', () => {
         expect(r.unknown).toEqual([])
     })
 
+    it('lists a sub-device apart, without charting its device', () => {
+        const SUB = 'aaaaaaaa-0000-4000-8000-0000000000b1'
+        const by = merge_datasets([], [
+            { uuid: EQ, structure: STRUCTURE.UNION, config: [DS1, SUB] },
+            { uuid: DS1, structure: STRUCTURE.DEVICE, config: { source: D1 } },
+            { uuid: SUB, structure: STRUCTURE.SUBSET, config: { source: D2, metrics: [{ instance: D2, metric: 'Load' }] } },
+        ])
+        const r = resolve_devices(EQ, by)
+        expect(r.devices).toEqual([D1])
+        expect(r.sub_devices).toEqual([SUB])
+        expect(r.unknown).toEqual([])
+    })
+
     it('stops on a cycle and reports unknown datasets', () => {
         const by = merge_datasets([], [
             { uuid: EQ, structure: STRUCTURE.UNION, config: [RUN, 'zzzz'] },

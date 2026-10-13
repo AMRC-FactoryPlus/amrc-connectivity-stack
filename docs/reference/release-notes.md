@@ -452,6 +452,21 @@ probes with no MQTT connection until someone restarted them.
 Every service that connects through the service client now keeps
 reconnecting after a refusal, whichever MQTT.js release it uses.
 
+### Command Escalation answers 503 when it cannot send a command
+
+Command Escalation answered 200 to a command request even when it had
+no MQTT connection. The command waited in memory, and was sent late,
+if at all, when the connection came back. During the outage above,
+the UNS ingester's rebirth requests all got 200 and none reached a
+device, so those devices sent no births and the UNS historian wrote
+nothing, with no error in any log.
+
+It now answers 503 when it cannot send the command, and logs why.
+Commands are no longer held while disconnected, so a reconnect does
+not release a backlog of old commands to devices. The UNS ingester
+logs a failed rebirth request and asks again when the device next
+publishes.
+
 ### Data Access grows into Datasets
 
 The Admin UI's Data Access page grows into **Datasets**, at

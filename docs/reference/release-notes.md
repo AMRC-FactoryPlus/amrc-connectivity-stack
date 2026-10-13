@@ -154,6 +154,32 @@ The Explorer in the admin UI shows a composition's current value as a
 tree of names, with nested compositions expanded. It reads 3 levels at
 once and loads deeper ones when you expand them.
 
+### i3X subscriptions deliver to a stream or to sync, not both
+
+A subscription used to queue every change, even while a stream was
+open. Stream events carry no sequence numbers, so a client that only
+streamed could never acknowledge them, and its queue grew without
+limit. Subscriptions now follow the i3X spec:
+
+- While a stream is open, changes go to the stream only. Opening a
+  stream sends anything queued while no stream was open, then clears
+  the queue.
+- **`/sync` returns 409 while a stream is open.** Close the stream
+  before syncing.
+- Each queue holds at most 10,000 updates
+  (`I3X_SUBSCRIPTION_QUEUE_MAX`, not set by the chart). When it is
+  full, the oldest updates are dropped, and the next `/sync` answers
+  206 with a `responseDetail` saying how many were lost.
+- `lastSequenceNumber: -1` clears the queue. A value that is not a
+  non-negative integer clears nothing.
+- Opening a second stream on a subscription closes the first, instead
+  of failing with a 500.
+- A subscription does not expire while its stream is open. Its TTL
+  starts when the stream closes.
+
+`/sync` still returns the flat per-update shape, not the batched shape
+in the current spec.
+
 ### Other changes to the i3X API
 
 - `GET /objects`, related objects and composition values are streamed
@@ -162,9 +188,6 @@ once and loads deeper ones when you expand them.
   gets a 304.
 - A client that reads nothing from a streamed response for 60 seconds
   is disconnected (`I3X_STREAM_IDLE_MS`).
-- Each subscription's queue holds at most 10,000 updates
-  (`I3X_SUBSCRIPTION_QUEUE_MAX`). When it is full, the oldest updates
-  are dropped.
 - UNS messages for devices that are not in ConfigDB are ignored.
 
 The environment variables in this list are not set by the chart.

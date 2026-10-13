@@ -1177,7 +1177,19 @@ openmetadata-dependencies:
           persistentVolumeClaim:
             claimName: manual-airflow-dags
 
+    # The chart runs both of these jobs as post-install/post-upgrade Helm
+    # hooks, but the scheduler, triggerer and api-server have a
+    # wait-for-airflow-migrations init container. With --wait (or any
+    # failure in the main release) Helm never reaches the post hooks, the
+    # pods never get past init, and the upgrade hangs in pending-upgrade.
+    # As plain resources the jobs are created alongside the pods instead.
+    # ttlSecondsAfterFinished (chart default 300s) removes the finished
+    # Job, so its immutable pod template doesn't block the next upgrade.
+    migrateDatabaseJob:
+      useHelmHooks: false
+
     createUserJob:
+      useHelmHooks: false
       # Reset the webserver admin user's password to the same random value
       # openmetadata's pipelineServiceClientConfig.airflow.auth uses (secret
       # airflow-secrets/openmetadata-airflow-password), so the two stay in

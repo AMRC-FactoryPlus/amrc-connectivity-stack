@@ -3,7 +3,7 @@ import { once } from "events";
 import pLimit from "p-limit";
 
 import { csv_escape, strip_metric_suffix } from "./utils.js";
-import { build_flux_query } from "./flux.js";
+import { build_flux_queries } from "./flux.js";
 
 const CSV_HEADER = "device,metric,timestamp,value,unit";
 
@@ -67,34 +67,37 @@ export class InfluxReader {
         writable,
         meta
     ) {
-        const query = build_flux_query({
+        const queries = build_flux_queries({
             bucket: this.influx_bucket,
             source,
             filter: meta,
         });
 
         this.log(
-            "streaming",
-            source.device_uuid
+            "streaming %s (%d queries)",
+            source.device_uuid,
+            queries.length
         );
 
-        const response =
-            this.influx_query_api.response(query);
+        for (const query of queries) {
+            const response =
+                this.influx_query_api.response(query);
 
-        for await (
-            const row of response.iterateRows()
-        ) {
-            const o = row.tableMeta.toObject(row.values);
+            for await (
+                const row of response.iterateRows()
+            ) {
+                const o = row.tableMeta.toObject(row.values);
 
-            const line = [
-                csv_escape(o.device),
-                csv_escape(strip_metric_suffix(o._measurement)),
-                csv_escape(o._time),
-                csv_escape(o._value),
-                csv_escape(o.unit),
-            ].join(",");
+                const line = [
+                    csv_escape(o.device),
+                    csv_escape(strip_metric_suffix(o._measurement)),
+                    csv_escape(o._time),
+                    csv_escape(o._value),
+                    csv_escape(o.unit),
+                ].join(",");
 
-            await this.#write(writable, line + "\n");
+                await this.#write(writable, line + "\n");
+            }
         }
     }
 

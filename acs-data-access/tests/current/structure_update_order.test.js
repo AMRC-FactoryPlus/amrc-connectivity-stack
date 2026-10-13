@@ -47,6 +47,8 @@ function make_api(datasets, denied = [], delete_errors = {}) {
       record("delete_config", app, uuid);
     },
     async create_object() { throw new Error("create_object not expected"); },
+    /* No device has an origin map, so no sub-device path resolves. */
+    async get_config() { return undefined; },
   };
 
   const auth = {
@@ -163,6 +165,18 @@ describe("structure_update rejects before it removes anything", () => {
 
     await expect(api.structure_update(
       make_req(UNION, Constants.App.SessionLimits, { source: SRC_A }),
+      make_res(),
+    )).rejects.toMatchObject({ status: 422 });
+
+    expect(calls.writes).toEqual([]);
+  });
+
+  test("invalid dataset: a sub-device path that does not resolve keeps its config entries", async () => {
+    const { api, calls } = make_api(invalid_dataset);
+
+    await expect(api.structure_update(
+      make_req(UNION, Constants.App.SparkplugSubset,
+        { source: SRC_A, metrics: [{ path: "Axes/X/Position" }] }),
       make_res(),
     )).rejects.toMatchObject({ status: 422 });
 

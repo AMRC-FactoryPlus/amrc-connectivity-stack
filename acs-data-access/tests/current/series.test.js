@@ -428,9 +428,10 @@ function fake_query_api(rows = {}) {
 }
 
 /* grants: principal -> targets for UseSparkplug. A principal named in
- * `refused` gets that status from Auth; `acl` replaces fetch_acl. */
+ * `refused` gets that status from Auth; `acl` replaces fetch_acl. `cdb`
+ * answers ConfigDB reads, such as a sub-device's origin map. */
 function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
-        refused = {}, acl } = {}) {
+        refused = {}, acl, cdb = {} } = {}) {
     const flow = Object.create(DataFlow.prototype);
     flow.datasets = rx.of(new Map(Object.entries(datasets)));
 
@@ -451,7 +452,7 @@ function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
             check_acl: async (principal, perm, target) =>
                 principal == ROOT || (perm == Constants.Perm.ReadDataset && read.includes(target)),
         },
-        cdb: {},
+        cdb,
     });
     const qa = query_api ?? fake_query_api(rows);
     api.seriesReader = new SeriesReader({ debug, influx_bucket: "default", query_api: qa });
@@ -559,6 +560,78 @@ describe("series route permissions", () => {
             mean: [{ device: D2, metric: "A" }] });
         expect(res.statusCode).toBe(422);
         expect(res.body.error).toBe("invalid_request");
+    });
+
+    /* D3 is a sub-device of D1 holding Axes/X/Load and the root metric
+     * Switch, but not Axes/X/Temp. */
+    const AXIS = "a1a1a1a1-0000-4000-8000-000000000001";
+    const DS2 = "55555555-5555-5555-5555-555555555555";
+    const origin_map = {
+        Instance_UUID: D1,
+        Switch: { Sparkplug_Type: "Boolean", Record_To_Historian: true },
+        Axes: { X: {
+            Instance_UUID: AXIS,
+            Load: { Sparkplug_Type: "Double", Record_To_Historian: true },
+            Temp: { Sparkplug_Type: "Double", Record_To_Historian: true },
+        } },
+    };
+    const sub_device = { structure: Constants.App.SparkplugSubset, config: {
+        source: D1,
+        metrics: [{ instance: AXIS, metric: "Load" }, { instance: D1, metric: "Switch" }],
+    } };
+    const cdb = {
+        get_config: async (app, obj) => app == UUIDs.App.DeviceInformation && obj == D1
+            ? { originMap: origin_map } : undefined,
+    };
+    const sub_request = mean => {
+        const { devices, ...rest } = req;
+        return { ...rest, dataset: DS, mean };
+    };
+
+    test("a sub-device dataset allows means of its own metrics", async () => {
+        const { api } = make_api({ read: [DS], cdb, datasets: { [DS]: sub_device },
+            rows: { count: count_rows } });
+        const res = await call(api, USER, sub_request([
+            { device: D1, metric: "Axes/X/Load" },
+            { device: D1, metric: "Switch", type: "b" },
+        ]));
+        expect(res.statusCode).toBe(200);
+        expect(res.body.metrics.map(m => m.metric)).toEqual(["Axes/X/Load", "Switch"]);
+    });
+
+    test("422 for a mean metric outside a sub-device", async () => {
+        const { api, query_api } = make_api({ read: [DS], cdb, datasets: { [DS]: sub_device } });
+        const res = await call(api, USER, sub_request([{ device: D1, metric: "Axes/X/Temp" }]));
+        expect(res.statusCode).toBe(422);
+        expect(res.body.error).toBe("invalid_request");
+        expect(query_api.seen).toEqual([]);
+    });
+
+    test("the whole device in the same windows grants every metric", async () => {
+        const datasets = {
+            [DS]: { structure: Constants.App.UnionComponents, config: [D2, D3] },
+            [D2]: { structure: Constants.App.SparkplugSrc, config: { source: D1 } },
+            [D3]: sub_device,
+        };
+        const { api } = make_api({ read: [DS], cdb, datasets, rows: { count: count_rows } });
+        expect((await call(api, USER, sub_request([{ device: D1, metric: "Axes/X/Temp" }])))
+            .statusCode).toBe(200);
+    });
+
+    test("a metric must be granted across all of its device's windows", async () => {
+        /* The whole device for six hours, the sub-device for the day. */
+        const datasets = {
+            [DS]: { structure: Constants.App.UnionComponents, config: [DS2, D3] },
+            [DS2]: { structure: Constants.App.SessionLimits, config: {
+                source: D2, from: "2026-10-08T06:00:00.000Z", to: "2026-10-08T12:00:00.000Z" } },
+            [D2]: { structure: Constants.App.SparkplugSrc, config: { source: D1 } },
+            [D3]: sub_device,
+        };
+        const { api } = make_api({ read: [DS], cdb, datasets, rows: { count: count_rows } });
+        expect((await call(api, USER, sub_request([{ device: D1, metric: "Axes/X/Temp" }])))
+            .statusCode).toBe(422);
+        expect((await call(api, USER, sub_request([{ device: D1, metric: "Axes/X/Load" }])))
+            .statusCode).toBe(200);
     });
 });
 

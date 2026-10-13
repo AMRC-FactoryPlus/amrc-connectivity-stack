@@ -111,6 +111,14 @@ describe('page logic', () => {
         expect(structure_type(STRUCTURE.UNION)).toBe('Union components')
     })
 
+    it('words a sub-device by its metric count and device', () => {
+        const by = merge_datasets([], [{ uuid: 'sub', structure: STRUCTURE.SUBSET, config: {
+            source: 'dev-a', metrics: [{ instance: 'dev-a', metric: 'A' }, { instance: 'dev-a', metric: 'B' }] } }])
+        const rows = tree_rows(structure_tree('sub', by), { deviceName: u => ({ 'dev-a': 'Meter A' })[u] ?? null })
+        expect(rows[0].wording).toBe('2 metrics of device Meter A')
+        expect(structure_type(STRUCTURE.SUBSET)).toBe('Sub-device')
+    })
+
     it('marks cycles and unknown nodes', () => {
         const by = merge_datasets([], [
             { uuid: 'x', structure: STRUCTURE.UNION, config: ['y', 'gone'] },

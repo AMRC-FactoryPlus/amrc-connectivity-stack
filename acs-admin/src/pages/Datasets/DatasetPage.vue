@@ -221,7 +221,7 @@ const rec = computed(() => ds.byUuid[uuid.value] ?? null)
 const loaded = computed(() => !!rec.value || (ds.ready && ds.structureReady))
 const name = computed(() => display_name(rec.value))
 
-const resolved = computed(() => rec.value ? ds.devicesOf(uuid.value) : { devices: [], device_datasets: [], unknown: [] })
+const resolved = computed(() => rec.value ? ds.devicesOf(uuid.value) : { devices: [], device_datasets: [], sub_devices: [], unknown: [] })
 const labels = computed(() => labels_for(rec.value, ds.byUuid))
 const deviceRecords = computed(() => resolved.value.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
 const equipment = computed(() => equipment_of(rec.value, ds.byUuid))

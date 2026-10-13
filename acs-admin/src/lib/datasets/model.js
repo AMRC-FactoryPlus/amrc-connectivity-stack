@@ -146,6 +146,7 @@ export function included_in (uuid, byUuid) {
 export function resolve_devices (uuid, byUuid) {
     const devices = new Set()
     const device_datasets = new Set()
+    const sub_devices = new Set()
     const unknown = new Set()
     const seen = new Set()
     const walk = id => {
@@ -158,12 +159,18 @@ export function resolve_devices (uuid, byUuid) {
             device_datasets.add(id)
             return
         }
+        // Not charted: its device's other metrics are not in the dataset.
+        if (r.structure === STRUCTURE.SUBSET) {
+            sub_devices.add(id)
+            return
+        }
         for (const s of direct_sources(r)) walk(s)
     }
     walk(uuid)
     return {
         devices: [...devices],
         device_datasets: [...device_datasets],
+        sub_devices: [...sub_devices],
         unknown: [...unknown],
     }
 }

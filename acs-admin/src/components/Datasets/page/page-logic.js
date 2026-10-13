@@ -192,6 +192,10 @@ function wording (node, deviceName, now) {
     if (node.structure === STRUCTURE.DEVICE) {
         return `device ${deviceName(r.config?.source) ?? r.name ?? r.config?.source ?? 'unknown'}`
     }
+    if (node.structure === STRUCTURE.SUBSET) {
+        const n = r.config?.metrics?.length ?? 0
+        return `${n} ${n === 1 ? 'metric' : 'metrics'} of device ${deviceName(r.config?.source) ?? r.config?.source ?? 'unknown'}`
+    }
     if (node.structure === STRUCTURE.UNION) {
         const n = node.children.length
         return `combines ${n} ${n === 1 ? 'dataset' : 'datasets'}`
@@ -206,6 +210,7 @@ function wording (node, deviceName, now) {
 export function structure_type (structure) {
     switch (structure) {
         case STRUCTURE.DEVICE:  return 'Sparkplug source'
+        case STRUCTURE.SUBSET:  return 'Sub-device'
         case STRUCTURE.UNION:   return 'Union components'
         case STRUCTURE.SESSION: return 'Session limits'
         case STRUCTURE.INVALID: return 'Invalid'

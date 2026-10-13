@@ -391,10 +391,13 @@ History is only served for leaf metrics.
 ### subscriptions.ts
 
 In-memory subscription store with SSE and sync delivery. Ownership is the
-authenticated principal. Each subscription queues updates for sync and
-stream replay; the queue holds at most `I3X_SUBSCRIPTION_QUEUE_MAX`
-updates (default 10,000), dropping the oldest and counting the drops.
-Subscriptions not used within the TTL are deleted.
+authenticated principal. While a stream is open, changes go to the stream
+only; while none is, they are queued for `/sync`, which answers 409 while
+a stream is open. Opening a stream sends the queue and clears it, and a
+second stream replaces the first. The queue holds at most
+`I3X_SUBSCRIPTION_QUEUE_MAX` updates (default 10,000), dropping the
+oldest; the next `/sync` reports the drops with a 206. A subscription
+with neither an open stream nor a call within the TTL is deleted.
 
 ### MCP and the RAG index (opt-in)
 

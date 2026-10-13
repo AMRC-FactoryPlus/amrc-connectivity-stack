@@ -41,6 +41,8 @@ spec:
           env:
             - name: VERBOSE
               value: {{.Values.monitor.verbosity | quote | required "values.monitor.verbosity is required!"}}
+            - name: MQTT_WATCHDOG_TIMEOUT
+              value: {{ .Values.monitor.mqttWatchdogTimeout | default 0 | quote }}
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: DIRECTORY_URL

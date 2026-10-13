@@ -62,6 +62,8 @@ spec:
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: VERBOSE
               value: {{.Values.cmdesc.verbosity | quote | required "values.cmdesc.verbosity is required!"}}
+            - name: MQTT_WATCHDOG_TIMEOUT
+              value: {{ .Values.cmdesc.mqttWatchdogTimeout | default 0 | quote }}
             - name: HTTP_API_URL
               value: http://cmdesc.{{ .Release.Namespace }}.svc.cluster.local
             - name: PORT

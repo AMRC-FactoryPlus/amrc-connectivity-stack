@@ -93,6 +93,8 @@ spec:
               value: "8080"
             - name: VERBOSE
               value: {{.Values.git.verbosity | quote | required "values.git.verbosity is required!"}}
+            - name: MQTT_WATCHDOG_TIMEOUT
+              value: {{ .Values.git.mqttWatchdogTimeout | default 0 | quote }}
             - name: DATA_DIR
               value: /data
             - name: DATA_CHANGED_FIFO

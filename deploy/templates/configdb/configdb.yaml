@@ -129,6 +129,8 @@ spec:
               value: configdb
             - name: VERBOSE
               value: {{.Values.configdb.verbosity | quote | required "values.configdb.verbosity is required!"}}
+            - name: MQTT_WATCHDOG_TIMEOUT
+              value: {{ .Values.configdb.mqttWatchdogTimeout | default 0 | quote }}
 {{ include "amrc-connectivity-stack.cache-max-age" (list . "configdb") | indent 12 }}
             - name: BODY_LIMIT
               value: "{{ .Values.configdb.bodyLimit }}"

@@ -485,6 +485,39 @@ What changes on upgrade:
 - **Dataset edits.** Editing a dataset's definition now checks the new
   definition fully before removing anything (from #806).
 
+### Sub-device datasets
+
+Data Access has a fourth dataset structure, **Sub-device**
+(`7f7d40cc-4075-4f06-90cf-aa6261d68f18`), which selects chosen metrics
+from one Sparkplug device instead of the whole device. Each metric is
+stored against the `Instance_UUID` of its nearest object, so it
+survives that object being renamed. A sub-device can be used inside a
+union or a session like any other dataset.
+
+- **Create them through the API for now.** `POST /v1/structure`
+  accepts a Sub-device config whose metrics are given by their full
+  Sparkplug name, for example `{ "path": "Axes/X/Position/Actual" }`.
+  `GET /v1/sparkplug-sources/<device>/metrics` lists a device's
+  recorded metrics. The service client has
+  `DataAccess.get_device_metrics(device)`.
+- **The Datasets pages show them but cannot chart or edit them.** A
+  sub-device appears in a dataset's structure with its metric count;
+  its metrics are not charted. The CSV download includes them.
+- **Who can create them.** The Dataset maker role can. A principal
+  given `Create dataset` on each structure separately needs it on the
+  new structure too.
+- **Data Access reads device information.** Service setup grants Data
+  Access read access to `DeviceInformation`, which it uses to find a
+  sub-device's metrics.
+- **`/v1/series` honours sub-devices.** A dataset request may ask for
+  the means of a sub-device's own metrics only; any other metric gets
+  `422`. Counts and last-data times are per device, so for a
+  sub-device they cover the whole device.
+
+History recorded before an object was renamed is not returned, and a
+change to a device's schema breaks its references until the dataset
+is changed.
+
 ### Other improvements
 
 ConfigDB:

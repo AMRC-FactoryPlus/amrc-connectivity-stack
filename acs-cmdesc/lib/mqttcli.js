@@ -22,7 +22,11 @@ export class MqttCli {
     }
 
     async run() {
-        const mqtt = await this.fplus.mqtt_client({});
+        /* Don't hold QoS 0 packets in memory while disconnected. A
+         * command published without a connection then fails at once,
+         * and a reconnect doesn't release a backlog of stale commands
+         * to devices. */
+        const mqtt = await this.fplus.mqtt_client({ queueQoSZero: false });
         this.mqtt = mqtt;
 
         mqtt.on("error", this.on_error.bind(this));
@@ -129,12 +133,23 @@ export class MqttCli {
         return SpB.encodePayload(payload);
     }
 
+    /* Resolves true once the packet is written to the broker, or false
+     * if it could not be sent, for example because we have no
+     * connection. */
     async publish (opts) {
+        if (!this.mqtt) return false;
+
         const topic = opts.address.topic(opts.type);
         const payload = this.encode_metrics(opts);
 
         this.log("mqtt", `Publishing to ${topic}`);
-        this.mqtt.publish(topic, payload);
+        return new Promise(resolve => {
+            this.mqtt.publish(topic, payload, err => {
+                if (err)
+                    console.log(`MQTT: can't publish to ${topic}: ${err.message}`);
+                resolve(!err);
+            });
+        });
     }
 
     async handle_command_request(from, metric) {

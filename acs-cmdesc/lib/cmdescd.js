@@ -82,7 +82,8 @@ export default class CmdEscD {
      * 403: Forbidden
      * 404: Metric does not exist
      * 409: Wrong type / metric otherwise can't be set
-     * 503: Device offline / not responding
+     * 503: Device offline / not responding, or we have no connection
+     *      to the MQTT broker
      *
      * from can be an Address or a Kerberos principal string.
      * to must be an Address.
@@ -127,7 +128,7 @@ export default class CmdEscD {
             }
         }
 
-        this.mqtt.publish({
+        const sent = await this.mqtt.publish({
             address:    to,
             type:       "CMD",
             metrics:    [cmd],
@@ -135,6 +136,6 @@ export default class CmdEscD {
                 ? `sparkplug:${from}`
                 : `kerberos:${from}`,
         });
-        return log(200);
+        return log(sent ? 200 : 503);
     }
 }

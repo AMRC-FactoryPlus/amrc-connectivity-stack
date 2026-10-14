@@ -61,6 +61,7 @@ subdirs+= acs-service-setup
 subdirs+= acs-visualiser
 subdirs+= deploy
 subdirs+= edge-bacnet
+subdirs+= edge-ftp
 subdirs+= edge-helm-charts
 subdirs+= edge-modbus
 subdirs+= edge-pathfindr

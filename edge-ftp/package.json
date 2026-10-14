@@ -1,0 +1,18 @@
+{
+  "name": "edge-ftp",
+  "version": "1.0.0",
+  "description": "ACS Edge Agent driver for FTP, FTPS and SFTP servers: reads files and directory listings, and writes files on command",
+  "main": "bin/driver.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@amrc-factoryplus/edge-driver": "^0.1.1",
+    "basic-ftp": "^6.2.1",
+    "ssh2-sftp-client": "^12.1.1"
+  }
+}

@@ -159,8 +159,9 @@ deployment that's:
 - `acs-git`
 - `acs-cluster-manager` (clusters subdomain)
 - `acs-i3x`
+- `acs-data-access`
 
-The chart wires `OIDC_DISCOVERY_URL` into all eight services via the
+The chart wires `OIDC_DISCOVERY_URL` into all nine services via the
 shared `amrc-connectivity-stack.oidc-env` helper, so opting a new
 service in is a single-line include in its deployment template.
 
@@ -317,7 +318,7 @@ deployment, or the deployment template was missed when the helper
 was added. Confirm with:
 
 ```sh
-for d in auth configdb directory i3x cmdesc files git cluster-manager; do
+for d in auth configdb directory i3x cmdesc files git cluster-manager data-access; do
   v=$(kubectl get deploy -n <ns> $d \
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OIDC_DISCOVERY_URL")].value}')
   echo "$d: ${v:-<MISSING>}"

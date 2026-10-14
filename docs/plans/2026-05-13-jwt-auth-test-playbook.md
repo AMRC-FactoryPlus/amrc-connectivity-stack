@@ -55,7 +55,7 @@ kubectl logs -n <ns> -l job-name=service-setup --tail=200 | grep -i acs-cli
 ## 2. Confirm every F+ service has `OIDC_DISCOVERY_URL` wired
 
 ```sh
-for d in i3x auth configdb directory files cmdesc clusters git; do
+for d in i3x auth configdb directory files cmdesc clusters git data-access; do
   url=$(kubectl get deploy -n <ns> $d -o jsonpath='{.spec.template.spec.containers[?(@.name)].env[?(@.name=="OIDC_DISCOVERY_URL")].value}' 2>/dev/null)
   echo "$d -> ${url:-<MISSING>}"
 done

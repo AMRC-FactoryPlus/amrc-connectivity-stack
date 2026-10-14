@@ -589,6 +589,77 @@ History recorded before an object was renamed is not returned, and a
 change to a device's schema breaks its references until the dataset
 is changed.
 
+### Upgrading: the coverage backfill no longer reads the whole raw bucket
+
+Before this fix, the coverage backfill in Data Access first looked up
+the oldest point in the Sparkplug bucket. That query read every point
+of every series over the whole history. On an installation with
+several years of history and high series cardinality it ran past its
+10-minute timeout. InfluxDB kept running it after Data Access gave up,
+with high CPU and memory use, and Data Access started it again every
+15 minutes. The backfill never summarised a day.
+
+Now:
+
+- **No whole-history query.** The backfill walks back from today one
+  day at a time. Below an empty day it looks for data in the 30 days
+  below with one `last()` query that runs inside InfluxDB's storage
+  engine. It stops after 365 days in a row with no data below the
+  oldest data it has found (`COVERAGE_BACKFILL_EMPTY_DAYS`).
+- **Day counts run in the storage engine.** The hourly count in the
+  backfill and in the hourly InfluxDB task now runs its window in UTC,
+  which lets InfluxDB count in storage instead of streaming every raw
+  point to Flux. Hours are the same in UTC and Europe/London, so the
+  counts do not change. Data Access updates the task's Flux on start.
+- **Timeouts close the connection.** When a backfill or repair query
+  runs past `COVERAGE_TIMEOUT_MS`, or Data Access stops, Data Access
+  closes the connection, so InfluxDB can cancel the query. A day counted
+  hour by hour has three times that limit in total. Waits between days
+  end at once when Data Access stops.
+- **Failed queries are not taken for empty ones.** An error that
+  InfluxDB reports after it has started its response now fails the
+  query, instead of reading as a day with no data.
+- **Less data back from InfluxDB.** Backfill and repair queries now
+  return a count of what they wrote, not every written row.
+- **Coverage ends where the backfill stopped.** If the backfill stopped
+  after a run of empty days, reads below that point count raw data or
+  report `pending`. Before, a finished backfill made all older time
+  read as zero from the summary.
+- **Backoff.** After a failure the backfill waits 15 minutes, then 30
+  minutes, 1, 2 and 4 hours, then 6 hours between tries. Each failure
+  is one log line that names the step that failed.
+- **Helm values.** `dataAccess.coverage` sets the coverage settings:
+  `enabled`, `backfill`, `pauseMs`, `backfillEmptyDays`,
+  `backfillFrom`, `timeoutMs`, `repairDays` and `rebuild`. Use these
+  instead of `kubectl set env`, which the next upgrade undoes.
+
+What to do on upgrade:
+
+- If you turned the backfill off by hand (`COVERAGE_BACKFILL=false` on
+  the Data Access deployment), set `dataAccess.coverage.backfill: false`
+  in your values **before** you upgrade. The chart now sets
+  `COVERAGE_ENABLED`, `COVERAGE_BACKFILL`, `COVERAGE_PAUSE_MS`,
+  `COVERAGE_BACKFILL_EMPTY_DAYS`, `COVERAGE_TIMEOUT_MS` and
+  `COVERAGE_REPAIR_DAYS`, and `COVERAGE_BACKFILL_FROM` and
+  `COVERAGE_REBUILD` when they are not empty, so the upgrade replaces
+  hand-set values of these. Move any of them you set by hand to
+  `dataAccess.coverage`. The chart does not manage `COVERAGE_BUCKET`,
+  `COVERAGE_TASK`, `COVERAGE_RECOUNT_HOURS` or `COVERAGE_MIN_TIME`.
+- Expect the backfill to start, or resume, as soon as Data Access
+  starts: one query at a time, each followed by a pause at least as
+  long, so it uses at most about half of one InfluxDB query slot until
+  it finishes. To defer it, upgrade with `backfill: false` and set it to
+  `true` later, or raise `pauseMs` to slow it down.
+- The backfill resumes from its marker. A marker written by an earlier
+  version counts its run of empty days from where it got to. A
+  backfill that never summarised a day starts from today.
+- Raw data below a gap of more than 365 days is no longer summarised.
+  To include it, raise `dataAccess.coverage.backfillEmptyDays` or set
+  `dataAccess.coverage.backfillFrom`.
+- `GET /v1/coverage/status` reports `backfill.oldestData` (the oldest
+  day with data the backfill has found) instead of
+  `backfill.earliestRaw`, and adds `backfillEmptyDays`.
+
 ### Other improvements
 
 ConfigDB:

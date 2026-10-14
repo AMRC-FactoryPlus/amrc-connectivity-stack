@@ -135,6 +135,7 @@ export const ACS = {
         RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",
         Pathfindr:              "6f971ef5-c3d7-4222-9254-d8f02f91c1f7",
         Sim:                    "da866ba6-cd0e-491b-a780-19466723b23f",
+        FTP:                    "f9af82a7-0c2b-45f9-b259-9d64973ff473",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",
@@ -350,6 +351,8 @@ export const Edge = {
     Class: {
         Alert:              "ddb853fc-262a-4a10-888a-816a961d37c5",
         Connection:         "f371cbfc-de3e-11ef-b361-7b31622bc42f",
+        /* Files the Edge Agent may fetch for its drivers */
+        DeliveryFile:       "6bf0450c-16c1-450e-8913-fad7272c6df4",
         Driver:             "3874e06c-de4a-11ef-a68c-0f1c2d4d555c",
         LinkRelation:       "2bce9142-6b5b-4a5e-8e2f-f8a8d51d6c15",
     },
@@ -552,6 +555,14 @@ export const EdgeSim = {
     },
     Perm: {
         ControlPlayer:  "d29ff0fc-a3b5-485d-aa58-cc77c6d39d7b",
+    },
+};
+
+/* FTP edge driver (edge-ftp): command permissions. */
+export const EdgeFTP = {
+    Perm: {
+        WriteFiles:     "5edb5f7f-b965-4c15-b4b0-d817416131ba",
+        ManageFiles:    "3fe5d076-30f6-4fa5-b288-238da9dde743",
     },
 };
 

@@ -1,0 +1,148 @@
+# FTP edge driver (edge-ftp): reads files and directory listings from
+# FTP, FTPS and SFTP servers, and writes, deletes and renames files on
+# command. Registers the driver with the Manager, the cmdesc command
+# definitions for its file commands, and the class of files an Edge
+# Agent may fetch from the Files service for a write. No principals are
+# bound to the command permissions here; that happens per deployment.
+#
+# NOTE: this dump deliberately contains NO Authentication grants, for
+# the same reason as edge-sim.yaml. The Edge Agent role's Download
+# grant on the delivery class lives in helm.yaml with the rest of that
+# role's grants.
+#-REQUIRE: acs-v2 edge files
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Edge.Class.Driver:
+    !u ACS.Driver.FTP: { name: "FTP / SFTP" }
+
+  !u ACS.PermGroup.CmdEsc:
+    !u EdgeFTP.Perm.WriteFiles: { name: "Write files over FTP" }
+    !u EdgeFTP.Perm.ManageFiles: { name: "Delete and rename files over FTP" }
+
+  # Files an Edge Agent may fetch from the Files service, for a driver
+  # to write to its device. Make a file a member of this class to let a
+  # write command deliver it.
+  !u ConfigDB.Class.R1Class:
+    !u Edge.Class.DeliveryFile:
+      name: "Edge delivery file"
+      memberOf:
+        - !u Files.Class.FileGroup
+      subclassOf:
+        - !u Files.Class.File
+
+configs:
+  !u Edge.App.DriverDef:
+    !u ACS.Driver.FTP:
+      image:
+        repository: edge-ftp
+      polled: true
+      presentation:
+        address:
+          title: "File or command address"
+          description: "What to read, as <kind>:<path>. file:<path>
+            returns the file as it is. text:<path> returns { path,
+            content }. stat:<path> returns { path, exists, type, size,
+            modified }. list:<dir> returns { path, exists, count,
+            entries }. latest:<dir>/<glob> returns the newest file
+            matching the glob, once it has stopped changing, as { path,
+            name, size, modified, content }. Or a command, written as a
+            String metric holding JSON: cmd:write takes { path, content }
+            or { path, file } with a Files service UUID; cmd:delete takes
+            { path }; cmd:rename takes { from, to }. cmd:result reads the
+            outcome of the last command."
+          icon: "folder-open"
+          placeholder: "e.g. file:/status/cell3.json or cmd:write"
+        path:
+          title: "JSON Path"
+          description: "JSONPath into the value, with the device's
+            payload format set to JSON. For example $.state in a JSON
+            file read with file:, $.content for text:, $.size for stat:,
+            $.count for list:, or $.ok and $.error for cmd:result."
+          icon: "code"
+          placeholder: "e.g. $.content"
+      schema:
+        properties:
+          protocol:
+            default: ftp
+            description: "ftp is unencrypted, password included.
+              ftps upgrades port 21 to TLS; ftps-implicit uses TLS from
+              the start, usually on port 990. sftp is file transfer over
+              SSH."
+            enum:
+              - ftp
+              - ftps
+              - ftps-implicit
+              - sftp
+            title: "Protocol"
+            type: string
+            options:
+              order: 1
+          host:
+            minLength: 1
+            title: "Hostname/IP"
+            type: string
+            options:
+              order: 2
+          port:
+            description: "Leave empty for the protocol's usual port: 21,
+              990 for implicit FTPS, 22 for SFTP."
+            title: "Port"
+            type: number
+            options:
+              order: 3
+          username:
+            description: "Leave empty to log in to an FTP server
+              anonymously. SFTP needs one."
+            title: "Username"
+            type: string
+            options:
+              order: 4
+          password:
+            format: password
+            title: "Password"
+            type: string
+            options:
+              order: 5
+          fingerprint:
+            description: "SHA-256 fingerprint of the server's TLS
+              certificate (FTPS) or SSH host key (SFTP). An FTPS
+              certificate with a fingerprint here is trusted even if
+              self-signed; without one it must pass the usual checks. An
+              SFTP server is only trusted with one. If the server is
+              refused, the driver's log shows the fingerprint it
+              presented. Both AB:CD:... and SHA256:... forms work."
+            title: "Server fingerprint"
+            type: string
+            options:
+              order: 6
+          atomicWrites:
+            default: true
+            description: "Upload to a temporary name and rename it into
+              place, so nothing sees a half-written file. Turn this off
+              for servers that refuse unexpected file names or can't
+              rename, as some robot controllers do."
+            format: checkbox
+            title: "Write through a temporary file"
+            type: boolean
+            options:
+              order: 7
+        required:
+          - protocol
+          - host
+        title: "FTP Connection Details"
+        type: object
+
+  # Command Escalation definitions for the file commands. The metric
+  # names match a device schema with a File_Commands folder; the
+  # addresses these map to are the cmd:* addresses above.
+  !u CmdEsc.App.CmdDef:
+    !u EdgeFTP.Perm.WriteFiles:
+      - name: File_Commands/Write
+        type: String
+    !u EdgeFTP.Perm.ManageFiles:
+      - name: File_Commands/Delete
+        type: String
+      - name: File_Commands/Rename
+        type: String

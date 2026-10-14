@@ -258,6 +258,10 @@ grants:
       # The agent proxies cassette fetches for the edge-sim driver
       # (drivers hold no credentials of their own).
       !u EdgeSim.App.Cassette: false
+      !u Edge.App.ScoutResults: false
+    # Scout mode stores discovered addresses against the connection.
+    !u ConfigDB.Perm.WriteConfig:
+      !u Edge.App.ScoutResults: false
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
       !u Clusters.App.K8sTemplate: false

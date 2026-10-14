@@ -50,6 +50,10 @@ objects:
       name: "Driver definition"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    !u Edge.App.ScoutResults:
+      name: "Edge scout results"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST" }

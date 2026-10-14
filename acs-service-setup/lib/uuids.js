@@ -363,6 +363,7 @@ export const Edge = {
         ConnConfig:         "fa8b429c-de3e-11ef-87fd-6382f0eac944",
         Deployment:         "f2b9417a-ef7f-421f-b387-bb8183a48cdb",
         DriverDef:          "454e5bec-de4a-11ef-bfea-4bc400f636a5",
+        ScoutResults:       "f8c1b13b-ebaf-45c9-b712-9cd712695513",
     },
     Perm: {
         ReloadConfig:       "6335f100-e68e-4e4d-b46d-85b42f85a036",

@@ -35,6 +35,11 @@ import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
 import { DriverConnection } from "./devices/driver.js";
 import { Scout, ScoutResult } from "./scout.js";
 
+/* The default for DRIVER_FILE_LIMIT. The agent holds a fetched file in
+ * memory several times over while it encodes and sends it, so raising
+ * this a long way also means raising the agent's memory limit. */
+const DEFAULT_FILE_LIMIT = 10 * 1024 * 1024;
+
 /* Does this parsed config contain a secret placeholder anywhere, in a
  * key or in a string value? Uses an explicit stack, as a config can be
  * tens of MB and deeply nested. The test is the "__FPSI__" prefix alone,
@@ -102,6 +107,9 @@ export class Translator extends EventEmitter {
     missingSecrets: string[] = []
     /* Aborted by stop(), to cancel waitForSecrets. */
     abort = new AbortController()
+    /* The largest file a driver may have fetched from the Files
+     * service, in bytes. */
+    fileLimit: number
 
     constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
@@ -111,12 +119,17 @@ export class Translator extends EventEmitter {
         this.pollInt = pollInt;
         this.connections = {};
         this.devices = {};
+        this.fileLimit = parseInt(process.env.DRIVER_FILE_LIMIT ?? "")
+            || DEFAULT_FILE_LIMIT;
     }
 
     /* Serve driver req/<what> messages. Drivers have no Factory+
-     * identity of their own, so the agent proxies specific, known
-     * ConfigDB reads on their behalf. Currently only edge-sim
-     * cassettes (the Cassette application, by object UUID). */
+     * identity of their own, so the agent makes specific, known reads
+     * on their behalf, each by UUID:
+     *
+     *  cassette    an edge-sim cassette (the Cassette application)
+     *  file        a file from the Files service, for edge-ftp
+     */
     async driverRequest({ id, msg, data, payload }) {
         if (msg != "req") return;
 
@@ -125,6 +138,8 @@ export class Translator extends EventEmitter {
             payload: Buffer.from(JSON.stringify(body)),
         }).catch(e => log(`Driver rsp publish failed: ${e}`));
 
+        if (data == "file")
+            return this.fileRequest(id, payload, reply);
         if (data != "cassette")
             return reply({ error: `Unknown request: ${data}` });
 
@@ -143,6 +158,66 @@ export class Translator extends EventEmitter {
         catch (e: any) {
             log(`Cassette fetch ${uuid} for driver ${id} failed: ${e.message}`);
             return reply({ uuid, error: `ConfigDB fetch failed: ${e.message}` });
+        }
+    }
+
+    /* Fetch a file from the Files service for a driver to write to its
+     * device. Which files the agent may fetch is up to its own Download
+     * grant. The whole file is held in memory and sent base64-encoded,
+     * so files over fileLimit are refused. */
+    async fileRequest(id: string, payload: Buffer, reply: (body: object) => Promise<void>) {
+        const uuid = payload.toString().trim();
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid))
+            return reply({ uuid, error: "Not a file UUID" });
+
+        const limit = this.fileLimit;
+        const fail = (error: string) => {
+            log(`File fetch ${uuid} for driver ${id} failed: ${error}`);
+            return reply({ uuid, error });
+        };
+
+        try {
+            const res = await this.fplus.Fetch.fetch({
+                service:    UUIDs.Service.Files,
+                url:        `/v1/file/${uuid}`,
+                headers:    { Accept: "application/octet-stream" },
+                /* The HTTP cache would keep a copy of every file. */
+                cache:      "no-store",
+            });
+            switch (res.status) {
+            case 200:
+                break;
+            case 0:
+                return fail("Can't reach the Files service");
+            case 403:
+                return fail("This Edge Agent may not download that file. "
+                    + "Edge Agents can only fetch files in the Edge delivery file class.");
+            case 404:
+                return fail("File not found");
+            default:
+                return fail(`Files service returned ${res.status}`);
+            }
+
+            const length = Number(res.headers.get("content-length"));
+            if (length > limit)
+                return fail(`File is ${length} bytes, over the ${limit} byte limit`);
+
+            /* Count as it arrives, in case there was no length. */
+            const chunks: Buffer[] = [];
+            let size = 0;
+            for await (const chunk of res.body) {
+                size += chunk.length;
+                if (size > limit)
+                    return fail(`File is over the ${limit} byte limit`);
+                chunks.push(chunk);
+            }
+
+            log(`Fetched file ${uuid} (${size} bytes) for driver ${id}`);
+            return reply({ uuid, size,
+                content: Buffer.concat(chunks).toString("base64") });
+        }
+        catch (e: any) {
+            return fail(`Files service fetch failed: ${e.message}`);
         }
     }
 

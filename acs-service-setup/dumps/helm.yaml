@@ -258,6 +258,10 @@ grants:
       # The agent proxies cassette fetches for the edge-sim driver
       # (drivers hold no credentials of their own).
       !u EdgeSim.App.Cassette: false
+    # The agent fetches files from the Files service for drivers' write
+    # commands (edge-ftp), but only members of the delivery class.
+    !u Files.Perm.Download:
+      !u Edge.Class.DeliveryFile: true
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
       !u Clusters.App.K8sTemplate: false

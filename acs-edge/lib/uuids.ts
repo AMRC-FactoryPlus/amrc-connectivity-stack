@@ -14,6 +14,10 @@ export const App = {
     /* edge-sim cassettes; must match acs-service-setup EdgeSim.App */
     Cassette:         "844c9d80-97ab-4ffc-918c-f4e529411108",
 };
+export const Service = {
+    /* Drivers' file requests are fetched from here */
+    Files:          "a2a6efc5-9793-4486-9fd9-7caf9e3b5451",
+};
 export const Schema = {
     EdgeAgent:      "15360868-2f35-4b52-990b-49329fb246fe",
     Alert:          "8853aa15-2228-4309-b98e-e086cefbc72c",

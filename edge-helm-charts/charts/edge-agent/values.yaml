@@ -19,6 +19,8 @@ image:
     repository: edge-tplink-smartplug
   pathfindr:
     repository: edge-pathfindr
+  ftp:
+    repository: edge-ftp
   # Further image names for drivers as needed
 
 # An object mapping connection names to driver configuration. This is
@@ -51,6 +53,11 @@ drivers: {}
 debug: false
 verbosity: ALL,!token,!service,!sparkplug
 poll_int: 10
+# The largest file, in bytes, the Edge Agent will fetch from the Files
+# service for a driver to write to its device (edge-ftp). The agent
+# holds a fetched file in memory several times over while it sends it,
+# so raise limits.memory too if this goes up much.
+driverFileLimit: 10485760
 authGroup:
   # This must be supplied on deployment. It specifies the Auth group to
   # place the Edge Agent user account in.

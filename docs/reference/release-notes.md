@@ -589,6 +589,45 @@ History recorded before an object was renamed is not returned, and a
 change to a device's schema breaks its references until the dataset
 is changed.
 
+### A driver for FTP, FTPS and SFTP servers
+
+A new edge driver, **FTP / SFTP** (`edge-ftp`), reads files from a file
+server and writes files to it on command. It suits robot controllers
+and other kit that takes programs over FTP, and folders where another
+system drops files. See `edge-ftp/README.md`.
+
+- **Reads.** A metric's address says what to read: `file:<path>`,
+  `text:<path>`, `stat:<path>` (whether the file exists, its size and
+  time), `list:<dir>`, or `latest:<dir>/<glob>`, the newest matching
+  file in a drop folder once it has stopped changing. Set the device's
+  payload format to JSON and pick values out with JSONPath. A read is
+  limited to 1 MiB.
+- **Commands.** Writes to `cmd:write`, `cmd:delete` and `cmd:rename`
+  carry JSON and arrive through Command Escalation. A write takes the
+  text inline or the UUID of a file in the Files service. `cmd:result`
+  reports how the last command went. Two new permissions cover them,
+  *Write files over FTP* and *Delete and rename files over FTP*; grant
+  them per device.
+- **Server checks.** FTPS and SFTP connections can pin the server's
+  SHA-256 fingerprint, and SFTP needs one. When a server is refused,
+  the driver's log shows the fingerprint it presented.
+
+What changes on upgrade:
+
+- **Edge Agents can download delivery files.** To write a file from
+  the Files service, the Edge Agent fetches it with its own identity.
+  The Edge Agent role now has **Download** on members of a new class,
+  **Edge delivery file**, and no other files. Make a file a member of
+  that class before a write command can deliver it.
+- **The agent refuses files over 10 MiB.** Set `driverFileLimit`
+  (bytes) in the edge-agent chart values to change this. The agent
+  holds the file in memory while it sends it, so raise
+  `limits.memory` alongside a large increase.
+- **Upgrade the Edge Agent with the driver.** An older agent answers
+  file requests with `Unknown request: file`, which the driver reports
+  on `cmd:result`. Inline writes, reads and the other commands work
+  with any agent.
+
 ### Upgrading: the coverage backfill no longer reads the whole raw bucket
 
 Before this fix, the coverage backfill in Data Access first looked up

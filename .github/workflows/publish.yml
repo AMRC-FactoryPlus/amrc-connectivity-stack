@@ -291,6 +291,7 @@ jobs:
           - edge-rtde
           - edge-pathfindr
           - edge-sim
+          - edge-ftp
     permissions:
       contents: read
       packages: write
@@ -334,6 +335,7 @@ jobs:
           - edge-rtde
           - edge-pathfindr
           - edge-sim
+          - edge-ftp
     permissions:
       contents: read
       packages: write
@@ -377,6 +379,7 @@ jobs:
           - edge-rtde
           - edge-pathfindr
           - edge-sim
+          - edge-ftp
     permissions:
       contents: read
       packages: write

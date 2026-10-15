@@ -11,11 +11,12 @@
 #
 #   BASE=https://portal.pathfindr.co.uk \
 #   CLIENT_ID=25 CLIENT_SECRET=... \
-#   ./tools/catalogue-api.sh > catalogue.txt
+#   ./tools/catalogue-api.sh > tools/api-catalogue.txt
 #
 # Read-only: every request is a GET apart from the token exchange. Nothing
 # is created, modified or triggered. The output contains asset serials and
-# site names, so treat it as you would any other site data.
+# site names, so treat it as you would any other site data. The default
+# output path above is gitignored; keep it out of the repo.
 
 set -uo pipefail
 

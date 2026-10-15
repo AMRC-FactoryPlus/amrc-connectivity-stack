@@ -117,11 +117,22 @@ const TABLES = `
 `;
 
 /**
- * Indexes added since SCHEMA_VERSION was last bumped. Created if
- * missing on every open, so an existing database gains them without a
- * rebuild (a few hundred ms at 3 million values).
+ * Indexes and tables added since SCHEMA_VERSION was last bumped.
+ * Created if missing on every open, so an existing database gains them
+ * without a rebuild (a few hundred ms at 3 million values).
  */
 const ADDED_INDEXES = `
+    -- The device segment of each device's UNS topics (the segment
+    -- after "Edge"), which the UNS historian puts at the start of its
+    -- path tag. source is 'uns' when seen on a UNS topic, or 'config'
+    -- when taken from DeviceInformation's sparkplugName before any
+    -- UNS message has been seen. See ObjectTree.unsDeviceSegment.
+    create table if not exists uns_device (
+        device_uuid     text primary key,
+        segment         text not null,
+        source          text not null           -- 'uns' | 'config'
+    ) without rowid;
+
     -- Values not kept current by the UNS ('influx' and 'empty'), by
     -- device, for ValueCache's refresh. Queries must say
     -- source != 'uns' for SQLite to use it.

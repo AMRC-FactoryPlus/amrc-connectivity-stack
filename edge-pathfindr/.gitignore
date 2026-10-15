@@ -1,2 +1,4 @@
 node_modules
 tmp
+# Live API responses: asset serials, site names and staff names.
+tools/api-catalogue.txt

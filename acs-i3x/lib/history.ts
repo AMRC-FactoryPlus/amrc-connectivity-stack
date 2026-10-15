@@ -85,13 +85,18 @@ interface LastRow {
 
 /**
  * Where one leaf's series lives: a bucket and the path tag to match.
- * `path` undefined means no path filter (a Sparkplug-bucket metric at
- * the top level of its device, as before).
+ * An empty `path` matches only series without a path tag: the
+ * Sparkplug historian writes a metric at the top level of its device
+ * with an empty path, and the InfluxDB client leaves out a tag with an
+ * empty value.
  */
 interface SeriesTarget {
     bucket: string;
-    path?: string;
+    path: string;
 }
+
+/** How often a failing bucket is logged, at most, in ms. */
+const BUCKET_FAILURE_LOG_INTERVAL = 60_000;
 
 /**
  * An RFC 3339 time from InfluxDB, padded to nine fractional digits so
@@ -106,11 +111,9 @@ function timeKey(t: string): string {
     return `${m[1]}.${(m[2] ?? "").padEnd(9, "0")}Z`;
 }
 
-/** Map key for a series: measurement, device and (optionally) path. */
-function seriesKey(measurement: string, tli: string, path?: string): string {
-    return path === undefined
-        ? `${measurement}\u0000${tli}`
-        : `${measurement}\u0000${tli}\u0000${path}`;
+/** Map key for a series: measurement, device and path ("" for none). */
+function seriesKey(measurement: string, tli: string, path: string): string {
+    return `${measurement}\u0000${tli}\u0000${path}`;
 }
 
 /** Quote a value as a Flux string literal. */
@@ -157,6 +160,8 @@ export class History {
     private bulkMeasurementFilterMax: number;
     private semaphore: Semaphore;
     private valueCache?: HistoryOpts["valueCache"];
+    /** When each bucket's failure was last logged. */
+    private bucketFailureLogged = new Map<string, number>();
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
@@ -183,6 +188,37 @@ export class History {
     /** Run one Flux query, waiting for a slot under the process-wide cap. */
     private query<T>(flux: string): Promise<T[]> {
         return this.semaphore.run(() => this.queryApi.collectRows<T>(flux));
+    }
+
+    /**
+     * Run one query per bucket. When more than one bucket is read, a
+     * bucket whose query fails (not authorised, missing, timed out)
+     * counts as having no rows, so the other answers, as it would have
+     * alone; the failure is logged (see bucketFailed). Rejects only if
+     * every query fails. One bucket alone fails as it always has.
+     */
+    private async queryBuckets<T>(queries: Array<{ bucket: string; flux: string }>): Promise<T[][]> {
+        if (queries.length === 1) return [await this.query<T>(queries[0].flux)];
+        const settled = await Promise.allSettled(queries.map(q => this.query<T>(q.flux)));
+        if (settled.every(r => r.status === "rejected"))
+            throw (settled[0] as PromiseRejectedResult).reason;
+        return settled.map((r, i) => {
+            if (r.status === "fulfilled") return r.value;
+            this.bucketFailed(queries[i].bucket, r.reason);
+            return [];
+        });
+    }
+
+    /** Log a bucket's failed query, at most once per bucket per
+     * BUCKET_FAILURE_LOG_INTERVAL, as every read of a UNS device
+     * would otherwise log it. */
+    private bucketFailed(bucket: string, err: unknown): void {
+        const now = Date.now();
+        const last = this.bucketFailureLogged.get(bucket);
+        if (last !== undefined && now - last < BUCKET_FAILURE_LOG_INTERVAL) return;
+        this.bucketFailureLogged.set(bucket, now);
+        console.error(`History: InfluxDB bucket ${JSON.stringify(bucket)} failed; `
+            + `answering from the other bucket: ${(err as Error)?.message ?? err}`);
     }
 
     /**
@@ -313,9 +349,11 @@ export class History {
         if (!meta) return null;
 
         const targets = this.seriesTargets(meta);
-        const results = await Promise.all(targets.map(t =>
-            this.query<{ _value: unknown; _time: string }>(
-                this.buildSeriesQuery(meta, t, "  |> range(start: -30d)", "  |> last()"))));
+        const results = await this.queryBuckets<{ _value: unknown; _time: string }>(
+            targets.map(t => ({
+                bucket: t.bucket,
+                flux: this.buildSeriesQuery(meta, t, "  |> range(start: -30d)", "  |> last()"),
+            })));
 
         /* The later of the buckets' last points; the first target's
          * (the UNS bucket's) on a tie. */
@@ -444,8 +482,9 @@ export class History {
      * last() runs per series, so this returns one row per series of
      * each device, in the same series order that the per-leaf query
      * sees. Each leaf then takes the first row whose measurement and
-     * topLevelInstance match, and whose path matches when the leaf
-     * has a path. That is the same row getCurrentValue returns as
+     * topLevelInstance match, and whose path matches the leaf's (no
+     * path tag for a top-level metric). That is the same row
+     * getCurrentValue returns as
      * rows[0] when a leaf has more than one series (for example after
      * a device rename changes the `device` tag).
      *
@@ -457,7 +496,9 @@ export class History {
      * match, so the rows each leaf sees, and their order, are the same.
      *
      * Leaves without MetricMeta, or with no data in the window, are
-     * absent from the returned map.
+     * absent from the returned map. With two buckets, a failed query
+     * counts as no rows (see queryBuckets); the read fails only for a
+     * leaf none of whose buckets answered.
      */
     async getCurrentValues(leafIds: string[]): Promise<Map<string, I3xValueResponse>> {
         const { values } = await this.readLast(leafIds, "-30d", this.bulkConcurrency);
@@ -504,14 +545,12 @@ export class History {
             const measurement = `${meta.metricName}:${meta.typeSuffix}`;
             const keys: Array<{ bucket: string; key: string }> = [];
             for (const t of this.seriesTargets(meta, targetCache)) {
-                // A target without a path is not filtered on path at
-                // all by the per-leaf query, so match it on measurement
-                // and device only.
+                // A row without a path tag has key path "", which only
+                // a top-level metric's target matches, as in the
+                // per-leaf query.
                 keys.push({
                     bucket: t.bucket,
-                    key: t.path === undefined
-                        ? seriesKey(measurement, meta.topLevelInstanceUuid)
-                        : seriesKey(measurement, meta.topLevelInstanceUuid, t.path),
+                    key: seriesKey(measurement, meta.topLevelInstanceUuid, t.path),
                 });
                 let devices = buckets.get(t.bucket);
                 if (!devices) buckets.set(t.bucket, devices = new Map());
@@ -525,8 +564,7 @@ export class History {
         const out = new Map<string, I3xValueResponse>();
         if (wanted.length === 0) return { known, values: out };
 
-        // First row seen per key, per bucket. Both the path-qualified
-        // and the path-less key are recorded for every row.
+        // First row seen per key, per bucket.
         const first = new Map<string, Map<string, { _value: unknown; _time: string }>>();
         const jobs: Array<{ bucket: string; tlis: string[] }> = [];
         for (const [bucket, devices] of buckets) {
@@ -534,6 +572,9 @@ export class History {
             for (const tlis of chunk([...devices.keys()], this.bulkChunkSize))
                 jobs.push({ bucket, tlis });
         }
+        // Devices whose query failed, per bucket, and the first error.
+        const failed = new Map<string, Set<string>>();
+        let firstError: unknown;
         await mapLimit(jobs, concurrency, async ({ bucket, tlis }) => {
             const devices = buckets.get(bucket)!;
             const seen = first.get(bucket)!;
@@ -544,15 +585,36 @@ export class History {
             const filter = measurements.size <= this.bulkMeasurementFilterMax
                 ? [...measurements]
                 : undefined;
-            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter, start, bucket));
+            let rows: LastRow[];
+            try {
+                rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter, start, bucket));
+            } catch (err) {
+                firstError ??= err;
+                let f = failed.get(bucket);
+                if (!f) failed.set(bucket, f = new Set());
+                for (const tli of tlis) f.add(tli);
+                return;
+            }
             for (const row of rows) {
-                const path = row.path ?? "";
-                const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
-                const noPath = seriesKey(row._measurement, row.topLevelInstance);
-                if (!seen.has(withPath)) seen.set(withPath, row);
-                if (!seen.has(noPath)) seen.set(noPath, row);
+                const key = seriesKey(row._measurement, row.topLevelInstance, row.path ?? "");
+                if (!seen.has(key)) seen.set(key, row);
             }
         });
+
+        if (failed.size) {
+            /* A leaf none of whose buckets answered fails the read, as
+             * any failure did with one bucket. Otherwise a failed
+             * bucket counts as having no rows (see queryBuckets). */
+            for (const { leafId } of wanted) {
+                await slicer.maybe();
+                const meta = this.objectTree.getMetricMeta(leafId);
+                if (!meta) continue;
+                const targets = this.seriesTargets(meta, targetCache);
+                if (targets.every(t => failed.get(t.bucket)?.has(meta.topLevelInstanceUuid)))
+                    throw firstError;
+            }
+            for (const bucket of failed.keys()) this.bucketFailed(bucket, firstError);
+        }
 
         for (const { leafId, keys } of wanted) {
             await slicer.maybe();
@@ -594,7 +656,7 @@ export class History {
     seriesTargets(meta: MetricMeta, cache?: Map<string, boolean>): SeriesTarget[] {
         const sparkplug: SeriesTarget = {
             bucket: this.bucket,
-            path: meta.metricPath ? meta.metricPath : undefined,
+            path: meta.metricPath,
         };
         if (!this.unsBucket) return [sparkplug];
 
@@ -625,8 +687,11 @@ export class History {
      */
     private buildSeriesQuery(meta: MetricMeta, target: SeriesTarget, range: string, final: string): string {
         const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-        const pathFilter = target.path === undefined
-            ? ""
+        /* A top-level Sparkplug metric has no path tag. Matching any
+         * path would also read a same-named metric deeper in the
+         * device. */
+        const pathFilter = target.path === ""
+            ? `  |> filter(fn: (r) => not exists r["path"] or r["path"] == "")`
             : `  |> filter(fn: (r) => r["path"] == ${fluxString(target.path)})`;
         return [
             `from(bucket: ${fluxString(target.bucket)})`,
@@ -684,11 +749,23 @@ export class History {
         startTime: string,
         endTime: string,
     ): string[] | null {
+        return this.historyQueries(elementId, startTime, endTime)?.map(q => q.flux) ?? null;
+    }
+
+    /** buildFluxQueries, with the bucket each query reads. */
+    private historyQueries(
+        elementId: string,
+        startTime: string,
+        endTime: string,
+    ): Array<{ bucket: string; flux: string }> | null {
         const meta = this.objectTree.getMetricMeta(elementId);
         if (!meta) return null;
-        return this.seriesTargets(meta).map(t => this.buildSeriesQuery(meta, t,
-            `  |> range(start: ${startTime}, stop: ${endTime})`,
-            `  |> sort(columns: ["_time"])`));
+        return this.seriesTargets(meta).map(t => ({
+            bucket: t.bucket,
+            flux: this.buildSeriesQuery(meta, t,
+                `  |> range(start: ${startTime}, stop: ${endTime})`,
+                `  |> sort(columns: ["_time"])`),
+        }));
     }
 
     /** The first (preferred) of buildFluxQueries, or null. */
@@ -718,11 +795,10 @@ export class History {
         // No MetricMeta means we cannot identify a metric series for this
         // elementId. Return no data rather than guessing at a filter: a
         // leaf with no meta is indistinguishable from an unknown element.
-        const queries = this.buildFluxQueries(elementId, startTime, endTime);
+        const queries = this.historyQueries(elementId, startTime, endTime);
         if (queries === null) return [];
 
-        const results = await Promise.all(queries.map(q =>
-            this.query<{ _value: unknown; _time: string }>(q)));
+        const results = await this.queryBuckets<{ _value: unknown; _time: string }>(queries);
 
         let rows = results[0];
         if (results.length > 1) {

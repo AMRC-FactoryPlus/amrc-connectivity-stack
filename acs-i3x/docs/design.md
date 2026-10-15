@@ -395,7 +395,10 @@ read from the UNS historian's bucket, with the path
 `<device segment>/<metric path>` (the device segment alone at the top
 level). History is then the union of both, one point per timestamp, the UNS
 bucket's on a clash; a current value is the later of the two last points.
-See architecture.md, "Which bucket". Every tag value is quoted with
+If one bucket's query fails, the other answers alone (logged at most once a
+minute per bucket); the read fails only if both fail. A top-level metric
+matches only series without a `path` tag. See architecture.md, "Which
+bucket". Every tag value is quoted with
 `fluxString`. Current values for many leaves are read with a few bulk `last()`
 queries. Every Flux query, for current values and history alike, waits for
 a slot in a process-wide semaphore (`I3X_INFLUX_CONCURRENCY`, default 4).

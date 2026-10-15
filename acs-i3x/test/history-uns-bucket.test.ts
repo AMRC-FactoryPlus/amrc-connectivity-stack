@@ -8,8 +8,13 @@
  * that i3X finds from UNS messages.
  */
 
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { jest } from "@jest/globals";
 import { History } from "../lib/history.js";
+import { I3xStore } from "../lib/store.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import type { MetricMeta } from "../lib/object-tree.js";
 import { createMockFplus } from "./helpers/mock-services.js";
@@ -102,8 +107,9 @@ describe("bucket choice", () => {
         const qs = history.buildFluxQueries("top", START, END)!;
         expect(qs[0]).toContain(`r["path"] == "Device_A")`);
         expect(qs[0]).toContain(`r["_measurement"] == "Status:d"`);
-        // The Sparkplug bucket keeps its old rule: no path filter.
-        expect(qs[1]).not.toContain(`r["path"]`);
+        // In the Sparkplug bucket a top-level metric has no path tag.
+        expect(qs[1]).toContain(`not exists r["path"] or r["path"] == ""`);
+        expect(qs[1]).not.toContain(`r["path"] == "Device_A"`);
     });
 
     it("reads only the Sparkplug bucket for a device that does not publish to the UNS", () => {
@@ -381,5 +387,182 @@ describe("ObjectTree and History together", () => {
         const qs = history.buildFluxQueries(leaf, START, END)!;
         expect(qs).toHaveLength(1);
         expect(qs[0]).toContain(`from(bucket: "${SP_BUCKET}")`);
+    });
+});
+
+describe("top-level metrics in the Sparkplug bucket", () => {
+    it("bulk reads ignore a nested same-named series", async () => {
+        const tree = mockTree({
+            metas: { top: meta(DEV, "", "Status") },
+            publishing: [DEV],
+            segments: { [DEV]: "Device_A" },
+        });
+        const { history, collectRows } = makeHistory(tree, UNS_BUCKET);
+        collectRows.mockImplementation(async (q: string) => q.includes(UNS_BUCKET)
+            ? [{ _measurement: "Status:d", topLevelInstance: DEV, path: "Device_A", _value: 1, _time: "2026-01-01T00:00:01Z" }]
+            : [
+                // A metric of the same name, deeper in the device, newer.
+                { _measurement: "Status:d", topLevelInstance: DEV, path: "Sub", _value: 99, _time: "2026-01-01T00:00:09Z" },
+                { _measurement: "Status:d", topLevelInstance: DEV, _value: 2, _time: "2026-01-01T00:00:02Z" },
+            ]);
+        expect((await history.getCurrentValues(["top"])).get("top")!.value).toBe(2);
+    });
+
+    it("bulk reads without a UNS bucket ignore a nested same-named series too", async () => {
+        const tree = mockTree({ metas: { top: meta(OTHER, "", "Status") } });
+        const { history, collectRows } = makeHistory(tree);
+        collectRows.mockResolvedValue([
+            { _measurement: "Status:d", topLevelInstance: OTHER, path: "Sub", _value: 99, _time: "2026-01-01T00:00:09Z" },
+        ]);
+        expect((await history.getCurrentValues(["top"])).has("top")).toBe(false);
+    });
+});
+
+describe("one bucket failing", () => {
+    const setup = () => {
+        const tree = mockTree({
+            metas: { a: meta(DEV, "Phases/1"), c: meta(OTHER, "Phases/1") },
+            publishing: [DEV],
+            segments: { [DEV]: "Device_A" },
+        });
+        return makeHistory(tree, UNS_BUCKET);
+    };
+    const unsRow = { _value: 1, _time: "2026-01-01T00:00:01Z" };
+    const spRow = { _value: 2, _time: "2026-01-01T00:00:02Z" };
+    const fail = (bucket: string | null) => async (q: string) => {
+        const isUns = q.includes(UNS_BUCKET);
+        if (bucket === null || (bucket === UNS_BUCKET) === isUns) throw new Error("unauthorized");
+        return [isUns ? unsRow : spRow];
+    };
+    let errors: ReturnType<typeof jest.spyOn>;
+    beforeEach(() => { errors = jest.spyOn(console, "error").mockImplementation(() => {}); });
+    afterEach(() => errors.mockRestore());
+
+    it("queryHistory answers from the other bucket, and logs once per bucket per interval", async () => {
+        const { history, collectRows } = setup();
+        collectRows.mockImplementation(fail(UNS_BUCKET));
+        expect((await history.queryHistory("a", START, END)).map(v => v.value)).toEqual([2]);
+        expect((await history.queryHistory("a", START, END)).map(v => v.value)).toEqual([2]);
+        expect(errors).toHaveBeenCalledTimes(1);
+        expect(String(errors.mock.calls[0][0])).toContain(UNS_BUCKET);
+
+        collectRows.mockImplementation(fail(SP_BUCKET));
+        expect((await history.queryHistory("a", START, END)).map(v => v.value)).toEqual([1]);
+        expect(errors).toHaveBeenCalledTimes(2);
+    });
+
+    it("queryHistory fails when both buckets fail", async () => {
+        const { history, collectRows } = setup();
+        collectRows.mockImplementation(fail(null));
+        await expect(history.queryHistory("a", START, END)).rejects.toThrow("unauthorized");
+    });
+
+    it("getCurrentValue answers from the other bucket, and fails when both fail", async () => {
+        const { history, collectRows } = setup();
+        collectRows.mockImplementation(fail(UNS_BUCKET));
+        expect((await history.getCurrentValue("a"))!.value).toBe(2);
+        collectRows.mockImplementation(fail(SP_BUCKET));
+        expect((await history.getCurrentValue("a"))!.value).toBe(1);
+        collectRows.mockImplementation(fail(null));
+        await expect(history.getCurrentValue("a")).rejects.toThrow("unauthorized");
+    });
+
+    const bulkRows = (q: string) => q.includes(UNS_BUCKET)
+        ? [{ _measurement: "Current:d", topLevelInstance: DEV, path: "Device_A/Phases/1", ...unsRow }]
+        : [
+            { _measurement: "Current:d", topLevelInstance: DEV, path: "Phases/1", ...spRow },
+            { _measurement: "Current:d", topLevelInstance: OTHER, path: "Phases/1", _value: 3, _time: "2026-01-01T00:00:03Z" },
+        ];
+
+    it("getCurrentValues answers from the Sparkplug bucket when the UNS bucket fails", async () => {
+        const { history, collectRows } = setup();
+        collectRows.mockImplementation(async (q: string) => {
+            if (q.includes(UNS_BUCKET)) throw new Error("unauthorized");
+            return bulkRows(q);
+        });
+        const out = await history.getCurrentValues(["a", "c"]);
+        expect(out.get("a")!.value).toBe(2);
+        expect(out.get("c")!.value).toBe(3);
+        expect(errors).toHaveBeenCalledTimes(1);
+    });
+
+    it("getCurrentValues answers a UNS device from the UNS bucket when the Sparkplug bucket fails", async () => {
+        const { history, collectRows } = setup();
+        collectRows.mockImplementation(async (q: string) => {
+            if (q.includes(SP_BUCKET)) throw new Error("unauthorized");
+            return bulkRows(q);
+        });
+        expect((await history.getCurrentValues(["a"])).get("a")!.value).toBe(1);
+        // A device read from the Sparkplug bucket alone has no other.
+        await expect(history.getCurrentValues(["a", "c"])).rejects.toThrow("unauthorized");
+    });
+
+    it("getCurrentValues fails when both buckets fail", async () => {
+        const { history, collectRows } = setup();
+        collectRows.mockImplementation(fail(null));
+        await expect(history.getCurrentValues(["a"])).rejects.toThrow("unauthorized");
+    });
+
+    it("a lone Sparkplug bucket fails as before", async () => {
+        const tree = mockTree({ metas: { c: meta(OTHER, "Phases/1") } });
+        const { history, collectRows } = makeHistory(tree);
+        collectRows.mockRejectedValue(new Error("timeout"));
+        await expect(history.queryHistory("c", START, END)).rejects.toThrow("timeout");
+        await expect(history.getCurrentValue("c")).rejects.toThrow("timeout");
+        await expect(history.getCurrentValues(["c"])).rejects.toThrow("timeout");
+        expect(errors).not.toHaveBeenCalled();
+    });
+});
+
+describe("upgrading a warm database", () => {
+    let dir: string;
+    beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "i3x-uns-bucket-")); });
+    afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+    const treeOn = (store: I3xStore) => new ObjectTree({
+        fplus: createMockFplus(),
+        namespaceName: "Factory+",
+        namespaceUri: "urn:factoryplus:ns",
+        store,
+    });
+
+    it("seeds device segments from stored sparkplugNames, so the UNS bucket is read", () => {
+        const path = join(dir, "i3x.db");
+        const s1 = new I3xStore({ path, fingerprint: "ns" });
+        treeOn(s1).addDevice(DEV, devInfo("Device_A"), { name: "Device A" });
+        // What the sync engine stores for each device it applies.
+        s1.prepare("insert into sync_device (uuid, sparkplug_name) values (?, ?)").run(DEV, "Device_A");
+        s1.prepare("insert into sync_device (uuid, sparkplug_name) values (?, ?)").run(OTHER, "Not_In_Tree");
+        // A database from before uns_device existed.
+        s1.prepare("drop table uns_device").run();
+        s1.close();
+
+        const s2 = new I3xStore({ path, fingerprint: "ns" });
+        expect(s2.warm).toBe(true);
+        const tree = treeOn(s2);
+        expect(tree.unsDeviceSegment(DEV)).toBe("Device_A");
+        expect(tree.unsDeviceSegment(OTHER)).toBeUndefined();
+
+        const leaf = tree.getChildElementIds(DEV)
+            .flatMap(p => tree.getChildElementIds(p))
+            .flatMap(p => tree.getChildElementIds(p))[0];
+        const { history } = makeHistory(tree, UNS_BUCKET);
+        const qs = history.buildFluxQueries(leaf, START, END)!;
+        expect(qs).toHaveLength(2);
+        expect(qs[0]).toContain(`from(bucket: "${UNS_BUCKET}")`);
+        expect(qs[0]).toContain(`r["path"] == "Device_A/Phases/1"`);
+        s2.close();
+    });
+
+    it("does not seed again once the table exists", () => {
+        const path = join(dir, "i3x.db");
+        const s1 = new I3xStore({ path, fingerprint: "ns" });
+        treeOn(s1).addDevice(DEV, devInfo(undefined), { name: "Device A" });
+        s1.prepare("insert into sync_device (uuid, sparkplug_name) values (?, ?)").run(DEV, "Device_A");
+        s1.close();
+
+        const s2 = new I3xStore({ path, fingerprint: "ns" });
+        expect(treeOn(s2).unsDeviceSegment(DEV)).toBeUndefined();
+        s2.close();
     });
 });

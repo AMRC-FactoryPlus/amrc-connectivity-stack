@@ -388,6 +388,23 @@ export class I3xStore {
         }
     }
 
+    /**
+     * A database from before uns_device has none of its rows, and the
+     * sync engine re-applies only devices whose config has changed, so
+     * ObjectTree.buildDevice would never write them. Seed the stand-in
+     * ('config') rows from the sparkplugName the sync engine stored,
+     * for the devices in the tree, as buildDevice would have.
+     */
+    private seedUnsDevice(): void {
+        const r = this.db.prepare(`
+            insert or ignore into uns_device (device_uuid, segment, source)
+            select s.uuid, s.sparkplug_name, 'config' from sync_device s
+            where s.sparkplug_name is not null and s.sparkplug_name != ''
+                and exists (select 1 from device_schema d where d.device_uuid = s.uuid)
+        `).run();
+        this.log("seeded the UNS device segment of %d devices", Number(r.changes));
+    }
+
     private ensureSchema(fingerprint: string): void {
         const version = (this.db.prepare("pragma user_version").get() as any).user_version;
         let stored: string | undefined;
@@ -397,7 +414,10 @@ export class I3xStore {
         }
         if (version === SCHEMA_VERSION && stored === fingerprint) {
             this.warm = true;
+            const hadUnsDevice = !!this.db.prepare(
+                "select 1 from sqlite_master where type = 'table' and name = 'uns_device'").get();
             this.db.exec(ADDED_INDEXES);
+            if (!hadUnsDevice) this.seedUnsDevice();
             return;
         }
 

@@ -118,7 +118,7 @@ describe("History", () => {
             expect(query).toContain("sort(columns: [\"_time\"])");
         });
 
-        it("for a leaf metric without metricPath omits path filter", () => {
+        it("for a leaf metric without metricPath matches only series without a path", () => {
             const metricMeta = new Map([
                 ["leaf-no-path", {
                     topLevelInstanceUuid: "bbbb-2222-3333-4444",
@@ -139,7 +139,9 @@ describe("History", () => {
 
             expect(query).toContain(`r["_measurement"] == "Voltage:d"`);
             expect(query).toContain(`r["topLevelInstance"] == "bbbb-2222-3333-4444"`);
-            expect(query).not.toContain("path");
+            // Only series without a path tag: a same-named metric
+            // deeper in the device must not match.
+            expect(query).toContain(`not exists r["path"] or r["path"] == ""`);
         });
 
         it("returns null for an elementId with no MetricMeta", () => {

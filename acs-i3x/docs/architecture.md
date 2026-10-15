@@ -191,6 +191,9 @@ catch-up reads:
 - Otherwise read both buckets. History is the union of the two, one point
   per timestamp, the UNS bucket's where both have one. A current value is
   the later of the two last points, the UNS bucket's on a tie.
+- If one of the two buckets' queries fails (for example the token cannot
+  read the UNS bucket), the other answers alone, and the failure is logged
+  at most once a minute per bucket. The read fails only if both fail.
 
 Both are read, rather than the UNS bucket alone, because the Sparkplug
 bucket holds what a device recorded before it was published to the UNS,
@@ -205,10 +208,17 @@ device segment of the topic (the Sparkplug device ID):
 | Metric | Sparkplug bucket `path` | UNS bucket `path` |
 |---|---|---|
 | `Phases/1/Current` on `Device_A` | `Phases/1` | `Device_A/Phases/1` |
-| `Status` (top level) on `Device_A` | none (no filter) | `Device_A` |
+| `Status` (top level) on `Device_A` | no `path` tag | `Device_A` |
+
+The Sparkplug historian writes an empty path for a top-level metric, and
+the InfluxDB client leaves out an empty tag, so a top-level metric matches
+only series without a `path` tag. A same-named metric deeper in the device
+does not match.
 
 The tree records each device's segment from its UNS topics, and uses
-DeviceInformation's `sparkplugName` until one has been seen.
+DeviceInformation's `sparkplugName` until one has been seen. A database
+from before the `uns_device` table is seeded, on its first warm open, from
+the `sparkplugName` the sync engine stored for each device.
 
 ### How MetricMeta maps to InfluxDB tags
 

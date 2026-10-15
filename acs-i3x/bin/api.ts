@@ -82,6 +82,10 @@ const history = new History({
     influxToken: env.INFLUX_TOKEN || "",
     influxOrg: env.INFLUX_ORG || "default",
     influxBucket: env.INFLUX_BUCKET || "default",
+    // The UNS historian's bucket, set only when it is deployed. A
+    // device that publishes to the UNS is then read from this bucket
+    // as well as INFLUX_BUCKET (see lib/history.ts).
+    influxUnsBucket: env.INFLUX_UNS_BUCKET || undefined,
     objectTree,
     // Flux queries in flight across the whole process.
     influxConcurrency: positiveInt("I3X_INFLUX_CONCURRENCY", 4),

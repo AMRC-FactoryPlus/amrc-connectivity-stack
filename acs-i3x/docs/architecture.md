@@ -93,6 +93,11 @@ The tree builder walks this recursively:
 - Keys with `Sparkplug_Type` and no children become **leaf objects**
 - `Instance_UUID` used where available, v5 UUID synthesised otherwise
 - `MetricMeta` stored per leaf for InfluxDB queries
+- A leaf that only a UNS message names (source `uns`) gets `MetricMeta`
+  from that message: measurement `<metric name>:<suffix of the Type
+  property>`, `topLevelInstance` the first UUID of `InstanceUUIDPath`
+  (the device), and path the topic segments between the device and the
+  metric name
 
 ## Runtime: Current Values (hybrid)
 
@@ -168,12 +173,49 @@ sequenceDiagram
     API-->>Client: { success: true, result: { elementId, values: [...] } }
 ```
 
+### Which bucket
+
+Two historians can write InfluxDB. The Sparkplug historian writes every
+device to the Sparkplug bucket (`INFLUX_BUCKET`, `default`). The UNS
+historian, when deployed, writes what is published to the UNS to its own
+bucket (`INFLUX_UNS_BUCKET`, `uns`; the Helm chart sets it only when
+`historians.uns.enabled` is true). Data can be in the UNS bucket only,
+for example after an import or a backfill.
+
+The rule, applied alike to history, the current-value fallback and the
+catch-up reads:
+
+- `INFLUX_UNS_BUCKET` unset, or the device does not publish to the UNS
+  (no ISA-95 hierarchy), or its UNS device segment is not known: read the
+  Sparkplug bucket only.
+- Otherwise read both buckets. History is the union of the two, one point
+  per timestamp, the UNS bucket's where both have one. A current value is
+  the later of the two last points, the UNS bucket's on a tie.
+
+Both are read, rather than the UNS bucket alone, because the Sparkplug
+bucket holds what a device recorded before it was published to the UNS,
+and the UNS bucket holds what only it was given. Where both historians
+recorded a point, its timestamp and value are the same.
+
+The buckets share `_measurement`, `_field` (`value`) and
+`topLevelInstance`, but not `path`. The UNS historian's `path` is every
+topic segment between `Edge` and the metric name, so it starts with the
+device segment of the topic (the Sparkplug device ID):
+
+| Metric | Sparkplug bucket `path` | UNS bucket `path` |
+|---|---|---|
+| `Phases/1/Current` on `Device_A` | `Phases/1` | `Device_A/Phases/1` |
+| `Status` (top level) on `Device_A` | none (no filter) | `Device_A` |
+
+The tree records each device's segment from its UNS topics, and uses
+DeviceInformation's `sparkplugName` until one has been seen.
+
 ### How MetricMeta maps to InfluxDB tags
 
 | MetricMeta field | InfluxDB concept | Example |
 |---|---|---|
 | `topLevelInstanceUuid` | `topLevelInstance` tag | `7192c247-573c-4e9d-89fe-618acdc99c2b` |
-| `metricPath` | `path` tag | `Phases/1` |
+| `metricPath` | `path` tag (Sparkplug bucket; see "Which bucket" for the UNS bucket) | `Phases/1` |
 | `metricName` + `typeSuffix` | `_measurement` | `True_RMS_Current:d` |
 
 The type suffix is derived from `Sparkplug_Type` in the originMap:
@@ -225,8 +267,8 @@ Only works for devices publishing to UNS. Devices not on UNS never trigger SSE e
 | Object names | ConfigDB Info app | Start, then each change | ETag SEARCH |
 | JSON Schemas | ConfigDB ConfigSchema app | Start, then each change | ETag SEARCH |
 | Current value (primary) | MQTT UNS/v1/# into SQLite `last_value` | Continuous | Real-time |
-| Current value (fallback) | InfluxDB default bucket, last(); kept in `last_value` for devices that publish to UNS | First read of a leaf (every read for other devices), and any read during a catch-up | ~10s |
-| Current value (catch-up) | InfluxDB default bucket, last() since the values were last current | After a restart or MQTT reconnect, and every refresh interval for values kept from InfluxDB | Margin (60 s) plus the query |
-| Historical values | InfluxDB default bucket, range query | On request | N/A |
+| Current value (fallback) | InfluxDB, last() (see "Which bucket"); kept in `last_value` for devices that publish to UNS | First read of a leaf (every read for other devices), and any read during a catch-up | ~10s |
+| Current value (catch-up) | InfluxDB, last() since the values were last current | After a restart or MQTT reconnect, and every refresh interval for values kept from InfluxDB | Margin (60 s) plus the query |
+| Historical values | InfluxDB, range query (see "Which bucket") | On request | N/A |
 | SSE streaming | MQTT UNS/v1/# via SSE bridge | Continuous | Real-time |
 | Device online/offline | Not currently used | -- | -- |

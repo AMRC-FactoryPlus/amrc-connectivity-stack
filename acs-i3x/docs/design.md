@@ -110,6 +110,7 @@ Tables:
 |---|---|
 | `object` | Every i3X object: elementId, parent, type, display name, composition flag, source (`config` or `uns`). `seq` keeps insertion order. |
 | `metric_meta` | InfluxDB query metadata per leaf metric. |
+| `uns_device` | Each device's UNS device segment (topic segment after `Edge`), from its UNS topics or, until one is seen, `sparkplugName`. |
 | `object_type` | ObjectTypes: display name and JSON schema. |
 | `device_schema` | The Schema_UUIDs each device in the tree references. |
 | `sync_device`, `sync_schema` | The ConfigDB ETags each device and schema was last built from. |
@@ -210,7 +211,12 @@ hierarchy and its metric tree; its Info config gives its display name.
   device under them.
 - `addCompositionFromUns` adds nodes a UNS message names but the config
   does not (source `uns`). `replaceDeviceSubtree` keeps them while their
-  parent survives; a node the new config defines becomes `config`.
+  parent survives; a node the new config defines becomes `config`. A leaf
+  without MetricMeta gets it from the message (measurement name and Type,
+  device from `InstanceUUIDPath`, path from the topic), so its history and
+  InfluxDB current value can be read. The message's device segment (the
+  topic segment after `Edge`) is recorded in `uns_device`; see
+  `unsDeviceSegment`.
 - `refreshFromSnapshot` makes the tree hold exactly a given set of devices
   and schemas, with the same per-device mutations.
 - `iterateObjects` reads the tree a page at a time; `GET /objects` streams
@@ -381,9 +387,16 @@ Exposes: `getValue(elementId)`, `getValueLazy(elementId)`,
 
 ### history.ts
 
-Translates i3X value and history requests into Flux queries against the
-Sparkplug bucket, using each leaf's MetricMeta (measurement name, device,
-path). Current values for many leaves are read with a few bulk `last()`
+Translates i3X value and history requests into Flux queries, using each
+leaf's MetricMeta (measurement name, device, path). A leaf is read from the
+Sparkplug bucket (`INFLUX_BUCKET`). When `INFLUX_UNS_BUCKET` is set and the
+leaf's device publishes to the UNS with a known device segment, it is also
+read from the UNS historian's bucket, with the path
+`<device segment>/<metric path>` (the device segment alone at the top
+level). History is then the union of both, one point per timestamp, the UNS
+bucket's on a clash; a current value is the later of the two last points.
+See architecture.md, "Which bucket". Every tag value is quoted with
+`fluxString`. Current values for many leaves are read with a few bulk `last()`
 queries. Every Flux query, for current values and history alike, waits for
 a slot in a process-wide semaphore (`I3X_INFLUX_CONCURRENCY`, default 4).
 History is only served for leaf metrics.
@@ -509,6 +522,8 @@ INFLUX_URL=http://influxdb.namespace.svc.cluster.local
 INFLUX_TOKEN=<token>
 INFLUX_ORG=<org>
 INFLUX_BUCKET=default
+INFLUX_UNS_BUCKET=uns              # optional: the UNS historian's bucket;
+                                   # unset reads INFLUX_BUCKET only
 
 # i3X specific
 I3X_NAMESPACE_NAME=<organisation name from Helm values.organisation>

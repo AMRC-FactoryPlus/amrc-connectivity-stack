@@ -4,15 +4,27 @@
 
 /*
  * History — Translates i3X value and history requests into InfluxDB
- * Flux queries against the sparkplug (default) bucket.
+ * Flux queries.
  *
  * Uses MetricMeta from ObjectTree to map elementIds to InfluxDB
  * measurement names and tag filters.
+ *
+ * Which bucket: the Sparkplug historian's bucket (`influxBucket`)
+ * holds every device. When `influxUnsBucket` is set (the UNS historian
+ * is deployed), a device that publishes to the UNS is read from both:
+ * the UNS bucket holds data written only there (an import or a
+ * backfill), and the Sparkplug bucket holds what came before the
+ * device was published to the UNS. History is the union of the two,
+ * one point per timestamp, the UNS bucket's on a clash. A current
+ * value is the later of the two last points, the UNS bucket's on a
+ * tie. Both historians write the same measurement, field and
+ * topLevelInstance; the UNS historian's path tag also starts with the
+ * device segment of the UNS topic (see seriesTargets).
  */
 
 import { InfluxDB } from "@influxdata/influxdb-client";
 import type { QueryApi } from "@influxdata/influxdb-client";
-import type { ObjectTree } from "./object-tree.js";
+import type { MetricMeta, ObjectTree } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import type { InfluxValue } from "./value-cache.js";
 import { Semaphore } from "./semaphore.js";
@@ -23,6 +35,11 @@ interface HistoryOpts {
     influxToken: string;
     influxOrg: string;
     influxBucket: string;
+    /**
+     * The UNS historian's bucket. Unset (the default) reads every
+     * device from `influxBucket` only, as before.
+     */
+    influxUnsBucket?: string;
     objectTree: ObjectTree;
     /** Devices per bulk last-value query. */
     bulkChunkSize?: number;
@@ -64,6 +81,29 @@ interface LastRow {
     path?: string;
     _value: unknown;
     _time: string;
+}
+
+/**
+ * Where one leaf's series lives: a bucket and the path tag to match.
+ * `path` undefined means no path filter (a Sparkplug-bucket metric at
+ * the top level of its device, as before).
+ */
+interface SeriesTarget {
+    bucket: string;
+    path?: string;
+}
+
+/**
+ * An RFC 3339 time from InfluxDB, padded to nine fractional digits so
+ * that times compare correctly as strings and the same instant always
+ * gives the same key. InfluxDB trims trailing zeros, so
+ * "...:00Z" and "...:00.5Z" would otherwise sort the wrong way round.
+ * Anything else is returned unchanged.
+ */
+function timeKey(t: string): string {
+    const m = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(t);
+    if (!m) return t;
+    return `${m[1]}.${(m[2] ?? "").padEnd(9, "0")}Z`;
 }
 
 /** Map key for a series: measurement, device and (optionally) path. */
@@ -109,6 +149,7 @@ async function mapLimit<T>(
 
 export class History {
     private bucket: string;
+    private unsBucket?: string;
     private objectTree: ObjectTree;
     private queryApi: QueryApi;
     private bulkChunkSize: number;
@@ -119,6 +160,11 @@ export class History {
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
+        /* The same bucket twice would only read it twice, with a path
+         * no Sparkplug-bucket series has. */
+        this.unsBucket = opts.influxUnsBucket && opts.influxUnsBucket !== opts.influxBucket
+            ? opts.influxUnsBucket
+            : undefined;
         this.objectTree = opts.objectTree;
         this.semaphore = opts.semaphore ?? new Semaphore(opts.influxConcurrency ?? 4);
         this.valueCache = opts.valueCache;
@@ -266,26 +312,20 @@ export class History {
         const meta = this.objectTree.getMetricMeta(elementId);
         if (!meta) return null;
 
-        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-        const pathFilter = meta.metricPath
-            ? `  |> filter(fn: (r) => r["path"] == "${meta.metricPath}")`
-            : "";
+        const targets = this.seriesTargets(meta);
+        const results = await Promise.all(targets.map(t =>
+            this.query<{ _value: unknown; _time: string }>(
+                this.buildSeriesQuery(meta, t, "  |> range(start: -30d)", "  |> last()"))));
 
-        const query = [
-            `from(bucket: "${this.bucket}")`,
-            `  |> range(start: -30d)`,
-            `  |> filter(fn: (r) => r["_measurement"] == "${measurement}")`,
-            `  |> filter(fn: (r) => r["topLevelInstance"] == "${meta.topLevelInstanceUuid}")`,
-            pathFilter,
-            `  |> filter(fn: (r) => r["_field"] == "value")`,
-            `  |> last()`,
-        ].filter(Boolean).join("\n");
+        /* The later of the buckets' last points; the first target's
+         * (the UNS bucket's) on a tie. */
+        let row: { _value: unknown; _time: string } | undefined;
+        for (const rows of results) {
+            const r = rows[0];
+            if (r && (!row || timeKey(r._time) > timeKey(row._time))) row = r;
+        }
+        if (!row) return null;
 
-        const rows = await this.query<{ _value: unknown; _time: string }>(query);
-
-        if (rows.length === 0) return null;
-
-        const row = rows[0];
         const result: I3xValueResponse = {
             elementId,
             isComposition: false,
@@ -448,10 +488,13 @@ export class History {
         known: Set<string>;
         values: Map<string, I3xValueResponse>;
     }> {
-        const wanted: Array<{ leafId: string; key: string }> = [];
+        // Per leaf, the series key to look for in each bucket, in
+        // order of preference.
+        const wanted: Array<{ leafId: string; keys: Array<{ bucket: string; key: string }> }> = [];
         const known = new Set<string>();
-        // Measurements each device's leaves need.
-        const devices = new Map<string, Set<string>>();
+        // Per bucket, the measurements each device's leaves need.
+        const buckets = new Map<string, Map<string, Set<string>>>();
+        const targetCache = new Map<string, boolean>();
         const slicer = new Slicer();
         for (const leafId of leafIds) {
             await slicer.maybe();
@@ -459,26 +502,41 @@ export class History {
             if (!meta) continue;
             known.add(leafId);
             const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-            // A leaf without a path is not filtered on path at all by
-            // the per-leaf query, so match it on measurement and
-            // device only.
-            const key = meta.metricPath
-                ? seriesKey(measurement, meta.topLevelInstanceUuid, meta.metricPath)
-                : seriesKey(measurement, meta.topLevelInstanceUuid);
-            wanted.push({ leafId, key });
-            let measurements = devices.get(meta.topLevelInstanceUuid);
-            if (!measurements) devices.set(meta.topLevelInstanceUuid, measurements = new Set());
-            measurements.add(measurement);
+            const keys: Array<{ bucket: string; key: string }> = [];
+            for (const t of this.seriesTargets(meta, targetCache)) {
+                // A target without a path is not filtered on path at
+                // all by the per-leaf query, so match it on measurement
+                // and device only.
+                keys.push({
+                    bucket: t.bucket,
+                    key: t.path === undefined
+                        ? seriesKey(measurement, meta.topLevelInstanceUuid)
+                        : seriesKey(measurement, meta.topLevelInstanceUuid, t.path),
+                });
+                let devices = buckets.get(t.bucket);
+                if (!devices) buckets.set(t.bucket, devices = new Map());
+                let measurements = devices.get(meta.topLevelInstanceUuid);
+                if (!measurements) devices.set(meta.topLevelInstanceUuid, measurements = new Set());
+                measurements.add(measurement);
+            }
+            wanted.push({ leafId, keys });
         }
 
         const out = new Map<string, I3xValueResponse>();
         if (wanted.length === 0) return { known, values: out };
 
-        // First row seen per key. Both the path-qualified and the
-        // path-less key are recorded for every row.
-        const first = new Map<string, { _value: unknown; _time: string }>();
-        const chunks = chunk([...devices.keys()], this.bulkChunkSize);
-        await mapLimit(chunks, concurrency, async (tlis) => {
+        // First row seen per key, per bucket. Both the path-qualified
+        // and the path-less key are recorded for every row.
+        const first = new Map<string, Map<string, { _value: unknown; _time: string }>>();
+        const jobs: Array<{ bucket: string; tlis: string[] }> = [];
+        for (const [bucket, devices] of buckets) {
+            first.set(bucket, new Map());
+            for (const tlis of chunk([...devices.keys()], this.bulkChunkSize))
+                jobs.push({ bucket, tlis });
+        }
+        await mapLimit(jobs, concurrency, async ({ bucket, tlis }) => {
+            const devices = buckets.get(bucket)!;
+            const seen = first.get(bucket)!;
             const measurements = new Set<string>();
             for (const tli of tlis) {
                 for (const m of devices.get(tli)!) measurements.add(m);
@@ -486,19 +544,25 @@ export class History {
             const filter = measurements.size <= this.bulkMeasurementFilterMax
                 ? [...measurements]
                 : undefined;
-            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter, start));
+            const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter, start, bucket));
             for (const row of rows) {
                 const path = row.path ?? "";
                 const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
                 const noPath = seriesKey(row._measurement, row.topLevelInstance);
-                if (!first.has(withPath)) first.set(withPath, row);
-                if (!first.has(noPath)) first.set(noPath, row);
+                if (!seen.has(withPath)) seen.set(withPath, row);
+                if (!seen.has(noPath)) seen.set(noPath, row);
             }
         });
 
-        for (const { leafId, key } of wanted) {
+        for (const { leafId, keys } of wanted) {
             await slicer.maybe();
-            const row = first.get(key);
+            /* The latest of the buckets' rows; the first bucket's on a
+             * tie, as getCurrentValue picks. */
+            let row: { _value: unknown; _time: string } | undefined;
+            for (const { bucket, key } of keys) {
+                const r = first.get(bucket)!.get(key);
+                if (r && (!row || timeKey(r._time) > timeKey(row._time))) row = r;
+            }
             if (!row) continue;
             out.set(leafId, {
                 elementId: leafId,
@@ -512,13 +576,82 @@ export class History {
     }
 
     /**
+     * The buckets a leaf's series is read from, in order of
+     * preference, with the path tag to match in each.
+     *
+     * The Sparkplug bucket's path is the metric's path within its
+     * device. The UNS historian writes everything between "Edge" and
+     * the metric name (UnsTopic.GetMetricPath), so its path is the
+     * device segment, then "/" and that path; for a metric at the top
+     * level of its device, the device segment alone.
+     *
+     * The UNS bucket is read only when it is configured, the device
+     * publishes to the UNS (ObjectTree.publishesToUns), and its device
+     * segment is known (ObjectTree.unsDeviceSegment). Otherwise only
+     * the Sparkplug bucket is read, as before. `cache` holds answers
+     * by device for a caller that looks up many leaves.
+     */
+    seriesTargets(meta: MetricMeta, cache?: Map<string, boolean>): SeriesTarget[] {
+        const sparkplug: SeriesTarget = {
+            bucket: this.bucket,
+            path: meta.metricPath ? meta.metricPath : undefined,
+        };
+        if (!this.unsBucket) return [sparkplug];
+
+        const tli = meta.topLevelInstanceUuid;
+        let publishes = cache?.get(tli);
+        if (publishes === undefined) {
+            publishes = this.objectTree.publishesToUns(tli);
+            cache?.set(tli, publishes);
+        }
+        if (!publishes) return [sparkplug];
+        const segment = this.objectTree.unsDeviceSegment(tli);
+        if (!segment) return [sparkplug];
+
+        return [
+            {
+                bucket: this.unsBucket,
+                path: meta.metricPath ? `${segment}/${meta.metricPath}` : segment,
+            },
+            sparkplug,
+        ];
+    }
+
+    /**
+     * One leaf's query against one bucket: the range, the series
+     * filters, then the final step. Every tag value is quoted with
+     * fluxString; `range` and `final` are built by us, never from
+     * client input.
+     */
+    private buildSeriesQuery(meta: MetricMeta, target: SeriesTarget, range: string, final: string): string {
+        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
+        const pathFilter = target.path === undefined
+            ? ""
+            : `  |> filter(fn: (r) => r["path"] == ${fluxString(target.path)})`;
+        return [
+            `from(bucket: ${fluxString(target.bucket)})`,
+            range,
+            `  |> filter(fn: (r) => r["_measurement"] == ${fluxString(measurement)})`,
+            `  |> filter(fn: (r) => r["topLevelInstance"] == ${fluxString(meta.topLevelInstanceUuid)})`,
+            pathFilter,
+            `  |> filter(fn: (r) => r["_field"] == "value")`,
+            final,
+        ].filter(Boolean).join("\n");
+    }
+
+    /**
      * Build the bulk last-value query for a chunk of devices, and
      * optionally only those measurements, over the window from `start`
      * (a Flux duration or an RFC 3339 time we made, never client
      * input). Uses `or` chains of equality tests, directly after
      * range(), because InfluxDB pushes those down to the storage index.
      */
-    buildBulkLastQuery(topLevelInstances: string[], measurements?: string[], start: string = "-30d"): string {
+    buildBulkLastQuery(
+        topLevelInstances: string[],
+        measurements?: string[],
+        start: string = "-30d",
+        bucket: string = this.bucket,
+    ): string {
         const anyOf = (tag: string, values: string[]) => values
             .map((v) => `r[${fluxString(tag)}] == ${fluxString(v)}`)
             .join(" or ");
@@ -526,7 +659,7 @@ export class History {
             ? `  |> filter(fn: (r) => ${anyOf("_measurement", measurements)})`
             : "";
         return [
-            `from(bucket: ${fluxString(this.bucket)})`,
+            `from(bucket: ${fluxString(bucket)})`,
             `  |> range(start: ${start})`,
             measurementFilter,
             `  |> filter(fn: (r) => ${anyOf("topLevelInstance", topLevelInstances)})`,
@@ -536,35 +669,35 @@ export class History {
     }
 
     /**
-     * Build a Flux query for historical data of a leaf metric.
+     * Build the Flux queries for historical data of a leaf metric, one
+     * per bucket it is read from (see seriesTargets), in order of
+     * preference. `startTime` and `endTime` are RFC 3339 times the API
+     * has validated.
      *
      * Returns null when the elementId has no MetricMeta. Without meta we
      * have no measurement name and no topLevelInstance to filter on, so
      * there is no safe query to build: the caller-supplied elementId must
      * never be used as a tag value itself.
      */
+    buildFluxQueries(
+        elementId: string,
+        startTime: string,
+        endTime: string,
+    ): string[] | null {
+        const meta = this.objectTree.getMetricMeta(elementId);
+        if (!meta) return null;
+        return this.seriesTargets(meta).map(t => this.buildSeriesQuery(meta, t,
+            `  |> range(start: ${startTime}, stop: ${endTime})`,
+            `  |> sort(columns: ["_time"])`));
+    }
+
+    /** The first (preferred) of buildFluxQueries, or null. */
     buildFluxQuery(
         elementId: string,
         startTime: string,
         endTime: string,
     ): string | null {
-        const meta = this.objectTree.getMetricMeta(elementId);
-        if (!meta) return null;
-
-        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-        const pathFilter = meta.metricPath
-            ? `  |> filter(fn: (r) => r["path"] == "${meta.metricPath}")`
-            : "";
-
-        return [
-            `from(bucket: "${this.bucket}")`,
-            `  |> range(start: ${startTime}, stop: ${endTime})`,
-            `  |> filter(fn: (r) => r["_measurement"] == "${measurement}")`,
-            `  |> filter(fn: (r) => r["topLevelInstance"] == "${meta.topLevelInstanceUuid}")`,
-            pathFilter,
-            `  |> filter(fn: (r) => r["_field"] == "value")`,
-            `  |> sort(columns: ["_time"])`,
-        ].filter(Boolean).join("\n");
+        return this.buildFluxQueries(elementId, startTime, endTime)?.[0] ?? null;
     }
 
     /**
@@ -585,10 +718,28 @@ export class History {
         // No MetricMeta means we cannot identify a metric series for this
         // elementId. Return no data rather than guessing at a filter: a
         // leaf with no meta is indistinguishable from an unknown element.
-        const query = this.buildFluxQuery(elementId, startTime, endTime);
-        if (query === null) return [];
+        const queries = this.buildFluxQueries(elementId, startTime, endTime);
+        if (queries === null) return [];
 
-        const rows = await this.query<{ _value: unknown; _time: string }>(query);
+        const results = await Promise.all(queries.map(q =>
+            this.query<{ _value: unknown; _time: string }>(q)));
+
+        let rows = results[0];
+        if (results.length > 1) {
+            /* The union of the buckets, one point per timestamp: the
+             * first bucket's (the UNS bucket's) where both have one.
+             * Where both historians recorded a point, it is the same. */
+            const byTime = new Map<string, { _value: unknown; _time: string }>();
+            for (const bucketRows of results) {
+                for (const row of bucketRows) {
+                    const key = timeKey(row._time);
+                    if (!byTime.has(key)) byTime.set(key, row);
+                }
+            }
+            rows = [...byTime.entries()]
+                .sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)
+                .map(e => e[1]);
+        }
 
         return rows.map((row) => ({
             value: row._value,

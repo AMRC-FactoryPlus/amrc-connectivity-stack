@@ -52,13 +52,17 @@ export default class Vis {
             this.leaves.push(graph);
             graph.leaves = 1;
             graph.maxdepth = 0;
+            graph.too_many = null;
         }
         else {
             nodes.forEach(c => {
                 this.count_leaves(c, depth + 1);
                 c.parent = graph;
             });
-            if (nodes.every(n => !n.children) && nodes.length > 5) {
+            /* Expiry leaves an empty children array behind (e.g. once a
+             * CMD sender times out), so test for length, not presence,
+             * or the parent never collapses again. */
+            if (nodes.every(n => !n.children?.length) && nodes.length > 5) {
                 graph.leaves = 1;
                 graph.maxdepth = 0;
                 graph.too_many = nodes.length;

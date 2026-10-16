@@ -15,7 +15,10 @@ COPY --from=lib . /home/node/lib/
 USER node
 WORKDIR /home/node/app
 COPY --chown=node . .
+# Without set -e a failed webpack build still produces an image, with
+# a bundle that throws in the browser.
 RUN <<'SHELL'
+    set -e
     npm install --save=false --install-links
     npx webpack
     npx tailwindcss -i ./public/style.css -o ./public/output.css

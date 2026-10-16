@@ -40,9 +40,12 @@ module.exports = {
         /* Strip the node: scheme so the aliases above apply. */
         new webpack.NormalModuleReplacementPlugin(/^node:/,
             res => { res.request = res.request.replace(/^node:/, ""); }),
+        /* The polyfill paths must be fully specified (with .js): they
+         * are injected into ESM modules such as the service-client,
+         * where webpack won't add the extension for us. */
         new webpack.ProvidePlugin({
             Buffer: ["buffer", "Buffer"],
-            process: "process/browser",
+            process: "process/browser.js",
         }),
     ],
 };

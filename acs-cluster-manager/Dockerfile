@@ -11,6 +11,7 @@ ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node -g node /home/node/app
     mkdir /home/node/lib
     cd /tmp
@@ -24,11 +25,13 @@ WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
 RUN <<'SHELL'
+    set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 

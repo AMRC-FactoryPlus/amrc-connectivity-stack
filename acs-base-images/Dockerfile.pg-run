@@ -13,6 +13,7 @@ FROM ${base}-js-run:${version}
 
 # Install system packages we need for runtime.
 RUN <<'SHELL'
+    set -e
     apk add libedit krb5-libs kstart
     # Create the runtime directories root-owned, for security.
     install -d -o root -g root -m 755 /home/node

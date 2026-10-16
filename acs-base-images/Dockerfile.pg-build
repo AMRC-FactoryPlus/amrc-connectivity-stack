@@ -18,6 +18,7 @@ USER root
 # Install postgres from source as the alpine package doesn't include
 # GSSAPI support.
 RUN <<SHELL
+    set -e
     apk add bison flex zlib-dev linux-headers
 
     wget -O /tmp/postgresql.tar.bz2 "https://ftp.postgresql.org/pub/source/v${pg_version}/postgresql-${pg_version}.tar.bz2"

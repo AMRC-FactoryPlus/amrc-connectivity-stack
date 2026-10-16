@@ -7,6 +7,7 @@ FROM node:lts-alpine
 # file:../lib/js-* so they land where npm expects.
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node -g node /home/node/app
     mkdir /home/node/lib
 SHELL

@@ -11,7 +11,7 @@ ARG tag=latest
 ARG pullpolicy=IfNotPresent
 
 USER root
-RUN sh -x <<'SHELL'
+RUN sh -ex <<'SHELL'
     install -d -o node -g node /home/node/app
     mkdir /home/node/lib
 SHELL
@@ -20,12 +20,12 @@ COPY --from=lib . /home/node/lib/
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
-RUN sh -x <<'SHELL'
+RUN sh -ex <<'SHELL'
     touch /home/node/.npmrc
     npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
-RUN sh -x <<'SHELL'
+RUN sh -ex <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
     sed -i -e"s!%%TAG%%!${tag}!g" \

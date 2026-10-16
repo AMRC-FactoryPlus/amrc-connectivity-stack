@@ -7,6 +7,7 @@
 import { Address, Topic, EventEmitter, MQTT, SpB } from "./webpack.js";
 
 const FactoryPlus = "11ad7b32-1d32-4c4a-b0c9-fa049208939a";
+const RETRY_DELAY = 30000;
 
 export default class MQTTClient extends EventEmitter {
     constructor (opts) {
@@ -62,8 +63,14 @@ export default class MQTTClient extends EventEmitter {
         
         const graph = this.add_to_graph(parts);
         if (kind == "BIRTH" || kind == "DATA") {
-            for (let g = graph; g; g = g.parent)
+            /* A Node whose Devices are publishing has been seen, even
+             * if it hasn't published itself; otherwise an NCMD would
+             * expire it and take its Devices with it. */
+            for (let g = graph; g; g = g.parent) {
                 g.online = true;
+                g.seen_data = true;
+                delete g.expires;
+            }
         }
         if (kind == "DEATH") {
             graph.online = false;
@@ -153,17 +160,35 @@ export default class MQTTClient extends EventEmitter {
             return;
         node.checked_directory = true;
 
+        let schema;
+        try {
+            schema = await this.lookup_schema(address);
+        }
+        catch (e) {
+            /* Don't leave the node marked as checked, or it never gets
+             * a schema on this screen. Retry after a delay rather than
+             * on every DATA. */
+            console.log(`Directory lookup for ${address} failed: ${e}`);
+            setTimeout(() => node.checked_directory = false, RETRY_DELAY);
+            return;
+        }
+
+        if (!schema) return;
+        if (node.seen_birth) return;
+
+        node.schema = schema;
+        this.emit("schema", node.schema);
+    }
+
+    async lookup_schema (address) {
         const dir = this.fplus.Directory;
 
         const [st, rv] = await dir.fetch(`v1/address/${address}`);
-        if (st != 200) return;
+        if (st == 404) return;
+        if (st != 200)
+            throw new Error(`address lookup returned ${st}`);
         const info = await dir.get_device_info(rv.uuid);
-        
-        if (!info.top_schema) return;
-        if (node.seen_birth) return;
-        
-        node.schema = info.top_schema;
-        this.emit("schema", node.schema);
+        return info?.top_schema;
     }
 
     on_expiry () {
@@ -181,11 +206,20 @@ export default class MQTTClient extends EventEmitter {
             if (!kid.expires || kid.expires > now)
                 return true;
             changed[0] = true;
-            this.known.delete(kid.path);
+            this.forget(kid);
             return false;
         });
         if (!node.children.length && !node.seen_data)
             node.expires = now;
+    }
+
+    /* Drop a removed node and everything under it from the cache.
+     * Dropping only the node itself would leave its descendants cached
+     * but detached from the graph, so they would never be drawn again. */
+    forget (node) {
+        if (node.path)
+            this.known.delete(node.path);
+        node.children?.forEach(c => this.forget(c));
     }
 }   
 

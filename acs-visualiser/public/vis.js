@@ -285,6 +285,11 @@ export default class Vis {
         const segment = TURN / this.graph.leaves;
         const ring = this.radius * 0.8 / this.graph.maxdepth;
         this.pick_centres(this.graph, 0, 0, segment, ring);
+
+        const queued = this.queued ?? [];
+        this.queued = [];
+        for (const args of queued)
+            this.make_active(...args);
     }
 
     /* A full re-layout per graph change is too expensive when a BIRTH
@@ -299,12 +304,18 @@ export default class Vis {
 
     make_active (path, style, stopping) {
         let node = this.paths.get(path);
-        if (node) {
-            if (node.parent.too_many) {
-                node = node.parent.overflow;
-            }
-            this.active.add(new Packet(this, node, style, stopping));
+        if (!node) {
+            /* A new node has no position until the pending re-layout
+             * runs. Hold its packet until then, or a one-off message
+             * such as a rebirth request is never shown. */
+            if (this.reset_timer)
+                this.queued.push([path, style, stopping]);
+            return;
         }
+        if (node.parent.too_many) {
+            node = node.parent.overflow;
+        }
+        this.active.add(new Packet(this, node, style, stopping));
     }
 
     render (time) {

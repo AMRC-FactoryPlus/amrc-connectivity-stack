@@ -14,11 +14,13 @@ WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
 RUN <<'SHELL'
+    set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 

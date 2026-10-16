@@ -6,12 +6,14 @@ ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node -g node /home/node/app
 SHELL
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
     then
@@ -22,6 +24,7 @@ RUN <<'SHELL'
 SHELL
 COPY --chown=node . .
 RUN <<'SHELL'
+    set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 

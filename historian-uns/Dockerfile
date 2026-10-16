@@ -15,6 +15,7 @@ ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node /home/node /home/node/app
     mkdir /home/node/lib
 SHELL
@@ -23,6 +24,7 @@ USER node
 WORKDIR /home/node/app
 COPY --chown=node . ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
     then
@@ -41,6 +43,7 @@ SHELL
 FROM ${acs_build} as util-build
 USER root
 RUN <<'SHELL'
+    set -e
     # Are these necessary?
     apk upgrade --update-cache --available
     apk add openssl
@@ -59,6 +62,7 @@ RUN npm install --save=false --only=production --install-links
 FROM ${acs_run}
 USER root
 RUN <<'SHELL'
+    set -e
     apk upgrade --update-cache --available
     apk add openssl
     rm -rf /var/cache/apk/*

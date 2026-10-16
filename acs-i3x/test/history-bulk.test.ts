@@ -148,13 +148,21 @@ describe("History bulk current values", () => {
             expect(out.has("a-status-rpm")).toBe(false);
         });
 
-        it("matches a leaf without a path on the first row of any path, as the unfiltered per-leaf query does", async () => {
+        it("matches a leaf without a path only on a row without a path, as the per-leaf query does", async () => {
             const { history } = makeHistory([
                 { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "Deep/Er", _value: 5, _time: T1 },
                 { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 6, _time: T3 },
             ]);
             const out = await history.getCurrentValues(["a-temp"]);
-            expect(out.get("a-temp")?.value).toBe(5);
+            expect(out.get("a-temp")?.value).toBe(6);
+        });
+
+        it("gives a leaf without a path nothing when only a nested same-named series has data", async () => {
+            const { history } = makeHistory([
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "Deep/Er", _value: 5, _time: T1 },
+            ]);
+            const out = await history.getCurrentValues(["a-temp"]);
+            expect(out.has("a-temp")).toBe(false);
         });
 
         it("does not match another device's row", async () => {

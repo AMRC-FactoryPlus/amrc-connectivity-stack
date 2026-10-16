@@ -554,9 +554,12 @@ describe("InfluxDB write-back", () => {
 
     it("files the marker of a leaf without InfluxDB metadata under its own device", async () => {
         const s = setup();
-        // A leaf found from UNS has no MetricMeta. Drop its value.
+        // A leaf without MetricMeta. A leaf found from UNS now gets
+        // some from the message; remove it, as for a leaf stored
+        // before that. Drop its value.
         uns(s.valueCache, ["Extra"], 5, "2026-10-05T12:00:00Z");
         const extra = s.leaf("Extra");
+        s.store.prepare("delete from metric_meta where element_id = ?").run(extra);
         expect(s.tree.getMetricMeta(extra)).toBeFalsy();
         s.valueCache.flush();
         s.valueCache.removeElements([extra]);

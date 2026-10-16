@@ -395,9 +395,12 @@ describe("after a restart", () => {
         const w = world();
         const first = await run(w);
         first.mqtt.connect();
-        /* A metric not in the device's schema: no MetricMeta. */
+        /* A metric not in the device's schema. The tree now gives it
+         * MetricMeta from the UNS message; remove it, as for a leaf
+         * stored before that, to test a leaf without any. */
         uns(first.valueCache, ["Extra"], 1, iso(Date.now() - 3600_000));
         const extra = w.leaf("Extra");
+        w.store.prepare("delete from metric_meta where element_id = ?").run(extra);
         expect(w.tree.getMetricMeta(extra)).toBeUndefined();
         first.valueCache.recordInfluxEmpty([{ elementId: "no-meta", device: DEV, anchor: DEV }]);
         first.valueCache.flush();

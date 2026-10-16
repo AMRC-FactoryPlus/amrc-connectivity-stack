@@ -81,6 +81,14 @@ export class APIv2 {
         const acl = await this.fetch_acl(principal);
         if (!acl) fail(404);
 
+        /* A principal can always read their own ACL in full, the same
+         * way id_whoami lets them look up their own identities. */
+        const caller = await this._whoami_uuid(req);
+        if (caller === principal) {
+            this.log("Returning own ACL %o", acl);
+            return res.status(200).json(acl);
+        }
+
         const tok = await this.data.check_targ(req.auth, Perm.ReadACL, true);
         if (!tok) fail(403);
         const rv = acl.filter(e => tok(e.permission));

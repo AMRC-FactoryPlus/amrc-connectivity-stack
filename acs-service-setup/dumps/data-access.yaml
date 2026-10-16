@@ -203,7 +203,9 @@ grants:
   # only a member's own: a member can edit any dataset's definition,
   # overwrite any dataset's tags, run details and recordings, set any
   # dataset's kind, read data from any device, and (through Info write)
-  # rename any object. It does not include deleting datasets.
+  # rename any object. Delete stays service-account-only: deliberately
+  # not included here, since the data-access delete route is gated on
+  # DataAccess.Perm.DeleteDataset, which this role doesn't grant either.
   !u DataAccess.Group.DatasetMaker:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
@@ -220,6 +222,9 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+      # Device originMap, to resolve sub-device metric references to
+      # their current Sparkplug paths.
+      !u UUIDs.App.DeviceInformation: false
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
@@ -228,6 +233,15 @@ grants:
     !u ConfigDB.Perm.WriteMembers:
       !u DataAccess.Group.FunctionalDatasetGroup: true
     !u ConfigDB.Perm.WriteMemberships:
+      !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.ReadMembers:
+      !u DataAccess.Class.Dataset: "both"
+      !u DataAccess.Group.FunctionalDatasetGroup: "both"
+    !u ConfigDB.Perm.CreateObject:
+      !u DataAccess.Class.Dataset: false
+    !u ConfigDB.Perm.WriteSubclasses:
+      !u DataAccess.Class.Dataset: true
+    !u ConfigDB.Perm.WriteSuperclasses:
       !u DataAccess.Class.Dataset: true
 
 

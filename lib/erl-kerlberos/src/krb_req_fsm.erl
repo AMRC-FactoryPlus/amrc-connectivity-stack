@@ -31,7 +31,8 @@
 
 -include("KRB5.hrl").
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     start_link/4,
@@ -97,7 +98,7 @@ wait({call, From}, await, S0 = #?MODULE{awaiters = Aws0, type = Type,
 terminate(normal, _State, #?MODULE{}) ->
     ok;
 terminate(Why, State, #?MODULE{}) ->
-    lager:debug("terminating from ~p due to ~p", [State, Why]),
+    ?LOG_DEBUG("terminating from ~p due to ~p", [State, Why]),
     ok.
 
 callback_mode() -> [state_functions, state_enter].
@@ -112,7 +113,7 @@ udp_single(enter, _PrevState, S0 = #?MODULE{}) ->
     {keep_state, S1, [{state_timeout, 100, multi}]};
 udp_single(state_timeout, multi, S0 = #?MODULE{req = Req, proto = FSM}) ->
     krb_proto_srv:cancel_req(FSM, Req),
-    lager:debug("giving up on single KDC UDP attempt"),
+    ?LOG_DEBUG("giving up on single KDC UDP attempt"),
     {next_state, udp_multi, S0};
 udp_single(info, {krb_error, Req}, S0 = #?MODULE{req = Req}) ->
     {next_state, tcp, S0};

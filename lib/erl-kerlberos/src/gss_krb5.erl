@@ -29,7 +29,8 @@
 -module(gss_krb5).
 -behaviour(gss_mechanism).
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -include("KRB5.hrl").
 -include("SPNEGO.hrl").
@@ -655,7 +656,7 @@ accept_req(APReq0, S0 = #?MODULE{opts = C}) ->
                             erlang:system_time(millisecond), millisecond), utf8),
                     if
                         (NowKrb > EndTime) ->
-                            lager:debug("client presented expired ticket: "
+                            ?LOG_DEBUG("client presented expired ticket: "
                                 "now = ~p, end = ~p", [NowKrb, EndTime]),
                             init_error(Realm, Service,
                                 'KRB_AP_ERR_TKT_EXPIRED', S1);
@@ -675,21 +676,22 @@ accept_req(APReq0, S0 = #?MODULE{opts = C}) ->
                                         'KRB_AP_ERR_BAD_INTEGRITY', S1);
 
                                 {error, Why} ->
-                                    lager:debug("decrypt of ap-req failed: ~p",
+                                    ?LOG_DEBUG("decrypt of ap-req failed: ~p",
                                         [Why]),
                                     init_generic_error(Realm, Service, Why, S1)
                             end
                     end;
 
                 {error, no_key_found} ->
-                    lager:debug("no key for ~p in ~p", [Ticket0, KeySet]),
+                    % ACS patch: log the ticket, not the keytab's keys.
+                    ?LOG_DEBUG("no key for ~p in the keytab", [Ticket0]),
                     init_error(Realm, Service, 'KRB_AP_ERR_NOKEY', S0);
 
                 {error, {bad_mac, _OurMAC, _TheirMAC}} ->
                     init_error(Realm, Service, 'KRB_AP_ERR_BAD_INTEGRITY', S0);
 
                 {error, Why} ->
-                    lager:debug("decrypt of ticket failed: ~p", [Why]),
+                    ?LOG_DEBUG("decrypt of ticket failed: ~p", [Why]),
                     init_generic_error(Realm, Service, Why, S0)
 
             end;
@@ -720,12 +722,12 @@ accept_auth(A, S0 = #?MODULE{tktkey = TktKey, opts = C,
     ATime = unicode:characters_to_binary(ATimeStr, utf8),
     if
         not ((ACRealm =:= CRealm) and (ACName =:= CName)) ->
-            lager:debug("authenticator/apreq name mismatch: ~p/~p vs ~p/~p",
+            ?LOG_DEBUG("authenticator/apreq name mismatch: ~p/~p vs ~p/~p",
                 [CRealm, CName, ACRealm, ACName]),
             init_error(Realm, Service, 'KRB_AP_ERR_MODIFIED', S0);
 
         (ATime > HiLimitTime) or (ATime < LoLimitTime) ->
-            lager:debug("authenticator clock skew: ~p < ~p < ~p",
+            ?LOG_DEBUG("authenticator clock skew: ~p < ~p < ~p",
                 [LoLimitTime, ATime, HiLimitTime]),
             init_error(Realm, Service, 'KRB_AP_ERR_SKEW', S0);
 
@@ -787,7 +789,7 @@ accept_auth(A, S0 = #?MODULE{tktkey = TktKey, opts = C,
                                         'KRB_AP_ERR_BAD_INTEGRITY', S2)
                             end;
                         _ ->
-                            lager:debug("rejecting client based on checksum: "
+                            ?LOG_DEBUG("rejecting client based on checksum: "
                                 "d2 =  ~p, valid = ~p", [D2, Valid]),
                             init_error(Realm, Service,
                                 'KRB_AP_ERR_INAPP_CKSUM', S2)

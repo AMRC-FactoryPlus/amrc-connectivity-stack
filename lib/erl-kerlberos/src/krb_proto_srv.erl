@@ -31,7 +31,8 @@
 
 -include("KRB5.hrl").
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     start_link/1,
@@ -125,7 +126,7 @@ init([Config]) ->
 
 %% @private
 terminate(Why, #?MODULE{}) ->
-    lager:debug("terminating due to ~p", [Why]),
+    ?LOG_DEBUG("terminating due to ~p", [Why]),
     ok.
 
 -spec get_n_prefs(integer(), term(), [pid()]) -> {[proto_fsm_ref()], [pid()], [pid()]}.
@@ -167,7 +168,7 @@ handle_call({req, Pid, Proto, N, Type, Msg, Expect}, From,
             Pid ! {krb_error, Ref},
             {noreply, S1};
         _ ->
-            lager:debug("sent req ~p to ~B KDCs via ~p",
+            ?LOG_DEBUG("sent req ~p to ~B KDCs via ~p",
                 [Ref, length(PRefs), Proto]),
             Req0 = #req{pid = Pid, protorefs = PRefs},
             RefMap1 = lists:foldl(fun (PRef, Acc) ->
@@ -188,7 +189,7 @@ handle_call({cancel, Ref}, From, S0 = #?MODULE{reqs = Reqs0,
                 maps:remove(PRef, Acc)
             end, RefMap0, PRefs),
             S1 = S0#?MODULE{reqs = Reqs1, refmap = RefMap1},
-            lager:debug("cancel req ~p", [Ref]),
+            ?LOG_DEBUG("cancel req ~p", [Ref]),
             gen_server:reply(From, ok),
             maybe_stop_if_draining(S1);
         _ ->
@@ -201,7 +202,7 @@ handle_call(drain, From, S0 = #?MODULE{drain = undefined, reqs = Reqs0}) ->
             gen_server:reply(From, ok),
             {stop, normal, S0};
         _ ->
-            lager:debug("draining proto_srv"),
+            ?LOG_DEBUG("draining proto_srv"),
             S1 = S0#?MODULE{drain = From},
             {noreply, S1}
     end.

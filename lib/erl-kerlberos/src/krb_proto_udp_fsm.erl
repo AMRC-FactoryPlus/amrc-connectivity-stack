@@ -29,7 +29,8 @@
 -module(krb_proto_udp_fsm).
 -behaviour(gen_statem).
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -include("KRB5.hrl").
 
@@ -92,7 +93,7 @@ init([ClientFSM, Realm, Host, Port, RConfig]) ->
     {ok, idle, S1}.
 
 terminate(Why, State, #?MODULE{usock = undefined}) ->
-    lager:debug("terminating from ~p due to ~p", [State, Why]),
+    ?LOG_DEBUG("terminating from ~p due to ~p", [State, Why]),
     ok;
 terminate(Why, State, S0 = #?MODULE{usock = Sock}) ->
     gen_udp:close(Sock),
@@ -125,7 +126,7 @@ idle(enter, _PrevState, S0 = #?MODULE{ping = Ping}) ->
 idle(state_timeout, ping, S0 = #?MODULE{}) ->
     {next_state, ping, S0};
 idle(info, {udp, Sock, IP, Port, Data}, _S0 = #?MODULE{usock = Sock}) ->
-    lager:debug("unsolicited udp packet from ~p:~p (~B bytes)",
+    ?LOG_DEBUG("unsolicited udp packet from ~p:~p (~B bytes)",
         [IP, Port, byte_size(Data)]),
     keep_state_and_data;
 idle({call, From}, {send, Type, Msg, Expect}, S0 = #?MODULE{}) ->
@@ -140,7 +141,7 @@ retry({call, _From}, _Msg, _S0 = #?MODULE{}) ->
 retry(enter, _PrevState, _S0 = #?MODULE{}) ->
     {keep_state_and_data, [{state_timeout, 0, entry}]};
 retry(state_timeout, entry, S0 = #?MODULE{retries = 0, host = H}) ->
-    lager:debug("[~p] out of udp retries", [H]),
+    ?LOG_DEBUG("[~p] out of udp retries", [H]),
     {next_state, err, S0};
 retry(state_timeout, entry, S0 = #?MODULE{usock = Sock, host = H, port = P,
                                           pkt = Bytes, timeout = T0}) ->
@@ -148,7 +149,7 @@ retry(state_timeout, entry, S0 = #?MODULE{usock = Sock, host = H, port = P,
         ok ->
             {keep_state, S0, [{state_timeout, T0, limit}]};
         {error, Why} ->
-            lager:debug("[~p] error during send: ~p", [H, Why]),
+            ?LOG_DEBUG("[~p] error during send: ~p", [H, Why]),
             {next_state, delay, S0}
     end;
 retry(state_timeout, limit, S0 = #?MODULE{}) ->
@@ -168,14 +169,14 @@ retry(info, {udp, Sock, _IP, Port, Data}, S0 = #?MODULE{usock = Sock,
             S1 = S0#?MODULE{pkt = undefined, expect = [], sendref = undefined},
             {next_state, idle, S1};
         {error, not_decoded} ->
-            lager:debug("[~p] got unparseable response, retrying", [H]),
+            ?LOG_DEBUG("[~p] got unparseable response, retrying", [H]),
             {next_state, delay, S0}
     end.
 
 delay({call, _From}, _Msg, _S0 = #?MODULE{}) ->
     {keep_state_and_data, [postpone]};
 delay(info, {udp, Sock, IP, Port, Data}, _S0 = #?MODULE{usock = Sock}) ->
-    lager:debug("unsolicited udp packet from ~p:~p (~B bytes)",
+    ?LOG_DEBUG("unsolicited udp packet from ~p:~p (~B bytes)",
         [IP, Port, byte_size(Data)]),
     keep_state_and_data;
 delay(enter, _PrevState, S0 = #?MODULE{delay = D0}) ->
@@ -238,7 +239,7 @@ err(info, {udp, Sock, _IP, Port, Data}, S0 = #?MODULE{usock = Sock, host = H,
             S1 = S0#?MODULE{pkt = undefined, expect = [], sendref = undefined},
             {next_state, idle, S1};
         {error, not_decoded} ->
-            lager:debug("[~p] got unparseable response, retrying", [H]),
+            ?LOG_DEBUG("[~p] got unparseable response, retrying", [H]),
             {next_state, err_delay, S0}
     end.
 
@@ -246,7 +247,7 @@ err_delay({call, From}, _Msg, _S0 = #?MODULE{}) ->
     gen_statem:reply(From, {error, short_circuit}),
     keep_state_and_data;
 err_delay(info, {udp, Sock, IP, Port, Data}, _S0 = #?MODULE{usock = Sock}) ->
-    lager:debug("unsolicited udp packet from ~p:~p (~B bytes)",
+    ?LOG_DEBUG("unsolicited udp packet from ~p:~p (~B bytes)",
         [IP, Port, byte_size(Data)]),
     keep_state_and_data;
 err_delay(enter, _PrevState, S0 = #?MODULE{delay = D0}) ->

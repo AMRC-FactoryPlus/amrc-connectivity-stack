@@ -28,7 +28,8 @@
 %% @private
 -module(krb_proto).
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -include("krb_key_records.hrl").
 -include("KRB5.hrl").
@@ -183,7 +184,7 @@ decode(Data, [NextType | Rest]) ->
             case Leftover of
                 <<>> -> ok;
                 _ ->
-                    lager:debug("garbage after asn.1 decoding (~p): ~p",
+                    ?LOG_DEBUG("garbage after asn.1 decoding (~p): ~p",
                         [NextType, Leftover])
             end,
             Record1 = post_decode(Record0),

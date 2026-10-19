@@ -73,7 +73,6 @@
 configure(Realm) ->
     configure(Realm, #{}).
 
--compile([{parse_transform, lager_transform}]).
 
 -spec configure(realm(), config()) -> config().
 configure(Realm, UserConf) ->

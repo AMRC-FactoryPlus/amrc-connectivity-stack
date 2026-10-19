@@ -3,7 +3,7 @@
               {vsn,"2.0.3"},
               {registered,[]},
               {included_applications,[]},
-              {applications,[kernel,stdlib,asn1,pbkdf2,lager,neotoma]},
+              {applications,[kernel,stdlib,asn1,pbkdf2,neotoma]},
               {mod,{krb_app,[]}},
               {env,[]},
               {licenses,["BSD-2-Clause"]},

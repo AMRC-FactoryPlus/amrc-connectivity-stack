@@ -29,7 +29,8 @@
 -module(gss_spnego).
 -behaviour(gss_mechanism).
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -include("KRB5.hrl").
 -include("SPNEGO.hrl").
@@ -192,7 +193,7 @@ spnego_initiator_fsm(await_mech, T = #'NegTokenResp'{}, S0 = #?MODULE{}) ->
                 Err = {error, _Why} -> Err
             end;
         _ ->
-            lager:debug("remote side tried unknown spnego mech ~p, rejecting",
+            ?LOG_DEBUG("remote side tried unknown spnego mech ~p, rejecting",
                 [Mech]),
             TokenRec = #'NegTokenResp'{
                 negState = 'reject'
@@ -556,11 +557,11 @@ verify_mechlist_mic(MIC, S0 = #?MODULE{config = Opts, mechmod = Mod,
             S1 = S0#?MODULE{mechstate = MS1},
             {true, S1};
         {error, Why, MS1} ->
-            lager:debug("mechlist MIC failed: ~p", [Why]),
+            ?LOG_DEBUG("mechlist MIC failed: ~p", [Why]),
             S1 = S0#?MODULE{mechstate = MS1},
             {false, S1};
         {error, Why} ->
-            lager:debug("mechlist MIC failed: ~p", [Why]),
+            ?LOG_DEBUG("mechlist MIC failed: ~p", [Why]),
             {false, S0}
     end.
 

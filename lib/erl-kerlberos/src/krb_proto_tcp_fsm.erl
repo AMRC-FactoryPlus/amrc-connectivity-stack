@@ -29,7 +29,8 @@
 -module(krb_proto_tcp_fsm).
 -behaviour(gen_statem).
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -include("KRB5.hrl").
 
@@ -99,7 +100,7 @@ init([ClientFSM, Realm, Host, Port, RConfig]) ->
     {ok, connect, S0}.
 
 terminate(Why, State, #?MODULE{tsock = undefined}) ->
-    lager:debug("terminating from ~p due to ~p", [State, Why]),
+    ?LOG_DEBUG("terminating from ~p due to ~p", [State, Why]),
     ok;
 terminate(Why, State, S0 = #?MODULE{tsock = Sock}) ->
     gen_tcp:close(Sock),
@@ -129,7 +130,7 @@ incr_retry(S0 = #?MODULE{config = RConfig, retries = R0, timeout = T0,
 connect({call, _From}, _Msg, _S0 = #?MODULE{}) ->
     {keep_state_and_data, [postpone]};
 connect(enter, _PrevState, _S0 = #?MODULE{retries = 0, host = H}) ->
-    lager:debug("[~p] out of tcp retries", [H]),
+    ?LOG_DEBUG("[~p] out of tcp retries", [H]),
     {keep_state_and_data, [{state_timeout, 0, err}]};
 connect(enter, _PrevState, _S0 = #?MODULE{}) ->
     {keep_state_and_data, [{state_timeout, 0, connect}]};
@@ -155,7 +156,7 @@ connect_delay({call, _From}, _Msg, _S0 = #?MODULE{}) ->
 connect_delay(enter, _PrevState, S0 = #?MODULE{delay = D0}) ->
     {keep_state, S0, [{state_timeout, D0, none}]};
 connect_delay(info, {timeout, _, inet}, #?MODULE{}) ->
-    lager:debug("ignoring bogus inet timeout!"),
+    ?LOG_DEBUG("ignoring bogus inet timeout!"),
     keep_state_and_data;
 connect_delay(state_timeout, _, S0 = #?MODULE{}) ->
     {next_state, connect, incr_retry(S0)}.
@@ -168,13 +169,13 @@ idle(enter, _PrevState, S0 = #?MODULE{cfsm = FSM, ping_timeout = Ping}) ->
             {stop, normal, S0}
     end;
 idle(info, {timeout, _, inet}, #?MODULE{}) ->
-    lager:debug("ignoring bogus inet timeout!"),
+    ?LOG_DEBUG("ignoring bogus inet timeout!"),
     keep_state_and_data;
 idle(info, {tcp, Sock, Data}, _S0 = #?MODULE{tsock = Sock}) ->
-    lager:debug("got unsolicited data:~p (~B bytes)", [byte_size(Data)]),
+    ?LOG_DEBUG("got unsolicited data:~p (~B bytes)", [byte_size(Data)]),
     keep_state_and_data;
 idle(info, {tcp_error, Sock, Why}, S0 = #?MODULE{host = H, tsock = Sock}) ->
-    lager:debug("[~p] got tcp error: ~p", [H, Why]),
+    ?LOG_DEBUG("[~p] got tcp error: ~p", [H, Why]),
     gen_tcp:close(Sock),
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect_delay, S1};
@@ -194,7 +195,7 @@ idle(state_timeout, _, S0 = #?MODULE{}) ->
 retry({call, _From}, _Msg, _S0 = #?MODULE{}) ->
     {keep_state_and_data, [postpone]};
 retry(enter, _PrevState, S0 = #?MODULE{retries = 0, host = H}) ->
-    lager:debug("[~p] out of tcp retries", [H]),
+    ?LOG_DEBUG("[~p] out of tcp retries", [H]),
     {keep_state, S0, [{state_timeout, 0, err}]};
 retry(state_timeout, err, S0 = #?MODULE{}) ->
     {next_state, err, S0};
@@ -216,7 +217,7 @@ retry(state_timeout, send, S0 = #?MODULE{tsock = Sock}) ->
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect, S1};
 retry(info, {tcp_error, Sock, Why}, S0 = #?MODULE{host = H, tsock = Sock}) ->
-    lager:debug("[~p] got tcp error: ~p", [H, Why]),
+    ?LOG_DEBUG("[~p] got tcp error: ~p", [H, Why]),
     gen_tcp:close(Sock),
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect_delay, S1};
@@ -225,7 +226,7 @@ retry(info, {tcp_closed, Sock}, S0 = #?MODULE{tsock = Sock}) ->
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect_delay, S1};
 retry(info, {timeout, _, inet}, #?MODULE{}) ->
-    lager:debug("ignoring bogus inet timeout!"),
+    ?LOG_DEBUG("ignoring bogus inet timeout!"),
     keep_state_and_data;
 retry(info, {tcp, Sock, Data}, S0 = #?MODULE{tsock = Sock, cfsm = ClientFSM,
                                              host = H, expect = Es,
@@ -236,7 +237,7 @@ retry(info, {tcp, Sock, Data}, S0 = #?MODULE{tsock = Sock, cfsm = ClientFSM,
             S1 = S0#?MODULE{pkt = undefined, expect = [], sendref = undefined},
             {next_state, idle, S1};
         {error, not_decoded} ->
-            lager:debug("[~p] got unparseable response, retrying",
+            ?LOG_DEBUG("[~p] got unparseable response, retrying",
                 [H]),
             gen_tcp:close(Sock),
             S1 = S0#?MODULE{tsock = undefined},
@@ -254,7 +255,7 @@ err(enter, _PrevState, S0 = #?MODULE{sendref = undefined, delay = D0, cfsm = FSM
             {stop, normal, S0}
     end;
 err(info, {timeout, _, inet}, #?MODULE{}) ->
-    lager:debug("ignoring bogus inet timeout!"),
+    ?LOG_DEBUG("ignoring bogus inet timeout!"),
     keep_state_and_data;
 err(state_timeout, retry, S0 = #?MODULE{}) ->
     {next_state, err_connect, S0#?MODULE{}};
@@ -274,13 +275,13 @@ err_connect(enter, _PrevState, S0 = #?MODULE{cfsm = FSM}) ->
             {stop, normal, S0}
     end;
 err_connect(info, {timeout, _, inet}, #?MODULE{}) ->
-    lager:debug("ignoring bogus inet timeout!"),
+    ?LOG_DEBUG("ignoring bogus inet timeout!"),
     keep_state_and_data;
 err_connect(state_timeout, connect, S0 = #?MODULE{host = H, port = P,
                                                   timeout = T0}) ->
     case gen_tcp:connect(H, P, ?tcp_options, T0) of
         {ok, Sock} ->
-            lager:debug("[~p] got connection, leaving err state", [H]),
+            ?LOG_DEBUG("[~p] got connection, leaving err state", [H]),
             S1 = S0#?MODULE{tsock = Sock},
             {next_state, idle, reset_retries(S1)};
         {error, _} ->
@@ -323,17 +324,17 @@ ping(enter, _PrevState, S0 = #?MODULE{tsock = Sock, ping_timeout = T0,
             {next_state, connect_delay, S1}
     end;
 ping(state_timeout, _, S0 = #?MODULE{tsock = Sock, host = H}) ->
-    lager:debug("[~p] ping timeout", [H]),
+    ?LOG_DEBUG("[~p] ping timeout", [H]),
     gen_tcp:close(Sock),
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect_delay, S1};
 ping(info, {tcp_error, Sock, Why}, S0 = #?MODULE{host = H, tsock = Sock}) ->
-    lager:debug("[~p] got tcp error: ~p", [H, Why]),
+    ?LOG_DEBUG("[~p] got tcp error: ~p", [H, Why]),
     gen_tcp:close(Sock),
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect_delay, S1};
 ping(info, {tcp_closed, Sock}, S0 = #?MODULE{tsock = Sock, host = H}) ->
-    lager:debug("[~p] closed cleanly after ping", [H]),
+    ?LOG_DEBUG("[~p] closed cleanly after ping", [H]),
     gen_tcp:close(Sock),
     S1 = S0#?MODULE{tsock = undefined},
     {next_state, connect, S1};
@@ -342,7 +343,7 @@ ping(info, {tcp, Sock, Data}, S0 = #?MODULE{tsock = Sock, host = H}) ->
         {ok, _Msg} ->
             {next_state, idle, S0};
         {error, not_decoded} ->
-            lager:debug("[~p] got unparseable response to ping", [H]),
+            ?LOG_DEBUG("[~p] got unparseable response to ping", [H]),
             gen_tcp:close(Sock),
             S1 = S0#?MODULE{tsock = undefined},
             {next_state, connect_delay, S1}

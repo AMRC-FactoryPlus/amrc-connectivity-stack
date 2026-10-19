@@ -31,7 +31,8 @@
 
 -include("KRB5.hrl").
 
--compile([{parse_transform, lager_transform}]).
+%% ACS patch: log through OTP's logger instead of lager.
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     start_link/2,
@@ -110,7 +111,7 @@ done(state_timeout, die, S0 = #?MODULE{}) ->
 terminate(normal, _State, #?MODULE{}) ->
     ok;
 terminate(Why, State, #?MODULE{}) ->
-    lager:debug("terminating from ~p due to ~p", [State, Why]),
+    ?LOG_DEBUG("terminating from ~p due to ~p", [State, Why]),
     ok.
 
 callback_mode() -> [state_functions, state_enter].

@@ -71,22 +71,39 @@ this file and `.gitignore`, the copy is unchanged from the Hex package.
    deriving one from a password. If the keytab has no key for that
    etype, the result is `{error, {no_keytab_key, EType}}` rather than a
    crash, because a crash report would include the keytab.
+3. **OTP's logger instead of lager** (10 files under `src/`,
+   `src/kerlberos.app.src`, `rebar.config`, `rebar.lock`). kerlberos
+   only used lager for debug messages. Starting kerlberos started lager,
+   which wrote `log/console.log`, `log/error.log` and `log/crash.log`
+   into the working directory of whatever application started it. By
+   default it also captured OTP's crash reports into `crash.log`, which
+   could put passwords or keys on disk. Each `lager:debug` call is now
+   `?LOG_DEBUG` (44 calls), so messages go to the application's own
+   logger and only appear at debug level. `lager` and `goldrush` are no
+   longer dependencies. One acceptor-side message logged the keytab's
+   keys when no key matched a ticket; it now logs only the ticket.
 
-Checked against the `acs-local` KDC and broker on 2026-10-19: password
-and keytab logins (the keytab one as `sv1warehouse`), a wrong password
-(`{error, bad_secret}`), a keytab without the KDC's etype, and an MQTT 5
-GSSAPI connection with mutual authentication.
+Patches 1 and 2 were checked against the `acs-local` KDC and broker on
+2026-10-19: password and keytab logins (the keytab one as
+`sv1warehouse`), a wrong password (`{error, bad_secret}`), a keytab
+without the KDC's etype, and an MQTT 5 GSSAPI connection with mutual
+authentication. After patch 3, login and the MQTT connection work as
+before, debug messages arrive through Elixir's `Logger`, nothing is
+written to `log/`, and the compiler warnings are the same 23 upstream
+ones as before.
 
-## Known differences from MIT Kerberos
+## Known issues
 
-Not patched, because ACS doesn't need them:
+Not patched:
 
 - With no channel bindings, the GSS initiator sends the MD5 hash of an
   empty binding where MIT sends 16 zero bytes. The ACS broker's Java
   acceptor ignores bindings, so this works.
-- Logging uses `lager`, which produces deprecation warnings on OTP 29.
-  Its crash reports include process state, which holds the password or
-  keytab key, so callers must keep those reports out of their logs.
+- Crash reports from kerlberos's processes include their state, which
+  holds the password or keytab key. Callers must keep those reports out
+  of their logs.
+- On OTP 29 kerlberos compiles with 23 warnings, mostly the deprecated
+  `catch` expression. A later OTP may turn these into errors.
 
 ## Updating
 

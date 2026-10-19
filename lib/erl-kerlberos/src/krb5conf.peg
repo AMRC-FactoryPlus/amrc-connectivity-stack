@@ -1,0 +1,33 @@
+file <- eol* head:section tail:(eol+ section)* `
+  Head = proplists:get_value(head, Node),
+  Tail = [R || [_,R] <- proplists:get_value(tail, Node)],
+  [Head | Tail]
+`;
+
+section <- ws? '[' name:name ']' tail:(eol+ property)* `
+  Name = proplists:get_value(name, Node),
+  Tail = [R || [_,R] <- proplists:get_value(tail, Node)],
+  {Name, Tail}
+`;
+
+property <- propgroup / oneprop;
+propgroup <- ws? name:name ws? '=' ws? '{' tail:(eol+ property)* eol+ ws? '}' `
+  Name = proplists:get_value(name, Node),
+  Tail = [R || [_,R] <- proplists:get_value(tail, Node)],
+  {Name, Tail}
+`;
+oneprop <- ws? name:name ws? '=' ws? value:(!ws !crlf ![#] .)* `
+  Name = proplists:get_value(name, Node),
+  Value = iolist_to_binary(proplists:get_value(value, Node)),
+  {Name, Value}
+`;
+
+eol <- ws? (comment / crlf) ~;
+comment <- '#' (!crlf .)* crlf ~;
+name <- (!ws !crlf !'[' !']' !'=' .)+ `iolist_to_binary(Node)`;
+
+crlf <- [\r]? [\n] ~;
+ws <- [ \t]+ ~;
+
+
+

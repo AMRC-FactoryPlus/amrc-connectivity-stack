@@ -213,6 +213,7 @@ The AMRC Connectivity Stack (ACS) is a Kubernetes-deployed implementation of the
   - `py-edge-driver` - Python edge driver base
   - `java-service-client` - Java client library
   - `ex-sparkplug` - Sparkplug B library for Elixir services
+  - `erl-kerlberos` - Fork of the kerlberos Erlang Kerberos library (see its `FORK.md`)
 
 - `acs-*` - Central cluster services (Auth, ConfigDB, Directory, etc.)
 - `edge-*` - Edge protocol translators (Modbus, BACnet, ADS, etc.)
@@ -351,6 +352,9 @@ ACS conventions above. `lib/ex-sparkplug` is the reference as it grows.
   unlike the JS `kebab-case.js`.
 - Generated code (e.g. from protox) is committed and never edited by
   hand. The project README says how to regenerate it.
+- Forked Erlang libraries are vendored under `lib/erl-<name>` and used as
+  `{:<name>, path: "../erl-<name>", manager: :rebar3}`. Each has a
+  `FORK.md` recording where it came from and every patch we carry.
 
 ### Formatting and linting
 - `mix format` with the `.formatter.exs` that `mix new` creates. No

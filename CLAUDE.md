@@ -212,6 +212,7 @@ The AMRC Connectivity Stack (ACS) is a Kubernetes-deployed implementation of the
   - `js-pg-client`, `js-rx-client`, `js-rx-util` - Database and reactive utilities
   - `py-edge-driver` - Python edge driver base
   - `java-service-client` - Java client library
+  - `ex-sparkplug` - Sparkplug B library for Elixir services
 
 - `acs-*` - Central cluster services (Auth, ConfigDB, Directory, etc.)
 - `edge-*` - Edge protocol translators (Modbus, BACnet, ADS, etc.)
@@ -329,6 +330,77 @@ before adding new ones so the style stays consistent.
 Read `acs-configdb/lib/api-v1.js`, `acs-configdb/lib/auth.js`,
 `acs-configdb/lib/notify.js`, and `acs-configdb/bin/api.js` before writing a
 new service. Copy the shape; do not improvise.
+
+## Code Style (Elixir)
+
+Elixir code lives in Mix projects under `lib/ex-*`. There is no canonical
+Elixir service yet, so these rules come from the Elixir defaults plus the
+ACS conventions above. `lib/ex-sparkplug` is the reference as it grows.
+
+### Language and projects
+- Elixir 1.20 on OTP 29, pinned in each project's `.tool-versions`.
+- Each library is its own Mix project. The directory is `lib/ex-<name>`
+  (kebab-case, like `js-*` and `py-*`), the app is `:snake_case` and the
+  top-level module is `PascalCase`: `lib/ex-sparkplug` is app
+  `:sparkplug_b`, module `SparkplugB`.
+- Projects depend on each other through path dependencies
+  (`{:sparkplug_b, path: "../lib/ex-sparkplug"}`), not Hex.
+- Standard Mix layout: code in `lib/`, tests in `test/`, one module per
+  file, with the file path following the module name (`SparkplugB.Topic`
+  is `lib/sparkplug_b/topic.ex`). Elixir file names are `snake_case.ex`,
+  unlike the JS `kebab-case.js`.
+- Generated code (e.g. from protox) is committed and never edited by
+  hand. The project README says how to regenerate it.
+
+### Formatting and linting
+- `mix format` with the `.formatter.exs` that `mix new` creates. No
+  custom formatter options.
+- `mix credo` with its default checks. No `.credo.exs`.
+- Code must pass `mix format --check-formatted`, `mix credo` and
+  `mix compile --warnings-as-errors`, which includes the compiler's type
+  warnings.
+
+### Naming
+- Elixir's own conventions, which already match ACS: `snake_case` for
+  functions, variables and atoms; `PascalCase` for modules.
+- Constants are module attributes (`@ns_threshold`), not
+  `SCREAMING_SNAKE_CASE`.
+- Functions returning a boolean end in `?` (`valid?`). Functions that
+  raise instead of returning an error end in `!` (`decode!`).
+
+### Errors
+- Functions that can fail on bad input return `{:ok, value}` or
+  `{:error, reason}`. Data from the network is input, so decoding never
+  raises; add a `!` variant only where callers want one.
+- Don't rescue broadly to keep a process alive. Let it crash and let its
+  supervisor restart it.
+
+### Processes
+- Use processes for runtime state (connections, caches, buffers), not to
+  organise code. Plain functions run in the caller's process.
+- Libraries take options; they don't read application config
+  (`Application.get_env`). A library that needs processes exposes a child
+  spec for the application's supervision tree rather than starting its
+  own.
+- Libraries never stop the VM. They report problems through return
+  values, logs or `:telemetry`, and the application decides what to do.
+
+### Docs, logs and tests
+- `@moduledoc` on every module (`@moduledoc false` for internal ones),
+  and `@doc` and `@spec` on public functions. Use doctests where an
+  example helps.
+- Log with `Logger`, never `IO.puts`.
+- ExUnit tests mirror the `lib/` path (`test/sparkplug_b/topic_test.exs`)
+  and use `async: true` unless they touch global state.
+
+### Headers
+- Each source file starts with a short comment block, then a blank line:
+  ```
+  # ACS Sparkplug B
+  # <one-line file purpose>
+  # Copyright <year> University of Sheffield
+  ```
+  Generated files keep the generator's header instead.
 
 ## Contributing
 

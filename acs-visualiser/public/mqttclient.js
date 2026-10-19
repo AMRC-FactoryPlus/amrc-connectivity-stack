@@ -65,10 +65,13 @@ export default class MQTTClient extends EventEmitter {
         if (kind == "BIRTH" || kind == "DATA") {
             /* A Node whose Devices are publishing has been seen, even
              * if it hasn't published itself; otherwise an NCMD would
-             * expire it and take its Devices with it. */
+             * expire it and take its Devices with it. Likewise it
+             * mustn't fade as idle while its Devices are active. */
+            const now = Date.now();
             for (let g = graph; g; g = g.parent) {
                 g.online = true;
                 g.seen_data = true;
+                g.last_data = now;
                 delete g.expires;
             }
         }

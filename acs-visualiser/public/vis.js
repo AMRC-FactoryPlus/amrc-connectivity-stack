@@ -12,6 +12,13 @@ const HALF = Math.PI;
 const QUARTER = Math.PI/2;
 const FADEOUT = 15000;
 const RESET_DELAY = 250;
+/* A node with no BIRTH or DATA for IDLE_AFTER seconds starts to fade,
+ * reaching IDLE_OPACITY after a further IDLE_FADE seconds. Edge Agents
+ * only publish on change, so a faded node is quiet, not necessarily
+ * broken. The chart can override these through config.json. */
+const IDLE_AFTER = 120;
+const IDLE_FADE = 600;
+const IDLE_OPACITY = 0.4;
 
 function fade (expires, now) {
     const rv = 0.2 + Math.min(0.8, Math.max(0, (expires - now)/FADEOUT));
@@ -19,10 +26,15 @@ function fade (expires, now) {
 }
 
 export default class Vis {
-    constructor (graph, canvas, icons) {
+    constructor (graph, canvas, icons, config) {
         this.graph = graph;
         this.canvas = canvas;
         this.icons = icons;
+
+        this.idle_after = (config?.idle_after ?? IDLE_AFTER) * 1000;
+        /* At least 1ms, so a fade of 0 is a step, not a division by 0. */
+        this.idle_fade = Math.max(1, (config?.idle_fade ?? IDLE_FADE) * 1000);
+        this.idle_opacity = config?.idle_opacity ?? IDLE_OPACITY;
 
         this.render = this.render.bind(this);
         this.circle = this.circle.bind(this);
@@ -30,6 +42,18 @@ export default class Vis {
         const obs = new ResizeObserver(() => this.resize());
         obs.observe(this.canvas);
         this.resize();
+    }
+
+    idle (last_data, now) {
+        if (!last_data) return this.idle_opacity;
+        const by = (now - last_data - this.idle_after)/this.idle_fade;
+        return 1 - (1 - this.idle_opacity)*Math.min(1, Math.max(0, by));
+    }
+
+    /* Nodes about to expire keep the faster fadeout. */
+    alpha (node, now) {
+        return node.expires ? fade(node.expires, now)
+            : this.idle(node.last_data, now);
     }
 
     circle (x, y, r, fill_style, stroke) {
@@ -122,7 +146,7 @@ export default class Vis {
 
         if (graph.children) {
             if (graph.too_many)
-                this.render_too_many(graph);
+                this.render_too_many(graph, now);
             else
               this.render_children(graph, now);
         }
@@ -131,16 +155,18 @@ export default class Vis {
         const icon = this.icons.fetch_icon(graph.schema);
 
         ctx.save()
-        if (graph.expires)
-            ctx.globalAlpha = fade(graph.expires, now);
+        /* Fill in the background solid first, or the line to the
+         * node shows through it once it fades. */
+        ctx.fillStyle = Style.background;
         if (icon) {
             const r = 0.3*this.root_node;
             graph.text_roff = r;
             ctx.strokeStyle = graph.online ? Style.circles : Style.offline;
             ctx.lineWidth = 4;
-            ctx.fillStyle = Style.background;
             ctx.translate(pos[0], pos[1]);
-            this.circle(0, 0, r, null, true);
+            this.circle(0, 0, r);
+            ctx.globalAlpha = this.alpha(graph, now);
+            ctx.stroke();
 
             ctx.fillStyle = Style.text;
             const scale = r * icon.scale;
@@ -151,6 +177,8 @@ export default class Vis {
         else {
             graph.text_roff = graph.radius;
             const style = graph.is_cmd ? "CMD" : graph.online ? "circles" : "offline";
+            this.circle(pos[0], pos[1], graph.radius);
+            ctx.globalAlpha = this.alpha(graph, now);
             this.circle(pos[0], pos[1], graph.radius, style);
         }
         ctx.restore();
@@ -167,23 +195,28 @@ export default class Vis {
                 ctx.strokeStyle = Style.CMD;
             else 
                 ctx.strokeStyle = Style.circles;
+            ctx.save();
+            ctx.globalAlpha = this.alpha(n, now);
             ctx.beginPath();
             ctx.moveTo(...graph.centre);
             ctx.lineTo(...n.centre);
             ctx.stroke();
+            ctx.restore();
             this.render_nodes(n, now);
         }
     }
 
-    render_too_many (graph) {
+    render_too_many (graph, now) {
         const ctx = this.ctx;
 
         ctx.save()
+        ctx.globalAlpha = this.alpha(graph, now);
         ctx.beginPath();
         ctx.moveTo(...graph.centre);
         ctx.lineTo(...graph.overflow.centre);
         ctx.strokeStyle = Style.circles;
         ctx.stroke();
+        ctx.globalAlpha = 1;
         ctx.lineWidth = 3 * this.line_width;
 
         const [x, y] = graph.overflow.centre;
@@ -194,8 +227,10 @@ export default class Vis {
 
         const th = TURN / graph.too_many;
         for (let i = 0; i < graph.too_many; i++) {
-            if (!graph.children[i]) continue;
-            ctx.strokeStyle = graph.children[i].online ? Style.circles : Style.offline;
+            const kid = graph.children[i];
+            if (!kid) continue;
+            ctx.strokeStyle = kid.online ? Style.circles : Style.offline;
+            ctx.globalAlpha = this.alpha(kid, now);
             const [st, en] = [th*i, th*(i + 1)];
             ctx.beginPath();
             ctx.arc(x, y, r, st, en, false);
@@ -214,8 +249,7 @@ export default class Vis {
                 ctx.save();
                 ctx.font = `${size}px ${Style.font}`;
                 ctx.fillStyle = fill;
-                if (graph.expires)
-                    ctx.globalAlpha = fade(graph.expires, now);
+                ctx.globalAlpha = this.alpha(graph, now);
                 ctx.translate(centre[0], centre[1]);
                 //ctx.rotate(-0.5);
                 if (offset) {

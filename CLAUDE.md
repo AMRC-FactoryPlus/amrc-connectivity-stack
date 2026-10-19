@@ -212,6 +212,7 @@ The AMRC Connectivity Stack (ACS) is a Kubernetes-deployed implementation of the
   - `js-pg-client`, `js-rx-client`, `js-rx-util` - Database and reactive utilities
   - `py-edge-driver` - Python edge driver base
   - `java-service-client` - Java client library
+  - `ex-service-client` - Factory+ service client for Elixir services
   - `ex-sparkplug` - Sparkplug B library for Elixir services
   - `erl-kerlberos` - Fork of the kerlberos Erlang Kerberos library (see its `FORK.md`)
 

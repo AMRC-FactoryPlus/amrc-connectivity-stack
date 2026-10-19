@@ -1,0 +1,16 @@
+{
+  "name": "ex-sparkplug-fixtures",
+  "private": true,
+  "description": "Encodes the Sparkplug test fixtures with the Tahu JS library ACS edge agents use",
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "long": "4.0.0",
+    "sparkplug-payload": "1.0.3"
+  },
+  "overrides": {
+    "protobufjs": "6.11.4"
+  }
+}

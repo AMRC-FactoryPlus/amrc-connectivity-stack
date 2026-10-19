@@ -1,0 +1,34 @@
+{
+  "timestamp": {
+    "long": "1760000000123",
+    "unsigned": true
+  },
+  "metrics": [
+    {
+      "value": 12.5,
+      "type": "Double",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "50",
+        "unsigned": true
+      },
+      "properties": {
+        "simulated": {
+          "value": true,
+          "type": "Boolean"
+        },
+        "run_id": {
+          "value": "run-42",
+          "type": "String"
+        }
+      }
+    }
+  ],
+  "seq": {
+    "long": "4",
+    "unsigned": true
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "timestamp": {
+    "long": "1760000000123456789",
+    "unsigned": true
+  },
+  "metrics": [
+    {
+      "value": 1,
+      "type": "Double",
+      "timestamp": {
+        "long": "1760000000123",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "40",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 2,
+      "type": "Double",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "41",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 3,
+      "type": "Double",
+      "alias": {
+        "long": "42",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 4,
+      "type": "Double",
+      "timestamp": {
+        "long": "999999999999999",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "43",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 5,
+      "type": "Double",
+      "timestamp": {
+        "long": "1000000000000000",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "44",
+        "unsigned": true
+      }
+    }
+  ],
+  "seq": {
+    "long": "3",
+    "unsigned": true
+  }
+}

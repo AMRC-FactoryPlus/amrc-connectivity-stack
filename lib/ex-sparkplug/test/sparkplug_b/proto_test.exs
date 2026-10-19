@@ -5,25 +5,15 @@
 defmodule SparkplugB.ProtoTest do
   use ExUnit.Case, async: true
 
+  import SparkplugB.Fixtures
+
   alias SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.DataType
   alias SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload
-
-  @fixtures Path.expand("../fixtures/payloads", __DIR__)
 
   defp round_trip(payload) do
     {:ok, iodata, _size} = Protox.encode(payload)
     Protox.decode(IO.iodata_to_binary(iodata), Payload)
   end
-
-  defp fixture(name) do
-    bin = File.read!(Path.join(@fixtures, name <> ".bin"))
-    json = File.read!(Path.join(@fixtures, name <> ".json"))
-    {bin, JSON.decode!(json)}
-  end
-
-  # The generator tags JS Longs, which JSON can't hold.
-  defp untag(%{"long" => digits}), do: String.to_integer(digits)
-  defp untag(other), do: other
 
   describe "encode and decode" do
     test "a payload survives an encode and decode" do
@@ -64,16 +54,12 @@ defmodule SparkplugB.ProtoTest do
 
   # Fixtures encoded by Tahu's JS library, as ACS edge agents encode,
   # with Tahu's own decode of the same bytes alongside. See
-  # test/fixtures/README.md. Values are compared once the native-type
-  # layer exists; here we check the protobuf layer agrees with Tahu.
+  # test/fixtures/README.md. Here we check the protobuf layer agrees
+  # with Tahu; sparkplug_b_test.exs compares the native values.
   describe "fixtures encoded by Tahu JS" do
-    for name <-
-          @fixtures
-          |> Path.join("*.bin")
-          |> Path.wildcard()
-          |> Enum.map(&Path.basename(&1, ".bin")) do
+    for name <- names() do
       test "#{name} has the structure Tahu decodes" do
-        {bin, expected} = fixture(unquote(name))
+        {bin, expected} = load(unquote(name))
 
         assert {:ok, %Payload{} = payload} = Protox.decode(bin, Payload)
         assert payload.timestamp == untag(expected["timestamp"])
@@ -99,7 +85,7 @@ defmodule SparkplugB.ProtoTest do
     end
 
     test "each datatype uses the wire field Tahu JS writes" do
-      {bin, _} = fixture("ddata_scalars")
+      {bin, _} = load("ddata_scalars")
       {:ok, payload} = Protox.decode(bin, Payload)
 
       fields =
@@ -129,7 +115,7 @@ defmodule SparkplugB.ProtoTest do
     end
 
     test "signed integers arrive as two's complement" do
-      {bin, _} = fixture("ddata_scalars")
+      {bin, _} = load("ddata_scalars")
       {:ok, payload} = Protox.decode(bin, Payload)
       values = Map.new(payload.metrics, fn %{alias: a, value: {_, v}} -> {a, v} end)
 

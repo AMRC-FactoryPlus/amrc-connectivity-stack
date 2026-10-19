@@ -12,34 +12,29 @@ const HALF = Math.PI;
 const QUARTER = Math.PI/2;
 const FADEOUT = 15000;
 const RESET_DELAY = 250;
-/* A node with no BIRTH or DATA for IDLE_AFTER starts to fade, reaching
- * IDLE_ALPHA after a further IDLE_FADE. Edge Agents only publish on
- * change, so a faded node is quiet, not necessarily broken. */
-const IDLE_AFTER = 2*60*1000;
-const IDLE_FADE = 10*60*1000;
-const IDLE_ALPHA = 0.4;
+/* A node with no BIRTH or DATA for IDLE_AFTER seconds starts to fade,
+ * reaching IDLE_OPACITY after a further IDLE_FADE seconds. Edge Agents
+ * only publish on change, so a faded node is quiet, not necessarily
+ * broken. The chart can override these through config.json. */
+const IDLE_AFTER = 120;
+const IDLE_FADE = 600;
+const IDLE_OPACITY = 0.4;
 
 function fade (expires, now) {
     const rv = 0.2 + Math.min(0.8, Math.max(0, (expires - now)/FADEOUT));
     return rv;
 }
 
-function idle (last_data, now) {
-    if (!last_data) return IDLE_ALPHA;
-    const by = (now - last_data - IDLE_AFTER)/IDLE_FADE;
-    return 1 - (1 - IDLE_ALPHA)*Math.min(1, Math.max(0, by));
-}
-
-/* Nodes about to expire keep the faster fadeout. */
-function alpha (node, now) {
-    return node.expires ? fade(node.expires, now) : idle(node.last_data, now);
-}
-
 export default class Vis {
-    constructor (graph, canvas, icons) {
+    constructor (graph, canvas, icons, config) {
         this.graph = graph;
         this.canvas = canvas;
         this.icons = icons;
+
+        this.idle_after = (config?.idle_after ?? IDLE_AFTER) * 1000;
+        /* At least 1ms, so a fade of 0 is a step, not a division by 0. */
+        this.idle_fade = Math.max(1, (config?.idle_fade ?? IDLE_FADE) * 1000);
+        this.idle_opacity = config?.idle_opacity ?? IDLE_OPACITY;
 
         this.render = this.render.bind(this);
         this.circle = this.circle.bind(this);
@@ -47,6 +42,18 @@ export default class Vis {
         const obs = new ResizeObserver(() => this.resize());
         obs.observe(this.canvas);
         this.resize();
+    }
+
+    idle (last_data, now) {
+        if (!last_data) return this.idle_opacity;
+        const by = (now - last_data - this.idle_after)/this.idle_fade;
+        return 1 - (1 - this.idle_opacity)*Math.min(1, Math.max(0, by));
+    }
+
+    /* Nodes about to expire keep the faster fadeout. */
+    alpha (node, now) {
+        return node.expires ? fade(node.expires, now)
+            : this.idle(node.last_data, now);
     }
 
     circle (x, y, r, fill_style, stroke) {
@@ -158,7 +165,7 @@ export default class Vis {
             ctx.lineWidth = 4;
             ctx.translate(pos[0], pos[1]);
             this.circle(0, 0, r);
-            ctx.globalAlpha = alpha(graph, now);
+            ctx.globalAlpha = this.alpha(graph, now);
             ctx.stroke();
 
             ctx.fillStyle = Style.text;
@@ -171,7 +178,7 @@ export default class Vis {
             graph.text_roff = graph.radius;
             const style = graph.is_cmd ? "CMD" : graph.online ? "circles" : "offline";
             this.circle(pos[0], pos[1], graph.radius);
-            ctx.globalAlpha = alpha(graph, now);
+            ctx.globalAlpha = this.alpha(graph, now);
             this.circle(pos[0], pos[1], graph.radius, style);
         }
         ctx.restore();
@@ -189,7 +196,7 @@ export default class Vis {
             else 
                 ctx.strokeStyle = Style.circles;
             ctx.save();
-            ctx.globalAlpha = alpha(n, now);
+            ctx.globalAlpha = this.alpha(n, now);
             ctx.beginPath();
             ctx.moveTo(...graph.centre);
             ctx.lineTo(...n.centre);
@@ -203,7 +210,7 @@ export default class Vis {
         const ctx = this.ctx;
 
         ctx.save()
-        ctx.globalAlpha = alpha(graph, now);
+        ctx.globalAlpha = this.alpha(graph, now);
         ctx.beginPath();
         ctx.moveTo(...graph.centre);
         ctx.lineTo(...graph.overflow.centre);
@@ -223,7 +230,7 @@ export default class Vis {
             const kid = graph.children[i];
             if (!kid) continue;
             ctx.strokeStyle = kid.online ? Style.circles : Style.offline;
-            ctx.globalAlpha = alpha(kid, now);
+            ctx.globalAlpha = this.alpha(kid, now);
             const [st, en] = [th*i, th*(i + 1)];
             ctx.beginPath();
             ctx.arc(x, y, r, st, en, false);
@@ -242,7 +249,7 @@ export default class Vis {
                 ctx.save();
                 ctx.font = `${size}px ${Style.font}`;
                 ctx.fillStyle = fill;
-                ctx.globalAlpha = alpha(graph, now);
+                ctx.globalAlpha = this.alpha(graph, now);
                 ctx.translate(centre[0], centre[1]);
                 //ctx.rotate(-0.5);
                 if (offset) {

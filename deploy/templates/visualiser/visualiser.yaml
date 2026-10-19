@@ -30,6 +30,14 @@ spec:
               value: visualiser
             - name: DIRECTORY_EXTERNAL_URL
               value: {{ include "amrc-connectivity-stack.external-url" (list . "directory") | quote }}
+            {{- with .Values.visualiser.idleFade }}
+            - name: IDLE_AFTER
+              value: {{ .after | quote }}
+            - name: IDLE_FADE
+              value: {{ .duration | quote }}
+            - name: IDLE_OPACITY
+              value: {{ .opacity | quote }}
+            {{- end }}
 {{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
 {{ include "amrc-connectivity-stack.image" (list . .Values.visualiser) | indent 10 }}
 ---

@@ -699,6 +699,28 @@ What to do on upgrade:
   day with data the backfill has found) instead of
   `backfill.earliestRaw`, and adds `backfillEmptyDays`.
 
+### The visualiser fades quiet devices
+
+Devices on the visualiser now fade when they have not sent a BIRTH or
+DATA for a while, so the active ones stand out. A device stays solid
+for 2 minutes after its last message, then fades over 10 minutes to
+40% opacity, and its line and label fade with it. It returns to full
+opacity as soon as it publishes again. Groups and Nodes stay solid
+while any Device under them is publishing.
+
+Edge Agents only publish when a value changes, so a faded device has
+been quiet, not necessarily broken. Set the timings in the chart
+values, in seconds:
+
+```yaml
+visualiser:
+  idleFade:
+    after: 120
+    duration: 600
+    # Set opacity to 1 to turn fading off.
+    opacity: 0.4
+```
+
 ### Other improvements
 
 ConfigDB:

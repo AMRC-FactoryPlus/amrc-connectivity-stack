@@ -33,7 +33,7 @@ class FPlusVis {
 
         const fplus = clients[0].fplus;
         const icons = await new Icons({ fplus }).init();
-        const vis = this.vis = new Vis(graph, canvas, icons);
+        const vis = this.vis = new Vis(graph, canvas, icons, this.config);
 
         vis.run();
         for (const { mqtt } of clients) {
@@ -170,7 +170,7 @@ class FPlusVis {
     }
 
     async run () {
-        const config = await this.fetch_config();
+        const config = this.config = await this.fetch_config();
 
         if (config?.oidc_discovery_url) {
             const creds = await this.oidc_login(config);

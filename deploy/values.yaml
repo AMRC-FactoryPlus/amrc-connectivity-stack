@@ -519,6 +519,16 @@ visualiser:
   image:
     # -- The repository of the MQTT component
     repository: acs-visualiser
+  idleFade:
+    # -- Seconds a device can go without sending a BIRTH or DATA before
+    # it starts to fade. Edge Agents only publish when a value changes,
+    # so a faded device has been quiet, not necessarily broken.
+    after: 120
+    # -- Seconds a device takes to fade fully once it has started.
+    duration: 600
+    # -- Opacity of a fully faded device, from 0 to 1. Set it to 1 to
+    # turn fading off.
+    opacity: 0.4
 
 cmdesc:
   # -- Whether or not to enable the Commands component

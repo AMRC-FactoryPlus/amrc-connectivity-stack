@@ -44,8 +44,38 @@ plugins, from sources that aren't vendored here.
 
 ## Patches
 
-None yet. Apart from this file and `.gitignore`, the copy is unchanged
-from the Hex package.
+Each change is marked `ACS patch` in the source. Apart from these,
+this file and `.gitignore`, the copy is unchanged from the Hex package.
+
+1. **Pre-authentication not required** (`src/krb_auth_fsm.erl`,
+   `probe/3`). kerlberos first sends a request without
+   pre-authentication to learn the etype and salt, and expects
+   `KDC_ERR_PREAUTH_REQUIRED`. A KDC that doesn't require
+   pre-authentication for the principal answers with a ticket instead,
+   which crashed `probe/3`. The new clause takes the etype and salt from
+   that reply and carries on to the normal pre-authenticated request.
+   The unauthenticated ticket is discarded, so the ticket kerlberos
+   returns still has the `pre_auth` flag.
+2. **Log in from a keytab** (`src/krb_auth_fsm.erl`,
+   `src/krb_realm.erl`). Pass the principal's keytab entries as an
+   option; the password argument is then ignored:
+
+   ```erlang
+   {ok, KeyTab} = krb_mit_keytab:file("client.keytab"),
+   Entries = [E || E = #{principal := ["sv1warehouse"]} <- KeyTab],
+   {ok, TGT} = krb_realm:authenticate(Realm, ["sv1warehouse"], <<>>,
+                                      #{keytab => Entries}).
+   ```
+
+   The keytab's key for the etype the KDC chose is used instead of
+   deriving one from a password. If the keytab has no key for that
+   etype, the result is `{error, {no_keytab_key, EType}}` rather than a
+   crash, because a crash report would include the keytab.
+
+Checked against the `acs-local` KDC and broker on 2026-10-19: password
+and keytab logins (the keytab one as `sv1warehouse`), a wrong password
+(`{error, bad_secret}`), a keytab without the KDC's etype, and an MQTT 5
+GSSAPI connection with mutual authentication.
 
 ## Known differences from MIT Kerberos
 

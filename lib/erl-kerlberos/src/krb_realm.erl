@@ -78,7 +78,10 @@ open(Realm) ->
 
 
 -type auth_options() :: #{lifetime => secs(),
-                          flags => [krb_proto:kdc_flag()]}.
+                          flags => [krb_proto:kdc_flag()],
+                          % ACS patch: log in with these keys instead of
+                          % a password, which is then ignored.
+                          keytab => [krb_mit_keytab:keytab_entry()]}.
 
 %% @doc Performs an initial Kerberos password authentication for the given
 %%      principal (AS-REQ with an encrypted timestamp).

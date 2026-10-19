@@ -72,7 +72,9 @@ await(Pid) ->
     flags => [krb_proto:kdc_flag()],
     etypes => [krb_crypto:etype()],
     lifetime => secs(),
-    secret => binary()
+    secret => binary(),
+    % ACS patch: log in with these keys instead of a password.
+    keytab => [krb_mit_keytab:keytab_entry()]
     }.
 
 -record(?MODULE, {
@@ -176,6 +178,38 @@ probe(krb, E = #'KRB-ERROR'{'error-code' = 'KDC_ERR_PREAUTH_REQUIRED'},
     S1 = S0#?MODULE{etype = EType, salt = Salt},
     {next_state, auth, S1};
 
+%% ACS patch: a KDC that doesn't require pre-authentication for this
+%% principal answers the probe with a ticket (AS-REP) rather than
+%% KDC_ERR_PREAUTH_REQUIRED. Take the etype and salt it advertises and
+%% authenticate properly, with pre-authentication, as above. The probe's
+%% ticket is discarded.
+probe(krb, #'KDC-REP'{'msg-type' = 11, padata = PAs}, S0 = #?MODULE{}) ->
+    Info2s = [D || #'PA-DATA'{'padata-type' = 19, 'padata-value' = D} <- PAs],
+    Entries = case Info2s of
+        [Bin | _] when is_binary(Bin) ->
+            case 'KRB5':decode('ETYPE-INFO2', Bin) of
+                {ok, Es, _Rest} -> Es;
+                _ -> []
+            end;
+        [Es | _] when is_list(Es) ->
+            Es;
+        [] ->
+            []
+    end,
+    {EType, Salt} = case Entries of
+        [#'ETYPE-INFO2-ENTRY'{etype = ET, salt = asn1_NOVALUE} | _] ->
+            {krb_crypto:etype_to_atom(ET), <<>>};
+        [#'ETYPE-INFO2-ENTRY'{etype = ET, salt = Sa} | _] ->
+            {krb_crypto:etype_to_atom(ET), iolist_to_binary([Sa])};
+        [] ->
+            #?MODULE{config = C} = S0,
+            #{realm := Realm, principal := Principal} = C,
+            {lists:last(maps:get(etypes, C, krb_crypto:default_etypes())),
+             iolist_to_binary([Realm, Principal])}
+    end,
+    S1 = S0#?MODULE{etype = EType, salt = Salt},
+    {next_state, auth, S1};
+
 probe(krb, #'KRB-ERROR'{'error-code' = 'KDC_ERR_ETYPE_NOSUPP'},
                                                             S0 = #?MODULE{}) ->
     S1 = S0#?MODULE{result = {error, no_matching_etypes}},
@@ -201,8 +235,21 @@ probe(krb, #'KRB-ERROR'{'error-code' = Other},
     S1 = S0#?MODULE{result = {error, {krb5, Other}}},
     {next_state, done, S1}.
 
+%% ACS patch: logging in from a keytab needs its key for the etype the
+%% KDC chose. Fail cleanly if there isn't one: a crash report would
+%% include the keytab.
+auth(enter, _PrevState, S0 = #?MODULE{config = #{keytab := KeyTab}, etype = ET}) ->
+    case keytab_key(KeyTab, ET) of
+        {ok, _Key} ->
+            {keep_state, S0, [{state_timeout, 0, req}]};
+        error ->
+            S1 = S0#?MODULE{result = {error, {no_keytab_key, ET}}},
+            {keep_state, S1, [{state_timeout, 0, no_key}]}
+    end;
 auth(enter, _PrevState, S0 = #?MODULE{}) ->
     {keep_state, S0, [{state_timeout, 0, req}]};
+auth(state_timeout, no_key, S0 = #?MODULE{}) ->
+    {next_state, done, S0};
 auth(state_timeout, req, S0 = #?MODULE{proto = P, config = C, salt = S,
                                        etype = ET}) ->
     #{realm := Realm, principal := Principal, secret := Secret} = C,
@@ -239,7 +286,14 @@ auth(state_timeout, req, S0 = #?MODULE{proto = P, config = C, salt = S,
             pausec = USec
         }
     },
-    Key = krb_crypto:string_to_key(ET, Secret, S),
+    % ACS patch: use the keytab's key when logging in from a keytab.
+    Key = case C of
+        #{keytab := KeyTab} ->
+            {ok, K} = keytab_key(KeyTab, ET),
+            K;
+        _ ->
+            krb_crypto:string_to_key(ET, Secret, S)
+    end,
     PAEncTs1 = krb_proto:encrypt(Key, as_req_pa_enc_ts, PAEncTs0),
 
     Req = #'KDC-REQ'{
@@ -326,3 +380,10 @@ auth(krb, #'KRB-ERROR'{'error-code' = Other},
                                                             S0 = #?MODULE{}) ->
     S1 = S0#?MODULE{result = {error, {krb5, Other}}},
     {next_state, done, S1}.
+
+%% ACS patch: the keytab's key for an etype.
+keytab_key(KeyTab, ET) ->
+    case [K || #{key := K} <- KeyTab, krb_crypto:key_etype(K) =:= ET] of
+        [K | _] -> {ok, K};
+        [] -> error
+    end.

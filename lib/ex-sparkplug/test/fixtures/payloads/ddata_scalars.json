@@ -1,0 +1,227 @@
+{
+  "timestamp": {
+    "long": "1760000000123",
+    "unsigned": true
+  },
+  "metrics": [
+    {
+      "value": -5,
+      "type": "Int8",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "10",
+        "unsigned": true
+      }
+    },
+    {
+      "value": -300,
+      "type": "Int16",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "11",
+        "unsigned": true
+      }
+    },
+    {
+      "value": -70000,
+      "type": "Int32",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "12",
+        "unsigned": true
+      }
+    },
+    {
+      "value": -2147483648,
+      "type": "Int32",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "13",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "long": "-5000000000",
+        "unsigned": false
+      },
+      "type": "Int64",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "14",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 250,
+      "type": "UInt8",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "15",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 65000,
+      "type": "UInt16",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "16",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 4000000000,
+      "type": "UInt32",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "17",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "long": "18446744073709551615",
+        "unsigned": true
+      },
+      "type": "UInt64",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "18",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 1.5,
+      "type": "Float",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "19",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 230.5,
+      "type": "Double",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "20",
+        "unsigned": true
+      }
+    },
+    {
+      "value": true,
+      "type": "Boolean",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "21",
+        "unsigned": true
+      }
+    },
+    {
+      "value": "hello",
+      "type": "String",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "22",
+        "unsigned": true
+      }
+    },
+    {
+      "value": "a longer piece of text",
+      "type": "Text",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "23",
+        "unsigned": true
+      }
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "type": "UUID",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "24",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "long": "1760000000123",
+        "unsigned": true
+      },
+      "type": "DateTime",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "25",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "bytes": "AAEC/w=="
+      },
+      "type": "Bytes",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "26",
+        "unsigned": true
+      }
+    }
+  ],
+  "seq": {
+    "long": "1",
+    "unsigned": true
+  }
+}

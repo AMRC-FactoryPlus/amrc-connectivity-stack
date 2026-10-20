@@ -1,0 +1,10 @@
+{application,kerlberos,
+             [{description,"Native Kerberos V (KRB5) and GSS-API for Erlang"},
+              {vsn,"2.0.3"},
+              {registered,[]},
+              {included_applications,[]},
+              {applications,[kernel,stdlib,asn1,pbkdf2,neotoma]},
+              {mod,{krb_app,[]}},
+              {env,[]},
+              {licenses,["BSD-2-Clause"]},
+              {links,[{"GitHub","https://github.com/arekinath/kerlberos"}]}]}.

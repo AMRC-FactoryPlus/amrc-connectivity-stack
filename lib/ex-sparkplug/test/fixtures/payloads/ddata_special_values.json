@@ -1,0 +1,68 @@
+{
+  "timestamp": {
+    "long": "1760000000123",
+    "unsigned": true
+  },
+  "metrics": [
+    {
+      "value": {
+        "float": "NaN"
+      },
+      "type": "Double",
+      "alias": {
+        "long": "30",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "float": "Infinity"
+      },
+      "type": "Double",
+      "alias": {
+        "long": "31",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "float": "-Infinity"
+      },
+      "type": "Double",
+      "alias": {
+        "long": "32",
+        "unsigned": true
+      }
+    },
+    {
+      "value": {
+        "float": "NaN"
+      },
+      "type": "Float",
+      "alias": {
+        "long": "33",
+        "unsigned": true
+      }
+    },
+    {
+      "value": null,
+      "type": "Double",
+      "alias": {
+        "long": "34",
+        "unsigned": true
+      }
+    },
+    {
+      "value": "",
+      "type": "String",
+      "alias": {
+        "long": "35",
+        "unsigned": true
+      }
+    }
+  ],
+  "seq": {
+    "long": "2",
+    "unsigned": true
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "timestamp": {
+    "long": "1760000000123",
+    "unsigned": true
+  },
+  "metrics": [
+    {
+      "value": {
+        "long": "3",
+        "unsigned": false
+      },
+      "type": "Int64",
+      "name": "bdSeq"
+    },
+    {
+      "value": false,
+      "type": "Boolean",
+      "name": "Node Control/Rebirth",
+      "alias": {
+        "long": "1",
+        "unsigned": true
+      }
+    },
+    {
+      "value": "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+      "type": "UUID",
+      "name": "Instance_UUID",
+      "alias": {
+        "long": "2",
+        "unsigned": true
+      }
+    },
+    {
+      "value": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "type": "UUID",
+      "name": "Schema_UUID",
+      "alias": {
+        "long": "3",
+        "unsigned": true
+      }
+    },
+    {
+      "value": 230.5,
+      "type": "Double",
+      "name": "Phases/1/Voltage",
+      "timestamp": {
+        "long": "1760000000123456789",
+        "unsigned": true
+      },
+      "alias": {
+        "long": "4",
+        "unsigned": true
+      },
+      "properties": {
+        "engUnit": {
+          "value": "V",
+          "type": "String"
+        }
+      }
+    },
+    {
+      "value": {
+        "long": "86400",
+        "unsigned": true
+      },
+      "type": "UInt64",
+      "name": "Status/Uptime",
+      "alias": {
+        "long": "5",
+        "unsigned": true
+      },
+      "isTransient": true
+    }
+  ],
+  "seq": {
+    "long": "0",
+    "unsigned": true
+  }
+}

@@ -8,6 +8,20 @@ and the kerlberos fork:
 {:fplus, path: "../lib/ex-service-client"}
 ```
 
+An application outside this repo takes all three from git. The client
+refers to the other two by relative path, which doesn't exist in its
+checkout, so declare them alongside it with `override: true`, at the
+same ref:
+
+```elixir
+@acs "https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack.git"
+@ref "..."   # a tag or commit
+
+{:fplus, git: @acs, ref: @ref, sparse: "lib/ex-service-client"},
+{:sparkplug_b, git: @acs, ref: @ref, sparse: "lib/ex-sparkplug", override: true},
+{:kerlberos, git: @acs, ref: @ref, sparse: "lib/erl-kerlberos", manager: :rebar3, override: true}
+```
+
 ## Using it
 
 Add the whole client to the application's supervision tree, reading its

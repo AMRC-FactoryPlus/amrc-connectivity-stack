@@ -24,8 +24,10 @@ defmodule FPlus.Credentials do
 
   ## Options
 
-    * `:principal` - required. The principal to log in as, such as
-      `"sv1warehouse@ACS.LOCALHOST"`.
+    * `:principal` - the principal to log in as, such as
+      `"sv1warehouse@ACS.LOCALHOST"`. Required with `:password`; with
+      `:keytab` it defaults to the keytab's principal, if the keytab
+      holds keys for only one.
     * `:realm` - the realm, if `:principal` doesn't include one.
     * `:keytab` - the path of a keytab holding the principal's keys.
     * `:password` - the principal's password. Give either `:keytab` or
@@ -152,11 +154,10 @@ defmodule FPlus.Credentials do
   @impl true
   def init(opts) do
     opts = Keyword.validate!(opts, [:principal, :realm, :keytab, :password, :kdc])
-    {principal, realm} = parse_principal(opts[:principal], opts[:realm])
-    configure_kdc(realm, opts[:kdc])
 
-    case credential(principal, realm, opts) do
-      {:ok, credential} ->
+    case identity(opts) do
+      {:ok, principal, realm, credential} ->
+        configure_kdc(realm, opts[:kdc])
         state = %__MODULE__{principal: principal, realm: realm, credential: credential}
         {:ok, state, {:continue, :login}}
 
@@ -323,24 +324,58 @@ defmodule FPlus.Credentials do
     {name |> String.split("/") |> Enum.map(&String.to_charlist/1), String.to_charlist(realm)}
   end
 
-  defp credential(principal, realm, opts) do
+  # Who to log in as, and with what.
+  defp identity(opts) do
     case {opts[:keytab], opts[:password]} do
-      {nil, nil} -> raise ArgumentError, "give :keytab or :password"
-      {path, nil} -> keytab(path, principal, realm)
-      {nil, password} -> {:ok, {:password, password}}
-      {_path, _password} -> raise ArgumentError, "give :keytab or :password, not both"
+      {nil, nil} ->
+        raise ArgumentError, "give :keytab or :password"
+
+      {nil, password} ->
+        {principal, realm} = parse_principal(opts[:principal], opts[:realm])
+        {:ok, principal, realm, {:password, password}}
+
+      {path, nil} ->
+        keytab_identity(path, opts)
+
+      {_path, _password} ->
+        raise ArgumentError, "give :keytab or :password, not both"
+    end
+  end
+
+  defp keytab_identity(path, opts) do
+    with {:ok, entries} <- read_keytab(path),
+         {:ok, principal, realm} <- keytab_principal(entries, path, opts) do
+      case Enum.filter(entries, &(&1.principal == principal and &1.realm == realm)) do
+        [] -> {:error, {:no_keytab_keys, path}}
+        keys -> {:ok, principal, realm, {:keytab, keys}}
+      end
+    end
+  end
+
+  # Without :principal, use the keytab's principal, if it holds only one.
+  defp keytab_principal(entries, path, opts) do
+    case {opts[:principal], Enum.uniq_by(entries, &{&1.principal, &1.realm})} do
+      {nil, [%{principal: principal, realm: realm}]} ->
+        {:ok, principal, realm}
+
+      {nil, []} ->
+        {:error, {:no_keytab_keys, path}}
+
+      {nil, _several} ->
+        raise ArgumentError, "#{path} holds keys for several principals, so give :principal"
+
+      {name, _entries} ->
+        {principal, realm} = parse_principal(name, opts[:realm])
+        {:ok, principal, realm}
     end
   end
 
   # krb_mit_keytab:file/1 crashes on a read error, so read the file here.
   # A parse error can hold keytab bytes, so keep only its kind.
-  defp keytab(path, principal, realm) do
+  defp read_keytab(path) do
     with {:ok, data} <- File.read(path),
          {:ok, entries} <- :krb_mit_keytab.parse(data) do
-      case Enum.filter(entries, &(&1.principal == principal and &1.realm == realm)) do
-        [] -> {:error, {:no_keytab_keys, path}}
-        keys -> {:ok, {:keytab, keys}}
-      end
+      {:ok, entries}
     else
       {:error, reason} -> {:error, {:keytab, path, :krb_redact.reason(reason)}}
     end

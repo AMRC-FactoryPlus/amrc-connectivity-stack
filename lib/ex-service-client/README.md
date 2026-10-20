@@ -8,6 +8,27 @@ and the kerlberos fork:
 {:fplus, path: "../lib/ex-service-client"}
 ```
 
+## Using it
+
+Add the whole client to the application's supervision tree, reading its
+options from the environment ACS pods are given (`DIRECTORY_URL`,
+`CLIENT_KEYTAB`, and `KRB5_CONFIG` for the KDC):
+
+```elixir
+children = [
+  {FPlus, [name: MyApp.FPlus] ++ FPlus.opts_from_env()}
+]
+
+:ok = FPlus.MQTT.subscribe(FPlus.mqtt(MyApp.FPlus), "spBv1.0/#")
+:ok = FPlus.CmdEsc.rebirth(FPlus.http(MyApp.FPlus), %{group: "Site_1", node: "Edge_1"})
+```
+
+This starts `FPlus.Credentials`, `FPlus.HTTP` and `FPlus.MQTT`. The
+principal comes from the keytab, and the MQTT broker from the Directory
+unless `MQTT_URL` is set; `CONFIGDB_URL` and `AUTHN_URL` override the
+Directory too. `mqtt: false` leaves MQTT out. The sections below
+describe each part, which can also be started on its own.
+
 ## Design
 
 - An application adds the client to its own supervision tree, rather
@@ -30,8 +51,8 @@ and the kerlberos fork:
 - **HTTP** (`FPlus.HTTP`): requests to Factory+ services, with service
   discovery through the Directory and bearer tokens from Kerberos, plus
   `FPlus.Directory` and `FPlus.CmdEsc` (rebirth requests).
-- Next: one child spec for the whole client, and reading its options
-  from the environment, as the JS client does.
+- **The whole client** (`FPlus`): one child spec, with options from the
+  environment.
 
 ## Credentials
 

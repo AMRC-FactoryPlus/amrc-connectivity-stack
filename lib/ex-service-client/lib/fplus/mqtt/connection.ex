@@ -27,6 +27,7 @@ defmodule FPlus.MQTT.Connection do
 
   defstruct [
     :credentials,
+    :http,
     :registry,
     :host,
     :port,
@@ -47,7 +48,7 @@ defmodule FPlus.MQTT.Connection do
 
   @impl true
   def init(opts) do
-    opts = Keyword.validate!(opts, [:name, :credentials, :registry, :url, :client_id])
+    opts = Keyword.validate!(opts, [:name, :credentials, :http, :registry, :url, :client_id])
 
     # emqtt is linked to this process and exits when its connection ends.
     Process.flag(:trap_exit, true)
@@ -56,10 +57,17 @@ defmodule FPlus.MQTT.Connection do
     # Kerberos token in it.
     :logger.set_module_level(:emqtt, :info)
 
-    {host, port} = parse_url(Keyword.fetch!(opts, :url))
+    # Without a URL, the broker is looked up in the Directory on connect.
+    {host, port} =
+      case {opts[:url], opts[:http]} do
+        {nil, nil} -> raise ArgumentError, "give :url, or :http to find the broker"
+        {nil, _http} -> {nil, nil}
+        {url, _http} -> parse_url!(url)
+      end
 
     state = %__MODULE__{
       credentials: Keyword.fetch!(opts, :credentials),
+      http: opts[:http],
       registry: Keyword.fetch!(opts, :registry),
       host: host,
       port: port,
@@ -101,6 +109,7 @@ defmodule FPlus.MQTT.Connection do
     status = %{
       connected: connected?(state),
       connected_at: state.connected_at,
+      broker: state.host && "#{state.host}:#{state.port}",
       subscriptions: state.filters |> MapSet.to_list() |> Enum.sort(),
       refused: state.refused
     }
@@ -158,43 +167,68 @@ defmodule FPlus.MQTT.Connection do
   defp connect(%{client: client} = state) when is_pid(client), do: state
 
   defp connect(state) do
-    case Credentials.initiate(state.credentials, "mqtt", state.host) do
-      {:ok, token, context} ->
-        {:ok, client} =
-          :emqtt.start_link(
-            host: String.to_charlist(state.host),
-            port: state.port,
-            proto_ver: :v5,
-            clientid: state.client_id,
-            clean_start: true,
-            connect_timeout: @connect_timeout,
-            owner: self(),
-            properties: %{"Authentication-Method": "GSSAPI", "Authentication-Data": token}
-          )
-
-        task = Task.async(fn -> :emqtt.connect(client) end)
-
-        %{
-          state
-          | client: client,
-            context: context,
-            connect_task: task.ref,
-            waiting_for_credentials: false
-        }
-
+    with {:ok, state} <- find_broker(state),
+         {:ok, token, context} <- Credentials.initiate(state.credentials, "mqtt", state.host) do
+      start_client(state, token, context)
+    else
       # Not logged in yet. That isn't the broker's fault, so check again
       # soon rather than backing off, and say so once.
       {:error, :unavailable} ->
         unless state.waiting_for_credentials do
-          Logger.info("MQTT broker #{state.host}:#{state.port}: waiting for Kerberos login")
+          Logger.info("MQTT broker #{broker(state)}: waiting for Kerberos login")
         end
 
         Process.send_after(self(), :connect, @min_retry)
         %{state | waiting_for_credentials: true}
 
+      {:error, {:no_broker, reason}} ->
+        retry(state, "can't find the broker in the Directory: #{inspect(reason)}")
+
       {:error, reason} ->
         retry(state, "no Kerberos token: #{inspect(reason)}")
     end
+  end
+
+  defp find_broker(%{host: host} = state) when is_binary(host), do: {:ok, state}
+
+  defp find_broker(state) do
+    case FPlus.HTTP.service_url(state.http, FPlus.Service.mqtt()) do
+      {:ok, url} ->
+        case parse_url(url) do
+          {:ok, host, port} -> {:ok, %{state | host: host, port: port}}
+          :error -> {:error, {:no_broker, {:bad_url, url}}}
+        end
+
+      {:error, :unavailable} ->
+        {:error, :unavailable}
+
+      {:error, reason} ->
+        {:error, {:no_broker, reason}}
+    end
+  end
+
+  defp start_client(state, token, context) do
+    {:ok, client} =
+      :emqtt.start_link(
+        host: String.to_charlist(state.host),
+        port: state.port,
+        proto_ver: :v5,
+        clientid: state.client_id,
+        clean_start: true,
+        connect_timeout: @connect_timeout,
+        owner: self(),
+        properties: %{"Authentication-Method": "GSSAPI", "Authentication-Data": token}
+      )
+
+    task = Task.async(fn -> :emqtt.connect(client) end)
+
+    %{
+      state
+      | client: client,
+        context: context,
+        connect_task: task.ref,
+        waiting_for_credentials: false
+    }
   end
 
   defp connect_done(state, {:ok, connack}) do
@@ -202,7 +236,7 @@ defmodule FPlus.MQTT.Connection do
 
     case Credentials.verify(state.context, reply) do
       :ok ->
-        Logger.info("Connected to MQTT broker #{state.host}:#{state.port} as #{state.client_id}")
+        Logger.info("Connected to MQTT broker #{broker(state)} as #{state.client_id}")
 
         %{state | context: nil, connected_at: DateTime.utc_now(), retry: @min_retry}
         |> subscribe_all()
@@ -219,9 +253,7 @@ defmodule FPlus.MQTT.Connection do
   end
 
   defp retry(state, why) do
-    Logger.warning(
-      "MQTT broker #{state.host}:#{state.port}: #{why}; retrying in #{state.retry} ms"
-    )
+    Logger.warning("MQTT broker #{broker(state)}: #{why}; retrying in #{state.retry} ms")
 
     Process.send_after(self(), :connect, state.retry)
     %{state | retry: min(state.retry * 2, @max_retry)}
@@ -289,13 +321,26 @@ defmodule FPlus.MQTT.Connection do
     |> Enum.each(&send(&1, {:fplus_mqtt, topic, payload, properties}))
   end
 
+  defp broker(%{host: nil}), do: "(from the Directory)"
+  defp broker(state), do: "#{state.host}:#{state.port}"
+
+  defp parse_url!(url) do
+    case parse_url(url) do
+      {:ok, host, port} ->
+        {host, port}
+
+      :error ->
+        raise ArgumentError, "the broker URL must be mqtt://host[:port], got: #{inspect(url)}"
+    end
+  end
+
   defp parse_url(url) do
     case URI.parse(url) do
       %URI{scheme: "mqtt", host: host, port: port} when is_binary(host) and host != "" ->
-        {host, port || 1883}
+        {:ok, host, port || 1883}
 
       _other ->
-        raise ArgumentError, "the broker URL must be mqtt://host[:port], got: #{inspect(url)}"
+        :error
     end
   end
 end

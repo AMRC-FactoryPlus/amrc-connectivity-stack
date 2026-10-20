@@ -34,9 +34,11 @@ defmodule FPlus.MQTT do
     * `:name` - required. An atom naming the connection for the other
       functions.
     * `:credentials` - required. The `FPlus.Credentials` process.
-    * `:url` - required. The broker, such as
-      `"mqtt://mqtt.acs.localhost:1883"`. Its host is also the Kerberos
-      service host (`mqtt@host`). Only `mqtt://` is supported so far.
+    * `:url` - the broker, such as `"mqtt://mqtt.acs.localhost:1883"`.
+      Its host is also the Kerberos service host (`mqtt@host`). Only
+      `mqtt://` is supported so far.
+    * `:http` - an `FPlus.HTTP` client, used to find the broker in the
+      Directory when `:url` isn't given.
     * `:client_id` - the MQTT client ID. Defaults to a random one.
   """
 
@@ -49,6 +51,7 @@ defmodule FPlus.MQTT do
           {:name, atom()}
           | {:credentials, GenServer.server()}
           | {:url, String.t()}
+          | {:http, atom()}
           | {:client_id, String.t()}
 
   @doc "Start the connection's supervisor."
@@ -116,6 +119,7 @@ defmodule FPlus.MQTT do
   @spec status(atom()) :: %{
           connected: boolean(),
           connected_at: DateTime.t() | nil,
+          broker: String.t() | nil,
           subscriptions: [String.t()],
           refused: %{String.t() => non_neg_integer()}
         }

@@ -74,6 +74,30 @@ defmodule FPlus.CredentialsTest do
                Credentials.init(principal: "sv1test@#{realm}", keytab: path)
     end
 
+    test "a keytab with one principal supplies it", %{tmp_dir: dir} do
+      realm = realm()
+      path = keytab(dir, "sv1test", realm)
+
+      assert {:ok, state, {:continue, :login}} = Credentials.init(keytab: path)
+      assert state.principal == [~c"sv1test"]
+      assert state.realm == String.to_charlist(realm)
+    end
+
+    test "a keytab with several principals needs :principal", %{tmp_dir: dir} do
+      realm = realm()
+
+      path =
+        Keytab.write!(Path.join(dir, "shared.keytab"), [
+          %{principal: "sv1one", realm: realm, etype: :aes256_hmac_sha1, key: @key},
+          %{principal: "sv1two", realm: realm, etype: :aes256_hmac_sha1, key: @key}
+        ])
+
+      assert_raise ArgumentError, ~r/several principals/, fn -> Credentials.init(keytab: path) end
+
+      assert {:ok, %{principal: [~c"sv1two"]}, _continue} =
+               Credentials.init(keytab: path, principal: "sv1two@#{realm}")
+    end
+
     test "a principal can be a service principal", %{tmp_dir: dir} do
       realm = realm()
       path = keytab(dir, "HTTP/svc.test.invalid", realm)

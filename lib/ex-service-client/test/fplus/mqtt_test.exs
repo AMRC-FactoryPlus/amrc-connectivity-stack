@@ -56,6 +56,11 @@ defmodule FPlus.MQTTTest do
     assert_raise ArgumentError, fn -> MQTT.subscribe(name, "spBv1.0/#/DDATA") end
   end
 
+  test "without a URL or an HTTP client to find one, the connection stops" do
+    Process.flag(:trap_exit, true)
+    assert {:error, _reason} = MQTT.start_link(name: :no_broker, credentials: :none)
+  end
+
   test "a broker URL that isn't mqtt:// stops the connection" do
     Process.flag(:trap_exit, true)
 

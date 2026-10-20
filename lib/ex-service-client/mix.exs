@@ -34,6 +34,7 @@ defmodule FPlus.MixProject do
       {:kerlberos, path: "../erl-kerlberos", manager: :rebar3},
       {:emqtt, "~> 1.16"},
       {:quicer, "0.2.15", override: true, compile: "true", app: false},
+      {:finch, "~> 0.24"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

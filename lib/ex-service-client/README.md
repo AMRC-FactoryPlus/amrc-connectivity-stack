@@ -27,7 +27,11 @@ and the kerlberos fork:
 - **MQTT** (`FPlus.MQTT`): an MQTT 5 connection to the broker,
   authenticated with Kerberos, with subscriptions that survive
   reconnects.
-- Next: the HTTP layer (tokens, discovery, Command Escalation).
+- **HTTP** (`FPlus.HTTP`): requests to Factory+ services, with service
+  discovery through the Directory and bearer tokens from Kerberos, plus
+  `FPlus.Directory` and `FPlus.CmdEsc` (rebirth requests).
+- Next: one child spec for the whole client, and reading its options
+  from the environment, as the JS client does.
 
 ## Credentials
 
@@ -83,6 +87,32 @@ when their last subscriber exits.
 
 The connection sets emqtt's log level to `:info`, because at debug level
 emqtt logs whole packets, including the Kerberos token in CONNECT.
+
+## HTTP
+
+```elixir
+children = [
+  {FPlus.Credentials, name: MyApp.Credentials, ...},
+  {FPlus.HTTP,
+   name: MyApp.HTTP,
+   credentials: MyApp.Credentials,
+   directory_url: "http://directory.acs.localhost"}
+]
+
+{:ok, url} = FPlus.Directory.get_service_url(MyApp.HTTP, FPlus.Service.configdb())
+:ok = FPlus.CmdEsc.rebirth(MyApp.HTTP, %{group: "Site_1", node: "Edge_1"})
+
+{:ok, %{status: 200, body: body}} =
+  FPlus.HTTP.request(MyApp.HTTP, FPlus.Service.configdb(), :get, "v1/app")
+```
+
+`FPlus.HTTP.request/5` finds the service through the Directory, gets a
+bearer token from the service's `/token` endpoint and makes the request
+in the calling process; JSON responses are decoded. The token exchange
+authenticates with Kerberos (`Negotiate`) and checks the service's
+reply. Service URLs and tokens are cached, each fetched once at a time
+however many callers ask, and a refused token is replaced and the
+request retried once. Requests go through a Finch pool.
 
 ## Building
 

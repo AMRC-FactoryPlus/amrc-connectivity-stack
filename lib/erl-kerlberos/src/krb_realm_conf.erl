@@ -88,12 +88,9 @@ configure(Realm, UserConf) ->
         kdc => [],
         ttl => 3600
     },
-    Conf1 = add_realm_conf(Conf0, [
-        "/opt/local/etc/krb5/krb5.conf",
-        "/opt/local/etc/krb5.conf",
-        "/etc/krb5/krb5.conf",
-        "/etc/krb5.conf"
-    ], unicode:characters_to_binary(Realm, utf8)),
+    % ACS patch: config_paths/0 reads KRB5_CONFIG.
+    Conf1 = add_realm_conf(Conf0, config_paths(),
+        unicode:characters_to_binary(Realm, utf8)),
     {GlobalConfig, RealmConfig} = case application:get_env(kerlberos, realms) of
         {ok, KC} ->
             {maps:from_list(proplists:get_value(default, KC, [])),
@@ -114,6 +111,21 @@ configure(Realm, UserConf) ->
         (Host) -> {Host, KdcPort}
     end, Kdcs0),
     _Conf5 = Conf4#{kdc => Kdcs1}.
+
+%% ACS patch: as MIT Kerberos does, read the colon-separated files in
+%% KRB5_CONFIG instead of the default files when it is set. ACS pods keep
+%% their krb5.conf elsewhere and point KRB5_CONFIG at it.
+-spec config_paths() -> [string()].
+config_paths() ->
+    case os:getenv("KRB5_CONFIG") of
+        Paths when is_list(Paths), Paths =/= "" ->
+            string:lexemes(Paths, ":");
+        _ ->
+            ["/opt/local/etc/krb5/krb5.conf",
+             "/opt/local/etc/krb5.conf",
+             "/etc/krb5/krb5.conf",
+             "/etc/krb5.conf"]
+    end.
 
 -spec lookup_kdcs(config(), string()) -> config().
 lookup_kdcs(C0, Domain) ->
@@ -138,7 +150,12 @@ lookup_kdcs(C0, Domain, ForceTCP) ->
                         Acc
                 end
             end, [], Answers),
-            MinTTL0 = lists:min([TTL || {TTL, _Srv} <- Srvs]),
+            % ACS patch: an answer with no SRV records (NODATA) means DNS
+            % gives no KDCs. lists:min/1 crashed on the empty list.
+            MinTTL0 = case Srvs of
+                [] -> maps:get(ttl, C0, 3600);
+                _ -> lists:min([TTL || {TTL, _Srv} <- Srvs])
+            end,
             MinTTL1 = case C0 of
                 #{ttl := OtherTTL} when (OtherTTL < MinTTL0) -> OtherTTL;
                 _ -> MinTTL0

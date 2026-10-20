@@ -31,8 +31,8 @@ defmodule FPlus.Credentials do
     * `:password` - the principal's password. Give either `:keytab` or
       `:password`.
     * `:kdc` - the KDCs to use, as `{host, port}` tuples. Without it,
-      kerlberos reads `/etc/krb5.conf` and DNS. It doesn't read
-      `KRB5_CONFIG`.
+      kerlberos reads the files in `KRB5_CONFIG`, or `/etc/krb5.conf`,
+      and DNS.
     * `:name` - a name to register the process under.
   """
 

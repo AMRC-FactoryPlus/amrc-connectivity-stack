@@ -111,6 +111,20 @@ this file and `.gitignore`, the copy is unchanged from the Hex package.
    client's `test/fplus/credentials_acs_local_test.exs` checks both cases
    against the `acs-local` broker.
 
+6. **`KRB5_CONFIG`** (`src/krb_realm_conf.erl`, `config_paths/0`).
+   kerlberos only read fixed paths such as `/etc/krb5.conf`. As MIT
+   Kerberos does, it now reads the colon-separated files in
+   `KRB5_CONFIG` instead when that is set, skipping any that are
+   missing. ACS pods keep their `krb5.conf` under `/config` and point
+   `KRB5_CONFIG` at it.
+7. **An empty DNS answer for KDCs** (`src/krb_realm_conf.erl`,
+   `lookup_kdcs/3`). Unless `krb5.conf` sets `dns_lookup_kdc = false`,
+   which ACS's doesn't, kerlberos also looks up `_kerberos._udp.<realm>`
+   in DNS. An answer with no SRV records (NODATA) crashed it in
+   `lists:min/1`. It now adds no KDCs from DNS in that case. The service
+   client's `test/kerlberos_fork_config_test.exs` checks both patches,
+   including with a `krb5.conf` as ACS's Helm template renders it.
+
 Patches 1 and 2 were checked against the `acs-local` KDC and broker on
 2026-10-19: password and keytab logins (the keytab one as
 `sv1warehouse`), a wrong password (`{error, bad_secret}`), a keytab
@@ -133,6 +147,12 @@ Not patched:
 - `krb_mit_keytab:file/1` matches `{err, _}` where it means
   `{error, _}`, so it crashes on any read error. The service client
   reads keytabs itself and calls `krb_mit_keytab:parse/1`.
+- kerlberos ignores two settings in ACS's `krb5.conf`.
+  `udp_preference_limit = 1` tells MIT clients to use TCP, but kerlberos
+  tries UDP first, which only costs time where UDP isn't reachable.
+  `disable_encrypted_timestamp = true` tells MIT clients to use SPAKE
+  pre-authentication, but kerlberos only has encrypted timestamps, which
+  the KDC still accepts.
 - On OTP 29 kerlberos compiles with 23 warnings, mostly the deprecated
   `catch` expression. A later OTP may turn these into errors.
 

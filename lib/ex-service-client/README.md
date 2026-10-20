@@ -53,9 +53,8 @@ the application starting; `initiate/4` returns `{:error, :unavailable}`
 until it has logged in. Each token can be used once, so make a new one
 for every connection attempt.
 
-kerlberos doesn't read `KRB5_CONFIG`. Without the `:kdc` option it uses
-`/etc/krb5.conf` and DNS, which isn't where ACS pods keep their
-`krb5.conf`, so in a cluster pass `:kdc` for now.
+Without the `:kdc` option, kerlberos finds the KDC from `KRB5_CONFIG`
+(as ACS pods set it), or `/etc/krb5.conf`, and DNS.
 
 ## MQTT
 

@@ -21,9 +21,35 @@ and the kerlberos fork:
 
 ## Status
 
-So far this is the project and its dependencies. Credentials, the MQTT
-connection and the HTTP layer (tokens, discovery, Command Escalation)
-come next.
+- **Credentials** (`FPlus.Credentials`): Kerberos login from a keytab
+  or a password, renewal before the TGT expires, service-ticket caching,
+  and the GSS-API tokens that authenticate to a service.
+- Next: the MQTT connection, then the HTTP layer (tokens, discovery,
+  Command Escalation).
+
+## Credentials
+
+```elixir
+children = [
+  {FPlus.Credentials,
+   name: MyApp.Credentials,
+   principal: "sv1warehouse@ACS.LOCALHOST",
+   keytab: "/keytabs/client"}
+]
+
+{:ok, token, context} = FPlus.Credentials.initiate(MyApp.Credentials, "mqtt", "mqtt.acs.localhost")
+# Send the token to the service; check its reply with verify/2.
+:ok = FPlus.Credentials.verify(context, reply)
+```
+
+The process logs in after it starts, so a KDC that is down doesn't stop
+the application starting; `initiate/4` returns `{:error, :unavailable}`
+until it has logged in. Each token can be used once, so make a new one
+for every connection attempt.
+
+kerlberos doesn't read `KRB5_CONFIG`. Without the `:kdc` option it uses
+`/etc/krb5.conf` and DNS, which isn't where ACS pods keep their
+`krb5.conf`, so in a cluster pass `:kdc` for now.
 
 ## Building
 
@@ -48,4 +74,18 @@ mix deps.get
 mix test
 mix format --check-formatted
 mix credo
+```
+
+Tests tagged `:acs_local` need the local test cluster, and are excluded
+by default. They log in as `admin` with its password and as
+`sv1warehouse` from its keytab, and authenticate to the broker:
+
+```sh
+umask 077
+acs-local kubectl get secret krb5-keytabs -n factory-plus \
+    -o jsonpath='{.data.sv1warehouse}' | base64 -d > /tmp/sv1warehouse.keytab
+ACS_LOCAL_PASSWORD="$(acs-local password)" \
+ACS_LOCAL_KEYTAB=/tmp/sv1warehouse.keytab \
+    mix test --include acs_local
+rm /tmp/sv1warehouse.keytab
 ```

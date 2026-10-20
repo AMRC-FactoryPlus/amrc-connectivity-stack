@@ -43,6 +43,8 @@
     start_link/1,
     init/1,
     terminate/2,
+    % ACS patch: keep secrets out of crash reports.
+    format_status/1,
     handle_call/3,
     handle_info/2,
     handle_cast/2
@@ -212,3 +214,16 @@ handle_call({obtain_ticket, TGT, Princ, Opts}, _From,
 %% @private
 handle_cast(_, #?MODULE{}) ->
     error(no_casts).
+
+%% ACS patch: the authenticate and obtain_ticket calls carry a password,
+%% keytab or ticket. Keep them out of crash reports and
+%% sys:get_status/1. See krb_redact.
+format_status(Status) ->
+    maps:map(fun
+        (message, Message) ->
+            krb_redact:message(Message);
+        (reason, Reason) ->
+            krb_redact:reason(Reason);
+        (_Key, Value) ->
+            Value
+    end, Status).

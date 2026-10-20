@@ -44,6 +44,8 @@
     init/1,
     callback_mode/0,
     terminate/3,
+    % ACS patch: keep secrets out of crash reports.
+    format_status/1,
     done/3,
     wait/3,
     probe/3,
@@ -388,3 +390,17 @@ keytab_key(KeyTab, ET) ->
         [K | _] -> {ok, K};
         [] -> error
     end.
+
+%% ACS patch: keep the password, keytab, keys and tickets out of crash
+%% reports and sys:get_status/1. See krb_redact.
+format_status(Status) ->
+    maps:map(fun
+        (data, S = #?MODULE{}) ->
+            S#?MODULE{config = krb_redact:config(S#?MODULE.config),
+                      key = krb_redact:key(S#?MODULE.key),
+                      result = krb_redact:ticket_result(S#?MODULE.result)};
+        (reason, Reason) ->
+            krb_redact:reason(Reason);
+        (_Key, Value) ->
+            Value
+    end, Status).

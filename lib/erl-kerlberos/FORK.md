@@ -83,6 +83,20 @@ this file and `.gitignore`, the copy is unchanged from the Hex package.
    longer dependencies. One acceptor-side message logged the keytab's
    keys when no key matched a ticket; it now logs only the ticket.
 
+4. **Secrets kept out of crash reports** (`src/krb_redact.erl`, which is
+   new, and `format_status/1` in `src/krb_auth_fsm.erl`,
+   `src/krb_tkt_grant_fsm.erl` and `src/krb_realm.erl`). These processes
+   hold passwords, keytabs, keys and tickets in their state, and
+   `krb_realm` receives them in its `authenticate` and `obtain_ticket`
+   calls. OTP prints a process's state, last message and exit reason in
+   its crash report, and a `function_clause` exit reason carries the
+   crashed function's arguments, which can be the whole state.
+   `format_status/1` now blanks out the secrets, and reduces an exit
+   reason to the kind of error and where it happened (module, function,
+   arity and line). The same applies to `sys:get_status/1`. The service
+   client's `test/kerlberos_fork_test.exs` checks each process, and
+   crashes a live `krb_realm` to check its report.
+
 Patches 1 and 2 were checked against the `acs-local` KDC and broker on
 2026-10-19: password and keytab logins (the keytab one as
 `sv1warehouse`), a wrong password (`{error, bad_secret}`), a keytab
@@ -99,9 +113,9 @@ Not patched:
 - With no channel bindings, the GSS initiator sends the MD5 hash of an
   empty binding where MIT sends 16 zero bytes. The ACS broker's Java
   acceptor ignores bindings, so this works.
-- Crash reports from kerlberos's processes include their state, which
-  holds the password or keytab key. Callers must keep those reports out
-  of their logs.
+- When a call to `krb_realm` fails, the exit the caller receives
+  includes the request, so a password or ticket. Patch 4 can't change
+  that: callers must catch these exits and not log them as they are.
 - On OTP 29 kerlberos compiles with 23 warnings, mostly the deprecated
   `catch` expression. A later OTP may turn these into errors.
 

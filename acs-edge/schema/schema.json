@@ -231,7 +231,7 @@
                             "endpoint": {
                                 "type": "string",
                                 "title": "Endpoint",
-                                "pattern": "^opc.tcp://.+:\\d+/?$",
+                                "pattern": "^opc\\.tcp://[^/]+:\\d+(/.*)?$",
                                 "options": {
                                     "inputAttributes": {
                                         "placeholder": "e.g. opc.tcp://myserver:1234"

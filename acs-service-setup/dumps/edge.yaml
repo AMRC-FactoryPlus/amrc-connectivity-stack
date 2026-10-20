@@ -280,12 +280,12 @@ configs:
             minLength: 1
             title: Endpoint
             type: string
-            pattern: ^opc.tcp://.+:\d+/?$
+            pattern: ^opc\.tcp://[^/]+:\d+(/.*)?$
             options:
               order: 1
               inputAttributes:
                 placeholder: e.g. opc.tcp://myserver:1234
-              patternmessage: This doesn't look like a valid OPC UA address (opc.tcp://host:port).
+              patternmessage: This doesn't look like a valid OPC UA address (opc.tcp://host:port or opc.tcp://host:port/path).
           securityMode:
             default: None
             enum:

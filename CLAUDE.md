@@ -363,7 +363,8 @@ ACS conventions above. `lib/ex-sparkplug` is the reference as it grows.
 - `mix credo` with its default checks. No `.credo.exs`.
 - Code must pass `mix format --check-formatted`, `mix credo` and
   `mix compile --warnings-as-errors`, which includes the compiler's type
-  warnings.
+  warnings. `.github/workflows/elixir.yaml` runs these and `mix test` on
+  pull requests for each `lib/ex-*` project; add new ones to its matrix.
 
 ### Naming
 - Elixir's own conventions, which already match ACS: `snake_case` for

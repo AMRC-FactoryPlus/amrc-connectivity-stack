@@ -1,0 +1,62 @@
+name: Elixir libraries
+# The Elixir libraries in lib/ex-* aren't built by the Makefiles or
+# deployed yet, so this is the only place their checks run. Tests tagged
+# :acs_local need the local test cluster and are excluded by default.
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'lib/ex-**'
+      - 'lib/erl-**'
+      # FPlus.Service is checked against the JS client's UUIDs.
+      - 'lib/js-service-client/lib/uuids.js'
+      - '.github/workflows/elixir.yaml'
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        lib:
+          - ex-sparkplug
+          - ex-service-client
+    defaults:
+      run:
+        working-directory: lib/${{ matrix.lib }}
+    env:
+      MIX_ENV: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Erlang and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          version-file: lib/${{ matrix.lib }}/.tool-versions
+          version-type: strict
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            lib/${{ matrix.lib }}/deps
+            lib/${{ matrix.lib }}/_build
+          key: ${{ runner.os }}-mix-${{ matrix.lib }}-${{ hashFiles(format('lib/{0}/mix.lock', matrix.lib), format('lib/{0}/.tool-versions', matrix.lib)) }}
+
+      - name: Fetch dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile
+        run: mix compile --warnings-as-errors
+
+      - name: Lint
+        run: mix credo
+
+      - name: Test
+        run: mix test

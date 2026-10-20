@@ -24,8 +24,10 @@ and the kerlberos fork:
 - **Credentials** (`FPlus.Credentials`): Kerberos login from a keytab
   or a password, renewal before the TGT expires, service-ticket caching,
   and the GSS-API tokens that authenticate to a service.
-- Next: the MQTT connection, then the HTTP layer (tokens, discovery,
-  Command Escalation).
+- **MQTT** (`FPlus.MQTT`): an MQTT 5 connection to the broker,
+  authenticated with Kerberos, with subscriptions that survive
+  reconnects.
+- Next: the HTTP layer (tokens, discovery, Command Escalation).
 
 ## Credentials
 
@@ -50,6 +52,37 @@ for every connection attempt.
 kerlberos doesn't read `KRB5_CONFIG`. Without the `:kdc` option it uses
 `/etc/krb5.conf` and DNS, which isn't where ACS pods keep their
 `krb5.conf`, so in a cluster pass `:kdc` for now.
+
+## MQTT
+
+```elixir
+children = [
+  {FPlus.Credentials, name: MyApp.Credentials, ...},
+  {FPlus.MQTT,
+   name: MyApp.MQTT,
+   credentials: MyApp.Credentials,
+   url: "mqtt://mqtt.acs.localhost:1883"}
+]
+
+:ok = FPlus.MQTT.subscribe(MyApp.MQTT, "spBv1.0/#")
+
+receive do
+  {:fplus_mqtt, topic, payload, _properties} ->
+    {:ok, payload} = SparkplugB.decode(payload, timestamp_unit: :auto)
+end
+```
+
+The connection is made after the process starts. Each attempt
+authenticates with a fresh token and checks the broker's reply before
+the connection is used; failed attempts and dropped connections are
+retried with backoff. Subscriptions are held in a registry owned by the
+subscribing processes, so they are made again on every reconnect and end
+when the subscriber exits. Messages are delivered at QoS 0. Publishing is
+QoS 0 only for now, and subscriptions aren't removed from the broker
+when their last subscriber exits.
+
+The connection sets emqtt's log level to `:info`, because at debug level
+emqtt logs whole packets, including the Kerberos token in CONNECT.
 
 ## Building
 
@@ -78,7 +111,8 @@ mix credo
 
 Tests tagged `:acs_local` need the local test cluster, and are excluded
 by default. They log in as `admin` with its password and as
-`sv1warehouse` from its keytab, and authenticate to the broker:
+`sv1warehouse` from its keytab, authenticate to the broker, and receive
+the cluster's Sparkplug traffic:
 
 ```sh
 umask 077
@@ -89,3 +123,7 @@ ACS_LOCAL_KEYTAB=/tmp/sv1warehouse.keytab \
     mix test --include acs_local
 rm /tmp/sv1warehouse.keytab
 ```
+
+On `acs-local` the first Kerberos login in a VM takes about 10 seconds:
+kerlberos tries the KDC over UDP first, and the cluster only exposes it
+over TCP. Later logins take milliseconds.

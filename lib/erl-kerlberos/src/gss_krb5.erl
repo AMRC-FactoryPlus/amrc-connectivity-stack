@@ -86,7 +86,11 @@
     ikey :: undefined | krb_crypto:base_key(),
     ackey :: undefined | krb_crypto:base_key(),
     seq :: undefined | integer(),
-    rseq :: undefined | integer()
+    rseq :: undefined | integer(),
+    % ACS patch: our authenticator's time, which the acceptor's reply must
+    % echo.
+    ctime :: undefined | binary(),
+    cusec :: undefined | integer()
     }).
 
 %% @doc Retrieves the peer's Kerberos ticket if available (only possible if
@@ -576,7 +580,9 @@ initiate(C) ->
 
     S0 = #?MODULE{party = initiator, opts = C, nonce = Nonce, tktkey = Key,
         ikey = SessKey, seq = Nonce, rseq = Nonce, them = {SRealm, Them},
-        us = {CRealm, Us}},
+        us = {CRealm, Us},
+        % ACS patch: remember the authenticator's time.
+        ctime = iolist_to_binary([NowKrb]), cusec = USec},
     case Mutual of
         true ->
             {continue, Token, S0#?MODULE{continue = initiate}};
@@ -867,18 +873,8 @@ continue(Token, S0 = #?MODULE{continue = initiate, party = initiator}) ->
                 APRep0 = #'AP-REP'{} ->
                     case krb_proto:decrypt(Key, ap_rep_encpart, APRep0) of
                         {ok, APRep1} ->
-                            #'AP-REP'{'enc-part' = EP} = APRep1,
-                            #'EncAPRepPart'{'seq-number' = RSeq0} = EP,
-                            #'EncAPRepPart'{'subkey' = NewKey} = EP,
-                            case NewKey of
-                                asn1_NOVALUE ->
-                                    {ok, S0#?MODULE{continue = undefined,
-                                                    rseq = RSeq0}};
-                                _ ->
-                                    {ok, S0#?MODULE{continue = undefined,
-                                                    ackey = NewKey,
-                                                    rseq = RSeq0}}
-                            end;
+                            % ACS patch: moved to initiator_ap_rep/2.
+                            initiator_ap_rep(APRep1, S0);
                         {error, Why} ->
                             {error, Why}
                     end;
@@ -1148,3 +1144,29 @@ rotate_bytes_wrap_test() ->
     ?assertMatch(Bytes0, unrotate_bytes(<<6,7,8,1,2,3,4,5>>, 11)).
 
 -endif.
+
+%% ACS patch: the initiator's handling of a decrypted AP-REP, moved out of
+%% continue/2 so it can check the reply first. The reply must echo the
+%% ctime and cusec of the authenticator we sent (RFC 4120 section 3.2.5),
+%% as MIT Kerberos checks. Otherwise any reply encrypted with the
+%% ticket's session key would pass, including one recorded from an
+%% earlier connection that used the same ticket.
+initiator_ap_rep(#'AP-REP'{'enc-part' = EP},
+                 S0 = #?MODULE{ctime = CTime, cusec = CUSec}) ->
+    #'EncAPRepPart'{ctime = RCTime, cusec = RCUSec} = EP,
+    case {iolist_to_binary([RCTime]), RCUSec} of
+        {CTime, CUSec} ->
+            #'EncAPRepPart'{'seq-number' = RSeq0} = EP,
+            #'EncAPRepPart'{'subkey' = NewKey} = EP,
+            case NewKey of
+                asn1_NOVALUE ->
+                    {ok, S0#?MODULE{continue = undefined,
+                                    rseq = RSeq0}};
+                _ ->
+                    {ok, S0#?MODULE{continue = undefined,
+                                    ackey = NewKey,
+                                    rseq = RSeq0}}
+            end;
+        _ ->
+            {error, mutual_failed}
+    end.

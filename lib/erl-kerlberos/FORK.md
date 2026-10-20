@@ -97,6 +97,20 @@ this file and `.gitignore`, the copy is unchanged from the Hex package.
    client's `test/kerlberos_fork_test.exs` checks each process, and
    crashes a live `krb_realm` to check its report.
 
+5. **Mutual authentication checks the reply's time** (`src/gss_krb5.erl`).
+   The initiator only checked that the acceptor's reply (AP-REP)
+   decrypted with the ticket's session key. It didn't check that the
+   reply echoes the time (`ctime`, `cusec`) of the authenticator it sent,
+   as RFC 4120 section 3.2.5 asks and MIT Kerberos does. Without that,
+   any reply made with the same ticket passed, so someone who recorded
+   the broker's reply to one connection could replay it to pass as the
+   broker on a later one that reused the ticket, and tickets are cached
+   for hours. `initiate/1` now keeps the authenticator's time in its
+   state, and the reply handling, moved into `initiator_ap_rep/2`, returns
+   `{error, mutual_failed}` when the reply doesn't echo it. The service
+   client's `test/fplus/credentials_acs_local_test.exs` checks both cases
+   against the `acs-local` broker.
+
 Patches 1 and 2 were checked against the `acs-local` KDC and broker on
 2026-10-19: password and keytab logins (the keytab one as
 `sv1warehouse`), a wrong password (`{error, bad_secret}`), a keytab
@@ -116,6 +130,9 @@ Not patched:
 - When a call to `krb_realm` fails, the exit the caller receives
   includes the request, so a password or ticket. Patch 4 can't change
   that: callers must catch these exits and not log them as they are.
+- `krb_mit_keytab:file/1` matches `{err, _}` where it means
+  `{error, _}`, so it crashes on any read error. The service client
+  reads keytabs itself and calls `krb_mit_keytab:parse/1`.
 - On OTP 29 kerlberos compiles with 23 warnings, mostly the deprecated
   `catch` expression. A later OTP may turn these into errors.
 

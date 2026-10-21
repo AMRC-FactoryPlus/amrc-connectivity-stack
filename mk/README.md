@@ -79,5 +79,6 @@ configures `make deploy`.
 
 Then we include Makefiles to perform a build. `acs.js.mk` is for Docker
 images which include a Javascript service; it pulls in `acs.docker.mk`
-which builds a Docker image. See the Makefiles themselves for more
+which builds a Docker image. `acs.ex.mk` does the same for Elixir
+services (`acs-ingest`). See the Makefiles themselves for more
 details.

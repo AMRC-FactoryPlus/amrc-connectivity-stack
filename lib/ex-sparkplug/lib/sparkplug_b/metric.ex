@@ -27,6 +27,10 @@ defmodule SparkplugB.Metric do
     * for datatypes not converted yet: datasets, templates, arrays and
       extensions.
     * when the wire field doesn't match the datatype.
+    * when an integer is out of range for its type, such as an Int8
+      sent as 300. Signed types accept two's complement at the type's
+      own width, or sign-extended to 32 or 64 bits, so an Int8 -5 may be
+      251, 4294967291 or 18446744073709551611.
 
   `timestamp` is integer nanoseconds since the Unix epoch; see
   `SparkplugB.decode/2`. `properties` is a map from key to

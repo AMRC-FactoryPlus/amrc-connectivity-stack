@@ -117,11 +117,22 @@ const TABLES = `
 `;
 
 /**
- * Indexes added since SCHEMA_VERSION was last bumped. Created if
- * missing on every open, so an existing database gains them without a
- * rebuild (a few hundred ms at 3 million values).
+ * Indexes and tables added since SCHEMA_VERSION was last bumped.
+ * Created if missing on every open, so an existing database gains them
+ * without a rebuild (a few hundred ms at 3 million values).
  */
 const ADDED_INDEXES = `
+    -- The device segment of each device's UNS topics (the segment
+    -- after "Edge"), which the UNS historian puts at the start of its
+    -- path tag. source is 'uns' when seen on a UNS topic, or 'config'
+    -- when taken from DeviceInformation's sparkplugName before any
+    -- UNS message has been seen. See ObjectTree.unsDeviceSegment.
+    create table if not exists uns_device (
+        device_uuid     text primary key,
+        segment         text not null,
+        source          text not null           -- 'uns' | 'config'
+    ) without rowid;
+
     -- Values not kept current by the UNS ('influx' and 'empty'), by
     -- device, for ValueCache's refresh. Queries must say
     -- source != 'uns' for SQLite to use it.
@@ -377,6 +388,23 @@ export class I3xStore {
         }
     }
 
+    /**
+     * A database from before uns_device has none of its rows, and the
+     * sync engine re-applies only devices whose config has changed, so
+     * ObjectTree.buildDevice would never write them. Seed the stand-in
+     * ('config') rows from the sparkplugName the sync engine stored,
+     * for the devices in the tree, as buildDevice would have.
+     */
+    private seedUnsDevice(): void {
+        const r = this.db.prepare(`
+            insert or ignore into uns_device (device_uuid, segment, source)
+            select s.uuid, s.sparkplug_name, 'config' from sync_device s
+            where s.sparkplug_name is not null and s.sparkplug_name != ''
+                and exists (select 1 from device_schema d where d.device_uuid = s.uuid)
+        `).run();
+        this.log("seeded the UNS device segment of %d devices", Number(r.changes));
+    }
+
     private ensureSchema(fingerprint: string): void {
         const version = (this.db.prepare("pragma user_version").get() as any).user_version;
         let stored: string | undefined;
@@ -386,7 +414,10 @@ export class I3xStore {
         }
         if (version === SCHEMA_VERSION && stored === fingerprint) {
             this.warm = true;
+            const hadUnsDevice = !!this.db.prepare(
+                "select 1 from sqlite_master where type = 'table' and name = 'uns_device'").get();
             this.db.exec(ADDED_INDEXES);
+            if (!hadUnsDevice) this.seedUnsDevice();
             return;
         }
 

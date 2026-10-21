@@ -121,6 +121,9 @@ describe("ValueCache", () => {
                 ["cnc-schema", "axis-schema", "pos-schema", "cmdval-schema"],
                 expect.any(Array),
                 expect.any(Array),
+                // The topic's device segment and the Type property, for
+                // MetricMeta and the UNS historian's path.
+                { deviceSegment: "my-device", type: "Double" },
             );
         });
 

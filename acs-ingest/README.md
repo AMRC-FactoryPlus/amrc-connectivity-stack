@@ -6,8 +6,9 @@ historian first, and later the UNS ingester and the UNS historian.
 
 ## Status
 
-The Sparkplug historian is written, but not yet tested against a real
-InfluxDB, built into an image or deployed. The application reads its
+The Sparkplug historian is written, and builds into an image that runs
+on `acs-local`, but isn't yet tested against a real InfluxDB or in the
+Helm chart. The application reads its
 configuration, and starts the Factory+ client
 (`lib/ex-service-client`), a buffered InfluxDB writer for the
 historian (`Ingest.Writer`), and the Sparkplug path
@@ -69,6 +70,25 @@ INFLUX_URL=http://influxdb.acs.localhost INFLUX_ORG=default INFLUX_TOKEN=... \
     mix run --no-halt
 ```
 
-Delete the keytab afterwards. The first Kerberos login in a VM takes
-about 10 seconds, as kerlberos tries the KDC over UDP first and the
-cluster only exposes it over TCP.
+Delete the keytab afterwards. Put `udp_preference_limit = 1` in the
+`krb5.conf`'s `[libdefaults]`, as ACS's has: otherwise kerlberos tries
+the KDC over UDP first, and as the cluster only exposes it over TCP,
+each login and ticket request takes about 10 seconds.
+
+## Image
+
+`make` builds the image and pushes it, to `ghcr.io/amrc-factoryplus`
+unless `registry` is set in `config.mk` (see `mk/README.md`). It needs
+the Elixir base images, built in `acs-base-images`, at the version in
+`base_version`. To build it into the local Docker instead, without
+pushing:
+
+```sh
+docker buildx build --load -t acs-ingest:dev \
+    --build-arg base_version=v1.0.0 --build-context lib=../lib .
+```
+
+The image runs the release as the `elixir` user, with no Erlang
+distribution. It reads the same environment as above; Kubernetes stops
+it with SIGTERM, after which the writers write what they hold. When
+the stall monitor gives up, the VM exits with status 1.

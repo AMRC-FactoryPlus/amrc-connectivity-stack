@@ -1,0 +1,16 @@
+# ACS base image for running Elixir services.
+# Services run as releases, which carry their own ERTS, so this needs
+# only the libraries ERTS uses: lksctp-tools stops the socket NIF
+# warning at every start that it can't load libsctp. There is no
+# k5start: the services log in to Kerberos themselves.
+
+# The Alpine of Dockerfile.ex-build - see the note there.
+FROM alpine:3.24.2
+
+RUN apk add --no-cache libstdc++ ncurses-libs openssl lksctp-tools \
+    && adduser -D -u 1000 elixir \
+    # Create the runtime directory root-owned, for security.
+    && install -d -o root -g root -m 755 /home/elixir/app
+
+# The BEAM reads file names as Latin-1 without a UTF-8 locale.
+ENV LANG=C.UTF-8

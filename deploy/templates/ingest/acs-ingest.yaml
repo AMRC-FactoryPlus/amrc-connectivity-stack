@@ -1,0 +1,87 @@
+{{- if .Values.historians.sparkplug.enabled }}
+{{- /*
+acs-ingest, the Elixir ingestion service. It runs a part for each
+enabled ingester written in Elixir, so far the Sparkplug historian. Each
+part logs in as its own principal, from its own keytab, as the JS
+services did. The parts log in to Kerberos themselves and retry until
+the KDC answers, so the pod needs neither k5start nor the wait-for-kdc
+init container.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acs-ingest
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: acs-ingest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: acs-ingest
+  template:
+    metadata:
+      labels:
+        component: acs-ingest
+        factory-plus.service: acs-ingest
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: krb5-keytabs
+            items:
+              {{- if .Values.historians.sparkplug.enabled }}
+              - key: sv1warehouse
+                path: sparkplug-historian
+              {{- end }}
+
+      containers:
+        - name: acs-ingest
+{{ include "amrc-connectivity-stack.image" (list . .Values.ingest) | indent 10 }}
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: LOG_LEVEL
+              value: {{ .Values.ingest.logLevel | required "values.ingest.logLevel" }}
+            - name: INFLUX_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_ORG
+              value: default
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
+            {{- if .Values.historians.sparkplug.enabled }}
+            {{- with .Values.historians.sparkplug }}
+            - name: SPARKPLUG_HISTORIAN
+              value: "true"
+            - name: SPARKPLUG_HISTORIAN_KEYTAB
+              value: /keytabs/sparkplug-historian
+            - name: SPARKPLUG_HISTORIAN_BUCKET
+              value: default
+            - name: SPARKPLUG_HISTORIAN_BATCH_SIZE
+              value: {{ .batchSize | quote | required "values.historians.sparkplug.batchSize" }}
+            - name: SPARKPLUG_HISTORIAN_FLUSH_INTERVAL
+              value: {{ .flushInterval | quote | required "values.historians.sparkplug.flushInterval" }}
+            - name: SPARKPLUG_HISTORIAN_STALL_TIMEOUT
+              value: {{ .stallTimeout | default 0 | quote }}
+            - name: SPARKPLUG_HISTORIAN_CONNECT_TIMEOUT
+              value: {{ .connectTimeout | default 0 | quote }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+{{- end }}

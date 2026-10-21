@@ -6,35 +6,52 @@ defmodule IngestTest do
   # The tree registers global names.
   use ExUnit.Case, async: false
 
+  alias Ingest.Config
+
   @moduletag :capture_log
 
-  # Nothing answers on port 9, so the client never logs in or connects.
-  defp config(overrides) do
+  @historian Ingest.Parts.SparkplugHistorian
+
+  # Nothing answers on port 9, so a client never logs in or connects.
+  @fplus [
+    directory_url: "http://127.0.0.1:9/",
+    principal: "nobody@ACS.INVALID",
+    password: "unused",
+    kdc: [{"127.0.0.1", 9}]
+  ]
+
+  defp config(part_overrides \\ [], overrides \\ []) do
+    part =
+      struct!(
+        Config.Part,
+        [
+          name: :sparkplug_historian,
+          fplus: @fplus,
+          stall_timeout: nil,
+          connect_timeout: 400,
+          writer: %{
+            bucket: "bucket",
+            batch_size: 5000,
+            flush_interval: 1000,
+            buffer_limit: 100_000
+          }
+        ] ++ part_overrides
+      )
+
     struct!(
-      Ingest.Config,
+      Config,
       [
-        fplus: [
-          directory_url: "http://127.0.0.1:9/",
-          principal: "nobody@ACS.INVALID",
-          password: "unused",
-          kdc: [{"127.0.0.1", 9}]
-        ],
-        sparkplug_historian: true,
+        parts: [part],
         influx_url: "http://127.0.0.1:9",
         influx_org: "org",
-        influx_bucket: "bucket",
         influx_token: "token",
-        batch_size: 5000,
-        flush_interval: 1000,
-        buffer_limit: 100_000,
-        stall_timeout: nil,
-        connect_timeout: 400,
         log_level: :info
       ] ++ overrides
     )
   end
 
-  defp pids, do: Map.new(Supervisor.which_children(Ingest), fn {id, pid, _, _} -> {id, pid} end)
+  defp pids(supervisor),
+    do: Map.new(Supervisor.which_children(supervisor), fn {id, pid, _, _} -> {id, pid} end)
 
   defp wait_until(fun, tries \\ 300) do
     cond do
@@ -44,19 +61,27 @@ defmodule IngestTest do
     end
   end
 
-  test "the parts come after the writers, the stall monitor and the client" do
-    start_supervised!({Ingest, config([])})
+  test "the writers come first, then a subtree per part" do
+    start_supervised!({Ingest, config()})
 
-    assert Enum.map(Supervisor.which_children(Ingest), &elem(&1, 0)) ==
-             [Ingest.Sparkplug, FPlus, Ingest.StallMonitor, Ingest.Writers]
+    assert Enum.map(Supervisor.which_children(Ingest), &elem(&1, 0)) == [
+             @historian,
+             Ingest.Writers
+           ]
+
+    assert Enum.map(Supervisor.which_children(@historian), &elem(&1, 0)) ==
+             [Ingest.Sparkplug, FPlus, Ingest.StallMonitor]
+
+    assert Process.whereis(Ingest.Writers.SparkplugHistorian)
+    assert Process.whereis(Module.concat(@historian, "FPlus"))
   end
 
-  test "without health checks there is no stall monitor" do
+  test "a part without health checks has no stall monitor" do
     start_supervised!({Ingest, config(connect_timeout: nil)})
-    refute Map.has_key?(pids(), Ingest.StallMonitor)
+    refute Map.has_key?(pids(@historian), Ingest.StallMonitor)
   end
 
-  test "a client that can't connect is restarted with the parts, and then the service stops" do
+  test "a part's client that can't connect is restarted in its subtree, and then the service stops" do
     test = self()
 
     influx =
@@ -69,27 +94,59 @@ defmodule IngestTest do
       )
 
     # The writer holds what it's given for a minute.
-    config = config(influx_url: Ingest.Test.FakeInflux.url(influx), flush_interval: 60_000)
+    writer = %{bucket: "bucket", batch_size: 5000, flush_interval: 60_000, buffer_limit: 100_000}
+    config = config([writer: writer], influx_url: Ingest.Test.FakeInflux.url(influx))
     ingest = start_supervised!({Ingest, config}, restart: :temporary)
     ref = Process.monitor(ingest)
-    Ingest.Writer.write(Ingest.Writers.Sparkplug, "a value=1i 1\n", 1)
-    before = pids()
+    Ingest.Writer.write(Ingest.Writers.SparkplugHistorian, "a value=1i 1\n", 1)
+    top = pids(Ingest)
+    before = pids(@historian)
 
-    # CONNECT_TIMEOUT is 400 ms.
+    # The connect timeout is 400 ms.
     wait_until(fn ->
-      fplus = pids()[FPlus]
+      fplus = pids(@historian)[FPlus]
       is_pid(fplus) and fplus != before[FPlus]
     end)
 
-    after_restart = pids()
+    after_restart = pids(@historian)
 
     assert after_restart[Ingest.Sparkplug] != before[Ingest.Sparkplug]
-    assert after_restart[Ingest.Writers] == before[Ingest.Writers]
     assert after_restart[Ingest.StallMonitor] == before[Ingest.StallMonitor]
+    assert pids(Ingest) == top
 
-    # Two restarts, then the third time it gives up, and the tree shuts
-    # down. The writer stops last, and writes what it held.
+    # Two restarts, then the third time it gives up: the part stops, so
+    # the tree shuts down. The writer stops last, and writes what it held.
     assert_receive {:DOWN, ^ref, :process, ^ingest, :shutdown}, 5000
     assert_received {:written, "a value=1i 1\n"}
+  end
+
+  test "a part's restart leaves the other parts as they were" do
+    # Two parts with no children of their own: one whose connection
+    # check fires, and one with no checks.
+    part = fn name, connect_timeout ->
+      Supervisor.child_spec(
+        {Ingest.Part,
+         name: name,
+         part: name,
+         fplus: @fplus,
+         children: [],
+         last_message: fn -> nil end,
+         stall_timeout: nil,
+         connect_timeout: connect_timeout},
+        significant: false
+      )
+    end
+
+    start_supervised!(part.(IngestTest.Failing, 400))
+    start_supervised!(part.(IngestTest.Steady, nil))
+    failing = pids(IngestTest.Failing)[FPlus]
+    steady = pids(IngestTest.Steady)[FPlus]
+
+    wait_until(fn ->
+      fplus = pids(IngestTest.Failing)[FPlus]
+      is_pid(fplus) and fplus != failing
+    end)
+
+    assert pids(IngestTest.Steady)[FPlus] == steady
   end
 end

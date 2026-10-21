@@ -6,14 +6,11 @@ defmodule Ingest.Config do
   @moduledoc """
   The service's configuration, read from the environment when it starts.
 
-  The variables are the ones the JS historian and ACS's Helm chart use.
-  A variable set to the empty string counts as unset.
-
-  ## Factory+
-
-  Read by `FPlus.opts_from_env/1`: `DIRECTORY_URL` and `CLIENT_KEYTAB`
-  (required), and `MQTT_URL`, `CONFIGDB_URL` and `AUTHN_URL`. The KDC
-  comes from `KRB5_CONFIG`.
+  The service runs parts, each logged in to Factory+ as its own
+  principal (see `Ingest`). Variables that every part shares have plain
+  names; a part's own variables start with its name, such as
+  `SPARKPLUG_HISTORIAN_KEYTAB`. A variable set to the empty string
+  counts as unset.
 
   ## Parts
 
@@ -22,69 +19,96 @@ defmodule Ingest.Config do
 
     * `SPARKPLUG_HISTORIAN` - write Sparkplug device data to InfluxDB
 
+  ## Factory+
+
+  Shared, and read by `FPlus.opts_from_env/1`: `DIRECTORY_URL`
+  (required), and `MQTT_URL`, `CONFIGDB_URL` and `AUTHN_URL`. The KDC
+  comes from `KRB5_CONFIG`.
+
+  For each part that is on:
+
+    * `<PART>_KEYTAB` - required. The keytab of the part's principal.
+
   ## InfluxDB
 
-  Required when a historian is on:
+  Shared, and required when a historian is on:
 
     * `INFLUX_URL` - an `http` or `https` URL
     * `INFLUX_ORG`
     * `INFLUX_TOKEN`
-    * `INFLUX_BUCKET` - default `default`
 
-  ## Batching
+  For each historian that is on:
 
-    * `BATCH_SIZE` - flush after this many points; default 5000
-    * `FLUSH_INTERVAL` - flush at least this often, in milliseconds;
-      default 1000. The JS historian's chart value was 10000.
-    * `BUFFER_LIMIT` - the most points a writer holds while InfluxDB is
-      slow or down; beyond it, the oldest are dropped. Default 100,000,
-      and at least `BATCH_SIZE`. The JS historian had no limit.
+    * `<PART>_BUCKET` - default `default` for the Sparkplug historian
+    * `<PART>_BATCH_SIZE` - flush after this many points; default 5000
+    * `<PART>_FLUSH_INTERVAL` - flush at least this often, in
+      milliseconds; default 1000. The JS historian's chart value was
+      10000.
+    * `<PART>_BUFFER_LIMIT` - the most points its writer holds while
+      InfluxDB is slow or down; beyond it, the oldest are dropped.
+      Default 100,000, and at least the batch size. The JS historian
+      had no limit.
 
   ## Health
 
-  For `Ingest.StallMonitor`'s checks, in whole seconds, with 0 to turn
-  the check off. The struct holds them in milliseconds, or `nil` when
-  off.
+  For each part's `Ingest.StallMonitor`, in whole seconds, with 0 to
+  turn the check off. The structs hold them in milliseconds, or `nil`
+  when off.
 
-    * `STALL_TIMEOUT` - restart the Factory+ client after this long
-      without a message, once one has arrived; default 600
-    * `CONNECT_TIMEOUT` - restart it after this long without an MQTT
-      connection with its subscriptions granted; default 300
+    * `<PART>_STALL_TIMEOUT` - restart the part's Factory+ client after
+      this long without a message, once one has arrived; default 600
+    * `<PART>_CONNECT_TIMEOUT` - restart it after this long without an
+      MQTT connection with its subscriptions granted; default 300
 
   ## Logging
 
-    * `LOG_LEVEL` - one of the pino level names the chart documents:
-      `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`.
-      Default `info`. It is mapped to a `Logger` level.
+    * `LOG_LEVEL` - shared. One of the pino level names the chart
+      documents: `fatal`, `error`, `warn`, `info`, `debug`, `trace` or
+      `silent`. Default `info`. It is mapped to a `Logger` level.
   """
 
+  defmodule Part do
+    @moduledoc """
+    A part's configuration: its name, its `FPlus` options (with its own
+    keytab), its stall monitor's timeouts, and for a historian, its
+    writer's.
+    """
+
+    @enforce_keys [:name, :fplus, :stall_timeout, :connect_timeout, :writer]
+    defstruct @enforce_keys
+
+    @type writer :: %{
+            bucket: String.t(),
+            batch_size: pos_integer(),
+            flush_interval: pos_integer(),
+            buffer_limit: pos_integer()
+          }
+
+    @type t :: %__MODULE__{
+            name: atom(),
+            fplus: keyword(),
+            stall_timeout: pos_integer() | nil,
+            connect_timeout: pos_integer() | nil,
+            writer: writer() | nil
+          }
+  end
+
   @derive {Inspect, except: [:influx_token]}
-  @enforce_keys [
-    :fplus,
-    :sparkplug_historian,
-    :batch_size,
-    :flush_interval,
-    :buffer_limit,
-    :stall_timeout,
-    :connect_timeout,
-    :log_level
-  ]
-  defstruct @enforce_keys ++ [:influx_url, :influx_org, :influx_bucket, :influx_token]
+  @enforce_keys [:parts, :log_level]
+  defstruct @enforce_keys ++ [:influx_url, :influx_org, :influx_token]
 
   @type t :: %__MODULE__{
-          fplus: keyword(),
-          sparkplug_historian: boolean(),
+          parts: [Part.t()],
           influx_url: String.t() | nil,
           influx_org: String.t() | nil,
-          influx_bucket: String.t() | nil,
           influx_token: String.t() | nil,
-          batch_size: pos_integer(),
-          flush_interval: pos_integer(),
-          buffer_limit: pos_integer(),
-          stall_timeout: pos_integer() | nil,
-          connect_timeout: pos_integer() | nil,
           log_level: Logger.level() | :none
         }
+
+  # Each part: its variable, and for a historian, its default bucket.
+  @parts [
+    sparkplug_historian: %{variable: "SPARKPLUG_HISTORIAN", bucket: "default"}
+  ]
 
   @log_levels %{
     "fatal" => :critical,
@@ -106,31 +130,47 @@ defmodule Ingest.Config do
   def from_env(env \\ System.get_env()) do
     env = Map.reject(env, fn {_variable, value} -> value == "" end)
 
-    with {:ok, fplus} <- fplus(env),
-         {:ok, historian} <- flag(env, "SPARKPLUG_HISTORIAN"),
-         :ok <- some_part([historian]),
-         {:ok, influx} <- influx(env, historian),
-         {:ok, batch_size} <- positive(env, "BATCH_SIZE", 5000),
-         {:ok, flush_interval} <- positive(env, "FLUSH_INTERVAL", 1000),
-         {:ok, buffer_limit} <- positive(env, "BUFFER_LIMIT", 100_000),
-         :ok <- at_least_batch(buffer_limit, batch_size),
-         {:ok, stall_timeout} <- timeout(env, "STALL_TIMEOUT", 600),
-         {:ok, connect_timeout} <- timeout(env, "CONNECT_TIMEOUT", 300),
+    with {:ok, parts} <- parts(env),
+         {:ok, influx} <- influx(env, Enum.any?(parts, & &1.writer)),
          {:ok, log_level} <- log_level(env) do
+      {:ok, struct!(__MODULE__, [parts: parts, log_level: log_level] ++ influx)}
+    end
+  end
+
+  defp parts(env) do
+    results = for {name, part} <- @parts, do: part(env, name, part)
+
+    case Enum.find(results, &match?({:error, _}, &1)) do
+      {:error, _message} = error -> error
+      nil -> some_part(for {:ok, part} <- results, do: part)
+    end
+  end
+
+  defp some_part([]) do
+    variables = Enum.map_join(@parts, " or ", fn {_name, part} -> part.variable end)
+    {:error, "no parts are on: set #{variables} to true"}
+  end
+
+  defp some_part(parts), do: {:ok, parts}
+
+  defp part(env, name, %{variable: variable} = part) do
+    with {:ok, true} <- flag(env, variable),
+         {:ok, keytab} <- required(env, variable <> "_KEYTAB"),
+         {:ok, fplus} <- fplus(Map.put(env, "CLIENT_KEYTAB", keytab)),
+         {:ok, stall_timeout} <- timeout(env, variable <> "_STALL_TIMEOUT", 600),
+         {:ok, connect_timeout} <- timeout(env, variable <> "_CONNECT_TIMEOUT", 300),
+         {:ok, writer} <- writer(env, variable, part) do
       {:ok,
-       struct!(
-         __MODULE__,
-         [
-           fplus: fplus,
-           sparkplug_historian: historian,
-           batch_size: batch_size,
-           flush_interval: flush_interval,
-           buffer_limit: buffer_limit,
-           stall_timeout: stall_timeout,
-           connect_timeout: connect_timeout,
-           log_level: log_level
-         ] ++ influx
-       )}
+       %Part{
+         name: name,
+         fplus: fplus,
+         stall_timeout: stall_timeout,
+         connect_timeout: connect_timeout,
+         writer: writer
+       }}
+    else
+      {:ok, false} -> :off
+      error -> error
     end
   end
 
@@ -149,10 +189,21 @@ defmodule Ingest.Config do
     end
   end
 
-  defp some_part(parts) do
-    if Enum.any?(parts),
-      do: :ok,
-      else: {:error, "no parts are on: set SPARKPLUG_HISTORIAN to true"}
+  defp writer(_env, _variable, %{bucket: nil}), do: {:ok, nil}
+
+  defp writer(env, variable, %{bucket: bucket}) do
+    with {:ok, batch_size} <- positive(env, variable <> "_BATCH_SIZE", 5000),
+         {:ok, flush_interval} <- positive(env, variable <> "_FLUSH_INTERVAL", 1000),
+         {:ok, buffer_limit} <- positive(env, variable <> "_BUFFER_LIMIT", 100_000),
+         :ok <- at_least_batch(variable, buffer_limit, batch_size) do
+      {:ok,
+       %{
+         bucket: Map.get(env, variable <> "_BUCKET", bucket),
+         batch_size: batch_size,
+         flush_interval: flush_interval,
+         buffer_limit: buffer_limit
+       }}
+    end
   end
 
   defp influx(_env, false), do: {:ok, []}
@@ -162,13 +213,7 @@ defmodule Ingest.Config do
          :ok <- http_url("INFLUX_URL", url),
          {:ok, org} <- required(env, "INFLUX_ORG"),
          {:ok, token} <- required(env, "INFLUX_TOKEN") do
-      {:ok,
-       [
-         influx_url: url,
-         influx_org: org,
-         influx_bucket: Map.get(env, "INFLUX_BUCKET", "default"),
-         influx_token: token
-       ]}
+      {:ok, [influx_url: url, influx_org: org, influx_token: token]}
     end
   end
 
@@ -199,10 +244,14 @@ defmodule Ingest.Config do
   end
 
   # A smaller buffer could never fill a batch.
-  defp at_least_batch(buffer_limit, batch_size) when buffer_limit >= batch_size, do: :ok
+  defp at_least_batch(_variable, buffer_limit, batch_size) when buffer_limit >= batch_size,
+    do: :ok
 
-  defp at_least_batch(buffer_limit, batch_size),
-    do: {:error, "BUFFER_LIMIT must be at least BATCH_SIZE, #{batch_size}, got #{buffer_limit}"}
+  defp at_least_batch(variable, buffer_limit, batch_size) do
+    {:error,
+     "#{variable}_BUFFER_LIMIT must be at least #{variable}_BATCH_SIZE, " <>
+       "#{batch_size}, got #{buffer_limit}"}
+  end
 
   defp timeout(env, variable, default) do
     case whole_number(env, variable, default) do

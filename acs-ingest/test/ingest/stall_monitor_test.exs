@@ -65,7 +65,7 @@ defmodule Ingest.StallMonitorTest do
       assert_received :restarted
 
       assert log =~
-               "No message for 2 s (STALL_TIMEOUT 2 s); restarting the Factory+ client (1 of 2)"
+               "No message for 2 s (the stall timeout is 2 s); restarting the Factory+ client (1 of 2)"
     end
 
     test "doesn't fire while messages arrive" do
@@ -110,7 +110,7 @@ defmodule Ingest.StallMonitorTest do
         end)
 
       assert log =~
-               "No message for 2 s (STALL_TIMEOUT 2 s). Restarting the Factory+ client 2 times " <>
+               "No message for 2 s (the stall timeout is 2 s). Restarting the Factory+ client 2 times " <>
                  "hasn't helped, so the service is stopping"
 
       assert_received :restarted
@@ -150,7 +150,7 @@ defmodule Ingest.StallMonitorTest do
 
       assert log =~
                "The MQTT connection hasn't been up with its subscriptions granted for 1 s " <>
-                 "(CONNECT_TIMEOUT 1 s); restarting the Factory+ client (1 of 2)"
+                 "(the connect timeout is 1 s); restarting the Factory+ client (1 of 2)"
     end
 
     test "counts from when the connection was lost" do

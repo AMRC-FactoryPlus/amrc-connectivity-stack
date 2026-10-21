@@ -9,8 +9,8 @@ defmodule Ingest.ConfigTest do
 
   @env %{
     "DIRECTORY_URL" => "http://directory.example",
-    "CLIENT_KEYTAB" => "/keytabs/client",
     "SPARKPLUG_HISTORIAN" => "true",
+    "SPARKPLUG_HISTORIAN_KEYTAB" => "/keytabs/sparkplug-historian",
     "INFLUX_URL" => "http://influxdb.example",
     "INFLUX_ORG" => "default",
     "INFLUX_TOKEN" => "secret-token"
@@ -18,58 +18,80 @@ defmodule Ingest.ConfigTest do
 
   defp error(env), do: elem(Config.from_env(env), 1)
 
+  defp historian(env) do
+    {:ok, %Config{parts: [part]}} = Config.from_env(env)
+    part
+  end
+
   test "reads the environment, with defaults" do
     assert {:ok, config} = Config.from_env(@env)
 
-    assert config.fplus == [directory_url: "http://directory.example", keytab: "/keytabs/client"]
-    assert config.sparkplug_historian
     assert config.influx_url == "http://influxdb.example"
     assert config.influx_org == "default"
-    assert config.influx_bucket == "default"
     assert config.influx_token == "secret-token"
-    assert config.batch_size == 5000
-    assert config.flush_interval == 1000
-    assert config.buffer_limit == 100_000
-    assert config.stall_timeout == 600_000
-    assert config.connect_timeout == 300_000
     assert config.log_level == :info
+
+    assert [
+             %Config.Part{
+               name: :sparkplug_historian,
+               fplus: [
+                 directory_url: "http://directory.example",
+                 keytab: "/keytabs/sparkplug-historian"
+               ],
+               stall_timeout: 600_000,
+               connect_timeout: 300_000,
+               writer: %{
+                 bucket: "default",
+                 batch_size: 5000,
+                 flush_interval: 1000,
+                 buffer_limit: 100_000
+               }
+             }
+           ] = config.parts
   end
 
   test "reads the values the Helm chart sets" do
     env =
       Map.merge(@env, %{
-        "INFLUX_BUCKET" => "default-elixir",
-        "BATCH_SIZE" => "200",
-        "FLUSH_INTERVAL" => "10000",
-        "BUFFER_LIMIT" => "20000",
-        "STALL_TIMEOUT" => "60",
-        "CONNECT_TIMEOUT" => " 30 ",
+        "SPARKPLUG_HISTORIAN_BUCKET" => "default-elixir",
+        "SPARKPLUG_HISTORIAN_BATCH_SIZE" => "200",
+        "SPARKPLUG_HISTORIAN_FLUSH_INTERVAL" => "10000",
+        "SPARKPLUG_HISTORIAN_BUFFER_LIMIT" => "20000",
+        "SPARKPLUG_HISTORIAN_STALL_TIMEOUT" => "60",
+        "SPARKPLUG_HISTORIAN_CONNECT_TIMEOUT" => " 30 ",
         "LOG_LEVEL" => "warn"
       })
 
-    assert {:ok, config} = Config.from_env(env)
-    assert config.influx_bucket == "default-elixir"
-    assert config.batch_size == 200
-    assert config.flush_interval == 10_000
-    assert config.buffer_limit == 20_000
-    assert config.stall_timeout == 60_000
-    assert config.connect_timeout == 30_000
-    assert config.log_level == :warning
+    assert {:ok, %Config{log_level: :warning, parts: [part]}} = Config.from_env(env)
+
+    assert part.writer == %{
+             bucket: "default-elixir",
+             batch_size: 200,
+             flush_interval: 10_000,
+             buffer_limit: 20_000
+           }
+
+    assert {part.stall_timeout, part.connect_timeout} == {60_000, 30_000}
   end
 
   test "treats empty variables as unset" do
-    assert {:ok, config} =
-             Config.from_env(Map.merge(@env, %{"INFLUX_BUCKET" => "", "BATCH_SIZE" => ""}))
+    part =
+      historian(
+        Map.merge(@env, %{
+          "SPARKPLUG_HISTORIAN_BUCKET" => "",
+          "SPARKPLUG_HISTORIAN_BATCH_SIZE" => ""
+        })
+      )
 
-    assert config.influx_bucket == "default"
-    assert config.batch_size == 5000
-
+    assert {part.writer.bucket, part.writer.batch_size} == {"default", 5000}
     assert error(Map.put(@env, "INFLUX_TOKEN", "")) == "INFLUX_TOKEN isn't set"
   end
 
-  test "needs the Factory+ variables" do
+  test "needs the Factory+ variables, and a keytab for each part" do
     assert error(Map.delete(@env, "DIRECTORY_URL")) == "DIRECTORY_URL isn't set"
-    assert error(Map.delete(@env, "CLIENT_KEYTAB")) == "CLIENT_KEYTAB isn't set"
+
+    assert error(Map.delete(@env, "SPARKPLUG_HISTORIAN_KEYTAB")) ==
+             "SPARKPLUG_HISTORIAN_KEYTAB isn't set"
   end
 
   test "needs a part to be on" do
@@ -84,7 +106,14 @@ defmodule Ingest.ConfigTest do
              ~s(SPARKPLUG_HISTORIAN must be true or false, got "yes")
   end
 
-  test "needs InfluxDB when the historian is on" do
+  test "a part that is off needs none of its variables" do
+    env =
+      Map.merge(@env, %{"SPARKPLUG_HISTORIAN" => "false", "SPARKPLUG_HISTORIAN_BATCH_SIZE" => "x"})
+
+    assert error(Map.delete(env, "SPARKPLUG_HISTORIAN_KEYTAB")) =~ "no parts are on"
+  end
+
+  test "needs InfluxDB when a historian is on" do
     for variable <- ["INFLUX_URL", "INFLUX_ORG", "INFLUX_TOKEN"] do
       assert error(Map.delete(@env, variable)) == "#{variable} isn't set"
     end
@@ -97,28 +126,37 @@ defmodule Ingest.ConfigTest do
 
   test "rejects numbers that aren't whole and positive" do
     for value <- ["ten", "1.5", "-1", "10ms"] do
-      assert error(Map.put(@env, "BATCH_SIZE", value)) ==
-               "BATCH_SIZE must be a whole number, got #{inspect(value)}"
+      assert error(Map.put(@env, "SPARKPLUG_HISTORIAN_BATCH_SIZE", value)) ==
+               "SPARKPLUG_HISTORIAN_BATCH_SIZE must be a whole number, got #{inspect(value)}"
     end
 
-    assert error(Map.put(@env, "FLUSH_INTERVAL", "0")) == "FLUSH_INTERVAL must be above 0"
+    assert error(Map.put(@env, "SPARKPLUG_HISTORIAN_FLUSH_INTERVAL", "0")) ==
+             "SPARKPLUG_HISTORIAN_FLUSH_INTERVAL must be above 0"
   end
 
   test "needs room in the buffer for a batch" do
-    env = Map.merge(@env, %{"BATCH_SIZE" => "500", "BUFFER_LIMIT" => "499"})
-    assert error(env) == "BUFFER_LIMIT must be at least BATCH_SIZE, 500, got 499"
+    env =
+      Map.merge(@env, %{
+        "SPARKPLUG_HISTORIAN_BATCH_SIZE" => "500",
+        "SPARKPLUG_HISTORIAN_BUFFER_LIMIT" => "499"
+      })
 
-    assert error(Map.put(@env, "BUFFER_LIMIT", "1000")) ==
-             "BUFFER_LIMIT must be at least BATCH_SIZE, 5000, got 1000"
+    assert error(env) ==
+             "SPARKPLUG_HISTORIAN_BUFFER_LIMIT must be at least SPARKPLUG_HISTORIAN_BATCH_SIZE, " <>
+               "500, got 499"
   end
 
   test "turns a health check off with 0" do
-    env = Map.merge(@env, %{"STALL_TIMEOUT" => "0", "CONNECT_TIMEOUT" => "0"})
+    env =
+      Map.merge(@env, %{
+        "SPARKPLUG_HISTORIAN_STALL_TIMEOUT" => "0",
+        "SPARKPLUG_HISTORIAN_CONNECT_TIMEOUT" => "0"
+      })
 
-    assert {:ok, %Config{stall_timeout: nil, connect_timeout: nil}} = Config.from_env(env)
+    assert %Config.Part{stall_timeout: nil, connect_timeout: nil} = historian(env)
 
-    assert error(Map.put(@env, "STALL_TIMEOUT", "5m")) ==
-             ~s(STALL_TIMEOUT must be a whole number, got "5m")
+    assert error(Map.put(@env, "SPARKPLUG_HISTORIAN_STALL_TIMEOUT", "5m")) ==
+             ~s(SPARKPLUG_HISTORIAN_STALL_TIMEOUT must be a whole number, got "5m")
   end
 
   test "maps the pino log levels onto Logger's" do

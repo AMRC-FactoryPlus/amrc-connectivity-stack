@@ -546,6 +546,15 @@ cmdesc:
   # broker is down is not restarted. Set it to 0 to disable the check.
   mqttWatchdogTimeout: 300
 
+ingest:
+  # -- The minimum log level of acs-ingest, the Elixir ingestion service,
+  # which runs the ingesters written in Elixir (so far the Sparkplug
+  # historian) as parts of one pod (One of 'fatal', 'error', 'warn',
+  # 'info', 'debug', 'trace' or 'silent'.)
+  logLevel: info
+  image:
+    # -- The repository of acs-ingest
+    repository: acs-ingest
 historians:
   uns:
     enabled: false
@@ -579,8 +588,6 @@ historians:
       repository: historian-uns
   sparkplug:
     enabled: true
-    # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
-    logLevel: info
     # -- The number of messages to batch together before sending to InfluxDB
     batchSize: 5000
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
@@ -608,9 +615,6 @@ historians:
     # Kubernetes restarts the pod. The default allows for a broker and
     # KDC restart during an upgrade. Set it to 0 to disable the check.
     connectTimeout: 300
-    image:
-      # -- The repository of the Sparkplug historian, acs-ingest
-      repository: acs-ingest
 git:
   # -- Whether or not to enable the Git component
   enabled: true

@@ -38,6 +38,8 @@ defmodule Ingest.StallMonitor do
   ## Options
 
     * `:name` - required.
+    * `:part` - the part it watches, such as `:sparkplug_historian`,
+      for its logs' metadata.
     * `:stall_timeout`, `:connect_timeout` - in ms, or `nil` to turn
       the check off.
     * `:last_message` - required. A function returning when the last
@@ -75,6 +77,7 @@ defmodule Ingest.StallMonitor do
           :connected?,
           :restart,
           :check_interval,
+          :part,
           max_restarts: 2,
           clock: fn -> System.monotonic_time(:millisecond) end
         ]
@@ -85,6 +88,7 @@ defmodule Ingest.StallMonitor do
 
   @impl true
   def init(opts) do
+    if opts[:part], do: Logger.metadata(part: opts[:part])
     clock = Keyword.fetch!(opts, :clock)
     now = clock.()
 
@@ -218,12 +222,13 @@ defmodule Ingest.StallMonitor do
 
   defp why(state, :stalled, now) do
     "No message for #{seconds(quiet(state, now))} " <>
-      "(STALL_TIMEOUT #{seconds(state.stall_timeout)})"
+      "(the stall timeout is #{seconds(state.stall_timeout)})"
   end
 
   defp why(state, :disconnected, now) do
     "The MQTT connection hasn't been up with its subscriptions granted " <>
-      "for #{seconds(now - state.down_since)} (CONNECT_TIMEOUT #{seconds(state.connect_timeout)})"
+      "for #{seconds(now - state.down_since)} " <>
+      "(the connect timeout is #{seconds(state.connect_timeout)})"
   end
 
   defp restart(state) do
@@ -259,7 +264,7 @@ defmodule Ingest.StallMonitor do
           "for #{seconds(state.stall_timeout)}, once one has"
       )
     else
-      Logger.warning("Stall check off (STALL_TIMEOUT=0)")
+      Logger.warning("Stall check off: its timeout is 0")
     end
 
     if state.connect_timeout do
@@ -268,7 +273,7 @@ defmodule Ingest.StallMonitor do
           "its subscriptions granted for #{seconds(state.connect_timeout)}"
       )
     else
-      Logger.warning("Connection check off (CONNECT_TIMEOUT=0)")
+      Logger.warning("Connection check off: its timeout is 0")
     end
   end
 

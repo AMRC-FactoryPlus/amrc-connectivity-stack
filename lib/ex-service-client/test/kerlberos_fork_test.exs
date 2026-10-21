@@ -93,6 +93,9 @@ defmodule KerlberosForkTest do
 
     {:ok, pid} = :krb_realm.open(realm)
     ref = Process.monitor(pid)
+    sup = Process.whereis(:krb_realm_sup)
+    sup_ref = Process.monitor(sup)
+    db = Process.whereis(:krb_realm_db)
 
     # Options that aren't a map crash krb_realm in handle_call, with the
     # whole request, password included, in the exit reason.
@@ -100,10 +103,29 @@ defmodule KerlberosForkTest do
       capture_log(fn ->
         catch_exit(:krb_realm.authenticate(pid, [~c"sv1test"], @password, :not_a_map))
         assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
+
+        # krb_realm_sup allows no restarts, so the crash can take it down
+        # with every realm, and then kerlberos restarts it and
+        # krb_realm_db, in that order. Wait for that, or the next test to
+        # open a realm may find them gone.
+        receive do
+          {:DOWN, ^sup_ref, :process, ^sup, _reason} ->
+            wait_until(fn -> Process.whereis(:krb_realm_db) not in [nil, db] end)
+        after
+          500 -> Process.demonitor(sup_ref, [:flush])
+        end
       end)
 
     assert log =~ "krb_realm"
     refute log =~ @password
+  end
+
+  defp wait_until(fun, tries \\ 100) do
+    cond do
+      fun.() -> :ok
+      tries == 0 -> flunk("timed out waiting")
+      true -> Process.sleep(10) && wait_until(fun, tries - 1)
+    end
   end
 
   test "a normal exit reason is left alone" do

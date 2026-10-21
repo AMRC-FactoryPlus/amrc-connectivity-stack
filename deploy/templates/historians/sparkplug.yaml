@@ -1,4 +1,10 @@
 {{ if .Values.historians.sparkplug.enabled }}
+{{- /*
+The Sparkplug historian is acs-ingest, the Elixir ingestion service,
+with only its historian part on. It logs in to Kerberos itself and
+retries until the KDC answers, so it needs neither k5start nor the
+wait-for-kdc init container.
+*/}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -32,15 +38,12 @@ spec:
               - key: sv1warehouse
                 path: client
 
-      initContainers:
-{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
-
       containers:
         - name: historian-sparkplug
 {{ include "amrc-connectivity-stack.image" (list . .Values.historians.sparkplug) | indent 10 }}
-          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
-          args: [ "node", "--es-module-specifier-resolution=node", "bin/ingester.js" ]
           env:
+            - name: SPARKPLUG_HISTORIAN
+              value: "true"
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             - name: CLIENT_KEYTAB

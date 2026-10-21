@@ -585,28 +585,32 @@ historians:
     batchSize: 5000
     # -- Send all buffered messages after this amount of time has elapsed if the buffer is not full (in milliseconds)
     flushInterval: 10000
-    # -- Exit (so Kubernetes restarts the pod) if no Sparkplug message has
-    # been received for this many seconds, once data has started to
+    # -- Restart the historian's Factory+ client, with fresh Kerberos
+    # credentials and a fresh MQTT connection, if no Sparkplug message
+    # has been received for this many seconds, once data has started to
     # flow. This catches a historian that stops receiving data and does
     # not recover, for example after a broker or KDC restart. Any
     # Sparkplug message counts, including births, deaths and STATE. The
     # check arms on the first message, so a site with no traffic at all
-    # does not restart. A gap in traffic longer than this after data has
-    # flowed does cause a restart: raise the value on sites with long
-    # quiet periods, or set it to 0 to disable the check.
+    # does not restart. If restarting the client twice doesn't help, the
+    # historian exits so Kubernetes restarts the pod. A gap in traffic
+    # longer than this after data has flowed does cause a restart: raise
+    # the value on sites with long quiet periods, or set it to 0 to
+    # disable the check.
     stallTimeout: 600
-    # -- Exit (so Kubernetes restarts the pod) if the MQTT client has not
-    # been connected to the broker with a granted subscription for this
-    # many seconds, counted from startup or from when the connection or
+    # -- Restart the historian's Factory+ client if it has not been
+    # connected to the broker with a granted subscription for this many
+    # seconds, counted from startup or from when the connection or
     # subscription was lost. This catches a client that never connects,
     # or stops reconnecting, even on a site with no traffic. A connected
-    # and subscribed client is healthy however quiet the broker is. The
-    # default allows for a broker and KDC restart during an upgrade. Set
-    # it to 0 to disable the check.
+    # and subscribed client is healthy however quiet the broker is. If
+    # restarting the client twice doesn't help, the historian exits so
+    # Kubernetes restarts the pod. The default allows for a broker and
+    # KDC restart during an upgrade. Set it to 0 to disable the check.
     connectTimeout: 300
     image:
-      # -- The repository of the Warehouse component
-      repository: historian-sparkplug
+      # -- The repository of the Sparkplug historian, acs-ingest
+      repository: acs-ingest
 git:
   # -- Whether or not to enable the Git component
   enabled: true

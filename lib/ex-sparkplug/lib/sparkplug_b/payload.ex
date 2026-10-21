@@ -14,6 +14,7 @@ defmodule SparkplugB.Payload do
   alias SparkplugB.Metric
   alias SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload, as: Proto
   alias SparkplugB.Timestamp
+  alias SparkplugB.Value
 
   defstruct timestamp: nil, seq: nil, uuid: nil, body: nil, metrics: []
 
@@ -31,7 +32,7 @@ defmodule SparkplugB.Payload do
     %__MODULE__{
       timestamp: Timestamp.to_ns(payload.timestamp, unit),
       seq: payload.seq,
-      uuid: payload.uuid,
+      uuid: Value.text(payload.uuid),
       body: payload.body,
       metrics: Enum.map(payload.metrics, &Metric.from_proto(&1, unit))
     }

@@ -34,7 +34,7 @@ defmodule SparkplugB.Value do
   def from_wire(:float, {:float_value, v}), do: v
   def from_wire(:double, {:double_value, v}), do: v
   def from_wire(:boolean, {:boolean_value, v}), do: v
-  def from_wire(type, {:string_value, v}) when type in @strings, do: v
+  def from_wire(type, {:string_value, v}) when type in @strings, do: text(v)
   def from_wire(:date_time, {:long_value, v}), do: v
   def from_wire(type, {:bytes_value, v}) when type in @bytes, do: v
 
@@ -44,6 +44,14 @@ defmodule SparkplugB.Value do
     do: Enum.map(list.propertyset, &Property.from_set/1)
 
   def from_wire(_datatype, raw), do: raw
+
+  # The protobuf code decodes `string` fields as bytes (see the README),
+  # so a payload with invalid UTF-8 in one still decodes. Here invalid
+  # sequences become U+FFFD, one for each maximal invalid subsequence, as
+  # Node decodes them for Tahu JS.
+  @spec text(binary() | nil) :: String.t() | nil
+  def text(nil), do: nil
+  def text(bytes), do: String.replace_invalid(bytes)
 
   # Signed integers are two's complement in an unsigned field. Encoders
   # use the type's own width (Int8 -5 as 251), or sign-extend to the

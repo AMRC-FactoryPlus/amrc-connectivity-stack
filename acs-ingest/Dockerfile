@@ -18,6 +18,7 @@ WORKDIR /home/elixir/src/acs-ingest
 COPY --chown=elixir mix.exs mix.lock ./
 COPY --chown=elixir config config/
 RUN <<'SHELL'
+    set -e
     # A local build copies whatever the libraries' checkouts hold.
     rm -rf ../lib/*/_build ../lib/*/deps ../lib/*/tmp
     mix deps.get --only prod

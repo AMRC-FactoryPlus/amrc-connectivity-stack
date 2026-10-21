@@ -15,6 +15,9 @@ historian (`Ingest.Writer`), and the Sparkplug path
 devices to rebirth, and resolves their data, which the historian
 (`Ingest.SparkplugHistorian`) turns into the points the JS historian
 wrote, apart from the cases where those were wrong.
+`Ingest.StallMonitor` restarts the Factory+ client when messages stop
+or its connection stays down, and stops the service if that doesn't
+help.
 
 ## Configuration
 

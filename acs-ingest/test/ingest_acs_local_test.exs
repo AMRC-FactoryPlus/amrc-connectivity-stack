@@ -44,5 +44,17 @@ defmodule IngestACSLocalTest do
     assert Process.whereis(Ingest.Sparkplug)
     # The historian's points can't be written with a dummy token.
     assert %{written: 0} = Ingest.Writer.stats(Ingest.Writers.Sparkplug)
+
+    # The stall monitor sees the connection as working once the router
+    # has subscribed. Its own checks are 30 s apart, so check now.
+    wait_until(fn -> FPlus.MQTT.status(mqtt).subscriptions != [] end)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        send(Ingest.StallMonitor, :check)
+        :sys.get_state(Ingest.StallMonitor)
+      end)
+
+    assert log =~ "MQTT connected with its subscriptions granted"
   end
 end

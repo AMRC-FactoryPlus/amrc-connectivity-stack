@@ -10,7 +10,8 @@ defmodule Ingest.Sparkplug.Router do
   topic and notes when the message arrived.
 
   A topic that isn't a valid Sparkplug topic is logged and dropped, and
-  host `STATE` messages are dropped.
+  host `STATE` messages are dropped. Every message counts for
+  `last_message/1`, which `Ingest.StallMonitor` checks.
 
   ## Options
 
@@ -39,10 +40,17 @@ defmodule Ingest.Sparkplug.Router do
     GenServer.start_link(__MODULE__, opts, name: Keyword.fetch!(opts, :name))
   end
 
+  @doc """
+  When the router last had a message, as
+  `System.monotonic_time(:millisecond)`, or `nil` if it hasn't had one.
+  """
+  @spec last_message(GenServer.server()) :: integer() | nil
+  def last_message(router), do: GenServer.call(router, :last_message)
+
   @impl true
   def init(opts) do
     state = Map.new(Keyword.take(opts, [:subscribe, :registry, :nodes, :node_opts]))
-    {:ok, state, {:continue, :subscribe}}
+    {:ok, Map.put(state, :last_message, nil), {:continue, :subscribe}}
   end
 
   @impl true
@@ -68,8 +76,11 @@ defmodule Ingest.Sparkplug.Router do
         Logger.warning("Ignored a message on #{inspect(name)}, which isn't a Sparkplug topic")
     end
 
-    {:noreply, state}
+    {:noreply, %{state | last_message: System.monotonic_time(:millisecond)}}
   end
+
+  @impl true
+  def handle_call(:last_message, _from, state), do: {:reply, state.last_message, state}
 
   defp route(state, topic, payload, received) do
     key = {topic.group, topic.node}

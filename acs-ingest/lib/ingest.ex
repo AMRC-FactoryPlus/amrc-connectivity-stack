@@ -81,9 +81,17 @@ defmodule Ingest do
      buffer_limit: config.buffer_limit}
   end
 
+  # No consumers yet: the Sparkplug historian will be the first.
   defp parts(config) do
-    if config.sparkplug_historian,
-      do: [{Ingest.Sparkplug, fplus: @fplus, writer: @sparkplug_writer}],
-      else: []
+    if config.sparkplug_historian do
+      [
+        {Ingest.Sparkplug,
+         name: Ingest.Sparkplug,
+         subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(@fplus), &1),
+         rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(@fplus), &1)}
+      ]
+    else
+      []
+    end
   end
 end

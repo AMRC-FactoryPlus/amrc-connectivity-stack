@@ -32,7 +32,8 @@ DATA messages may leave a metric's datatype out, because the birth gave
 it. Such a metric keeps its raw protobuf value, such as
 `{:long_value, 42}`, until `SparkplugB.Metric.with_datatype/2` converts
 it. Datasets, templates, arrays and extensions are not converted yet
-and also stay raw. See `SparkplugB.Metric` for the full rules.
+and also stay raw, as does an integer out of range for its type. See
+`SparkplugB.Metric` for the full rules.
 
 ## Topics
 

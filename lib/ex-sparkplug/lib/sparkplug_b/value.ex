@@ -5,30 +5,31 @@
 defmodule SparkplugB.Value do
   @moduledoc false
 
+  import Bitwise
+
   alias SparkplugB.Property
 
   # Integers may arrive in either field: Tahu JS writes UInt32 to
   # long_value, where the spec has int_value.
   @int_fields [:int_value, :long_value]
-  @unsigned [:uint8, :uint16, :uint32, :uint64]
   @strings [:string, :text, :uuid]
   @bytes [:bytes, :file]
 
   # Turn a raw protobuf oneof value, `{field, value}`, into a native
   # value for a datatype. A value we can't convert (no datatype, a
-  # datatype we don't handle yet, or the wrong wire field for the
-  # datatype) stays as the raw tuple.
+  # datatype we don't handle yet, the wrong wire field for the datatype,
+  # or an integer out of range for its type) stays as the raw tuple.
   @spec from_wire(atom() | integer() | nil, {atom(), term()} | nil) :: term()
   def from_wire(_datatype, nil), do: nil
 
-  # Signed integers are two's complement in an unsigned field. Taking
-  # the low bits for the type's width handles encoders that use the
-  # type's own width as well as those that use the field's.
-  def from_wire(:int8, {field, v}) when field in @int_fields, do: signed(v, 8)
-  def from_wire(:int16, {field, v}) when field in @int_fields, do: signed(v, 16)
-  def from_wire(:int32, {field, v}) when field in @int_fields, do: signed(v, 32)
-  def from_wire(:int64, {field, v}) when field in @int_fields, do: signed(v, 64)
-  def from_wire(type, {field, v}) when type in @unsigned and field in @int_fields, do: v
+  def from_wire(:int8, {field, v} = raw) when field in @int_fields, do: signed(raw, v, 8)
+  def from_wire(:int16, {field, v} = raw) when field in @int_fields, do: signed(raw, v, 16)
+  def from_wire(:int32, {field, v} = raw) when field in @int_fields, do: signed(raw, v, 32)
+  def from_wire(:int64, {field, v} = raw) when field in @int_fields, do: signed(raw, v, 64)
+  def from_wire(:uint8, {field, v} = raw) when field in @int_fields, do: unsigned(raw, v, 8)
+  def from_wire(:uint16, {field, v} = raw) when field in @int_fields, do: unsigned(raw, v, 16)
+  def from_wire(:uint32, {field, v} = raw) when field in @int_fields, do: unsigned(raw, v, 32)
+  def from_wire(:uint64, {field, v} = raw) when field in @int_fields, do: unsigned(raw, v, 64)
 
   def from_wire(:float, {:float_value, v}), do: v
   def from_wire(:double, {:double_value, v}), do: v
@@ -44,8 +45,22 @@ defmodule SparkplugB.Value do
 
   def from_wire(_datatype, raw), do: raw
 
-  defp signed(value, bits) do
-    <<n::signed-size(^bits)>> = <<value::size(bits)>>
-    n
+  # Signed integers are two's complement in an unsigned field. Encoders
+  # use the type's own width (Int8 -5 as 251), or sign-extend to the
+  # field's 32 bits or to 64 (Tahu JS sends Int8 -5 as 4294967291).
+  # Anything else, such as an Int8 sent as 300, doesn't fit the type.
+  defp signed(raw, v, bits) do
+    half = 1 <<< (bits - 1)
+
+    cond do
+      v < half -> v
+      v < 2 * half -> v - 2 * half
+      v >= (1 <<< 32) - half and v < 1 <<< 32 -> v - (1 <<< 32)
+      v >= (1 <<< 64) - half and v < 1 <<< 64 -> v - (1 <<< 64)
+      true -> raw
+    end
   end
+
+  defp unsigned(_raw, v, bits) when v < 1 <<< bits, do: v
+  defp unsigned(raw, _v, _bits), do: raw
 end

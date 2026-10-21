@@ -169,8 +169,8 @@ jobs:
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-amd64
           labels: ${{ steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-amd64
+          cache-to: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-amd64,mode=max,ignore-error=true
   build-base-ex-arm64:
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -207,8 +207,8 @@ jobs:
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-arm64
           labels: ${{ steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-arm64
+          cache-to: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-arm64,mode=max,ignore-error=true
   build-base-ex-merge:
     runs-on: ubuntu-latest
     needs: [build-base-ex-amd64, build-base-ex-arm64]
@@ -429,8 +429,8 @@ jobs:
           push: true
           tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
           labels: ${{  steps.prepare.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:buildcache,mode=max,ignore-error=true
           build-args: |
             tag=${{ steps.prepare.outputs.version }}
             revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})

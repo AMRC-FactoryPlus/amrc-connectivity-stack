@@ -1034,6 +1034,7 @@ openmetadata:
             secretKey: mysql-password
       pipelineServiceClientConfig:
         airflow:
+          apiEndpoint: http://acs-api-server:8080
           auth:
             enabled: true
             username: admin
@@ -1125,7 +1126,7 @@ openmetadata-dependencies:
     images:
       airflow:
         repository: ghcr.io/amrc-factoryplus/openmetadata-ingestion
-        tag: 2.0.3-patched
+        tag: 2.0.6-patched
     # The chart's own fernet-key Secret is a pre-install-only Helm hook, so
     # it never gets created when openmetadata is enabled on an existing acs
     # release (an upgrade, not a fresh install). Point at our own instead -
@@ -1139,9 +1140,25 @@ openmetadata-dependencies:
       # deploy/templates/openmetadata/openmetadata-secrets.yaml, which builds
       # this from the same password airflow_user is actually created with.
       metadataSecretName: airflow-metadata-db
+    # Helm replaces lists rather than merging them, so setting env here drops
+    # the openmetadata-dependencies chart's own env list. The OpenMetadata
+    # entries from that list are repeated below. Without
+    # DAG_GENERATED_CONFIGS the api-server writes each pipeline's JSON config
+    # to its own local disk instead of the shared dags volume, and the
+    # scheduler fails with "Cannot open config file".
     env:
       - name: _PIP_ADDITIONAL_REQUIREMENTS
         value: "" # Empty string disables the fragile runtime pip installation step
+      - name: AIRFLOW__API__AUTH_BACKENDS
+        value: "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth"
+      - name: AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS
+        value: "/opt/airflow/dags"
+      - name: AIRFLOW__OPENMETADATA_SECRETS_MANAGER__AWS_REGION
+        value: ""
+      - name: AIRFLOW__OPENMETADATA_SECRETS_MANAGER__AWS_ACCESS_KEY_ID
+        value: ""
+      - name: AIRFLOW__OPENMETADATA_SECRETS_MANAGER__AWS_ACCESS_KEY
+        value: ""
 
     executor: "LocalExecutor"
     workers:

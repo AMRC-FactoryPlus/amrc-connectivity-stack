@@ -13,6 +13,8 @@ defmodule Ingest do
     * `Ingest.Writers` - a supervisor of the `Ingest.Writer`s, one per
       InfluxDB bucket in use, and their `Finch` pool, `Ingest.Finch`.
       The Sparkplug historian's writer is `Ingest.Writers.Sparkplug`.
+    * `Ingest.StallMonitor` - restarts the client when messages stop or
+      its connection stays down, unless both checks are off
     * `FPlus` - the Factory+ client, named `Ingest.FPlus`
     * `Ingest.Sparkplug` - the Sparkplug path, when the Sparkplug
       historian is on. Its edge node processes make the historian's
@@ -26,12 +28,19 @@ defmodule Ingest do
   stop last and write what the parts gave them. `Ingest.Writers` is
   `:one_for_one`, so a writer that crashes restarts on its own.
 
+  The stall monitor restarts the client by stopping it, so the parts
+  restart with it. It comes before the client, so it keeps counting
+  across those restarts. When restarting doesn't help, it stops, and
+  as it is a significant child, the whole tree shuts down, and the
+  application stops.
+
   The configuration comes from `Ingest.Config`.
   """
 
   use Supervisor
 
   alias Ingest.Config
+  alias Ingest.Sparkplug.Router
   alias Ingest.Writer
 
   @fplus Ingest.FPlus
@@ -50,8 +59,11 @@ defmodule Ingest do
 
   @impl true
   def init(%Config{} = config) do
-    children = writers(config) ++ [{FPlus, [name: @fplus] ++ config.fplus} | parts(config)]
-    Supervisor.init(children, strategy: :rest_for_one)
+    children =
+      writers(config) ++
+        monitor(config) ++ [{FPlus, [name: @fplus] ++ config.fplus} | parts(config)]
+
+    Supervisor.init(children, strategy: :rest_for_one, auto_shutdown: :any_significant)
   end
 
   defp writers(%Config{sparkplug_historian: false}), do: []
@@ -82,6 +94,29 @@ defmodule Ingest do
      flush_interval: config.flush_interval,
      buffer_limit: config.buffer_limit}
   end
+
+  defp monitor(%Config{stall_timeout: nil, connect_timeout: nil}), do: []
+
+  defp monitor(config) do
+    router = Ingest.Sparkplug.child(Ingest.Sparkplug, "Router")
+    mqtt = FPlus.mqtt(@fplus)
+
+    [
+      {Ingest.StallMonitor,
+       name: Ingest.StallMonitor,
+       stall_timeout: config.stall_timeout,
+       connect_timeout: config.connect_timeout,
+       last_message: fn -> Router.last_message(router) end,
+       connected?: fn -> subscribed?(FPlus.MQTT.status(mqtt)) end,
+       restart: fn -> Supervisor.stop(@fplus, {:shutdown, :restart}) end}
+    ]
+  end
+
+  # Connected, with subscriptions, none of them refused.
+  defp subscribed?(%{connected: true, subscriptions: [_ | _], refused: refused}),
+    do: map_size(refused) == 0
+
+  defp subscribed?(_status), do: false
 
   defp parts(config) do
     if config.sparkplug_historian do

@@ -42,11 +42,14 @@ defmodule Ingest.Config do
 
   ## Health
 
-  In whole seconds, with 0 to turn the check off. The struct holds them
-  in milliseconds, or `nil` when off.
+  For `Ingest.StallMonitor`'s checks, in whole seconds, with 0 to turn
+  the check off. The struct holds them in milliseconds, or `nil` when
+  off.
 
-    * `STALL_TIMEOUT` - default 600
-    * `CONNECT_TIMEOUT` - default 300
+    * `STALL_TIMEOUT` - restart the Factory+ client after this long
+      without a message, once one has arrived; default 600
+    * `CONNECT_TIMEOUT` - restart it after this long without an MQTT
+      connection with its subscriptions granted; default 300
 
   ## Logging
 

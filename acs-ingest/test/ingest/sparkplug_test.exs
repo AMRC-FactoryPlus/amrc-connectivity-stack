@@ -232,6 +232,15 @@ defmodule Ingest.SparkplugTest do
     end
   end
 
+  test "the router notes when it last had a message, of any kind", ctx do
+    assert Ingest.Sparkplug.Router.last_message(ctx.router) == nil
+
+    before = System.monotonic_time(:millisecond)
+    publish(ctx, "spBv1.0/STATE/some-host", ~s({"online": true}))
+    last = Ingest.Sparkplug.Router.last_message(ctx.router)
+    assert last >= before and last <= System.monotonic_time(:millisecond)
+  end
+
   test "ignores host STATE messages", ctx do
     publish(ctx, "spBv1.0/STATE/some-host", ~s({"online": true}))
     sync(ctx)

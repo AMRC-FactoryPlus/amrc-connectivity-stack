@@ -13,6 +13,7 @@ defmodule Ingest.Application do
   def start(_type, _args) do
     case Ingest.Config.from_env() do
       {:ok, config} ->
+        Logger.configure(level: config.log_level)
         Ingest.start_link(config)
 
       {:error, reason} ->

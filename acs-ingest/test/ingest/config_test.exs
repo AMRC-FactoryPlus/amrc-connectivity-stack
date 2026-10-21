@@ -29,6 +29,7 @@ defmodule Ingest.ConfigTest do
     assert config.influx_token == "secret-token"
     assert config.batch_size == 5000
     assert config.flush_interval == 1000
+    assert config.buffer_limit == 100_000
     assert config.stall_timeout == 600_000
     assert config.connect_timeout == 300_000
     assert config.log_level == :info
@@ -40,6 +41,7 @@ defmodule Ingest.ConfigTest do
         "INFLUX_BUCKET" => "default-elixir",
         "BATCH_SIZE" => "200",
         "FLUSH_INTERVAL" => "10000",
+        "BUFFER_LIMIT" => "20000",
         "STALL_TIMEOUT" => "60",
         "CONNECT_TIMEOUT" => " 30 ",
         "LOG_LEVEL" => "warn"
@@ -49,6 +51,7 @@ defmodule Ingest.ConfigTest do
     assert config.influx_bucket == "default-elixir"
     assert config.batch_size == 200
     assert config.flush_interval == 10_000
+    assert config.buffer_limit == 20_000
     assert config.stall_timeout == 60_000
     assert config.connect_timeout == 30_000
     assert config.log_level == :warning
@@ -99,6 +102,14 @@ defmodule Ingest.ConfigTest do
     end
 
     assert error(Map.put(@env, "FLUSH_INTERVAL", "0")) == "FLUSH_INTERVAL must be above 0"
+  end
+
+  test "needs room in the buffer for a batch" do
+    env = Map.merge(@env, %{"BATCH_SIZE" => "500", "BUFFER_LIMIT" => "499"})
+    assert error(env) == "BUFFER_LIMIT must be at least BATCH_SIZE, 500, got 499"
+
+    assert error(Map.put(@env, "BUFFER_LIMIT", "1000")) ==
+             "BUFFER_LIMIT must be at least BATCH_SIZE, 5000, got 1000"
   end
 
   test "turns a health check off with 0" do

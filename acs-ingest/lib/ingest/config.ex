@@ -36,6 +36,9 @@ defmodule Ingest.Config do
     * `BATCH_SIZE` - flush after this many points; default 5000
     * `FLUSH_INTERVAL` - flush at least this often, in milliseconds;
       default 1000. The JS historian's chart value was 10000.
+    * `BUFFER_LIMIT` - the most points a writer holds while InfluxDB is
+      slow or down; beyond it, the oldest are dropped. Default 100,000,
+      and at least `BATCH_SIZE`. The JS historian had no limit.
 
   ## Health
 
@@ -58,6 +61,7 @@ defmodule Ingest.Config do
     :sparkplug_historian,
     :batch_size,
     :flush_interval,
+    :buffer_limit,
     :stall_timeout,
     :connect_timeout,
     :log_level
@@ -73,6 +77,7 @@ defmodule Ingest.Config do
           influx_token: String.t() | nil,
           batch_size: pos_integer(),
           flush_interval: pos_integer(),
+          buffer_limit: pos_integer(),
           stall_timeout: pos_integer() | nil,
           connect_timeout: pos_integer() | nil,
           log_level: Logger.level() | :none
@@ -104,6 +109,8 @@ defmodule Ingest.Config do
          {:ok, influx} <- influx(env, historian),
          {:ok, batch_size} <- positive(env, "BATCH_SIZE", 5000),
          {:ok, flush_interval} <- positive(env, "FLUSH_INTERVAL", 1000),
+         {:ok, buffer_limit} <- positive(env, "BUFFER_LIMIT", 100_000),
+         :ok <- at_least_batch(buffer_limit, batch_size),
          {:ok, stall_timeout} <- timeout(env, "STALL_TIMEOUT", 600),
          {:ok, connect_timeout} <- timeout(env, "CONNECT_TIMEOUT", 300),
          {:ok, log_level} <- log_level(env) do
@@ -115,6 +122,7 @@ defmodule Ingest.Config do
            sparkplug_historian: historian,
            batch_size: batch_size,
            flush_interval: flush_interval,
+           buffer_limit: buffer_limit,
            stall_timeout: stall_timeout,
            connect_timeout: connect_timeout,
            log_level: log_level
@@ -186,6 +194,12 @@ defmodule Ingest.Config do
       error -> error
     end
   end
+
+  # A smaller buffer could never fill a batch.
+  defp at_least_batch(buffer_limit, batch_size) when buffer_limit >= batch_size, do: :ok
+
+  defp at_least_batch(buffer_limit, batch_size),
+    do: {:error, "BUFFER_LIMIT must be at least BATCH_SIZE, #{batch_size}, got #{buffer_limit}"}
 
   defp timeout(env, variable, default) do
     case whole_number(env, variable, default) do

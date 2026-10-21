@@ -12,6 +12,8 @@ defmodule Ingest.Sparkplug do
   ## Options
 
     * `:fplus` - required. The name of the `FPlus` client.
+    * `:writer` - required. The `Ingest.Writer` for the historian's
+      points.
   """
 
   use Supervisor
@@ -24,7 +26,7 @@ defmodule Ingest.Sparkplug do
 
   @impl true
   def init(opts) do
-    _opts = Keyword.validate!(opts, [:fplus])
+    _opts = Keyword.validate!(opts, [:fplus, :writer])
     Supervisor.init([], strategy: :one_for_one)
   end
 end

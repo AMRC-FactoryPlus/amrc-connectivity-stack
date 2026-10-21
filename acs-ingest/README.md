@@ -6,10 +6,12 @@ historian first, and later the UNS ingester and the UNS historian.
 
 ## Status
 
-Not doing anything useful yet. The application reads its
-configuration, and starts the Factory+ client (`lib/ex-service-client`),
-a buffered InfluxDB writer for the historian (`Ingest.Writer`), and an
-empty Sparkplug path. It isn't built into an image or deployed yet.
+Not writing anything yet. The application reads its configuration,
+and starts the Factory+ client (`lib/ex-service-client`), a buffered
+InfluxDB writer for the historian (`Ingest.Writer`), and the Sparkplug
+path (`Ingest.Sparkplug`), which keeps each edge node's births, asks
+unknown devices to rebirth and resolves their data, but has no
+consumers yet. It isn't built into an image or deployed yet.
 
 ## Configuration
 

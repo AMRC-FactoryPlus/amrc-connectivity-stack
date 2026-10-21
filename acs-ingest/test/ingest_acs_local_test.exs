@@ -25,8 +25,8 @@ defmodule IngestACSLocalTest do
     {:ok, config} =
       Ingest.Config.from_env(%{
         "DIRECTORY_URL" => "http://directory.acs.localhost/",
-        "CLIENT_KEYTAB" => keytab,
         "SPARKPLUG_HISTORIAN" => "true",
+        "SPARKPLUG_HISTORIAN_KEYTAB" => keytab,
         "INFLUX_URL" => "http://influxdb.acs.localhost",
         "INFLUX_ORG" => "default",
         "INFLUX_TOKEN" => "unused"
@@ -34,16 +34,18 @@ defmodule IngestACSLocalTest do
 
     # The KDC comes from :kdc here, as kerlberos reads a realm's config
     # once per VM.
-    config = %{config | fplus: config.fplus ++ [kdc: [{"127.0.0.1", 88}]]}
+    [part] = config.parts
+    config = %{config | parts: [%{part | fplus: part.fplus ++ [kdc: [{"127.0.0.1", 88}]]}]}
     start_supervised!({Ingest, config})
 
-    mqtt = FPlus.mqtt(Ingest.FPlus)
+    historian = Ingest.Parts.SparkplugHistorian
+    mqtt = FPlus.mqtt(Ingest.Part.fplus(historian))
     wait_until(fn -> FPlus.MQTT.status(mqtt).connected end)
 
     assert %{broker: "mqtt.acs.localhost:1883"} = FPlus.MQTT.status(mqtt)
-    assert Process.whereis(Ingest.Sparkplug)
+    assert Process.whereis(Module.concat(historian, "Sparkplug"))
     # The historian's points can't be written with a dummy token.
-    assert %{written: 0} = Ingest.Writer.stats(Ingest.Writers.Sparkplug)
+    assert %{written: 0} = Ingest.Writer.stats(Ingest.Writers.SparkplugHistorian)
 
     # The stall monitor sees the connection as working once the router
     # has subscribed. Its own checks are 30 s apart, so check now.
@@ -51,8 +53,9 @@ defmodule IngestACSLocalTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        send(Ingest.StallMonitor, :check)
-        :sys.get_state(Ingest.StallMonitor)
+        monitor = Module.concat(historian, "StallMonitor")
+        send(monitor, :check)
+        :sys.get_state(monitor)
       end)
 
     assert log =~ "MQTT connected with its subscriptions granted"

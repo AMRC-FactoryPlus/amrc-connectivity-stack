@@ -5,34 +5,26 @@
 defmodule Ingest do
   @moduledoc """
   The ACS ingestion service. It replaces the JS Sparkplug historian, and
-  later the UNS ingester and UNS historian, as parts of one application
-  that share a Factory+ client.
+  later the UNS ingester and UNS historian, as parts of one application.
 
-  This is the top of its supervision tree, in order:
+  Each part is an `Ingest.Part`: a subtree with its own Factory+ client,
+  logged in as the part's own principal, as the JS services each were,
+  and its own stall monitor. The parts share the writers. This is the
+  top of the tree, in order:
 
-    * `Ingest.Writers` - a supervisor of the `Ingest.Writer`s, one per
-      InfluxDB bucket in use, and their `Finch` pool, `Ingest.Finch`.
-      The Sparkplug historian's writer is `Ingest.Writers.Sparkplug`.
-    * `Ingest.StallMonitor` - restarts the client when messages stop or
-      its connection stays down, unless both checks are off
-    * `FPlus` - the Factory+ client, named `Ingest.FPlus`
-    * `Ingest.Sparkplug` - the Sparkplug path, when the Sparkplug
-      historian is on. Its edge node processes make the historian's
+    * `Ingest.Writers` - a supervisor of the historians' `Ingest.Writer`s,
+      one per part that writes, named after it (the Sparkplug historian's
+      is `Ingest.Writers.SparkplugHistorian`), and their `Finch` pool,
+      `Ingest.Finch`
+    * a part per part that is on: `Ingest.Parts.SparkplugHistorian`,
+      whose Sparkplug path's edge node processes make the historian's
       points, with `Ingest.SparkplugHistorian`, and hand them to its
-      writer.
+      writer
 
-  The parts subscribe through the client's MQTT connection, and a client
-  that restarts has lost their subscriptions, so the strategy is
-  `:rest_for_one`: the parts restart after the client. The writers come
-  first, so that a client restart keeps their buffers, and so that they
-  stop last and write what the parts gave them. `Ingest.Writers` is
-  `:one_for_one`, so a writer that crashes restarts on its own.
-
-  The stall monitor restarts the client by stopping it, so the parts
-  restart with it. It comes before the client, so it keeps counting
-  across those restarts. When restarting doesn't help, it stops, and
-  as it is a significant child, the whole tree shuts down, and the
-  application stops.
+  The strategy is `:one_for_one`, so each part restarts on its own. The
+  writers come first, so that they stop last and write what the parts
+  gave them. A part that gives up stops: it is significant, so the
+  whole tree then shuts down, and the application stops.
 
   The configuration comes from `Ingest.Config`.
   """
@@ -40,12 +32,11 @@ defmodule Ingest do
   use Supervisor
 
   alias Ingest.Config
+  alias Ingest.Part
   alias Ingest.Sparkplug.Router
   alias Ingest.Writer
 
-  @fplus Ingest.FPlus
   @finch Ingest.Finch
-  @sparkplug_writer Ingest.Writers.Sparkplug
 
   # Fail a connection to InfluxDB quickly, and retry, rather than wait
   # Mint's default 30 s.
@@ -57,78 +48,73 @@ defmodule Ingest do
     Supervisor.start_link(__MODULE__, config, name: __MODULE__)
   end
 
+  @doc "The name of a part's supervisor, such as `Ingest.Parts.SparkplugHistorian`."
+  @spec part(atom()) :: atom()
+  def part(name), do: Module.concat(Ingest.Parts, Macro.camelize(Atom.to_string(name)))
+
+  @doc "The name of a part's writer, such as `Ingest.Writers.SparkplugHistorian`."
+  @spec writer(atom()) :: atom()
+  def writer(name), do: Module.concat(Ingest.Writers, Macro.camelize(Atom.to_string(name)))
+
   @impl true
   def init(%Config{} = config) do
-    children =
-      writers(config) ++
-        monitor(config) ++ [{FPlus, [name: @fplus] ++ config.fplus} | parts(config)]
-
-    Supervisor.init(children, strategy: :rest_for_one, auto_shutdown: :any_significant)
+    children = writers(config) ++ Enum.map(config.parts, &part_spec/1)
+    Supervisor.init(children, strategy: :one_for_one, auto_shutdown: :any_significant)
   end
-
-  defp writers(%Config{sparkplug_historian: false}), do: []
 
   defp writers(config) do
-    pools = %{default: [conn_opts: [transport_opts: [timeout: @connect_timeout]]]}
-    children = [{Finch, name: @finch, pools: pools}, writer(config, @sparkplug_writer)]
+    case for(part <- config.parts, part.writer, do: writer_spec(config, part)) do
+      [] ->
+        []
 
-    [
-      %{
-        id: Ingest.Writers,
-        type: :supervisor,
-        start:
-          {Supervisor, :start_link, [children, [strategy: :one_for_one, name: Ingest.Writers]]}
-      }
-    ]
+      writers ->
+        pools = %{default: [conn_opts: [transport_opts: [timeout: @connect_timeout]]]}
+        children = [{Finch, name: @finch, pools: pools} | writers]
+
+        [
+          %{
+            id: Ingest.Writers,
+            type: :supervisor,
+            start:
+              {Supervisor, :start_link,
+               [children, [strategy: :one_for_one, name: Ingest.Writers]]}
+          }
+        ]
+    end
   end
 
-  defp writer(config, name) do
+  defp writer_spec(config, part) do
     {Writer,
-     name: name,
+     name: writer(part.name),
      finch: @finch,
      url: config.influx_url,
      org: config.influx_org,
-     bucket: config.influx_bucket,
+     bucket: part.writer.bucket,
      token: config.influx_token,
-     batch_size: config.batch_size,
-     flush_interval: config.flush_interval,
-     buffer_limit: config.buffer_limit}
+     batch_size: part.writer.batch_size,
+     flush_interval: part.writer.flush_interval,
+     buffer_limit: part.writer.buffer_limit}
   end
 
-  defp monitor(%Config{stall_timeout: nil, connect_timeout: nil}), do: []
+  defp part_spec(%Config.Part{name: :sparkplug_historian} = config) do
+    name = part(config.name)
+    fplus = Part.fplus(name)
+    sparkplug = Module.concat(name, "Sparkplug")
+    router = Ingest.Sparkplug.child(sparkplug, "Router")
 
-  defp monitor(config) do
-    router = Ingest.Sparkplug.child(Ingest.Sparkplug, "Router")
-    mqtt = FPlus.mqtt(@fplus)
-
-    [
-      {Ingest.StallMonitor,
-       name: Ingest.StallMonitor,
-       stall_timeout: config.stall_timeout,
-       connect_timeout: config.connect_timeout,
-       last_message: fn -> Router.last_message(router) end,
-       connected?: fn -> subscribed?(FPlus.MQTT.status(mqtt)) end,
-       restart: fn -> Supervisor.stop(@fplus, {:shutdown, :restart}) end}
-    ]
-  end
-
-  # Connected, with subscriptions, none of them refused.
-  defp subscribed?(%{connected: true, subscriptions: [_ | _], refused: refused}),
-    do: map_size(refused) == 0
-
-  defp subscribed?(_status), do: false
-
-  defp parts(config) do
-    if config.sparkplug_historian do
-      [
-        {Ingest.Sparkplug,
-         name: Ingest.Sparkplug,
-         subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(@fplus), &1),
-         rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(@fplus), &1),
-         consumers: [{Ingest.SparkplugHistorian, writer: @sparkplug_writer}]}
-      ]
-    else
-      []
-    end
+    {Part,
+     name: name,
+     part: config.name,
+     fplus: config.fplus,
+     stall_timeout: config.stall_timeout,
+     connect_timeout: config.connect_timeout,
+     last_message: fn -> Router.last_message(router) end,
+     children: [
+       {Ingest.Sparkplug,
+        name: sparkplug,
+        subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(fplus), &1),
+        rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(fplus), &1),
+        consumers: [{Ingest.SparkplugHistorian, writer: writer(config.name)}]}
+     ]}
   end
 end

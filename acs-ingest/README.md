@@ -1,8 +1,10 @@
 # ACS Ingest
 
 One Elixir application to replace ACS's Node.js ingestion services. It
-runs them as parts that share one Factory+ client: the Sparkplug
-historian first, and later the UNS ingester and the UNS historian.
+runs them as parts in one pod: the Sparkplug historian first, and later
+the UNS ingester and the UNS historian. Each part has its own Factory+
+client, logged in as its own principal, as the JS services were, and
+the parts share the InfluxDB writers.
 
 ## Status
 
@@ -22,13 +24,13 @@ help.
 
 ## Configuration
 
-The configuration comes from the environment, using the variables the
-JS historian and ACS's Helm chart use. `Ingest.Config`
-(`lib/ingest/config.ex`) documents each one. The Sparkplug historian
-needs at least:
+The configuration comes from the environment. Variables the parts
+share have plain names, and a part's own start with its name.
+`Ingest.Config` (`lib/ingest/config.ex`) documents each one. The
+Sparkplug historian needs at least:
 
-- `DIRECTORY_URL`, `CLIENT_KEYTAB` and `KRB5_CONFIG`
-- `SPARKPLUG_HISTORIAN=true`
+- `DIRECTORY_URL` and `KRB5_CONFIG`
+- `SPARKPLUG_HISTORIAN=true` and `SPARKPLUG_HISTORIAN_KEYTAB`
 - `INFLUX_URL`, `INFLUX_ORG` and `INFLUX_TOKEN`
 
 If the configuration is missing or invalid, the application doesn't
@@ -64,8 +66,8 @@ To run the application itself, give it a `krb5.conf` that points the
 ```sh
 KRB5_CONFIG=/tmp/krb5.conf \
 DIRECTORY_URL=http://directory.acs.localhost/ \
-CLIENT_KEYTAB=/tmp/sv1warehouse.keytab \
 SPARKPLUG_HISTORIAN=true \
+SPARKPLUG_HISTORIAN_KEYTAB=/tmp/sv1warehouse.keytab \
 INFLUX_URL=http://influxdb.acs.localhost INFLUX_ORG=default INFLUX_TOKEN=... \
     mix run --no-halt
 ```

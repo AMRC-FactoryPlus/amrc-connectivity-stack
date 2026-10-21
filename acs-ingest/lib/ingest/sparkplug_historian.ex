@@ -6,8 +6,8 @@ defmodule Ingest.SparkplugHistorian do
   @moduledoc """
   The Sparkplug historian: an `Ingest.Sparkplug.Consumer` that writes
   the metrics of each device's births and DATA to InfluxDB. It writes
-  the points the JS historian (`historian-sparkplug`) wrote, except
-  where those were wrong or crashed it.
+  the points the JS historian it replaced wrote, except where those
+  were wrong or crashed it.
 
   It runs in each edge node's process, so encoding is spread across the
   cores, and hands each message's lines to an `Ingest.Writer` in one

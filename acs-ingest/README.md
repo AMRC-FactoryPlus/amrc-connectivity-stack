@@ -6,9 +6,10 @@ historian first, and later the UNS ingester and the UNS historian.
 
 ## Status
 
-A scaffold: the application reads its configuration, starts the
-Factory+ client (`lib/ex-service-client`) and an empty Sparkplug path.
-It isn't built into an image or deployed yet.
+Not doing anything useful yet. The application reads its
+configuration, and starts the Factory+ client (`lib/ex-service-client`),
+a buffered InfluxDB writer for the historian (`Ingest.Writer`), and an
+empty Sparkplug path. It isn't built into an image or deployed yet.
 
 ## Configuration
 

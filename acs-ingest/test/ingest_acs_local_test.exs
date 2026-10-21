@@ -42,5 +42,6 @@ defmodule IngestACSLocalTest do
 
     assert %{broker: "mqtt.acs.localhost:1883"} = FPlus.MQTT.status(mqtt)
     assert Process.whereis(Ingest.Sparkplug)
+    assert %{buffered: 0, written: 0} = Ingest.Writer.stats(Ingest.Writers.Sparkplug)
   end
 end

@@ -6,6 +6,7 @@ defmodule Ingest.MixProject do
       app: :acs_ingest,
       version: "0.1.0",
       elixir: "~> 1.20",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps()
@@ -19,6 +20,9 @@ defmodule Ingest.MixProject do
     ]
   end
 
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
+
   # The application reads its configuration from the environment when it
   # starts, so tests start what they need themselves.
   defp aliases do
@@ -28,6 +32,7 @@ defmodule Ingest.MixProject do
   defp deps do
     [
       {:fplus, path: "../lib/ex-service-client"},
+      {:finch, "~> 0.24"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

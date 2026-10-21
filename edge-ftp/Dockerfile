@@ -2,7 +2,6 @@
 
 FROM node:22-alpine AS build
 ARG acs_npm=NO
-ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
@@ -23,6 +22,8 @@ RUN <<'SHELL'
     npm install --save=false
 SHELL
 COPY --chown=node . .
+# Declare this late: changing an ARG reruns every RUN after it
+ARG revision=unknown
 RUN <<'SHELL'
     set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js

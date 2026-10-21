@@ -5,9 +5,7 @@ ARG base_prefix=ghcr.io/amrc-factoryplus/acs-base
 
 FROM ${base_prefix}-js-build:${base_version} AS build
 ARG acs_npm=NO
-ARG revision=unknown
 ARG registry=ghcr.io/amrc-factoryplus
-ARG tag=latest
 ARG pullpolicy=IfNotPresent
 
 USER root
@@ -25,6 +23,9 @@ RUN sh -ex <<'SHELL'
     npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
+# Declare these late: changing an ARG reruns every RUN after it
+ARG revision=unknown
+ARG tag=latest
 RUN sh -ex <<'SHELL'
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 

@@ -7,7 +7,6 @@ FROM ${base_prefix}-js-build:${base_version} AS build
 ARG kubeseal_version=0.21.0
 ARG TARGETOS
 ARG TARGETARCH
-ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
@@ -30,6 +29,8 @@ RUN <<'SHELL'
     npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
+# Declare this late: changing an ARG reruns every RUN after it
+ARG revision=unknown
 RUN <<'SHELL'
     set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js

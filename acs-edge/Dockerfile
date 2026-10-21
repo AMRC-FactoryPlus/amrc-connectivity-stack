@@ -8,7 +8,6 @@ FROM ${base_prefix}-js-build:${base_version} AS ts-compiler
 # This ARG must go here, in the image that uses it, or it isn't
 # available to the shell scripts. Don't ask me why...
 ARG acs_npm=NO
-ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
@@ -30,6 +29,8 @@ RUN <<'SHELL'
 SHELL
 
 COPY --chown=node . ./
+# Declare this late: changing an ARG reruns every RUN after it
+ARG revision=unknown
 RUN <<'SHELL'
     set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js

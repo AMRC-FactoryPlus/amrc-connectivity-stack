@@ -15,7 +15,9 @@ defmodule Ingest do
       The Sparkplug historian's writer is `Ingest.Writers.Sparkplug`.
     * `FPlus` - the Factory+ client, named `Ingest.FPlus`
     * `Ingest.Sparkplug` - the Sparkplug path, when the Sparkplug
-      historian is on
+      historian is on. Its edge node processes make the historian's
+      points, with `Ingest.SparkplugHistorian`, and hand them to its
+      writer.
 
   The parts subscribe through the client's MQTT connection, and a client
   that restarts has lost their subscriptions, so the strategy is
@@ -81,14 +83,14 @@ defmodule Ingest do
      buffer_limit: config.buffer_limit}
   end
 
-  # No consumers yet: the Sparkplug historian will be the first.
   defp parts(config) do
     if config.sparkplug_historian do
       [
         {Ingest.Sparkplug,
          name: Ingest.Sparkplug,
          subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(@fplus), &1),
-         rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(@fplus), &1)}
+         rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(@fplus), &1),
+         consumers: [{Ingest.SparkplugHistorian, writer: @sparkplug_writer}]}
       ]
     else
       []

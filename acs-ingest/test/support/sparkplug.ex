@@ -24,15 +24,23 @@ defmodule Ingest.Test.Sparkplug do
     string: 12,
     date_time: 13,
     text: 14,
-    uuid: 15
+    uuid: 15,
+    data_set: 16,
+    bytes: 17,
+    file: 18,
+    template: 19,
+    property_set: 20,
+    property_set_list: 21,
+    int8_array: 22
   }
 
   def factory_plus, do: @factory_plus
 
   # An encoded payload. Each metric is a keyword list of `:name`,
   # `:alias`, `:type` (an atom), `:value`, `:timestamp`, `:transient`
-  # and `:unit`; `:raw` gives the protobuf value as `{field, value}`.
-  # The payload's options are `:timestamp`, `:seq` and `:uuid`.
+  # and `:unit`; `:raw` gives the protobuf value as `{field, value}`,
+  # and `:properties` other properties as `[key: {type, value}]`. The
+  # payload's options are `:timestamp`, `:seq` and `:uuid`.
   def payload(metrics, opts \\ []) do
     proto = %Payload{
       timestamp: opts[:timestamp],
@@ -59,7 +67,7 @@ defmodule Ingest.Test.Sparkplug do
       is_transient: opts[:transient],
       is_null: Keyword.has_key?(opts, :value) and opts[:value] == nil,
       value: Keyword.get_lazy(opts, :raw, fn -> value(type, opts[:value]) end),
-      properties: properties(opts[:unit])
+      properties: properties(opts)
     }
   end
 
@@ -75,13 +83,23 @@ defmodule Ingest.Test.Sparkplug do
   defp value(:double, v), do: {:double_value, v}
   defp value(:boolean, v), do: {:boolean_value, v}
   defp value(type, v) when type in [:string, :text, :uuid], do: {:string_value, v}
+  defp value(type, v) when type in [:bytes, :file], do: {:bytes_value, v}
 
-  defp properties(nil), do: nil
+  defp properties(opts) do
+    unit = if opts[:unit], do: [engUnit: {:string, opts[:unit]}], else: []
 
-  defp properties(unit) do
-    %Payload.PropertySet{
-      keys: ["engUnit"],
-      values: [%Payload.PropertyValue{type: 12, value: {:string_value, unit}}]
-    }
+    case unit ++ Keyword.get(opts, :properties, []) do
+      [] ->
+        nil
+
+      properties ->
+        %Payload.PropertySet{
+          keys: Enum.map(properties, fn {key, _value} -> Atom.to_string(key) end),
+          values:
+            Enum.map(properties, fn {_key, {type, value}} ->
+              %Payload.PropertyValue{type: Map.fetch!(@types, type), value: value(type, value)}
+            end)
+        }
+    end
   end
 end

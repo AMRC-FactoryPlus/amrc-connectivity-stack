@@ -23,8 +23,14 @@ defmodule Ingest.SparkplugTest do
     start_supervised!(
       {Ingest.Sparkplug,
        name: name,
-       subscribe: fn filter -> send(test, {:subscribed, filter}) && :ok end,
-       rebirth: fn address -> send(test, {:rebirth, address}) && :ok end,
+       subscribe: fn filter ->
+         send(test, {:subscribed, filter})
+         :ok
+       end,
+       rebirth: fn address ->
+         send(test, {:rebirth, address})
+         :ok
+       end,
        consumers: [{Ingest.Test.Consumer, pid: test}]}
     )
 
@@ -164,6 +170,9 @@ defmodule Ingest.SparkplugTest do
     assert [{^n2, _}] = Registry.lookup(registry, {"G1", "N2"})
 
     # N1's next message starts a new process, which has lost its births.
+    # The registry forgets the old one soon after it dies; until then,
+    # the router would send to it, and the message would be lost.
+    wait_until(fn -> Registry.lookup(registry, {"G1", "N1"}) == [] end)
     data(ctx, [[alias: 3, type: :double, value: 1.0]], "D1", "N1")
     assert_receive {:rebirth, %{node: "N1", device: "D1"}}
     assert [{new_n1, _}] = Registry.lookup(registry, {"G1", "N1"})
@@ -227,6 +236,14 @@ defmodule Ingest.SparkplugTest do
     publish(ctx, "spBv1.0/STATE/some-host", ~s({"online": true}))
     sync(ctx)
     assert Registry.count(Ingest.Sparkplug.child(ctx.name, "Registry")) == 0
+  end
+
+  defp wait_until(fun, tries \\ 100) do
+    cond do
+      fun.() -> :ok
+      tries == 0 -> flunk("timed out waiting")
+      true -> Process.sleep(10) && wait_until(fun, tries - 1)
+    end
   end
 
   # Wait until the router, and a node's process, have handled what was

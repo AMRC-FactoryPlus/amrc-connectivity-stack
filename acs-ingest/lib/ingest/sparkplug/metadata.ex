@@ -30,6 +30,12 @@ defmodule Ingest.Sparkplug.Metadata do
       it, or `""`. The JS compares each path's depth with the depth of
       the previous value, a UUID, rather than of the previous path, so
       the order of the birth decides, not the depth.
+    * `uses` is the historian's `usesInstances` or `usesSchemas` tag:
+      `top + ":" + full.join(":")`, as the JS writes it, where a `nil`
+      top is `"null"` and a `nil` in the chain is `""`. It is `nil` if
+      a value isn't a string or `nil`. It is made here, once per birth,
+      because a string made for each point doubles the cost of
+      encoding the point.
 
   A birth metric with no name can't be resolved this way, and is left
   out.
@@ -43,8 +49,11 @@ defmodule Ingest.Sparkplug.Metadata do
   @enforce_keys [:name, :alias, :datatype, :unit, :transient, :instance, :schema]
   defstruct @enforce_keys
 
-  @typedoc "The top-level UUID, the bottom one, and every one that applies."
-  @type chain :: %{top: term(), bottom: term(), full: [term()]}
+  @typedoc """
+  The top-level UUID, the bottom one, every one that applies, and the
+  historian's tag for them.
+  """
+  @type chain :: %{top: term(), bottom: term(), full: [term()], uses: String.t() | nil}
 
   @type t :: %__MODULE__{
           name: String.t(),
@@ -147,7 +156,14 @@ defmodule Ingest.Sparkplug.Metadata do
         if depth(path) > depth(bottom), do: value, else: bottom
       end)
 
-    %{top: top, bottom: bottom, full: Enum.map(matching, fn {_path, value} -> value end)}
+    full = Enum.map(matching, fn {_path, value} -> value end)
+    %{top: top, bottom: bottom, full: full, uses: uses(top, full)}
+  end
+
+  defp uses(top, full) do
+    if Enum.all?([top | full], &(is_binary(&1) or is_nil(&1))),
+      do: (top || "null") <> ":" <> Enum.map_join(full, ":", &(&1 || "")),
+      else: nil
   end
 
   # The JS splits the previous value too. A value that isn't a string

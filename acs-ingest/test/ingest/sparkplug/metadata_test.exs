@@ -58,29 +58,44 @@ defmodule Ingest.Sparkplug.MetadataTest do
       # usesSchemas=s-top:s-phases:s-ph1:s-ph10, bottomLevelSchema=s-ph10,
       # usesInstances=i-top:i-ph1, bottomLevelInstance=i-ph1
       assert metas["Phases/10/Voltage"].schema ==
-               %{top: "s-top", bottom: "s-ph10", full: ["s-phases", "s-ph1", "s-ph10"]}
+               %{
+                 top: "s-top",
+                 bottom: "s-ph10",
+                 full: ["s-phases", "s-ph1", "s-ph10"],
+                 uses: "s-top:s-phases:s-ph1:s-ph10"
+               }
 
       assert metas["Phases/10/Voltage"].instance ==
-               %{top: "i-top", bottom: "i-ph1", full: ["i-ph1"]}
+               %{top: "i-top", bottom: "i-ph1", full: ["i-ph1"], uses: "i-top:i-ph1"}
 
       assert metas["Phases/1/Voltage"].schema ==
-               %{top: "s-top", bottom: "s-ph1", full: ["s-phases", "s-ph1"]}
+               %{
+                 top: "s-top",
+                 bottom: "s-ph1",
+                 full: ["s-phases", "s-ph1"],
+                 uses: "s-top:s-phases:s-ph1"
+               }
     end
 
     test "take the bottom in birth order, not by depth", %{metas: metas} do
       # bottomLevelSchema=s-ax1, usesSchemas=s-top:s-pos:s-ax1
       assert metas["Axes/1/BaseAxis/Position/Actual"].schema ==
-               %{top: "s-top", bottom: "s-ax1", full: ["s-pos", "s-ax1"]}
+               %{
+                 top: "s-top",
+                 bottom: "s-ax1",
+                 full: ["s-pos", "s-ax1"],
+                 uses: "s-top:s-pos:s-ax1"
+               }
 
       assert metas["Axes/1/BaseAxis/Position/Actual"].instance ==
-               %{top: "i-top", bottom: "", full: []}
+               %{top: "i-top", bottom: "", full: [], uses: "i-top:"}
     end
 
     test "never take a one-level path as the bottom", %{metas: metas} do
       assert metas["Phases/Schema_UUID"].schema ==
-               %{top: "s-top", bottom: "", full: ["s-phases"]}
+               %{top: "s-top", bottom: "", full: ["s-phases"], uses: "s-top:s-phases"}
 
-      assert metas["Status"].schema == %{top: "s-top", bottom: "", full: []}
+      assert metas["Status"].schema == %{top: "s-top", bottom: "", full: [], uses: "s-top:"}
     end
 
     test "carry the datatype, unit and transient flag", %{metas: metas} do
@@ -108,8 +123,8 @@ defmodule Ingest.Sparkplug.MetadataTest do
     {pairs, 0} = birth(metrics)
 
     for {_metric, meta} <- pairs do
-      assert meta.schema == %{top: nil, bottom: "", full: []}
-      assert meta.instance == %{top: nil, bottom: "", full: []}
+      assert meta.schema == %{top: nil, bottom: "", full: [], uses: "null:"}
+      assert meta.instance == %{top: nil, bottom: "", full: [], uses: "null:"}
     end
   end
 
@@ -122,7 +137,27 @@ defmodule Ingest.Sparkplug.MetadataTest do
     ]
 
     {pairs, 0} = birth(metrics, uuid: factory_plus())
-    assert by_name(pairs)["A/Value"].schema == %{top: "s-2", bottom: "", full: ["s-a"]}
+
+    assert by_name(pairs)["A/Value"].schema == %{
+             top: "s-2",
+             bottom: "",
+             full: ["s-a"],
+             uses: "s-2:s-a"
+           }
+  end
+
+  test "uses joins nulls as the JS does, and is nil for a UUID that isn't a string" do
+    metrics = [
+      uuid("Schema_UUID", "s-top", 1),
+      uuid("A/Schema_UUID", nil, 2),
+      [name: "Instance_UUID", type: :int32, value: 5, alias: 3],
+      [name: "A/V", type: :double, value: 1.0, alias: 4]
+    ]
+
+    {pairs, 0} = birth(metrics, uuid: factory_plus())
+    meta = by_name(pairs)["A/V"]
+    assert meta.schema.uses == "s-top:"
+    assert meta.instance == %{top: 5, bottom: "", full: [], uses: nil}
   end
 
   test "paths are in JS object key order" do

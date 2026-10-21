@@ -535,6 +535,24 @@ defmodule Ingest.SparkplugHistorianTest do
            ]
   end
 
+  test "invalid UTF-8 in a name is written with U+FFFD, as JS writes it", ctx do
+    # SparkplugB decodes it as Tahu JS does, rather than refusing the
+    # payload.
+    birth =
+      payload(
+        [
+          [name: <<"Dir/AAA", 0xFF, "BBB">>, type: :double, value: 1.0, alias: 1],
+          [name: "V", type: :double, value: 2.0, alias: 2]
+        ],
+        timestamp: @t0
+      )
+
+    assert dbirth(ctx, birth) == """
+           AAA�BBB:d,device=D1,group=G1,node=N1,path=Dir,usesInstances=null:,usesSchemas=null: value=1.0 #{@t0_ns}
+           V:d,device=D1,group=G1,node=N1,usesInstances=null:,usesSchemas=null: value=2.0 #{@t0_ns}
+           """
+  end
+
   test "node births and node data make no points", ctx do
     metrics = [[name: "bdSeq", type: :uint64, value: 1], [name: "X", type: :double, value: 1.0]]
     assert text(ctx, "spBv1.0/G1/NBIRTH/N1", payload(metrics, timestamp: @t0)) == ""

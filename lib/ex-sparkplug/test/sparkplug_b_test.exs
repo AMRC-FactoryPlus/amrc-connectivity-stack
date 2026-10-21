@@ -79,6 +79,44 @@ defmodule SparkplugBTest do
     end
   end
 
+  test "invalid UTF-8 becomes U+FFFD, as Tahu JS decodes it, and the payload still decodes" do
+    alias SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload, as: Proto
+
+    # The bytes, and what Tahu JS decoded them to, from running it.
+    bad_name = <<"AAA", 0xFF, "BBB">>
+    bad_value = <<"v", 0xE2, 0x82, "w">>
+
+    properties = %Proto.PropertySet{
+      keys: [<<"k", 0xFF>>],
+      values: [%Proto.PropertyValue{type: 12, value: {:string_value, bad_value}}]
+    }
+
+    proto = %Proto{
+      uuid: <<"u", 0xC0, 0xAF>>,
+      metrics: [
+        %Proto.Metric{name: bad_name, alias: 1, datatype: 12, value: {:string_value, bad_value}},
+        %Proto.Metric{
+          name: "Ok",
+          alias: 2,
+          datatype: 10,
+          value: {:double_value, 1.5},
+          properties: properties,
+          metadata: %Proto.MetaData{description: <<"d", 0xFE>>}
+        }
+      ]
+    }
+
+    {:ok, iodata, _size} = Protox.encode(proto)
+    assert {:ok, payload} = SparkplugB.decode(IO.iodata_to_binary(iodata))
+
+    assert payload.uuid == "u��"
+    assert [bad, ok] = payload.metrics
+    assert {bad.name, bad.value} == {"AAA�BBB", "v�w"}
+    assert {ok.name, ok.value} == {"Ok", 1.5}
+    assert ok.properties == %{"k�" => %Property{datatype: :string, value: "v�w"}}
+    assert ok.metadata == %{description: "d�"}
+  end
+
   test "a binary that isn't a payload is an error" do
     # Field 4 (uuid) claims 5 bytes but only 1 follows.
     assert {:error, %DecodeError{message: message}} = SparkplugB.decode(<<34, 5, 1>>)

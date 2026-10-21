@@ -33,6 +33,10 @@ defmodule SparkplugB do
       milliseconds and the rest as nanoseconds. ACS edge agents send
       nanoseconds, so ACS consumers pass `:auto`.
 
+  Invalid UTF-8 in a string, such as a metric name, a string value, a
+  property key or the payload's `uuid`, becomes U+FFFD, as Tahu JS
+  decodes it, rather than making the whole payload fail to decode.
+
   Returns `{:error, %SparkplugB.DecodeError{}}` if the binary isn't a
   valid payload.
   """

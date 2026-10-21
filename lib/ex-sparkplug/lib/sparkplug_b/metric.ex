@@ -12,7 +12,8 @@ defmodule SparkplugB.Metric do
     * `:float`, `:double`: a float, or `:nan`, `:infinity` or
       `:"-infinity"`, which the BEAM has no float for
     * `:boolean`: a boolean
-    * `:string`, `:text`, `:uuid`: a string
+    * `:string`, `:text`, `:uuid`: a string, with any invalid UTF-8
+      replaced by U+FFFD, as Tahu JS decodes it
     * `:date_time`: the integer as sent (milliseconds since the Unix
       epoch, per the spec)
     * `:bytes`, `:file`: a binary
@@ -86,7 +87,7 @@ defmodule SparkplugB.Metric do
     datatype = DataType.from_wire(metric.datatype)
 
     %__MODULE__{
-      name: metric.name,
+      name: Value.text(metric.name),
       alias: metric.alias,
       timestamp: Timestamp.to_ns(metric.timestamp, unit),
       datatype: datatype,
@@ -105,5 +106,9 @@ defmodule SparkplugB.Metric do
     |> Map.from_struct()
     |> Map.delete(:__uf__)
     |> Map.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new(fn
+      {key, value} when is_binary(value) -> {key, Value.text(value)}
+      pair -> pair
+    end)
   end
 end

@@ -4,9 +4,8 @@
 
 defmodule Ingest do
   @moduledoc """
-  The ACS ingestion service. It replaces the JS Sparkplug historian and
-  UNS ingester, and later the UNS historian, as parts of one
-  application.
+  The ACS ingestion service. It replaces the JS Sparkplug historian, UNS
+  ingester and UNS historian, as parts of one application.
 
   Each part is an `Ingest.Part`: a subtree with its own Factory+ client,
   logged in as the part's own principal, as the JS services each were,
@@ -17,13 +16,16 @@ defmodule Ingest do
       one per part that writes, named after it (the Sparkplug historian's
       is `Ingest.Writers.SparkplugHistorian`), and their `Finch` pool,
       `Ingest.Finch`
-    * a part per part that is on, each with its own Sparkplug path:
-      * `Ingest.Parts.SparkplugHistorian`, whose edge node processes make
-        the historian's points, with `Ingest.SparkplugHistorian`, and
-        hand them to its writer
-      * `Ingest.Parts.UnsIngester`, whose edge node processes make the
-        UNS messages, with `Ingest.UnsIngester`, and publish them on the
-        part's own MQTT connection
+    * a part per part that is on:
+      * `Ingest.Parts.SparkplugHistorian`, whose Sparkplug path's edge
+        node processes make the historian's points, with
+        `Ingest.SparkplugHistorian`, and hand them to its writer
+      * `Ingest.Parts.UnsIngester`, whose Sparkplug path's edge node
+        processes make the UNS messages, with `Ingest.UnsIngester`, and
+        publish them on the part's own MQTT connection
+      * `Ingest.Parts.UnsHistorian`, whose UNS path's workers make the
+        historian's points, with `Ingest.UnsHistorian`, and hand them to
+        its writer
 
   The strategy is `:one_for_one`, so each part restarts on its own. The
   writers come first, so that they stop last and write what the parts
@@ -37,7 +39,8 @@ defmodule Ingest do
 
   alias Ingest.Config
   alias Ingest.Part
-  alias Ingest.Sparkplug.Router
+  alias Ingest.Sparkplug
+  alias Ingest.Uns
   alias Ingest.Writer
 
   @finch Ingest.Finch
@@ -115,27 +118,47 @@ defmodule Ingest do
     end)
   end
 
+  defp part_spec(%Config.Part{name: :uns_historian} = config) do
+    name = part(config.name)
+    fplus = Part.fplus(name)
+    uns = Module.concat(name, "Uns")
+    router = Uns.child(uns, "Router")
+
+    subtree(config, fn -> Uns.Router.last_message(router) end, [
+      {Uns,
+       name: uns,
+       subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(fplus), &1),
+       consumer: {Ingest.UnsHistorian, writer: writer(config.name)}}
+    ])
+  end
+
   # A part whose Sparkplug path hands its updates to one consumer, given
   # the name of the part's `FPlus`.
   defp sparkplug_part(config, consumer) do
     name = part(config.name)
     fplus = Part.fplus(name)
     sparkplug = Module.concat(name, "Sparkplug")
-    router = Ingest.Sparkplug.child(sparkplug, "Router")
+    router = Sparkplug.child(sparkplug, "Router")
 
+    subtree(config, fn -> Sparkplug.Router.last_message(router) end, [
+      {Sparkplug,
+       name: sparkplug,
+       subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(fplus), &1),
+       rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(fplus), &1),
+       consumers: [consumer.(fplus)]}
+    ])
+  end
+
+  # A part's subtree, given its own children and a function returning
+  # when its router last had a message.
+  defp subtree(config, last_message, children) do
     {Part,
-     name: name,
+     name: part(config.name),
      part: config.name,
      fplus: config.fplus,
      stall_timeout: config.stall_timeout,
      connect_timeout: config.connect_timeout,
-     last_message: fn -> Router.last_message(router) end,
-     children: [
-       {Ingest.Sparkplug,
-        name: sparkplug,
-        subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(fplus), &1),
-        rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(fplus), &1),
-        consumers: [consumer.(fplus)]}
-     ]}
+     last_message: last_message,
+     children: children}
   end
 end

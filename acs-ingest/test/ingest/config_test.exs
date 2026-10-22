@@ -99,7 +99,8 @@ defmodule Ingest.ConfigTest do
           Map.delete(@env, "SPARKPLUG_HISTORIAN"),
           Map.put(@env, "SPARKPLUG_HISTORIAN", "false")
         ] do
-      assert error(env) == "no parts are on: set SPARKPLUG_HISTORIAN or UNS_INGESTER to true"
+      assert error(env) ==
+               "no parts are on: set SPARKPLUG_HISTORIAN, UNS_INGESTER or UNS_HISTORIAN to true"
     end
 
     assert error(Map.put(@env, "SPARKPLUG_HISTORIAN", "yes")) ==
@@ -134,6 +135,44 @@ defmodule Ingest.ConfigTest do
     assert error(Map.delete(env, "UNS_INGESTER_KEYTAB")) == "UNS_INGESTER_KEYTAB isn't set"
   end
 
+  test "the UNS historian has its own keytab, checks and writer, writing to uns" do
+    env =
+      Map.merge(@env, %{
+        "UNS_HISTORIAN" => "true",
+        "UNS_HISTORIAN_KEYTAB" => "/keytabs/uns-historian",
+        "UNS_HISTORIAN_BATCH_SIZE" => "200",
+        "UNS_HISTORIAN_FLUSH_INTERVAL" => "10000",
+        "UNS_HISTORIAN_CONNECT_TIMEOUT" => "0"
+      })
+
+    assert {:ok, %Config{parts: [%{name: :sparkplug_historian} = sparkplug, part]}} =
+             Config.from_env(env)
+
+    assert part == %Config.Part{
+             name: :uns_historian,
+             fplus: [directory_url: "http://directory.example", keytab: "/keytabs/uns-historian"],
+             stall_timeout: 600_000,
+             connect_timeout: nil,
+             writer: %{
+               bucket: "uns",
+               batch_size: 200,
+               flush_interval: 10_000,
+               buffer_limit: 100_000
+             }
+           }
+
+    # Each historian has its own writer settings.
+    assert sparkplug.writer.batch_size == 5000
+
+    uns_only = Map.put(env, "SPARKPLUG_HISTORIAN", "false")
+    assert historian(Map.put(uns_only, "UNS_HISTORIAN_BUCKET", "uns-2")).writer.bucket == "uns-2"
+
+    assert error(Map.delete(env, "UNS_HISTORIAN_KEYTAB")) == "UNS_HISTORIAN_KEYTAB isn't set"
+
+    assert error(Map.put(env, "UNS_HISTORIAN_BUFFER_LIMIT", "100")) ==
+             "UNS_HISTORIAN_BUFFER_LIMIT must be at least UNS_HISTORIAN_BATCH_SIZE, 200, got 100"
+  end
+
   test "doesn't need InfluxDB when no historian is on" do
     env = %{
       "DIRECTORY_URL" => "http://directory.example",
@@ -146,8 +185,17 @@ defmodule Ingest.ConfigTest do
   end
 
   test "needs InfluxDB when a historian is on" do
-    for variable <- ["INFLUX_URL", "INFLUX_ORG", "INFLUX_TOKEN"] do
-      assert error(Map.delete(@env, variable)) == "#{variable} isn't set"
+    uns_historian = %{
+      "DIRECTORY_URL" => "http://directory.example",
+      "UNS_HISTORIAN" => "true",
+      "UNS_HISTORIAN_KEYTAB" => "/keytabs/uns-historian",
+      "INFLUX_URL" => "http://influxdb.example",
+      "INFLUX_ORG" => "default",
+      "INFLUX_TOKEN" => "secret-token"
+    }
+
+    for env <- [@env, uns_historian], variable <- ["INFLUX_URL", "INFLUX_ORG", "INFLUX_TOKEN"] do
+      assert error(Map.delete(env, variable)) == "#{variable} isn't set"
     end
 
     for url <- ["influxdb.example", "ftp://influxdb.example", "http://"] do

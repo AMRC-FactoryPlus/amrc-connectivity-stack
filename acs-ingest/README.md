@@ -1,25 +1,30 @@
 # ACS Ingest
 
 One Elixir application to replace ACS's Node.js ingestion services. It
-runs them as parts in one pod: the Sparkplug historian and the UNS
-ingester, and later the UNS historian. Each part has its own Factory+
-client, logged in as its own principal, as the JS services were, and
-the historians share the InfluxDB writers.
+runs them as parts in one pod: the Sparkplug historian, the UNS
+ingester and the UNS historian. Each part has its own Factory+ client,
+logged in as its own principal, as the JS services were, and the
+historians share the InfluxDB writers' HTTP pool.
 
 ## Status
 
-The Sparkplug historian and the UNS ingester are written, and run in
-the Helm chart in place of the JS services. Each part starts its own
-Factory+ client (`lib/ex-service-client`) and Sparkplug path
+The Sparkplug historian, the UNS ingester and the UNS historian are
+written, and run in the Helm chart in place of the JS services. Each
+part starts its own Factory+ client (`lib/ex-service-client`). The
+Sparkplug historian and the UNS ingester each have a Sparkplug path
 (`Ingest.Sparkplug`), which keeps each edge node's births, asks
-unknown devices to rebirth, and resolves their data. The historian
-(`Ingest.SparkplugHistorian`) turns that into the points the JS
-historian wrote, through a buffered InfluxDB writer (`Ingest.Writer`),
-and the UNS ingester (`Ingest.UnsIngester`) into the UNS messages the
-JS UNS ingester published, apart from the cases where those were
-wrong. Each part's `Ingest.StallMonitor` restarts its Factory+ client
-when messages stop or its connection stays down, and stops the service
-if that doesn't help.
+unknown devices to rebirth, and resolves their data. The Sparkplug
+historian (`Ingest.SparkplugHistorian`) turns that into the points
+the JS historian wrote, through a buffered InfluxDB writer
+(`Ingest.Writer`), and the UNS ingester (`Ingest.UnsIngester`) into
+the UNS messages the JS UNS ingester published. The UNS historian has
+a UNS path (`Ingest.Uns`), which spreads the messages under `UNS/v1`
+across workers by topic, and turns them (`Ingest.UnsHistorian`) into
+the points the JS UNS historian wrote, through its own writer. Each
+differs from the JS only where the JS was wrong. Each part's
+`Ingest.StallMonitor` restarts its Factory+ client when messages stop
+or its connection stays down, and stops the service if that doesn't
+help.
 
 ## Configuration
 
@@ -33,6 +38,8 @@ at least:
   `SPARKPLUG_HISTORIAN_KEYTAB`, and `INFLUX_URL`, `INFLUX_ORG` and
   `INFLUX_TOKEN`
 - for the UNS ingester, `UNS_INGESTER=true` and `UNS_INGESTER_KEYTAB`
+- for the UNS historian, `UNS_HISTORIAN=true`, `UNS_HISTORIAN_KEYTAB`,
+  and the `INFLUX_*` variables
 
 If the configuration is missing or invalid, the application doesn't
 start, and logs which variable is wrong.

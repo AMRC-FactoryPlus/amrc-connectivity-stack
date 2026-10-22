@@ -1,13 +1,14 @@
-{{- $historian := .Values.historians.sparkplug.enabled }}
-{{- $uns := .Values.unsIngesters.sparkplug.enabled }}
-{{- if or $historian $uns }}
+{{- $sparkplugHistorian := .Values.historians.sparkplug.enabled }}
+{{- $unsIngester := .Values.unsIngesters.sparkplug.enabled }}
+{{- $unsHistorian := .Values.historians.uns.enabled }}
+{{- if or $sparkplugHistorian $unsIngester $unsHistorian }}
 {{- /*
 acs-ingest, the Elixir ingestion service. It runs a part for each
-enabled ingester written in Elixir: the Sparkplug historian and the UNS
-ingester. Each part logs in as its own principal, from its own keytab,
-as the JS services did. The parts log in to Kerberos themselves and
-retry until the KDC answers, so the pod needs neither k5start nor the
-wait-for-kdc init container.
+enabled ingester written in Elixir: the Sparkplug historian, the UNS
+ingester and the UNS historian. Each part logs in as its own principal,
+from its own keytab, as the JS services did. The parts log in to
+Kerberos themselves and retry until the KDC answers, so the pod needs
+neither k5start nor the wait-for-kdc init container.
 */}}
 apiVersion: apps/v1
 kind: Deployment
@@ -39,20 +40,51 @@ spec:
         - name: keytabs
           projected:
             sources:
-              {{- if $historian }}
+              {{- if $sparkplugHistorian }}
               - secret:
                   name: krb5-keytabs
                   items:
                     - key: sv1warehouse
                       path: sparkplug-historian
               {{- end }}
-              {{- if $uns }}
+              {{- if $unsIngester }}
               - secret:
                   name: uns-ingester-sparkplug-keytabs
                   items:
                     - key: client
                       path: uns-ingester
               {{- end }}
+              {{- if $unsHistorian }}
+              - secret:
+                  name: historian-uns-keytabs
+                  items:
+                    - key: client
+                      path: uns-historian
+              {{- end }}
+      {{- if $unsHistorian }}
+      initContainers:
+        # The UNS historian's bucket, with a v1 mapping for InfluxQL.
+        - name: create-bucket
+          image: "{{.Values.influxdb2.image.repository}}:{{.Values.influxdb2.image.tag}}"
+          env:
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: admin-token
+                  name: influxdb-auth
+            - name: INFLUX_HOST
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+          command:
+            - /bin/sh
+            - "-ec"
+            - |+
+              if ! influx bucket list -o default -n uns
+              then
+                influx bucket create --name uns --retention 0 --org default
+                UNS_BUCKET_ID=$(influx bucket list --name uns --org default | awk 'NR==2 {print $1}')
+                influx v1 dbrp create --bucket-id $UNS_BUCKET_ID --db uns --rp uns --default --org default
+              fi
+      {{- end }}
 
       containers:
         - name: acs-ingest
@@ -64,7 +96,7 @@ spec:
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: LOG_LEVEL
               value: {{ .Values.ingest.logLevel | required "values.ingest.logLevel" }}
-            {{- if $historian }}
+            {{- if or $sparkplugHistorian $unsHistorian }}
             - name: INFLUX_URL
               value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_ORG
@@ -74,6 +106,8 @@ spec:
                 secretKeyRef:
                   name: influxdb-auth
                   key: admin-token
+            {{- end }}
+            {{- if $sparkplugHistorian }}
             {{- with .Values.historians.sparkplug }}
             - name: SPARKPLUG_HISTORIAN
               value: "true"
@@ -91,7 +125,7 @@ spec:
               value: {{ .connectTimeout | default 0 | quote }}
             {{- end }}
             {{- end }}
-            {{- if $uns }}
+            {{- if $unsIngester }}
             {{- with .Values.unsIngesters.sparkplug }}
             - name: UNS_INGESTER
               value: "true"
@@ -100,6 +134,24 @@ spec:
             - name: UNS_INGESTER_STALL_TIMEOUT
               value: {{ .stallTimeout | default 0 | quote }}
             - name: UNS_INGESTER_CONNECT_TIMEOUT
+              value: {{ .connectTimeout | default 0 | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $unsHistorian }}
+            {{- with .Values.historians.uns }}
+            - name: UNS_HISTORIAN
+              value: "true"
+            - name: UNS_HISTORIAN_KEYTAB
+              value: /keytabs/uns-historian
+            - name: UNS_HISTORIAN_BUCKET
+              value: uns
+            - name: UNS_HISTORIAN_BATCH_SIZE
+              value: {{ .batchSize | quote | required "values.historians.uns.batchSize" }}
+            - name: UNS_HISTORIAN_FLUSH_INTERVAL
+              value: {{ .flushInterval | quote | required "values.historians.uns.flushInterval" }}
+            - name: UNS_HISTORIAN_STALL_TIMEOUT
+              value: {{ .stallTimeout | default 0 | quote }}
+            - name: UNS_HISTORIAN_CONNECT_TIMEOUT
               value: {{ .connectTimeout | default 0 | quote }}
             {{- end }}
             {{- end }}

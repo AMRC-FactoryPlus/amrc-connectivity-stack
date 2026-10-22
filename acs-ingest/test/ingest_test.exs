@@ -12,6 +12,7 @@ defmodule IngestTest do
 
   @historian Ingest.Parts.SparkplugHistorian
   @uns Ingest.Parts.UnsIngester
+  @uns_historian Ingest.Parts.UnsHistorian
 
   # Nothing answers on port 9, so a client never logs in or connects.
   @fplus [
@@ -103,6 +104,68 @@ defmodule IngestTest do
 
     refute Process.whereis(Module.concat(@historian, "FPlus")) ==
              Process.whereis(Module.concat(@uns, "FPlus"))
+  end
+
+  test "the UNS historian's part has its own UNS path and writer" do
+    start_supervised!({Ingest, config(name: :uns_historian)})
+
+    assert Enum.map(Supervisor.which_children(Ingest), &elem(&1, 0)) ==
+             [@uns_historian, Ingest.Writers]
+
+    assert Enum.map(Supervisor.which_children(@uns_historian), &elem(&1, 0)) ==
+             [Ingest.Uns, FPlus, Ingest.StallMonitor]
+
+    assert Process.whereis(Ingest.Writers.UnsHistorian)
+    stop_supervised!(Ingest)
+
+    # With both historians, each has its own writer.
+    historians = config().parts ++ config(name: :uns_historian).parts
+    start_supervised!({Ingest, %{config() | parts: historians}})
+
+    assert Enum.map(Supervisor.which_children(Ingest.Writers), &elem(&1, 0)) ==
+             [Ingest.Writers.UnsHistorian, Ingest.Writers.SparkplugHistorian, Ingest.Finch]
+  end
+
+  test "the UNS historian writes what its router is given to its bucket" do
+    test = self()
+
+    influx =
+      start_supervised!(
+        {Ingest.Test.FakeInflux,
+         fn request ->
+           send(test, {:written, request.query["bucket"], request.body})
+           {204, [], ""}
+         end}
+      )
+
+    writer = %{bucket: "uns", batch_size: 1, flush_interval: 1000, buffer_limit: 100_000}
+
+    config =
+      config([name: :uns_historian, connect_timeout: nil, writer: writer],
+        influx_url: Ingest.Test.FakeInflux.url(influx)
+      )
+
+    start_supervised!({Ingest, config})
+
+    properties = %{
+      "User-Property": [
+        {"InstanceUUIDPath", "i-top:i-d1"},
+        {"SchemaUUIDPath", "s-top:s-d1"},
+        {"Type", "Double"}
+      ]
+    }
+
+    send(
+      Module.concat(@uns_historian, "Uns.Router"),
+      {:fplus_mqtt, "UNS/v1/E/S/Edge/D1/V",
+       ~s({"timestamp":"2026-10-20T21:26:10.123Z","value":1.5}), properties}
+    )
+
+    assert_receive {:written, "uns", body}
+
+    assert body ==
+             "V:d,enterprise=E,path=D1,site=S,topLevelInstance=i-top,topLevelSchema=s-top," <>
+               "usesInstances=i-top:i-d1,usesSchemas=s-top:s-d1 value=1.5 1792531570123000000\n"
   end
 
   test "a part without health checks has no stall monitor" do

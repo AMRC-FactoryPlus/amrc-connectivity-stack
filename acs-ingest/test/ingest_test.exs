@@ -11,6 +11,7 @@ defmodule IngestTest do
   @moduletag :capture_log
 
   @historian Ingest.Parts.SparkplugHistorian
+  @uns Ingest.Parts.UnsIngester
 
   # Nothing answers on port 9, so a client never logs in or connects.
   @fplus [
@@ -74,6 +75,34 @@ defmodule IngestTest do
 
     assert Process.whereis(Ingest.Writers.SparkplugHistorian)
     assert Process.whereis(Module.concat(@historian, "FPlus"))
+  end
+
+  test "the UNS ingester's part has its own Sparkplug path" do
+    uns = %Config.Part{
+      name: :uns_ingester,
+      fplus: @fplus,
+      stall_timeout: nil,
+      connect_timeout: 400,
+      writer: nil
+    }
+
+    # With no historian, there are no writers.
+    start_supervised!({Ingest, %{config() | parts: [uns]}})
+    assert Enum.map(Supervisor.which_children(Ingest), &elem(&1, 0)) == [@uns]
+    refute Process.whereis(Ingest.Writers)
+
+    assert Enum.map(Supervisor.which_children(@uns), &elem(&1, 0)) ==
+             [Ingest.Sparkplug, FPlus, Ingest.StallMonitor]
+
+    stop_supervised!(Ingest)
+
+    start_supervised!({Ingest, %{config() | parts: config().parts ++ [uns]}})
+
+    assert Enum.map(Supervisor.which_children(Ingest), &elem(&1, 0)) ==
+             [@uns, @historian, Ingest.Writers]
+
+    refute Process.whereis(Module.concat(@historian, "FPlus")) ==
+             Process.whereis(Module.concat(@uns, "FPlus"))
   end
 
   test "a part without health checks has no stall monitor" do

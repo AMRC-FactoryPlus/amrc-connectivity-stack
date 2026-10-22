@@ -18,6 +18,7 @@ defmodule Ingest.Config do
   be on:
 
     * `SPARKPLUG_HISTORIAN` - write Sparkplug device data to InfluxDB
+    * `UNS_INGESTER` - publish Sparkplug device data to the UNS
 
   ## Factory+
 
@@ -71,7 +72,7 @@ defmodule Ingest.Config do
     @moduledoc """
     A part's configuration: its name, its `FPlus` options (with its own
     keytab), its stall monitor's timeouts, and for a historian, its
-    writer's.
+    writer's. The UNS ingester has no writer.
     """
 
     @enforce_keys [:name, :fplus, :stall_timeout, :connect_timeout, :writer]
@@ -107,7 +108,8 @@ defmodule Ingest.Config do
 
   # Each part: its variable, and for a historian, its default bucket.
   @parts [
-    sparkplug_historian: %{variable: "SPARKPLUG_HISTORIAN", bucket: "default"}
+    sparkplug_historian: %{variable: "SPARKPLUG_HISTORIAN", bucket: "default"},
+    uns_ingester: %{variable: "UNS_INGESTER", bucket: nil}
   ]
 
   @log_levels %{

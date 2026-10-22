@@ -99,7 +99,7 @@ defmodule Ingest.ConfigTest do
           Map.delete(@env, "SPARKPLUG_HISTORIAN"),
           Map.put(@env, "SPARKPLUG_HISTORIAN", "false")
         ] do
-      assert error(env) == "no parts are on: set SPARKPLUG_HISTORIAN to true"
+      assert error(env) == "no parts are on: set SPARKPLUG_HISTORIAN or UNS_INGESTER to true"
     end
 
     assert error(Map.put(@env, "SPARKPLUG_HISTORIAN", "yes")) ==
@@ -111,6 +111,38 @@ defmodule Ingest.ConfigTest do
       Map.merge(@env, %{"SPARKPLUG_HISTORIAN" => "false", "SPARKPLUG_HISTORIAN_BATCH_SIZE" => "x"})
 
     assert error(Map.delete(env, "SPARKPLUG_HISTORIAN_KEYTAB")) =~ "no parts are on"
+  end
+
+  test "the UNS ingester has its own keytab and checks, and no writer" do
+    env =
+      Map.merge(@env, %{
+        "UNS_INGESTER" => "true",
+        "UNS_INGESTER_KEYTAB" => "/keytabs/uns-ingester",
+        "UNS_INGESTER_STALL_TIMEOUT" => "120"
+      })
+
+    assert {:ok, %Config{parts: [%{name: :sparkplug_historian}, part]}} = Config.from_env(env)
+
+    assert part == %Config.Part{
+             name: :uns_ingester,
+             fplus: [directory_url: "http://directory.example", keytab: "/keytabs/uns-ingester"],
+             stall_timeout: 120_000,
+             connect_timeout: 300_000,
+             writer: nil
+           }
+
+    assert error(Map.delete(env, "UNS_INGESTER_KEYTAB")) == "UNS_INGESTER_KEYTAB isn't set"
+  end
+
+  test "doesn't need InfluxDB when no historian is on" do
+    env = %{
+      "DIRECTORY_URL" => "http://directory.example",
+      "UNS_INGESTER" => "true",
+      "UNS_INGESTER_KEYTAB" => "/keytabs/uns-ingester"
+    }
+
+    assert {:ok, %Config{parts: [%{name: :uns_ingester}], influx_url: nil}} =
+             Config.from_env(env)
   end
 
   test "needs InfluxDB when a historian is on" do

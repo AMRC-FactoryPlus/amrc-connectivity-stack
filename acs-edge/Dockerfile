@@ -8,16 +8,17 @@ FROM ${base_prefix}-js-build:${base_version} AS ts-compiler
 # This ARG must go here, in the image that uses it, or it isn't
 # available to the shell scripts. Don't ask me why...
 ARG acs_npm=NO
-ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node /home/node /usr/app
 SHELL
 USER node
 WORKDIR /usr/app
 COPY --chown=node package.json ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
     then
@@ -28,7 +29,10 @@ RUN <<'SHELL'
 SHELL
 
 COPY --chown=node . ./
+# Declare this late: changing an ARG reruns every RUN after it
+ARG revision=unknown
 RUN <<'SHELL'
+    set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 
     npm run clean
@@ -38,6 +42,7 @@ SHELL
 FROM ${base_prefix}-js-build:${base_version} AS util-build
 USER root
 RUN <<'SHELL'
+    set -e
     # Are these necessary?
     apk upgrade --update-cache --available
     apk add openssl
@@ -54,6 +59,7 @@ COPY --chown=node --from=ts-compiler /usr/app/build ./
 FROM ${base_prefix}-js-run:${base_version}
 USER root
 RUN <<'SHELL'
+    set -e
     apk upgrade --update-cache --available
     apk add openssl
     rm -rf /var/cache/apk/*

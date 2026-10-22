@@ -4,7 +4,6 @@
 # (bullseye, glibc 2.31) and rollup's prebuilt Linux binary now needs
 # 2.34, so it failed to dlopen at build time.
 FROM oven/bun:1.2.23-debian AS builder
-ARG tag="(unknown version)"
 
 # Set working directory
 WORKDIR /app/acs-admin
@@ -17,6 +16,8 @@ RUN --mount=type=bind,from=lib,dst=/app/lib bun install --production --frozen-lo
 
 # Copy the rest of the application code
 COPY . .
+# Declare this late: changing an ARG reruns every RUN after it
+ARG tag="(unknown version)"
 RUN echo "export const ACS_VERSION = '${tag}';" >src/lib/version.js
 
 # Build the application

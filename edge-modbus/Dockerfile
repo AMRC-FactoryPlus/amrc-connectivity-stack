@@ -2,16 +2,17 @@
 
 FROM node:22-alpine AS build
 ARG acs_npm=NO
-ARG revision=unknown
 
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node -g node /home/node/app
 SHELL
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     if [ "${acs_npm}" != NO ]
     then
@@ -21,7 +22,10 @@ RUN <<'SHELL'
     npm install --save=false
 SHELL
 COPY --chown=node . .
+# Declare this late: changing an ARG reruns every RUN after it
+ARG revision=unknown
 RUN <<'SHELL'
+    set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 

@@ -10,6 +10,7 @@ ARG TARGETARCH
 
 USER root
 RUN <<'SHELL'
+    set -e
     install -d -o node -g node /home/node/app
     mkdir /home/node/lib
 SHELL
@@ -19,6 +20,7 @@ WORKDIR /home/node/app
 USER node
 COPY package*.json ./
 RUN <<'SHELL'
+    set -e
     touch /home/node/.npmrc
     npm install --save=false --omit=dev --install-links
 SHELL
@@ -31,6 +33,7 @@ WORKDIR /home/node/app
 COPY --from=build --chown=root:root /home/node/app ./
 # Do this last to not smash the build cache
 RUN <<'SHELL'
+    set -e
     echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
 SHELL
 USER node

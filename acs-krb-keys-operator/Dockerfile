@@ -5,8 +5,10 @@ FROM alpine AS build
 ARG kubeseal_ver=0.19.5
 
 WORKDIR /root
-# We can't use a bind mount here, pip does in-tree builds
-COPY --from=lib . /acs-lib
+# We can't use a bind mount here, pip does in-tree builds. Copy only
+# the lib we need, or any change elsewhere in lib/ reruns the pip
+# install below, which compiles krb5 and gssapi from source.
+COPY --from=lib py-python-kadmv /acs-lib/py-python-kadmv
 COPY requirements.txt .
 RUN /bin/sh <<SHELL
     set -e

@@ -4,6 +4,7 @@
 FROM alpine
 
 RUN <<SHELL
+    set -e
     apk update
     apk add krb5 kstart
 

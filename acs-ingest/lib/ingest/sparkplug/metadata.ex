@@ -6,8 +6,10 @@ defmodule Ingest.Sparkplug.Metadata do
   @moduledoc """
   What a birth says about one of its metrics, kept to make sense of the
   metric's later DATA: its name, alias, datatype, unit (the `engUnit`
-  property) and transient flag, and the Factory+ instances and schemas
-  it belongs to.
+  property) and transient flag, the Factory+ instances and schemas it
+  belongs to, and its device's ISA-95 hierarchy (see
+  `Ingest.Sparkplug.Hierarchy`), which is the same for all of a birth's
+  metrics.
 
   ## Factory+ instances and schemas
 
@@ -41,12 +43,13 @@ defmodule Ingest.Sparkplug.Metadata do
   out.
   """
 
+  alias Ingest.Sparkplug.Hierarchy
   alias SparkplugB.Metric
   alias SparkplugB.Property
 
   @factory_plus "11ad7b32-1d32-4c4a-b0c9-fa049208939a"
 
-  @enforce_keys [:name, :alias, :datatype, :unit, :transient, :instance, :schema]
+  @enforce_keys [:name, :alias, :datatype, :unit, :transient, :instance, :schema, :hierarchy]
   defstruct @enforce_keys
 
   @typedoc """
@@ -62,7 +65,8 @@ defmodule Ingest.Sparkplug.Metadata do
           unit: term(),
           transient: boolean(),
           instance: chain(),
-          schema: chain()
+          schema: chain(),
+          hierarchy: Hierarchy.t()
         }
 
   @type index :: %{by_alias: %{non_neg_integer() => t()}, by_name: %{String.t() => t()}}
@@ -77,6 +81,7 @@ defmodule Ingest.Sparkplug.Metadata do
     {named, nameless} = Enum.split_with(metrics, &is_binary(&1.name))
     {instance_top, instances} = uuids(uuid, named, "Instance_UUID")
     {schema_top, schemas} = uuids(uuid, named, "Schema_UUID")
+    hierarchy = Hierarchy.from_birth(uuid, named)
 
     pairs =
       for metric <- named do
@@ -88,7 +93,8 @@ defmodule Ingest.Sparkplug.Metadata do
            unit: unit(metric),
            transient: metric.is_transient,
            instance: chain(metric.name, instance_top, instances),
-           schema: chain(metric.name, schema_top, schemas)
+           schema: chain(metric.name, schema_top, schemas),
+           hierarchy: hierarchy
          }}
       end
 

@@ -80,10 +80,10 @@ defmodule Ingest.SparkplugHistorian do
 
   alias Ingest.LineProtocol
   alias Ingest.Sparkplug.Metadata
+  alias Ingest.Sparkplug.Simulated
   alias Ingest.Sparkplug.Update
   alias Ingest.Writer
   alias SparkplugB.Metric
-  alias SparkplugB.Property
 
   @signed [:int8, :int16, :int32, :int64]
   @unsigned [:uint8, :uint16, :uint32, :uint64]
@@ -185,7 +185,7 @@ defmodule Ingest.SparkplugHistorian do
 
   defp tags(address, path, metric, meta) do
     with :ok <- strings(meta),
-         {:ok, simulated} <- simulated(metric.properties) do
+         {:ok, marker} <- Simulated.marker(metric.properties) do
       tags = %{
         "group" => address.group,
         "node" => address.node,
@@ -200,9 +200,13 @@ defmodule Ingest.SparkplugHistorian do
         "usesSchemas" => meta.schema.uses
       }
 
-      {:ok, Map.merge(tags, simulated)}
+      {:ok, Map.merge(tags, marker_tags(marker))}
     end
   end
+
+  defp marker_tags(:real), do: %{}
+  defp marker_tags({:simulated, nil}), do: %{"simulated" => "true"}
+  defp marker_tags({:simulated, run}), do: %{"simulated" => "true", "run_id" => run}
 
   # The birth's UUIDs and unit are metric values, which can be of any
   # type, but tags are strings.
@@ -227,31 +231,6 @@ defmodule Ingest.SparkplugHistorian do
   end
 
   defp string_or_nil?(value), do: is_binary(value) or is_nil(value)
-
-  defp simulated(%{"simulated" => %Property{value: flag}} = properties) do
-    if truthy?(flag), do: run_id(properties["run_id"]), else: {:ok, %{}}
-  end
-
-  defp simulated(_properties), do: {:ok, %{}}
-
-  defp run_id(%Property{value: run}) when is_binary(run) or is_integer(run) do
-    if truthy?(run),
-      do: {:ok, %{"simulated" => "true", "run_id" => to_string(run)}},
-      else: {:ok, %{"simulated" => "true"}}
-  end
-
-  defp run_id(%Property{value: run}) do
-    if truthy?(run),
-      do: {:error, "its run_id, #{inspect(run)}, isn't a string or an integer"},
-      else: {:ok, %{"simulated" => "true"}}
-  end
-
-  defp run_id(nil), do: {:ok, %{"simulated" => "true"}}
-
-  # Truthiness as in JS, for the values SparkplugB decodes.
-  defp truthy?(value) when value in [nil, false, "", :nan], do: false
-  defp truthy?(value) when is_number(value), do: value != 0
-  defp truthy?(_value), do: true
 
   # The name before its last "/", or "" if it has none, and its last
   # segment.

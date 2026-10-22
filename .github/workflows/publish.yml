@@ -362,7 +362,6 @@ jobs:
           - acs-service-setup
           - acs-visualiser
           - edge-helm-charts
-          - historian-uns
           - acs-opcua-server-edge
           - acs-i3x
     permissions:

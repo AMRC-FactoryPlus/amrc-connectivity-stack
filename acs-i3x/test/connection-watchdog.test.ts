@@ -3,8 +3,8 @@
  * Tests for the connection watchdog
  * Copyright 2026 AMRC
  *
- * lib/watchdog.ts is a copy of the module the historians and the UNS
- * ingester use; these tests are ported from theirs.
+ * lib/watchdog.ts is a copy of the module the JS historians and UNS
+ * ingester used; these tests are ported from theirs.
  */
 
 import { test } from "@jest/globals";

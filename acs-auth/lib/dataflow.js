@@ -198,9 +198,7 @@ export class DataFlow {
      * @returns A seq of iSets of targets
      */
     track_targets (input, perm) {
-        const principal$ = valid_uuid(input)
-            ? rx.of(input)
-            : this.track_kerberos(input);
+        const principal$ = this.resolve_principal(input);
         /* switchMap, not mergeMap: mergeMap keeps every inner
          * subscription alive, so each re-emission of the principal
          * (one per identity write, via the identities refetch) added
@@ -309,6 +307,14 @@ export class DataFlow {
 
     find_kerberos (upn) {
         return rx.firstValueFrom(this.track_kerberos(upn));
+    }
+
+    /** Normalise a principal UUID or Kerberos UPN into a UUID.
+     * @param input A principal UUID or Kerberos UPN
+     * @returns A seq of the principal UUID, or undefined if not found
+     */
+    resolve_principal (input) {
+        return valid_uuid(input) ? rx.of(input) : this.track_kerberos(input);
     }
 
     /** Backend for the v2 `principal/:uuid/groups` endpoint.

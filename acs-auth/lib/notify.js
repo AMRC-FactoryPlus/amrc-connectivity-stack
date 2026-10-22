@@ -78,15 +78,21 @@ export class AuthNotify {
         );
     }
 
-    _get_acl (sess, src) {
+    /* A principal can always read their own ACL in full, without
+     * needing Perm.ReadACL, the same way the HTTP API's id_whoami
+     * lets them look up their own identities. `sess.principal` and
+     * `principal$` may each be a UUID or a Kerberos UPN, so resolve
+     * both to UUIDs before comparing. */
+    _get_acl (sess, principal$, src) {
+        const caller$ = this.data.resolve_principal(sess.principal);
         return rxx.rx(
-            rx.combineLatest([
-                src,
-                this.data.permitted(sess.principal, Perm.ReadACL, true),
-            ]),
-            rx.map(([acl, tok]) => 
-                !tok    ? rxx.Response.of(403)
-                : !acl  ? rxx.Response.of(404)
+            rx.combineLatest([src, principal$, caller$,
+                this.data.permitted(sess.principal, Perm.ReadACL, true)]),
+            rx.map(([acl, principal, caller, tok]) =>
+                !acl                        ? rxx.Response.of(404)
+                : caller != null && caller === principal
+                                             ? rxx.Response.ok(acl)
+                : !tok                      ? rxx.Response.of(403)
                 : rxx.Response.ok(acl.filter(e => tok(e.permission)))),
             rx.map((r, i) => r.toUpdate(i)),
             this.rxlog("ACL update: %o"));
@@ -94,7 +100,7 @@ export class AuthNotify {
 
     get_acl (sess, principal) {
         if (!valid_uuid(principal)) return;
-        return this._get_acl(sess, this.data.acl_for(principal));
+        return this._get_acl(sess, rx.of(principal), this.data.acl_for(principal));
     }
 
     get_krb_acl (sess, upn) {
@@ -102,10 +108,11 @@ export class AuthNotify {
 
         if (!valid_krb(upn)) return;
 
+        const principal$ = data.track_kerberos(upn);
         const src = rxx.rx(
-            data.track_kerberos(upn),
-            rx.switchMap(p => data.acl_for(p)));
+            principal$,
+            rx.switchMap(p => p ? data.acl_for(p) : rx.of(null)));
 
-        return this._get_acl(sess, src);
+        return this._get_acl(sess, principal$, src);
     }
 }

@@ -831,7 +831,7 @@ export class ObjectTree {
     }
 
     /**
-     * Does this device publish to UNS? uns-ingester-sparkplug publishes
+     * Does this device publish to UNS? The UNS ingester publishes
      * only devices with an ISA-95 hierarchy (at least an Enterprise),
      * and buildDevice leaves every other device out of the tree, so: a
      * device in the tree, under a level. One indexed lookup.

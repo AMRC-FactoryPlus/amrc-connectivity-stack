@@ -343,7 +343,7 @@ same time again; after a gap longer than `I3X_CATCHUP_MAX_GAP_MS`, or more
 than 1,000,000 changes, those rows are dropped, 500 at a time, and read
 again when asked for.
 
-i3X serves the UNS. uns-ingester-sparkplug publishes a device only if its
+i3X serves the UNS. The UNS ingester publishes a device only if its
 birth certificate has an ISA-95 hierarchy with at least an Enterprise, so
 the tree holds only those devices: `buildDevice` leaves out a device
 without one, and drops it when a DeviceInformation change removes it. Like

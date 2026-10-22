@@ -19,6 +19,7 @@ defmodule Ingest.Config do
 
     * `SPARKPLUG_HISTORIAN` - write Sparkplug device data to InfluxDB
     * `UNS_INGESTER` - publish Sparkplug device data to the UNS
+    * `UNS_HISTORIAN` - write the UNS to InfluxDB
 
   ## Factory+
 
@@ -41,13 +42,14 @@ defmodule Ingest.Config do
   For each historian that is on:
 
     * `<PART>_BUCKET` - default `default` for the Sparkplug historian
+      and `uns` for the UNS historian
     * `<PART>_BATCH_SIZE` - flush after this many points; default 5000
     * `<PART>_FLUSH_INTERVAL` - flush at least this often, in
-      milliseconds; default 1000. The JS historian's chart value was
+      milliseconds; default 1000. The JS historians' chart values were
       10000.
     * `<PART>_BUFFER_LIMIT` - the most points its writer holds while
       InfluxDB is slow or down; beyond it, the oldest are dropped.
-      Default 100,000, and at least the batch size. The JS historian
+      Default 100,000, and at least the batch size. The JS historians
       had no limit.
 
   ## Health
@@ -109,7 +111,8 @@ defmodule Ingest.Config do
   # Each part: its variable, and for a historian, its default bucket.
   @parts [
     sparkplug_historian: %{variable: "SPARKPLUG_HISTORIAN", bucket: "default"},
-    uns_ingester: %{variable: "UNS_INGESTER", bucket: nil}
+    uns_ingester: %{variable: "UNS_INGESTER", bucket: nil},
+    uns_historian: %{variable: "UNS_HISTORIAN", bucket: "uns"}
   ]
 
   @log_levels %{
@@ -149,8 +152,8 @@ defmodule Ingest.Config do
   end
 
   defp some_part([]) do
-    variables = Enum.map_join(@parts, " or ", fn {_name, part} -> part.variable end)
-    {:error, "no parts are on: set #{variables} to true"}
+    {last, others} = @parts |> Enum.map(fn {_name, part} -> part.variable end) |> List.pop_at(-1)
+    {:error, "no parts are on: set #{Enum.join(others, ", ")} or #{last} to true"}
   end
 
   defp some_part(parts), do: {:ok, parts}

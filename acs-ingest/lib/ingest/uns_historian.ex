@@ -4,10 +4,13 @@
 
 defmodule Ingest.UnsHistorian do
   @moduledoc """
-  The UNS historian: makes InfluxDB points from the messages under
-  `UNS/v1`. It makes the points the JS UNS historian it replaced wrote,
-  except where those were wrong or crashed it. `Ingest.Uns` hands it the
-  messages and writes the points.
+  The UNS historian: an `Ingest.Uns.Consumer` that writes the messages
+  under `UNS/v1` to InfluxDB. It writes the points the JS UNS historian
+  it replaced wrote, except where those were wrong or crashed it.
+
+  It runs in the UNS path's workers, so decoding and encoding are spread
+  across the cores, and hands each message's lines to an
+  `Ingest.Writer` in one call.
 
   ## Points
 
@@ -75,13 +78,20 @@ defmodule Ingest.UnsHistorian do
     * one InfluxDB couldn't store, or would misread: an integer out of
       range, an infinite float, a timestamp outside 1677 to 2262, and
       the lines `Ingest.LineProtocol` refuses
+
+  ## Options
+
+    * `:writer` - required. The `Ingest.Writer` for the points.
   """
+
+  @behaviour Ingest.Uns.Consumer
 
   require Logger
 
   alias Ingest.JS
   alias Ingest.LineProtocol
   alias Ingest.UnsPayload
+  alias Ingest.Writer
 
   @signed ~w(Int8 Int16 Int32 Int64)
   @unsigned ~w(UInt8 UInt16 UInt32 UInt64)
@@ -92,6 +102,14 @@ defmodule Ingest.UnsHistorian do
   @read ~w(InstanceUUIDPath SchemaUUIDPath Unit Type Simulated RunId)
 
   @levels ~w(enterprise site area workCenter workUnit)
+
+  @impl true
+  def handle_message(topic, payload, properties, received, opts) do
+    case points(topic, payload, properties, received) do
+      [] -> :ok
+      lines -> Writer.write(Keyword.fetch!(opts, :writer), lines, length(lines))
+    end
+  end
 
   @doc """
   The points for a message, as lines of line protocol, each ending in a

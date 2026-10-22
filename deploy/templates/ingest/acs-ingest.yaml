@@ -1,11 +1,13 @@
-{{- if .Values.historians.sparkplug.enabled }}
+{{- $historian := .Values.historians.sparkplug.enabled }}
+{{- $uns := .Values.unsIngesters.sparkplug.enabled }}
+{{- if or $historian $uns }}
 {{- /*
 acs-ingest, the Elixir ingestion service. It runs a part for each
-enabled ingester written in Elixir, so far the Sparkplug historian. Each
-part logs in as its own principal, from its own keytab, as the JS
-services did. The parts log in to Kerberos themselves and retry until
-the KDC answers, so the pod needs neither k5start nor the wait-for-kdc
-init container.
+enabled ingester written in Elixir: the Sparkplug historian and the UNS
+ingester. Each part logs in as its own principal, from its own keytab,
+as the JS services did. The parts log in to Kerberos themselves and
+retry until the KDC answers, so the pod needs neither k5start nor the
+wait-for-kdc init container.
 */}}
 apiVersion: apps/v1
 kind: Deployment
@@ -33,13 +35,23 @@ spec:
         - name: krb5-conf
           configMap:
             name: krb5-conf
-        - name: krb5-keytabs
-          secret:
-            secretName: krb5-keytabs
-            items:
-              {{- if .Values.historians.sparkplug.enabled }}
-              - key: sv1warehouse
-                path: sparkplug-historian
+        # Each part's keytab, from the secret its KerberosKey writes.
+        - name: keytabs
+          projected:
+            sources:
+              {{- if $historian }}
+              - secret:
+                  name: krb5-keytabs
+                  items:
+                    - key: sv1warehouse
+                      path: sparkplug-historian
+              {{- end }}
+              {{- if $uns }}
+              - secret:
+                  name: uns-ingester-sparkplug-keytabs
+                  items:
+                    - key: client
+                      path: uns-ingester
               {{- end }}
 
       containers:
@@ -52,6 +64,7 @@ spec:
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: LOG_LEVEL
               value: {{ .Values.ingest.logLevel | required "values.ingest.logLevel" }}
+            {{- if $historian }}
             - name: INFLUX_URL
               value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_ORG
@@ -61,7 +74,6 @@ spec:
                 secretKeyRef:
                   name: influxdb-auth
                   key: admin-token
-            {{- if .Values.historians.sparkplug.enabled }}
             {{- with .Values.historians.sparkplug }}
             - name: SPARKPLUG_HISTORIAN
               value: "true"
@@ -79,9 +91,21 @@ spec:
               value: {{ .connectTimeout | default 0 | quote }}
             {{- end }}
             {{- end }}
+            {{- if $uns }}
+            {{- with .Values.unsIngesters.sparkplug }}
+            - name: UNS_INGESTER
+              value: "true"
+            - name: UNS_INGESTER_KEYTAB
+              value: /keytabs/uns-ingester
+            - name: UNS_INGESTER_STALL_TIMEOUT
+              value: {{ .stallTimeout | default 0 | quote }}
+            - name: UNS_INGESTER_CONNECT_TIMEOUT
+              value: {{ .connectTimeout | default 0 | quote }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
             - mountPath: /keytabs
-              name: krb5-keytabs
+              name: keytabs
 {{- end }}

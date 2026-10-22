@@ -4,8 +4,9 @@
 
 defmodule Ingest do
   @moduledoc """
-  The ACS ingestion service. It replaces the JS Sparkplug historian, and
-  later the UNS ingester and UNS historian, as parts of one application.
+  The ACS ingestion service. It replaces the JS Sparkplug historian and
+  UNS ingester, and later the UNS historian, as parts of one
+  application.
 
   Each part is an `Ingest.Part`: a subtree with its own Factory+ client,
   logged in as the part's own principal, as the JS services each were,
@@ -16,10 +17,13 @@ defmodule Ingest do
       one per part that writes, named after it (the Sparkplug historian's
       is `Ingest.Writers.SparkplugHistorian`), and their `Finch` pool,
       `Ingest.Finch`
-    * a part per part that is on: `Ingest.Parts.SparkplugHistorian`,
-      whose Sparkplug path's edge node processes make the historian's
-      points, with `Ingest.SparkplugHistorian`, and hand them to its
-      writer
+    * a part per part that is on, each with its own Sparkplug path:
+      * `Ingest.Parts.SparkplugHistorian`, whose edge node processes make
+        the historian's points, with `Ingest.SparkplugHistorian`, and
+        hand them to its writer
+      * `Ingest.Parts.UnsIngester`, whose edge node processes make the
+        UNS messages, with `Ingest.UnsIngester`, and publish them on the
+        part's own MQTT connection
 
   The strategy is `:one_for_one`, so each part restarts on its own. The
   writers come first, so that they stop last and write what the parts
@@ -97,6 +101,23 @@ defmodule Ingest do
   end
 
   defp part_spec(%Config.Part{name: :sparkplug_historian} = config) do
+    sparkplug_part(config, fn _fplus ->
+      {Ingest.SparkplugHistorian, writer: writer(config.name)}
+    end)
+  end
+
+  defp part_spec(%Config.Part{name: :uns_ingester} = config) do
+    sparkplug_part(config, fn fplus ->
+      mqtt = FPlus.mqtt(fplus)
+
+      {Ingest.UnsIngester,
+       publish: &FPlus.MQTT.publish(mqtt, &1, &2, properties: %{"User-Property": &3})}
+    end)
+  end
+
+  # A part whose Sparkplug path hands its updates to one consumer, given
+  # the name of the part's `FPlus`.
+  defp sparkplug_part(config, consumer) do
     name = part(config.name)
     fplus = Part.fplus(name)
     sparkplug = Module.concat(name, "Sparkplug")
@@ -114,7 +135,7 @@ defmodule Ingest do
         name: sparkplug,
         subscribe: &FPlus.MQTT.subscribe(FPlus.mqtt(fplus), &1),
         rebirth: &FPlus.CmdEsc.rebirth(FPlus.http(fplus), &1),
-        consumers: [{Ingest.SparkplugHistorian, writer: writer(config.name)}]}
+        consumers: [consumer.(fplus)]}
      ]}
   end
 end

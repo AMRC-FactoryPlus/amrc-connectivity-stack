@@ -1,37 +1,38 @@
 # ACS Ingest
 
 One Elixir application to replace ACS's Node.js ingestion services. It
-runs them as parts in one pod: the Sparkplug historian first, and later
-the UNS ingester and the UNS historian. Each part has its own Factory+
+runs them as parts in one pod: the Sparkplug historian and the UNS
+ingester, and later the UNS historian. Each part has its own Factory+
 client, logged in as its own principal, as the JS services were, and
-the parts share the InfluxDB writers.
+the historians share the InfluxDB writers.
 
 ## Status
 
-The Sparkplug historian is written, and builds into an image that runs
-on `acs-local`, but isn't yet tested against a real InfluxDB or in the
-Helm chart. The application reads its
-configuration, and starts the Factory+ client
-(`lib/ex-service-client`), a buffered InfluxDB writer for the
-historian (`Ingest.Writer`), and the Sparkplug path
-(`Ingest.Sparkplug`). That keeps each edge node's births, asks unknown
-devices to rebirth, and resolves their data, which the historian
-(`Ingest.SparkplugHistorian`) turns into the points the JS historian
-wrote, apart from the cases where those were wrong.
-`Ingest.StallMonitor` restarts the Factory+ client when messages stop
-or its connection stays down, and stops the service if that doesn't
-help.
+The Sparkplug historian and the UNS ingester are written, and run in
+the Helm chart in place of the JS services. Each part starts its own
+Factory+ client (`lib/ex-service-client`) and Sparkplug path
+(`Ingest.Sparkplug`), which keeps each edge node's births, asks
+unknown devices to rebirth, and resolves their data. The historian
+(`Ingest.SparkplugHistorian`) turns that into the points the JS
+historian wrote, through a buffered InfluxDB writer (`Ingest.Writer`),
+and the UNS ingester (`Ingest.UnsIngester`) into the UNS messages the
+JS UNS ingester published, apart from the cases where those were
+wrong. Each part's `Ingest.StallMonitor` restarts its Factory+ client
+when messages stop or its connection stays down, and stops the service
+if that doesn't help.
 
 ## Configuration
 
 The configuration comes from the environment. Variables the parts
 share have plain names, and a part's own start with its name.
-`Ingest.Config` (`lib/ingest/config.ex`) documents each one. The
-Sparkplug historian needs at least:
+`Ingest.Config` (`lib/ingest/config.ex`) documents each one. It needs
+at least:
 
 - `DIRECTORY_URL` and `KRB5_CONFIG`
-- `SPARKPLUG_HISTORIAN=true` and `SPARKPLUG_HISTORIAN_KEYTAB`
-- `INFLUX_URL`, `INFLUX_ORG` and `INFLUX_TOKEN`
+- for the Sparkplug historian, `SPARKPLUG_HISTORIAN=true`,
+  `SPARKPLUG_HISTORIAN_KEYTAB`, and `INFLUX_URL`, `INFLUX_ORG` and
+  `INFLUX_TOKEN`
+- for the UNS ingester, `UNS_INGESTER=true` and `UNS_INGESTER_KEYTAB`
 
 If the configuration is missing or invalid, the application doesn't
 start, and logs which variable is wrong.

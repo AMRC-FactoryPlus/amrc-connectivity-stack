@@ -70,7 +70,6 @@ subdirs+= edge-sim
 subdirs+= edge-test
 subdirs+= edge-tplink-smartplug
 subdirs+= historian-uns
-subdirs+= uns-ingester-sparkplug
 
 
 include ${mk}/acs.subdirs.mk

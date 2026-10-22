@@ -124,6 +124,25 @@ this file and `.gitignore`, the copy is unchanged from the Hex package.
    `lists:min/1`. It now adds no KDCs from DNS in that case. The service
    client's `test/kerlberos_fork_config_test.exs` checks both patches,
    including with a `krb5.conf` as ACS's Helm template renders it.
+8. **KDCs from DNS only when none are configured**
+   (`src/krb_realm_conf.erl`, `configure/2`). kerlberos added the KDCs
+   it found in DNS to the ones `krb5.conf` names, where MIT Kerberos
+   only asks DNS when the configuration names none. In the `acs-local`
+   cluster, whose DNS answers an SRV query for any name under
+   `acs.localhost` with Traefik's ports, that added seven "KDCs" to the
+   real one. kerlberos opens TCP connections to only three KDCs, picked
+   at random, so it usually left the real one out, Traefik never
+   answered, and logins hung. It now asks DNS only when the
+   configuration names no KDCs.
+9. **`udp_preference_limit`** (`src/krb_realm_conf.erl`,
+   `src/krb_proto_srv.erl`, `src/krb_req_fsm.erl`). kerlberos sent any
+   message under 1500 bytes by UDP first. It now reads
+   `udp_preference_limit`, defaulting to MIT's 1465, and sends a larger
+   message by TCP first, as MIT does. ACS's `krb5.conf` sets 1, as the
+   ACS KDC's service only listens on TCP. Trying UDP first cost about
+   10 s for each login and each ticket request there.
+   `test/kerlberos_fork_config_test.exs` checks both patches. Neither
+   adds a compiler warning.
 
 Patches 1 and 2 were checked against the `acs-local` KDC and broker on
 2026-10-19: password and keytab logins (the keytab one as
@@ -147,14 +166,18 @@ Not patched:
 - `krb_mit_keytab:file/1` matches `{err, _}` where it means
   `{error, _}`, so it crashes on any read error. The service client
   reads keytabs itself and calls `krb_mit_keytab:parse/1`.
-- kerlberos ignores two settings in ACS's `krb5.conf`.
-  `udp_preference_limit = 1` tells MIT clients to use TCP, but kerlberos
-  tries UDP first, which only costs time where UDP isn't reachable.
-  `disable_encrypted_timestamp = true` tells MIT clients to use SPAKE
-  pre-authentication, but kerlberos only has encrypted timestamps, which
-  the KDC still accepts.
-- On OTP 29 kerlberos compiles with 23 warnings, mostly the deprecated
-  `catch` expression. A later OTP may turn these into errors.
+- kerlberos ignores `disable_encrypted_timestamp = true` in ACS's
+  `krb5.conf`, which tells MIT clients to use SPAKE pre-authentication.
+  kerlberos only has encrypted timestamps, which the KDC still accepts.
+- Each KDC's UDP state machine pings it with an anonymous request when
+  it starts, then every minute, or every 6 s while it gets no answer,
+  even when `udp_preference_limit` (patch 9) sends every request by
+  TCP. A TCP-only KDC never answers. The pings are small and harmless,
+  but a request sent by UDP waits behind one in progress. Unlike MIT,
+  kerlberos doesn't try UDP when TCP fails.
+- On OTP 29 kerlberos compiles with 28 warnings (counted at patch 9),
+  mostly the deprecated `catch` expression. A later OTP may turn these
+  into errors.
 
 ## Updating
 

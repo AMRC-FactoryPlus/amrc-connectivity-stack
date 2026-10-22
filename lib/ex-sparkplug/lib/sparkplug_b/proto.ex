@@ -283,7 +283,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload do
 
   @type t :: %__MODULE__{
           body: binary() | nil,
-          uuid: String.t() | nil,
+          uuid: binary() | nil,
           seq: non_neg_integer() | nil,
           metrics: [SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric.t()],
           timestamp: non_neg_integer() | nil,
@@ -301,7 +301,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload do
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric}},
                 {:seq, 3, :optional, {:scalar, 0}, :uint64},
                 {:timestamp, 1, :optional, {:scalar, 0}, :uint64},
-                {:uuid, 4, :optional, {:scalar, ""}, :string}
+                {:uuid, 4, :optional, {:scalar, ""}, :bytes}
               ],
               %{
                 cc_enable_arenas: nil,
@@ -388,7 +388,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload do
         _value ->
           (
             delimited = :erlang.map_get(:uuid, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["\"", delimited_prefix, delimited | acc],
@@ -535,7 +535,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload do
 
           <<"\"", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | uuid: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | uuid: delimited}
             parse_key_value(rest, msg)
 
           <<"\x18", 0::1, varint_value::7, rest::binary>> ->
@@ -617,14 +617,14 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric do
           datatype: non_neg_integer() | nil,
           timestamp: non_neg_integer() | nil,
           alias: non_neg_integer() | nil,
-          name: String.t() | nil,
+          name: binary() | nil,
           value:
             {:int_value, non_neg_integer()}
             | {:long_value, non_neg_integer()}
             | {:float_value, float()}
             | {:double_value, float()}
             | {:boolean_value, boolean()}
-            | {:string_value, String.t()}
+            | {:string_value, binary()}
             | {:bytes_value, binary()}
             | {:dataset_value, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.t()}
             | {:template_value, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.t()}
@@ -668,10 +668,10 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric do
                 {:long_value, 11, :optional, {:oneof, :value}, :uint64},
                 {:metadata, 8, :optional, {:scalar, nil},
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData}},
-                {:name, 1, :optional, {:scalar, ""}, :string},
+                {:name, 1, :optional, {:scalar, ""}, :bytes},
                 {:properties, 9, :optional, {:scalar, nil},
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet}},
-                {:string_value, 15, :optional, {:oneof, :value}, :string},
+                {:string_value, 15, :optional, {:oneof, :value}, :bytes},
                 {:template_value, 18, :optional, {:oneof, :value},
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template}},
                 {:timestamp, 3, :optional, {:scalar, 0}, :uint64}
@@ -805,7 +805,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric do
         {:string_value, child_field_value} ->
           (
             delimited = child_field_value
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["z", delimited_prefix, delimited | acc],
@@ -996,7 +996,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric do
         _value ->
           (
             delimited = :erlang.map_get(:name, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["\n", delimited_prefix, delimited | acc],
@@ -1176,7 +1176,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric do
 
           <<"z", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | value: {:string_value, Protox.Decode.validate_string!(delimited)}}
+            msg = %{msg | value: {:string_value, delimited}}
             parse_key_value(rest, msg)
 
           <<"p", 0::1, varint_value::7, rest::binary>> ->
@@ -1329,7 +1329,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric do
 
           <<"\n", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | name: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | name: delimited}
             parse_key_value(rest, msg)
 
           <<bytes::binary>> ->
@@ -1372,7 +1372,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet do
   @type t :: %__MODULE__{
           rows: [SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.Row.t()],
           types: [non_neg_integer()],
-          columns: [String.t()],
+          columns: [binary()],
           num_of_columns: non_neg_integer() | nil,
           __uf__: [{non_neg_integer(), Protox.Types.tag(), binary()}]
         }
@@ -1383,7 +1383,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet do
               SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet,
               :proto2,
               [
-                {:columns, 2, :repeated, :unpacked, :string},
+                {:columns, 2, :repeated, :unpacked, :bytes},
                 {:num_of_columns, 1, :optional, {:scalar, 0}, :uint64},
                 {:rows, 4, :repeated, :unpacked,
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.Row}},
@@ -1553,7 +1553,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet do
         (
           (
             delimited = value
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           value_bytes = [delimited_prefix, delimited]
@@ -1680,14 +1680,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet do
 
           <<"\x12", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-
-            msg = %{
-              msg
-              | columns: [
-                  Protox.Decode.validate_string!(delimited) | :erlang.map_get(:columns, msg)
-                ]
-            }
-
+            msg = %{msg | columns: [delimited | :erlang.map_get(:columns, msg)]}
             parse_key_value(rest, msg)
 
           <<"\b", 0::1, varint_value::7, rest::binary>> ->
@@ -1964,7 +1957,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.DataSetValu
             | {:float_value, float()}
             | {:double_value, float()}
             | {:boolean_value, boolean()}
-            | {:string_value, String.t()}
+            | {:string_value, binary()}
             | {:extension_value,
                SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.DataSetValue.DataSetValueExtension.t()}
             | nil,
@@ -1985,7 +1978,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.DataSetValu
                 {:float_value, 3, :optional, {:oneof, :value}, :float},
                 {:int_value, 1, :optional, {:oneof, :value}, :uint32},
                 {:long_value, 2, :optional, {:oneof, :value}, :uint64},
-                {:string_value, 6, :optional, {:oneof, :value}, :string}
+                {:string_value, 6, :optional, {:oneof, :value}, :bytes}
               ],
               %{
                 cc_enable_arenas: nil,
@@ -2066,7 +2059,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.DataSetValu
         {:string_value, child_field_value} ->
           (
             delimited = child_field_value
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["2", delimited_prefix, delimited | acc],
@@ -2213,7 +2206,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.DataSet.DataSetValu
 
           <<"2", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | value: {:string_value, Protox.Decode.validate_string!(delimited)}}
+            msg = %{msg | value: {:string_value, delimited}}
             parse_key_value(rest, msg)
 
           <<"(", 0::1, varint_value::7, rest::binary>> ->
@@ -2441,13 +2434,13 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
   end
 
   @type t :: %__MODULE__{
-          description: String.t() | nil,
-          md5: String.t() | nil,
-          file_type: String.t() | nil,
-          file_name: String.t() | nil,
+          description: binary() | nil,
+          md5: binary() | nil,
+          file_type: binary() | nil,
+          file_name: binary() | nil,
           seq: non_neg_integer() | nil,
           size: non_neg_integer() | nil,
-          content_type: String.t() | nil,
+          content_type: binary() | nil,
           is_multi_part: boolean() | nil,
           __uf__: [{non_neg_integer(), Protox.Types.tag(), binary()}]
         }
@@ -2466,12 +2459,12 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
               SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData,
               :proto2,
               [
-                {:content_type, 2, :optional, {:scalar, ""}, :string},
-                {:description, 8, :optional, {:scalar, ""}, :string},
-                {:file_name, 5, :optional, {:scalar, ""}, :string},
-                {:file_type, 6, :optional, {:scalar, ""}, :string},
+                {:content_type, 2, :optional, {:scalar, ""}, :bytes},
+                {:description, 8, :optional, {:scalar, ""}, :bytes},
+                {:file_name, 5, :optional, {:scalar, ""}, :bytes},
+                {:file_type, 6, :optional, {:scalar, ""}, :bytes},
                 {:is_multi_part, 1, :optional, {:scalar, false}, :bool},
-                {:md5, 7, :optional, {:scalar, ""}, :string},
+                {:md5, 7, :optional, {:scalar, ""}, :bytes},
                 {:seq, 4, :optional, {:scalar, 0}, :uint64},
                 {:size, 3, :optional, {:scalar, 0}, :uint64}
               ],
@@ -2547,7 +2540,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
         _value ->
           (
             delimited = :erlang.map_get(:description, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["B", delimited_prefix, delimited | acc],
@@ -2563,7 +2556,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
         _value ->
           (
             delimited = :erlang.map_get(:md5, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {[":", delimited_prefix, delimited | acc],
@@ -2579,7 +2572,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
         _value ->
           (
             delimited = :erlang.map_get(:file_type, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["2", delimited_prefix, delimited | acc],
@@ -2595,7 +2588,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
         _value ->
           (
             delimited = :erlang.map_get(:file_name, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["*", delimited_prefix, delimited | acc],
@@ -2641,7 +2634,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
         _value ->
           (
             delimited = :erlang.map_get(:content_type, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["\x12", delimited_prefix, delimited | acc],
@@ -2726,22 +2719,22 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
 
           <<"B", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | description: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | description: delimited}
             parse_key_value(rest, msg)
 
           <<":", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | md5: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | md5: delimited}
             parse_key_value(rest, msg)
 
           <<"2", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | file_type: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | file_type: delimited}
             parse_key_value(rest, msg)
 
           <<"*", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | file_name: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | file_name: delimited}
             parse_key_value(rest, msg)
 
           <<" ", 0::1, varint_value::7, rest::binary>> ->
@@ -2766,7 +2759,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.MetaData do
 
           <<"\x12", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | content_type: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | content_type: delimited}
             parse_key_value(rest, msg)
 
           <<"\b", 0::1, varint_value::7, rest::binary>> ->
@@ -2965,7 +2958,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet do
 
   @type t :: %__MODULE__{
           values: [SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertyValue.t()],
-          keys: [String.t()],
+          keys: [binary()],
           __uf__: [{non_neg_integer(), Protox.Types.tag(), binary()}]
         }
   defstruct values: [], keys: [], __uf__: []
@@ -2975,7 +2968,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet do
               SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet,
               :proto2,
               [
-                {:keys, 1, :repeated, :unpacked, :string},
+                {:keys, 1, :repeated, :unpacked, :bytes},
                 {:values, 2, :repeated, :unpacked,
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertyValue}}
               ],
@@ -3088,7 +3081,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet do
         (
           (
             delimited = value
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           value_bytes = [delimited_prefix, delimited]
@@ -3187,12 +3180,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet do
 
           <<"\n", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-
-            msg = %{
-              msg
-              | keys: [Protox.Decode.validate_string!(delimited) | :erlang.map_get(:keys, msg)]
-            }
-
+            msg = %{msg | keys: [delimited | :erlang.map_get(:keys, msg)]}
             parse_key_value(rest, msg)
 
           <<bytes::binary>> ->
@@ -3234,10 +3222,10 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template do
 
   @type t :: %__MODULE__{
           is_definition: boolean() | nil,
-          template_ref: String.t() | nil,
+          template_ref: binary() | nil,
           parameters: [SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter.t()],
           metrics: [SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric.t()],
-          version: String.t() | nil,
+          version: binary() | nil,
           __uf__: [{non_neg_integer(), Protox.Types.tag(), binary()}]
         }
   defstruct is_definition: nil,
@@ -3257,8 +3245,8 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template do
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Metric}},
                 {:parameters, 3, :repeated, :unpacked,
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter}},
-                {:template_ref, 4, :optional, {:scalar, ""}, :string},
-                {:version, 1, :optional, {:scalar, ""}, :string}
+                {:template_ref, 4, :optional, {:scalar, ""}, :bytes},
+                {:version, 1, :optional, {:scalar, ""}, :bytes}
               ],
               %{
                 cc_enable_arenas: nil,
@@ -3340,7 +3328,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template do
         _value ->
           (
             delimited = :erlang.map_get(:template_ref, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["\"", delimited_prefix, delimited | acc],
@@ -3378,7 +3366,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template do
         _value ->
           (
             delimited = :erlang.map_get(:version, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["\n", delimited_prefix, delimited | acc],
@@ -3521,7 +3509,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template do
 
           <<"\"", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | template_ref: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | template_ref: delimited}
             parse_key_value(rest, msg)
 
           <<"\x1A", bytes::binary>> ->
@@ -3554,7 +3542,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template do
 
           <<"\n", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | version: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | version: delimited}
             parse_key_value(rest, msg)
 
           <<bytes::binary>> ->
@@ -3603,7 +3591,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertyValue do
             | {:float_value, float()}
             | {:double_value, float()}
             | {:boolean_value, boolean()}
-            | {:string_value, String.t()}
+            | {:string_value, binary()}
             | {:propertyset_value,
                SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet.t()}
             | {:propertysets_value,
@@ -3633,7 +3621,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertyValue do
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySet}},
                 {:propertysets_value, 10, :optional, {:oneof, :value},
                  {:message, SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertySetList}},
-                {:string_value, 8, :optional, {:oneof, :value}, :string},
+                {:string_value, 8, :optional, {:oneof, :value}, :bytes},
                 {:type, 1, :optional, {:scalar, 0}, :uint32}
               ],
               %{
@@ -3753,7 +3741,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertyValue do
         {:string_value, child_field_value} ->
           (
             delimited = child_field_value
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["B", delimited_prefix, delimited | acc],
@@ -3998,7 +3986,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.PropertyValue do
 
           <<"B", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | value: {:string_value, Protox.Decode.validate_string!(delimited)}}
+            msg = %{msg | value: {:string_value, delimited}}
             parse_key_value(rest, msg)
 
           <<"8", 0::1, varint_value::7, rest::binary>> ->
@@ -4468,14 +4456,14 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter 
 
   @type t :: %__MODULE__{
           type: non_neg_integer() | nil,
-          name: String.t() | nil,
+          name: binary() | nil,
           value:
             {:int_value, non_neg_integer()}
             | {:long_value, non_neg_integer()}
             | {:float_value, float()}
             | {:double_value, float()}
             | {:boolean_value, boolean()}
-            | {:string_value, String.t()}
+            | {:string_value, binary()}
             | {:extension_value,
                SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter.ParameterValueExtension.t()}
             | nil,
@@ -4496,8 +4484,8 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter 
                 {:float_value, 5, :optional, {:oneof, :value}, :float},
                 {:int_value, 3, :optional, {:oneof, :value}, :uint32},
                 {:long_value, 4, :optional, {:oneof, :value}, :uint64},
-                {:name, 1, :optional, {:scalar, ""}, :string},
-                {:string_value, 8, :optional, {:oneof, :value}, :string},
+                {:name, 1, :optional, {:scalar, ""}, :bytes},
+                {:string_value, 8, :optional, {:oneof, :value}, :bytes},
                 {:type, 2, :optional, {:scalar, 0}, :uint32}
               ],
               %{
@@ -4585,7 +4573,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter 
         {:string_value, child_field_value} ->
           (
             delimited = child_field_value
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["B", delimited_prefix, delimited | acc],
@@ -4669,7 +4657,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter 
         _value ->
           (
             delimited = :erlang.map_get(:name, msg)
-            delimited_prefix = Protox.Encode.encode_string_prefix(delimited)
+            delimited_prefix = Protox.Varint.encode(byte_size(delimited))
           )
 
           {["\n", delimited_prefix, delimited | acc],
@@ -4771,7 +4759,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter 
 
           <<"B", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | value: {:string_value, Protox.Decode.validate_string!(delimited)}}
+            msg = %{msg | value: {:string_value, delimited}}
             parse_key_value(rest, msg)
 
           <<"8", 0::1, varint_value::7, rest::binary>> ->
@@ -4826,7 +4814,7 @@ defmodule SparkplugB.Proto.Org.Eclipse.Tahu.Protobuf.Payload.Template.Parameter 
 
           <<"\n", bytes::binary>> ->
             {delimited, rest} = Protox.Decode.parse_delimited(bytes)
-            msg = %{msg | name: Protox.Decode.validate_string!(delimited)}
+            msg = %{msg | name: delimited}
             parse_key_value(rest, msg)
 
           <<bytes::binary>> ->

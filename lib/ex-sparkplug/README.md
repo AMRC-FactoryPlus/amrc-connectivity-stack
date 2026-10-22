@@ -32,7 +32,8 @@ DATA messages may leave a metric's datatype out, because the birth gave
 it. Such a metric keeps its raw protobuf value, such as
 `{:long_value, 42}`, until `SparkplugB.Metric.with_datatype/2` converts
 it. Datasets, templates, arrays and extensions are not converted yet
-and also stay raw. See `SparkplugB.Metric` for the full rules.
+and also stay raw, as does an integer out of range for its type. See
+`SparkplugB.Metric` for the full rules.
 
 ## Topics
 
@@ -89,17 +90,28 @@ not edit it by hand.
 at commit `46f25e79f3`. It is licensed under EPL-2.0, as its header
 says; the rest of this library is MIT like the rest of ACS.
 
+The code is generated from a copy of it with every `string` field
+read as `bytes`. Protox refuses a whole payload with invalid UTF-8 in
+any string, where Tahu JS replaces the bad bytes with U+FFFD; reading
+them as bytes lets the library do the same (`SparkplugB.Value.text/1`).
+
 To regenerate after changing the `.proto` (needs `protoc` on the
 `PATH`):
 
 ```sh
+mkdir -p /tmp/sparkplug-bytes
+sed -E 's/\bstring\b/bytes/g' proto/sparkplug_b.proto \
+    > /tmp/sparkplug-bytes/sparkplug_b.proto
 mix protox.generate \
     --output-path=lib/sparkplug_b/proto.ex \
-    --include-path=proto \
+    --include-path=/tmp/sparkplug-bytes \
     --namespace=SparkplugB.Proto \
-    proto/sparkplug_b.proto
+    /tmp/sparkplug-bytes/sparkplug_b.proto
 mix format
 ```
+
+Check that the `sed` changed only field types (`grep -nw string
+proto/sparkplug_b.proto`).
 
 ## Development
 

@@ -9,6 +9,7 @@ name: Build & Release ACS
 
 env:
   BASE_JS_VERSION: v4.1.0
+  BASE_EX_VERSION: v1.0.0
 
 on:
   workflow_call: {}
@@ -132,6 +133,124 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
           digest: ${{ steps.merge.outputs.digest }}
+  build-base-ex-amd64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        type:
+          - ex-build
+          - ex-run
+    steps:
+      - name: Check if build required
+        id: check
+        run: |
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-amd64 || echo "needs-build=true" >> $GITHUB_OUTPUT
+      - name: Checkout
+        if: steps.check.outputs.needs-build == 'true'
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        if: steps.check.outputs.needs-build == 'true'
+        id: prepare
+        with:
+          service-name: acs-base
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        id: build-and-push
+        if: steps.check.outputs.needs-build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          file: ./acs-base-images/Dockerfile.${{ matrix.type }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-amd64
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-amd64
+          cache-to: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-amd64,mode=max,ignore-error=true
+  build-base-ex-arm64:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        type:
+          - ex-build
+          - ex-run
+    steps:
+      - name: Check if build required
+        id: check
+        run: |
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-arm64 || echo "needs-build=true" >> $GITHUB_OUTPUT
+      - name: Checkout
+        if: steps.check.outputs.needs-build == 'true'
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        if: steps.check.outputs.needs-build == 'true'
+        id: prepare
+        with:
+          service-name: acs-base
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        id: build-and-push
+        if: steps.check.outputs.needs-build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          file: ./acs-base-images/Dockerfile.${{ matrix.type }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-arm64
+          labels: ${{ steps.prepare.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-arm64
+          cache-to: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:buildcache-arm64,mode=max,ignore-error=true
+  build-base-ex-merge:
+    runs-on: ubuntu-latest
+    needs: [build-base-ex-amd64, build-base-ex-arm64]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        type:
+          - ex-build
+          - ex-run
+    steps:
+      - name: Check if build required
+        id: check
+        run: |
+          docker manifest inspect ghcr.io/amrc-factoryplus/acs-base-${{ matrix.type }}:${{ env.BASE_EX_VERSION }} || echo "needs-build=true" >> $GITHUB_OUTPUT
+      - name: Checkout
+        if: steps.check.outputs.needs-build == 'true'
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        if: steps.check.outputs.needs-build == 'true'
+        id: prepare
+        with:
+          service-name: acs-base
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest
+        id: merge
+        if: steps.check.outputs.needs-build == 'true'
+        run: |
+          docker buildx imagetools create -t ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }} \
+            ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-amd64 \
+            ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }}-arm64
+          digest=$(docker buildx imagetools inspect ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}:${{ env.BASE_EX_VERSION }} --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=${digest}" >> $GITHUB_OUTPUT
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        if: steps.check.outputs.needs-build == 'true'
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}-${{ matrix.type }}
+          digest: ${{ steps.merge.outputs.digest }}
   build-base-pg-build:
     runs-on: ubuntu-latest
     needs: build-base-js-merge
@@ -242,9 +361,6 @@ jobs:
           - acs-service-setup
           - acs-visualiser
           - edge-helm-charts
-          - historian-sparkplug
-          - historian-uns
-          - uns-ingester-sparkplug
           - acs-opcua-server-edge
           - acs-i3x
     permissions:
@@ -274,6 +390,48 @@ jobs:
             tag=${{ steps.prepare.outputs.version }}
             revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
             base_version=${{ env.BASE_JS_VERSION }}
+          build-contexts: |
+            lib=./lib
+      - uses: ./.github/actions/cleanup
+        id: cleanup
+        with:
+          version: ${{ steps.prepare.outputs.version }}
+          service-name: ${{ steps.prepare.outputs.service-name }}
+          digest: ${{ steps.build-and-push.outputs.digest }}
+  build-x86-ex:
+    needs: [ build-base-ex-merge ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - acs-ingest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare
+        id: prepare
+        with:
+          service-name: ${{ matrix.service }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        id: build-and-push
+        with:
+          context: ./${{ steps.prepare.outputs.service-name }}
+          push: true
+          tags: ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:${{ steps.prepare.outputs.version }}
+          labels: ${{  steps.prepare.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/amrc-factoryplus/${{ steps.prepare.outputs.service-name }}:buildcache,mode=max,ignore-error=true
+          build-args: |
+            tag=${{ steps.prepare.outputs.version }}
+            revision=${{ steps.prepare.outputs.version }} (${{ github.sha }})
+            base_version=${{ env.BASE_EX_VERSION }}
           build-contexts: |
             lib=./lib
       - uses: ./.github/actions/cleanup
@@ -599,7 +757,7 @@ jobs:
 
   build-helm-chart:
     if: github.event_name == 'release'
-    needs: [ 'build-x86-js', 'build-arm-js-merge', 'build-x86-pg', 'java-services', 'build-keycloak' ]
+    needs: [ 'build-x86-js', 'build-x86-ex', 'build-arm-js-merge', 'build-x86-pg', 'java-services', 'build-keycloak' ]
     runs-on: ubuntu-latest
     steps:
       - name: Install Helm

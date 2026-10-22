@@ -38,7 +38,8 @@
     start_link/1,
     drain/1,
     start_req/6,
-    cancel_req/2
+    cancel_req/2,
+    udp_preference_limit/1
     ]).
 
 -export([
@@ -71,6 +72,12 @@ scrub_msgq(Ref) ->
     after 0 ->
         ok
     end.
+
+%% ACS patch: the largest message to send by UDP first; see
+%% krb_req_fsm:wait/3.
+-spec udp_preference_limit(krb_proto_srv()) -> non_neg_integer().
+udp_preference_limit(Pid) ->
+    gen_server:call(Pid, udp_preference_limit, infinity).
 
 -spec cancel_req(krb_proto_srv(), reference()) -> ok.
 cancel_req(Pid, Ref) ->
@@ -152,6 +159,8 @@ get_n_prefs_proto(udp, S0 = #?MODULE{udps = Pids0}, N, Call) ->
     {PRefs, S0#?MODULE{udps = Pids1}}.
 
 %% @private
+handle_call(udp_preference_limit, _From, S0 = #?MODULE{config = Config}) ->
+    {reply, maps:get(udp_preference_limit, Config, 1465), S0};
 handle_call({req, _Pid, _Proto, _N, _Type, _Msg, _Expect}, From,
                                             S0 = #?MODULE{drain = Drainer})
                                             when Drainer =/= undefined ->

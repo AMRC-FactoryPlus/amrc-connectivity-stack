@@ -1,0 +1,163 @@
+{{- $sparkplugHistorian := .Values.historians.sparkplug.enabled }}
+{{- $unsIngester := .Values.unsIngesters.sparkplug.enabled }}
+{{- $unsHistorian := .Values.historians.uns.enabled }}
+{{- if or $sparkplugHistorian $unsIngester $unsHistorian }}
+{{- /*
+acs-ingest, the Elixir ingestion service. It runs a part for each
+enabled ingester written in Elixir: the Sparkplug historian, the UNS
+ingester and the UNS historian. Each part logs in as its own principal,
+from its own keytab, as the JS services did. The parts log in to
+Kerberos themselves and retry until the KDC answers, so the pod needs
+neither k5start nor the wait-for-kdc init container.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acs-ingest
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: acs-ingest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: acs-ingest
+  template:
+    metadata:
+      labels:
+        component: acs-ingest
+        factory-plus.service: acs-ingest
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        # Each part's keytab, from the secret its KerberosKey writes.
+        - name: keytabs
+          projected:
+            sources:
+              {{- if $sparkplugHistorian }}
+              - secret:
+                  name: krb5-keytabs
+                  items:
+                    - key: sv1warehouse
+                      path: sparkplug-historian
+              {{- end }}
+              {{- if $unsIngester }}
+              - secret:
+                  name: uns-ingester-sparkplug-keytabs
+                  items:
+                    - key: client
+                      path: uns-ingester
+              {{- end }}
+              {{- if $unsHistorian }}
+              - secret:
+                  name: historian-uns-keytabs
+                  items:
+                    - key: client
+                      path: uns-historian
+              {{- end }}
+      {{- if $unsHistorian }}
+      initContainers:
+        # The UNS historian's bucket, with a v1 mapping for InfluxQL.
+        - name: create-bucket
+          image: "{{.Values.influxdb2.image.repository}}:{{.Values.influxdb2.image.tag}}"
+          env:
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: admin-token
+                  name: influxdb-auth
+            - name: INFLUX_HOST
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+          command:
+            - /bin/sh
+            - "-ec"
+            - |+
+              if ! influx bucket list -o default -n uns
+              then
+                influx bucket create --name uns --retention 0 --org default
+                UNS_BUCKET_ID=$(influx bucket list --name uns --org default | awk 'NR==2 {print $1}')
+                influx v1 dbrp create --bucket-id $UNS_BUCKET_ID --db uns --rp uns --default --org default
+              fi
+      {{- end }}
+
+      containers:
+        - name: acs-ingest
+{{ include "amrc-connectivity-stack.image" (list . .Values.ingest) | indent 10 }}
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: LOG_LEVEL
+              value: {{ .Values.ingest.logLevel | required "values.ingest.logLevel" }}
+            {{- if or $sparkplugHistorian $unsHistorian }}
+            - name: INFLUX_URL
+              value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
+            - name: INFLUX_ORG
+              value: default
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
+            {{- end }}
+            {{- if $sparkplugHistorian }}
+            {{- with .Values.historians.sparkplug }}
+            - name: SPARKPLUG_HISTORIAN
+              value: "true"
+            - name: SPARKPLUG_HISTORIAN_KEYTAB
+              value: /keytabs/sparkplug-historian
+            - name: SPARKPLUG_HISTORIAN_BUCKET
+              value: default
+            - name: SPARKPLUG_HISTORIAN_BATCH_SIZE
+              value: {{ .batchSize | quote | required "values.historians.sparkplug.batchSize" }}
+            - name: SPARKPLUG_HISTORIAN_FLUSH_INTERVAL
+              value: {{ .flushInterval | quote | required "values.historians.sparkplug.flushInterval" }}
+            - name: SPARKPLUG_HISTORIAN_STALL_TIMEOUT
+              value: {{ .stallTimeout | default 0 | quote }}
+            - name: SPARKPLUG_HISTORIAN_CONNECT_TIMEOUT
+              value: {{ .connectTimeout | default 0 | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $unsIngester }}
+            {{- with .Values.unsIngesters.sparkplug }}
+            - name: UNS_INGESTER
+              value: "true"
+            - name: UNS_INGESTER_KEYTAB
+              value: /keytabs/uns-ingester
+            - name: UNS_INGESTER_STALL_TIMEOUT
+              value: {{ .stallTimeout | default 0 | quote }}
+            - name: UNS_INGESTER_CONNECT_TIMEOUT
+              value: {{ .connectTimeout | default 0 | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $unsHistorian }}
+            {{- with .Values.historians.uns }}
+            - name: UNS_HISTORIAN
+              value: "true"
+            - name: UNS_HISTORIAN_KEYTAB
+              value: /keytabs/uns-historian
+            - name: UNS_HISTORIAN_BUCKET
+              value: uns
+            - name: UNS_HISTORIAN_BATCH_SIZE
+              value: {{ .batchSize | quote | required "values.historians.uns.batchSize" }}
+            - name: UNS_HISTORIAN_FLUSH_INTERVAL
+              value: {{ .flushInterval | quote | required "values.historians.uns.flushInterval" }}
+            - name: UNS_HISTORIAN_STALL_TIMEOUT
+              value: {{ .stallTimeout | default 0 | quote }}
+            - name: UNS_HISTORIAN_CONNECT_TIMEOUT
+              value: {{ .connectTimeout | default 0 | quote }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+{{- end }}

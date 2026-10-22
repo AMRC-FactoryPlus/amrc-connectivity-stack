@@ -7,7 +7,7 @@ registry?=ghcr.io/amrc-factoryplus
 repo?=acs-base
 suffix?=
 
-images=		js-build js-run pg-build pg-run
+images=		js-build js-run pg-build pg-run ex-build ex-run
 tag.base=	${registry}/${repo}
 tag.version=	${version}${suffix}
 

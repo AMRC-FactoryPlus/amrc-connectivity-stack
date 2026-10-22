@@ -1,0 +1,104 @@
+# ACS Ingest
+
+One Elixir application to replace ACS's Node.js ingestion services. It
+runs them as parts in one pod: the Sparkplug historian, the UNS
+ingester and the UNS historian. Each part has its own Factory+ client,
+logged in as its own principal, as the JS services were, and the
+historians share the InfluxDB writers' HTTP pool.
+
+## Status
+
+The Sparkplug historian, the UNS ingester and the UNS historian are
+written, and run in the Helm chart in place of the JS services. Each
+part starts its own Factory+ client (`lib/ex-service-client`). The
+Sparkplug historian and the UNS ingester each have a Sparkplug path
+(`Ingest.Sparkplug`), which keeps each edge node's births, asks
+unknown devices to rebirth, and resolves their data. The Sparkplug
+historian (`Ingest.SparkplugHistorian`) turns that into the points
+the JS historian wrote, through a buffered InfluxDB writer
+(`Ingest.Writer`), and the UNS ingester (`Ingest.UnsIngester`) into
+the UNS messages the JS UNS ingester published. The UNS historian has
+a UNS path (`Ingest.Uns`), which spreads the messages under `UNS/v1`
+across workers by topic, and turns them (`Ingest.UnsHistorian`) into
+the points the JS UNS historian wrote, through its own writer. Each
+differs from the JS only where the JS was wrong. Each part's
+`Ingest.StallMonitor` restarts its Factory+ client when messages stop
+or its connection stays down, and stops the service if that doesn't
+help.
+
+## Configuration
+
+The configuration comes from the environment. Variables the parts
+share have plain names, and a part's own start with its name.
+`Ingest.Config` (`lib/ingest/config.ex`) documents each one. It needs
+at least:
+
+- `DIRECTORY_URL` and `KRB5_CONFIG`
+- for the Sparkplug historian, `SPARKPLUG_HISTORIAN=true`,
+  `SPARKPLUG_HISTORIAN_KEYTAB`, and `INFLUX_URL`, `INFLUX_ORG` and
+  `INFLUX_TOKEN`
+- for the UNS ingester, `UNS_INGESTER=true` and `UNS_INGESTER_KEYTAB`
+- for the UNS historian, `UNS_HISTORIAN=true`, `UNS_HISTORIAN_KEYTAB`,
+  and the `INFLUX_*` variables
+
+If the configuration is missing or invalid, the application doesn't
+start, and logs which variable is wrong.
+
+## Development
+
+```sh
+mix deps.get
+mix test
+mix format --check-formatted
+mix credo
+```
+
+The application reads its configuration when it starts, so `mix test`
+doesn't start it (see `mix.exs`); tests start what they need.
+
+### On acs-local
+
+Tests tagged `:acs_local` need the local test cluster, and are excluded
+by default. They log in as `sv1warehouse` from its keytab:
+
+```sh
+umask 077
+acs-local kubectl get secret krb5-keytabs -n factory-plus \
+    -o jsonpath='{.data.sv1warehouse}' | base64 -d > /tmp/sv1warehouse.keytab
+ACS_LOCAL_KEYTAB=/tmp/sv1warehouse.keytab mix test --include acs_local
+```
+
+To run the application itself, give it a `krb5.conf` that points the
+`ACS.LOCALHOST` realm at `kdc = 127.0.0.1:88`, and the environment:
+
+```sh
+KRB5_CONFIG=/tmp/krb5.conf \
+DIRECTORY_URL=http://directory.acs.localhost/ \
+SPARKPLUG_HISTORIAN=true \
+SPARKPLUG_HISTORIAN_KEYTAB=/tmp/sv1warehouse.keytab \
+INFLUX_URL=http://influxdb.acs.localhost INFLUX_ORG=default INFLUX_TOKEN=... \
+    mix run --no-halt
+```
+
+Delete the keytab afterwards. Put `udp_preference_limit = 1` in the
+`krb5.conf`'s `[libdefaults]`, as ACS's has: otherwise kerlberos tries
+the KDC over UDP first, and as the cluster only exposes it over TCP,
+each login and ticket request takes about 10 seconds.
+
+## Image
+
+`make` builds the image and pushes it, to `ghcr.io/amrc-factoryplus`
+unless `registry` is set in `config.mk` (see `mk/README.md`). It needs
+the Elixir base images, built in `acs-base-images`, at the version in
+`base_version`. To build it into the local Docker instead, without
+pushing:
+
+```sh
+docker buildx build --load -t acs-ingest:dev \
+    --build-arg base_version=v1.0.0 --build-context lib=../lib .
+```
+
+The image runs the release as the `elixir` user, with no Erlang
+distribution. It reads the same environment as above; Kubernetes stops
+it with SIGTERM, after which the writers write what they hold. When
+the stall monitor gives up, the VM exits with status 1.

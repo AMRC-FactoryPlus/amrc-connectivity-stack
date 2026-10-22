@@ -69,7 +69,6 @@ subdirs+= edge-pathfindr
 subdirs+= edge-sim
 subdirs+= edge-test
 subdirs+= edge-tplink-smartplug
-subdirs+= historian-uns
 
 
 include ${mk}/acs.subdirs.mk

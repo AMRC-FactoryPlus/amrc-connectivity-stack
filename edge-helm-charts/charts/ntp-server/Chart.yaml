@@ -1,0 +1,4 @@
+apiVersion: v2
+name: ntp-server
+version: "0.0.1"
+description: "ACS edge NTP server"

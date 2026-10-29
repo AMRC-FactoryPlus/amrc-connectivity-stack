@@ -92,6 +92,8 @@ objects:
       name: "Edge MQTT broker"
     !u Local.Chart.OPCUAServer:
       name: "OPC UA Server"
+    !u Local.Chart.NTPServer:
+      name: "NTP Server"
 
   !u Clusters.Class.K8sResource:
     !u Clusters.Resource.GitRepo:
@@ -248,6 +250,12 @@ configs:
         authGroup:
           edgeService: !u Auth.Class.EdgeService
           unsReader: !u Local.Role.OPCUAServer
+    !u Local.Chart.NTPServer:
+      chart:  "ntp-server"
+      values:
+        name:   "{{name}}"
+        uuid:   "{{uuid}}"
+        hostname: "{{hostname}}"
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

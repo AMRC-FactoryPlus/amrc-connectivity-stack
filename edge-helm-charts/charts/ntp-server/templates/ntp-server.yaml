@@ -1,0 +1,42 @@
+{{- $k8sname := include "acs.k8sname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-{{ $k8sname }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    factory-plus.app: {{ .Chart.Name }}
+    factory-plus.uuid: {{ .Values.uuid }}
+    factory-plus.name: {{ .Values.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: {{ .Chart.Name }}
+      factory-plus.uuid: {{ .Values.uuid }}
+  template:
+    metadata:
+      labels:
+        factory-plus.app: {{ .Chart.Name }}
+        factory-plus.uuid: {{ .Values.uuid }}
+        factory-plus.name: {{ .Values.name }}
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: {{ required "hostname is required" .Values.hostname | quote }}
+      tolerations: {{ .Values.tolerations.specific | toYaml | nindent 8 }}
+      containers:
+        - name: ntp-server
+{{ list . "ntp" | include "acs.image" | indent 10 }}
+          # The image runs chronyd with -x, so it serves time without
+          # adjusting the host clock
+          env:
+            - name: NTP_SERVERS
+              value: {{ join "," .Values.ntpServers | quote }}
+          ports:
+            - name: ntp
+              containerPort: 123
+              protocol: UDP
+          resources: {{ .Values.resources | toYaml | nindent 12 }}

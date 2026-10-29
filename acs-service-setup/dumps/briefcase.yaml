@@ -80,6 +80,12 @@ grants:
     # Watch the Published class for datasets to build or withdraw.
     !u ConfigDB.Perm.ReadMembers:
       !u DataAccess.Class.Published: false
-    # Read the release records, to see what has been built.
+    # Read each Published dataset's metadata, release policy and data.
+    !u DataAccess.Perm.ReadDataset:
+      !u DataAccess.Class.Published: true
     !u UUIDs.Permission.ConfigDB.ReadConfig:
+      # The release records, to see what has been built.
       !u Briefcase.App.Release: false
+      # The name and origin map of each device in a briefcase.
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.DeviceInformation: false

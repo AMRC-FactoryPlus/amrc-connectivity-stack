@@ -31,6 +31,9 @@ spec:
         - name: keytabs
           secret:
             secretName: briefcase-keytabs
+        # Each briefcase is built and zipped here.
+        - name: work
+          emptyDir: {}
 
       initContainers:
 {{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
@@ -47,9 +50,18 @@ spec:
               value: /config/krb5-conf/krb5.conf
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: WORK_DIR
+              value: /work
+            # Each briefcase records the instance it came from.
+            - name: SOURCE_ORGANISATION
+              value: {{ .Values.acs.organisation | quote }}
+            - name: SOURCE_URL
+              value: {{ .Values.acs.secure | ternary "https" "http" }}://{{ .Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
             - mountPath: /keytabs
               name: keytabs
+            - mountPath: /work
+              name: work
 {{- end }}

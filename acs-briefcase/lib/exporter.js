@@ -35,6 +35,7 @@ export class Exporter {
     constructor (opts) {
         this.cdb = opts.fplus.ConfigDB;
         this.log = opts.fplus.debug.bound("exporter");
+        this.builder = opts.builder;
     }
 
     /** A sequence of plans, emitted each time the work to do changes.
@@ -49,15 +50,42 @@ export class Exporter {
             rx.distinctUntilChanged(imm.is));
     }
 
+    /* Build one briefcase. A failure is logged and does not stop the
+     * builds after it. */
+    async build (dataset) {
+        this.log("Building a briefcase of %s", dataset);
+        try {
+            const b = await this.builder.build(dataset);
+            this.log("Built %s: %s, sha256 %s", dataset, b.file, b.sha256);
+            return b;
+        }
+        catch (e) {
+            this.log("Can't build a briefcase of %s: %s", dataset, e.message ?? e);
+            return null;
+        }
+    }
+
+    /** A sequence of builds: each dataset that needs a briefcase,
+     * built one at a time. Nothing records the briefcases yet, so a
+     * dataset is built only once while the process runs. */
+    builds (plans) {
+        return plans.pipe(
+            rx.mergeMap(p => p.get("build")),
+            rx.distinct(),
+            rx.concatMap(ds => this.build(ds)));
+    }
+
     run () {
         this.log("Watching the Published class");
 
-        /* Nothing is built or withdrawn yet: this only reports the
-         * work it finds. */
-        this.plans().subscribe(p => {
-            const list = s => s.isEmpty() ? "none" : s.join(", ");
-            this.log("To build: %s", list(p.get("build")));
-            this.log("To withdraw: %s", list(p.get("withdraw")));
+        const plans = this.plans().pipe(rx.share());
+
+        /* Nothing is withdrawn yet: this only reports it. */
+        plans.subscribe(p => {
+            const withdraw = p.get("withdraw");
+            if (!withdraw.isEmpty())
+                this.log("To withdraw: %s", withdraw.join(", "));
         });
+        this.builds(plans).subscribe();
     }
 }

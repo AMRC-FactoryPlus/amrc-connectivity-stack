@@ -2,10 +2,16 @@ import { PassThrough } from "stream";
 import { once } from "events";
 import pLimit from "p-limit";
 
-import { csv_escape, strip_metric_suffix } from "./utils.js";
+import { csv_escape, metric_type, strip_metric_suffix } from "./utils.js";
 import { build_flux_queries } from "./flux.js";
 
-const CSV_HEADER = "device,metric,timestamp,value,unit";
+const CSV_HEADER = "device,metric,timestamp,value,unit,device_uuid,path,type";
+
+/* The value as Influx wrote it. The client parses long and unsignedLong
+ * into JS numbers, which lose precision above 2^53. */
+function raw_value(row) {
+    return row.values[row.tableMeta.column("_value").index];
+}
 
 export class InfluxReader {
     constructor(opts) {
@@ -23,8 +29,9 @@ export class InfluxReader {
     }
 
     /** Combines the resolved device sources of a dataset into a single CSV
-     * stream with columns device, metric, timestamp, value, unit - see the
-     * @returns doc on APIv1#dataset_data.
+     * stream with columns device, metric, timestamp, value, unit,
+     * device_uuid, path, type - see the @returns doc on
+     * APIv1#dataset_data.
      */
     exportDevices(deviceSources, meta = {}) {
         const csvStream = new PassThrough({
@@ -92,8 +99,11 @@ export class InfluxReader {
                     csv_escape(o.device),
                     csv_escape(strip_metric_suffix(o._measurement)),
                     csv_escape(o._time),
-                    csv_escape(o._value),
+                    csv_escape(raw_value(row)),
                     csv_escape(o.unit),
+                    csv_escape(source.device_uuid),
+                    csv_escape(o.path),
+                    csv_escape(metric_type(o._measurement)),
                 ].join(",");
 
                 await this.#write(writable, line + "\n");

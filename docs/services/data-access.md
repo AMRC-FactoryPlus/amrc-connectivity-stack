@@ -210,12 +210,16 @@ Column | Content
 `device` | The Sparkplug device the point came from
 `metric` | The metric name, without Influx's `:x` datatype suffix
 `timestamp` | ISO 8601 timestamp
-`value` | The data value
+`value` | The data value, exactly as Influx returns it, so 64-bit integers keep every digit
 `unit` | The engineering unit, if the metric has one
+`device_uuid` | The UUID of the device the point came from
+`path` | The metric's folders, the part of its name before the last `/`. Empty for a metric at the device root
+`type` | The datatype the historian stored: `double`, `int`, `uint`, `boolean` or `string`
 
-The CSV has no metric path column. Two metrics with the same name under
-different folders appear with the same `metric` value. Use a full-path
-`metrics` selector (below) to export only one of them.
+The full Sparkplug metric name is `path/metric`, or just `metric` when
+`path` is empty. Two metrics with the same name under different folders
+differ in `path`, and two devices with the same Sparkplug name differ in
+`device_uuid`.
 
 The request body is optional. An empty or absent body exports everything
 in the dataset. The body can contain one of these filters:
@@ -820,8 +824,7 @@ Compared to the original design notes for this service:
   parameters are not read.
 * **Dataset download filtering is limited to metrics.** The download
   can be restricted to a list of metric paths or names, but there is no
-  per-device, schema or datatype filtering and no subsampling. The CSV
-  has no metric path column.
+  per-device, schema or datatype filtering and no subsampling.
 * **`Sub-device` history across renames.** A reference is read using
   the metric's current path, so points recorded before an enclosing
   object was renamed are not returned.

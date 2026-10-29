@@ -622,7 +622,7 @@ describe("InfluxDB write-back", () => {
 });
 
 /* A device whose DeviceInformation has no ISA-95 hierarchy, or the
- * given one. uns-ingester-sparkplug publishes it to UNS only with one. */
+ * given one. The UNS ingester publishes it to UNS only with one. */
 function plainDevInfo(uuid: string, enterprise?: string) {
     return {
         schema: "top",
@@ -744,7 +744,7 @@ describe("InfluxDB write-back for devices that do not publish to UNS", () => {
     it("takes the hierarchy only from Device_Information/ISA95_Hierarchy, as the ingester does", async () => {
         const s = setup();
         const info: any = plainDevInfo("dev-2");
-        // Hierarchy-v1 elsewhere: uns-ingester-sparkplug ignores it.
+        // Hierarchy-v1 elsewhere: the UNS ingester ignores it.
         info.originMap.Extra = {
             Schema_UUID: "extra",
             ISA95_Hierarchy: { Schema_UUID: HIERARCHY, Enterprise: { Value: "AMRC" } },

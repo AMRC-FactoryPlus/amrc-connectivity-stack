@@ -86,7 +86,9 @@ configure(Realm, UserConf) ->
         ciphers => [aes256_hmac_sha384, aes128_hmac_sha256, aes256_hmac_sha1,
             aes128_hmac_sha1, des3_sha1],
         kdc => [],
-        ttl => 3600
+        ttl => 3600,
+        % ACS patch: MIT Kerberos's default.
+        udp_preference_limit => 1465
     },
     % ACS patch: config_paths/0 reads KRB5_CONFIG.
     Conf1 = add_realm_conf(Conf0, config_paths(),
@@ -99,8 +101,11 @@ configure(Realm, UserConf) ->
     end,
     Conf2 = maps:merge(maps:merge(Conf1, GlobalConfig), RealmConfig),
     Conf3 = maps:merge(Conf2, UserConf),
+    % ACS patch: as MIT Kerberos does, look the KDCs up in DNS only when
+    % the configuration names none. kerlberos added the ones DNS gave to
+    % the configured ones.
     Conf4 = case Conf3 of
-        #{use_dns := true} ->
+        #{use_dns := true, kdc := []} ->
             lookup_kdcs(Conf3, Realm);
         _ ->
             Conf3
@@ -242,7 +247,20 @@ add_realm_conf(C0, [Path | Rest], Realm) ->
                         _ ->
                             C2#{use_dns => true}
                     end,
-                    add_realm_conf(C3, Rest, Realm);
+                    % ACS patch: read udp_preference_limit, as MIT
+                    % Kerberos does.
+                    C4 = case proplists:get_value(<<"udp_preference_limit">>, Combined) of
+                        undefined ->
+                            C3;
+                        LimitBin ->
+                            case string:to_integer(LimitBin) of
+                                {Limit, _} when is_integer(Limit), Limit >= 0 ->
+                                    C3#{udp_preference_limit => Limit};
+                                _ ->
+                                    C3
+                            end
+                    end,
+                    add_realm_conf(C4, Rest, Realm);
                 _ ->
                     add_realm_conf(C0, Rest, Realm)
             end;

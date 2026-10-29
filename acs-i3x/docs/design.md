@@ -347,7 +347,7 @@ again when asked for.
 
 Only a later UNS message replaces a value kept from InfluxDB, so values
 (and "no data" markers) are kept only for devices that publish to UNS.
-uns-ingester-sparkplug publishes a device only if its birth certificate has
+The UNS ingester publishes a device only if its birth certificate has
 an ISA-95 hierarchy with at least an Enterprise; the Sparkplug historian
 writes every device to InfluxDB. `ObjectTree.publishesToUns` tells them
 apart by where the device sits: a device without a hierarchy is filed under

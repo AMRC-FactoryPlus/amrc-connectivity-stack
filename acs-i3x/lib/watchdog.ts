@@ -23,8 +23,6 @@
  * lost that state. A client that is connected and subscribed is
  * healthy however quiet the broker is.
  *
- * This file is copied, unchanged, into historian-sparkplug,
- * historian-uns and uns-ingester-sparkplug. Keep the copies identical.
  * It has no imports so the tests can load it directly.
  */
 

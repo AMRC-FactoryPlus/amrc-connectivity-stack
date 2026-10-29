@@ -89,7 +89,10 @@ until it has logged in. Each token can be used once, so make a new one
 for every connection attempt.
 
 Without the `:kdc` option, kerlberos finds the KDC from `KRB5_CONFIG`
-(as ACS pods set it), or `/etc/krb5.conf`, and DNS.
+(as ACS pods set it), or `/etc/krb5.conf`, and asks DNS only when those
+name no KDC, as MIT Kerberos does. It sends to the KDC by TCP first
+when `udp_preference_limit` says to, as ACS's `krb5.conf` does. Both
+are patches in the fork; see its `FORK.md`.
 
 ## MQTT
 
@@ -189,5 +192,6 @@ rm /tmp/sv1warehouse.keytab
 ```
 
 On `acs-local` the first Kerberos login in a VM takes about 10 seconds:
-kerlberos tries the KDC over UDP first, and the cluster only exposes it
-over TCP. Later logins take milliseconds.
+with the `:kdc` option the tests use, kerlberos tries the KDC over UDP
+first, and the cluster only exposes it over TCP. Later logins take
+milliseconds. In the cluster, ACS's `krb5.conf` has kerlberos use TCP.

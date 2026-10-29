@@ -5,8 +5,13 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   namespace: {{ .Release.Namespace }}
+{{- if .Values.acs.argocd }}
+  # ArgoCD names the Job after the sync, so each sync runs a new one.
+  generateName: service-setup-
+{{- else }}
   # Give the job a random id so helm reruns it on helm upgrade.
   name: service-setup-{{ randAlphaNum 8 | lower }}
+{{- end }}
   annotations:
     # ArgoCD would see the random name as a change on every render.
     # As a Sync hook it is left out of the diff, run on each sync and

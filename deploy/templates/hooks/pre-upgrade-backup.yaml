@@ -4,7 +4,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
+{{- if .Values.acs.argocd }}
+  # ArgoCD names the Job after the sync, so each sync runs a new one.
+  generateName: configdb-pre-upgrade-backup-
+{{- else }}
   name: configdb-pre-upgrade-backup
+{{- end }}
   namespace: {{ .Release.Namespace }}
   annotations:
     "helm.sh/hook": pre-upgrade

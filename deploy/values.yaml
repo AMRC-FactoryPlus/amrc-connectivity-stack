@@ -32,6 +32,13 @@ acs:
   # so setting this to false on an existing install leaves them in
   # place.
   generateSecrets: true
+  # -- Set this when ArgoCD deploys the chart. The chart's Jobs then
+  # use `generateName`, so ArgoCD names each one after the sync and
+  # runs it afresh every sync. With fixed or random names, ArgoCD can
+  # skip a Job left over from a recent sync, or start a second one when
+  # it renders the chart twice in one sync. Helm, and so Flux, needs
+  # this off, as it doesn't support `generateName`.
+  argocd: false
   # -- Image pull secrets for container images
   imagePullSecrets: []
   # The default registry for ACS images. This can be overridden for

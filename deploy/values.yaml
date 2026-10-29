@@ -223,6 +223,16 @@ configdb:
     retention: 5
     # -- Size of the PVC for storing backups
     storageSize: 1Gi
+    # -- Run the backup without first checking, with `lookup`, that the
+    # configdb-backups PVC exists. ArgoCD renders the chart without
+    # access to the cluster, so the check always fails there and the
+    # backup never runs. Under ArgoCD, set this to true once the first
+    # sync has finished; before then there is no PVC or database, and
+    # the backup would hold up the sync. ArgoCD runs the backup before
+    # every sync, not only upgrades, so `retention` keeps the last few
+    # syncs' backups. Helm and Flux don't need it, as the check works
+    # there.
+    alwaysRun: false
 
 metadb:
   enabled: false

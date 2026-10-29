@@ -197,7 +197,7 @@ this special UUID as `structure` and `null` as `config`.
 
 `acs-service-setup` creates these objects; `acs-service-setup/lib/uuids.js`
 defines every UUID below. The service's own `lib/constants.js` holds
-only the ones the service uses. The four metadata apps marked * are
+only the ones the service uses. The five metadata apps marked * are
 deliberately not in `App` in `lib/constants.js`: an edit to an invalid
 dataset deletes the entries of every app listed there, and these must
 survive that. The three the service writes are under `Metadata`
@@ -234,6 +234,7 @@ Application | `Dataset tags` * | `c95e372e-2fbe-45b9-9937-3235f94e22a3`
 Application | `Equipment device labels` * | `dfc3983b-658c-4099-b76a-01ce7c18bde1`
 Application | `Run metadata` * | `2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a`
 Application | `Recording in progress` * | `cf3f6103-0f0e-4839-953a-ad2cedc78c30`
+Application | `Release policy` * | `cb9b2307-3b82-4ffd-9665-0d214379ac21`
 Client role | `Dataset maker` | `b7aa3036-fc1f-4869-b0f5-50f28b028905`
 Client role | `Dataset manager` | `4ab8468a-166b-4c01-afa6-7bd558db806b`
 Composite permission | `Device data` | `6abc1879-429d-4c0f-a5e4-00a655a09f26`
@@ -243,6 +244,8 @@ Special | Structurally invalid dataset | `696396a0-2831-11f1-9b12-33d63b8c5115`
 The Admin UI writes a dataset's name, tags, equipment labels, kind and
 run details through the metadata routes below, which check
 `Edit dataset`. It writes `Recording in progress` directly to ConfigDB.
+`Release policy` holds the terms a `Published` dataset is released
+under, and its schema in the dump says what each field means.
 Two client roles hold what the Admin UI needs to make datasets and
 record runs as the signed-in user:
 

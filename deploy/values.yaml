@@ -20,6 +20,18 @@ acs:
   # specifies its own tlsSecretName.
   tlsSecretName: factoryplus-tls
   cacheMaxAge: 300
+  # -- Whether the chart generates the random passwords and keys for
+  # postgres-secret, manager-database-secret, influxdb-auth,
+  # grafana-admin-user, keycloak-clients and the OpenMetadata Secrets.
+  # The chart uses `lookup` to create each one only once. ArgoCD
+  # renders the chart without access to the cluster, so `lookup` finds
+  # nothing, every render makes new values, and ArgoCD writes them over
+  # the live Secrets. Set this to false under ArgoCD and create the
+  # Secrets yourself, for example as SealedSecrets, with the keys the
+  # templates show. The Secrets have `helm.sh/resource-policy: keep`,
+  # so setting this to false on an existing install leaves them in
+  # place.
+  generateSecrets: true
   # -- Image pull secrets for container images
   imagePullSecrets: []
   # The default registry for ACS images. This can be overridden for
@@ -86,6 +98,13 @@ identity:
   # 'restrictions' properties; see the kadmin documentation for their
   # meaning.
   kadminUsers: []
+  # -- The Traefik entrypoints the KDC, kpasswd and kadmin ports are
+  # routed from. The defaults are the entrypoints the bundled Traefik
+  # defines. Change them to use a Traefik that names them differently.
+  entryPoints:
+    kdc: kdc
+    kpasswd: kpasswd
+    kadmin: kadmin
   # -- Enable support for cross-realm authentication
   crossRealm: [ ]
   # crossRealm:
@@ -472,6 +491,17 @@ mqtt:
     repository: acs-mqtt
   # -- Possible values are either 1 to enable all possible debugging, or a comma-separated list of debug tags (the tags printed before the log lines). No logging is specified as an empty string.
   verbosity: 0
+  # -- The Traefik entrypoint MQTT connections are routed from. Empty
+  # uses `mqttsecure`, or `mqtt` when acs.secure is false, which are
+  # the entrypoints the bundled Traefik defines. Set this to use a
+  # Traefik that names its MQTT entrypoint differently.
+  entryPoint: ""
+  # -- Route only TLS connections for mqtt.<baseUrl>, matched by SNI,
+  # instead of every connection on the entrypoint. Set this when the
+  # entrypoint is shared with other services. Clients must then connect
+  # by hostname, not IP address. It has no effect when acs.secure is
+  # false, as plain TCP carries no hostname.
+  matchHostSNI: false
   # -- Extra JVM options for the HiveMQ broker, passed as JAVA_OPTS.
   # Without a heap limit the JVM sizes its heap from the node's memory
   # (25% by default, 4 GB on a 16 GB node) and rarely gives memory back,

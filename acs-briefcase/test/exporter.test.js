@@ -86,3 +86,45 @@ test("emits a plan only when the work changes", () => {
         { build: [B], withdraw: [] },
     ]);
 });
+
+/* An Exporter whose builder records the datasets it is asked for. A
+ * build of `fail` throws. */
+function make_builder_exporter (fail) {
+    const calls = [];
+    let running = 0;
+    const builder = {
+        build: async ds => {
+            assert.equal(running++, 0, "builds run one at a time");
+            calls.push(ds);
+            await new Promise(r => setTimeout(r, 5));
+            running--;
+            if (ds == fail) throw new Error("no data");
+            return { file: `${ds}.zip`, sha256: "x" };
+        },
+    };
+    const fplus = { debug: { bound: () => () => {} }, ConfigDB: {} };
+    return { exporter: new Exporter({ fplus, builder }), calls };
+}
+
+const work = (...build) => imm.Map({ build: imm.Set(build), withdraw: imm.Set() });
+
+test("builds each dataset once, one at a time", async () => {
+    const { exporter, calls } = make_builder_exporter();
+    const results = await rx.firstValueFrom(exporter.builds(rx.of(
+        work(A, B),
+        work(A, B, C),
+        work(C),
+    )).pipe(rx.toArray()));
+
+    assert.deepEqual(calls, [A, B, C]);
+    assert.equal(results.length, 3);
+});
+
+test("a failed build does not stop the others", async () => {
+    const { exporter, calls } = make_builder_exporter(A);
+    const results = await rx.firstValueFrom(
+        exporter.builds(rx.of(work(A, B))).pipe(rx.toArray()));
+
+    assert.deepEqual(calls, [A, B]);
+    assert.deepEqual(results.map(r => r?.file ?? null), [null, `${B}.zip`]);
+});

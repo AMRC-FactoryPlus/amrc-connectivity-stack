@@ -1,0 +1,24 @@
+{
+  "name": "acs-briefcase",
+  "version": "0.1.0",
+  "description": "Builds briefcases of Published datasets for sharing outside Factory+",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "node bin/exporter.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "immutable": "^5.1.4",
+    "rxjs": "^7.8.2"
+  },
+  "optionalDependencies": {
+    "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.39.2",
+    "globals": "^15.15.0"
+  }
+}

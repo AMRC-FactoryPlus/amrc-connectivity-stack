@@ -5,9 +5,15 @@ metadata:
   name: krb5-conf
   namespace: {{ .Release.Namespace }}
 data:
+  # Every KDC is listed below, so don't look them up in DNS. After a
+  # failed login MIT Kerberos looks for the realm's master KDC in DNS
+  # (_kerberos-master._tcp.<realm>). With coredns.traefikRedirect on,
+  # CoreDNS answers that with Traefik's ports, the request lands on
+  # kadmind, and it waits for a reply forever.
   krb5.conf: >
     [libdefaults]
         default_realm = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+        dns_lookup_kdc = false
         dns_canonicalize_hostname = false
         rdns = false
         udp_preference_limit = 1

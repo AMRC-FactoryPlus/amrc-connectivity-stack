@@ -1,4 +1,4 @@
-{{ if .Values.influxdb2.enabled }}
+{{ if and .Values.influxdb2.enabled .Values.acs.generateSecrets }}
 {{- if not (lookup "v1" "Secret" .Release.Namespace "influxdb-auth") }}
 
 apiVersion: v1

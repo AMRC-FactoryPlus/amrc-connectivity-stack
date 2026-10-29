@@ -10,8 +10,10 @@
   "license": "MIT",
   "dependencies": {
     "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "csv-parse": "^7.0.3",
     "immutable": "^5.1.4",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "yazl": "^3.3.1"
   },
   "optionalDependencies": {
     "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
@@ -19,6 +21,7 @@
   "devDependencies": {
     "@eslint/js": "^9.20.0",
     "eslint": "^9.39.2",
-    "globals": "^15.15.0"
+    "globals": "^15.15.0",
+    "yauzl": "^3.4.0"
   }
 }

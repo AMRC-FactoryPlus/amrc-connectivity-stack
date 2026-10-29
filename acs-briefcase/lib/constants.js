@@ -6,6 +6,9 @@
 
 export const App = {
     BriefcaseRelease:   "dee3e12f-4908-4f2d-b793-85847c2a4a3c",
+    ReleasePolicy:      "cb9b2307-3b82-4ffd-9665-0d214379ac21",
+    RunMetadata:        "2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a",
+    Tags:               "c95e372e-2fbe-45b9-9937-3235f94e22a3",
 };
 
 export const Class = {

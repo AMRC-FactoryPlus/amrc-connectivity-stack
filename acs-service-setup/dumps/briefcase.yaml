@@ -1,6 +1,16 @@
+# Briefcase exporter: builds a briefcase of each Published dataset.
+#
+#-REQUIRE: auth data-access
+---
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
+  !u Auth.Class.ServiceRole:
+    !u Briefcase.Requirement.ServiceRole:
+      name: "Briefcase exporter"
+      subclassOf:
+        - !u Auth.Class.CentralService
+
   # Written only by the briefcase exporter. It is not Dataset metadata,
   # because the Dataset maker role can write all of that.
   !u UUIDs.Class.App:
@@ -62,3 +72,14 @@ configs:
                 description: The version of the exporter that built it.
                 type: string
                 minLength: 1
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Briefcase.Requirement.ServiceRole:
+    # Watch the Published class for datasets to build or withdraw.
+    !u ConfigDB.Perm.ReadMembers:
+      !u DataAccess.Class.Published: false
+    # Read the release records, to see what has been built.
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u Briefcase.App.Release: false

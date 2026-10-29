@@ -229,6 +229,7 @@ jobs:
       matrix:
         service: 
           - acs-admin
+          - acs-briefcase
           - acs-cluster-manager
           - acs-cmdesc
           - acs-data-access

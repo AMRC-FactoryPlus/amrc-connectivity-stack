@@ -1,0 +1,29 @@
+# These are required
+# name: NTP_Server
+# uuid: 12345
+# The host to serve NTP from. Clients use this host's own IP addresses.
+# hostname: foo
+image:
+  default:
+    pullPolicy: IfNotPresent
+  ntp:
+    registry: docker.io
+    repository: cturra/ntp
+    # Only a 'latest' tag is published, so pin its digest
+    tag: "latest@sha256:7224d4e7c7833aabbcb7dd70c46c8a8dcccda365314c6db047b9b10403ace3bc"
+# Upstream NTP servers to take time from
+ntpServers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+  - 2.pool.ntp.org
+tolerations:
+  specific:
+    - key: factoryplus.app.amrc.co.uk/specialised
+      operator: Exists
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

@@ -122,7 +122,7 @@ class LocalUUIDs {
         await this.create_objects(
             ["Chart", Clusters.Class.HelmChart,
                 "EdgeAgent", "Cluster", "ModbusRest", "MQTT", "UNSBridge",
-                "OPCUAServer"],
+                "OPCUAServer", "NTPServer"],
             ["Repo", Git.Class.Repo, "HelmCharts"],
             ["RepoGroup", Git.Class.Group,
                 "Cluster", "Shared"],

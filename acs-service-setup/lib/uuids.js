@@ -524,6 +524,9 @@ export const Briefcase = {
     App: {
         Release: "dee3e12f-4908-4f2d-b793-85847c2a4a3c",
     },
+    Requirement: {
+        ServiceRole: "cae0ccc0-a85a-4ab6-8c98-0cd4ee590ef7",
+    },
 };
 
 /* Grafana role permissions. UUIDs must match

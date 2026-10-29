@@ -1,0 +1,64 @@
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  # Written only by the briefcase exporter. It is not Dataset metadata,
+  # because the Dataset maker role can write all of that.
+  !u UUIDs.Class.App:
+    !u Briefcase.App.Release:
+      name: "Briefcase release"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+configs:
+  !u UUIDs.App.ConfigSchema:
+    !u Briefcase.App.Release:
+      title: Briefcase release
+      description: >
+        The briefcases built from a dataset, recording what has left
+        Factory+ and in which version. The entry sits on the dataset.
+      type: object
+      required: [briefcase, versions]
+      additionalProperties: false
+      properties:
+        briefcase:
+          description: The briefcase's identifier, the same for every version.
+          type: string
+          format: uuid
+        withdrawn:
+          description: >
+            When the dataset was withdrawn by removing it from the
+            Published class. Absent while it is released.
+          type: string
+          format: date-time
+        versions:
+          description: Every version built, oldest first.
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [version, file, sha256, size, built, exporter]
+            additionalProperties: false
+            properties:
+              version:
+                type: integer
+                minimum: 1
+              file:
+                description: The File object holding the briefcase zip.
+                type: string
+                format: uuid
+              sha256:
+                description: The SHA-256 checksum of the zip, in lowercase hex.
+                type: string
+                pattern: "^[0-9a-f]{64}$"
+              size:
+                description: The size of the zip in bytes.
+                type: integer
+                minimum: 0
+              built:
+                description: When the exporter built this version.
+                type: string
+                format: date-time
+              exporter:
+                description: The version of the exporter that built it.
+                type: string
+                minLength: 1

@@ -1179,6 +1179,11 @@ openmetadata-dependencies:
     # release (an upgrade, not a fresh install). Point at our own instead -
     # see deploy/templates/openmetadata/openmetadata-secrets.yaml.
     fernetKeySecretName: airflow-fernet-key
+    # The chart's own JWT Secret gets a new random value on every render,
+    # which restarted the api-server and scheduler on every upgrade and
+    # left ArgoCD permanently out of sync. Point at our own, generated
+    # once - see deploy/templates/openmetadata/openmetadata-secrets.yaml.
+    jwtSecretName: airflow-jwt-secret
     data:
       # The chart's own default (data.metadataConnection.pass: airflow_pass)
       # is a hardcoded literal with no per-field secretRef - metadataSecretName

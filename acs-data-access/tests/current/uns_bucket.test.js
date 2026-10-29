@@ -145,6 +145,15 @@ describe("CSV columns from the uns bucket", () => {
             .toEqual({ device: "Press_1", path: "Switch_Closed" });
     });
 
+    /* An Influx row as the client yields it: the reader takes the raw
+     * `_value` by its column index, and the rest from toObject. */
+    function fake_row (o) {
+        return {
+            values: [o._value],
+            tableMeta: { toObject: () => o, column: () => ({ index: 0 }) },
+        };
+    }
+
     /* An InfluxReader whose fake query API answers by bucket. */
     function make_reader (answers) {
         const queries = [];
@@ -159,7 +168,7 @@ describe("CSV columns from the uns bucket", () => {
                             async *iterateRows () {
                                 if (answer instanceof Error) throw answer;
                                 for (const o of answer ?? [])
-                                    yield { values: [], tableMeta: { toObject: () => o } };
+                                    yield fake_row(o);
                             },
                         };
                     },
@@ -198,10 +207,10 @@ describe("CSV columns from the uns bucket", () => {
 
         expect(queries.map(q => /from\(bucket: "([^"]+)"\)/.exec(q)[1])).toEqual(["default", "uns"]);
         expect(lines).toEqual([
-            "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid",
-            `Press_1,Load,${T},1,N,Axes/X/Load,,,`,
-            `Oven_2,Temp,${T},2,degC,Zone/Temp,,,`,
-            `Oven_2,Door,${T},true,,Door,,,`,
+            "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid,type",
+            `Press_1,Load,${T},1,N,Axes/X/Load,,,,double`,
+            `Oven_2,Temp,${T},2,degC,Zone/Temp,,,,double`,
+            `Oven_2,Door,${T},true,,Door,,,,boolean`,
         ]);
     });
 
@@ -224,8 +233,8 @@ describe("CSV columns from the uns bucket", () => {
             { device_uuid: DEVICE, store: "sparkplug", from: FROM, to: TO },
         ]);
         expect(lines).toEqual([
-            "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid",
-            `Press_1,S,${T},true,,S,,,`,
+            "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid,type",
+            `Press_1,S,${T},true,,S,,,,boolean`,
         ]);
     });
 

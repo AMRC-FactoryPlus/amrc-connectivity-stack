@@ -444,9 +444,13 @@ Column | Content
 `device` | The Sparkplug device the point came from
 `metric` | The metric name, without Influx's `:x` datatype suffix
 `timestamp` | ISO 8601 timestamp
-`value` | The data value
+`value` | The data value, exactly as Influx returns it, so 64-bit integers keep every digit
 `unit` | The engineering unit, if the metric has one
 `path` | The full Sparkplug metric name, for example `Axes/X/Position/Actual`; for a metric at the top level of the device, its name
+`device_uuid` | The UUID of the device the point came from
+`instance_uuid` | The UUID of the instance that owns the metric's folder; for a metric at the top level of the device, the device's UUID
+`schema_uuid` | The UUID of that instance's schema
+`type` | The datatype the historian stored: `double`, `int`, `uint`, `boolean` or `string`
 
 The columns are the same whichever bucket a row comes from. A row from
 the `uns` bucket has no `device` tag: Data Access takes `device` from
@@ -459,8 +463,8 @@ Two metrics with the same name under different folders have the same
 `metric` value but different `path` values. You can send a `path`
 value back as a `metrics` selector (below) to export only that metric.
 A top-level metric's `path` has no `/`, so as a selector it also
-matches metrics with the same name in folders. The `path` column is
-last so that clients that read the columns by position keep working.
+matches metrics with the same name in folders. New columns go at the
+end, so clients that read the columns by position keep working.
 
 The body can carry a time window, **`from`** and **`to`**, as ISO 8601
 date-times (for example `2026-11-03T09:00:00Z`). They narrow each

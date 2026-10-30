@@ -524,6 +524,12 @@ export const Briefcase = {
     App: {
         Release: "dee3e12f-4908-4f2d-b793-85847c2a4a3c",
     },
+    FileType: {
+        Briefcase: "9327645a-d4de-4366-88e2-d102fa92799a",
+    },
+    Group: {
+        Releaser: "146755a2-f3bc-483e-8bdf-3cb3fb4d8bec",
+    },
     Requirement: {
         ServiceRole: "cae0ccc0-a85a-4ab6-8c98-0cd4ee590ef7",
     },

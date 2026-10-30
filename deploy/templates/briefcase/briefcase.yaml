@@ -52,6 +52,8 @@ spec:
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
             - name: WORK_DIR
               value: /work
+            - name: RETRY_INTERVAL
+              value: {{ .Values.briefcase.retryInterval | int64 | quote }}
             # Each briefcase records the instance it came from.
             - name: SOURCE_ORGANISATION
               value: {{ .Values.acs.organisation | quote }}

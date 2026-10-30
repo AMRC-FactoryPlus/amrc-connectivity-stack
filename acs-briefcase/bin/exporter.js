@@ -13,6 +13,7 @@ import { RxClient } from "@amrc-factoryplus/rx-client";
 import { GIT_VERSION } from "../lib/git-version.js";
 import { Builder } from "../lib/builder.js";
 import { Exporter } from "../lib/exporter.js";
+import { Store } from "../lib/store.js";
 
 const { env } = process;
 
@@ -29,6 +30,12 @@ const builder = new Builder({
     },
 });
 
-const exporter = new Exporter({ fplus, builder });
+const exporter = new Exporter({
+    fplus, builder,
+    store:      new Store({ fplus }),
+    exporter:   GIT_VERSION,
+    /* RETRY_INTERVAL is in seconds. */
+    retry:      (Number(env.RETRY_INTERVAL) || 300) * 1000,
+});
 
 exporter.run();

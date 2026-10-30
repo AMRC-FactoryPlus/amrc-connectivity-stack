@@ -22,6 +22,8 @@ import { RO_CRATE } from "../lib/crate.js";
 
 const DATASET = "11111111-1111-4111-8111-111111111111";
 const DEVICE = "a0000000-0000-4000-8000-000000000000";
+const BRIEFCASE = "c0000000-0000-4000-8000-000000000000";
+const OLD = "0b5e3a52-7f41-4c2e-a8d6-6a9f3e2d1c40";
 
 const POLICY = {
     tier: "approved-project",
@@ -126,8 +128,8 @@ function read_zip (file) {
 const sha256 = buf => crypto.createHash("sha256").update(buf).digest("hex");
 
 test("builds a bag with the RO-Crate inside data/", () => with_work_dir(async dir => {
-    const b = await builder(dir).build(DATASET);
-    const top = `briefcase-${b.briefcase}-v1`;
+    const b = await builder(dir).build(DATASET, { briefcase: BRIEFCASE });
+    const top = `briefcase-${b.briefcase}`;
     const zip = await read_zip(b.file);
 
     assert.deepEqual([...zip.keys()].sort(), [
@@ -151,8 +153,8 @@ test("builds a bag with the RO-Crate inside data/", () => with_work_dir(async di
 }));
 
 test("the manifest covers every payload file", () => with_work_dir(async dir => {
-    const b = await builder(dir).build(DATASET);
-    const top = `briefcase-${b.briefcase}-v1/`;
+    const b = await builder(dir).build(DATASET, { briefcase: BRIEFCASE });
+    const top = `briefcase-${b.briefcase}/`;
     const zip = await read_zip(b.file);
     const get = n => zip.get(top + n);
 
@@ -175,9 +177,9 @@ test("the manifest covers every payload file", () => with_work_dir(async dir => 
 }));
 
 test("copies only the listed dataset fields", () => with_work_dir(async dir => {
-    const b = await builder(dir).build(DATASET);
+    const b = await builder(dir).build(DATASET, { briefcase: BRIEFCASE });
     const zip = await read_zip(b.file);
-    const dataset = zip.get(`briefcase-${b.briefcase}-v1/data/metadata/dataset.json`);
+    const dataset = zip.get(`briefcase-${b.briefcase}/data/metadata/dataset.json`);
 
     assert.deepEqual(JSON.parse(dataset), {
         name: "Cutting trial 7",
@@ -192,13 +194,13 @@ test("copies only the listed dataset fields", () => with_work_dir(async dir => {
 }));
 
 test("describes the briefcase as an RO-Crate", () => with_work_dir(async dir => {
-    const b = await builder(dir).build(DATASET);
+    const b = await builder(dir).build(DATASET, { briefcase: BRIEFCASE });
     const zip = await read_zip(b.file);
     const crate = JSON.parse(zip.get(
-        `briefcase-${b.briefcase}-v1/data/ro-crate-metadata.json`));
+        `briefcase-${b.briefcase}/data/ro-crate-metadata.json`));
     const by_id = new Map(crate["@graph"].map(e => [e["@id"], e]));
 
-    assert.equal(crate["@context"], `${RO_CRATE}/context`);
+    assert.equal(crate["@context"][0], `${RO_CRATE}/context`);
     assert.deepEqual(by_id.get("ro-crate-metadata.json").conformsTo, { "@id": RO_CRATE });
 
     const root = by_id.get("./");
@@ -210,7 +212,7 @@ test("describes the briefcase as an RO-Crate", () => with_work_dir(async dir => 
 
     /* Every file is listed, and the telemetry says what it covers. */
     for (const part of root.hasPart)
-        assert.ok(zip.has(`briefcase-${b.briefcase}-v1/data/${part["@id"]}`), part["@id"]);
+        assert.ok(zip.has(`briefcase-${b.briefcase}/data/${part["@id"]}`), part["@id"]);
     const telemetry = by_id.get(`telemetry/csv/${DEVICE}.csv`);
     assert.deepEqual(telemetry.about, { "@id": `#device-${DEVICE}` });
     assert.equal(telemetry.temporalCoverage,
@@ -220,16 +222,34 @@ test("describes the briefcase as an RO-Crate", () => with_work_dir(async dir => 
 
 test("refuses a dataset with no release policy", () => with_work_dir(async dir => {
     const meta = { ...META, metadata: { ...META.metadata, [App.ReleasePolicy]: undefined } };
-    await assert.rejects(builder(dir, { meta }).build(DATASET), /no release policy/);
+    await assert.rejects(builder(dir, { meta }).build(DATASET, { briefcase: BRIEFCASE }), /no release policy/);
     assert.deepEqual(await fsp.readdir(dir), []);
 }));
 
 test("refuses a dataset with no time range", () => with_work_dir(async dir => {
     const meta = { ...META, to: undefined };
-    await assert.rejects(builder(dir, { meta }).build(DATASET), /no start and end time/);
+    await assert.rejects(builder(dir, { meta }).build(DATASET, { briefcase: BRIEFCASE }), /no start and end time/);
 }));
 
 test("cleans up when the data can't be read", () => with_work_dir(async dir => {
-    await assert.rejects(builder(dir, { data_status: 403 }).build(DATASET), /returned 403/);
+    await assert.rejects(builder(dir, { data_status: 403 }).build(DATASET, { briefcase: BRIEFCASE }), /returned 403/);
     assert.deepEqual(await fsp.readdir(dir), []);
+}));
+
+test("names the briefcase it replaces", () => with_work_dir(async dir => {
+    const b = await builder(dir).build(DATASET, { briefcase: BRIEFCASE, replaces: OLD });
+    const zip = await read_zip(b.file);
+    const crate = JSON.parse(zip.get(`briefcase-${BRIEFCASE}/data/ro-crate-metadata.json`));
+    const by_id = new Map(crate["@graph"].map(e => [e["@id"], e]));
+
+    assert.deepEqual(crate["@context"][1], { replaces: "http://purl.org/dc/terms/replaces" });
+    assert.deepEqual(by_id.get("./").replaces, { "@id": `urn:uuid:${OLD}` });
+    assert.equal(by_id.get(`urn:uuid:${OLD}`)["@type"], "CreativeWork");
+}));
+
+test("a first briefcase replaces nothing", () => with_work_dir(async dir => {
+    const b = await builder(dir).build(DATASET, { briefcase: BRIEFCASE });
+    const zip = await read_zip(b.file);
+    const crate = JSON.parse(zip.get(`briefcase-${BRIEFCASE}/data/ro-crate-metadata.json`));
+    assert.equal(crate["@graph"].find(e => e["@id"] == "./").replaces, undefined);
 }));

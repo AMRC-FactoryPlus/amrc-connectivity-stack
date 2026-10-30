@@ -14,3 +14,7 @@ export const App = {
 export const Class = {
     Published:          "414d2d10-6be8-4c27-8e9f-c716ef5432b9",
 };
+
+export const FileType = {
+    Briefcase:          "9327645a-d4de-4366-88e2-d102fa92799a",
+};

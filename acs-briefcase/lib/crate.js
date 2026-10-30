@@ -11,6 +11,14 @@ export const RO_CRATE = "https://w3id.org/ro/crate/1.3";
 const SPDX = "https://spdx.org/licenses/";
 const EXPORTER_URL = "https://github.com/AMRC-FactoryPlus/amrc-connectivity-stack";
 
+/* The RO-Crate context has no term for a briefcase replacing an
+ * earlier one, so this adds Dublin Core's. RO-Crate already uses
+ * Dublin Core for conformsTo. */
+const CONTEXT = [
+    `${RO_CRATE}/context`,
+    { replaces: "http://purl.org/dc/terms/replaces" },
+];
+
 const device_id = uuid => `#device-${uuid}`;
 
 /* The entity for the terms the data is released under. */
@@ -38,7 +46,8 @@ function terms_entity ({ licence, agreement }) {
  * relative to that.
  *
  * @param opts.briefcase The briefcase UUID.
- * @param opts.version The briefcase version, counting from 1.
+ * @param opts.replaces The UUID of the withdrawn briefcase this one
+ * replaces, if there is one.
  * @param opts.built When the briefcase was built, as an ISO 8601 string.
  * @param opts.dataset The description in `metadata/dataset.json`.
  * @param opts.policy The release policy.
@@ -52,17 +61,18 @@ function terms_entity ({ licence, agreement }) {
  */
 export function build_crate (opts) {
     const {
-        briefcase, version, built, dataset, policy, devices, files,
+        briefcase, replaces, built, dataset, policy, devices, files,
         exporter, source,
     } = opts;
     const owner = policy.data_owner;
     const terms = terms_entity(policy.terms);
+    const replaced = replaces && `urn:uuid:${replaces}`;
 
     const root = defined({
         "@id":              "./",
         "@type":            "Dataset",
         identifier:         { "@id": "#identifier" },
-        version:            String(version),
+        replaces:           replaced ? { "@id": replaced } : null,
         name:               dataset.name,
         description:        dataset.description
             ?? `Data from the trial dataset ${dataset.name}, exported from Factory+.`,
@@ -148,8 +158,18 @@ export function build_crate (opts) {
         },
     ];
 
+    /* Not a Dataset: RO-Crate would take that for one of this crate's
+     * own data entities. */
+    if (replaced) graph.push({
+        "@id":          replaced,
+        "@type":        "CreativeWork",
+        name:           `Briefcase ${replaces}`,
+        description:    "An earlier briefcase of this dataset, now withdrawn, "
+            + "which this briefcase replaces.",
+    });
+
     return {
-        "@context":     `${RO_CRATE}/context`,
+        "@context":     CONTEXT,
         "@graph":       graph,
     };
 }

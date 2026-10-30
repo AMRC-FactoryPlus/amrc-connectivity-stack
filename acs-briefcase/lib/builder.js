@@ -4,7 +4,6 @@
  * Copyright 2026 University of Sheffield
  */
 
-import crypto           from "node:crypto";
 import fsp              from "node:fs/promises";
 import path             from "node:path";
 import { Readable }     from "node:stream";
@@ -78,10 +77,13 @@ export class Builder {
     /** Build a briefcase of a dataset.
      *
      * @param dataset The dataset UUID.
-     * @returns `{ dataset, briefcase, version, built, file, size,
-     * sha256 }`, where `file` is the zip in the work directory.
+     * @param opts.briefcase The new briefcase's UUID.
+     * @param opts.replaces The UUID of the withdrawn briefcase this one
+     * replaces, if there is one.
+     * @returns `{ dataset, briefcase, built, file, size, sha256 }`,
+     * where `file` is the zip in the work directory.
      */
-    async build (dataset) {
+    async build (dataset, { briefcase, replaces }) {
         const meta = await this.da.get_single_metadata(dataset);
         if (!meta?.name)
             throw new Error(`Data Access has no metadata for ${dataset}`);
@@ -92,12 +94,8 @@ export class Builder {
         if (!meta.from || !meta.to)
             throw new Error(`${dataset} has no start and end time`);
 
-        /* Nothing records briefcases yet, so every build is a new
-         * briefcase at version 1. */
-        const briefcase = crypto.randomUUID();
-        const version = 1;
         const built = new Date();
-        const name = `briefcase-${briefcase}-v${version}`;
+        const name = `briefcase-${briefcase}`;
 
         const bag = await fsp.mkdtemp(path.join(this.work_dir, "build-"));
         try {
@@ -189,7 +187,7 @@ export class Builder {
 
             await write_json(path.join(data, "ro-crate-metadata.json"),
                 build_crate({
-                    briefcase, version, files, policy,
+                    briefcase, replaces, files, policy,
                     built:      built.toISOString(),
                     dataset:    described,
                     devices:    devices.map(d => ({ uuid: d.uuid, name: d.name })),
@@ -204,7 +202,6 @@ export class Builder {
                 ["External-Description",    described.name],
                 ["External-Identifier",     `urn:uuid:${briefcase}`],
                 ["Bagging-Date",            built.toISOString().slice(0, 10)],
-                ["Version",                 version],
             ]);
 
             const file = path.join(this.work_dir, `${name}.zip`);
@@ -213,7 +210,7 @@ export class Builder {
                 name, dataset, devices.length, zip.size);
 
             return {
-                dataset, briefcase, version, file,
+                dataset, briefcase, file,
                 built:  built.toISOString(),
                 ...zip,
             };

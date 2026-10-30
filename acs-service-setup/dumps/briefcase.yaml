@@ -1,6 +1,6 @@
 # Briefcase exporter: builds a briefcase of each Published dataset.
 #
-#-REQUIRE: auth data-access
+#-REQUIRE: auth data-access files
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -11,6 +11,10 @@ objects:
       subclassOf:
         - !u Auth.Class.CentralService
 
+  !u Auth.Class.ClientRole:
+    !u Briefcase.Group.Releaser:
+      name: "Briefcase releaser"
+
   # Written only by the briefcase exporter. It is not Dataset metadata,
   # because the Dataset maker role can write all of that.
   !u UUIDs.Class.App:
@@ -19,39 +23,38 @@ objects:
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
 
+  !u Files.Class.FileType:
+    !u Briefcase.FileType.Briefcase:
+      name: "Briefcase"
+      subclassOf:
+        - !u Files.Class.File
+
 configs:
   !u UUIDs.App.ConfigSchema:
     !u Briefcase.App.Release:
       title: Briefcase release
       description: >
-        The briefcases built from a dataset, recording what has left
-        Factory+ and in which version. The entry sits on the dataset.
+        Every briefcase built from a dataset, oldest first: a record of
+        what has left Factory+ and when. The entry sits on the dataset.
+        A briefcase never changes once it is released. Publishing a
+        withdrawn dataset again builds a new briefcase, which names the
+        one it replaces.
       type: object
-      required: [briefcase, versions]
+      required: [briefcases]
       additionalProperties: false
       properties:
-        briefcase:
-          description: The briefcase's identifier, the same for every version.
-          type: string
-          format: uuid
-        withdrawn:
-          description: >
-            When the dataset was withdrawn by removing it from the
-            Published class. Absent while it is released.
-          type: string
-          format: date-time
-        versions:
-          description: Every version built, oldest first.
+        briefcases:
           type: array
           minItems: 1
           items:
             type: object
-            required: [version, file, sha256, size, built, exporter]
+            required: [uuid, file, sha256, size, built, exporter]
             additionalProperties: false
             properties:
-              version:
-                type: integer
-                minimum: 1
+              uuid:
+                description: The briefcase's identifier.
+                type: string
+                format: uuid
               file:
                 description: The File object holding the briefcase zip.
                 type: string
@@ -65,13 +68,23 @@ configs:
                 type: integer
                 minimum: 0
               built:
-                description: When the exporter built this version.
+                description: When the exporter built it.
                 type: string
                 format: date-time
               exporter:
                 description: The version of the exporter that built it.
                 type: string
                 minLength: 1
+              replaces:
+                description: The withdrawn briefcase this one replaces.
+                type: string
+                format: uuid
+              withdrawn:
+                description: >
+                  When the dataset was withdrawn by removing it from the
+                  Published class. Absent while the briefcase is live.
+                type: string
+                format: date-time
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
@@ -89,3 +102,38 @@ grants:
       # The name and origin map of each device in a briefcase.
       !u UUIDs.App.Info: false
       !u UUIDs.App.DeviceInformation: false
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u Briefcase.App.Release: false
+    # Store each zip in the Files service as a Briefcase file.
+    !u ConfigDB.Perm.CreateObject:
+      !u Files.Class.File: false
+    !u ConfigDB.Perm.WriteMembers:
+      !u Briefcase.FileType.Briefcase: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u Files.Class.File: true
+    !u Files.Perm.Upload:
+      !u Files.App.Config: false
+
+  # What a person needs to release datasets and pass the briefcases on.
+  # Administrators grant this role to people by hand. Dataset maker can
+  # also add datasets to Published, until that is taken out of its
+  # grant.
+  !u Briefcase.Group.Releaser:
+    # See which datasets are released, release them and withdraw them.
+    # Adding a dataset to a class needs WriteMembers on the class and
+    # WriteMemberships on the dataset.
+    !u ConfigDB.Perm.ReadMembers:
+      !u DataAccess.Class.Published: false
+    !u ConfigDB.Perm.WriteMembers:
+      !u DataAccess.Class.Published: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u DataAccess.Class.Dataset: true
+    # Set the terms each dataset is released under.
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u DataAccess.App.ReleasePolicy: false
+      !u Briefcase.App.Release: false
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u DataAccess.App.ReleasePolicy: false
+    # Download briefcases to pass them on.
+    !u Files.Perm.Download:
+      !u Briefcase.FileType.Briefcase: true

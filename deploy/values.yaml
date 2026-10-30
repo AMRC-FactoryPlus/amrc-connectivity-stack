@@ -278,6 +278,9 @@ briefcase:
   image:
     repository: acs-briefcase
   verbosity: "ALL,!service,!token"
+  # -- (RETRY_INTERVAL) Seconds to wait before building a briefcase
+  # again after a build fails.
+  retryInterval: 300
 
 openid:
   # -- Whether or not to deploy the Keycloak OIDC server

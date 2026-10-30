@@ -138,6 +138,7 @@ test("builds a bag with the RO-Crate inside data/", () => with_work_dir(async di
         "data/policy.json",
         "data/ro-crate-metadata.json",
         `data/telemetry/csv/${DEVICE}.csv`,
+        `data/telemetry/parquet/${DEVICE}.parquet`,
         "manifest-sha256.txt",
         "tagmanifest-sha256.txt",
     ].map(n => `${top}/${n}`).sort());

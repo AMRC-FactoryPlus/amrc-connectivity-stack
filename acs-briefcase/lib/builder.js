@@ -15,6 +15,7 @@ import { write_bag, zip_bag } from "./bag.js";
 import { App }          from "./constants.js";
 import { build_crate }  from "./crate.js";
 import { describe_device } from "./device.js";
+import { write_parquet } from "./parquet.js";
 import { split_telemetry } from "./telemetry.js";
 import { defined }      from "./util.js";
 
@@ -102,12 +103,21 @@ export class Builder {
         try {
             const data = path.join(bag, "data");
             const csv_dir = path.join(data, "telemetry", "csv");
+            const pq_dir = path.join(data, "telemetry", "parquet");
             const dev_dir = path.join(data, "metadata", "devices");
-            await fsp.mkdir(csv_dir, { recursive: true });
-            await fsp.mkdir(dev_dir, { recursive: true });
+            for (const dir of [csv_dir, pq_dir, dev_dir])
+                await fsp.mkdir(dir, { recursive: true });
 
             const telemetry = await split_telemetry(
                 await this.telemetry(dataset), csv_dir);
+
+            /* The Parquet copy is made from the CSV, so the two can't
+             * disagree. */
+            for (const [uuid, t] of telemetry) {
+                t.parquet = `${uuid}.parquet`;
+                await write_parquet(path.join(csv_dir, t.file),
+                    path.join(pq_dir, t.parquet));
+            }
 
             const devices = [];
             for (const uuid of telemetry.keys()) {
@@ -145,6 +155,20 @@ export class Builder {
                                 + "timestamp (UTC, to the nanosecond), metric (the full "
                                 + "Sparkplug name), type, value and unit.",
                             format:         "text/csv",
+                            device:         d.uuid,
+                            first:          t.first,
+                            last:           t.last,
+                        },
+                        {
+                            path:           `telemetry/parquet/${t.parquet}`,
+                            name:           `Telemetry from ${label}, as Parquet`,
+                            description:    `The same ${t.rows} data points as the CSV, `
+                                + "in the same order. timestamp is UTC, truncated to the "
+                                + "microsecond, and timestamp_ns is the exact time in "
+                                + "nanoseconds since 1970. Each row sets only the value "
+                                + "column its type names: value_double, value_int, "
+                                + "value_uint, value_boolean or value_string.",
+                            format:         "application/vnd.apache.parquet",
                             device:         d.uuid,
                             first:          t.first,
                             last:           t.last,

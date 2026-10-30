@@ -1,0 +1,51 @@
+name: Briefcase exporter
+# The exporter's unit tests, then a sample briefcase checked with the
+# tools researchers will use: the BagIt validator, the RO-Crate
+# validator, and pyarrow reading the Parquet copy back against the CSV.
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'acs-briefcase/**'
+      - '.github/workflows/briefcase.yaml'
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: acs-briefcase
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # Use the same npm as the JS base image. npm 10 fails to install
+      # the local libraries with --install-links.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install
+        run: |
+          npm install --install-links
+          pip install pyarrow==26.0.0 bagit==1.9.0 roc-validator==0.13.1
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Check a sample briefcase
+        run: |
+          out=$(mktemp -d)
+          node test/validate/make-sample.js "$out"
+          python test/validate/check.py "$out"/*.zip

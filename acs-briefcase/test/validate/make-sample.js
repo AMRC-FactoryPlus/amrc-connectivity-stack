@@ -78,6 +78,10 @@ const built = await new Builder({
     work_dir:   process.argv[2],
     exporter:   "sample",
     source:     { organisation: "AMRC", url: "https://factoryplus.example.ac.uk" },
-}).build(DATASET);
+}).build(DATASET, {
+    briefcase:  "c0000000-0000-4000-8000-000000000000",
+    /* A withdrawn briefcase, to check the replaces link validates. */
+    replaces:   "0b5e3a52-7f41-4c2e-a8d6-6a9f3e2d1c40",
+});
 
 console.log(built.file);

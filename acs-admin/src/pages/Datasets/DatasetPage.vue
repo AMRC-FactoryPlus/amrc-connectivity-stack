@@ -134,6 +134,7 @@
                    :grafana="grafana" :downloading="downloading" @tab="setTab" @download="download"/>
       <DataTab v-else-if="tab === 'data'" :key="`data-${rec.uuid}`" :record="rec" :resolved="resolved" :downloading="downloading" @download="download"/>
       <UseTab v-else-if="tab === 'use'" :record="rec" :grafana="grafana" :downloading="downloading" @download="download"/>
+      <ReleaseTab v-else-if="tab === 'release'" :key="`release-${rec.uuid}`" :record="rec"/>
       <template v-else-if="tab === 'add-ons'">
         <EnergyCarbon :record="rec" :ec="ec"/>
         <p class="text-xs text-slate-500">
@@ -194,6 +195,7 @@ import DeleteDatasetDialog from '@/components/Datasets/DeleteDatasetDialog.vue'
 import OverviewTab from '@/components/Datasets/page/OverviewTab.vue'
 import DataTab from '@/components/Datasets/page/DataTab.vue'
 import UseTab from '@/components/Datasets/page/UseTab.vue'
+import ReleaseTab from '@/components/Datasets/page/ReleaseTab.vue'
 import StructureTab from '@/components/Datasets/page/StructureTab.vue'
 import CorrectTimesDialog from '@/components/Datasets/page/CorrectTimesDialog.vue'
 import VoidDialog from '@/components/Datasets/page/VoidDialog.vue'

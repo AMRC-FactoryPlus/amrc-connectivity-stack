@@ -26,6 +26,11 @@ objects:
       name: "Briefcase release"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    # Written by releasers, so the release record stays the exporter's.
+    !u Briefcase.App.Notes:
+      name: "Briefcase notes"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   !u Files.Class.FileType:
     !u Briefcase.FileType.Briefcase:
@@ -35,6 +40,27 @@ objects:
 
 configs:
   !u UUIDs.App.ConfigSchema:
+    !u Briefcase.App.Notes:
+      title: Briefcase notes
+      description: >
+        Why each briefcase of a dataset was withdrawn, keyed by the
+        briefcase's UUID. The entry sits on the dataset. Releasers write
+        it when they withdraw a dataset; it stays inside Factory+.
+      type: object
+      propertyNames:
+        format: uuid
+      additionalProperties:
+        type: object
+        required: [reason]
+        additionalProperties: false
+        properties:
+          reason:
+            description: Why the briefcase was withdrawn.
+            type: string
+            minLength: 1
+          by:
+            description: Who withdrew it.
+            type: string
     !u Briefcase.App.Release:
       title: Briefcase release
       description: >
@@ -124,6 +150,10 @@ grants:
   # grants also cover Published, but that role is not a subclass of
   # Principal, so its grants reach none of its members.
   !u Briefcase.Group.Releaser:
+    # See the datasets, and their data, to decide what to release. The
+    # Admin UI lists only the datasets a person can read.
+    !u DataAccess.Perm.ReadDataset:
+      !u DataAccess.Class.Dataset: true
     # See which datasets are released, release them and withdraw them.
     # Adding a dataset to a class needs WriteMembers on the class and
     # WriteMemberships on the dataset.
@@ -133,12 +163,15 @@ grants:
       !u DataAccess.Class.Published: false
     !u ConfigDB.Perm.WriteMemberships:
       !u DataAccess.Class.Dataset: true
-    # Set the terms each dataset is released under.
+    # Set the terms each dataset is released under, and say why a
+    # briefcase was withdrawn.
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.ReleasePolicy: false
       !u Briefcase.App.Release: false
+      !u Briefcase.App.Notes: false
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.ReleasePolicy: false
+      !u Briefcase.App.Notes: false
     # Download briefcases to pass them on.
     !u Files.Perm.Download:
       !u Briefcase.FileType.Briefcase: true

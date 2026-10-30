@@ -523,6 +523,7 @@ export const DataAccess = {
 export const Briefcase = {
     App: {
         Release: "dee3e12f-4908-4f2d-b793-85847c2a4a3c",
+        Notes: "935c7cda-6fad-4a4a-aa89-d5f5b8162e22",
     },
     FileType: {
         Briefcase: "9327645a-d4de-4366-88e2-d102fa92799a",

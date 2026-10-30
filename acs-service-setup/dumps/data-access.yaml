@@ -127,6 +127,12 @@ objects:
       name: "Recording in progress"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    # The terms a Published dataset is released under, which travel in
+    # its briefcase.
+    !u DataAccess.App.ReleasePolicy:
+      name: "Release policy"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   !u UUIDs.Class.Special:
     !u DataAccess.Special.InvalidDataset:
@@ -159,7 +165,84 @@ objects:
     !u DataAccess.Perm.UseSparkplug:
       name: "Use Sparkplug data"
 
-      
+configs:
+  !u UUIDs.App.ConfigSchema:
+    !u DataAccess.App.ReleasePolicy:
+      title: Release policy
+      description: >
+        The terms a dataset is released under. Whoever adds the dataset
+        to the Published class is accountable for them. The policy is
+        copied into every briefcase built from the dataset.
+      type: object
+      required: [tier, data_owner, terms, permitted_use]
+      additionalProperties: false
+      properties:
+        tier:
+          description: >
+            Who may have the data. `open`: anyone. `registered`: any
+            signed-in user who has accepted the licence.
+            `approved-project`: members of a project approved for this
+            briefcase. `enclave-only`: approved projects, inside an
+            enclave only.
+          enum: [open, registered, approved-project, enclave-only]
+        data_owner:
+          description: >
+            The organisation that owns the data, and who to contact
+            about it. This is never a Factory+ principal.
+          type: object
+          required: [organisation, contact]
+          additionalProperties: false
+          properties:
+            organisation:
+              type: string
+              minLength: 1
+            contact:
+              type: object
+              required: [name, email]
+              additionalProperties: false
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                email:
+                  type: string
+                  format: email
+        terms:
+          description: >
+            Either a licence, as an SPDX identifier such as `CC-BY-4.0`,
+            or a reference to the data sharing agreement.
+          type: object
+          minProperties: 1
+          maxProperties: 1
+          additionalProperties: false
+          properties:
+            licence:
+              type: string
+              minLength: 1
+            agreement:
+              type: string
+              minLength: 1
+        trial:
+          description: A reference to the trial the data comes from.
+          type: string
+          minLength: 1
+        permitted_use:
+          description: >
+            One paragraph saying what the data may be used for, shown
+            to everyone who gets it.
+          type: string
+          minLength: 1
+        embargo_until:
+          description: Nobody outside Factory+ gets the data before this date.
+          type: string
+          format: date
+        review_by:
+          description: >
+            The data owner reviews the release by this date, and renews
+            or withdraws it.
+          type: string
+          format: date
+
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

@@ -39,6 +39,7 @@ subdirs+= lib
 
 subdirs+= acs-admin
 subdirs+= acs-auth
+subdirs+= acs-briefcase
 subdirs+= acs-cluster-manager
 subdirs+= acs-cmdesc
 subdirs+= acs-configdb

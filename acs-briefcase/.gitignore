@@ -1,0 +1,5 @@
+config.mk
+lib/git-version.js
+node_modules
+package-lock.json
+.idea

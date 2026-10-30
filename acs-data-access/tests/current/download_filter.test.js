@@ -1,6 +1,7 @@
 /*
  * ACS Data Access Service
- * Unit tests for the metric filter on POST v1/data/:uuid.
+ * Unit tests for the metric filter and the CSV columns of
+ * POST v1/data/:uuid.
  *
  * These run against fakes, so they need no cluster.
  */
@@ -9,12 +10,15 @@ import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
 import { PassThrough } from "stream";
 import { describe, expect, test } from "vitest";
-import { fluxString } from "@influxdata/influxdb-client";
+import {
+  createFluxTableColumn, createFluxTableMetaData, fluxString,
+} from "@influxdata/influxdb-client";
 
 import { APIv1 } from "../../lib/api-v1.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
 import { InfluxReader } from "../../lib/influx-reader.js";
 import { build_flux_query, flux_string } from "../../lib/flux.js";
+import { metric_type } from "../../lib/utils.js";
 import {
   MAX_METRICS, MAX_METRIC_LENGTH, parse_download_filter,
 } from "../../lib/validate.js";
@@ -116,12 +120,12 @@ describe("build_flux_query", () => {
     const q = build_flux_query({ bucket: "b", source, filter: { metrics } });
 
     /* Every literal is well formed and the query has exactly the literals
-     * the builder meant to write: bucket, start, stop, device, the five
+     * the builder meant to write: bucket, start, stop, device, the six
      * kept column names, plus five
      * per name selector and six per path selector. */
     const lits = flux_literals(q);
     expect(lits.every(l => parse_flux_string(l) !== null)).toBe(true);
-    expect(lits.length).toBe(4 + 5 + 5 + 6 + 6);
+    expect(lits.length).toBe(4 + 6 + 5 + 6 + 6);
 
     const values = lits.map(parse_flux_string);
     expect(values).toContain(`${hostile}:d`);
@@ -142,7 +146,7 @@ describe("build_flux_query", () => {
     const lits = flux_literals(q);
     expect(lits.every(l => parse_flux_string(l) !== null)).toBe(true);
     expect(lits.map(parse_flux_string)).toContain(hostile);
-    expect(lits.length).toBe(4 + 5 + 1);
+    expect(lits.length).toBe(4 + 6 + 1);
   });
 
   test("escapes the device and time range too", () => {
@@ -152,7 +156,7 @@ describe("build_flux_query", () => {
     });
     const values = flux_literals(q).map(parse_flux_string);
     expect(values).toEqual(['bu"cket', "2024\\", "${x}", 'd") |> drop(', "_time",
-      "_value", "_measurement", "device", "unit"]);
+      "_value", "_measurement", "device", "path", "unit"]);
   });
 });
 
@@ -228,9 +232,29 @@ describe("parse_download_filter", () => {
   });
 });
 
+/* A row as the Influx client yields it: the raw strings Influx sent, and
+ * the client's own table metadata, which parses them by datatype. A
+ * field left out is a column the table does not have. */
+function influx_row(fields, value_type = "double") {
+  const labels = Object.keys(fields);
+  const tableMeta = createFluxTableMetaData(labels.map(label =>
+    createFluxTableColumn({
+      label,
+      dataType: label == "_value" ? value_type
+        : label == "_time" ? "dateTime:RFC3339"
+        : "string",
+    })));
+  return { values: labels.map(l => fields[l]), tableMeta };
+}
+
+const ROW = influx_row({
+  _time: "2024-01-01T00:00:00Z", _value: "1", _measurement: "Temp:d",
+  device: "Dev", path: "Folder", unit: "C",
+});
+
 /* An APIv1 with one Sparkplug source dataset and a fake Influx client
- * that records the queries it is given. */
-function make_api() {
+ * that records the queries it is given and answers each with `rows`. */
+function make_api(rows = [ROW]) {
   const queries = [];
   const influx_client = {
     getQueryApi() {
@@ -239,16 +263,7 @@ function make_api() {
           queries.push(query);
           return {
             async *iterateRows() {
-              const values = ["Dev", "Temp:d", "2024-01-01T00:00:00Z", 1, "C"];
-              yield {
-                values,
-                tableMeta: {
-                  toObject: () => ({
-                    device: "Dev", _measurement: "Temp:d",
-                    _time: "2024-01-01T00:00:00Z", _value: 1, unit: "C",
-                  }),
-                },
-              };
+              yield* rows;
             },
           };
         },
@@ -323,12 +338,13 @@ describe("dataset_data", () => {
     expect(queries).toEqual([]);
   });
 
-  test("streams the unchanged CSV header and rows", async () => {
+  test("streams the CSV header and rows", async () => {
     const { api } = make_api();
     const { res, text } = await post(api, {});
     expect(res.code).toBe(200);
     expect(text).toBe(
-      "device,metric,timestamp,value,unit\nDev,Temp,2024-01-01T00:00:00Z,1,C\n");
+      "device,metric,timestamp,value,unit,device_uuid,path,type\n" +
+      `Dev,Temp,2024-01-01T00:00:00Z,1,C,${DEVICE},Folder,double\n`);
   });
 
   test("passes a metrics filter to Influx", async () => {
@@ -346,5 +362,55 @@ describe("dataset_data", () => {
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain(
       'r._measurement ==\n                    "Temp:d\\") |> drop(columns: [\\"_value\\"])"');
+  });
+});
+
+describe("CSV columns", () => {
+  const lines = text => text.trim().split("\n").slice(1);
+
+  test("the query keeps the path tag", () => {
+    const q = build_flux_query({
+      bucket: "bucket", source: { device_uuid: DEVICE } });
+    expect(q).toMatch(/keep\(columns: \[[^\]]*"path"/);
+  });
+
+  test("leaves path empty for a metric at the device root", async () => {
+    const { api } = make_api([influx_row({
+      _time: "2024-01-01T00:00:00Z", _value: "1", _measurement: "Temp:d",
+      device: "Dev", unit: "C",
+    })]);
+    const { text } = await post(api, {});
+    expect(lines(text)).toEqual(
+      [`Dev,Temp,2024-01-01T00:00:00Z,1,C,${DEVICE},,double`]);
+  });
+
+  test("writes 64-bit integers with every digit", async () => {
+    const row = (measurement, value, type) => influx_row({
+      _time: "2024-01-01T00:00:00Z", _value: value,
+      _measurement: measurement, device: "Dev",
+    }, type);
+    const { api } = make_api([
+      row("Count:u", "18446744073709551615", "unsignedLong"),
+      row("Offset:i", "-9007199254740993", "long"),
+    ]);
+    const { text } = await post(api, {});
+    expect(lines(text)).toEqual([
+      `Dev,Count,2024-01-01T00:00:00Z,18446744073709551615,,${DEVICE},,uint`,
+      `Dev,Offset,2024-01-01T00:00:00Z,-9007199254740993,,${DEVICE},,int`,
+    ]);
+  });
+
+  test("keeps the device UUID apart from a shared device name", async () => {
+    const { api } = make_api();
+    const { text } = await post(api, {});
+    expect(lines(text)[0].split(",")[5]).toBe(DEVICE);
+  });
+
+  test("names the type of each historian suffix", () => {
+    expect(["T:d", "T:i", "T:u", "T:b", "T:s"].map(metric_type))
+      .toEqual(["double", "int", "uint", "boolean", "string"]);
+    expect(metric_type("T")).toBeNull();
+    expect(metric_type("T:x")).toBeNull();
+    expect(metric_type(undefined)).toBeNull();
   });
 });

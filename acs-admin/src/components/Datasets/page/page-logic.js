@@ -16,6 +16,7 @@ export const TABS = [
     { id: 'overview',  label: 'Overview' },
     { id: 'data',      label: 'Data' },
     { id: 'use',       label: 'Use' },
+    { id: 'release',   label: 'Release' },
     { id: 'add-ons',   label: 'Add-ons' },
     { id: 'structure', label: 'Structure' },
 ]

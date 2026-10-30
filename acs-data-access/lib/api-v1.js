@@ -350,8 +350,11 @@ export class APIv1 {
               * device - Device this data point comes from
               * metric - metric name (don't include Influx :x suffix)
               * timestamp - ISO string
-              * value - actual data value
+              * value - actual data value, exactly as Influx stores it
               * unit - Engineering unit (if available)
+              * device_uuid - UUID of the device this data point comes from
+              * path - metric folders, empty for a metric at the device root
+              * type - double, int, uint, boolean or string
     * Don't return valid response if dataset is invalid
    */
   async dataset_data(req, res) {

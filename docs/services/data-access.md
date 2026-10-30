@@ -107,7 +107,7 @@ this special UUID as `structure` and omits `config`.
 
 `acs-service-setup` creates these objects; `acs-service-setup/lib/uuids.js`
 defines every UUID below. The service's own `lib/constants.js` holds
-only the ones the service uses. The four metadata apps marked * are
+only the ones the service uses. The five metadata apps marked * are
 deliberately not in `lib/constants.js`: an edit to an invalid dataset
 deletes the entries of every app listed there, and these must survive
 that. They are members of `Dataset metadata`, so `v1/metadata` passes
@@ -141,11 +141,14 @@ Application | `Dataset tags` * | `c95e372e-2fbe-45b9-9937-3235f94e22a3`
 Application | `Equipment device labels` * | `dfc3983b-658c-4099-b76a-01ce7c18bde1`
 Application | `Run metadata` * | `2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a`
 Application | `Recording in progress` * | `cf3f6103-0f0e-4839-953a-ad2cedc78c30`
+Application | `Release policy` * | `cb9b2307-3b82-4ffd-9665-0d214379ac21`
 Client role | `Dataset maker` | `b7aa3036-fc1f-4869-b0f5-50f28b028905`
 Service function | `Data Access service` | `06cee697-29d3-4972-9479-bc392e24946e`
 Special | Structurally invalid dataset | `696396a0-2831-11f1-9b12-33d63b8c5115`
 
-The Admin UI writes the four metadata apps. `Dataset maker` holds what
+The Admin UI writes the first four metadata apps. `Release policy`
+holds the terms a `Published` dataset is released under, and its
+schema in the dump says what each field means. `Dataset maker` holds what
 the Admin UI needs to make datasets and record runs as the signed-in
 user. The grants apply to every dataset, not only a member's own: a
 member can edit any dataset's definition, overwrite any dataset's tags,
@@ -210,12 +213,16 @@ Column | Content
 `device` | The Sparkplug device the point came from
 `metric` | The metric name, without Influx's `:x` datatype suffix
 `timestamp` | ISO 8601 timestamp
-`value` | The data value
+`value` | The data value, exactly as Influx returns it, so 64-bit integers keep every digit
 `unit` | The engineering unit, if the metric has one
+`device_uuid` | The UUID of the device the point came from
+`path` | The metric's folders, the part of its name before the last `/`. Empty for a metric at the device root
+`type` | The datatype the historian stored: `double`, `int`, `uint`, `boolean` or `string`
 
-The CSV has no metric path column. Two metrics with the same name under
-different folders appear with the same `metric` value. Use a full-path
-`metrics` selector (below) to export only one of them.
+The full Sparkplug metric name is `path/metric`, or just `metric` when
+`path` is empty. Two metrics with the same name under different folders
+differ in `path`, and two devices with the same Sparkplug name differ in
+`device_uuid`.
 
 The request body is optional. An empty or absent body exports everything
 in the dataset. The body can contain one of these filters:
@@ -820,8 +827,7 @@ Compared to the original design notes for this service:
   parameters are not read.
 * **Dataset download filtering is limited to metrics.** The download
   can be restricted to a list of metric paths or names, but there is no
-  per-device, schema or datatype filtering and no subsampling. The CSV
-  has no metric path column.
+  per-device, schema or datatype filtering and no subsampling.
 * **`Sub-device` history across renames.** A reference is read using
   the metric's current path, so points recorded before an enclosing
   object was renamed are not returned.

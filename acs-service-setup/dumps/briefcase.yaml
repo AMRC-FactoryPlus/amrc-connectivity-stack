@@ -11,9 +11,13 @@ objects:
       subclassOf:
         - !u Auth.Class.CentralService
 
+  # Auth only applies a group's grants to its members if the group is a
+  # subclass of Principal.
   !u Auth.Class.ClientRole:
     !u Briefcase.Group.Releaser:
       name: "Briefcase releaser"
+      subclassOf:
+        - !u Auth.Class.Principal
 
   # Written only by the briefcase exporter. It is not Dataset metadata,
   # because the Dataset maker role can write all of that.
@@ -111,13 +115,14 @@ grants:
       !u Briefcase.FileType.Briefcase: false
     !u ConfigDB.Perm.WriteMemberships:
       !u Files.Class.File: true
-    !u Files.Perm.Upload:
-      !u Files.App.Config: false
+    # The Files service checks Upload against the wildcard target, not
+    # the Files Configuration app.
+    !u Files.Perm.Upload: null
 
   # What a person needs to release datasets and pass the briefcases on.
-  # Administrators grant this role to people by hand. Dataset maker can
-  # also add datasets to Published, until that is taken out of its
-  # grant.
+  # Administrators grant this role to people by hand. Dataset maker's
+  # grants also cover Published, but that role is not a subclass of
+  # Principal, so its grants reach none of its members.
   !u Briefcase.Group.Releaser:
     # See which datasets are released, release them and withdraw them.
     # Adding a dataset to a class needs WriteMembers on the class and

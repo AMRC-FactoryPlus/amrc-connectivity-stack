@@ -4,19 +4,34 @@
 
 <!-- Release: where the dataset's release outside Factory+ stands, the
      terms it is released under, and every briefcase built from it,
-     each with a download to pass it on. -->
+     each with a download to pass it on. Releasing and withdrawing are
+     here too. -->
 <template>
   <div class="flex flex-col gap-4">
     <Card class="flex flex-col gap-2 p-4">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="font-semibold">Release</span>
-        <span :class="['rounded px-2 py-0.5 text-xs font-medium', STATES[state].pill]">{{ STATES[state].label }}</span>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold">Release</span>
+          <span :class="['rounded px-2 py-0.5 text-xs font-medium', STATES[state].pill]">{{ STATES[state].label }}</span>
+        </div>
+        <Button v-if="published" size="sm" variant="outline" @click="withdrawDialog?.open(record, live?.uuid)">
+          <i class="fa-solid fa-ban mr-2"></i>Withdraw
+        </Button>
+        <Button v-else size="sm" :disabled="!!blocker" :title="blocker ?? ''" @click="releaseDialog?.open(record)">
+          <i class="fa-solid fa-paper-plane mr-2"></i>Release
+        </Button>
       </div>
       <p class="text-sm text-slate-600">{{ stateText }}</p>
+      <p v-if="!published && blocker" class="text-xs text-slate-500">To release it: {{ blocker }}</p>
     </Card>
 
     <Card class="flex flex-col gap-3 p-4">
-      <span class="font-semibold">Release policy</span>
+      <div class="flex items-center justify-between gap-2">
+        <span class="font-semibold">Release policy</span>
+        <Button size="sm" variant="outline" @click="policyDialog?.open(record)">
+          <i class="fa-solid fa-pen mr-2"></i>{{ policy ? 'Edit' : 'Add a policy' }}
+        </Button>
+      </div>
       <p v-if="!policy" class="text-sm text-slate-500">
         This dataset has no release policy. The exporter can't build a briefcase until it has one.
       </p>
@@ -73,6 +88,9 @@
           <span>
             <span v-if="b.live" class="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Live</span>
             <span v-else-if="b.withdrawn" class="text-xs text-slate-500">Withdrawn {{ fmt_time(b.withdrawn) }}</span>
+            <span v-if="b.note" class="block text-xs text-slate-600" :title="b.note.by ? `By ${b.note.by}` : ''">
+              {{ b.note.reason }}
+            </span>
           </span>
           <Button size="sm" variant="outline" :disabled="downloading === b.uuid" @click="download(b)">
             <i :class="['fa-solid mr-2', downloading === b.uuid ? 'fa-circle-notch animate-spin' : 'fa-download']"></i>Download
@@ -80,6 +98,10 @@
         </div>
       </div>
     </Card>
+
+    <ReleasePolicyDialog ref="policyDialog"/>
+    <ReleaseDialog ref="releaseDialog"/>
+    <WithdrawDialog ref="withdrawDialog"/>
   </div>
 </template>
 
@@ -94,8 +116,12 @@ import { useFileDownload } from '@/composables/useFileDownload.js'
 import { BRIEFCASE } from '@/lib/datasets/constants.js'
 import { fmt_time } from '@/lib/datasets/model.js'
 import {
-  TIERS, release_policy, release_state, briefcase_history, briefcase_file_name, fmt_size,
+  TIERS, is_published, release_policy, release_state, release_blocker,
+  briefcase_history, briefcase_file_name, fmt_size,
 } from '@/lib/datasets/release.js'
+import ReleasePolicyDialog from './ReleasePolicyDialog.vue'
+import ReleaseDialog from './ReleaseDialog.vue'
+import WithdrawDialog from './WithdrawDialog.vue'
 
 const props = defineProps({ record: { type: Object, required: true } })
 
@@ -109,30 +135,42 @@ const STATES = {
   unreleased:  { label: 'Not released', pill: 'bg-slate-100 text-slate-700' },
 }
 
-/* The dataset's Briefcase release entry: undefined while loading, null
- * when there is none or this account can't read it. */
+const policyDialog = ref(null)
+const releaseDialog = ref(null)
+const withdrawDialog = ref(null)
+
+/* The dataset's Briefcase release and Briefcase notes entries:
+ * undefined while loading, null when there is none or this account
+ * can't read it. */
 const entry = ref(undefined)
-let sub = null
+const notes = ref(undefined)
+let subs = []
 
 watch(() => props.record.uuid, async uuid => {
-  sub?.unsubscribe()
+  subs.forEach(s => s.unsubscribe())
+  subs = []
   entry.value = undefined
+  notes.value = undefined
   await serviceClientReady()
   // Another dataset may have opened while we waited.
   if (uuid !== props.record.uuid) return
-  sub = sc.client.ConfigDB.watch_config(BRIEFCASE.App.Release, uuid).subscribe({
-    next: e => { entry.value = e ?? null },
+  const follow = (app, into) => sc.client.ConfigDB.watch_config(app, uuid).subscribe({
+    next: e => { into.value = e ?? null },
     error: err => {
-      console.error('Watching briefcase releases failed', err)
-      entry.value = null
+      console.error('Watching briefcase entries failed', err)
+      into.value = null
     },
   })
+  subs = [follow(BRIEFCASE.App.Release, entry), follow(BRIEFCASE.App.Notes, notes)]
 }, { immediate: true })
-onUnmounted(() => sub?.unsubscribe())
+onUnmounted(() => subs.forEach(s => s.unsubscribe()))
 
 const policy = computed(() => release_policy(props.record))
+const published = computed(() => is_published(props.record))
+const blocker = computed(() => release_blocker(props.record))
 const state = computed(() => release_state(props.record, entry.value))
-const history = computed(() => briefcase_history(entry.value))
+const history = computed(() => briefcase_history(entry.value, notes.value))
+const live = computed(() => history.value.find(b => b.live) ?? null)
 
 const stateText = computed(() => ({
   released:    'This dataset is in Published and its briefcase is live. Download it below to pass it on.',

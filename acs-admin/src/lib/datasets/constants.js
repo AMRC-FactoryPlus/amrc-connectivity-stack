@@ -44,6 +44,8 @@ export const BRIEFCASE = {
     App: {
         // Every briefcase built from a dataset. Only the exporter writes it.
         Release:            'dee3e12f-4908-4f2d-b793-85847c2a4a3c',
+        // Why each briefcase was withdrawn, written by releasers.
+        Notes:              '935c7cda-6fad-4a4a-aa89-d5f5b8162e22',
     },
 }
 

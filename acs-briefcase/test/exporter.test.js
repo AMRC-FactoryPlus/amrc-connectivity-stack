@@ -118,7 +118,7 @@ function make_exporter ({ entries = {}, fail = new Set() } = {}) {
             calls.builds.push({ ds, ...opts });
             if (fail.has(ds)) throw new Error("no data");
             return { file: `${opts.briefcase}.zip`, sha256: "b".repeat(64),
-                size: 10, built: "2026-10-30T09:00:00.000Z" };
+                size: 10, built: "2026-10-30T09:00:00.000Z", tier: "open" };
         },
     };
     const exporter = new Exporter({
@@ -148,7 +148,7 @@ test("builds, uploads and records a briefcase", async () => {
     assert.deepEqual(records.get(A), { briefcases: [{
         uuid: b.briefcase, file: `file-of-${b.briefcase}.zip`,
         sha256: "b".repeat(64), size: 10,
-        built: "2026-10-30T09:00:00.000Z", exporter: "test",
+        built: "2026-10-30T09:00:00.000Z", tier: "open", exporter: "test",
     }] });
 });
 

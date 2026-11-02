@@ -165,6 +165,12 @@ configs:
                 description: When the exporter built it.
                 type: string
                 format: date-time
+              tier:
+                description: >
+                  The tier in the release policy the briefcase was
+                  built under. Absent from briefcases built before the
+                  exporter recorded it.
+                enum: [open, registered, approved-project, enclave-only]
               exporter:
                 description: The version of the exporter that built it.
                 type: string

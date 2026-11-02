@@ -104,6 +104,7 @@ export class Exporter {
                 sha256:     zip.sha256,
                 size:       zip.size,
                 built:      zip.built,
+                tier:       zip.tier,
                 exporter:   this.exporter,
             }));
 

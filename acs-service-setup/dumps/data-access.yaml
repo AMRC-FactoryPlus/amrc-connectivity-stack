@@ -197,6 +197,11 @@ grants:
       !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.DeleteObject:
       !u DataAccess.Class.Dataset: true
+    # Datasets are created owned by the caller: ConfigDB needs GiveTo
+    # on the owner, and ReadKerberos resolves the caller's UUID.
+    !u ConfigDB.Perm.GiveTo:
+      !u Auth.Class.Principal: true
+    !u Auth.Perm.ReadKerberos: null
 
   # Everything the Admin UI needs to make datasets and record runs as
   # the signed-in user. It is broad, and applies to every dataset, not

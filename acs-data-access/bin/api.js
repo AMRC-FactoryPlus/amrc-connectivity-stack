@@ -105,6 +105,9 @@ const api = await new WebAPI({
   keytab: env.SERVER_KEYTAB,
   http_port: env.PORT,
   max_age: env.CACHE_MAX_AGE,
+  // Data Access checks dataset permissions itself and writes to the
+  // ConfigDB with its own rights, so it never forwards a caller's JWT.
+  forward_jwt: false,
   routes: app => {
     app.use("/v1", apiv1.routes);
     // Malformed or oversized bodies get a JSON 400 or 413, not a 500.

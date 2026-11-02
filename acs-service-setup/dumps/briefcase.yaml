@@ -1,6 +1,7 @@
-# Briefcase exporter: builds a briefcase of each Published dataset.
+# Briefcase exporter: builds a briefcase of each Published dataset,
+# and publishes the release state of every dataset to the UNS.
 #
-#-REQUIRE: auth data-access files
+#-REQUIRE: auth data-access files schemas
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -38,7 +39,70 @@ objects:
       subclassOf:
         - !u Files.Class.File
 
+  !u ACS.PermGroup.MQTT:
+    !u Briefcase.Perm.WriteUNSDatasets: { name: "Write datasets to UNS" }
+
+  # The schema of the Release topics under each dataset in the UNS.
+  !u UUIDs.Class.Schema:
+    !u Briefcase.Schema.DatasetRelease:
+      name: "Datasets/Release (v1)"
+
 configs:
+  !u ACS.App.MQTTPermTemplate:
+    # Only the Datasets subtree of each enterprise, not the whole UNS.
+    !u Briefcase.Perm.WriteUNSDatasets:
+      UNS/v1/+/Datasets/#: w
+  !u UUIDs.App.SchemaInformation:
+    !u Briefcase.Schema.DatasetRelease:
+      name: Datasets/Release
+      version: "1"
+      source: acs-service-setup
+      created: 1793577600
+      modified: 1793577600
+  !u UUIDs.App.Schema:
+    !u Briefcase.Schema.DatasetRelease:
+      $id: urn:uuid:1ab3a88e-d179-4cc9-bdee-03bb322ec6ff
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      # Not a device schema, so not offered for a device's origin map.
+      topLevel: false
+      required: [Schema_UUID, Instance_UUID]
+      properties:
+        Schema_UUID:
+          const: 1ab3a88e-d179-4cc9-bdee-03bb322ec6ff
+        Instance_UUID:
+          description: The dataset's UUID.
+          type: string
+          format: uuid
+        State:
+          allOf:
+            - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+            - properties:
+                Documentation:
+                  default: >-
+                    unreleased, released, withdrawn or deleted
+                Sparkplug_Type:
+                  enum: [String]
+        Briefcase:
+          allOf:
+            - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+            - properties:
+                Documentation:
+                  default: >-
+                    The UUID of the dataset's newest briefcase, live
+                    or withdrawn
+                Sparkplug_Type:
+                  enum: [String]
+        Tier:
+          allOf:
+            - $ref: urn:uuid:b16275f1-e443-4c41-a482-fcbdfbd20769
+            - properties:
+                Documentation:
+                  default: >-
+                    The access tier in the newest briefcase's release
+                    policy
+                Sparkplug_Type:
+                  enum: [String]
   !u UUIDs.App.ConfigSchema:
     !u Briefcase.App.Notes:
       title: Briefcase notes
@@ -120,12 +184,15 @@ service: !u UUIDs.Service.Authentication
 version: 2
 grants:
   !u Briefcase.Requirement.ServiceRole:
-    # Watch the Published class for datasets to build or withdraw.
+    # Watch the Published class for datasets to build or withdraw, and
+    # the Dataset class for every dataset whose state goes to the UNS.
     !u ConfigDB.Perm.ReadMembers:
       !u DataAccess.Class.Published: false
-    # Read each Published dataset's metadata, release policy and data.
+      !u DataAccess.Class.Dataset: false
+    # Read each Published dataset's metadata, release policy and data,
+    # and every dataset's devices, to find its ISA-95 enterprise.
     !u DataAccess.Perm.ReadDataset:
-      !u DataAccess.Class.Published: true
+      !u DataAccess.Class.Dataset: true
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       # The release records, to see what has been built.
       !u Briefcase.App.Release: false
@@ -144,6 +211,8 @@ grants:
     # The Files service checks Upload against the wildcard target, not
     # the Files Configuration app.
     !u Files.Perm.Upload: null
+    # Publish each dataset's release state under UNS/v1/<Enterprise>/Datasets.
+    !u Briefcase.Perm.WriteUNSDatasets: null
 
   # What a person needs to release datasets and pass the briefcases on.
   # Administrators grant this role to people by hand. Dataset maker's

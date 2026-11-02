@@ -1,0 +1,16 @@
+# ACS base image for building Elixir services.
+# This has Elixir, Erlang/OTP, Hex and rebar3. kerlberos is pure
+# Erlang, so it needs no Kerberos libraries, and nothing needs a C
+# compiler yet.
+
+# Pinned exactly, Alpine included. A release carries this image's
+# ERTS, which needs the same Alpine underneath it at runtime, so bump
+# this and Dockerfile.ex-run together, and the projects' .tool-versions
+# with them.
+FROM hexpm/elixir:1.20.4-erlang-29.1.2-alpine-3.24.2
+
+RUN adduser -D -u 1000 elixir
+
+USER elixir
+WORKDIR /home/elixir
+RUN mix local.hex --force && mix local.rebar --force

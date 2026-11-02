@@ -1,7 +1,7 @@
-name: Elixir libraries
-# The Elixir libraries in lib/ex-* aren't built by the Makefiles or
-# deployed yet, so this is the only place their checks run. Tests tagged
-# :acs_local need the local test cluster and are excluded by default.
+name: Elixir
+# The Elixir projects aren't built by the Makefiles or deployed yet, so
+# this is the only place their checks run. Tests tagged :acs_local need
+# the local test cluster and are excluded by default.
 on:
   pull_request:
     branches:
@@ -10,6 +10,7 @@ on:
     paths:
       - 'lib/ex-**'
       - 'lib/erl-**'
+      - 'acs-ingest/**'
       # FPlus.Service is checked against the JS client's UUIDs.
       - 'lib/js-service-client/lib/uuids.js'
       - '.github/workflows/elixir.yaml'
@@ -20,12 +21,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lib:
-          - ex-sparkplug
-          - ex-service-client
+        project:
+          - lib/ex-sparkplug
+          - lib/ex-service-client
+          - acs-ingest
     defaults:
       run:
-        working-directory: lib/${{ matrix.lib }}
+        working-directory: ${{ matrix.project }}
     env:
       MIX_ENV: test
     steps:
@@ -35,16 +37,16 @@ jobs:
       - name: Set up Erlang and Elixir
         uses: erlef/setup-beam@v1
         with:
-          version-file: lib/${{ matrix.lib }}/.tool-versions
+          version-file: ${{ matrix.project }}/.tool-versions
           version-type: strict
 
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
           path: |
-            lib/${{ matrix.lib }}/deps
-            lib/${{ matrix.lib }}/_build
-          key: ${{ runner.os }}-mix-${{ matrix.lib }}-${{ hashFiles(format('lib/{0}/mix.lock', matrix.lib), format('lib/{0}/.tool-versions', matrix.lib)) }}
+            ${{ matrix.project }}/deps
+            ${{ matrix.project }}/_build
+          key: ${{ runner.os }}-mix-${{ matrix.project }}-${{ hashFiles(format('{0}/mix.lock', matrix.project), format('{0}/.tool-versions', matrix.project)) }}
 
       - name: Fetch dependencies
         run: mix deps.get

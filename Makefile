@@ -50,6 +50,7 @@ subdirs+= acs-files
 subdirs+= acs-git
 subdirs+= acs-identity
 subdirs+= acs-i3x
+subdirs+= acs-ingest
 subdirs+= acs-keycloak
 subdirs+= acs-krb-keys-operator
 subdirs+= acs-krb-utils
@@ -68,9 +69,6 @@ subdirs+= edge-pathfindr
 subdirs+= edge-sim
 subdirs+= edge-test
 subdirs+= edge-tplink-smartplug
-subdirs+= historian-sparkplug
-subdirs+= historian-uns
-subdirs+= uns-ingester-sparkplug
 
 
 include ${mk}/acs.subdirs.mk

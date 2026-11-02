@@ -786,7 +786,7 @@ export class ObjectTree {
     }
 
     /**
-     * Does this device publish to UNS? uns-ingester-sparkplug publishes
+     * Does this device publish to UNS? The UNS ingester publishes
      * only devices with an ISA-95 hierarchy (at least an Enterprise).
      * buildDevice files a device without one under <namespace>/Unknown,
      * and a UNS message moves a device under the levels it was
@@ -1214,7 +1214,7 @@ export class ObjectTree {
         const schemaUuids = new Set<string>([schemaUuid]);
 
         // The ISA-95 hierarchy: a Hierarchy-v1 object at
-        // Device_Information/ISA95_Hierarchy. uns-ingester-sparkplug
+        // Device_Information/ISA95_Hierarchy. The UNS ingester
         // looks only there, and publishes a device to UNS only if it
         // finds one; a hierarchy elsewhere must not count (see
         // publishesToUns).

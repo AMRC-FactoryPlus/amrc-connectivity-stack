@@ -29,6 +29,7 @@ defmodule SparkplugB.Property do
 
   def from_set(%Payload.PropertySet{keys: keys, values: values}) do
     keys
+    |> Enum.map(&Value.text/1)
     |> Enum.zip(values)
     |> Map.new(fn {key, value} -> {key, from_value(value)} end)
   end

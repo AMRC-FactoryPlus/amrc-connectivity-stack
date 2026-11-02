@@ -59,6 +59,15 @@ spec:
               value: {{ .Values.acs.organisation | quote }}
             - name: SOURCE_URL
               value: {{ .Values.acs.secure | ternary "https" "http" }}://{{ .Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
+            {{- if .Values.briefcase.uns.enabled }}
+            # Publish each dataset's release state to the UNS.
+            - name: UNS_PUBLISH
+              value: "true"
+            - name: UNS_FALLBACK_ENTERPRISE
+              value: {{ .Values.briefcase.uns.fallbackEnterprise | default .Values.acs.organisation | required "values.acs.organisation is required!" | quote }}
+            - name: MQTT_WATCHDOG_TIMEOUT
+              value: {{ .Values.briefcase.mqttWatchdogTimeout | default 0 | quote }}
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

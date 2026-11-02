@@ -531,8 +531,14 @@ export const Briefcase = {
     Group: {
         Releaser: "146755a2-f3bc-483e-8bdf-3cb3fb4d8bec",
     },
+    Perm: {
+        WriteUNSDatasets: "bcbc4cd3-effd-4267-9d9f-ba7f8ab4188d",
+    },
     Requirement: {
         ServiceRole: "cae0ccc0-a85a-4ab6-8c98-0cd4ee590ef7",
+    },
+    Schema: {
+        DatasetRelease: "1ab3a88e-d179-4cc9-bdee-03bb322ec6ff",
     },
 };
 

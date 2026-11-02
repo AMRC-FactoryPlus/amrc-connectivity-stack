@@ -279,8 +279,23 @@ briefcase:
     repository: acs-briefcase
   verbosity: "ALL,!service,!token"
   # -- (RETRY_INTERVAL) Seconds to wait before building a briefcase
-  # again after a build fails.
+  # again after a build fails, or publishing a dataset's state again
+  # after publishing fails.
   retryInterval: 300
+  uns:
+    # -- (UNS_PUBLISH) Publish the release state of every dataset to
+    # the UNS, under UNS/v1/<Enterprise>/Datasets/<dataset>/Release.
+    # The enterprise is the ISA-95 enterprise of the dataset's devices.
+    enabled: false
+    # -- (UNS_FALLBACK_ENTERPRISE) The enterprise to publish a dataset
+    # under when none of its devices has one. Empty means
+    # acs.organisation.
+    fallbackEnterprise: ""
+  # -- Exit (so Kubernetes restarts the pod) if the MQTT client has had
+  # no connection to the broker, and has made no attempt to connect, for
+  # this many seconds. Only used when uns.enabled is true. Set it to 0
+  # to disable the check.
+  mqttWatchdogTimeout: 300
 
 openid:
   # -- Whether or not to deploy the Keycloak OIDC server

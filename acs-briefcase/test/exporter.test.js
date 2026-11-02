@@ -32,6 +32,10 @@ const plain = p => ({
 const work = ({ build = [], withdraw = [] }) =>
     imm.Map({ build: imm.Set(build), withdraw: imm.Set(withdraw) });
 
+/* Class member responses, as ConfigDB's notify WATCH gives them. */
+const members = list => ({ status: 200, isOK: true, body: list });
+const refused = { status: 403, isOK: false };
+
 test("builds Published datasets with no live briefcase", () => {
     const p = plan(imm.Set([A, B]), imm.Map({ [A]: live }));
     assert.deepEqual(plain(p), { build: [B], withdraw: [] });
@@ -58,10 +62,10 @@ test("emits a plan only when the work changes", () => {
     const fplus = {
         debug: { bound: () => () => {} },
         ConfigDB: {
-            watch_members: klass => {
-                assert.equal(klass, Class.Published);
+            notify: { watch_full: url => {
+                assert.equal(url, `v2/class/${Class.Published}/member/`);
                 return published;
-            },
+            } },
             search_app: app => {
                 assert.equal(app, App.BriefcaseRelease);
                 return releases;
@@ -71,13 +75,13 @@ test("emits a plan only when the work changes", () => {
     const seen = [];
     new Exporter({ fplus }).plans().subscribe(p => seen.push(plain(p)));
 
-    published.next(imm.Set([A]));
+    published.next(members([A]));
     assert.equal(seen.length, 0, "waits for the release entries");
 
     releases.next(imm.Map());
     /* An unrelated release entry changes nothing. */
     releases.next(imm.Map({ [C]: gone }));
-    published.next(imm.Set([A, B]));
+    published.next(members([A, B]));
     releases.next(imm.Map({ [A]: live, [C]: gone }));
 
     assert.deepEqual(seen, [
@@ -85,6 +89,38 @@ test("emits a plan only when the work changes", () => {
         { build: [A, B], withdraw: [] },
         { build: [B], withdraw: [] },
     ]);
+});
+
+test("withdraws nothing when the Published class can't be read", async () => {
+    const published = new rx.Subject();
+    const releases = new rx.Subject();
+    const logged = [];
+    let watches = 0;
+    const fplus = {
+        debug: { bound: () => (...args) => logged.push(args) },
+        ConfigDB: {
+            notify: { watch_full: () => { watches++; return published; } },
+            search_app: () => releases,
+        },
+    };
+    const seen = [];
+    new Exporter({ fplus, retry: 0 }).plans()
+        .subscribe(p => seen.push(plain(p)));
+    const tick = () => new Promise(r => setTimeout(r, 5));
+
+    releases.next(imm.Map({ [A]: live }));
+    published.next(refused);
+    assert.equal(seen.length, 0, "a refusal is not an empty class");
+
+    await tick();
+    published.next(members([A]));
+    published.next(refused);
+    await tick();
+    published.next(members([A]));
+
+    assert.deepEqual(seen, [{ build: [], withdraw: [] }]);
+    assert.equal(watches, 3, "watches again after each refusal");
+    assert.equal(logged.length, 2);
 });
 
 /* An Exporter with an in-memory store and a fake builder. Builds of the
@@ -118,7 +154,7 @@ function make_exporter ({ entries = {}, fail = new Set() } = {}) {
             calls.builds.push({ ds, ...opts });
             if (fail.has(ds)) throw new Error("no data");
             return { file: `${opts.briefcase}.zip`, sha256: "b".repeat(64),
-                size: 10, built: "2026-10-30T09:00:00.000Z" };
+                size: 10, built: "2026-10-30T09:00:00.000Z", tier: "open" };
         },
     };
     const exporter = new Exporter({
@@ -148,7 +184,7 @@ test("builds, uploads and records a briefcase", async () => {
     assert.deepEqual(records.get(A), { briefcases: [{
         uuid: b.briefcase, file: `file-of-${b.briefcase}.zip`,
         sha256: "b".repeat(64), size: 10,
-        built: "2026-10-30T09:00:00.000Z", exporter: "test",
+        built: "2026-10-30T09:00:00.000Z", tier: "open", exporter: "test",
     }] });
 });
 

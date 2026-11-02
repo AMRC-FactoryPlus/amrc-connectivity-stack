@@ -14,6 +14,7 @@ import { GIT_VERSION } from "../lib/git-version.js";
 import { Builder } from "../lib/builder.js";
 import { Exporter } from "../lib/exporter.js";
 import { Store } from "../lib/store.js";
+import { UNSPublisher } from "../lib/uns.js";
 
 const { env } = process;
 
@@ -30,12 +31,25 @@ const builder = new Builder({
     },
 });
 
+/* RETRY_INTERVAL is in seconds. */
+const retry = (Number(env.RETRY_INTERVAL) || 300) * 1000;
+
 const exporter = new Exporter({
-    fplus, builder,
+    fplus, builder, retry,
     store:      new Store({ fplus }),
     exporter:   GIT_VERSION,
-    /* RETRY_INTERVAL is in seconds. */
-    retry:      (Number(env.RETRY_INTERVAL) || 300) * 1000,
 });
 
+/* Publishing to the UNS is off unless UNS_PUBLISH is "true". */
+let uns = null;
+if (env.UNS_PUBLISH == "true") {
+    if (!env.UNS_FALLBACK_ENTERPRISE)
+        throw new Error("UNS_PUBLISH needs UNS_FALLBACK_ENTERPRISE");
+    uns = new UNSPublisher({
+        fplus, retry,
+        enterprise: env.UNS_FALLBACK_ENTERPRISE,
+    });
+}
+
 exporter.run();
+uns?.run();

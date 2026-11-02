@@ -13,7 +13,9 @@ dataset again builds a new briefcase, with a new UUID, which names the
 one it replaces.
 
 The exporter has no HTTP API. It is a worker that watches ConfigDB, and
-the chart runs it only when `briefcase.enabled` is set.
+the chart runs it only when `briefcase.enabled` is set. It can also
+publish the release state of every dataset to the UNS, when
+`briefcase.uns.enabled` is set.
 
 ## Releasing a dataset
 
@@ -54,8 +56,59 @@ briefcase is recorded, its UUID is never used again. The exporter
 re-reads a dataset's entry before each build, and remembers work it has
 done until ConfigDB reports it, so it does not build a dataset twice.
 
+If ConfigDB refuses to list a class's members, for example while a
+grant is missing, the exporter logs it and asks again after
+`RETRY_INTERVAL`. Until then it keeps the last membership it read, so a
+refusal never looks like an empty `Published` class.
+
 The chart runs one replica with the `Recreate` strategy, so two
 exporters never run at once.
+
+## Publishing to the UNS
+
+With `briefcase.uns.enabled` set, the exporter publishes where each
+dataset's release stands to the UNS, under the dataset's UUID:
+
+```
+UNS/v1/<Enterprise>/Datasets/<dataset-uuid>/Release/State
+UNS/v1/<Enterprise>/Datasets/<dataset-uuid>/Release/Briefcase
+UNS/v1/<Enterprise>/Datasets/<dataset-uuid>/Release/Tier
+```
+
+Topic | Value | Timestamp
+---|---|---
+`State` | `unreleased`, `released`, `withdrawn` or `deleted` | When that state began, or when it was published for `unreleased` and `deleted`
+`Briefcase` | The UUID of the dataset's newest briefcase | When that briefcase was built
+`Tier` | The tier of the policy that briefcase was built under | When that briefcase was built
+
+Every dataset is published, from the moment it exists. A dataset with
+no briefcase is `unreleased`, and has only a `State` topic. Once it has
+one, its state is that of its newest briefcase: `released` while it is live,
+`withdrawn` once it has been withdrawn. A dataset that leaves the
+`Dataset` class is published once as `deleted`. A briefcase recorded
+before the exporter recorded tiers has no `Tier` topic.
+
+The enterprise is the ISA-95 enterprise of the dataset's devices, from
+each device's `Device information`, so the dataset sits beside its
+devices in the UNS. A dataset whose devices are in several enterprises
+is published under each of them. One with no devices, or none with an
+enterprise, is published under the fallback enterprise,
+`acs.organisation` unless `briefcase.uns.fallbackEnterprise` is set. The
+exporter gets a dataset's devices from Data Access without reading any
+of its data, but Data Access lists at most 500, so a dataset with more
+goes under the fallback.
+
+Messages use the same format as the UNS ingester's: a JSON payload of
+`{ "timestamp", "value" }`, every value a `String`, and MQTT 5 user
+properties giving the dataset's UUID as the instance and `Datasets/Release`
+as the schema. They are sent at QoS 1 and are not retained. The UNS
+historian records them like any other UNS topic, with `Datasets` as the
+site, the dataset's UUID as the area and `Release` as the work centre.
+
+The exporter publishes every dataset when it starts, and then each
+dataset whose state changes. A publish that fails is tried again after
+`RETRY_INTERVAL`. Only the UUIDs, the state and the tier are published:
+no dataset names, tags, release policies or people.
 
 ## Briefcase format
 
@@ -142,9 +195,12 @@ Application | `Briefcase notes` | `935c7cda-6fad-4a4a-aa89-d5f5b8162e22`
 File type | `Briefcase` | `9327645a-d4de-4366-88e2-d102fa92799a`
 Service role | `Briefcase exporter` | `cae0ccc0-a85a-4ab6-8c98-0cd4ee590ef7`
 Client role | `Briefcase releaser` | `146755a2-f3bc-483e-8bdf-3cb3fb4d8bec`
+MQTT permission | `Write datasets to UNS` | `bcbc4cd3-effd-4267-9d9f-ba7f8ab4188d`
+Schema | `Datasets/Release (v1)` | `1ab3a88e-d179-4cc9-bdee-03bb322ec6ff`
 
 Each application has a schema in ConfigDB, so a malformed entry is
-refused.
+refused. The `Datasets/Release` schema describes the UNS topics. It is
+not a device schema, so it is not offered for origin maps.
 
 **`Release policy`**, on the dataset, written by releasers. Because it
 is `Dataset metadata`, Data Access returns it with the dataset's
@@ -163,8 +219,8 @@ Field | Content
 `{ "briefcases": [...] }`, every briefcase built from the dataset,
 oldest first. Each has its `uuid`, the `file` (its Files object), its
 `sha256` and `size`, when it was `built`, the `exporter` version, the
-briefcase it `replaces` if any, and when it was `withdrawn` if it has
-been. The live briefcase is the last one, if it has no `withdrawn`.
+`tier` of the policy it was built under, the briefcase it `replaces` if
+any, and when it was `withdrawn` if it has been. The live briefcase is the last one, if it has no `withdrawn`.
 
 **`Briefcase notes`**, on the dataset, written by releasers: why each
 briefcase was withdrawn, keyed by briefcase UUID, as
@@ -177,13 +233,16 @@ to change the release record.
 The exporter runs as `sv1briefcase`, in the `Briefcase exporter` role.
 That role can:
 
-* read the members of `Published`, and read Published datasets through
-  Data Access (`Read dataset`);
+* read the members of `Published` and of `Dataset`, and read every
+  dataset through Data Access (`Read dataset`), to find each dataset's
+  devices;
 * read `Briefcase release`, and the `General information` and `Device
   information` of each device;
 * write `Briefcase release`;
 * create `File` objects, add them to the `Briefcase` file type, and
-  upload to the Files service.
+  upload to the Files service;
+* publish to `UNS/v1/+/Datasets/#`, through the `Write datasets to UNS`
+  MQTT permission, and nowhere else in the UNS.
 
 The Files service checks `Upload` against the wildcard target, so the
 grant uses it.
@@ -203,13 +262,16 @@ Value | Default | Content
 `briefcase.enabled` | `false` | Run the exporter
 `briefcase.image.repository` | `acs-briefcase` | The image to run
 `briefcase.verbosity` | `ALL,!service,!token` | Debug log tags (`VERBOSE`)
-`briefcase.retryInterval` | `300` | Seconds before a failed build is tried again (`RETRY_INTERVAL`)
+`briefcase.retryInterval` | `300` | Seconds before a failed build or publish is tried again (`RETRY_INTERVAL`)
+`briefcase.uns.enabled` | `false` | Publish each dataset's release state to the UNS (`UNS_PUBLISH`)
+`briefcase.uns.fallbackEnterprise` | `""` | The enterprise for a dataset none of whose devices has one; empty means `acs.organisation` (`UNS_FALLBACK_ENTERPRISE`)
+`briefcase.mqttWatchdogTimeout` | `300` | With UNS publishing on, exit if the MQTT client has neither a connection nor an attempt to connect for this many seconds; `0` turns the check off (`MQTT_WATCHDOG_TIMEOUT`)
 
 The chart also sets `DIRECTORY_URL`, `WORK_DIR` (an `emptyDir` at
 `/work`, where each briefcase is built and zipped), and
 `SOURCE_ORGANISATION` and `SOURCE_URL`, from `acs.organisation` and
 `acs.baseUrl`, which each briefcase records as the instance it came
-from.
+from. The UNS settings are only set when `briefcase.uns.enabled` is.
 
 ## Testing
 
@@ -240,3 +302,10 @@ Parquet file with pyarrow, which must match its CSV row for row. The
   publish it again to issue a corrected briefcase.
 * **A failed upload leaves an empty `File` object.** The exporter cannot
   delete File objects, so each failed attempt leaves one behind.
+* **A dataset does not follow its devices to another enterprise.** The
+  exporter does not watch devices, so a dataset moves only at its next
+  change of state, or when the exporter restarts. The old enterprise
+  keeps the dataset's last state.
+* **Each restart publishes every dataset again.** An `unreleased`
+  dataset has no recorded time, so the historian gets a new point for
+  it each time.

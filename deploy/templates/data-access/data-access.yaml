@@ -48,6 +48,7 @@ spec:
               value: data-access.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
             - name: ROOT_PRINCIPAL
               value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: VERBOSE

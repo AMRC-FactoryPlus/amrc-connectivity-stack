@@ -24,6 +24,7 @@ const AXIS = "a1a1a1a1-0000-4000-8000-000000000001";
 const SUBSET = "66666666-6666-6666-6666-666666666666";
 const UNION = "77777777-7777-7777-7777-777777777777";
 const GONE = "99999999-9999-4999-8999-999999999999";
+const OWNER = "88888888-8888-4888-8888-888888888888";
 
 const SUBSET_APP = Constants.App.SparkplugSubset;
 
@@ -215,6 +216,7 @@ function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = 
                 acl_checks.push([perm, target]);
                 return allowed;
             },
+            async resolve_principal () { return OWNER; },
         },
         cdb: {
             async get_config (app, obj) {

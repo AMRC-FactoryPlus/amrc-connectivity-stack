@@ -55,6 +55,7 @@ function make_api(datasets, denied = [], delete_errors = {}) {
     async check_acl(principal, perm, target) {
       return !denied.some(([p, t]) => p === perm && t === target);
     },
+    async resolve_principal() { throw new Error("resolve_principal not expected"); },
   };
 
   const api = new APIv1({

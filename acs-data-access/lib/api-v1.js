@@ -773,17 +773,52 @@ export class APIv1 {
     return { handler, config: stored };
   }
 
+  /** Returns the principal UUID to own a dataset the caller creates.
+   *
+   * Data Access holds GiveTo on every principal, so the owner must only
+   * ever come from the authenticated caller, never from the request.
+   * Root gets `undefined`, which leaves Data Access as the owner.
+   */
+  async _resolve_owner(principal) {
+    if (this.auth.root_principal && principal == this.auth.root_principal)
+      return undefined;
+
+    const owner = await this.auth.resolve_principal(principal)
+      .catch(e => {
+        this.log(`Owner lookup for ${principal} failed: ${e}`);
+        return null;
+      });
+    if (!owner)
+      return fail(this.log, 503, `Can't resolve the owner for ${principal}`);
+    return owner;
+  }
+
+  /** Creates a Dataset object owned by `owner`, mapping ConfigDB's
+   * refusals to clear statuses instead of a generic 503. */
+  async _create_dataset_object(owner) {
+    try {
+      return await this.cdb.create_object(
+        Constants.Class.Dataset, undefined, false, owner);
+    }
+    catch (e) {
+      if (e instanceof ServiceError && (e.status == 403 || e.status == 409))
+        return fail(this.log, e.status,
+          `ConfigDB refused a dataset owned by ${owner}: ${e.status}`);
+      throw e;
+    }
+  }
+
   /** Writes a dataset config and its subclass relationships.
    *
    * This only writes. The caller must have checked the config with
    * `_check_dataset_config` first, and pass the config it returned.
    */
-  async _write_dataset_config(structure, config, dataset_uuid){ 
+  async _write_dataset_config(structure, config, dataset_uuid, owner){
     const handler = this._getHandler(structure);
 
     // Create new Dataset object
     if(!dataset_uuid){
-      dataset_uuid = await this.cdb.create_object(Constants.Class.Dataset);
+      dataset_uuid = await this._create_dataset_object(owner);
       this.log("Created new dataset object in ConfigDB", dataset_uuid);
     }
 
@@ -823,10 +858,12 @@ export class APIv1 {
     if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
     const checked = await this._check_dataset_config(req.auth, structure, config);
+    const owner = await this._resolve_owner(req.auth);
     const dataset_uuid = await this._write_dataset_config(
       structure,
       checked.config,
-      null
+      null,
+      owner
     );
 
     return res.status(200).json(dataset_uuid);

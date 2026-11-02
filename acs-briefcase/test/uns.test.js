@@ -38,6 +38,10 @@ delete untiered.tier;
 const device_info = enterprise => ({ originMap: { Device_Information: {
     ISA95_Hierarchy: { Enterprise: { Value: enterprise } } } } });
 
+/* Class member responses, as ConfigDB's notify WATCH gives them. */
+const members = list => ({ status: 200, isOK: true, body: list });
+const refused = { status: 403, isOK: false };
+
 test("a dataset with no briefcase is unreleased", () => {
     assert.deepEqual(release_state(undefined), { state: "unreleased" });
     assert.deepEqual(release_state({ briefcases: [] }), { state: "unreleased" });
@@ -132,10 +136,10 @@ test("emits states only when one changes", () => {
     const fplus = {
         debug: { bound: () => () => {} },
         ConfigDB: {
-            watch_members: klass => {
-                assert.equal(klass, Class.Dataset);
+            notify: { watch_full: url => {
+                assert.equal(url, `v2/class/${Class.Dataset}/member/`);
                 return datasets;
-            },
+            } },
             search_app: app => {
                 assert.equal(app, App.BriefcaseRelease);
                 return releases;
@@ -147,13 +151,13 @@ test("emits states only when one changes", () => {
         .subscribe(s => seen.push(Object.fromEntries(
             [...s].map(([ds, st]) => [ds, st.state]))));
 
-    datasets.next(imm.Set([A]));
+    datasets.next(members([A]));
     assert.equal(seen.length, 0, "waits for the release entries");
 
     releases.next(imm.Map());
     /* A release entry of a dataset that has gone changes nothing. */
     releases.next(imm.Map({ [B]: live }));
-    datasets.next(imm.Set([A, B]));
+    datasets.next(members([A, B]));
     releases.next(imm.Map({ [A]: live, [B]: live }));
 
     assert.deepEqual(seen, [
@@ -161,6 +165,39 @@ test("emits states only when one changes", () => {
         { [A]: "unreleased", [B]: "released" },
         { [A]: "released", [B]: "released" },
     ]);
+});
+
+test("deletes nothing when the Dataset class can't be read", async () => {
+    const datasets = new rx.Subject();
+    const releases = new rx.Subject();
+    const logged = [];
+    let watches = 0;
+    const fplus = {
+        debug: { bound: () => (...args) => logged.push(args) },
+        ConfigDB: {
+            notify: { watch_full: () => { watches++; return datasets; } },
+            search_app: () => releases,
+        },
+    };
+    const seen = [];
+    new UNSPublisher({ fplus, retry: 0 }).watch_states()
+        .subscribe(s => seen.push(Object.fromEntries(
+            [...s].map(([ds, st]) => [ds, st.state]))));
+    const tick = () => new Promise(r => setTimeout(r, 5));
+
+    releases.next(imm.Map({ [A]: live }));
+    datasets.next(refused);
+    assert.equal(seen.length, 0, "a refusal is not an empty class");
+
+    await tick();
+    datasets.next(members([A]));
+    datasets.next(refused);
+    await tick();
+    datasets.next(members([A]));
+
+    assert.deepEqual(seen, [{ [A]: "released" }]);
+    assert.equal(watches, 3, "watches again after each refusal");
+    assert.equal(logged.length, 2);
 });
 
 /* A UNSPublisher with fake ConfigDB, Data Access and MQTT. `devices`

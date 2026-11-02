@@ -9,7 +9,7 @@ import * as rx          from "rxjs";
 import { UUIDs }        from "@amrc-factoryplus/rx-client";
 
 import { App, Class, Schema } from "./constants.js";
-import { defined }      from "./util.js";
+import { defined, watch_members } from "./util.js";
 
 /** How far back a device list request to Data Access looks. Data
  * Access lists every device in the dataset whatever the window, but
@@ -113,7 +113,10 @@ export class UNSPublisher {
      * can be read. */
     watch_states () {
         return rx.combineLatest([
-            this.cdb.watch_members(Class.Dataset),
+            watch_members({
+                cdb: this.cdb, klass: Class.Dataset,
+                log: this.log, delay: this.retry,
+            }),
             this.cdb.search_app(App.BriefcaseRelease),
         ]).pipe(
             rx.map(([datasets, releases]) => new Map(

@@ -20,6 +20,8 @@ export const DA = {
         EquipmentLabels:    'dfc3983b-658c-4099-b76a-01ce7c18bde1',
         RunMetadata:        '2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a',
         Recording:          'cf3f6103-0f0e-4839-953a-ad2cedc78c30',
+        // The terms a Published dataset is released under.
+        ReleasePolicy:      'cb9b2307-3b82-4ffd-9665-0d214379ac21',
     },
     Class: {
         Dataset:            'c31d3cbd-01cd-4833-8014-c4512aef1e5c',
@@ -29,9 +31,21 @@ export const DA = {
         Product:            '4a089748-b26b-4f12-8f1a-164bfba97809',
         Operation:          'bd0354eb-b8f7-4bd9-8407-0588e545603c',
         Run:                '3c866b35-66a1-4cb8-8db2-dae284883cf8',
+        // Datasets released outside Factory+ as briefcases.
+        Published:          '414d2d10-6be8-4c27-8e9f-c716ef5432b9',
     },
     Special: {
         InvalidDataset:     '696396a0-2831-11f1-9b12-33d63b8c5115',
+    },
+}
+
+// The briefcase exporter's apps (acs-service-setup dumps/briefcase.yaml).
+export const BRIEFCASE = {
+    App: {
+        // Every briefcase built from a dataset. Only the exporter writes it.
+        Release:            'dee3e12f-4908-4f2d-b793-85847c2a4a3c',
+        // Why each briefcase was withdrawn, written by releasers.
+        Notes:              '935c7cda-6fad-4a4a-aa89-d5f5b8162e22',
     },
 }
 

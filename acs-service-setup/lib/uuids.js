@@ -472,6 +472,7 @@ export const DataAccess = {
         EquipmentLabels: "dfc3983b-658c-4099-b76a-01ce7c18bde1",
         RunMetadata: "2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a",
         Recording: "cf3f6103-0f0e-4839-953a-ad2cedc78c30",
+        ReleasePolicy: "cb9b2307-3b82-4ffd-9665-0d214379ac21",
     },
 
     Class: {
@@ -518,6 +519,22 @@ export const DataAccess = {
         UseSparkplug: "788b049c-2831-11f1-99fd-2b0bf86d6f77",
     }
 }
+
+export const Briefcase = {
+    App: {
+        Release: "dee3e12f-4908-4f2d-b793-85847c2a4a3c",
+        Notes: "935c7cda-6fad-4a4a-aa89-d5f5b8162e22",
+    },
+    FileType: {
+        Briefcase: "9327645a-d4de-4366-88e2-d102fa92799a",
+    },
+    Group: {
+        Releaser: "146755a2-f3bc-483e-8bdf-3cb3fb4d8bec",
+    },
+    Requirement: {
+        ServiceRole: "cae0ccc0-a85a-4ab6-8c98-0cd4ee590ef7",
+    },
+};
 
 /* Grafana role permissions. UUIDs must match
  * deploy/values.yaml -> serviceSetup.config.grafanaPermissions; the

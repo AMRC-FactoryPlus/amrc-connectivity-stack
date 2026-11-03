@@ -526,18 +526,30 @@ What changes on upgrade:
 
 - **New ConfigDB objects.** Four dataset metadata applications (tags,
   equipment device labels, run metadata, and a recording held on the
-  server while it runs), a **Run** functional class, and a
-  **Dataset maker** client role. Service setup creates them.
+  server while it runs), a **Run** functional class, and the
+  **Dataset maker** and **Dataset manager** client roles. Service setup
+  creates them.
 - **Administrators can now see datasets.** The Administrator role gets
   every Data Access permission. Before, it had none, so an
   administrator saw an empty list.
 - **Root and wildcard grants list every dataset.** The dataset lists
   now follow the same rules as single permission checks.
-- **The Dataset maker role** holds what the Admin UI needs to make
-  datasets and record runs: create, read, include, use for a session
-  and edit every dataset, read every device's data, write dataset
-  names and metadata, and set a dataset's kind. It does not include
-  delete. Add people, and any kiosk tablet account, to this role.
+- **Two roles for the Admin UI.** Both hold what the Admin UI needs to
+  make datasets and record runs: create datasets, read, include and
+  use for a session every dataset, read every device's data, and start
+  and stop recordings on any equipment. A **Dataset maker** edits and
+  deletes only the datasets they created, including their names, tags,
+  kinds and run details. A **Dataset manager** edits and deletes every
+  dataset, including those created before Data Access recorded owners.
+  Add people, and any kiosk tablet account, to one of these roles.
+- **Dataset metadata is written through Data Access.** Names, tags,
+  equipment labels, kinds and run details go through new
+  `v1/metadata/:uuid/<field>` routes, which check `Edit dataset` on
+  the dataset. Neither role can write these ConfigDB apps, or rename
+  other objects, directly. Kiosk tablets that sign in as different
+  accounts can each stop any recording, but if one tablet resumes a
+  run and another stops it, the earlier run is not marked void. Its
+  owner or a Dataset manager can void it from its page.
 - **Data Access creates an InfluxDB bucket and task.** At startup it
   creates the `acs_coverage` bucket and an hourly task, `acs-coverage`,
   that counts points per device per hour. It then backfills the whole

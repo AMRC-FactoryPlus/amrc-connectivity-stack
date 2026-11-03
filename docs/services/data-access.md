@@ -108,10 +108,11 @@ this special UUID as `structure` and omits `config`.
 `acs-service-setup` creates these objects; `acs-service-setup/lib/uuids.js`
 defines every UUID below. The service's own `lib/constants.js` holds
 only the ones the service uses. The four metadata apps marked * are
-deliberately not in `lib/constants.js`: an edit to an invalid dataset
-deletes the entries of every app listed there, and these must survive
-that. They are members of `Dataset metadata`, so `v1/metadata` passes
-them through.
+deliberately not in `App` in `lib/constants.js`: an edit to an invalid
+dataset deletes the entries of every app listed there, and these must
+survive that. The three the service writes are under `Metadata`
+instead. They are members of `Dataset metadata`, so `v1/metadata`
+passes them through.
 
 Kind | Name | UUID
 ---|---|---
@@ -146,21 +147,23 @@ Client role | `Dataset manager` | `4ab8468a-166b-4c01-afa6-7bd558db806b`
 Service function | `Data Access service` | `06cee697-29d3-4972-9479-bc392e24946e`
 Special | Structurally invalid dataset | `696396a0-2831-11f1-9b12-33d63b8c5115`
 
-The Admin UI writes the four metadata apps. Two client roles hold what
-the Admin UI needs to make datasets and record runs as the signed-in
-user:
+The Admin UI writes a dataset's name, tags, equipment labels, kind and
+run details through the metadata routes below, which check
+`Edit dataset`. It writes `Recording in progress` directly to ConfigDB.
+Two client roles hold what the Admin UI needs to make datasets and
+record runs as the signed-in user:
 
 - `Dataset maker` edits and deletes only the datasets its member
-  created. Data Access records the creator as each new dataset's owner,
-  and these two grants target `Special.Mine`. Datasets created before
-  that change are owned by Data Access, so only a `Dataset manager` can
-  edit or delete them.
+  created, and that includes their metadata. Data Access records the
+  creator as each new dataset's owner, and these two grants target
+  `Special.Mine`. Datasets created before that change are owned by Data
+  Access, so only a `Dataset manager` can edit or delete them.
 - `Dataset manager` edits and deletes every dataset.
 
 Both roles read every dataset and any device's data, and can use any
-dataset in a union or session. Both can also overwrite any dataset's
-tags, run details and recordings, set any dataset's kind, and rename
-any object: ConfigDB scopes those metadata writes by app, not by owner.
+dataset in a union or session. Both can write any equipment's
+`Recording in progress` entry: any operator at a machine starts and
+stops its recordings. Neither has any other ConfigDB write.
 
 Both roles are subclasses of `Principal`. Auth only treats subclasses of
 `Principal` as groups, so a role declared without it grants nothing to
@@ -178,6 +181,30 @@ Returns the JSON array of dataset UUIDs the caller has `Read dataset`
 permission on, restricted to structurally valid datasets. **The `from`
 and `to` query parameters described in the original design are not
 implemented** — the endpoint always returns the full allowed list.
+
+### Metadata writes: `v1/metadata/:uuid/<field>`
+
+These routes write a dataset's metadata with the service's own rights.
+Each requires `Edit dataset` on `:uuid`, returns `404` if `:uuid` is not
+a dataset (structurally invalid datasets are included), and returns
+`204` on success. ConfigDB checks a config write against the app, for
+every object at once, so a caller writing these apps directly could
+change them for any dataset, and through `General Information` rename
+any object. These routes keep those writes to datasets the caller may
+edit.
+
+Method and path | Body | Writes
+---|---|---
+`PUT v1/metadata/:uuid/name` | `{"name": string}` | `name` in `General Information`, keeping its other fields
+`PUT v1/metadata/:uuid/tags` | `{"tags": [string]}` | `Dataset tags`; an empty list removes the entry
+`PUT v1/metadata/:uuid/labels` | `{"labels": {UUID: string}}` | `Equipment device labels`; an empty object removes the entry
+`PUT v1/metadata/:uuid/kind` | `{"kind": UUID \| null}` | Direct membership of one kind class: `MES equipment`, `Run`, `MES operation` or `MES product`. The dataset leaves the others; `null` leaves them all
+`PUT v1/metadata/:uuid/run` | object | Replaces `Run metadata`
+`PATCH v1/metadata/:uuid/run` | JSON merge patch | Merges into `Run metadata`, so two edits to different fields both stick
+
+A body of the wrong shape returns `422`. The service needs `WriteConfig`
+on `Dataset metadata` (plural) and `General Information`, and
+`WriteMembers` on `Functional dataset group` (plural).
 
 ### `GET v1/metadata/:uuid`
 
@@ -604,17 +631,17 @@ also be granted plural, against a group.
 Permission | UUID | Targets | Grants
 ---|---|---|---
 `Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/data/:uuid` and `v1/series` for the dataset
-`Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT) and inclusion in the `v1/structure` list
+`Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT), the `v1/metadata/:uuid/<field>` writes, and inclusion in the `v1/structure` list
 `Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`Sparkplug source` / `Sub-device` / `Union components` / `Session limits`) | Creating a dataset of that structure via `POST v1/structure`
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`
 `Use Sparkplug data` (`UseSparkplug`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Sparkplug Device/Node | Referencing it as a `Sparkplug source` or `Sub-device` source, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
 `Use for session` (`UseForSession`) | `c089b9a9-06cd-4211-94fc-9ad52a759987` | Dataset | Referencing it as a `Session limits` source
 `Include in union` (`IncludeInUnion`) | `94d51085-af83-4796-8059-fcd578e3f572` | Dataset | Referencing it as a `Union components` member
 
-Changing a dataset's metadata configs or its functional classification
-(e.g. marking it `Published`) is not exposed by this service at all —
-it is done directly against the ConfigDB and subject to ordinary
-ConfigDB permissions, per the original design.
+The metadata routes cover the name, tags, equipment labels, kind and
+run details. Any other metadata config, and any other functional
+classification (for example marking a dataset `Published`), is written
+directly to ConfigDB, subject to ordinary ConfigDB permissions.
 
 ## Notify interface
 

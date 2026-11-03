@@ -14,6 +14,7 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { ISA95_HIERARCHY_KEY } from '@store/useISA95Store.js'
 import { merge_datasets, historised_metrics, display_name, resolve_devices } from '@/lib/datasets/model.js'
+import { DA } from '@/lib/datasets/constants.js'
 
 const STATUS_POLL_MS = 60 * 1000
 // Keep the subscriptions this long after the last page leaves, so moving
@@ -37,6 +38,9 @@ export const useDatasetsStore = defineStore('datasets', {
         error: null,
         // device uuid -> { online, last_change }
         status: {},
+        // dataset uuid -> owner principal uuid, and principal -> name
+        owners: {},
+        ownerNames: {},
         statusReady: false,
         users: 0,
         running: false,
@@ -48,7 +52,14 @@ export const useDatasetsStore = defineStore('datasets', {
     getters: {
         ready: s => s.metadataReady,
 
-        byUuid: s => merge_datasets(s.metadata, s.structures),
+        byUuid: s => merge_datasets(s.metadata, s.structures, s.ownerNameOf),
+
+        /** Dataset UUID -> its owner's name, where we know it. */
+        ownerNameOf: s => {
+            const out = {}
+            for (const [ds, p] of Object.entries(s.owners)) if (s.ownerNames[p]) out[ds] = s.ownerNames[p]
+            return out
+        },
 
         /** Every dataset, device datasets included. */
         all () { return Object.values(this.byUuid) },
@@ -176,6 +187,7 @@ export const useDatasetsStore = defineStore('datasets', {
                     },
                 })
 
+                this.watchOwners()
                 this.pollStatus()
                 // Directory status is polled only while the page is seen.
                 this.statusTimer = setInterval(() => {
@@ -212,6 +224,44 @@ export const useDatasetsStore = defineStore('datasets', {
                 },
             })
             if (!sub.closed) this.subs.push(sub)
+        },
+
+        /**
+         * The ConfigDB owner of each dataset, for datasets made without
+         * the Admin UI's run details. This needs ReadConfig on the
+         * Registration app; without it the search emits nothing and
+         * those datasets keep showing no author.
+         */
+        watchOwners () {
+            const cdb = useServiceClientStore().client.ConfigDB
+            const sub = cdb.search_app(DA.Core.Registration, { class: DA.Class.Dataset }).subscribe({
+                next: regs => {
+                    const owners = {}
+                    for (const [uuid, reg] of regs ?? []) {
+                        if (reg?.owner && reg.owner !== DA.Core.Unowned) owners[uuid] = reg.owner
+                    }
+                    this.owners = owners
+                    this.nameOwners(new Set(Object.values(owners)))
+                },
+                error: err => console.warn('Datasets: owner search failed', err),
+            })
+            if (!sub.closed) this.subs.push(sub)
+        },
+
+        async nameOwners (principals) {
+            const cdb = useServiceClientStore().client.ConfigDB
+            for (const p of principals) {
+                if (p in this.ownerNames) continue
+                // Mark it first so a second emit does not fetch it again.
+                this.ownerNames[p] = null
+                try {
+                    const info = await cdb.get_config(DA.Core.Info, p)
+                    if (this.running) this.ownerNames[p] = info?.name ?? null
+                }
+                catch (err) {
+                    console.warn('Datasets: no name for owner %s', p, err)
+                }
+            }
         },
 
         stop () {

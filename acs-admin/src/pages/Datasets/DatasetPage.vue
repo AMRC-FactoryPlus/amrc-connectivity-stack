@@ -51,7 +51,7 @@
             <span class="text-slate-300">|</span>
             <span>{{ fmt_window(rec.from, rec.to) }}</span>
             <span class="text-slate-300">|</span>
-            <TagChips :tags="rec.tags" :known="ds.allTags" :editable="rec.readable" @update="saveTags"/>
+            <TagChips :tags="rec.tags" :known="ds.allTags" :editable="rec.editable" @update="saveTags"/>
           </div>
         </div>
 

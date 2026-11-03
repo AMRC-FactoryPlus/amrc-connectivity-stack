@@ -493,6 +493,7 @@ export const DataAccess = {
         DatasetRoleGroup: "56c52f70-0649-4962-8526-9ec9d1c85ca4",
         FunctionalDatasetGroup: "86e5b048-e956-4820-939e-3abf3eda4e03", 
         DatasetMaker: "b7aa3036-fc1f-4869-b0f5-50f28b028905",
+        DatasetManager: "4ab8468a-166b-4c01-afa6-7bd558db806b",
     }, 
     
     Service: {

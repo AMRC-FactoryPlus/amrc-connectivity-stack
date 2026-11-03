@@ -478,9 +478,37 @@ accepts Kerberos (`Negotiate`, or `Basic` with a UPN and password), an opaque
 bearer token from `POST /token`, or a Keycloak JWT carrying `fp_principal_uuid`,
 and sets `req.auth` to the authenticated principal.
 
-There is no authorization yet. No ACL check is made, so any principal that
-authenticates can read every object, value, history series and subscription,
-and use the `/mcp` endpoint when it is enabled.
+## Access control (access.ts, isa95.ts)
+
+Each request reads the caller's ACL (`Auth.fetch_auth_acl`, which RxClient
+keeps current from the Auth notify interface) and keeps the targets of
+ReadObject (`d24495fd-72a3-41cd-8b9f-f4ebabdade44`). A caller sees a device,
+and every object below it, when a target is:
+
+- the device UUID;
+- a member of a class granted with a plural grant (the Auth service expands
+  these to the members);
+- an ISA-95 vocabulary node the device's hierarchy resolves through;
+- the wildcard (`00000000-...`), or the caller is the Kerberos
+  `ROOT_PRINCIPAL`: then nothing is filtered at all.
+
+An ISA-95 level is seen when it is under a granted node, or when a device
+below it is seen. Everything else is hidden, and every route answers for a
+hidden object as for a missing one: 404 alone or per item in bulk calls. A
+level's composition value leaves hidden devices out. Object types,
+relationship types and namespaces are not filtered.
+
+The object table records each object's device (`device_uuid`, null for
+levels), and `ObjectTree.placement()` gives where every device and level
+sits, re-read only after one moves. `isa95.ts` follows the vocabulary in
+ConfigDB and resolves a hierarchy one level at a time: at the top among the
+Enterprise nodes, then among the children of the node matched above,
+ignoring case, by name or alias. A name that does not match ends the match.
+At 20,000 devices filtering a full `GET /objects` costs about 10%.
+
+Subscriptions follow the owner's ACL live (`Access.track`): a revoked grant
+stops delivery at once, including updates already queued. An Auth service
+that cannot be reached is a 503, never a grant.
 
 `GET /v1/info` is mounted outside the auth middleware (spec requirement).
 

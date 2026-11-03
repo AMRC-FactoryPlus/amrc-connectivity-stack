@@ -269,32 +269,32 @@ Either option avoids the duplicate-source-of-truth problem that
 existed before this branch (where Keycloak roles and F+ ACLs had to
 be administered separately).
 
-#### What acs-i3x does today
+#### Example: acs-i3x
 
-`acs-i3x` is **not** an example of either option. It authenticates
-callers and then serves them the whole object tree.
-
-Authentication is the shared `FplusHttpAuth` middleware from
-`@amrc-factoryplus/service-api`, so it accepts:
+`acs-i3x` takes Option B. It authenticates callers with the shared
+`FplusHttpAuth` middleware from `@amrc-factoryplus/service-api`, so it
+accepts:
 
 - Kerberos, via `Negotiate` or via `Basic` with a UPN and password;
 - an opaque bearer token obtained from `POST /token`;
 - a Keycloak-issued JWT carrying `fp_principal_uuid`.
 
 `GET /v1/info` is public; every other endpoint requires one of the
-above.
+above. For each request it reads the caller's ACL from the F+ auth
+service (kept current through the notify interface) and shows only the
+devices the caller holds the i3X **Read i3X objects** permission on:
 
-There is currently **no authorization**. `acs-i3x` performs no ACL
-check and does not consult the F+ auth service about the calling
-principal, so any principal that authenticates can read every object,
-value, history series and subscription the service exposes, and can
-use the `/mcp` endpoint when it is enabled. Per-object
-access control is not yet implemented.
+- on the device itself;
+- on a class the device is a member of, with a plural grant;
+- on an ISA-95 vocabulary node the device's hierarchy resolves
+  through, which covers every device under that node;
+- on the wildcard, which covers every device.
 
-The practical consequence: a credential handed to an acs-i3x consumer
-is not scoped by Factory+ ACLs. Treat it as granting read access to
-the whole tree, and scope it by deciding who gets the credential at
-all.
+Everything else is hidden: the API answers for a hidden object exactly
+as for one that does not exist. Administrators hold the wildcard. Give
+an acs-i3x consumer its own principal, and grant that principal
+exactly the devices or ISA-95 nodes it needs. The admin UI's device
+page, ISA-95 page and Explorer each have a panel for this.
 
 ## Worked example: minimal Express + openid-client
 

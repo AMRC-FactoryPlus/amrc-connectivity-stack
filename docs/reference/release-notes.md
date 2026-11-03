@@ -12,6 +12,48 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Upgrading: i3X shows each caller only the devices they may read
+
+Until now any principal that could log in to i3X could read every
+object, value and history series in the tree. i3X now checks a new
+permission, **Read i3X objects**, for every request. A caller sees a
+device, and everything below it, only when they hold it:
+
+- on the device;
+- on a class the device is a member of (a plural grant);
+- on an ISA-95 vocabulary node above the device, which covers every
+  device under that node;
+- on every target (the wildcard).
+
+The Administrator group holds it on every target. **Nobody else sees
+any i3X data after the upgrade until you grant it.** Before you
+upgrade, list the people and service accounts that use the i3X API,
+and grant each of them the devices or ISA-95 nodes they need. The
+device page, the ISA-95 page and the Explorer in the admin UI each have
+an **i3X Read Access** panel for this.
+
+A grant on an ISA-95 node applies to a device whose hierarchy matches
+the vocabulary: level by level, ignoring case, by name or alias. A
+device whose hierarchy text does not match is covered only by device
+and class grants.
+
+Objects a caller may not read answer `404`, exactly as objects that do
+not exist. A subscription stops delivering updates as soon as a grant
+is revoked. When i3X cannot reach the Auth service it answers `503`.
+Object types, relationship types and namespaces stay visible to every
+logged-in caller.
+
+The i3X database schema changes with this release, so the first start
+after the upgrade rebuilds the database from ConfigDB, as described
+below.
+
+### i3X no longer serves MCP
+
+The `/mcp` endpoint and its search index are gone, and so is the
+`i3x.mcp` chart value. An `i3x.mcp` left in your values file is ignored. Use the
+i3X REST API, or a command-line MCP client of your own, instead.
+`i3x.maxHeapMB` now always applies.
+
 ### Basic auth no longer hangs on clusters with the CoreDNS redirect
 
 On a cluster with `coredns.traefikRedirect.enabled`, every HTTP Basic

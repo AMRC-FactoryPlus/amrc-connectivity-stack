@@ -1,4 +1,12 @@
 {{ if .Values.identity.enabled }}
+{{- /*
+  master_kdc and dns_lookup_kdc: when a password login fails, the
+  Kerberos library retries it on the realm's master KDC. With no
+  master_kdc it looks one up in DNS, and a cluster that rewrites its own
+  domain to the ingress (coredns.traefikRedirect) answers that lookup
+  with the ingress, which never replies. Every failed Basic login then
+  hangs instead of returning 401. Naming the master stops the lookup.
+*/}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,6 +20,7 @@ data:
         rdns = false
         udp_preference_limit = 1
         spake_preauth_groups = edwards25519
+        dns_lookup_kdc = false
 
     [domain_realm]
         cluster.local = {{ .Values.identity.realm | required "values.identity.realm is required!" }}
@@ -27,12 +36,14 @@ data:
     [realms]
             {{ .Values.identity.realm | required "values.identity.realm is required!" }} = {
             kdc = kdc.{{.Release.Namespace }}.svc.cluster.local
+            master_kdc = kdc.{{.Release.Namespace }}.svc.cluster.local
             admin_server = kadmin.{{ .Release.Namespace }}.svc.cluster.local
             disable_encrypted_timestamp = true
         }
 {{- range .Values.identity.crossRealm }}
         {{ .realm }} = {
             kdc = kdc.{{ .domain }}
+            master_kdc = kdc.{{ .domain }}
             admin_server = kadmin.{{ .domain }}
             disable_encrypted_timestamp = true
         }

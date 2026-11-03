@@ -49,6 +49,32 @@ export function valid_datetime(datetime_str){
     return new Date(timestamp).toISOString() === datetime_str;
 }
 
+/** Reads the optional time window from a download request body.
+ *
+ * `from` and `to` are ISO 8601 date-times, either or both. They narrow
+ * the dataset's own window; they never widen it.
+ *
+ * @returns {{window: {from: string|null, to: string|null}} | {error: string}}
+ */
+export function parse_download_window(body) {
+    const window = { from: null, to: null };
+    if (body == null || typeof body !== "object" || Array.isArray(body))
+        return { window };
+
+    for (const key of ["from", "to"]) {
+        const v = body[key];
+        if (v == null) continue;
+        const t = typeof v == "string" ? Date.parse(v) : NaN;
+        if (isNaN(t))
+            return { error: `${key} must be an ISO 8601 date-time, such as 2026-11-03T09:00:00Z` };
+        window[key] = new Date(t).toISOString();
+    }
+    if (window.from && window.to && window.from >= window.to)
+        return { error: "from must be before to" };
+
+    return { window };
+}
+
 /* Limits on the metric filter in a download request body. */
 export const MAX_METRICS = 100;
 export const MAX_METRIC_LENGTH = 512;

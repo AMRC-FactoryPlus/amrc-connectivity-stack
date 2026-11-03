@@ -67,17 +67,26 @@ export function merge_patch_of (prev, next) {
     return patch
 }
 
-// Waits before each try of a metadata write refused with 403.
+// Waits before each try of a metadata write refused with 403, for a
+// dataset this screen has just created.
 const META_RETRY_MS = [0, 250, 500, 1000]
+
+// Passed by the create paths: the dataset was made a moment ago.
+const FRESH = { fresh: true }
 
 /**
  * A metadata write through Data Access. It checks EditDataset on the
  * dataset, so a member of an own-scope role changes only their own.
  * Throws an error carrying the status, as a ConfigDB write would.
+ *
+ * With `fresh`, a 403 is tried again for a couple of seconds: straight
+ * after a create, Data Access's copy of the caller's ACL may not yet
+ * list the dataset as theirs. Any other 403 is a real refusal and is
+ * reported at once.
  */
-async function da_meta (client, uuid, field, body, method = 'PUT') {
+async function da_meta (client, uuid, field, body, { method = 'PUT', fresh = false } = {}) {
     let st
-    for (const wait of META_RETRY_MS) {
+    for (const wait of fresh ? META_RETRY_MS : [0]) {
         if (wait) await new Promise(r => setTimeout(r, wait))
         ;[st] = await client.DataAccess.fetch({
             method,
@@ -85,8 +94,6 @@ async function da_meta (client, uuid, field, body, method = 'PUT') {
             body,
             ...(method === 'PATCH' ? { content_type: 'application/merge-patch+json' } : {}),
         })
-        // A 403 straight after creating a dataset can be Data Access's
-        // copy of the caller's ACL not yet listing it as theirs.
         if (st !== 403) break
     }
     if (st === 204) return
@@ -95,25 +102,25 @@ async function da_meta (client, uuid, field, body, method = 'PUT') {
     throw err
 }
 
-export async function set_name (client, uuid, name) {
+export async function set_name (client, uuid, name, opts) {
     // Data Access keeps any other fields in the Info entry.
-    await da_meta(client, uuid, 'name', { name })
+    await da_meta(client, uuid, 'name', { name }, opts)
 }
 
-export async function set_tags (client, uuid, tags) {
-    await da_meta(client, uuid, 'tags', { tags: normalise_tags(tags) })
+export async function set_tags (client, uuid, tags, opts) {
+    await da_meta(client, uuid, 'tags', { tags: normalise_tags(tags) }, opts)
 }
 
-export async function set_labels (client, uuid, labels) {
+export async function set_labels (client, uuid, labels, opts) {
     const clean = Object.fromEntries(Object.entries(labels ?? {})
         .map(([k, v]) => [k, (v ?? '').trim()])
         .filter(([, v]) => v))
-    await da_meta(client, uuid, 'labels', { labels: clean })
+    await da_meta(client, uuid, 'labels', { labels: clean }, opts)
 }
 
 /** Replace a run's details. */
-export async function put_run_meta (client, uuid, meta) {
-    await da_meta(client, uuid, 'run', meta)
+export async function put_run_meta (client, uuid, meta, opts) {
+    await da_meta(client, uuid, 'run', meta, opts)
 }
 
 /** Read, change and write run metadata. `change` gets a copy. */
@@ -123,16 +130,16 @@ export async function update_run_meta (client, uuid, change) {
     // Send only what changed, so two edits to different fields both stick.
     const patch = merge_patch_of(current, next)
     if (!Object.keys(patch).length) return current
-    try { await da_meta(client, uuid, 'run', patch, 'PATCH') }
+    try { await da_meta(client, uuid, 'run', patch, { method: 'PATCH' }) }
     catch (err) { throw cdb_fail('The details were not saved.', err.status) }
     return next
 }
 
 /** Set a dataset's kind. Data Access takes it out of any other kind. */
-export async function set_kind (client, uuid, kind, previous = null) {
+export async function set_kind (client, uuid, kind, previous = null, opts) {
     const klass = KIND_BY_ID[kind]?.klass ?? null
     if (kind === previous || (!klass && !previous)) return
-    await da_meta(client, uuid, 'kind', { kind: klass })
+    await da_meta(client, uuid, 'kind', { kind: klass }, opts)
 }
 
 async function delete_quietly (client, app, uuid) {
@@ -161,7 +168,7 @@ export async function ensure_device_datasets (client, devices, byUuid, nameOf = 
         if (!uuid) throw new DatasetError(`Could not make a dataset for device ${nameOf(dev) ?? dev}.`)
         created[dev] = uuid
         const name = nameOf(dev)
-        if (name) await set_name(client, uuid, name)
+        if (name) await set_name(client, uuid, name, FRESH)
         out[dev] = uuid
     }
     return out
@@ -237,7 +244,7 @@ export async function create_from_spec (client, spec, progress = {}) {
                 progress.union = source
                 saved.push(source)
             }
-            await set_name(client, source, spec.window ? `${spec.name.trim()} (devices)` : spec.name.trim())
+            await set_name(client, source, spec.window ? `${spec.name.trim()} (devices)` : spec.name.trim(), FRESH)
         }
 
         let uuid = source
@@ -253,7 +260,7 @@ export async function create_from_spec (client, spec, progress = {}) {
                 progress.session = uuid
                 saved.push(uuid)
             }
-            await set_name(client, uuid, spec.name.trim())
+            await set_name(client, uuid, spec.name.trim(), FRESH)
         }
 
         await write_metadata(client, uuid, spec)
@@ -268,17 +275,18 @@ export async function create_from_spec (client, spec, progress = {}) {
     }
 }
 
+// Only called for a dataset just created.
 async function write_metadata (client, uuid, spec) {
-    if (spec.kind) await set_kind(client, uuid, spec.kind)
-    if (spec.tags?.length) await set_tags(client, uuid, spec.tags)
-    if (spec.kind === 'equipment' && spec.labels) await set_labels(client, uuid, spec.labels)
+    if (spec.kind) await set_kind(client, uuid, spec.kind, null, FRESH)
+    if (spec.tags?.length) await set_tags(client, uuid, spec.tags, FRESH)
+    if (spec.kind === 'equipment' && spec.labels) await set_labels(client, uuid, spec.labels, FRESH)
     await put_run_meta(client, uuid, {
         createdBy: spec.createdBy ?? null,
         createdAt: to_iso(Date.now()),
         createdVia: spec.createdVia ?? 'desk',
         description: spec.description?.trim() || undefined,
         ...(spec.run ?? {}),
-    })
+    }, FRESH)
 }
 
 /**
@@ -734,9 +742,9 @@ export async function stop_recording (client, equipment, { stoppedAt, by, starte
             if (st !== 204) throw { status: st }
         })
     }
-    await attempt('name', () => set_name(client, run, name))
-    await attempt('kind', () => set_kind(client, run, 'run'))
-    if (rec.tags?.length) await attempt('tags', () => set_tags(client, run, rec.tags))
+    await attempt('name', () => set_name(client, run, name, FRESH))
+    await attempt('kind', () => set_kind(client, run, 'run', null, FRESH))
+    if (rec.tags?.length) await attempt('tags', () => set_tags(client, run, rec.tags, FRESH))
     await attempt('details', () => put_run_meta(client, run, {
         createdBy: rec.startedBy,
         createdAt: to_iso(Date.now()),
@@ -748,7 +756,7 @@ export async function stop_recording (client, equipment, { stoppedAt, by, starte
         reference: rec.reference,
         stoppedBy: rec.stoppedBy,
         resumes: rec.resumes ?? undefined,
-    }))
+    }, FRESH))
     // A resumed recording replaces the run it resumes: make sure that one is void.
     if (rec.resumes) {
         await attempt('earlier run', async () => {

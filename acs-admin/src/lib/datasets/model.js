@@ -19,11 +19,12 @@ export const TZ = 'Europe/London'
  * `metadata` comes from search_metadata (datasets you can read, valid
  * ones only). `structures` comes from search_structure (datasets you can
  * edit, including invalid ones). Either may be missing a dataset the
- * other has.
+ * other has. `owners` maps a dataset UUID to the name of its ConfigDB
+ * owner, the author shown when the dataset has no run details.
  *
  * @returns {Object<string, DatasetRecord>} keyed by UUID
  */
-export function merge_datasets (metadata = [], structures = []) {
+export function merge_datasets (metadata = [], structures = [], owners = {}) {
     const out = {}
     for (const m of metadata) {
         if (!m?.uuid) continue
@@ -46,7 +47,7 @@ export function merge_datasets (metadata = [], structures = []) {
         r.editable = true
         r.invalid = s.structure === STRUCTURE.INVALID
     }
-    for (const r of Object.values(out)) decorate(r)
+    for (const r of Object.values(out)) decorate(r, owners)
     return out
 }
 
@@ -68,14 +69,16 @@ function base_record (uuid) {
 }
 
 // Pull the Admin UI's own metadata apps out into named fields.
-function decorate (r) {
+function decorate (r, owners) {
     const meta = r.meta ?? {}
     r.tags = normalise_tags(meta[DA.App.Tags]?.tags)
     r.labels = meta[DA.App.EquipmentLabels]?.labels ?? {}
     r.run = meta[DA.App.RunMetadata] ?? null
     r.recording = meta[DA.App.Recording] ?? null
     r.kind = dataset_kind(r)
-    r.created_by = r.run?.createdBy ?? null
+    // Only the Admin UI writes run details. Data Access records whoever
+    // made a dataset as its owner, so use that for anything else.
+    r.created_by = r.run?.createdBy ?? owners[r.uuid] ?? null
     r.created_via = r.run?.createdVia ?? null
     r.voided = !!r.run?.void
     r.reference = r.run?.reference ?? null

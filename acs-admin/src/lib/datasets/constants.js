@@ -21,6 +21,12 @@ export const DA = {
         RunMetadata:        '2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a',
         Recording:          'cf3f6103-0f0e-4839-953a-ad2cedc78c30',
     },
+    // Core ConfigDB UUIDs, for a dataset's owner and the owner's name.
+    Core: {
+        Info:               '64a8bfa9-7772-45c4-9d1a-9e6290690957',
+        Registration:       'cb40bed5-49ad-4443-a7f5-08c75009da8f',
+        Unowned:            '091e796a-65c0-4080-adff-c3ce01a65b2e',
+    },
     Class: {
         Dataset:            'c31d3cbd-01cd-4833-8014-c4512aef1e5c',
         MESDataset:         '586205bf-81c6-4091-9d2c-f3c0465ebdc4',

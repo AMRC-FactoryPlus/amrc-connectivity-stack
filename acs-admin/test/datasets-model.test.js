@@ -70,6 +70,16 @@ describe('merge_datasets', () => {
         expect(by[EQ].readable).toBe(false)
         expect(dataset_status(by[EQ])).toBe('invalid')
     })
+
+    it('names the owner as author when there are no run details', () => {
+        const by = merge_datasets(
+            [{ uuid: EQ }, { uuid: RUN, metadata: { [DA.App.RunMetadata]: { createdBy: 'op1' } } }],
+            [],
+            { [EQ]: 'Partner user', [RUN]: 'Someone else' })
+        expect(by[EQ].created_by).toBe('Partner user')
+        // Run details win: they name who pressed the button.
+        expect(by[RUN].created_by).toBe('op1')
+    })
 })
 
 describe('structure', () => {

@@ -555,18 +555,34 @@ export async function delete_in_order (client, order, {
  * The CSV response. `metrics` (full metric names) limits it to those
  * metrics; a Data Access without that filter answers 422.
  */
-async function data_response (client, uuid, { metrics = null } = {}) {
+async function data_response (client, uuid, { metrics = null, from = null, to = null } = {}) {
+    const body = {
+        ...(metrics ? { metrics } : {}),
+        ...(from != null ? { from: to_iso(from) } : {}),
+        ...(to != null ? { to: to_iso(to) } : {}),
+    }
     const [st, stream, , headers] = await client.DataAccess.fetch({
         url: `v1/data/${uuid}`,
         method: 'POST',
         accept: 'text/csv',
         response_type: 'stream',
-        body: metrics ? { metrics } : {},
+        body,
     })
     if (st === 403) throw new DatasetError('You do not have permission to read this dataset.', { status: st })
-    if (st === 422 && metrics) throw new DatasetError('The service refused the pinned-only download.', { status: st })
+    if (st === 422) {
+        // The service says why: no time window, a bad window or a bad filter.
+        const reason = await refusal_reason(stream)
+        const fallback = metrics ? 'The service refused the pinned-only download.' : 'The service refused the download.'
+        throw new DatasetError(reason ?? fallback, { status: st })
+    }
     if (st !== 200) throw new DatasetError(`The download failed (HTTP ${st}).`, { status: st })
     return { stream, headers }
+}
+
+/** The `error` text of a JSON refusal body, or null. */
+async function refusal_reason (stream) {
+    try { return JSON.parse(await new Response(stream).text())?.error ?? null }
+    catch { return null }
 }
 
 /** The whole dataset as CSV text, for browser add-ons. */
@@ -577,10 +593,12 @@ export async function fetch_csv (client, uuid) {
 
 /**
  * Download the dataset as a CSV file: all of it, or only `metrics`
- * (full metric names) when given.
+ * (full metric names) when given. A dataset with no time window of its
+ * own needs `from` and `to`; without them the service refuses, and the
+ * error says why.
  */
-export async function download_csv (client, uuid, streamSaver, { metrics = null } = {}) {
-    const { stream, headers } = await data_response(client, uuid, { metrics })
+export async function download_csv (client, uuid, streamSaver, { metrics = null, from = null, to = null } = {}) {
+    const { stream, headers } = await data_response(client, uuid, { metrics, from, to })
     const disposition = headers?.get?.('Content-Disposition') ?? ''
     const filename = /filename\*?=(?:UTF-8'')?("?)([^";]+)\1/i.exec(disposition)?.[2] ?? `${uuid}.csv`
     const out = streamSaver.createWriteStream(filename.replace(/[\/\\]/g, '_'))

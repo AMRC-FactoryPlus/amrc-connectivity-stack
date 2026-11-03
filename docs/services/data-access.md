@@ -257,8 +257,22 @@ The CSV has no metric path column. Two metrics with the same name under
 different folders appear with the same `metric` value. Use a full-path
 `metrics` selector (below) to export only one of them.
 
-The request body is optional. An empty or absent body exports everything
-in the dataset. The body can contain one of these filters:
+The body can carry a time window, **`from`** and **`to`**, as ISO 8601
+date-times (for example `2026-11-03T09:00:00Z`). They narrow each
+source's resolved range and never widen it. The download needs a start
+and an end for every source:
+
+* A dataset bounded by a `Session limits` structure downloads with no
+  window in the body.
+* A dataset with no time window of its own, such as a `Sparkplug source`
+  or a union of them, needs both `from` and `to`. Without them the
+  service returns `422`, because the download would read the whole
+  history of every device in the dataset.
+* A window outside the dataset's own returns `422`, as does a window
+  whose `from` is not before its `to`.
+
+A refusal is JSON, `{"error": "<reason>"}`, where the reason says what to
+change. Otherwise the body can also contain one of these filters:
 
 * **`metrics`** (array of strings): export only the listed metrics.
   The service reads one Influx bucket (`INFLUXDB_BUCKET`, by default the

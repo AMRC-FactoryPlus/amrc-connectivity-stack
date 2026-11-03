@@ -10,7 +10,9 @@ import * as rx from "rxjs";
 import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
-import { valid_uuid, valid_datetime, parse_download_filter } from "./validate.js";
+import {
+  valid_uuid, valid_datetime, parse_download_filter, parse_download_window,
+} from "./validate.js";
 import { fail, maxDate, minDate } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
@@ -37,6 +39,33 @@ function abortable(promise, signal) {
       v => { done(); resolve(v); },
       e => { done(); reject(e); });
   });
+}
+
+/** Narrows each resolved source to the requested window.
+ *
+ * Every source must end up with both a start and an end: a dataset with
+ * no time window of its own needs `from` and `to` in the request.
+ * Sources the window leaves empty are dropped.
+ *
+ * @returns {{sources: Array} | {error: string}}
+ */
+export function bound_sources(resolved, window) {
+  const bounded = resolved.map(s => ({
+    ...s,
+    from: maxDate(s.from, window.from),
+    to: minDate(s.to, window.to),
+  }));
+
+  if (bounded.some(s => !s.from || !s.to))
+    return { error: "This dataset has no time window, so downloading it "
+      + "would return its whole history. Add from and to to the request, "
+      + "or download a session dataset over the time you need." };
+
+  const sources = bounded.filter(s => new Date(s.from) < new Date(s.to));
+  if (resolved.length && !sources.length)
+    return { error: "The requested from and to fall outside this dataset's time window." };
+
+  return { sources };
 }
 
 export class APIv1 {
@@ -522,9 +551,10 @@ export class APIv1 {
     if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid dataset uuid`);
 
     const { filter: meta, error } = parse_download_filter(req.body);
-    if (error) {
-      this.log(`Rejecting download of ${dataset_uuid}: ${error}`);
-      return res.status(422).json({ error });
+    const { window, error: window_error } = parse_download_window(req.body);
+    if (error || window_error) {
+      this.log(`Rejecting download of ${dataset_uuid}: ${error ?? window_error}`);
+      return res.status(422).json({ error: error ?? window_error });
     }
 
     const ok = await this.auth.check_acl(
@@ -540,13 +570,22 @@ export class APIv1 {
         // Resolve dataset tree
         const resolved_sources = await this.resolve_dataset(dataset_uuid);
 
+        /* A download with no end in time would read the whole history
+         * of every device in the dataset: for a machine dataset that is
+         * months of data. Refuse it, and say how to bound it. */
+        const { sources, error: bound_error } = bound_sources(resolved_sources, window);
+        if (bound_error) {
+          this.log(`Rejecting download of ${dataset_uuid}: ${bound_error}`);
+          return res.status(422).json({ error: bound_error });
+        }
+
         res.setHeader("Content-Type", "text/csv");
         res.setHeader(
             "Content-Disposition",
             `attachment; filename="${dataset_uuid}.csv"`
         );
 
-        const csvStream = this.influxReader.exportDevices(resolved_sources, meta);
+        const csvStream = this.influxReader.exportDevices(sources, meta);
 
         csvStream.on("error", err => {
             this.log(err);

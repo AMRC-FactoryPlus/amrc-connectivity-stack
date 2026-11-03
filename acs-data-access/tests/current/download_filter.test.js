@@ -21,6 +21,9 @@ import {
 
 const DATASET = "11111111-1111-1111-1111-111111111111";
 const DEVICE = "55555555-5555-5555-5555-555555555555";
+const SESSION = "66666666-6666-6666-6666-666666666666";
+const FROM = "2024-01-01T00:00:00.000Z";
+const TO = "2024-01-02T00:00:00.000Z";
 
 const HOSTILE = [
   'a"b',
@@ -268,6 +271,10 @@ function make_api() {
       structure: Constants.App.SparkplugSrc,
       config: { source: DEVICE },
     },
+    [SESSION]: {
+      structure: Constants.App.SessionLimits,
+      config: { source: DATASET, from: FROM, to: TO },
+    },
   };
 
   const api = new APIv1({
@@ -298,10 +305,12 @@ function make_res() {
   return res;
 }
 
-async function post(api, body) {
+/* A device dataset has no time window of its own, so the existing tests
+ * send one. */
+async function post(api, body, uuid = DATASET) {
   const res = make_res();
   await api.dataset_data(
-    { params: { uuid: DATASET }, auth: "tester", body }, res);
+    { params: { uuid }, auth: "tester", body }, res);
   const text = await res.text;
   return { res, text };
 }
@@ -325,7 +334,7 @@ describe("dataset_data", () => {
 
   test("streams the unchanged CSV header and rows", async () => {
     const { api } = make_api();
-    const { res, text } = await post(api, {});
+    const { res, text } = await post(api, { from: FROM, to: TO });
     expect(res.code).toBe(200);
     expect(text).toBe(
       "device,metric,timestamp,value,unit\nDev,Temp,2024-01-01T00:00:00Z,1,C\n");
@@ -333,7 +342,7 @@ describe("dataset_data", () => {
 
   test("passes a metrics filter to Influx", async () => {
     const { api, queries } = make_api();
-    await post(api, { metrics: ["Folder/Temp", 'x"y'] });
+    await post(api, { metrics: ["Folder/Temp", 'x"y'], from: FROM, to: TO });
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain('r.path == "Folder"');
     expect(queries[0]).toContain('r._measurement == "Temp:d"');
@@ -342,9 +351,69 @@ describe("dataset_data", () => {
 
   test("still honours the deprecated measurement, escaped", async () => {
     const { api, queries } = make_api();
-    await post(api, { measurement: 'Temp:d") |> drop(columns: ["_value"])' });
+    await post(api, { measurement: 'Temp:d") |> drop(columns: ["_value"])', from: FROM, to: TO });
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain(
       'r._measurement ==\n                    "Temp:d\\") |> drop(columns: [\\"_value\\"])"');
+  });
+});
+
+describe("dataset_data time window", () => {
+  test("refuses a dataset with no window, and says how to bound it", async () => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, {});
+    expect(res.code).toBe(422);
+    expect(res.body.error).toMatch(/no time window/);
+    expect(res.body.error).toMatch(/from and to/);
+    expect(queries).toEqual([]);
+  });
+
+  test("refuses a window with only one end", async () => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, { from: FROM });
+    expect(res.code).toBe(422);
+    expect(queries).toEqual([]);
+  });
+
+  test("bounds the Influx range by the requested window", async () => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, { from: FROM, to: TO });
+    expect(res.code).toBe(200);
+    expect(queries[0]).toContain(`start: time(v: "${FROM}")`);
+    expect(queries[0]).toContain(`stop: time(v: "${TO}")`);
+  });
+
+  test("a session downloads with no window in the request", async () => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, {}, SESSION);
+    expect(res.code).toBe(200);
+    expect(queries[0]).toContain(`start: time(v: "${FROM}")`);
+  });
+
+  test("a requested window narrows a session's, never widens it", async () => {
+    const { api, queries } = make_api();
+    await post(api, { from: "2023-01-01T00:00:00Z", to: "2024-01-01T12:00:00Z" }, SESSION);
+    expect(queries[0]).toContain(`start: time(v: "${FROM}")`);
+    expect(queries[0]).toContain('stop: time(v: "2024-01-01T12:00:00.000Z")');
+  });
+
+  test("a window outside the session's is refused", async () => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, { from: "2025-01-01T00:00:00Z", to: "2025-01-02T00:00:00Z" }, SESSION);
+    expect(res.code).toBe(422);
+    expect(res.body.error).toMatch(/outside/);
+    expect(queries).toEqual([]);
+  });
+
+  test.each([
+    [{ from: "yesterday", to: TO }, /from must be/],
+    [{ from: FROM, to: 5 }, /to must be/],
+    [{ from: TO, to: FROM }, /before/],
+  ])("refuses a bad window %o", async (body, msg) => {
+    const { api, queries } = make_api();
+    const { res } = await post(api, body);
+    expect(res.code).toBe(422);
+    expect(res.body.error).toMatch(msg);
+    expect(queries).toEqual([]);
   });
 });

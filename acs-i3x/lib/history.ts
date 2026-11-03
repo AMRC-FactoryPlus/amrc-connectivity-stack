@@ -12,7 +12,7 @@
 
 import { InfluxDB } from "@influxdata/influxdb-client";
 import type { QueryApi } from "@influxdata/influxdb-client";
-import type { ObjectTree } from "./object-tree.js";
+import type { ObjectTree, Visible } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import type { InfluxValue } from "./value-cache.js";
 import { Semaphore } from "./semaphore.js";
@@ -304,8 +304,9 @@ export class History {
      * All leaves are read in one bulk query (see getCurrentValues)
      * rather than one query per leaf.
      */
-    async getCompositionValue(elementId: string, maxDepth: number = 1): Promise<I3xValueResponse | null> {
-        const values = await this.getValues([elementId], maxDepth);
+    async getCompositionValue(elementId: string, maxDepth: number = 1,
+            visible?: Visible): Promise<I3xValueResponse | null> {
+        const values = await this.getValues([elementId], maxDepth, visible);
         return values.get(elementId) ?? null;
     }
 
@@ -320,10 +321,13 @@ export class History {
      * bounded number of Flux queries instead of one query per leaf.
      *
      * The returned map holds a value, or null, for every requested id.
+     * With `visible`, a composition leaves out hidden devices and
+     * levels; the caller checks the requested ids themselves.
      */
     async getValues(
         elementIds: string[],
         maxDepth: number = 1,
+        visible?: Visible,
     ): Promise<Map<string, I3xValueResponse | null>> {
         // Work out which leaves each requested id needs.
         /* A composition high in the hierarchy expands to millions of
@@ -340,12 +344,12 @@ export class History {
                 leafIds = [id];
             } else if (this.objectTree.iterateDescendantLeafIds) {
                 leafIds = [];
-                for (const leaf of this.objectTree.iterateDescendantLeafIds(id, maxDepth)) {
+                for (const leaf of this.objectTree.iterateDescendantLeafIds(id, maxDepth, visible)) {
                     if (leaf !== null) leafIds.push(leaf);
                     await slicer.maybe();
                 }
             } else {
-                leafIds = this.objectTree.getDescendantLeafIds(id, maxDepth);
+                leafIds = this.objectTree.getDescendantLeafIds(id, maxDepth, 0, visible);
             }
             plan.set(id, { composition, leafIds });
             for (const leaf of leafIds) allLeaves.add(leaf);

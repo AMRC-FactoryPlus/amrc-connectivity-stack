@@ -29,6 +29,7 @@ import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import { deriveQuality } from "./quality.js";
 import { toI3xVqt } from "./mapping.js";
 import { I3xStore } from "./store.js";
+import type { Visible } from "./object-tree.js";
 import { Slicer } from "./slicer.js";
 import {
     ConnectionWatchdog, StallWatchdog, describeConnectionChange,
@@ -144,7 +145,7 @@ interface ObjectTreeLike {
     getChildElementIds(elementId: string): string[];
     isReady(): boolean;
     /** Leaf ids under a composition, null between pages (ObjectTree). */
-    iterateDescendantLeafIds?(elementId: string, maxDepth?: number): Generator<string | null>;
+    iterateDescendantLeafIds?(elementId: string, maxDepth?: number, visible?: Visible): Generator<string | null>;
 }
 
 type ValueChangeListener = (elementId: string, vqt: I3xVqt) => void;
@@ -1254,18 +1255,18 @@ export class ValueCache {
      * read from InfluxDB records every leaf it covered, values and
      * markers, so the next read of it is answered from here.
      */
-    private *missingLeaves(rootId: string): Generator<boolean | null> {
+    private *missingLeaves(rootId: string, visible?: Visible): Generator<boolean | null> {
         const has = this.store.prepare("select 1 from last_value where element_id = ? and seq > ?");
         if (!this.objectTree.iterateDescendantLeafIds) { yield true; return; }
-        for (const leaf of this.objectTree.iterateDescendantLeafIds(rootId, 0)) {
+        for (const leaf of this.objectTree.iterateDescendantLeafIds(rootId, 0, visible)) {
             if (leaf === null) { yield null; continue; }
             if (!has.get(leaf, this.trustAbove)) { yield true; return; }
         }
     }
 
-    private async compositionComplete(rootId: string): Promise<boolean> {
+    private async compositionComplete(rootId: string, visible?: Visible): Promise<boolean> {
         const slicer = new Slicer();
-        for (const step of this.missingLeaves(rootId)) {
+        for (const step of this.missingLeaves(rootId, visible)) {
             if (step) return false;
             await slicer.maybe();
         }
@@ -1287,9 +1288,10 @@ export class ValueCache {
      * its own snapshot, so a value written in between can make the
      * head differ slightly from the components. `maxDepth` limits the
      * walk as it does for InfluxDB reads: 1 is the direct leaves only,
-     * 0 is the whole subtree.
+     * 0 is the whole subtree. With `visible`, hidden devices and levels
+     * are left out of a composition; the caller checks `elementId`.
      */
-    async getValueLazy(elementId: string, maxDepth: number = 0): Promise<LazyValue | null> {
+    async getValueLazy(elementId: string, maxDepth: number = 0, visible?: Visible): Promise<LazyValue | null> {
         if (!this.treeInStore()) return lazyFromValue(this.getValue(elementId));
 
         /* A leaf value still queued is the newest. */
@@ -1320,14 +1322,14 @@ export class ValueCache {
         /* Both passes see the same rows as trusted, even if a catch-up
          * starts or ends in between. */
         const trust = this.trustAbove;
-        const all = this.pending.size === 0 && await this.compositionComplete(elementId);
+        const all = this.pending.size === 0 && await this.compositionComplete(elementId, visible);
 
         /* The old value took the latest timestamp, by string order,
          * starting from "". */
         let n = 0;
         let latest = "";
         const slicer = new Slicer();
-        for (const step of this.walkComponents(elementId, all, trust, maxDepth)) {
+        for (const step of this.walkComponents(elementId, all, trust, maxDepth, visible)) {
             if (step) {
                 n++;
                 const ts = step[1].timestamp;
@@ -1344,7 +1346,7 @@ export class ValueCache {
                 quality: "Good",
                 timestamp: latest,
             },
-            components: () => this.walkComponents(elementId, all, trust, maxDepth),
+            components: () => this.walkComponents(elementId, all, trust, maxDepth, visible),
         };
     }
 
@@ -1358,10 +1360,12 @@ export class ValueCache {
      * their parent) and is not visited. A null is yielded after each
      * node, so the consumer can pause however few values there are.
      * With `maxDepth` above 0 compositions deeper than that are not
-     * entered, as in ObjectTree.iterateDescendantLeafIds.
+     * entered, as in ObjectTree.iterateDescendantLeafIds, and with
+     * `visible` neither are hidden ones.
      */
     private *walkComponents(rootId: string, all: boolean = false,
-            trustAbove: number = this.trustAbove, maxDepth: number = 0): Generator<ComponentStep> {
+            trustAbove: number = this.trustAbove, maxDepth: number = 0,
+            visible?: Visible): Generator<ComponentStep> {
         /* Callers store queued values first (flush or flushSliced). */
         this.store.commit();
         const reader = this.store.openReader();
@@ -1372,7 +1376,7 @@ export class ValueCache {
                 select element_id, value_json, quality, timestamp from last_value
                 where anchor = ? and ${all ? "source != 'empty'" : "source = 'uns'"} and seq > ? order by seq`);
             const children = db.prepare(`
-                select o.seq, o.element_id,
+                select o.seq, o.element_id, o.device_uuid,
                     o.is_composition or exists (select 1 from object c where c.parent_id = o.element_id) walk
                 from object o where o.parent_id = ? and o.seq > ? order by o.seq limit ?`);
 
@@ -1404,6 +1408,7 @@ export class ValueCache {
                 }
                 const child = top.page[top.i++];
                 if (!child.walk) continue;
+                if (visible && !visible(child.element_id, child.device_uuid ?? null)) continue;
                 if (maxDepth > 0 && stack.length >= maxDepth) continue;
                 if (stack.length >= 64) continue;   // guards against a parent cycle
                 yield* visit(child.element_id);

@@ -371,7 +371,7 @@ describe("History bulk current values", () => {
             ], { tree });
             const v = await history.getCompositionValue("dev-A");
             expect(collectRows).toHaveBeenCalledTimes(1);
-            expect((tree.getDescendantLeafIds as jest.Mock)).toHaveBeenCalledWith("dev-A", 1);
+            expect((tree.getDescendantLeafIds as jest.Mock)).toHaveBeenCalledWith("dev-A", 1, 0, undefined);
             expect(Object.keys(v!.components!)).toEqual(["a-temp"]);
         });
 

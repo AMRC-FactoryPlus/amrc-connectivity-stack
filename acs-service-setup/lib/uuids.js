@@ -543,6 +543,10 @@ export const I3X = {
     Requirement: {
         ServiceRole:    "0eb1f761-6b81-4757-a458-c0257c905a20",
     },
+    Perm: {
+        All:            "6e00fd2b-1d57-4b78-96e1-9f789bbe1c52",
+        ReadObject:     "d24495fd-72a3-41cd-8b9f-f4ebabdade44",
+    },
 };
 
 /* Simulator edge driver (edge-sim): cassette playback. The App and

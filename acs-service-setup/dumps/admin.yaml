@@ -1,5 +1,5 @@
 # Grant appropriate permissions to the Administrator group
-#-REQUIRE: auth sparkplug uns data-access
+#-REQUIRE: auth sparkplug uns data-access i3x
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -105,5 +105,7 @@ grants:
     # Every dataset, including deleting. The Data Access lists honour
     # this wildcard grant.
     !u DataAccess.Perm.All: null
+    # The whole i3X tree. Nobody else can read i3X until granted.
+    !u I3X.Perm.All: null
     # Cluster admins land as Grafana org Admin by default.
     !u Grafana.Perm.Admin: null

@@ -67,10 +67,9 @@ export function useI3xClient () {
   }
 
   return {
-    // /info is not wrapped in the { success, result } envelope.
     async getInfo () {
       const { body } = await fetch_body(c(), { url: 'v1/info', method: 'GET' })
-      return body
+      return body?.result
     },
 
     getObjects (params = {}) {

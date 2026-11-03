@@ -220,7 +220,7 @@ const stats = computed(() => {
   else out.push({ label: 'Window', value: 'Ongoing', sub: data.window.value.windowless ? 'No time window. Coverage shows the last 24 hours.' : 'No time window' })
   const known = r.structure != null
   const subs = props.resolved.sub_devices?.length ?? 0
-  const devices_sub = props.resolved.unknown.length ? 'Some parts are hidden from you'
+  const devices_sub = props.resolved.unknown.length ? 'Some parts are not listed'
     : subs ? `Plus ${subs} ${subs === 1 ? 'sub-device' : 'sub-devices'}, not shown`
     : 'Covered by this dataset'
   out.push({ label: 'Devices', value: known ? String(props.resolved.devices.length) : '–', sub: known ? devices_sub : 'Needs edit access to see' })

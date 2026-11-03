@@ -68,7 +68,7 @@
     </div>
     <div v-if="record.structure && readOnly.length" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-lock mr-1"></i>
-      {{ readOnly.length }} {{ readOnly.length === 1 ? 'part of this dataset is a dataset' : 'parts of this dataset are datasets' }} you can read but not edit, so their devices are not listed. The CSV download includes their data.
+      {{ readOnly.length }} {{ readOnly.length === 1 ? 'part of this dataset is a dataset' : 'parts of this dataset are datasets' }} you can read but not edit, so {{ readOnly.length === 1 ? 'its' : 'their' }} devices are not listed. The CSV download includes {{ readOnly.length === 1 ? 'its' : 'their' }} data.
     </div>
     <div v-if="record.structure && hidden.length" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-eye-slash mr-1"></i>

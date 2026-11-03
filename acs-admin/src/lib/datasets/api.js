@@ -6,7 +6,6 @@
  * and the page shows that nothing (or what) was saved.
  */
 
-import { UUIDs } from '@amrc-factoryplus/service-client'
 import { DA, STRUCTURE, KIND_BY_ID } from './constants.js'
 import { to_iso, validate_window, device_dataset_for, direct_sources, normalise_tags } from './model.js'
 import { parse_series, series_error } from './series.js'
@@ -68,25 +67,53 @@ export function merge_patch_of (prev, next) {
     return patch
 }
 
+// Waits before each try of a metadata write refused with 403.
+const META_RETRY_MS = [0, 250, 500, 1000]
+
+/**
+ * A metadata write through Data Access. It checks EditDataset on the
+ * dataset, so a member of an own-scope role changes only their own.
+ * Throws an error carrying the status, as a ConfigDB write would.
+ */
+async function da_meta (client, uuid, field, body, method = 'PUT') {
+    let st
+    for (const wait of META_RETRY_MS) {
+        if (wait) await new Promise(r => setTimeout(r, wait))
+        ;[st] = await client.DataAccess.fetch({
+            method,
+            url: `v1/metadata/${uuid}/${field}`,
+            body,
+            ...(method === 'PATCH' ? { content_type: 'application/merge-patch+json' } : {}),
+        })
+        // A 403 straight after creating a dataset can be Data Access's
+        // copy of the caller's ACL not yet listing it as theirs.
+        if (st !== 403) break
+    }
+    if (st === 204) return
+    const err = new Error(`Data Access did not save the ${field} (${st}).`)
+    err.status = st
+    throw err
+}
+
 export async function set_name (client, uuid, name) {
-    // Keep any other fields in the Info entry.
-    const current = await client.ConfigDB.get_config(UUIDs.App.Info, uuid) ?? {}
-    if (current.name === name) return
-    await client.ConfigDB.put_config(UUIDs.App.Info, uuid, { ...current, name })
+    // Data Access keeps any other fields in the Info entry.
+    await da_meta(client, uuid, 'name', { name })
 }
 
 export async function set_tags (client, uuid, tags) {
-    const clean = normalise_tags(tags)
-    if (clean.length) await client.ConfigDB.put_config(DA.App.Tags, uuid, { tags: clean })
-    else await delete_quietly(client, DA.App.Tags, uuid)
+    await da_meta(client, uuid, 'tags', { tags: normalise_tags(tags) })
 }
 
 export async function set_labels (client, uuid, labels) {
     const clean = Object.fromEntries(Object.entries(labels ?? {})
         .map(([k, v]) => [k, (v ?? '').trim()])
         .filter(([, v]) => v))
-    if (Object.keys(clean).length) await client.ConfigDB.put_config(DA.App.EquipmentLabels, uuid, { labels: clean })
-    else await delete_quietly(client, DA.App.EquipmentLabels, uuid)
+    await da_meta(client, uuid, 'labels', { labels: clean })
+}
+
+/** Replace a run's details. */
+export async function put_run_meta (client, uuid, meta) {
+    await da_meta(client, uuid, 'run', meta)
 }
 
 /** Read, change and write run metadata. `change` gets a copy. */
@@ -96,18 +123,16 @@ export async function update_run_meta (client, uuid, change) {
     // Send only what changed, so two edits to different fields both stick.
     const patch = merge_patch_of(current, next)
     if (!Object.keys(patch).length) return current
-    const st = await cdb_write(client, { method: 'PATCH', app: DA.App.RunMetadata, obj: uuid, body: patch, merge: true })
-    if (st !== 204) throw cdb_fail('The details were not saved.', st)
+    try { await da_meta(client, uuid, 'run', patch, 'PATCH') }
+    catch (err) { throw cdb_fail('The details were not saved.', err.status) }
     return next
 }
 
+/** Set a dataset's kind. Data Access takes it out of any other kind. */
 export async function set_kind (client, uuid, kind, previous = null) {
-    if (previous && previous !== kind && KIND_BY_ID[previous]) {
-        await client.ConfigDB.class_remove_member(KIND_BY_ID[previous].klass, uuid)
-    }
-    if (kind && KIND_BY_ID[kind] && kind !== previous) {
-        await client.ConfigDB.class_add_member(KIND_BY_ID[kind].klass, uuid)
-    }
+    const klass = KIND_BY_ID[kind]?.klass ?? null
+    if (kind === previous || (!klass && !previous)) return
+    await da_meta(client, uuid, 'kind', { kind: klass })
 }
 
 async function delete_quietly (client, app, uuid) {
@@ -247,7 +272,7 @@ async function write_metadata (client, uuid, spec) {
     if (spec.kind) await set_kind(client, uuid, spec.kind)
     if (spec.tags?.length) await set_tags(client, uuid, spec.tags)
     if (spec.kind === 'equipment' && spec.labels) await set_labels(client, uuid, spec.labels)
-    await client.ConfigDB.put_config(DA.App.RunMetadata, uuid, {
+    await put_run_meta(client, uuid, {
         createdBy: spec.createdBy ?? null,
         createdAt: to_iso(Date.now()),
         createdVia: spec.createdVia ?? 'desk',
@@ -712,7 +737,7 @@ export async function stop_recording (client, equipment, { stoppedAt, by, starte
     await attempt('name', () => set_name(client, run, name))
     await attempt('kind', () => set_kind(client, run, 'run'))
     if (rec.tags?.length) await attempt('tags', () => set_tags(client, run, rec.tags))
-    await attempt('details', () => client.ConfigDB.put_config(DA.App.RunMetadata, run, {
+    await attempt('details', () => put_run_meta(client, run, {
         createdBy: rec.startedBy,
         createdAt: to_iso(Date.now()),
         createdVia: 'kiosk',

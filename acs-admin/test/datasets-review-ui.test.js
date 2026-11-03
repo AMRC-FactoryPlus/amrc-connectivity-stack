@@ -13,8 +13,7 @@ import { describe, it, expect } from 'vitest'
 import { parse_series } from '../src/lib/datasets/series.js'
 import { window_gaps } from '../src/lib/datasets/gaps.js'
 import { find_power_series, power_to_register, reports_by_exception, energy_and_carbon } from '../src/lib/datasets/energy.js'
-import { update_recording, stop_recording, create_from_spec, ensure_device_datasets, void_resumed } from '../src/lib/datasets/api.js'
-import { DA } from '../src/lib/datasets/constants.js'
+import { update_recording, stop_recording, create_from_spec, ensure_device_datasets, void_resumed, set_name } from '../src/lib/datasets/api.js'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -144,7 +143,10 @@ function fake_cdb (entry, { onRead = () => {} } = {}) {
                 return [204]
             },
         },
-        DataAccess: { create_dataset: async () => 'ffffffff-0000-4000-8000-000000000001' },
+        DataAccess: {
+            create_dataset: async () => 'ffffffff-0000-4000-8000-000000000001',
+            fetch: async () => [204],
+        },
     }
     return client
 }
@@ -200,6 +202,7 @@ describe('saves that carry on after a part-way failure', () => {
                     made.push([structure, u])
                     return u
                 },
+                fetch: async () => [204],
             },
             ConfigDB: {
                 get_config: async () => ({}),
@@ -216,7 +219,7 @@ describe('saves that carry on after a part-way failure', () => {
         const progress = {}
         // Fail on the metadata write.
         let calls = 0
-        c.ConfigDB.put_config = async (app) => { if (app === DA.App.RunMetadata && calls++ === 0) throw new Error('down') }
+        c.DataAccess.fetch = async ({ url }) => (url.endsWith('/run') && calls++ === 0 ? [503] : [204])
         await expect(create_from_spec(c, spec, progress)).rejects.toThrow()
         expect(c.made).toHaveLength(2)
         const uuid = await create_from_spec(c, spec, progress)
@@ -236,7 +239,7 @@ describe('saves that carry on after a part-way failure', () => {
         const c = client()
         const created = {}
         let names = 0
-        c.ConfigDB.put_config = async () => { if (names++ === 1) throw new Error('down') }
+        c.DataAccess.fetch = async () => (names++ === 1 ? [503] : [204])
         await expect(ensure_device_datasets(c, ['d1', 'd2'], {}, () => 'Name', created)).rejects.toThrow()
         expect(Object.keys(created)).toEqual(['d1', 'd2'])
         const out = await ensure_device_datasets(c, ['d1', 'd2'], {}, () => 'Name', created)
@@ -249,12 +252,29 @@ describe('resuming a run', () => {
     it('tries again to void the earlier run', async () => {
         let tries = 0
         const client = {
-            ConfigDB: {
-                get_config: async () => ({}),
-                fetch: async () => (++tries < 2 ? [500] : [204]),
-            },
+            ConfigDB: { get_config: async () => ({}) },
+            DataAccess: { fetch: async () => (++tries < 2 ? [500] : [204]) },
         }
         expect(await void_resumed(client, 'r', 'me', 3)).toBe(true)
         expect(tries).toBe(2)
+    })
+})
+
+describe('metadata writes through Data Access', () => {
+    it('tries a 403 again while a new dataset reaches the ACL', async () => {
+        const sent = []
+        const client = {
+            DataAccess: {
+                fetch: async (req) => { sent.push(req); return [sent.length < 3 ? 403 : 204] },
+            },
+        }
+        await set_name(client, 'd', 'Trial')
+        expect(sent).toHaveLength(3)
+        expect(sent[0]).toMatchObject({ method: 'PUT', url: 'v1/metadata/d/name', body: { name: 'Trial' } })
+    })
+
+    it('gives up with the status when the 403 stays', async () => {
+        const client = { DataAccess: { fetch: async () => [403] } }
+        await expect(set_name(client, 'd', 'Trial')).rejects.toMatchObject({ status: 403 })
     })
 })

@@ -485,10 +485,14 @@ Gzip compression via `compression` middleware when client sends `Accept-Encoding
 
 ## Authentication
 
-HTTP Basic Auth via WebAPI's built-in `FplusHttpAuth` middleware (spec deviation D1
-in TID). Username/password verified against Kerberos via `GSS.verifyCredentials()`.
-Sets `req.auth` to authenticated principal UPN. ACL checks via `Auth.check_acl()`
-per request.
+WebAPI's built-in `FplusHttpAuth` middleware (spec deviation D1 in TID). It
+accepts Kerberos (`Negotiate`, or `Basic` with a UPN and password), an opaque
+bearer token from `POST /token`, or a Keycloak JWT carrying `fp_principal_uuid`,
+and sets `req.auth` to the authenticated principal.
+
+There is no authorization yet. No ACL check is made, so any principal that
+authenticates can read every object, value, history series and subscription,
+and use the `/mcp` endpoint when it is enabled.
 
 `GET /v1/info` is mounted outside the auth middleware (spec requirement).
 

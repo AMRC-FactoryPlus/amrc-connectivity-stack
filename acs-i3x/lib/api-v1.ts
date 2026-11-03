@@ -278,7 +278,10 @@ export class APIv1 {
     setup_routes() {
         /* ---- /info router (unauthenticated) ---- */
 
-        this.infoRoute.get("/info", this.get_info.bind(this));
+        /* The envelope goes on the route, not the router: both routers
+         * mount on /v1, so infoRoute.use() would wrap the main router's
+         * responses a second time. */
+        this.infoRoute.get("/info", i3xEnvelope, this.get_info.bind(this));
 
         /* ---- Main router (authenticated) ---- */
 

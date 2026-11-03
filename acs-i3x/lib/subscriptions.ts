@@ -26,6 +26,7 @@ interface SubscriptionManagerOpts {
      * with HTTP 206. Default 10,000.
      */
     maxQueue?: number;
+    log?: (msg: string, ...args: any[]) => void;
 }
 
 export interface SyncResult {
@@ -59,6 +60,7 @@ export class SubscriptionManager {
     private valueCache: ValueCacheLike;
     private ttl: number;
     private maxQueue: number;
+    private log: (msg: string, ...args: any[]) => void;
     private subscriptions: Map<string, Subscription> = new Map();
     private boundOnValueChange: (elementId: string, vqt: I3xVqt) => void;
 
@@ -66,6 +68,7 @@ export class SubscriptionManager {
         this.valueCache = opts.valueCache;
         this.ttl = opts.ttl;
         this.maxQueue = Math.max(1, opts.maxQueue ?? 10_000);
+        this.log = opts.log ?? (() => {});
         this.boundOnValueChange = this.onValueChange.bind(this);
         this.valueCache.onValueChange(this.boundOnValueChange);
     }
@@ -153,14 +156,14 @@ export class SubscriptionManager {
             sub.registeredElements.set(elementId, maxDepth);
         }
 
-        console.log(`[SUB] register: sub=${subscriptionId.slice(0,8)} elements=[${elementIds.join(", ")}] maxDepth=${maxDepth}`);
+        this.log("register: sub=%s elements=%d maxDepth=%d", subscriptionId.slice(0, 8), elementIds.length, maxDepth);
         this.resetTtl(sub);
     }
 
     registerOne(owner: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
         const sub = this.getAndVerify(owner, subscriptionId);
         sub.registeredElements.set(elementId, maxDepth);
-        console.log(`[SUB] register: sub=${subscriptionId.slice(0,8)} element=${elementId} maxDepth=${maxDepth}`);
+        this.log("register: sub=%s element=%s maxDepth=%d", subscriptionId.slice(0, 8), elementId, maxDepth);
         this.resetTtl(sub);
     }
 
@@ -216,12 +219,12 @@ export class SubscriptionManager {
         const sub = this.getAndVerify(owner, subscriptionId);
 
         if (sub.activeStream) {
-            console.log(`[SSE] replacing existing stream: sub=${subscriptionId.slice(0,8)}`);
+            this.log("replacing existing stream: sub=%s", subscriptionId.slice(0, 8));
             sub.activeStream.end();
             sub.activeStream = null;
         }
 
-        console.log(`[SSE] stream opened: sub=${subscriptionId.slice(0,8)} registered=[${[...sub.registeredElements.keys()].map(k => k.slice(0,8)).join(", ")}] queued=${sub.queue.length} dropped=${sub.dropped}`);
+        this.log("stream opened: sub=%s registered=%d queued=%d dropped=%d", subscriptionId.slice(0, 8), sub.registeredElements.size, sub.queue.length, sub.dropped);
 
         // Set SSE headers
         res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -233,7 +236,7 @@ export class SubscriptionManager {
 
         // Flush any queued items
         if (sub.queue.length > 0) {
-            console.log(`[SSE] flushing ${sub.queue.length} queued items`);
+            this.log("flushing %d queued items", sub.queue.length);
         }
         for (const item of sub.queue) {
             this.writeSseEvent(res, item);
@@ -243,7 +246,7 @@ export class SubscriptionManager {
 
         // Handle close
         res.on("close", () => {
-            console.log(`[SSE] stream closed: sub=${subscriptionId.slice(0,8)}`);
+            this.log("stream closed: sub=%s", subscriptionId.slice(0, 8));
             /* A stream replaced by a newer one must not detach its
              * successor, and a deleted subscription must not get a
              * fresh TTL timer. */

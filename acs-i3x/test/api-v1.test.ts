@@ -201,7 +201,8 @@ describe("APIv1", () => {
             const res = await request(app).get("/info");
 
             expect(res.status).toBe(200);
-            expect(res.body).toEqual({
+            expect(res.body.success).toBe(true);
+            expect(res.body.result).toEqual({
                 specVersion: I3X_SPEC_VERSION,
                 serverName: "AMRC Connectivity Stack",
                 serverVersion: Version,
@@ -218,7 +219,7 @@ describe("APIv1", () => {
             const res = await request(app).get("/info");
 
             expect(res.status).toBe(200);
-            expect(res.body.capabilities.query).toEqual({
+            expect(res.body.result.capabilities.query).toEqual({
                 history: true,
                 maxDepthCap: 5,
             });
@@ -228,7 +229,7 @@ describe("APIv1", () => {
             const { app } = createApp();
             const res = await request(app).get("/info");
 
-            expect(res.body.capabilities.query).not.toHaveProperty("maxDepthCap");
+            expect(res.body.result.capabilities.query).not.toHaveProperty("maxDepthCap");
         });
     });
 

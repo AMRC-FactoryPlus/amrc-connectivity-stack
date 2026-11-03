@@ -12,6 +12,16 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Dataset downloads need a time window
+
+`POST v1/data/:uuid` on Data Access no longer downloads a dataset with
+no time window of its own, such as a machine's device or union dataset.
+That request read the device's whole history and could run to gigabytes.
+It now returns `422` with a reason. Download a session dataset over the
+time you need, or pass `from` and `to` in the request body. Sessions
+download as before. The Admin UI's Data tab sends the time range in
+view; the other download buttons show the reason when they are refused.
+
 ### Upgrading: i3X needs a volume, and answers 503 while it first syncs
 
 i3X now keeps its namespace and the last value of each metric in a

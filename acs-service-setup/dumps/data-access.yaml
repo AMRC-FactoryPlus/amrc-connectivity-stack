@@ -132,9 +132,17 @@ objects:
     !u DataAccess.Special.InvalidDataset:
       name: "Structurally invalid dataset"
 
+  # Roles must be subclasses of Principal: Auth only treats subclasses
+  # of Principal as groups, so a role without it grants nothing.
   !u Auth.Class.ClientRole:
     !u DataAccess.Group.DatasetMaker:
       name: "Dataset maker"
+      subclassOf:
+        - !u Auth.Class.Principal
+    !u DataAccess.Group.DatasetManager:
+      name: "Dataset manager"
+      subclassOf:
+        - !u Auth.Class.Principal
 
 # Permissions
   !u Auth.Class.ServicePerms:
@@ -204,11 +212,12 @@ grants:
     !u Auth.Perm.ReadKerberos: null
 
   # Everything the Admin UI needs to make datasets and record runs as
-  # the signed-in user. It is broad, and applies to every dataset, not
-  # only a member's own: a member can edit any dataset's definition,
-  # overwrite any dataset's tags, run details and recordings, set any
-  # dataset's kind, read data from any device, and (through Info write)
-  # rename any object. It does not include deleting datasets.
+  # the signed-in user. A member edits and deletes only the datasets
+  # they created (Data Access records the creator as owner). Reading,
+  # unions and sessions still cover every dataset, and the metadata
+  # writes below cover every dataset's tags, run details, recordings
+  # and kind, and (through Info write) any object's name: ConfigDB
+  # scopes those writes by app, not by owner.
   !u DataAccess.Group.DatasetMaker:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
@@ -221,6 +230,39 @@ grants:
     !u DataAccess.Perm.UseForSession:
       !u DataAccess.Class.Dataset: true
     !u DataAccess.Perm.EditDataset:
+      !u UUIDs.Special.Mine: true
+    !u DataAccess.Perm.DeleteDataset:
+      !u UUIDs.Special.Mine: true
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u DataAccess.App.DatasetMetadata: true
+      !u UUIDs.App.Info: false
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u DataAccess.App.DatasetMetadata: true
+      !u UUIDs.App.Info: false
+    # Setting a kind adds the dataset to a class: ConfigDB checks the
+    # class (WriteMembers) and the dataset (WriteMemberships).
+    !u ConfigDB.Perm.WriteMembers:
+      !u DataAccess.Group.FunctionalDatasetGroup: true
+    !u ConfigDB.Perm.WriteMemberships:
+      !u DataAccess.Class.Dataset: true
+
+  # Dataset maker's grants, with edit and delete on every dataset. For
+  # whoever tidies up other people's datasets, and the datasets made
+  # before Data Access recorded owners.
+  !u DataAccess.Group.DatasetManager:
+    !u DataAccess.Perm.CreateDataset:
+      !u DataAccess.App.DatasetDefinition: true
+    !u DataAccess.Perm.UseSparkplug:
+      !u UUIDs.Class.Device: true
+    !u DataAccess.Perm.ReadDataset:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.IncludeInUnion:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.UseForSession:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.EditDataset:
+      !u DataAccess.Class.Dataset: true
+    !u DataAccess.Perm.DeleteDataset:
       !u DataAccess.Class.Dataset: true
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true

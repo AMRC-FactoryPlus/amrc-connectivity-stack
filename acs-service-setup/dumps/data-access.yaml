@@ -184,8 +184,13 @@ grants:
       # Device originMap, to resolve sub-device metric references to
       # their current Sparkplug paths.
       !u UUIDs.App.DeviceInformation: false
+    # Metadata writes go through Data Access, which checks EditDataset
+    # on the dataset first: tags, labels and run details, and the name
+    # of a dataset (never of another object).
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.DatasetDefinition: true
+      !u DataAccess.App.DatasetMetadata: true
+      !u UUIDs.App.Info: false
     !u ConfigDB.Perm.CreateObject:
       !u DataAccess.Class.Dataset: false
     !u ConfigDB.Perm.ReadMembers:
@@ -193,8 +198,11 @@ grants:
       !u DataAccess.App.DatasetMetadata: false
       !u DataAccess.Class.Dataset: "both"
       !u DataAccess.Group.FunctionalDatasetGroup: "both"
+    # Setting a dataset's kind moves it between the kind classes, the
+    # members of Functional dataset group.
     !u ConfigDB.Perm.WriteMembers:
       !u DataAccess.Class.Dataset: true
+      !u DataAccess.Group.FunctionalDatasetGroup: true
     !u ConfigDB.Perm.WriteMemberships:
       !u DataAccess.Class.Dataset: true
     !u ConfigDB.Perm.WriteSubclasses:
@@ -213,11 +221,10 @@ grants:
 
   # Everything the Admin UI needs to make datasets and record runs as
   # the signed-in user. A member edits and deletes only the datasets
-  # they created (Data Access records the creator as owner). Reading,
-  # unions and sessions still cover every dataset, and the metadata
-  # writes below cover every dataset's tags, run details, recordings
-  # and kind, and (through Info write) any object's name: ConfigDB
-  # scopes those writes by app, not by owner.
+  # they created (Data Access records the creator as owner), and that
+  # includes their names, tags, labels, kinds and run details, which
+  # Data Access writes for them. Reading, unions and sessions still
+  # cover every dataset.
   !u DataAccess.Group.DatasetMaker:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
@@ -236,15 +243,10 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+    # The kiosk's recording lock sits on the equipment, and any operator
+    # at the machine starts and stops it, so it stays a direct write.
     !u UUIDs.Permission.ConfigDB.WriteConfig:
-      !u DataAccess.App.DatasetMetadata: true
-      !u UUIDs.App.Info: false
-    # Setting a kind adds the dataset to a class: ConfigDB checks the
-    # class (WriteMembers) and the dataset (WriteMemberships).
-    !u ConfigDB.Perm.WriteMembers:
-      !u DataAccess.Group.FunctionalDatasetGroup: true
-    !u ConfigDB.Perm.WriteMemberships:
-      !u DataAccess.Class.Dataset: true
+      !u DataAccess.App.Recording: false
 
   # Dataset maker's grants, with edit and delete on every dataset. For
   # whoever tidies up other people's datasets, and the datasets made
@@ -267,14 +269,9 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+    # The kiosk's recording lock sits on the equipment, and any operator
+    # at the machine starts and stops it, so it stays a direct write.
     !u UUIDs.Permission.ConfigDB.WriteConfig:
-      !u DataAccess.App.DatasetMetadata: true
-      !u UUIDs.App.Info: false
-    # Setting a kind adds the dataset to a class: ConfigDB checks the
-    # class (WriteMembers) and the dataset (WriteMemberships).
-    !u ConfigDB.Perm.WriteMembers:
-      !u DataAccess.Group.FunctionalDatasetGroup: true
-    !u ConfigDB.Perm.WriteMemberships:
-      !u DataAccess.Class.Dataset: true
+      !u DataAccess.App.Recording: false
 
 

@@ -1,4 +1,4 @@
-{{ if .Values.grafana.enabled }}
+{{ if and .Values.grafana.enabled .Values.acs.generateSecrets }}
 {{- if not (lookup "v1" "Secret" .Release.Namespace "grafana-admin-user") }}
 
 apiVersion: v1

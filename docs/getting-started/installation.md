@@ -93,6 +93,62 @@ echo $(kubectl get secret admin-password -o jsonpath="{.data.password}" -n {{.Re
 
 Once you have the admin password you can connect to the MQTT broker at the URL supplied to you and subscribe to spBv1.0/#. It's advisable to do this before you start adding devices to the system so that you can see all traffic. The bundled [Visualiser](whats-new-in-v3.md#visualiser) is a great tool to view MQTT traffic (plus it's ACS-aware!), or something like MQTTExplorer may be more useful if you're interested in viewing raw packet contents. MQTTExplorer can be downloaded [here](https://mqtt-explorer.com), however building the tool from [this](https://github.com/thomasnordquist/MQTT-Explorer/pull/712) pull request may be more useful when working with ACS and Sparkplug messages.
 
+## Deploying with Flux or ArgoCD
+
+The steps above use the Helm CLI, but ACS is an ordinary Helm chart, so you can deploy it with whatever you already use to manage your cluster. How you lay that out is up to you. This section only covers where the tools differ.
+
+### Helm and Flux
+
+Flux's helm-controller installs and upgrades the chart with Helm itself, so a Flux `HelmRelease` behaves the same as `helm install` and `helm upgrade` and needs no extra values. Give it a long `spec.timeout`, like the `--timeout 30m` above, as the first install takes a while.
+
+### ArgoCD
+
+ArgoCD renders the chart with `helm template` and applies the result itself, with no access to the cluster while it renders. A few parts of the chart rely on Helm, so set these values:
+
+- `acs.argocd: true`, so that each sync runs the chart's Jobs, such as `service-setup`, afresh.
+- `acs.generateSecrets: false`. The chart can only keep its generated passwords stable under Helm, so create the Secrets below yourself before the first sync.
+- `configdb.backup.alwaysRun: true`, once the first sync has finished, to back up the ConfigDB before every sync. Leave it off until then, as there is nothing to back up yet.
+
+Neither `acs.argocd` nor `configdb.backup.alwaysRun` changes anything ArgoCD compares, so after setting either, start a sync by hand. Syncing by hand is also how to rerun `service-setup`.
+
+| Secret | Keys | Needed when |
+|---|---|---|
+| `postgres-secret` | `postgres-password`, `replication-password` | `postgres.enabled` |
+| `manager-database-secret` | `postgres-password`, `replication-password` | always |
+| `influxdb-auth` | `admin-password`, `admin-token` | `influxdb2.enabled` |
+| `grafana-admin-user` | `admin-user`, `admin-password` | `grafana.enabled` |
+| `keycloak-clients` | `_bootstrap`, `_admin` and one per client in `serviceSetup.config.openidClients` | `openid.enabled` |
+| `openmetadata-mysql-secrets`, `airflow-mysql-secrets`, `airflow-metadata-db`, `airflow-secrets`, `airflow-fernet-key`, `airflow-jwt-secret`, `elasticsearch-secrets` | see `templates/openmetadata/openmetadata-secrets.yaml` | `openmetadata.enabled` |
+
+The simplest way to make them is to let the chart render them with random values, then encrypt the output (for example with Sealed Secrets or SOPS) before it goes anywhere near git:
+
+```bash
+helm template acs amrc-connectivity-stack/amrc-connectivity-stack -f values.yaml \
+  --namespace factory-plus --set acs.generateSecrets=true \
+  --show-only templates/postgres/env/postgres-secret.yaml \
+  --show-only templates/manager/database/env/manager-database-secret.yaml \
+  --show-only templates/influxdb/influx-auth.yaml \
+  --show-only templates/grafana/grafana-admin-user.yaml \
+  --show-only templates/openid/keycloak-clients.yaml
+```
+
+Drop the line for anything you've turned off, and add `--show-only templates/openmetadata/openmetadata-secrets.yaml` if you use OpenMetadata. Two of its Secrets must hold the same Airflow database password, which rendering them together takes care of.
+
+#### Uninstalling
+
+ArgoCD deletes the Kerberos keys operator at the same time as the KerberosKey objects it looks after, and waits for them all to go before it runs the chart's clean-up hook. A KerberosKey the operator didn't get to then stays stuck on its finalizer. To avoid this, delete the Application without cascading, then stop the operator and clear the finalizers before deleting the namespace:
+
+```bash
+kubectl -n factory-plus scale deployment krb-keys-operator --replicas=0
+kubectl -n factory-plus wait pod -l component=krb-keys --for=delete --timeout=5m
+kubectl -n factory-plus get kerberos-keys -o name \
+  | xargs -I{} kubectl -n factory-plus patch {} --type=json \
+      -p '[{"op":"remove","path":"/metadata/finalizers"}]'
+kubectl delete namespace factory-plus
+```
+
+If a cascading delete is already stuck, clearing the finalizers is enough for ArgoCD to finish. ArgoCD never deletes the chart's CRDs. After a non-cascading delete, its ClusterRoles, ClusterRoleBindings and the `kubegres-system` namespace are left behind too.
+
 ## Configure your first edge cluster
 
 Next, log into the manager at the URL supplied to you as the `admin` user and create an `Edge Cluster`. This will provide you with a bootstrap script to run on a fresh Kubernetes cluster at the edge. The bootstrap script handles the installation and configuration of all necessary components to connect the edge cluster to the central cluster (see the [Edge Clusters](whats-new-in-v3.md#edge-clusters) section for more information on this process).

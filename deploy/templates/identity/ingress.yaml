@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
-    - kdc
+    - {{ .Values.identity.entryPoints.kdc }}
   routes:
     - match: HostSNI(`*`)
       services:
@@ -21,7 +21,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
-    - kpasswd
+    - {{ .Values.identity.entryPoints.kpasswd }}
   routes:
     - match: HostSNI(`*`)
       services:
@@ -36,7 +36,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   entryPoints:
-    - kadmin
+    - {{ .Values.identity.entryPoints.kadmin }}
   routes:
     - match: HostSNI(`*`)
       services:

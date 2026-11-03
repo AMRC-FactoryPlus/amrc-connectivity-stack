@@ -1,4 +1,4 @@
-{{- if .Values.openid.enabled }}
+{{- if and .Values.openid.enabled .Values.acs.generateSecrets }}
 # Random per-key passwords for Keycloak:
 #   _bootstrap  -> initial Keycloak admin (KEYCLOAK_ADMIN_PASSWORD env
 #                  on the keycloak StatefulSet)

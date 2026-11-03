@@ -21,13 +21,11 @@ import type { EtagChange } from "../lib/sync.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { I3xStore } from "../lib/store.js";
 import { ValueCache } from "../lib/value-cache.js";
-import { I3xRag } from "../lib/rag/i3x-rag.js";
 import {
     DEVICE_INFORMATION_APP_UUID as DI,
     INFO_APP_UUID as INFO,
     SCHEMA_APP_UUID as SCHEMA,
 } from "../lib/constants.js";
-import { createMockHistory } from "./helpers/mock-rag.js";
 // @ts-ignore - plain ESM benchmark fixture
 import { device, deviceUuid } from "../bench/dataset.mjs";
 
@@ -829,26 +827,5 @@ describe("ConfigSync", () => {
         await settle(sync);
         expect(tree.getObject(joiner)).toBeDefined();
         expect(state(tree)).toEqual(state(reference(cdb, [...members, joiner])));
-    });
-
-    it("marks the RAG index dirty on every tree change, so MCP search sees it", async () => {
-        const cdb = new FakeConfigDB();
-        const uuids = seed(cdb);
-        const { tree, sync } = start(stack(cdb));
-        const rag = new I3xRag(tree, { getValue: () => null }, createMockHistory());
-        tree.onChange(() => rag.markDirty());
-        cdb.setMembers(uuids);
-        cdb.snapshots();
-        await settle(sync);
-        const renamed = () => rag.search("Renamed Signal", 100)
-            .filter(r => r.displayName === "Renamed Signal").map(r => r.elementId);
-        expect(renamed()).toEqual([]);
-
-        cdb.put(INFO, uuids[1], { name: "Renamed Signal" });
-        await settle(sync);
-        expect(renamed()).toEqual([uuids[1]]);
-
-        tree.addCompositionFromUns([uuids[1]], [TOP], ["Brakes", "Brake_Pressure"]);
-        expect(rag.search("Brake_Pressure").map(r => r.displayName)).toContain("Brake_Pressure");
     });
 });

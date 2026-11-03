@@ -657,10 +657,9 @@ i3x:
   # the kernel OOM killer and for eviction under node memory pressure.
   # Set a memory request to make it Burstable, and a memory limit to cap
   # it. Size the limit above the normal working set, because a limit that
-  # is too low turns memory pressure into a restart loop. With MCP off and
-  # the default maxHeapMB, i3X used about 370 MiB during its first sync of
+  # is too low turns memory pressure into a restart loop. With the
+  # default maxHeapMB, i3X used about 370 MiB during its first sync of
   # about 40,000 devices and about 280 MiB at 74,000 devices in testing.
-  # With MCP on, allow several GiB.
   # For example:
   # resources:
   #   requests:
@@ -688,18 +687,12 @@ i3x:
     size: 10Gi
     # -- StorageClass for the claim. Empty uses the cluster default.
     storageClass: ""
-  mcp:
-    # -- Serve the MCP endpoint (/mcp) and build the search index it
-    # uses. Off by default: the index costs about 47 KB of memory per
-    # device. When off, /mcp answers 404.
-    enabled: false
   # -- Cap on the i3X JavaScript heap in MiB (--max-old-space-size).
   # The object tree and values live in SQLite, so the heap stays small
   # (about 75 MiB at 74,000 devices). Without a cap V8 lets the heap
   # grow between collections during a cold sync (about 550 MiB RSS at
-  # 74,000 devices, against about 320 MiB with a 256 MiB cap). Only
-  # applied while MCP is off: the MCP search index needs several GB at
-  # fleet scale. Set to 0 for no cap.
+  # 74,000 devices, against about 320 MiB with a 256 MiB cap). Set to 0
+  # for no cap.
   maxHeapMB: 384
   # After a restart or an MQTT reconnect, i3X catches up its stored
   # values from InfluxDB (the points written while it was not listening)

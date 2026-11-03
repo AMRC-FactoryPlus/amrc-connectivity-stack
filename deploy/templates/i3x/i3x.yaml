@@ -114,8 +114,6 @@ spec:
               value: "300000"
             - name: I3X_DB_PATH
               value: /data/i3x.db
-            - name: I3X_MCP_ENABLED
-              value: {{ .Values.i3x.mcp.enabled | toString | quote }}
             - name: I3X_CATCHUP_MARGIN_MS
               value: {{ .Values.i3x.catchUp.marginMs | int | toString | quote }}
             - name: I3X_CATCHUP_MAX_GAP_MS
@@ -126,7 +124,7 @@ spec:
               value: {{ .Values.i3x.stallTimeout | default 0 | quote }}
             - name: CONNECT_TIMEOUT
               value: {{ .Values.i3x.connectTimeout | default 0 | quote }}
-            {{- if and (not .Values.i3x.mcp.enabled) (gt (int .Values.i3x.maxHeapMB) 0) }}
+            {{- if gt (int .Values.i3x.maxHeapMB) 0 }}
             - name: NODE_OPTIONS
               value: "--max-old-space-size={{ int .Values.i3x.maxHeapMB }}"
             {{- end }}

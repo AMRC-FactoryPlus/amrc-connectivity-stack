@@ -17,7 +17,7 @@ acs-i3x/
 ├── lib/
 │   ├── constants.ts           UUIDs, relationship types, version
 │   ├── git-version.ts         (generated at build)
-│   ├── routes.ts              Route factory → Express app (+ /mcp)
+│   ├── routes.ts              Route factory → Express app
 │   ├── api-v1.ts              i3X v1 endpoint router
 │   ├── store.ts               SQLite database (node:sqlite)
 │   ├── object-tree.ts         Object graph, kept in the database
@@ -29,8 +29,6 @@ acs-i3x/
 │   ├── mapping.ts             Factory+ → i3X translation helpers
 │   ├── quality.ts             Quality derivation
 │   ├── middleware/envelope.ts i3X response envelope
-│   ├── rag/i3x-rag.ts         Graph + search index for MCP (opt-in)
-│   ├── mcp/                   MCP tools and transport (opt-in)
 │   └── types/i3x.ts           i3X request/response types
 ├── test/                      Jest suites (see Test Strategy)
 └── bench/                     Bulk value benchmark against InfluxDB
@@ -44,7 +42,6 @@ RxClient.init()
     → ObjectTree (over the store)
     → ValueCache.init (subscribes to UNS/v1/#)
     → History, SubscriptionManager
-    → MCP server + RAG index, only if I3X_MCP_ENABLED=true
     → WebAPI.init({ routes, ping }), api.run()
     → ConfigSync.run (fills the tree from ConfigDB)
 ```
@@ -153,13 +150,12 @@ allocator keeps after the cold sync's churn; the live heap stays under
 75 MiB. The cold-sync peak is V8 letting the heap grow between
 collections while 148,000 config bodies are parsed. With
 `--max-old-space-size=256` the 74,000-device cold sync peaked at 319 MiB
-RSS and settled at 268 MiB, in the same time. The chart does not set it:
-with MCP enabled the RAG index alone needs several GB at that size, and
-memory limits are set separately. A smaller page cache
+RSS and settled at 268 MiB, in the same time. The chart sets it from
+`i3x.maxHeapMB`; memory limits are set separately. A smaller page cache
 (`I3X_DB_CACHE_MB=16`) made the sync slower and saved no memory.
 
 After the fixes from the review of this change, at 74,000 devices with
-`--max-old-space-size=384` (the chart's `i3x.maxHeapMB` default, MCP off):
+`--max-old-space-size=384` (the chart's `i3x.maxHeapMB` default):
 cold sync 371 s, peak RSS 329 MiB; 279 MiB RSS and 74 MiB heap after sync;
 277 MiB at steady state (304 MiB after a warm restart, which took 1.9 s
 and no GETs). UNS ingest ran at 9,500 messages a second creating nodes and
@@ -220,7 +216,7 @@ hierarchy and its metric tree; its Info config gives its display name.
 - `addCompositionFromUns` adds nothing for a device that is not in the
   tree. `dropOrphans` removes UNS nodes whose parent is gone and empty
   ISA-95 levels; the sync engine runs it on every reconcile.
-- `onChange` reports writes; the RAG index uses it to know it is stale.
+- `onChange` reports writes.
 
 ### sync.ts (ConfigSync)
 
@@ -399,14 +395,6 @@ second stream replaces the first. The queue holds at most
 oldest; the next `/sync` reports the drops with a 206. A subscription
 with neither an open stream nor a call within the TTL is deleted.
 
-### MCP and the RAG index (opt-in)
-
-With `I3X_MCP_ENABLED=true`, `/mcp` serves MCP tools over a graph and
-full-text index of the whole tree. The index is built on the first MCP
-query and again on the first query after any change. It costs about 47 KB
-of heap per device, so it is off by default; then nothing is built and
-`/mcp` answers 404.
-
 ### mapping.ts, quality.ts, types/i3x.ts
 
 Pure translation helpers, quality derivation and the i3X type definitions.
@@ -527,7 +515,6 @@ I3X_DB_PATH=/data/i3x.db           # ":memory:" also works
 I3X_DB_CACHE_MB=64                 # SQLite page cache
 I3X_SYNC_CONCURRENCY=16            # ConfigDB fetches in flight
 I3X_INFLUX_CONCURRENCY=4           # Flux queries in flight, process-wide
-I3X_MCP_ENABLED=false              # serve /mcp and build the RAG index
 
 # Logging
 VERBOSE=ALL,!query,!acl,!notify-msg
@@ -552,6 +539,6 @@ Jest suites under `test/`, run with Node 22 (`node:sqlite`):
 - `api-v1.test.ts`, `e2e.test.ts`: every endpoint and the i3X envelope,
   over mocked components.
 - `subscriptions.test.ts`, `history*.test.ts`, `value-cache.test.ts`,
-  `mapping.test.ts`, `quality.test.ts`, `envelope.test.ts`, `rag/`, `mcp/`.
+  `mapping.test.ts`, `quality.test.ts`, `envelope.test.ts`.
 - `history-influx.test.ts` runs against a real InfluxDB when
   `I3X_TEST_INFLUX_URL` is set.

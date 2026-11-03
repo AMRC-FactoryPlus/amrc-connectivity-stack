@@ -8,6 +8,7 @@ import { useExplorerStore } from '@store/useExplorerStore.js'
 import { useMonitorStore } from '@store/useMonitorStore.js'
 import ExplorerTreeNode from './ExplorerTreeNode.vue'
 import NodeDetail from './NodeDetail.vue'
+import ExplorerAccess from './ExplorerAccess.vue'
 import CurrentValue from './CurrentValue.vue'
 import RelationshipGraph from './RelationshipGraph.vue'
 import HistoryPanel from './HistoryPanel.vue'
@@ -79,6 +80,7 @@ function handleSubscribe () {
         :node="store.selectedNode"
         @subscribe="handleSubscribe"
       />
+      <ExplorerAccess/>
     </div>
   </div>
 </template>

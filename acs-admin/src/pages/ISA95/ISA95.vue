@@ -83,6 +83,8 @@
             :value="childNames"
           />
         </div>
+        <!-- Who can read the devices under this node through i3X -->
+        <ReadAccessPanel :target="selectedNode.uuid" :via="selectedVia" :noun="selectedNode.level.toLowerCase()"/>
       </div>
     </template>
   </BridgesContainer>
@@ -102,10 +104,12 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useDialog } from '@/composables/useDialog';
 import { useServiceClientStore } from "@store/serviceClientStore";
 import { toast } from "vue-sonner";
+import ReadAccessPanel from "@components/Access/ReadAccessPanel.vue";
+import { isa95_path } from "@/lib/access/i3x-access.js";
 
 export default {
   name: 'ISA95',
-  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState },
+  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState, ReadAccessPanel },
 
   setup() {
     return {
@@ -144,6 +148,10 @@ export default {
     selectedNode() {
       if (!this.selectedUuid) return null;
       return this.isa95.by_uuid(this.selectedUuid) ?? null;
+    },
+    /* The nodes above the selected one, whose grants also cover it. */
+    selectedVia() {
+      return isa95_path(this.isa95.data, this.selectedUuid).slice(0, -1);
     },
     parentNames() {
       const parents = this.isa95.parents_of(this.selectedUuid).map(p => p.name);

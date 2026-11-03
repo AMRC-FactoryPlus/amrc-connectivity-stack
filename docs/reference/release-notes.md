@@ -12,6 +12,18 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Basic auth no longer hangs on clusters with the CoreDNS redirect
+
+On a cluster with `coredns.traefikRedirect.enabled`, every HTTP Basic
+login to an ACS service hung instead of answering, whether the password
+was right or wrong. When a password login gets an error reply from the
+KDC, which happens even on the way to success, the Kerberos library
+retries it on the realm's master KDC. The services' `krb5.conf` named no
+master KDC, so the library looked one up in DNS, and the redirect
+answered with the ingress, which never replied. The `krb5.conf` now
+names each realm's `master_kdc` and turns off `dns_lookup_kdc`. Clusters
+without the redirect see no change.
+
 ### Dataset downloads need a time window
 
 `POST v1/data/:uuid` on Data Access no longer downloads a dataset with

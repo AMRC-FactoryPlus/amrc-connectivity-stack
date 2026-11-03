@@ -1426,7 +1426,7 @@ export class ValueCache {
 
     getValue(elementId: string): I3xValueResponse | null {
         if (this.treeInStore()) {
-            /* Synchronous, and so for small compositions (MCP, tests):
+            /* Synchronous, and so for small compositions (tests):
              * the value routes use getValueLazy. */
             const flushed = this.flush();
             const row = this.store.prepare(

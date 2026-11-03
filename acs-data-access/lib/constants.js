@@ -9,6 +9,15 @@ export const DataAccess = {
         MESIdentifiers: "af178f0c-3b1e-44f2-9724-5cf06e8fd056",
     },
 
+    /* Metadata apps the Admin UI writes through the metadata routes.
+     * These are kept out of App above: an edit to an invalid dataset
+     * deletes the entries of every app listed there. */
+    Metadata: {
+        Tags: "c95e372e-2fbe-45b9-9937-3235f94e22a3",
+        EquipmentLabels: "dfc3983b-658c-4099-b76a-01ce7c18bde1",
+        RunMetadata: "2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a",
+    },
+
     Class: {
         Measurement: "cce0ac4e-b5ba-4837-b45d-c74df55aa2d7",
         Dataset: "c31d3cbd-01cd-4833-8014-c4512aef1e5c",
@@ -19,7 +28,17 @@ export const DataAccess = {
         WorkOrder: "b416e44c-c57e-4486-9431-64c425f1b2c6",
         Product: "4a089748-b26b-4f12-8f1a-164bfba97809",
         Operation: "bd0354eb-b8f7-4bd9-8407-0588e545603c",
+        Run: "3c866b35-66a1-4cb8-8db2-dae284883cf8",
         MES: "2c691583-89fe-4421-bf2c-64e34e663711"
+    },
+
+    /* The kinds the Admin UI gives a dataset, each a functional class.
+     * A dataset is a direct member of at most one. */
+    Kind: {
+        Equipment: "4c93ddc1-e610-4efe-91e3-a355f9ba1a09",
+        Run: "3c866b35-66a1-4cb8-8db2-dae284883cf8",
+        Operation: "bd0354eb-b8f7-4bd9-8407-0588e545603c",
+        Product: "4a089748-b26b-4f12-8f1a-164bfba97809",
     },
 
     Group: {

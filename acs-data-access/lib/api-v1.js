@@ -71,7 +71,23 @@ export class APIv1 {
 
     api.route("/metadata/:uuid")
       .get(this.metadata_uuid.bind(this));
-    
+
+    api.route("/metadata/:uuid/name")
+      .put(this.metadata_put_name.bind(this));
+
+    api.route("/metadata/:uuid/tags")
+      .put(this.metadata_put_tags.bind(this));
+
+    api.route("/metadata/:uuid/labels")
+      .put(this.metadata_put_labels.bind(this));
+
+    api.route("/metadata/:uuid/kind")
+      .put(this.metadata_put_kind.bind(this));
+
+    api.route("/metadata/:uuid/run")
+      .put(this.metadata_put_run.bind(this))
+      .patch(this.metadata_patch_run.bind(this));
+
     api.route("/data/:uuid")
       .post(this.dataset_data.bind(this));
 
@@ -288,7 +304,153 @@ export class APIv1 {
   }
 
 
+  /* Metadata writes.
+   *
+   * These routes write a dataset's name, tags, equipment labels, kind and
+   * run details with Data Access's own rights. ConfigDB checks writes to
+   * an app for every object at once, so a caller who could write these
+   * apps directly could write them for any dataset, and through Info
+   * rename any object at all. Here the caller needs EditDataset on the
+   * dataset, which an owner-scoped grant can give, and the object must
+   * be a dataset. */
 
+  /** Checks that the caller may edit the metadata of a dataset.
+   * Throws a 422, 403 or 404 APIError if not.
+   * @returns The dataset UUID.
+   */
+  async _check_metadata_edit(req) {
+    const dataset_uuid = req.params.uuid;
+    if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.EditDataset,
+      dataset_uuid,
+      true,
+    );
+    if (!ok) return fail(this.log, 403, `You don't have Edit permission for dataset ${dataset_uuid}`);
+
+    /* Ask ConfigDB rather than the dataset map: the Admin UI names a
+     * dataset straight after creating it, before the map has caught up.
+     * An invalid dataset is still a dataset, and can still be edited. */
+    if (!await this.cdb.class_has_member(Constants.Class.Dataset, dataset_uuid))
+      return fail(this.log, 404, `Dataset ${dataset_uuid} not found.`);
+
+    return dataset_uuid;
+  }
+
+  /** PUT. Sets a dataset's name, keeping any other fields in its
+   * General information entry.
+   * Body: { name: string }
+   */
+  async metadata_put_name(req, res) {
+    const name = req.body?.name;
+    if (typeof name != "string" || !name.trim())
+      return fail(this.log, 422, `Name must be a non-empty string`);
+
+    const uuid = await this._check_metadata_edit(req);
+
+    const current = await this.cdb.get_config(UUIDs.App.Info, uuid) ?? {};
+    if (current.name !== name.trim())
+      await this.cdb.put_config(UUIDs.App.Info, uuid, { ...current, name: name.trim() });
+
+    return res.status(204).end();
+  }
+
+  /** PUT. Sets a dataset's tags. An empty list removes them.
+   * Body: { tags: [string] }
+   */
+  async metadata_put_tags(req, res) {
+    const tags = req.body?.tags;
+    if (!Array.isArray(tags) || !tags.every(t => typeof t == "string"))
+      return fail(this.log, 422, `Tags must be a list of strings`);
+
+    const uuid = await this._check_metadata_edit(req);
+    await this._put_or_remove(Constants.Metadata.Tags, uuid,
+      tags.length ? { tags } : null);
+
+    return res.status(204).end();
+  }
+
+  /** PUT. Sets an equipment dataset's device labels. An empty object
+   * removes them.
+   * Body: { labels: { [device dataset]: string } }
+   */
+  async metadata_put_labels(req, res) {
+    const labels = req.body?.labels;
+    if (!labels || typeof labels != "object" || Array.isArray(labels)
+        || !Object.values(labels).every(l => typeof l == "string"))
+      return fail(this.log, 422, `Labels must be an object of strings`);
+
+    const uuid = await this._check_metadata_edit(req);
+    await this._put_or_remove(Constants.Metadata.EquipmentLabels, uuid,
+      Object.keys(labels).length ? { labels } : null);
+
+    return res.status(204).end();
+  }
+
+  /** PUT. Sets a dataset's kind: the one kind class it is a direct
+   * member of. A null kind removes it from all of them.
+   * Body: { kind: UUID | null }
+   */
+  async metadata_put_kind(req, res) {
+    const kind = req.body?.kind;
+    const kinds = Object.values(Constants.Kind);
+    if (kind !== null && !kinds.includes(kind))
+      return fail(this.log, 422, `Kind must be one of ${kinds.join(", ")} or null`);
+
+    const uuid = await this._check_metadata_edit(req);
+
+    for (const klass of kinds) {
+      if (klass == kind) continue;
+      if (await this.cdb.class_has_direct_member(klass, uuid))
+        await this.cdb.class_remove_member(klass, uuid);
+    }
+    if (kind && !await this.cdb.class_has_direct_member(kind, uuid))
+      await this.cdb.class_add_member(kind, uuid);
+
+    return res.status(204).end();
+  }
+
+  /** PUT. Replaces a run's details.
+   * Body: the Run metadata entry, an object.
+   */
+  async metadata_put_run(req, res) {
+    if (!this._is_object(req.body))
+      return fail(this.log, 422, `Run details must be an object`);
+
+    const uuid = await this._check_metadata_edit(req);
+    await this.cdb.put_config(Constants.Metadata.RunMetadata, uuid, req.body);
+
+    return res.status(204).end();
+  }
+
+  /** PATCH. Changes a run's details with a JSON merge patch, so two
+   * edits to different fields both stick.
+   * Body: a merge patch, an object.
+   */
+  async metadata_patch_run(req, res) {
+    if (!this._is_object(req.body))
+      return fail(this.log, 422, `The patch must be an object`);
+
+    const uuid = await this._check_metadata_edit(req);
+    await this.cdb.patch_config(Constants.Metadata.RunMetadata, uuid, "merge", req.body);
+
+    return res.status(204).end();
+  }
+
+  _is_object(v) {
+    return v != null && typeof v == "object" && !Array.isArray(v);
+  }
+
+  /** Writes a config entry, or removes it when `config` is null. */
+  async _put_or_remove(app, uuid, config) {
+    if (config)
+      await this.cdb.put_config(app, uuid, config);
+    else
+      await this.cdb.delete_config(app, uuid)
+        .catch(ServiceError.check(404));
+  }
 
 
   async resolve_dataset( dataset_uuid, inherited_range = {from: null, to: null}, visited = new Set()){

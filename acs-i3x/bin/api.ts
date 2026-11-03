@@ -97,6 +97,7 @@ const subscriptions = new SubscriptionManager({
     valueCache,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
     maxQueue: positiveInt("I3X_SUBSCRIPTION_QUEUE_MAX", 10_000),
+    log: fplus.debug.bound("subscriptions"),
 });
 
 // The MCP endpoint and its RAG index (a graph and a search index of

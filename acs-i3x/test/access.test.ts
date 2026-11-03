@@ -147,6 +147,40 @@ describe("Isa95Vocabulary", () => {
         expect(v.resolve(["AMRC", "Nowhere", "North"])).toBeNull();
         expect(v.resolve([])).toBeNull();
     });
+
+    /* ConfigDB as it is: ISA95Level's members are the level classes,
+     * and the nodes are the members of those. */
+    it("follows the nodes in ConfigDB, not the level classes", async () => {
+        const LEVEL = "3866b165-6b31-46e3-a801-cb367e04e726";
+        const ENTERPRISE = "2980293e-4a82-49a3-b121-9a8fa109d0a8";
+        const SITE = "site-class";
+        const members: Record<string, string[]> = {
+            [LEVEL]: [ENTERPRISE, SITE],
+            [ENTERPRISE]: ["v-amrc"],
+            [SITE]: ["v-f2050"],
+        };
+        const names: Record<string, string> = {
+            [ENTERPRISE]: "ISA-95 Enterprise", [SITE]: "ISA-95 Site",
+            "v-amrc": "AMRC", "v-f2050": "Factory 2050",
+        };
+        const vocab = new Map<string, any>([
+            ["v-amrc", { children: ["v-f2050"] }],
+            ["v-f2050", { aliases: ["F2050"], children: [] }],
+        ]);
+        const cdb = {
+            watch_members: (k: string) => rx.of(members[k] ?? []),
+            watch_member_members: (k: string) => rx.of(new Map(
+                (members[k] ?? []).map(m => [m, members[m] ?? []]))),
+            search_app: () => rx.of(vocab),
+            watch_config: (_app: string, u: string) => rx.of({ name: names[u] }),
+        };
+        const fed = new Isa95Vocabulary();
+        fed.run({ ConfigDB: cdb });
+        await new Promise(r => setTimeout(r, 200));
+        expect(fed.resolve(["AMRC", "F2050"])).toBe("v-f2050");
+        expect(fed.resolve(["ISA-95 Enterprise"])).toBeNull();
+        fed.stop();
+    });
 });
 
 describe("Access", () => {

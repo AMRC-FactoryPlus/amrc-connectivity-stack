@@ -89,17 +89,20 @@ export class Isa95Vocabulary {
      * Follow the vocabulary in ConfigDB: the members of the ISA-95
      * level classes, their vocabulary configs and their names. Until
      * the first full set arrives the vocabulary is empty, so no grant
-     * on a node applies.
+     * on a node applies. ISA95Level is a class of classes: its members
+     * are the level classes (Enterprise, Site, ...), and the nodes are
+     * the members of those.
      */
     run(fplus: any): void {
         const cdb = fplus.ConfigDB;
         this.subscription = rx.combineLatest({
-            all: cdb.watch_members(ISA95_LEVEL_CLASS_UUID) as rx.Observable<Iterable<string>>,
+            levels: cdb.watch_member_members(ISA95_LEVEL_CLASS_UUID) as
+                rx.Observable<{ values(): Iterable<Iterable<string>> }>,
             roots: cdb.watch_members(ISA95_ENTERPRISE_CLASS_UUID) as rx.Observable<Iterable<string>>,
             vocab: cdb.search_app(ISA95_VOCABULARY_APP_UUID) as rx.Observable<{ get(k: string): any }>,
         }).pipe(
-            rx.switchMap(({ all, roots, vocab }) => {
-                const uuids = [...all];
+            rx.switchMap(({ levels, roots, vocab }) => {
+                const uuids = [...new Set([...levels.values()].flatMap(ms => [...ms]))];
                 const top = new Set(roots);
                 const names = uuids.length
                     ? rx.combineLatest(uuids.map(u =>

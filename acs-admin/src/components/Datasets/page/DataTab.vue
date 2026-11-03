@@ -385,7 +385,9 @@ async function downloadPinned () {
   if (pinnedDownloading.value) return
   pinnedDownloading.value = true
   try {
-    await download_csv(sc.client, props.record.uuid, streamSaver, { metrics: [...new Set(entries.value.map(e => e.path))] })
+    // A dataset with no window of its own downloads the time in view.
+    const range = win.value.windowless ? current.value : {}
+    await download_csv(sc.client, props.record.uuid, streamSaver, { metrics: [...new Set(entries.value.map(e => e.path))], ...range })
     toast.success('Download complete')
   }
   catch (err) {

@@ -300,3 +300,22 @@ describe('metadata writes through Data Access', () => {
         ])
     })
 })
+
+describe('downloads and the time window', () => {
+    const stream_of = text => new Response(text).body
+
+    it('sends from and to when given', async () => {
+        let sent
+        const client = { DataAccess: { fetch: async (req) => { sent = req; return [403] } } }
+        const { download_csv } = await import('../src/lib/datasets/api.js')
+        await expect(download_csv(client, 'd', {}, { from: 0, to: 3600000 })).rejects.toMatchObject({ status: 403 })
+        expect(sent.body).toEqual({ from: '1970-01-01T00:00:00.000Z', to: '1970-01-01T01:00:00.000Z' })
+    })
+
+    it("shows the service's reason when it refuses", async () => {
+        const reason = 'This dataset has no time window, so downloading it would return its whole history.'
+        const client = { DataAccess: { fetch: async () => [422, stream_of(JSON.stringify({ error: reason }))] } }
+        const { download_csv } = await import('../src/lib/datasets/api.js')
+        await expect(download_csv(client, 'd', {})).rejects.toMatchObject({ status: 422, message: reason })
+    })
+})

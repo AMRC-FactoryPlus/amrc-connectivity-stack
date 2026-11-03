@@ -88,7 +88,8 @@ const curl = computed(() => [
   `  -H "Authorization: Bearer <token>" \\`,
   `  -H "Accept: text/csv" \\`,
   `  -H "Content-Type: application/json" \\`,
-  `  -d '{}' \\`,
+  // A dataset with no window of its own needs one in the request.
+  `  -d '${props.record.from && props.record.to ? '{}' : '{"from": "2026-01-01T00:00:00Z", "to": "2026-01-02T00:00:00Z"}'}' \\`,
   `  "${apiUrl.value ?? `<data access>/v1/data/${props.record.uuid}`}"`,
 ].join('\n'))
 </script>

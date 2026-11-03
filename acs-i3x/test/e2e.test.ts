@@ -26,6 +26,7 @@ import type {
     I3xVqt,
     I3xSubscription,
 } from "../lib/types/i3x.js";
+import { allowAll } from "./helpers/allow-all.js";
 
 /* ================================================================
  * Realistic test data
@@ -346,7 +347,7 @@ function createPreloadedMocks() {
 function createE2eApp(opts: { maxDepthCap?: number } = {}) {
     const mocks = createPreloadedMocks();
 
-    const api = new APIv1({
+    const api = new APIv1({ access: allowAll,
         objectTree: mocks.objectTree as any,
         valueCache: mocks.valueCache as any,
         history: mocks.history as any,

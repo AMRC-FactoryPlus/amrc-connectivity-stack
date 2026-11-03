@@ -11,6 +11,7 @@
 
 import { randomUUID } from "crypto";
 import type { I3xVqt, I3xSubscription, I3xSyncItem } from "./types/i3x.js";
+import type { Viewer } from "./access.js";
 
 interface ValueCacheLike {
     onValueChange(listener: (elementId: string, vqt: I3xVqt) => void): void;
@@ -19,6 +20,9 @@ interface ValueCacheLike {
 
 interface SubscriptionManagerOpts {
     valueCache: ValueCacheLike;
+    /** What each owner may see, followed live (Access). Updates for
+     * objects the owner cannot see are not delivered. */
+    viewers: { track(owner: string): Viewer };
     ttl: number;
     /**
      * Most updates a subscription queues while no stream is open. When
@@ -54,10 +58,12 @@ interface Subscription {
     activeStream: any | null;
     lastAccessed: number;
     ttlTimer: ReturnType<typeof setTimeout>;
+    viewer: Viewer;
 }
 
 export class SubscriptionManager {
     private valueCache: ValueCacheLike;
+    private viewers: { track(owner: string): Viewer };
     private ttl: number;
     private maxQueue: number;
     private log: (msg: string, ...args: any[]) => void;
@@ -66,6 +72,7 @@ export class SubscriptionManager {
 
     constructor(opts: SubscriptionManagerOpts) {
         this.valueCache = opts.valueCache;
+        this.viewers = opts.viewers;
         this.ttl = opts.ttl;
         this.maxQueue = Math.max(1, opts.maxQueue ?? 10_000);
         this.log = opts.log ?? (() => {});
@@ -90,6 +97,7 @@ export class SubscriptionManager {
             activeStream: null,
             lastAccessed: Date.now(),
             ttlTimer: setTimeout(() => this.expireSubscription(subscriptionId), this.ttl),
+            viewer: this.viewers.track(owner),
         };
 
         this.subscriptions.set(subscriptionId, sub);
@@ -142,6 +150,7 @@ export class SubscriptionManager {
         const sub = this.getAndVerify(owner, subscriptionId);
 
         clearTimeout(sub.ttlTimer);
+        sub.viewer.stop();
         if (sub.activeStream) {
             sub.activeStream.end();
             sub.activeStream = null;
@@ -208,7 +217,8 @@ export class SubscriptionManager {
         sub.dropped = 0;
 
         this.resetTtl(sub);
-        return { updates: [...sub.queue], dropped };
+        /* Access may have been revoked since these were queued. */
+        return { updates: sub.queue.filter(item => sub.viewer.visible(item.elementId)), dropped };
     }
 
     /* Only one stream per subscription: a new stream closes the
@@ -239,7 +249,7 @@ export class SubscriptionManager {
             this.log("flushing %d queued items", sub.queue.length);
         }
         for (const item of sub.queue) {
-            this.writeSseEvent(res, item);
+            if (sub.viewer.visible(item.elementId)) this.writeSseEvent(res, item);
         }
         sub.queue = [];
         sub.dropped = 0;
@@ -263,6 +273,7 @@ export class SubscriptionManager {
     destroy(): void {
         for (const [id, sub] of this.subscriptions) {
             clearTimeout(sub.ttlTimer);
+            sub.viewer.stop();
             if (sub.activeStream) {
                 sub.activeStream.end();
                 sub.activeStream = null;
@@ -279,6 +290,7 @@ export class SubscriptionManager {
 
         for (const sub of this.subscriptions.values()) {
             if (!sub.registeredElements.has(elementId)) continue;
+            if (!sub.viewer.visible(elementId)) continue;
 
             if (sub.activeStream) {
                 this.writeSseEvent(sub.activeStream, { elementId, ...vqt });
@@ -357,6 +369,7 @@ export class SubscriptionManager {
         }
 
         clearTimeout(sub.ttlTimer);
+        sub.viewer.stop();
         sub.queue.length = 0;
         this.subscriptions.delete(subscriptionId);
     }

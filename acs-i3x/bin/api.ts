@@ -12,6 +12,8 @@ import { ValueCache } from "../lib/value-cache.js";
 import { parseConnectTimeout, parseStallTimeout } from "../lib/watchdog.js";
 import { History } from "../lib/history.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
+import { Access } from "../lib/access.js";
+import { Isa95Vocabulary } from "../lib/isa95.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
@@ -89,9 +91,22 @@ const history = new History({
 // Subscribe to UNS/v1/#, catching up stored values from InfluxDB.
 await valueCache.init(fplus, history);
 
+// The ISA-95 vocabulary, for grants on vocabulary nodes.
+const vocabulary = new Isa95Vocabulary({ log: fplus.debug.bound("isa95") });
+vocabulary.run(fplus);
+
+// What each caller may see: their ReadObject grants against the tree.
+const access = new Access({
+    auth: fplus.Auth,
+    objectTree,
+    vocabulary,
+    log: fplus.debug.bound("access"),
+});
+
 // Subscription manager
 const subscriptions = new SubscriptionManager({
     valueCache,
+    viewers: access,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
     maxQueue: positiveInt("I3X_SUBSCRIPTION_QUEUE_MAX", 10_000),
     log: fplus.debug.bound("subscriptions"),
@@ -115,6 +130,7 @@ const api = await new WebAPI({
     public: "/v1/info",
     routes: routes({
         objectTree,
+        access,
         valueCache,
         history,
         subscriptions,

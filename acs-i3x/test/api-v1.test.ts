@@ -15,6 +15,7 @@ import type {
     I3xSubscription,
     I3xSyncItem,
 } from "../lib/types/i3x.js";
+import { allowAll } from "./helpers/allow-all.js";
 
 /* ---- Mock factories ---- */
 
@@ -111,7 +112,7 @@ function createApp(opts: { maxDepthCap?: number; debug?: any } = {}) {
     const history = mockHistory(objectTree);
     const subscriptions = mockSubscriptions();
 
-    const api = new APIv1({
+    const api = new APIv1({ access: allowAll,
         objectTree: objectTree as any,
         valueCache: valueCache as any,
         history: history as any,
@@ -677,7 +678,7 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(history.getValues).toHaveBeenCalledTimes(1);
-            expect(history.getValues).toHaveBeenCalledWith(["miss-1", "none", "miss-2"], 2);
+            expect(history.getValues).toHaveBeenCalledWith(["miss-1", "none", "miss-2"], 2, undefined);
             expect(res.body.success).toBe(false);
             expect(res.body.results.map((r: any) => [r.elementId, r.success, r.result?.value ?? r.error?.code]))
                 .toEqual([

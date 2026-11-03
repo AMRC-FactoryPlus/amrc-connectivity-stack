@@ -1,6 +1,7 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { SubscriptionManager } from "../lib/subscriptions.js";
 import type { I3xVqt, I3xSyncItem } from "../lib/types/i3x.js";
+import { allowAll } from "./helpers/allow-all.js";
 
 /* ---- Mock helpers ---- */
 
@@ -52,7 +53,7 @@ describe("SubscriptionManager", () => {
     beforeEach(() => {
         jest.useFakeTimers();
         valueCache = mockValueCache();
-        mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL, maxQueue: MAX_QUEUE });
+        mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: MAX_QUEUE });
     });
 
     afterEach(() => {
@@ -455,7 +456,7 @@ describe("SubscriptionManager", () => {
 
         it("drops the oldest updates when full, and counts them", () => {
             mgr.destroy();
-            mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL, maxQueue: 3 });
+            mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: 3 });
             const sub = mgr.create("client-1", "client-1");
             mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
             for (let i = 1; i <= 5; i++) listen()("elem-1", makeVqt(i));
@@ -472,7 +473,7 @@ describe("SubscriptionManager", () => {
 
         it("still streams every update when the queue is full", () => {
             mgr.destroy();
-            mgr = new SubscriptionManager({ valueCache: valueCache as any, ttl: TTL, maxQueue: 2 });
+            mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: 2 });
             const sub = mgr.create("client-1", "client-1");
             mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
             const res = mockSseRes();

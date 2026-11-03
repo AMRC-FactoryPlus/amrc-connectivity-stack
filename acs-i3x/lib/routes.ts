@@ -1,5 +1,6 @@
 import compression from "compression";
 import { APIv1 } from "./api-v1.js";
+import type { AccessLike } from "./api-v1.js";
 import type { ObjectTree } from "./object-tree.js";
 import type { ValueCache } from "./value-cache.js";
 import type { History } from "./history.js";
@@ -7,6 +8,7 @@ import type { SubscriptionManager } from "./subscriptions.js";
 
 export function routes(opts: {
     objectTree: ObjectTree;
+    access: AccessLike;
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;

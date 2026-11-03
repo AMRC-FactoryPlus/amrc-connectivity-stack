@@ -17,3 +17,16 @@ export const DEVICE_CLASS_UUID            = "18773d6d-a70d-443a-b29a-3f158319529
 export const SCHEMA_APP_UUID              = "b16e85fb-53c2-49f9-8d83-cdf6763304ba";
 export const INFO_APP_UUID                = "64a8bfa9-7772-45c4-9d1a-9e6290690957";
 export const DEVICE_INFORMATION_APP_UUID  = "a98ffed5-c613-4e70-bfd3-efeee250ade5";
+
+// ISA-95 vocabulary: every node is a member of ISA95_LEVEL_CLASS_UUID,
+// the top-level nodes of ISA95_ENTERPRISE_CLASS_UUID.
+export const ISA95_LEVEL_CLASS_UUID       = "3866b165-6b31-46e3-a801-cb367e04e726";
+export const ISA95_ENTERPRISE_CLASS_UUID  = "2980293e-4a82-49a3-b121-9a8fa109d0a8";
+export const ISA95_VOCABULARY_APP_UUID    = "11096075-acc6-4eae-b682-9b27d776384d";
+
+// i3X permissions (acs-service-setup/dumps/i3x.yaml).
+export const Perm = {
+    ReadObject:    "d24495fd-72a3-41cd-8b9f-f4ebabdade44",
+};
+// The wildcard target: a grant on it covers every target.
+export const NULL_UUID = "00000000-0000-0000-0000-000000000000";

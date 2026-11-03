@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest'
 import { parse_series } from '../src/lib/datasets/series.js'
 import { window_gaps } from '../src/lib/datasets/gaps.js'
 import { find_power_series, power_to_register, reports_by_exception, energy_and_carbon } from '../src/lib/datasets/energy.js'
-import { update_recording, stop_recording, create_from_spec, ensure_device_datasets, void_resumed, set_name } from '../src/lib/datasets/api.js'
+import { update_recording, stop_recording, create_from_spec, ensure_device_datasets, void_resumed, set_name, set_tags } from '../src/lib/datasets/api.js'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -268,13 +268,35 @@ describe('metadata writes through Data Access', () => {
                 fetch: async (req) => { sent.push(req); return [sent.length < 3 ? 403 : 204] },
             },
         }
-        await set_name(client, 'd', 'Trial')
+        await set_name(client, 'd', 'Trial', { fresh: true })
         expect(sent).toHaveLength(3)
         expect(sent[0]).toMatchObject({ method: 'PUT', url: 'v1/metadata/d/name', body: { name: 'Trial' } })
     })
 
     it('gives up with the status when the 403 stays', async () => {
         const client = { DataAccess: { fetch: async () => [403] } }
-        await expect(set_name(client, 'd', 'Trial')).rejects.toMatchObject({ status: 403 })
+        await expect(set_name(client, 'd', 'Trial', { fresh: true })).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('reports a 403 on an existing dataset at once', async () => {
+        let tries = 0
+        const client = { DataAccess: { fetch: async () => { tries++; return [403] } } }
+        await expect(set_tags(client, 'd', ['a'])).rejects.toMatchObject({ status: 403 })
+        expect(tries).toBe(1)
+    })
+
+    it('retries the metadata of a dataset it has just created', async () => {
+        const sent = []
+        const client = {
+            DataAccess: {
+                create_dataset: async () => 'new',
+                fetch: async (req) => { sent.push(req); return [sent.length < 2 ? 403 : 204] },
+            },
+        }
+        const uuid = await create_from_spec(client, { name: 'Trial', items: ['d1'], tags: ['a'], createdBy: 'me' })
+        expect(uuid).toBe('new')
+        expect(sent.map(r => r.url)).toEqual([
+            'v1/metadata/new/name', 'v1/metadata/new/name', 'v1/metadata/new/tags', 'v1/metadata/new/run',
+        ])
     })
 })

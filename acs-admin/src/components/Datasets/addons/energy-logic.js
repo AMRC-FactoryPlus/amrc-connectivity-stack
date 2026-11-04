@@ -6,7 +6,7 @@
  * lib/datasets/energy.js. Tested in test/datasets-page.test.js.
  */
 
-import { ENERGY_LABEL, STRUCTURE } from '@/lib/datasets/constants.js'
+import { ENERGY_LABEL, is_device_structure } from '@/lib/datasets/constants.js'
 import { find_energy_series, find_intensity_series, find_power_series, power_to_register } from '@/lib/datasets/energy.js'
 
 const ENERGY_UNIT = /^(wh|kwh|mwh)$/i
@@ -55,7 +55,7 @@ export function energy_sparkplug_ids (labels, byUuid, deviceByUuid) {
     for (const [dd, label] of Object.entries(labels ?? {})) {
         if ((label ?? '').trim().toLowerCase() !== ENERGY_LABEL.toLowerCase()) continue
         const r = byUuid[dd]
-        const dev = r?.structure === STRUCTURE.DEVICE ? deviceByUuid[r.config?.source] : null
+        const dev = is_device_structure(r?.structure) ? deviceByUuid[r.config?.source] : null
         if (dev?.sparkplug) out.add(dev.sparkplug)
     }
     return out

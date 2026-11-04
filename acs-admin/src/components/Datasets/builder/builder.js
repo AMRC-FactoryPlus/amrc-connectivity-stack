@@ -11,7 +11,7 @@
  * unchanged item reuses exactly the dataset it came from.
  */
 
-import { STRUCTURE, KIND_BY_ID } from '@/lib/datasets/constants.js'
+import { STRUCTURE, KIND_BY_ID, is_device_structure } from '@/lib/datasets/constants.js'
 import {
     direct_sources, included_in, resolve_devices, device_dataset_for,
     validate_window, to_iso,
@@ -40,10 +40,13 @@ export function empty_state () {
  * Items
  * ------------------------------------------------------------------ */
 
-/** A builder item for a dataset UUID: device datasets become devices. */
+/**
+ * A builder item for a dataset UUID: device datasets of either kind
+ * become devices, keeping the dataset, so edit and duplicate reuse it.
+ */
 export function item_for (uuid, byUuid, label = '') {
     const r = byUuid[uuid]
-    if (r?.structure === STRUCTURE.DEVICE && r.config?.source) {
+    if (is_device_structure(r?.structure) && r.config?.source) {
         return { type: 'device', uuid: r.config.source, label, dataset: uuid }
     }
     return { type: 'dataset', uuid, label }
@@ -62,7 +65,7 @@ export function source_items (rec, byUuid) {
         if (src?.structure === STRUCTURE.UNION && src.name === `${rec.name} (devices)`) return direct_sources(src)
         return rec.config?.source ? [rec.config.source] : []
     }
-    if (rec.structure === STRUCTURE.DEVICE) return [rec.uuid]
+    if (is_device_structure(rec.structure)) return [rec.uuid]
     return direct_sources(rec)
 }
 
@@ -248,8 +251,8 @@ export function store_rows (state, byUuid, { steps = null, edit = null, record =
     const dd = device_dataset_plan(state.items, byUuid)
     const reused = dd.filter(d => d.existing).length
     const created = dd.length - reused
-    if (reused) rows.push({ text: `${reused} device ${reused === 1 ? 'dataset' : 'datasets'} reused`, note: 'Already exist for these devices.', type: 'Sparkplug source' })
-    if (created) rows.push({ text: `${created} device ${created === 1 ? 'dataset' : 'datasets'} created`, note: 'Made when you save.', type: 'Sparkplug source' })
+    if (reused) rows.push({ text: `${reused} device ${reused === 1 ? 'dataset' : 'datasets'} reused`, note: 'Already exist for these devices.', type: 'Device' })
+    if (created) rows.push({ text: `${created} device ${created === 1 ? 'dataset' : 'datasets'} created`, note: 'Made when you save.', type: 'Device' })
 
     if (steps) {
         for (const s of steps) {

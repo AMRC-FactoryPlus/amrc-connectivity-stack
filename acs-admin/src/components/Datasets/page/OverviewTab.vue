@@ -223,7 +223,7 @@ const stats = computed(() => {
   const known = r.structure != null
   const subs = props.resolved.sub_devices?.length ?? 0
   const devices_sub = props.resolved.unknown.length ? 'Some parts are not listed'
-    : subs ? `Plus ${subs} ${subs === 1 ? 'sub-device' : 'sub-devices'}, not shown`
+    : subs ? `Plus chosen metrics of ${subs} ${subs === 1 ? 'device' : 'devices'}, not shown`
     : 'Covered by this dataset'
   out.push({ label: 'Devices', value: known ? String(props.resolved.devices.length) : '–', sub: known ? devices_sub : 'Needs edit access to see' })
   out.push({ label: 'Metrics', value: known ? String(metric_total(devices.value)) : '–', sub: 'Recorded to the historian' })

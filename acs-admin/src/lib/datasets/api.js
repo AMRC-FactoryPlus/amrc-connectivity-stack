@@ -6,7 +6,7 @@
  * and the page shows that nothing (or what) was saved.
  */
 
-import { DA, STRUCTURE, KIND_BY_ID } from './constants.js'
+import { DA, STRUCTURE, KIND_BY_ID, is_device_structure, is_metrics_structure } from './constants.js'
 import { to_iso, validate_window, device_dataset_for, direct_sources, normalise_tags } from './model.js'
 import { parse_series, series_error } from './series.js'
 import { pipe_with_stall_timeout } from '../stream-download.js'
@@ -311,8 +311,8 @@ export function own_helper (rec, byUuid) {
 export function edit_shape (rec, byUuid) {
     if (!rec?.editable) return { ok: false, reason: 'You cannot edit this dataset.' }
     if (rec.invalid) return { ok: false, reason: 'The service reports this dataset as invalid. Duplicate it instead.' }
-    if (rec.structure === STRUCTURE.DEVICE) return { ok: false, reason: 'A device dataset always covers one device.' }
-    if (rec.structure === STRUCTURE.SUBSET) return { ok: false, reason: 'A sub-device dataset can only be changed through the Data Access API.' }
+    if (is_device_structure(rec.structure)) return { ok: false, reason: 'A device dataset always covers one device.' }
+    if (is_metrics_structure(rec.structure)) return { ok: false, reason: 'A dataset of chosen device metrics can only be changed through the Data Access API.' }
     if (rec.structure === STRUCTURE.UNION) return { ok: true, has_window: false, items_uuid: rec.uuid, items: rec.config ?? [] }
     if (rec.structure === STRUCTURE.SESSION) {
         const src = byUuid[rec.config?.source]
@@ -376,7 +376,7 @@ export async function update_from_spec (client, rec, spec, byUuid) {
             }
             done.push('name')
         }
-        await set_kind(client, rec.uuid, spec.kind, rec.kind === 'other' || rec.kind === 'device' ? null : rec.kind)
+        await set_kind(client, rec.uuid, spec.kind, KIND_BY_ID[rec.kind] ? rec.kind : null)
         const same_list = (a, b) => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
         if (!same_list(normalise_tags(spec.tags), rec.tags)) await set_tags(client, rec.uuid, spec.tags ?? [])
         if (spec.kind === 'equipment' && JSON.stringify(spec.labels ?? {}) !== JSON.stringify(rec.labels ?? {})) {

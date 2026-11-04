@@ -5,7 +5,7 @@
  * so all of it is unit-tested in test/datasets-page.test.js.
  */
 
-import { STRUCTURE } from '@/lib/datasets/constants.js'
+import { STRUCTURE, is_device_structure, is_metrics_structure } from '@/lib/datasets/constants.js'
 import { direct_sources, included_in, fmt_window } from '@/lib/datasets/model.js'
 import { i3x_leaf_id, metric_label, device_metric_labels, split_key, chartable } from '@/lib/datasets/series.js'
 
@@ -52,7 +52,7 @@ export function included_list (rec, byUuid) {
 /** Map a device dataset UUID to its device UUID; keep anything else. */
 function to_device (id, byUuid) {
     const r = byUuid[id]
-    return r?.structure === STRUCTURE.DEVICE && r.config?.source ? r.config.source : id
+    return is_device_structure(r?.structure) && r.config?.source ? r.config.source : id
 }
 
 /**
@@ -189,10 +189,10 @@ function wording (node, deviceName, now) {
     if (!r) return 'a dataset you cannot see'
     if (r.invalid) return 'reported as invalid by the service'
     if (!node.structure) return 'structure not visible to you'
-    if (node.structure === STRUCTURE.DEVICE) {
+    if (is_device_structure(node.structure)) {
         return `device ${deviceName(r.config?.source) ?? r.name ?? r.config?.source ?? 'unknown'}`
     }
-    if (node.structure === STRUCTURE.SUBSET) {
+    if (is_metrics_structure(node.structure)) {
         const n = r.config?.metrics?.length ?? 0
         return `${n} ${n === 1 ? 'metric' : 'metrics'} of device ${deviceName(r.config?.source) ?? r.config?.source ?? 'unknown'}`
     }
@@ -206,11 +206,15 @@ function wording (node, deviceName, now) {
     return 'unknown structure'
 }
 
-/** The service's own name for a structure type. */
+/**
+ * A structure type, in words. The older device kinds and the ones that
+ * read the UNS have the same names: which store a dataset reads from is
+ * not something a person chooses.
+ */
 export function structure_type (structure) {
+    if (is_device_structure(structure)) return 'Device'
+    if (is_metrics_structure(structure)) return 'Device metrics'
     switch (structure) {
-        case STRUCTURE.DEVICE:  return 'Sparkplug source'
-        case STRUCTURE.SUBSET:  return 'Sub-device'
         case STRUCTURE.UNION:   return 'Union components'
         case STRUCTURE.SESSION: return 'Session limits'
         case STRUCTURE.INVALID: return 'Invalid'

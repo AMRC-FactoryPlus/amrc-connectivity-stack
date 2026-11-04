@@ -64,7 +64,7 @@
     </div>
     <div v-if="record.structure && subDevices" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-filter mr-1"></i>
-      {{ subDevices }} {{ subDevices === 1 ? 'part of this dataset is a sub-device' : 'parts of this dataset are sub-devices' }}, with only chosen metrics of a device. They are not shown here, but the CSV download includes them.
+      {{ subDevices }} {{ subDevices === 1 ? 'part of this dataset holds' : 'parts of this dataset hold' }} only chosen metrics of a device. They are not shown here, but the CSV download includes them.
     </div>
     <div v-if="record.structure && readOnly.length" class="border-t border-slate-200 px-4 py-2 text-xs text-slate-500">
       <i class="fa-solid fa-lock mr-1"></i>

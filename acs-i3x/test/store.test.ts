@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { jest } from "@jest/globals";
 import { I3xStore, SCHEMA_VERSION } from "../lib/store.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { ValueCache } from "../lib/value-cache.js";
 
 const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
@@ -48,7 +49,7 @@ function devInfo(name: string, isa: string[], extra: Record<string, any> = {}) {
 }
 
 function tree(store?: I3xStore) {
-    return new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+    return new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
 }
 
 function rows(store: I3xStore, table: string): number {

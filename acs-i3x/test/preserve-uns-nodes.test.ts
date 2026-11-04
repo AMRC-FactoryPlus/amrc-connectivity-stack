@@ -3,6 +3,7 @@
  */
 
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 
 /*
@@ -26,7 +27,7 @@ const DEV = "dev-preserve";
 const SCHEMA = "schema-preserve";
 
 function makeTree(): ObjectTree {
-    return new ObjectTree({
+    return new TestObjectTree({
         fplus: createMockFplus(),
         namespaceName: "Factory+",
         namespaceUri: "urn:factoryplus:ns",

@@ -19,8 +19,14 @@
 import * as rx from "rxjs";
 
 import {
+    isa95_chain, isa95_value_problem, isa95_vocabulary,
+} from "@amrc-factoryplus/service-client";
+import type { Isa95VocabIndex } from "@amrc-factoryplus/service-client";
+
+import {
     INFO_APP_UUID,
     ISA95_ENTERPRISE_CLASS_UUID,
+    ISA95_LEVEL_CLASSES,
     ISA95_LEVEL_CLASS_UUID,
     ISA95_VOCABULARY_APP_UUID,
 } from "./constants.js";
@@ -33,6 +39,11 @@ export interface VocabNode {
     children: string[];
     /** An Enterprise node: the top of a match. */
     root: boolean;
+    /** The ISA-95 level (Enterprise, Site, ...), when known. */
+    level?: string;
+    /** False when the node's name has not been read: `name` is then
+     * its UUID, which must not reach a topic. */
+    named?: boolean;
 }
 
 interface Isa95VocabularyOpts {
@@ -48,6 +59,8 @@ export class Isa95Vocabulary {
     private subscription: rx.Subscription | null = null;
     /* Bumped by every change to the nodes. */
     private changes: number = 0;
+    private index: Isa95VocabIndex | null = null;
+    private listeners: Set<() => void> = new Set();
 
     constructor(opts: Isa95VocabularyOpts = {}) {
         this.log = opts.log ?? (() => {});
@@ -58,12 +71,43 @@ export class Isa95Vocabulary {
         return this.changes;
     }
 
+    /** Has the vocabulary been read from ConfigDB yet? */
+    isReady(): boolean {
+        return this.changes > 0;
+    }
+
+    /** Call `fn` after every change. Returns a function to stop. */
+    onChange(fn: () => void): () => void {
+        this.listeners.add(fn);
+        return () => this.listeners.delete(fn);
+    }
+
     /** Replace the whole vocabulary. */
     set(nodes: VocabNode[]): void {
         this.nodes = new Map(nodes.map(n => [n.uuid, n]));
         this.roots = nodes.filter(n => n.root);
+        this.index = null;
         this.changes++;
         this.log("vocabulary: %d nodes, %d enterprises", nodes.length, this.roots.length);
+        for (const fn of this.listeners) fn();
+    }
+
+    /**
+     * The UNS segments of a placement: the names from its node's
+     * Enterprise down to the node, by the shared rule. Null when the
+     * placement is missing, its chain is broken, a name is not known
+     * yet, or a name cannot go in a topic.
+     */
+    placementSegments(placement: any): string[] | null {
+        const node = placement?.node;
+        if (typeof node !== "string") return null;
+        this.index ??= isa95_vocabulary([...this.nodes.values()]
+            .filter(n => n.named !== false));
+        const { chain } = isa95_chain(this.index, node);
+        if (!chain) return null;
+        const segments = chain.map(n => n.name.trim());
+        if (segments.some(s => isa95_value_problem(s))) return null;
+        return segments;
     }
 
     /**
@@ -95,28 +139,39 @@ export class Isa95Vocabulary {
      */
     run(fplus: any): void {
         const cdb = fplus.ConfigDB;
+        const levelOf = new Map(Object.entries(ISA95_LEVEL_CLASSES)
+            .map(([level, klass]) => [klass, level]));
         this.subscription = rx.combineLatest({
             levels: cdb.watch_member_members(ISA95_LEVEL_CLASS_UUID) as
-                rx.Observable<{ values(): Iterable<Iterable<string>> }>,
+                rx.Observable<{ entries(): Iterable<[string, Iterable<string>]> }>,
             roots: cdb.watch_members(ISA95_ENTERPRISE_CLASS_UUID) as rx.Observable<Iterable<string>>,
             vocab: cdb.search_app(ISA95_VOCABULARY_APP_UUID) as rx.Observable<{ get(k: string): any }>,
         }).pipe(
             rx.switchMap(({ levels, roots, vocab }) => {
-                const uuids = [...new Set([...levels.values()].flatMap(ms => [...ms]))];
+                /* A node's level is the level class it is a member of. */
+                const level = new Map<string, string>();
+                for (const [klass, members] of levels.entries())
+                    for (const m of members)
+                        if (levelOf.has(klass)) level.set(m, levelOf.get(klass)!);
+                const uuids = [...new Set([...levels.entries()].flatMap(([, ms]) => [...ms]))];
                 const top = new Set(roots);
+                /* Wait for every name: a name that has not arrived would
+                 * otherwise render as a UUID in a device's position. */
                 const names = uuids.length
                     ? rx.combineLatest(uuids.map(u =>
-                        (cdb.watch_config(INFO_APP_UUID, u) as rx.Observable<any>)
-                            .pipe(rx.startWith(null))))
+                        cdb.watch_config(INFO_APP_UUID, u) as rx.Observable<any>))
                     : rx.of([]);
                 return names.pipe(rx.map(infos => uuids.map((uuid, i): VocabNode => {
                     const v = vocab.get(uuid) ?? {};
+                    const name = infos[i]?.name;
                     return {
                         uuid,
-                        name: infos[i]?.name ?? uuid,
+                        name: typeof name === "string" ? name : uuid,
+                        named: typeof name === "string",
                         aliases: Array.isArray(v.aliases) ? v.aliases : [],
                         children: Array.isArray(v.children) ? v.children : [],
                         root: top.has(uuid),
+                        level: level.get(uuid),
                     };
                 })));
             }),

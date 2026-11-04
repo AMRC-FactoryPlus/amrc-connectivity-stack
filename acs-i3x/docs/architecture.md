@@ -41,6 +41,7 @@ sequenceDiagram
     CS->>CDB: SEARCH v2/app/<DeviceInformation>/etag/
     CS->>CDB: SEARCH v2/app/<Info>/etag/
     CS->>CDB: SEARCH v2/app/<Schema>/etag/
+    CS->>CDB: SEARCH v2/app/<ISA-95 Placement>/ (via Isa95Placements)
     CDB-->>CS: members, and { uuid: etag } snapshots
 
     Note over CS: Compare with the stored ETags:<br/>remove devices no longer in the class,<br/>fetch only configs that differ
@@ -49,7 +50,7 @@ sequenceDiagram
         CS->>CDB: GET DeviceInformation and/or Info
         CDB-->>CS: config + ETag
         CS->>OT: replaceDeviceSubtree / updateDeviceName
-        Note right of OT: Extract from originMap:<br/>- schema (Schema_UUID = type)<br/>- ISA-95 hierarchy<br/>- Full metric tree (recursive)
+        Note right of OT: Extract from originMap:<br/>- schema (Schema_UUID = type)<br/>- Full metric tree (recursive)<br/>ISA-95 position from the placement
     end
 
     loop Each referenced schema that changed

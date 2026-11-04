@@ -2,10 +2,12 @@ import { PassThrough } from "stream";
 import { once } from "events";
 import pLimit from "p-limit";
 
-import { csv_escape, strip_metric_suffix } from "./utils.js";
+import { csv_escape, metric_path, strip_metric_suffix } from "./utils.js";
 import { build_flux_queries } from "./flux.js";
 
-const CSV_HEADER = "device,metric,timestamp,value,unit";
+/* `path` comes last so that clients reading the columns by position
+ * still work. */
+const CSV_HEADER = "device,metric,timestamp,value,unit,path";
 
 export class InfluxReader {
     constructor(opts) {
@@ -23,7 +25,7 @@ export class InfluxReader {
     }
 
     /** Combines the resolved device sources of a dataset into a single CSV
-     * stream with columns device, metric, timestamp, value, unit - see the
+     * stream with columns device, metric, timestamp, value, unit, path - see the
      * @returns doc on APIv1#dataset_data.
      */
     exportDevices(deviceSources, meta = {}) {
@@ -94,6 +96,7 @@ export class InfluxReader {
                     csv_escape(o._time),
                     csv_escape(o._value),
                     csv_escape(o.unit),
+                    csv_escape(metric_path(o.path, o._measurement)),
                 ].join(",");
 
                 await this.#write(writable, line + "\n");

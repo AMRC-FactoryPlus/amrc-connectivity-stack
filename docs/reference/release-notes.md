@@ -104,6 +104,17 @@ data, and missed metrics that rarely report. Each metric's `path` can
 be sent as a `metrics` filter to download only that metric. The
 service client has a matching `get_dataset_contents` method.
 
+### Dataset downloads have a metric path column
+
+The CSV from `POST v1/data/:uuid` on Data Access has a new `path`
+column at the end: `device,metric,timestamp,value,unit,path`. It holds
+the full Sparkplug metric name, for example `Axes/X/Position/Actual`,
+or the name alone for a metric at the top level of the device. Before,
+metrics with the same name in different folders could not be told
+apart. You can send a `path` value back in the `metrics` filter to
+download only that metric. Clients that read the columns by name or by
+position keep working.
+
 ### Dataset downloads need a time window
 
 `POST v1/data/:uuid` on Data Access no longer downloads a dataset with

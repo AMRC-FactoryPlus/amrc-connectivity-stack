@@ -161,7 +161,8 @@ export function build_flux_query({ bucket, source, filter = {}, subset }) {
                 "_value",
                 "_measurement",
                 "device",
-                "unit"
+                "unit",
+                "path"
             ])
         `;
 }

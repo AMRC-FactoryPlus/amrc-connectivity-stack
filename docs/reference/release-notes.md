@@ -49,6 +49,29 @@ The i3X database schema changes with this release, so the first start
 after the upgrade rebuilds the database from ConfigDB, as described
 below.
 
+### Upgrading: i3X serves the UNS, and needs the UNS historian
+
+i3X now serves only devices that are published to the UNS, and reads
+their history from the UNS historian's bucket (`uns`), not the
+Sparkplug bucket. A device is published to the UNS when its
+DeviceInformation has an ISA-95 hierarchy with at least an Enterprise,
+at `Device_Information/ISA95_Hierarchy`.
+
+- **Devices without an ISA-95 hierarchy disappear from i3X.** They were
+  shown under `<organisation>/Unknown`. Give a device a hierarchy in the
+  admin UI to bring it back.
+- **History starts when a device was first published to the UNS.**
+  Points written to the Sparkplug bucket before then are not served.
+- **The UNS historian is on by default, and i3X needs it.** The chart
+  refuses to install i3X with `historians.uns.enabled: false`. If you
+  upgrade with `--reuse-values` from a release where it was off, set
+  `historians.uns.enabled: true`, or `i3x.enabled: false`.
+- **Metrics that only the UNS names now have history.** i3X creates
+  these from UNS messages, and could not read their history or
+  InfluxDB value before.
+- **The i3X database is rebuilt on first start** after the upgrade,
+  because its schema changed.
+
 ### i3X no longer serves MCP
 
 The `/mcp` endpoint and its search index are gone, and so is the

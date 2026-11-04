@@ -341,24 +341,20 @@ same time again; after a gap longer than `I3X_CATCHUP_MAX_GAP_MS`, or more
 than 1,000,000 changes, those rows are dropped, 500 at a time, and read
 again when asked for.
 
+i3X serves the UNS. uns-ingester-sparkplug publishes a device only if its
+birth certificate has an ISA-95 hierarchy with at least an Enterprise, so
+the tree holds only those devices: `buildDevice` leaves out a device
+without one, and drops it when a DeviceInformation change removes it. Like
+the ingester, the tree takes the hierarchy only from
+`Device_Information/ISA95_Hierarchy`. A device whose hierarchy text does
+not match the ISA-95 vocabulary is still in the tree; it is only outside
+the reach of grants on vocabulary nodes. When a device leaves the tree,
+ConfigSync drops all its values, as for a removed device.
+
 Only a later UNS message replaces a value kept from InfluxDB, so values
-(and "no data" markers) are kept only for devices that publish to UNS.
-uns-ingester-sparkplug publishes a device only if its birth certificate has
-an ISA-95 hierarchy with at least an Enterprise; the Sparkplug historian
-writes every device to InfluxDB. `ObjectTree.publishesToUns` tells them
-apart by where the device sits: a device without a hierarchy is filed under
-`<namespace>/Unknown`, and a UNS message moves a device under the levels it
-was published with. Like the ingester, the tree takes the hierarchy only
-from `Device_Information/ISA95_Hierarchy`. A real hierarchy of exactly
-`<namespace>/Unknown` counts as none, which costs only InfluxDB reads. A
-device without a hierarchy is read from InfluxDB on every request. A
-composition that includes it has no markers for its leaves, so it is never
-complete: it is built from the UNS values of its other devices, as on main,
-or read from InfluxDB whole if it has none. History
-checks just before each write, so a device that loses its hierarchy during
-a read keeps nothing. When a DeviceInformation change leaves a device
-without a hierarchy, ConfigSync drops its InfluxDB values and markers
-(`removeInfluxValues`); its UNS values stay.
+(and "no data" markers) are kept only for devices in the tree
+(`ObjectTree.publishesToUns`). History checks just before each write, so a
+device that leaves the tree during a read keeps nothing.
 
 The check reads ConfigDB, while the ingester reads the device's birth
 certificate. Edge agents build births from the same DeviceInformation, but
@@ -378,9 +374,18 @@ Exposes: `getValue(elementId)`, `getValueLazy(elementId)`,
 ### history.ts
 
 Translates i3X value and history requests into Flux queries against the
-Sparkplug bucket, using each leaf's MetricMeta (measurement name, device,
-path). Current values for many leaves are read with a few bulk `last()`
-queries. Every Flux query, for current values and history alike, waits for
+UNS historian's bucket (`uns`), using each leaf's MetricMeta (measurement
+name, device, path). The UNS historian's `path` tag is every topic segment
+between `Edge` and the metric name, so a leaf's series has the path
+`<device segment>/<metric path>`, or the device segment alone for a
+top-level metric, matched exactly. The device segment is the one seen on
+the device's latest UNS message (`ObjectTree.unsDeviceSegment`), with
+DeviceInformation's `sparkplugName` standing in until one arrives. A leaf
+that only a UNS message names gets MetricMeta from that message: the
+measurement from its `Type` user property, mapped as the historians map
+it. History from before a device was published to UNS is in the Sparkplug
+bucket only, and i3X does not serve it. Current values for many leaves are
+read with a few bulk `last()` queries. Every Flux query, for current values and history alike, waits for
 a slot in a process-wide semaphore (`I3X_INFLUX_CONCURRENCY`, default 4).
 History is only served for leaf metrics.
 
@@ -528,7 +533,7 @@ SERVER_KEYTAB=/keytabs/server
 INFLUX_URL=http://influxdb.namespace.svc.cluster.local
 INFLUX_TOKEN=<token>
 INFLUX_ORG=<org>
-INFLUX_BUCKET=default
+INFLUX_BUCKET=uns
 
 # i3X specific
 I3X_NAMESPACE_NAME=<organisation name from Helm values.organisation>

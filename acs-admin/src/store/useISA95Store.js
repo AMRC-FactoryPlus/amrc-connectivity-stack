@@ -11,10 +11,12 @@ import { UUIDs }        from '@amrc-factoryplus/service-client'
 
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady }    from '@store/useServiceClientReady.js'
+import { vocabulary_of }         from '@/lib/isa95-placement.js'
 
-/* The Device Information schema key holding the ISA-95 level metrics. These
- * are a controlled vocabulary: they are written only via ISA95HierarchyPanel,
- * never by free-text entry. */
+/* The Device Information schema key that held the ISA-95 level metrics.
+ * A device's position is now its placement (lib/isa95-placement.js), so
+ * the UI never writes this key: the origin map editor hides it and the
+ * origin map CSV import refuses it. */
 export const ISA95_HIERARCHY_KEY = 'ISA95_Hierarchy'
 
 /* Ordered list of ISA-95 levels, matching the metric key names used in the
@@ -44,6 +46,9 @@ export const useISA95Store = defineStore('isa95', {
     }),
 
     getters: {
+        /* The nodes indexed for lib/isa95-placement.js. */
+        vocabulary: (state) => vocabulary_of(state.data),
+
         /* All enterprise-level nodes. */
         enterprises: (state) => state.data.filter(n => n.level === 'Enterprise'),
 

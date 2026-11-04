@@ -7,11 +7,12 @@
  * stored in the ISA-95 Placement app. The levels above the node come
  * from the vocabulary. The origin map's ISA95_Hierarchy is not read.
  *
- * Everything here is pure, so it can be tested without a browser.
+ * Everything here is pure, so it can be tested without a browser. The
+ * two writers at the end take the ConfigDB client as an argument.
  */
 
 import {
-  ISA95_LEVELS, isa95_chain, isa95_resolve, isa95_subtree,
+  ISA95_LEVELS, UUIDs, isa95_chain, isa95_resolve, isa95_subtree,
   isa95_value_problem, isa95_vocabulary, render_isa95,
 } from '@amrc-factoryplus/service-client'
 
@@ -45,6 +46,51 @@ export function placement_state (vocab, placement, device) {
 /** Is the device on the UNS? */
 export function on_uns (vocab, placement) {
   return placement_state(vocab, placement).state === 'placed'
+}
+
+/** What a placement state means for the device, as a sentence, or null
+ * for a placed device. */
+export function placement_explanation (state, error) {
+  if (state === 'unplaced')
+    return 'This device has no ISA-95 placement, so it is not on the UNS.'
+  if (state !== 'broken') return null
+  const why = String(error ?? '').trim()
+  return 'The ISA-95 placement does not resolve, so this device is not on the UNS.'
+    + (why ? ` ${why}${/[.!?]$/.test(why) ? '' : '.'}` : '')
+}
+
+const by_name = (a, b) => a.name.localeCompare(b.name)
+
+/** The nodes a placement picker offers one level below `parent`, or
+ * the Enterprises when `parent` is null. Only nodes a device can be
+ * placed on are offered: a node whose chain is broken, or whose name
+ * cannot go in a topic, is left out. Sorted by name. */
+export function placement_options (vocab, parent) {
+  let nodes
+  if (parent == null) {
+    nodes = [...vocab.nodes.values()].filter(n => n.level === ISA95_LEVELS[0])
+  }
+  else {
+    const p = vocab.nodes.get(parent)
+    if (!p) return []
+    const level = ISA95_LEVELS[ISA95_LEVELS.indexOf(p.level) + 1]
+    if (!level) return []
+    nodes = p.children
+      .map(c => vocab.nodes.get(c))
+      .filter(n => n?.level === level)
+  }
+  return nodes.filter(n => on_uns(vocab, { node: n.uuid })).sort(by_name)
+}
+
+/** The nodes `node` can be merged into: the same level, not the node
+ * itself and not under it. Sorted by name. */
+export function merge_targets (vocab, node) {
+  const n = vocab.nodes.get(node)
+  if (!n) return []
+  const under = isa95_subtree(vocab, node)
+  return [...vocab.nodes.values()]
+    .filter(o => o.level === n.level && !under.has(o.uuid))
+    .sort(by_name)
 }
 
 export const PLACEMENT_CSV_COLUMNS = ['device_uuid', ...ISA95_LEVELS]
@@ -252,4 +298,43 @@ export function devices_placed_under (vocab, placements, node) {
   return [...(placements ?? [])]
     .filter(([, p]) => p?.node && under.has(p.node))
     .map(([d]) => d)
+}
+
+/** Write the changes of a bulk import, one at a time.
+ * Only placement configs are written: the placement watcher updates
+ * the Edge Agent configs. A failed write does not stop the rest.
+ * @arg cdb The ConfigDB client.
+ * @arg changes From `plan_placements`.
+ * @arg progress Called with the number written so far.
+ * @returns The changes that failed, each with the error `message`.
+ */
+export async function apply_placements (cdb, changes, progress) {
+  const failed = []
+  let done = 0
+  for (const c of changes) {
+    try {
+      await cdb.put_config(UUIDs.App.ISA95Placement, c.device, c.placement)
+    }
+    catch (err) {
+      failed.push({ ...c, message: err?.message })
+    }
+    progress?.(++done)
+  }
+  return failed
+}
+
+/** Apply the steps of a merge, in order, stopping at the first error.
+ * A merge that stopped part way can be planned and applied again.
+ * @arg cdb The ConfigDB client.
+ * @arg steps From `plan_merge`.
+ */
+export async function apply_merge (cdb, steps) {
+  for (const step of steps) {
+    if (step.vocabulary)
+      await cdb.put_config(UUIDs.App.ISA95Vocabulary, step.vocabulary, step.config)
+    else if (step.placement)
+      await cdb.put_config(UUIDs.App.ISA95Placement, step.placement, step.config)
+    else if (step.delete)
+      await cdb.delete_object(step.delete)
+  }
 }

@@ -114,9 +114,3 @@ export function by_principal (rows) {
   for (const e of list) e.routes.sort((a, b) => ROUTE_ORDER[a.reason] - ROUTE_ORDER[b.reason])
   return [...list.filter(e => e.here), ...list.filter(e => !e.here)]
 }
-
-/* How many devices sit under the vocabulary node `uuid`, given each
- * device's hierarchy names, Enterprise first. */
-export function devices_under (nodes, chains, uuid) {
-  return chains.filter(c => resolve_isa95(nodes, c).some(n => n.uuid === uuid)).length
-}

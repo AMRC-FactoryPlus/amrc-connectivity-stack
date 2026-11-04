@@ -208,8 +208,8 @@ import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useISA95Store } from '@store/useISA95Store.js'
-import { extract_hierarchy } from '@/composables/useISA95Migration.js'
-import { READ_OBJECT, by_principal, devices_under } from '@/lib/access/i3x-access.js'
+import { devices_placed_under } from '@/lib/isa95-placement.js'
+import { READ_OBJECT, by_principal } from '@/lib/access/i3x-access.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -378,13 +378,19 @@ function pick (p) {
 function unpick (p) { picked.value = picked.value.filter(o => o.uuid !== p.uuid) }
 function closeSuggest () { setTimeout(() => { suggest.value = false }, 100) }
 
-/* Device counts need the device store; where it has not loaded, the
- * scope text leaves the count out rather than show a wrong one. */
-const chains = computed(() => (useDeviceStore().data ?? [])
-  .map(d => extract_hierarchy(d)?.chain).filter(Boolean))
+/* Device counts need the device store and the vocabulary; until both
+ * have loaded, the scope text leaves the count out rather than show a
+ * wrong one. A device counts when it is placed at or under the node. */
+const placements = computed(() => {
+  const devices = useDeviceStore()
+  if (!devices.ready || !useISA95Store().ready) return null
+  return new Map((devices.data ?? []).map(d => [d.uuid, d.placement]))
+})
 
 function covers (node) {
-  const n = chains.value.length ? devices_under(useISA95Store().data, chains.value, node.uuid) : null
+  const n = placements.value
+    ? devices_placed_under(useISA95Store().vocabulary, placements.value, node.uuid).length
+    : null
   const what = n === null ? 'every device' : `the ${n} device${n === 1 ? '' : 's'}`
   return `Gives read access to ${what} under ${node.name}, and any added later.`
 }

@@ -1,4 +1,4 @@
-import streamSaver from "streamsaver";
+import streamSaver from "@/lib/stream-saver.js";
 
 export async function useFileDownload(serviceClient, fileName, fileUUID) {
     const readableStream = await serviceClient.Files.get_file_stream(fileUUID);

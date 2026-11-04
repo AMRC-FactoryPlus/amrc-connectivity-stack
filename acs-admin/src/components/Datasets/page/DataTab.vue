@@ -161,7 +161,7 @@
 import { ref, shallowRef, computed, watch, onBeforeUnmount } from 'vue'
 import { useElementSize, refDebounced } from '@vueuse/core'
 import { toast } from 'vue-sonner'
-import streamSaver from 'streamsaver'
+import streamSaver from '@/lib/stream-saver.js'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'

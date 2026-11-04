@@ -156,7 +156,7 @@
 import { ref, computed, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import streamSaver from 'streamsaver'
+import streamSaver from '@/lib/stream-saver.js'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'

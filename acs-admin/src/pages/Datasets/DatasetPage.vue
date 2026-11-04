@@ -175,7 +175,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import streamSaver from 'streamsaver'
+import streamSaver from '@/lib/stream-saver.js'
 import EmptyState from '@/components/EmptyState.vue'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'

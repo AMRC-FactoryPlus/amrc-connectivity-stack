@@ -180,10 +180,16 @@ export function resolve_devices (uuid, byUuid) {
     }
 }
 
-/** Find the device dataset (a bare device dataset) for a device. */
-export function device_dataset_for (device_uuid, byUuid) {
+/**
+ * Find the device dataset (a bare device dataset) for a device.
+ * `structures` limits it to some device kinds: the builder reuses only
+ * a UNS device dataset, as it makes no other kind. By default either
+ * kind is found.
+ */
+export function device_dataset_for (device_uuid, byUuid, structures = null) {
     const found = Object.values(byUuid)
         .filter(r => is_device_structure(r.structure) && r.config?.source === device_uuid)
+        .filter(r => !structures || structures.includes(r.structure))
         // Prefer a named one, then the oldest-looking (stable) choice.
         .sort((a, b) => (b.name ? 1 : 0) - (a.name ? 1 : 0) || a.uuid.localeCompare(b.uuid))
     return found[0]?.uuid ?? null

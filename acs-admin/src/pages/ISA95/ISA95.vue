@@ -51,6 +51,14 @@
             </Button>
           </div>
         </div>
+        <!-- Who can read the devices under this node through i3X -->
+        <div class="flex flex-col items-start gap-2 p-4 border-b">
+          <I3xAccessButton :target="selectedNode.uuid" :via="selectedVia" :noun="selectedNode.level.toLowerCase()"
+                           :name="selectedNode.name" :path="[...selectedVia, selectedNode].map(n => n.name).join(' / ')"/>
+          <div class="text-xs text-gray-500">
+            A grant here covers every device under {{ selectedNode.name }}, and any added later.
+          </div>
+        </div>
         <div class="space-y-4 p-4">
           <SidebarDetail
             icon="key"
@@ -83,8 +91,6 @@
             :value="childNames"
           />
         </div>
-        <!-- Who can read the devices under this node through i3X -->
-        <ReadAccessPanel :target="selectedNode.uuid" :via="selectedVia" :noun="selectedNode.level.toLowerCase()"/>
       </div>
     </template>
   </BridgesContainer>
@@ -104,12 +110,12 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useDialog } from '@/composables/useDialog';
 import { useServiceClientStore } from "@store/serviceClientStore";
 import { toast } from "vue-sonner";
-import ReadAccessPanel from "@components/Access/ReadAccessPanel.vue";
+import I3xAccessButton from "@components/Access/I3xAccessButton.vue";
 import { isa95_path } from "@/lib/access/i3x-access.js";
 
 export default {
   name: 'ISA95',
-  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState, ReadAccessPanel },
+  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState, I3xAccessButton },
 
   setup() {
     return {

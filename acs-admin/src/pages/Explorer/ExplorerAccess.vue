@@ -10,7 +10,7 @@ import { computed, onMounted } from 'vue'
 import { useExplorerStore } from '@store/useExplorerStore.js'
 import { useISA95Store, ISA95_LEVELS } from '@store/useISA95Store.js'
 import { resolve_isa95 } from '@/lib/access/i3x-access.js'
-import ReadAccessPanel from '@components/Access/ReadAccessPanel.vue'
+import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 
 const ISA95_LEVEL_TYPE = 'isa95-level'
 
@@ -44,14 +44,18 @@ const deviceVia = computed(() => isDevice.value
 </script>
 
 <template>
-  <template v-if="isDevice">
-    <ReadAccessPanel :target="selected.elementId" device :via="deviceVia" noun="device"/>
-  </template>
+  <div v-if="isDevice" class="p-4 border-t">
+    <I3xAccessButton :target="selected.elementId" device :via="deviceVia" noun="device"
+                     :name="selected.displayName" :path="chainTo(selected.parentId).join(' / ')"/>
+  </div>
   <template v-else-if="isLevel && isa95.ready">
-    <ReadAccessPanel v-if="levelMatched"
-                     :target="levelNodes.at(-1).uuid"
-                     :via="levelNodes.slice(0, -1)"
-                     :noun="(ISA95_LEVELS[levelNodes.length - 1] ?? 'level').toLowerCase()"/>
+    <div v-if="levelMatched" class="p-4 border-t">
+      <I3xAccessButton :target="levelNodes.at(-1).uuid"
+                       :via="levelNodes.slice(0, -1)"
+                       :noun="(ISA95_LEVELS[levelNodes.length - 1] ?? 'level').toLowerCase()"
+                       :name="levelNodes.at(-1).name"
+                       :path="levelChain.join(' / ')"/>
+    </div>
     <div v-else class="p-4 text-sm text-gray-500 border-t">
       This level's name does not match the ISA-95 vocabulary, so i3X access cannot be granted on it.
       Add the name, or an alias, on the ISA-95 page.

@@ -77,7 +77,7 @@ describe('GET /delete/:uuid', () => {
 
 
     test('Successful deletion', async () => {
-        const dataset_uuid = await admin_fplus.DataAccess.create_dataset(Constants.App.SparkplugSrc, Temp_Data.Valid_Body.SRC.config);
+        const dataset_uuid = await admin_fplus.DataAccess.create_dataset(Constants.App.UNSDevice, Temp_Data.Valid_Body.SRC.config);
 
         await sleep(4000);
 

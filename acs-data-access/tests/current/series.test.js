@@ -427,7 +427,7 @@ function fake_query_api(rows = {}) {
     };
 }
 
-/* grants: principal -> targets for UseSparkplug. A principal named in
+/* grants: principal -> targets for UseDevice. A principal named in
  * `refused` gets that status from Auth; `acl` replaces fetch_acl. `cdb`
  * answers ConfigDB reads, such as a sub-device's origin map. */
 function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
@@ -440,7 +440,7 @@ function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
         if (refused[principal] != null)
             throw Object.assign(new Error("Failed to read ACL"), { status: refused[principal] });
         const targets = grants[principal] ?? [];
-        return (perm, target, wild) => perm == Constants.Perm.UseSparkplug
+        return (perm, target, wild) => perm == Constants.Perm.UseDevice
             && (targets.includes(target) || (wild && targets.includes(UUIDs.Special.Null)));
     });
 
@@ -643,7 +643,7 @@ describe("series route principals", () => {
         const asked = [];
         const { api } = make_api({ rows: { count: count_rows },
             acl: async p => { asked.push(p);
-                return (perm, target) => perm == Constants.Perm.UseSparkplug && target == D1; } });
+                return (perm, target) => perm == Constants.Perm.UseDevice && target == D1; } });
         const res = await call(api, PU, req);
         expect(res.statusCode).toBe(200);
         expect(asked).toEqual([PU]);

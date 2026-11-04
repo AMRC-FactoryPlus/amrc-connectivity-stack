@@ -83,6 +83,40 @@ function make_req(uuid) {
 }
 
 describe("delete_dataset referential integrity", () => {
+  test.each([
+    ["UNS device", Constants.App.UNSDevice, { source: DEVICE }],
+    ["UNS device metrics", Constants.App.UNSDeviceMetrics,
+      { source: DEVICE, metrics: [{ instance: DEVICE, metric: "Speed" }] }],
+  ])("deletes a %s dataset with no referrers", async (_, structure, config) => {
+    const { api, calls } = make_api({ [SRC_A]: { structure, config } });
+
+    const res = make_res();
+    await api.delete_dataset(make_req(SRC_A), res);
+
+    expect(res.code).toBe(200);
+    expect(calls.deleted).toEqual([SRC_A]);
+  });
+
+  test("refuses to delete a UNS device dataset listed by a union", async () => {
+    const { api, calls } = make_api({
+      [SRC_A]: { structure: Constants.App.UNSDevice, config: { source: DEVICE } },
+      [SRC_B]: { structure: Constants.App.UNSDeviceMetrics,
+        config: { source: SRC_A, metrics: [{ instance: SRC_A, metric: "Speed" }] } },
+      [UNION]: { structure: Constants.App.UnionComponents, config: [SRC_A] },
+    });
+
+    const res = make_res();
+    await api.delete_dataset(make_req(SRC_A), res);
+
+    /* Only the union refers to it: a UNS device metrics source names a
+     * device, never a dataset, even when the UUIDs match. */
+    expect(res.code).toBe(409);
+    expect(res.body.referrers).toEqual([
+      { dataset: UNION, structure: Constants.App.UnionComponents },
+    ]);
+    expect(calls.deleted).toEqual([]);
+  });
+
   test("deletes a dataset with no referrers", async () => {
     const { api, calls } = make_api({
       [SRC_A]: {

@@ -13,10 +13,12 @@ import { DataAccess as Constants } from "./constants.js";
 import {
   valid_uuid, valid_datetime, parse_download_filter, parse_download_window,
 } from "./validate.js";
-import { fail, maxDate, minDate } from './utils.js';
+import { fail, maxDate, minDate, Refusal, refuse } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
 import { SparkplugSubsetHandler } from "./sparkplug-subset-handler.js";
+import { UNSDeviceHandler } from "./uns-device-handler.js";
+import { UNSDeviceMetricsHandler } from "./uns-device-metrics-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
 import { walk_origin_map } from "./origin-map.js";
@@ -76,6 +78,9 @@ export class APIv1 {
     this.log = opts.debug.bound("apiv1");
     this.influxReader = opts.influxReader;
     this.seriesReader = opts.seriesReader;
+    /* The InfluxDB bucket of each store, { sparkplug, uns }. A site
+     * without the UNS historian has no `uns` bucket. */
+    this.buckets = opts.buckets ?? {};
     this.routes = this.setup_routes();
     this.handlers = {
       [Constants.App.SparkplugSrc]:
@@ -83,6 +88,12 @@ export class APIv1 {
 
       [Constants.App.SparkplugSubset]:
         new SparkplugSubsetHandler(this),
+
+      [Constants.App.UNSDevice]:
+        new UNSDeviceHandler(this),
+
+      [Constants.App.UNSDeviceMetrics]:
+        new UNSDeviceMetricsHandler(this),
 
       [Constants.App.SessionLimits]:
         new SessionLimitsHandler(this),
@@ -160,6 +171,70 @@ export class APIv1 {
       fail(this.log, 422, `Unknown structure ${structure}`);
 
     return handler;
+  }
+
+  /** Sends a Refusal as its JSON body. Anything else is rethrown, for
+   * WebAPI to answer as before. */
+  send_refusal(err, res) {
+    if (!(err instanceof Refusal)) throw err;
+    return res.status(err.status).json(err.body);
+  }
+
+  /** Whether this site has a UNS bucket for the new device kinds. */
+  uns_available() {
+    return !!this.buckets[Constants.Store.UNS];
+  }
+
+  /** Refuses with 503 when a source reads the UNS on a site without a
+   * UNS bucket. */
+  check_stores(sources) {
+    if (!this.uns_available() && sources.some(s => s.store == Constants.Store.UNS))
+      refuse(this.log, 503, "uns_unavailable",
+        "This dataset reads the UNS, and this site has no UNS bucket configured.");
+  }
+
+  /** Refuses a structure that can no longer be created. Existing
+   * datasets of it still work. */
+  check_creatable(structure) {
+    const handler = this._getHandler(structure);
+    if (handler.replaced_by)
+      refuse(this.log, 422, "structure_retired",
+        `New datasets of structure ${structure} can no longer be created. `
+        + `Use UNS device or UNS device metrics, which read the UNS.`,
+        { use: handler.replaced_by });
+  }
+
+  /** Whether a device has an ISA-95 placement.
+   *
+   * This is the one place Data Access depends on the ISA-95 placement
+   * work: it reads the device's entry in the ISA-95 Placement app,
+   * `{ node }`. A placed device is on the UNS. */
+  async has_placement(device) {
+    const placement = await this.cdb.get_config(
+      Constants.External.ISA95Placement, device);
+    return typeof placement?.node == "string" && placement.node != "";
+  }
+
+  /** Checks the source of a new or changed UNS device dataset.
+   * Call this after the source permission check: a caller without
+   * permission must learn nothing about the source. A root or wildcard
+   * grant passes the permission check for any UUID, so the source is
+   * checked to be a Device here. */
+  async check_uns_source(device) {
+    if (!this.uns_available())
+      refuse(this.log, 503, "uns_unavailable",
+        "This site has no UNS bucket configured, so it cannot make datasets that read the UNS.");
+
+    if (!await this.cdb.class_has_member(UUIDs.Class.Device, device))
+      refuse(this.log, 422, "device_required",
+        `${device} is not a device. A UNS device dataset needs a device.`,
+        { device });
+
+    if (!await this.has_placement(device))
+      refuse(this.log, 422, "placement_required",
+        `Device ${device} has no ISA-95 placement, so it is not on the UNS. `
+        + `Place it in the ISA-95 hierarchy first.`,
+        { device });
   }
 
 
@@ -591,7 +666,7 @@ export class APIv1 {
     const {structure, config} = dataset;
     
     if(!structure) return fail(this.log, 404, `Structure not found for dataset ${dataset_uuid}`);
-    if(!valid_uuid(structure)) return (this.log, 404, `Structure uuid is invalid ${structure}`);
+    if(!valid_uuid(structure)) return fail(this.log, 404, `Structure uuid is invalid ${structure}`);
     if(structure === Constants.Special.InvalidDataset) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
     if(!config) return fail(this.log, 404, `Config not found for ${dataset_uuid}`);
     
@@ -840,7 +915,7 @@ export class APIv1 {
       timer = setTimeout(() => resolve(false), 5000);
     });
     const check = this.auth.check_acl(
-      principal, Constants.Perm.UseSparkplug, UUIDs.Special.Null, true)
+      principal, Constants.Perm.UseDevice, UUIDs.Special.Null, true)
       .catch(err => {
         this.log("Can't read the ACL for %s: %s", principal, err.message);
         return false;
@@ -935,7 +1010,7 @@ export class APIv1 {
     const windows = new Map();
     const denied = [];
     for (const device of parsed.devices) {
-      if (acl(Constants.Perm.UseSparkplug, device, true))
+      if (acl(Constants.Perm.UseDevice, device, true))
         windows.set(device, [[parsed.from, parsed.to]]);
       else
         denied.push(device);
@@ -979,8 +1054,9 @@ export class APIv1 {
     return res.status(200).json(uuids);
   }
 
-  /** GET. Lists the metrics of a Sparkplug device that a Sub-device
-   * dataset can select. Requires USE_SPARKPLUG on the device.
+  /** GET. Lists the metrics of a device that a device metrics dataset
+   * (UNS device metrics or Sub-device) can select. Requires UseDevice
+   * ("Build datasets from device") on the device.
    * Only metrics recorded to the historian are listed, as nothing else
    * can be read back. A device with no origin map has an empty list.
    * @returns array of objects:
@@ -997,11 +1073,11 @@ export class APIv1 {
 
     const ok = await this.auth.check_acl(
       req.auth,
-      Constants.Perm.UseSparkplug,
+      Constants.Perm.UseDevice,
       device,
       true,
     );
-    if (!ok) return fail(this.log, 403, `You don't have permission to use Sparkplug data from ${device}.`);
+    if (!ok) return fail(this.log, 403, `You don't have permission to build datasets from ${device}.`);
 
     const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
     const { metrics } = walk_origin_map(info?.originMap, device);
@@ -1049,10 +1125,12 @@ export class APIv1 {
   /** Checks a proposed config without writing anything.
    *
    * Runs the structure's own validation and the source permission
-   * checks, then converts the config to the form that is stored. Throws
-   * a 422 or 403 APIError if the config is not acceptable. Call this
-   * before removing or changing any existing state, so that a rejected
-   * request leaves the dataset exactly as it was.
+   * checks, then the structure's own source checks (a UNS device must
+   * be a placed device), then converts the config to the form that is
+   * stored. Throws a 422 or 403 APIError, or a Refusal, if the config
+   * is not acceptable. Call this before removing or changing any
+   * existing state, so that a rejected request leaves the dataset
+   * exactly as it was.
    *
    * @returns {{handler, config}} The handler for the structure, and the
    *   config to store.
@@ -1063,6 +1141,10 @@ export class APIv1 {
 
     const ok = await handler.check_sources_permissions(principal, config);
     if(!ok) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
+
+    /* After the permission check, like normalising below, so a caller
+     * without permission learns nothing about the source. */
+    await handler.check_source(config);
 
     /* After the permission check: normalising can report what a source
      * contains, which only a principal allowed to use it may learn. */
@@ -1136,13 +1218,29 @@ export class APIv1 {
    * @param {*} req.body must be object (structure, config) without uuid.
    * @param {*} res 
    * @returns new dataset's UUID - JSON string 
+   *
+   * Refusals the client can act on are JSON `{ error, message }`:
+   * 422 `structure_retired` for Sparkplug source and Sub-device (with
+   * `use`, the structures to use instead), 422 `device_required` and
+   * `placement_required` for a UNS device that is not a placed device,
+   * and 503 `uns_unavailable` on a site with no UNS bucket.
    */
 
   async structure_create(req, res){
+    try {
+      return await this._structure_create(req, res);
+    }
+    catch (err) {
+      return this.send_refusal(err, res);
+    }
+  }
+
+  async _structure_create(req, res){
     const {structure, config} = req.body;
 
     if(!structure) return fail(this.log, 422, `Structure not provided in request body.`);
     if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid ${structure} is invalid.`);
+    this.check_creatable(structure);
 
     if(!config) return fail(this.log, 422, `Config not provided in request body.`);
     this._getHandler(structure).validate_config(config);
@@ -1186,6 +1284,15 @@ export class APIv1 {
   */
 
   async structure_update(req, res){
+    try {
+      return await this._structure_update(req, res);
+    }
+    catch (err) {
+      return this.send_refusal(err, res);
+    }
+  }
+
+  async _structure_update(req, res){
     const dataset_uuid = req.params.uuid;
     if(!dataset_uuid) return fail(this.log, 422, `Dataset uuid not provided`);
     if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
@@ -1217,6 +1324,12 @@ export class APIv1 {
 
     if(is_valid && current_structure != structure)
       return fail(this.log, 409, `Changing structure type is not allowed (current: ${current_structure}, new: ${structure})`); 
+
+    /* Rewriting an invalid dataset makes it anew, so it must use a
+     * structure that can still be created. A valid dataset keeps its
+     * structure, and may still be edited. */
+    if(!is_valid)
+      this.check_creatable(structure);
 
     /* Check the new config completely before removing anything. Every
      * rejection (422, 403) must happen here, so a rejected update leaves

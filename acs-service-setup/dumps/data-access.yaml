@@ -1,4 +1,7 @@
-#-REQUIRE: auth
+#-REQUIRE: auth i3x
+# i3x: the "Device data" composite below names i3X's ReadObject, and a
+# dump load resets the memberships of every object it names, so this
+# dump must load after i3x.yaml.
 service: !u UUIDs.Service.ConfigDB
 version: 2
 objects:
@@ -92,6 +95,17 @@ objects:
       name: "Sub-device"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    # The device kinds that read the UNS bucket, so a dataset holds
+    # what i3X serves. New device datasets use these; Data Access no
+    # longer creates the two above.
+    !u DataAccess.App.UNSDevice:
+      name: "UNS device"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    !u DataAccess.App.UNSDeviceMetrics:
+      name: "UNS device metrics"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
     !u DataAccess.App.UnionComponents:
       name: "Union components"
       subclassOf:
@@ -164,8 +178,22 @@ objects:
       name: "Edit dataset"
     !u DataAccess.Perm.DeleteDataset:
       name: "Delete dataset"
-    !u DataAccess.Perm.UseSparkplug:
-      name: "Use Sparkplug data"
+    # Data Access only: build datasets from a device. This was "Use
+    # Sparkplug data"; it never gave MQTT access.
+    !u DataAccess.Perm.UseDevice:
+      name: "Build datasets from device"
+
+  # Browse a device in i3X and build datasets from it. Each service
+  # sees its own half. It must stay a subclass of Permission: Auth only
+  # expands composites that are.
+  !u Auth.Class.CompositePerm:
+    !u ACS.Perm.Composite.DeviceData:
+      name: "Device data"
+      subclassOf:
+        - !u UUIDs.Class.Permission
+      enum:
+        - !u I3X.Perm.ReadObject
+        - !u DataAccess.Perm.UseDevice
 
       
 ---
@@ -184,6 +212,8 @@ grants:
       # Device originMap, to resolve sub-device metric references to
       # their current Sparkplug paths.
       !u UUIDs.App.DeviceInformation: false
+      # A new UNS device dataset needs a device with a placement.
+      !u DataAccess.External.ISA95Placement: false
     # Metadata writes go through Data Access, which checks EditDataset
     # on the dataset first: tags, labels and run details, and the name
     # of a dataset (never of another object).
@@ -198,6 +228,8 @@ grants:
       !u DataAccess.App.DatasetMetadata: false
       !u DataAccess.Class.Dataset: "both"
       !u DataAccess.Group.FunctionalDatasetGroup: "both"
+      # A new UNS device dataset must name a device.
+      !u UUIDs.Class.Device: false
     # Setting a dataset's kind moves it between the kind classes, the
     # members of Functional dataset group.
     !u ConfigDB.Perm.WriteMembers:
@@ -228,7 +260,12 @@ grants:
   !u DataAccess.Group.DatasetMaker:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
-    !u DataAccess.Perm.UseSparkplug:
+    !u DataAccess.Perm.UseDevice:
+      !u UUIDs.Class.Device: true
+    # The builder picks devices and shows live values through i3X.
+    # A direct grant, not the composite, so the role never loses it
+    # while the dumps load.
+    !u I3X.Perm.ReadObject:
       !u UUIDs.Class.Device: true
     !u DataAccess.Perm.ReadDataset:
       !u DataAccess.Class.Dataset: true
@@ -254,7 +291,9 @@ grants:
   !u DataAccess.Group.DatasetManager:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
-    !u DataAccess.Perm.UseSparkplug:
+    !u DataAccess.Perm.UseDevice:
+      !u UUIDs.Class.Device: true
+    !u I3X.Perm.ReadObject:
       !u UUIDs.Class.Device: true
     !u DataAccess.Perm.ReadDataset:
       !u DataAccess.Class.Dataset: true

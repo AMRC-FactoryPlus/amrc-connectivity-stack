@@ -24,7 +24,7 @@ import { UnionComponentsHandler } from "./unions-components-handler.js";
 import { walk_origin_map } from "./origin-map.js";
 import {
   SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
-  LIMITS as SeriesLimits,
+  check_coverage, LIMITS as SeriesLimits,
 } from "./series.js";
 import { SeriesAbort } from "./series-reader.js";
 
@@ -420,16 +420,20 @@ export class APIv1 {
               * uuid {UUID} - Dataset UUID
               * from {date} - Dataset starting bound (if any)
               * to {date} - Dataset finishing bound (if any)
-              * devices {array} - one entry per device, in the order the
-                dataset first reaches them:
+              * devices {array} - one entry per device and store, in the
+                order the dataset first reaches them:
                   * uuid {UUID} - Device UUID
                   * name {string|null} - Device name from General
                     Information, which is the Sparkplug device ID the
                     download's `device` column shows
+                  * store {string} - where the download reads the device:
+                    `sparkplug` (the default bucket) or `uns`. A device
+                    reached through both has an entry for each.
                   * metrics {array} - the metrics the download reads, in
                     the shape GET /sparkplug-sources/:uuid/metrics returns.
-                    A Sparkplug source gives every metric recorded to the
-                    historian; a Sub-device gives only its selected metrics.
+                    A whole-device source gives every metric recorded to
+                    the historian; a metrics source gives only its
+                    selected metrics.
    * Returns 404 if dataset is invalid.
    */
   async metadata_contents(req, res) {
@@ -465,36 +469,42 @@ export class APIv1 {
     });
   }
 
-  /** Merges resolved sources into one entry per device.
+  /** Merges resolved sources into one entry per device and store.
    *
-   * A device can be reached through several components. A Sparkplug
-   * source (no `metrics`) covers the whole device, so it gives every
-   * metric recorded to the historian. Otherwise the device gives the
-   * union of the metrics its Sub-device sources select.
+   * A device can be reached through several components. A whole-device
+   * source (no `metrics`) gives every metric recorded to the
+   * historian. Otherwise the device gives the union of the metrics its
+   * metrics sources select. Metric paths are relative to the device in
+   * both stores, so one store's list reads like the other's.
    *
    * @param sources Resolved sources, as resolve_dataset returns them.
    * @param infos The General Information entries, by object UUID.
-   * @returns {Promise<Array<{uuid, name, metrics}>>}
+   * @returns {Promise<Array<{uuid, name, store, metrics}>>}
    */
   async source_devices(sources, infos) {
     const by_device = new Map();
     for (const s of sources) {
-      const entry = by_device.get(s.device_uuid) ?? { whole: false, paths: new Set() };
+      const store = s.store ?? Constants.Store.Sparkplug;
+      const key = `${s.device_uuid} ${store}`;
+      const entry = by_device.get(key)
+        ?? { device: s.device_uuid, store, whole: false, paths: new Set() };
       if (!s.metrics)
         entry.whole = true;
       else
         for (const m of s.metrics)
           entry.paths.add(m.path ? `${m.path}/${m.name}` : m.name);
-      by_device.set(s.device_uuid, entry);
+      by_device.set(key, entry);
     }
 
-    return Promise.all([...by_device].map(async ([device, entry]) => {
+    return Promise.all([...by_device.values()].map(async entry => {
+      const { device } = entry;
       const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
       const { metrics } = walk_origin_map(info?.originMap, device);
 
       return {
         uuid: device,
         name: infos?.get(device)?.name ?? null,
+        store: entry.store,
         metrics: entry.whole
           ? metrics
           : metrics.filter(m => entry.paths.has(m.path)),
@@ -741,6 +751,7 @@ export class APIv1 {
     try {
         // Resolve dataset tree
         const resolved_sources = await this.resolve_dataset(dataset_uuid);
+        this.check_stores(resolved_sources);
 
         /* A download with no end in time would read the whole history
          * of every device in the dataset: for a machine dataset that is
@@ -767,6 +778,7 @@ export class APIv1 {
         csvStream.pipe(res);
 
        }catch (err) {
+        if (err instanceof Refusal) return this.send_refusal(err, res);
         this.log(err);
         return fail(this.log, 500);
     }
@@ -778,9 +790,12 @@ export class APIv1 {
    * See docs/services/data-access.md for the request and response.
    *
    * A dataset request needs ReadDataset on the dataset. A device request
-   * needs UseSparkplug on each device: devices without it are listed in
+   * needs UseDevice on each device: devices without it are listed in
    * `denied` and left out, and the request fails with 403 only when
    * every device is denied.
+   *
+   * Each source reads its own store. A dataset reaching devices in both
+   * stores runs once per store, and the results merge by device.
    */
   async series(req, res) {
     /* One time limit covers the whole request: the permission lookups
@@ -793,19 +808,31 @@ export class APIv1 {
 
     try {
       const as_of = Date.now();
-      /* Read the coverage state once, so validation and the queries
-       * agree on it. */
-      const coverage = this.seriesReader.coverage_state();
-      const parsed = parse_request(req.body, as_of, { coverage: coverage != null });
+      /* Read the coverage states once, so validation and the queries
+       * agree on them. A dataset's stores are known only once it
+       * resolves, so its check waits until then. */
+      const coverage = this.seriesReader.coverage_states();
+      const ready = store => coverage[store] != null;
+      const parsed = parse_request(req.body, as_of,
+        { coverage: store => store == null || ready(store) });
 
       const scope = await abortable(parsed.dataset
         ? this.series_dataset_scope(req.auth, parsed, as_of)
         : this.series_device_scope(req.auth, parsed), ctl.signal);
 
-      /* Each distinct window set is its own set of queries. */
-      const groups = Math.max(
-        group_by_windows(scope.windows).length,
-        group_by_windows(scope.last_windows).length);
+      const stores = [...scope.by_store.keys()];
+      if (stores.some(s => !this.seriesReader.has_store(s)))
+        throw new SeriesError(503, "uns_unavailable",
+          "This request reads the UNS, and this site has no UNS bucket configured.");
+      check_coverage(parsed, ready, stores);
+
+      /* Each distinct window set of each store is its own set of
+       * queries. */
+      let groups = 0;
+      for (const { windows, last_windows } of scope.by_store.values())
+        groups += Math.max(
+          group_by_windows(windows).length,
+          group_by_windows(last_windows).length);
       if (groups > SeriesLimits.groups)
         throw new SeriesError(422, "invalid_request",
           `The dataset's devices have more than ${SeriesLimits.groups} distinct window sets.`,
@@ -817,8 +844,8 @@ export class APIv1 {
         mean: parsed.mean.filter(m => scope.windows.has(m.device)),
       };
 
-      const result = await this.seriesReader.run(
-        run, scope.windows, as_of, ctl.signal, coverage, scope.last_windows);
+      const result = await this.seriesReader.run_stores(
+        run, scope.by_store, as_of, ctl.signal, coverage);
 
       const iso = t => new Date(t).toISOString();
       const devices = {};
@@ -934,7 +961,10 @@ export class APIv1 {
    * `windows` are clipped to the request, for counts and means.
    * `last_windows` are not: they end at their source's end, or at
    * `as_of` for an open source, so `last` shows the newest data the
-   * dataset grants even when the request ends earlier. */
+   * dataset grants even when the request ends earlier.
+   *
+   * `by_store` holds the same two maps for each store the sources
+   * read, for the queries; `windows` merges the stores. */
   async series_dataset_scope(principal, parsed, as_of) {
     const ok = await this.auth.check_acl(
       principal,
@@ -964,9 +994,19 @@ export class APIv1 {
 
     const windows = new Map();
     const last_windows = new Map();
+    const by_store = new Map();
     for (const [device, list] of by_device) {
       windows.set(device, merge_windows(list, parsed.from, parsed.to));
       last_windows.set(device, merge_windows(list, -Infinity, as_of));
+
+      for (const store of new Set(list.map(s => s.store ?? Constants.Store.Sparkplug))) {
+        if (!by_store.has(store))
+          by_store.set(store, { windows: new Map(), last_windows: new Map() });
+        const in_store = list.filter(s => (s.store ?? Constants.Store.Sparkplug) == store);
+        const scope = by_store.get(store);
+        scope.windows.set(device, merge_windows(in_store, parsed.from, parsed.to));
+        scope.last_windows.set(device, merge_windows(in_store, -Infinity, as_of));
+      }
     }
 
     /* A sub-device source grants only its own metrics. Means are read
@@ -984,7 +1024,7 @@ export class APIv1 {
       throw new SeriesError(422, "invalid_request",
         `"mean" metric ${outside.metric} of device ${outside.device} is not in the dataset.`);
 
-    return { windows, last_windows, denied: [] };
+    return { windows, last_windows, by_store, denied: [] };
   }
 
   /** Permission and windows for a device request. One ACL fetch gives
@@ -1017,9 +1057,10 @@ export class APIv1 {
     }
 
     if (!windows.size)
-      return fail(this.log, 403, `No UseSparkplug permission on any requested device`);
+      return fail(this.log, 403, `No UseDevice permission on any requested device`);
 
-    return { windows, last_windows: windows, denied };
+    const by_store = new Map([[parsed.store, { windows, last_windows: windows }]]);
+    return { windows, last_windows: windows, by_store, denied };
   }
 
   /** GET. 

@@ -70,6 +70,29 @@ export function metric_path(path, measurement) {
     return `${path}/${name}`;
 }
 
+/** The `device` and `path` columns of a CSV row.
+ *
+ * A row from the `default` bucket has a `device` tag (the Sparkplug
+ * device ID) and a `path` tag relative to the device. A row from the
+ * `uns` bucket has no `device` tag; its `path` is the Sparkplug device
+ * ID, then the folder. Both give the same columns.
+ *
+ * @param {object} row The Influx row, with `device`, `path` and
+ *   `_measurement`.
+ * @param {string} [store] The source's store, `sparkplug` or `uns`.
+ * @returns {{device: string, path: string}}
+ */
+export function csv_device_path(row, store) {
+    if (store != "uns")
+        return { device: row.device, path: metric_path(row.path, row._measurement) };
+
+    const p = row.path ?? "";
+    const at = p.indexOf("/");
+    const device = at < 0 ? p : p.slice(0, at);
+    const folder = at < 0 ? null : p.slice(at + 1);
+    return { device, path: metric_path(folder, row._measurement) };
+}
+
 
 // const toTime = d => d ? new Date(d).getTime() : null;
 

@@ -1,0 +1,36 @@
+# ISA-95 placement watcher (acs-placement-watcher)
+# Renders each device's ISA-95 placement into its node's Edge Agent
+# config. Needs: ConfigDB read of the placements, the vocabulary, Info
+# (node names) and DeviceInformation (which node a device is on), and
+# ConfigDB write of Edge Agent configs. Nothing else.
+#
+# This principal has its own dump: a dump load replaces every grant of
+# each principal it names.
+#
+#-REQUIRE: auth isa95
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u Auth.Class.ServiceRole:
+    !u ISA95.Requirement.PlacementWatcher:
+      name: "ISA-95 placement watcher"
+      subclassOf:
+        - !u Auth.Class.CentralService
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u ISA95.Requirement.PlacementWatcher:
+    !u ConfigDB.Perm.ReadConfig:
+      !u UUIDs.App.ISA95Placement: false
+      !u UUIDs.App.ISA95Vocabulary: false
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.DeviceInformation: false
+      !u UUIDs.App.EdgeAgentConfig: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u UUIDs.App.EdgeAgentConfig: false
+    # The level classes (members of ISA95Level) and the vocabulary
+    # nodes (members of each level class).
+    !u ConfigDB.Perm.ReadMembers:
+      !u UUIDs.Class.ISA95Level: "both"

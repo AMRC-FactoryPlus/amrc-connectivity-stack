@@ -1,0 +1,61 @@
+{{- if .Values.placementWatcher.enabled }}
+# Renders each device's ISA-95 placement into its node's Edge Agent
+# config. See acs-placement-watcher.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: placement-watcher
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: placement-watcher
+spec:
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      component: placement-watcher
+  template:
+    metadata:
+      labels:
+        component: placement-watcher
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: keytabs
+          secret:
+            secretName: placement-watcher-keytabs
+
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
+      containers:
+        - name: placement-watcher
+{{ include "amrc-connectivity-stack.image" (list . .Values.placementWatcher) | indent 10 }}
+          command: [ "/usr/bin/k5start", "-Uf", "/keytabs/client" ]
+          args: ["node", "bin/watcher.js"]
+          env:
+            - name: VERBOSE
+              value: {{ .Values.placementWatcher.verbosity | quote | required "values.placementWatcher.verbosity is required!" }}
+            - name: DEBOUNCE_MS
+              value: {{ .Values.placementWatcher.debounceMs | default 500 | quote }}
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+          {{- with .Values.placementWatcher.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: keytabs
+{{- end }}

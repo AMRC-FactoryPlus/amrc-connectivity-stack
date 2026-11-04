@@ -571,6 +571,14 @@ export const EdgeFTP = {
     },
 };
 
+/* ISA-95 placement watcher (acs-placement-watcher). The ServiceRole
+ * UUID is also in deploy/templates/auth/principals/service-clients.yaml. */
+export const ISA95 = {
+    Requirement: {
+        PlacementWatcher:   "a09d9417-f24d-48ce-8359-a15388135131",
+    },
+};
+
 export const UNS = {
     Group: {
         Sparkplug:  "e414d355-b991-429b-8f5d-97e823ff71f5",

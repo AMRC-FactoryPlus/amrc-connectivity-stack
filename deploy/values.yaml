@@ -231,6 +231,20 @@ monitor:
   # broker is down is not restarted. Set it to 0 to disable the check.
   mqttWatchdogTimeout: 300
 
+placementWatcher:
+  # -- Whether or not to run the ISA-95 placement watcher. It renders
+  # each device's ISA-95 placement into its node's Edge Agent config,
+  # which is how devices reach the UNS. Leave it on.
+  enabled: true
+  image:
+    repository: acs-placement-watcher
+  verbosity: "ALL,!service,!token"
+  # -- How long to wait for a burst of placement or vocabulary changes
+  # to finish before rendering them, in milliseconds.
+  debounceMs: 500
+  # -- Resource requests and limits for the watcher container.
+  resources: {}
+
 dataAccess:
   enabled: true
   image:

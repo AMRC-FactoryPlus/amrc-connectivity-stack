@@ -2,12 +2,50 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import { UUIDs } from '@amrc-factoryplus/service-client'
+import {
+  UUIDs, is_isa95_tag, isa95_vocabulary, merge_isa95_tags, render_isa95,
+} from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@/store/useDeviceStore'
 import { useConnectionStore } from '@/store/useConnectionStore'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useDriverStore } from '@/store/useDriverStore.js'
+import { useISA95Store } from '@/store/useISA95Store.js'
 import { storeReady } from '@/store/useStoreReady.js'
+
+/**
+ * Puts a device's ISA-95 placement into its tags.
+ *
+ * Every ISA95_Hierarchy tag from the origin map (root, nested or hand
+ * set) is replaced by the rendered placement, so the device births its
+ * hierarchy at Device_Information/ISA95_Hierarchy. The placement
+ * watcher uses the same merge. A device with no placement gets no
+ * hierarchy. A placement that does not render (a broken vocabulary
+ * chain) leaves the hierarchy tags the entry already had, as the
+ * watcher does.
+ *
+ * @param {Array} tags - The tags built for the device
+ * @param {Object} device - The device store entry
+ * @param {Object} vocab - From isa95_vocabulary
+ * @param {Array} existing - The tags of the device's current entry, if any
+ * @returns {Array} - The tags to save
+ */
+export function applyPlacement (tags, device, vocab, existing) {
+  const placement = device.placement
+  if (!placement?.node) return merge_isa95_tags(tags, null)
+
+  const rendered = render_isa95(placement, vocab, device.uuid)
+  if (rendered.error) {
+    console.warn('Cannot render the ISA-95 placement of %s: %s', device.uuid, rendered.error)
+    return [
+      ...merge_isa95_tags(tags, null),
+      ...(existing ?? []).filter(is_isa95_tag),
+    ]
+  }
+  return merge_isa95_tags(tags, rendered)
+}
+
+/* How many times to rebuild when someone else saved the config first. */
+const SAVE_ATTEMPTS = 3
 
 /**
  * Creates an array of tags from the origin map for the edge agent config
@@ -242,7 +280,22 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
  * @param {string} options.connectionId - UUID of the connection (required if deviceId not provided)
  * @returns {Promise<void>}
  */
-export async function updateEdgeAgentConfig({
+export async function updateEdgeAgentConfig(opts) {
+  /* The config is saved with If-Match on the ETag it was built from.
+   * If someone else (the placement watcher, another browser) saved it
+   * in between, build it again from fresh data. */
+  for (let attempt = 1; attempt <= SAVE_ATTEMPTS; attempt++) {
+    try {
+      return await buildEdgeAgentConfig(opts)
+    } catch (err) {
+      if (err?.status !== 412) throw err
+      console.debug('Edge Agent config changed while it was built; rebuilding')
+    }
+  }
+  console.error('Edge Agent config kept changing; not saved')
+}
+
+async function buildEdgeAgentConfig({
   deviceId = null,
   connectionId = null
 }) {
@@ -250,6 +303,7 @@ export async function updateEdgeAgentConfig({
   const deviceStore = useDeviceStore()
   const connectionStore = useConnectionStore()
   const driverStore = useDriverStore()
+  const isa95Store = useISA95Store()
   const serviceClientStore = useServiceClientStore()
   const serviceClient = serviceClientStore.client
 
@@ -266,6 +320,11 @@ export async function updateEdgeAgentConfig({
   await Promise.all(
     [deviceStore, connectionStore, driverStore]
       .map(s => s.synchronise()))
+
+  /* The vocabulary, to render placements. */
+  await isa95Store.start()
+  await storeReady(isa95Store)
+  const vocab = isa95_vocabulary(isa95Store.data)
 
   console.debug('All stores refreshed')
   try {
@@ -320,7 +379,9 @@ export async function updateEdgeAgentConfig({
     }
 
     // Get the current edge agent config
-    const [edgeAgentConfig, etag] = await serviceClient.ConfigDB.get_config_with_etag(UUIDs.App.EdgeAgentConfig, nodeUuid) || [{}, null]
+    /* Revalidate: the ETag must be the current one for If-Match. */
+    const [edgeAgentConfig, etag] = await serviceClient.ConfigDB.get_config_with_etag(
+      UUIDs.App.EdgeAgentConfig, nodeUuid, { cache: 'no-cache' }) || [{}, null]
 
     // Create a new config if none exists
     const config = edgeAgentConfig || {
@@ -452,6 +513,10 @@ export async function updateEdgeAgentConfig({
           }]
         }
 
+        /* The hierarchy comes from the placement, never the origin map. */
+        tags = applyPlacement(tags, device, vocab,
+          deviceIndex >= 0 ? connectionConfig.devices[deviceIndex].tags : null)
+
         // Create or update the device in the connection
         const deviceConfig = {
           deviceId: deviceIdValue,
@@ -489,12 +554,16 @@ export async function updateEdgeAgentConfig({
     // Log the final config before saving
     console.debug('Final edge agent config to be saved:', JSON.stringify(config, null, 2))
 
-    // Update the edge agent config in the ConfigDB
-    await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentConfig, nodeUuid, config)
+    // Update the edge agent config in the ConfigDB, only if nobody
+    // else has saved it since we read it.
+    await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentConfig, nodeUuid, config,
+      etag ? { etag } : undefined)
 
     // Update the Edge Agent Deployment configuration for external drivers
     await updateEdgeAgentDeployment(nodeUuid, config.deviceConnections)
   } catch (configErr) {
+    /* Stale ETag: the caller builds the config again. */
+    if (configErr?.status === 412) throw configErr
     console.error('Error updating edge agent config:', configErr)
   }
 }

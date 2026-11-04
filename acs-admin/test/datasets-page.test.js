@@ -117,7 +117,22 @@ describe('page logic', () => {
             source: 'dev-a', metrics: [{ instance: 'dev-a', metric: 'A' }, { instance: 'dev-a', metric: 'B' }] } }])
         const rows = tree_rows(structure_tree('sub', by), { deviceName: u => ({ 'dev-a': 'Meter A' })[u] ?? null })
         expect(rows[0].wording).toBe('2 metrics of device Meter A')
-        expect(structure_type(STRUCTURE.SUBSET)).toBe('Sub-device')
+        expect(structure_type(STRUCTURE.SUBSET)).toBe('Device metrics')
+    })
+
+    it('words the UNS device kinds as the older ones', () => {
+        const by = merge_datasets([], [
+            { uuid: 'u', structure: STRUCTURE.UNION, config: ['dev', 'sub'] },
+            { uuid: 'dev', structure: STRUCTURE.UNS_DEVICE, config: { source: 'dev-a' } },
+            { uuid: 'sub', structure: STRUCTURE.UNS_METRICS, config: { source: 'dev-a', metrics: [{ instance: 'dev-a', metric: 'A' }] } },
+        ])
+        const rows = tree_rows(structure_tree('u', by), { deviceName: u => ({ 'dev-a': 'Meter A' })[u] ?? null })
+        expect(rows[1].wording).toBe('device Meter A')
+        expect(rows[2].wording).toBe('1 metric of device Meter A')
+        // No label names a structure app or a bucket.
+        expect(structure_type(STRUCTURE.UNS_DEVICE)).toBe('Device')
+        expect(structure_type(STRUCTURE.DEVICE)).toBe('Device')
+        expect(structure_type(STRUCTURE.UNS_METRICS)).toBe('Device metrics')
     })
 
     it('marks cycles and unknown nodes', () => {

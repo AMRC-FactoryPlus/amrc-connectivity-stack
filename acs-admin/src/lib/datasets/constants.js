@@ -11,6 +11,10 @@ export const DA = {
         DatasetMetadata:    'e3b9fd2c-9de1-470b-9675-739e2a55b77f',
         SparkplugSrc:       'f5d550c4-2831-11f1-b0b0-83fda3035799',
         SparkplugSubset:    '7f7d40cc-4075-4f06-90cf-aa6261d68f18',
+        // The device kinds that read the UNS. New device datasets use
+        // these; the two above can no longer be created.
+        UnsDevice:          '0d4ac57f-76b5-45c9-9c2d-4b0812be08ff',
+        UnsDeviceMetrics:   'bd9550fb-ef75-4523-81d6-25dd32c22925',
         UnionComponents:    '1c4ca454-de38-44d9-92fb-aa5218bfa257',
         SessionLimits:      '8754c000-3778-4ae6-b2b8-bbcd959bb775',
         MESIdentifiers:     'af178f0c-3b1e-44f2-9724-5cf06e8fd056',
@@ -42,13 +46,29 @@ export const DA = {
 }
 
 export const STRUCTURE = {
+    // A whole device, read from the historian's default bucket. Existing
+    // ones still work; new ones cannot be created.
     DEVICE:  DA.App.SparkplugSrc,
     // Chosen metrics of one device. Made through the API only: these
     // pages show them but cannot chart, create or edit them yet.
     SUBSET:  DA.App.SparkplugSubset,
+    // A whole device, read from the UNS. The builder makes these.
+    UNS_DEVICE:  DA.App.UnsDevice,
+    // Chosen metrics of one device, read from the UNS. API only.
+    UNS_METRICS: DA.App.UnsDeviceMetrics,
     UNION:   DA.App.UnionComponents,
     SESSION: DA.App.SessionLimits,
     INVALID: DA.Special.InvalidDataset,
+}
+
+// A whole-device dataset, of either kind.
+export function is_device_structure (s) {
+    return s === STRUCTURE.DEVICE || s === STRUCTURE.UNS_DEVICE
+}
+
+// A dataset of chosen metrics of one device, of either kind.
+export function is_metrics_structure (s) {
+    return s === STRUCTURE.SUBSET || s === STRUCTURE.UNS_METRICS
 }
 
 // The kinds a person can give a dataset. A process is stored as an MES
@@ -68,10 +88,18 @@ export const KIND_BY_ID = Object.fromEntries(KINDS.map(k => [k.id, k]))
 
 export const OTHER_KIND = { id: 'other',  label: 'Dataset', plural: 'Other',   icon: 'database' }
 export const DEVICE_KIND = { id: 'device', label: 'Device',  plural: 'Devices', icon: 'microchip' }
+// Chosen metrics of one device. Made through the API only.
+export const DEVICE_METRICS_KIND = { id: 'device-metrics', label: 'Device metrics', plural: 'Device metrics', icon: 'filter' }
 
 export function kind_info (id) {
     if (id === 'device') return DEVICE_KIND
+    if (id === 'device-metrics') return DEVICE_METRICS_KIND
     return KIND_BY_ID[id] ?? OTHER_KIND
+}
+
+// A kind nobody chose: listed under Other.
+export function is_other_kind (id) {
+    return !KIND_BY_ID[id]
 }
 
 // Reference windows recorded from the kiosk.

@@ -32,6 +32,23 @@ export function strip_metric_suffix(value) {
     return String(value).replace(/:[iudbs]$/, "");
 }
 
+/** The full Sparkplug metric name of an Influx row.
+ *
+ * The historians split a metric `a/b/c` into the `path` tag `a/b` and
+ * the measurement `c:x`. A metric at the device root has an empty path,
+ * which Influx does not store, so the row has no `path` at all. The
+ * result is a full-path selector for the download's `metrics` filter.
+ *
+ * @param {string} [path] The row's `path` tag, if any.
+ * @param {string} measurement The row's `_measurement`, with its suffix.
+ * @returns {string} The metric name, e.g. `Axes/X/Actual`.
+ */
+export function metric_path(path, measurement) {
+    const name = strip_metric_suffix(measurement);
+    if (path == null || path === "") return name;
+    return `${path}/${name}`;
+}
+
 
 // const toTime = d => d ? new Date(d).getTime() : null;
 

@@ -543,6 +543,8 @@ export class APIv1 {
               * timestamp - ISO string
               * value - actual data value
               * unit - Engineering unit (if available)
+              * path - full Sparkplug metric name (`Folder/Sub/Name`, or
+                just the name at the device root); a valid metrics selector
     * Don't return valid response if dataset is invalid
    */
   async dataset_data(req, res) {

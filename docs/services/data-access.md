@@ -252,10 +252,14 @@ Column | Content
 `timestamp` | ISO 8601 timestamp
 `value` | The data value
 `unit` | The engineering unit, if the metric has one
+`path` | The full Sparkplug metric name, for example `Axes/X/Position/Actual`; for a metric at the top level of the device, its name
 
-The CSV has no metric path column. Two metrics with the same name under
-different folders appear with the same `metric` value. Use a full-path
-`metrics` selector (below) to export only one of them.
+Two metrics with the same name under different folders have the same
+`metric` value but different `path` values. You can send a `path`
+value back as a `metrics` selector (below) to export only that metric.
+A top-level metric's `path` has no `/`, so as a selector it also
+matches metrics with the same name in folders. The `path` column is
+last so that clients that read the columns by position keep working.
 
 The body can carry a time window, **`from`** and **`to`**, as ISO 8601
 date-times (for example `2026-11-03T09:00:00Z`). They narrow each
@@ -874,8 +878,7 @@ Compared to the original design notes for this service:
   parameters are not read.
 * **Dataset download filtering is limited to metrics.** The download
   can be restricted to a list of metric paths or names, but there is no
-  per-device, schema or datatype filtering and no subsampling. The CSV
-  has no metric path column.
+  per-device, schema or datatype filtering and no subsampling.
 * **`Sub-device` history across renames.** A reference is read using
   the metric's current path, so points recorded before an enclosing
   object was renamed are not returned.

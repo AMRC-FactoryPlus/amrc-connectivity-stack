@@ -82,7 +82,7 @@
 
         <div ref="pinnedEl">
           <PinnedCard :entries="pinned" :series="spark.series.value" :display="spark.display" :from="sparkRange.from" :to="sparkRange.to"
-                      :live="spark.live.value" :hint="spark.hint.value" :so-far="soFar" :error="spark.error.value"
+                      :live="sparkBadge === 'live'" :denied="sparkBadge === 'denied'" :hint="spark.hint.value" :so-far="soFar" :error="spark.error.value"
                       :range-id="sparkId" @range="id => sparkChoice = id" @tab="t => $emit('tab', t)"/>
         </div>
       </div>
@@ -122,7 +122,7 @@ import { Button } from '@/components/ui/button'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { fmt_time, fmt_window, fmt_duration, fmt_elapsed } from '@/lib/datasets/model.js'
 import { window_gaps, fmt_coverage, coverage_sub } from '@/lib/datasets/gaps.js'
-import { metric_total, group_items } from './page-logic.js'
+import { metric_total, group_items, live_badge } from './page-logic.js'
 import StatusPill from '../StatusPill.vue'
 import AddonsSummary from '../addons/AddonsSummary.vue'
 import RecordingsCard from './RecordingsCard.vue'
@@ -176,6 +176,8 @@ const spark = useChartSeries(() => props.record, pinned, {
   width: () => pinnedWidth.value ? Math.max(200, pinnedWidth.value - SPARK_CHROME_PX) : 400,
 })
 const sparkRange = computed(() => spark.range.value)
+// Live only once i3X streams a pinned metric; see live_badge.
+const sparkBadge = computed(() => live_badge(spark.live.value, spark.stream.value, spark.liveStatus.value))
 // The window is still filling in.
 const soFar = computed(() => spark.live.value && !data.window.value.windowless)
 

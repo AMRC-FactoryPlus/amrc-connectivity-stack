@@ -15,6 +15,7 @@
           <span class="size-1.5 rounded-full bg-green-500"></span>Live
           <span v-if="hint" class="text-slate-400">{{ hint }}</span>
         </span>
+        <span v-else-if="denied && entries.length" class="text-xs text-slate-500">{{ LIVE_DENIED }}</span>
         <!-- The span every sparkline shows. -->
         <div v-if="entries.length" class="inline-flex rounded-md border border-slate-200 p-0.5" role="radiogroup" aria-label="Sparkline span">
           <button v-for="r in SPARK_RANGES" :key="r.id" type="button" role="radio" :aria-checked="r.id === rangeId"
@@ -69,6 +70,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { sparkline_path, latest_point, y_range, gap_joins } from '@/lib/datasets/series.js'
 import { SPARK_RANGES } from '@/lib/datasets/chart-view.js'
+import { LIVE_DENIED } from './page-logic.js'
 
 const props = defineProps({
   // pinned_entries()
@@ -83,6 +85,8 @@ const props = defineProps({
   from: { type: Number, required: true },
   to: { type: Number, required: true },
   live: { type: Boolean, default: false },
+  // i3X refused every pinned metric, so nothing is live.
+  denied: { type: Boolean, default: false },
   // The window is still filling in: the sparklines end at now.
   soFar: { type: Boolean, default: false },
   error: { type: String, default: null },

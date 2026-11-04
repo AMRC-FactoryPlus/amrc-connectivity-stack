@@ -8,6 +8,7 @@ import { merge_datasets, structure_tree } from '../src/lib/datasets/model.js'
 import {
     tab_of, equipment_of, included_list, equipment_change, group_items,
     labels_for, metric_total, filter_metrics, tree_rows, structure_type,
+    live_badge,
 } from '../src/components/Datasets/page/page-logic.js'
 import {
     is_energy_metric, energy_applies, energy_sparkplug_ids, pick_meters, pick_intensity,
@@ -206,5 +207,27 @@ describe('fmt_amount', () => {
         expect(fmt_amount(12.34)).toBe('12.3')
         expect(fmt_amount(1234.5)).toBe('1,235')
         expect(fmt_amount(0)).toBe('0')
+    })
+})
+
+describe('live_badge', () => {
+    it('shows nothing when the view does not include now', () => {
+        expect(live_badge(false, true, 'live')).toBeNull()
+        expect(live_badge(false, false, 'off')).toBeNull()
+    })
+
+    it('is live at coarse buckets, which refetch without i3X', () => {
+        expect(live_badge(true, false, 'off')).toBe('live')
+        expect(live_badge(true, false, 'denied')).toBe('live')
+    })
+
+    it('is live at fine buckets only once i3X streams', () => {
+        expect(live_badge(true, true, 'live')).toBe('live')
+        expect(live_badge(true, true, 'off')).toBeNull()
+        expect(live_badge(true, true, 'unavailable')).toBeNull()
+    })
+
+    it('says when i3X refused every metric', () => {
+        expect(live_badge(true, true, 'denied')).toBe('denied')
     })
 })

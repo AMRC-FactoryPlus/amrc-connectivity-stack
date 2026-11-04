@@ -171,8 +171,8 @@ export function applyCsvToModel(rows, model, schema, setFn) {
     for (const { tagPath, fields } of rows) {
         const segments = tagPath.split('/');
 
-        // The ISA-95 hierarchy is a controlled vocabulary, managed exclusively
-        // by ISA95HierarchyPanel. Never let free-text CSV values write to it.
+        // The ISA-95 hierarchy comes from the device's placement, not the
+        // origin map. Never let free-text CSV values write to it.
         // Skip before traversal so we don't create the parent objects either.
         if (segments.includes(ISA95_HIERARCHY_KEY)) {
             // Only report rows where the CSV would actually have changed the

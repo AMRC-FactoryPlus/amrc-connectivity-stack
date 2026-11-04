@@ -8,9 +8,9 @@ import {h} from 'vue'
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import RebirthButton from '@/components/EdgeManager/RebirthButton.vue'
 import I3xAccessButton from '@/components/Access/I3xAccessButton.vue'
+import PlacementPill from '@/components/ISA95/PlacementPill.vue'
 import {useISA95Store} from '@/store/useISA95Store.js'
-import {extract_hierarchy} from '@/composables/useISA95Migration.js'
-import {resolve_isa95} from '@/lib/access/i3x-access.js'
+import {placement_chain, placement_state} from '@/lib/isa95-placement.js'
 
 export interface Device {
     uuid: string,
@@ -21,6 +21,26 @@ export interface Device {
     schema: string,
     originMap: string
 }
+
+/* Where a device stands on the UNS, from placement_state. The Node page
+ * works this out once per row as `_placement`, so the table re-sorts and
+ * re-filters when the vocabulary changes. Null until the vocabulary has
+ * loaded, so no device shows as broken while it loads. */
+function placementOf(row: any) {
+    if (row._placement !== undefined) return row._placement
+    const isa95 = useISA95Store()
+    if (!isa95.ready) return null
+    return placement_state(isa95.vocabulary, row.placement, row.uuid)
+}
+
+/* 'on' or 'off' the UNS, for the UNS filter, or null while loading. */
+function unsOf(row: any) {
+    const p = placementOf(row)
+    if (!p) return null
+    return p.state === 'placed' ? 'on' : 'off'
+}
+
+const pathText = (row: any) => placementOf(row)?.path?.join(' / ') ?? ''
 
 export const deviceColumns: ColumnDef<Device>[] = [
     {
@@ -38,19 +58,42 @@ export const deviceColumns: ColumnDef<Device>[] = [
         },
     },
     {
+        // The device's ISA-95 placement, or a warning pill when the
+        // device is not on the UNS. Unplaced devices sort first.
+        id: 'uns',
+        accessorFn: (row) => unsOf(row),
+        header: ({column}) => h(DataTableColumnHeader, {
+            column,
+            title: 'ISA-95 placement'
+        }),
+        cell: ({row}) => {
+            const p = placementOf(row.original)
+            if (!p) return null
+            if (p.state === 'placed') {
+                const path = p.path.join(' / ')
+                return h('div', {class: 'max-w-[300px] truncate text-gray-500', title: path}, path)
+            }
+            return h(PlacementPill, {state: p.state, error: p.error ?? null, tooltip: true})
+        },
+        sortingFn: (a, b) => pathText(a.original).localeCompare(pathText(b.original)),
+        filterFn: (row, id, value) => {
+            return value.includes(row.getValue(id))
+        },
+    },
+    {
         // Opens the i3X access dialog for the device. The button stops
         // the click, so the rest of the row still opens the device.
         id: 'i3x',
         header: () => h('div', {class: 'w-[200px]'}, 'i3X access'),
         cell: ({row}) => {
-            const chain = extract_hierarchy(row.original)?.chain ?? []
+            const via = placement_chain(useISA95Store().vocabulary, row.original.placement)
             return h(I3xAccessButton, {
                 target: row.original.uuid,
                 device: true,
-                via: resolve_isa95(useISA95Store().data, chain),
+                via,
                 noun: 'device',
                 name: row.original.name,
-                path: chain.join(' / '),
+                path: via.map(n => n.name).join(' / '),
             })
         },
         enableSorting: false,

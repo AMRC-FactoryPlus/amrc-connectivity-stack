@@ -296,6 +296,14 @@ an acs-i3x consumer its own principal, and grant that principal
 exactly the devices or ISA-95 nodes it needs. The admin UI's device
 page, ISA-95 page and Explorer each have a panel for this.
 
+If the consumer also builds Data Access datasets from those devices,
+grant it **Device data** instead. This composite permission holds
+**Read i3X objects** and Data Access's **Build datasets from device**,
+so one grant on a device covers both. Data Access checks its half on
+the device only, so give it on devices, not on ISA-95 nodes. The
+consumer also needs **Create dataset** on the structures it makes; the
+**Dataset maker** role holds it.
+
 ## Worked example: minimal Express + openid-client
 
 For a Node.js application using

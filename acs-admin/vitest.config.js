@@ -18,6 +18,11 @@ export default defineConfig({
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
     },
+    /* The rx libraries are linked from lib/, and resolve their own
+     * dependencies from there. A checkout that has not installed them
+     * (a fresh worktree) then has no rxjs for them at all. Take these
+     * from acs-admin instead, which also keeps one copy of each. */
+    dedupe: ['rxjs', 'immutable'],
   },
   test: {
     environment: 'node',

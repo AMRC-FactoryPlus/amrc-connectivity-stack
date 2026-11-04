@@ -118,7 +118,10 @@
                 </template>
               </BreadcrumbList>
             </Breadcrumb>
-          <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
+          <div class="flex items-center gap-3">
+            <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
+            <slot name="actions"/>
+          </div>
         </header>
         <!-- Scrollable content area -->
         <div class="flex-1 content-scroll">

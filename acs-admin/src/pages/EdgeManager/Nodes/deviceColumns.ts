@@ -7,6 +7,10 @@ import {h} from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import RebirthButton from '@/components/EdgeManager/RebirthButton.vue'
+import I3xAccessButton from '@/components/Access/I3xAccessButton.vue'
+import {useISA95Store} from '@/store/useISA95Store.js'
+import {extract_hierarchy} from '@/composables/useISA95Migration.js'
+import {resolve_isa95} from '@/lib/access/i3x-access.js'
 
 export interface Device {
     uuid: string,
@@ -32,6 +36,25 @@ export const deviceColumns: ColumnDef<Device>[] = [
         filterFn: (row, id, value) => {
             return value.includes(row.getValue(id))
         },
+    },
+    {
+        // Opens the i3X access dialog for the device. The button stops
+        // the click, so the rest of the row still opens the device.
+        id: 'i3x',
+        header: () => h('div', {class: 'w-[200px]'}, 'i3X access'),
+        cell: ({row}) => {
+            const chain = extract_hierarchy(row.original)?.chain ?? []
+            return h(I3xAccessButton, {
+                target: row.original.uuid,
+                device: true,
+                via: resolve_isa95(useISA95Store().data, chain),
+                noun: 'device',
+                name: row.original.name,
+                path: chain.join(' / '),
+            })
+        },
+        enableSorting: false,
+        enableHiding: false,
     },
     {
         id: 'actions',

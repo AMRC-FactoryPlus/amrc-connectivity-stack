@@ -12,14 +12,23 @@ import type { Request, Response, NextFunction } from "express";
 import { I3X_SPEC_VERSION, Version } from "./constants.js";
 import { i3xEnvelope, i3xErrorHandler } from "./middleware/envelope.js";
 import { Slicer } from "./slicer.js";
-import type { ObjectTree } from "./object-tree.js";
+import type { ObjectTree, Visible } from "./object-tree.js";
+import type { Grants } from "./access.js";
 import type { ValueCache, LazyValue } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
 import validator from 'validator';
 
+/** What APIv1 needs from Access. */
+export interface AccessLike {
+    grants(principal: unknown): Promise<Grants>;
+    visible(grants: Grants): Visible | undefined;
+}
+
 interface APIv1Opts {
     objectTree: ObjectTree;
+    /** Decides what each caller may see. */
+    access: AccessLike;
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
@@ -74,8 +83,9 @@ function badRequest(message: string): Error & { status: number } {
 function objectsEtag(
     rev: string,
     opts: { typeElementId?: string; root: boolean; includeMetadata: boolean },
+    scope: string,
 ): string {
-    const q = JSON.stringify([opts.typeElementId ?? null, opts.root, opts.includeMetadata]);
+    const q = JSON.stringify([opts.typeElementId ?? null, opts.root, opts.includeMetadata, scope]);
     const h = createHash("sha1").update(q).digest("base64url").slice(0, 16);
     return `W/"objects-${rev}-${h}"`;
 }
@@ -228,11 +238,31 @@ function subscription_owner(req: Request): string {
     return (req as any).auth;
 }
 
+/** What this caller may see: set by APIv1.load_grants on every
+ * request. Undefined sees everything. */
+function visibleTo(res: Response): Visible | undefined {
+    return res.locals.visible;
+}
+
+/* A key for what a set of grants sees, for ETags: two callers who see
+ * different trees must not share a cached listing. */
+const scopeKeys = new WeakMap<Grants, string>();
+function scopeKey(grants: Grants): string {
+    if (grants.all) return "all";
+    let k = scopeKeys.get(grants);
+    if (k === undefined) {
+        k = createHash("sha1").update([...grants.targets].sort().join(",")).digest("base64url");
+        scopeKeys.set(grants, k);
+    }
+    return k;
+}
+
 export class APIv1 {
     public routes: Router;
     public infoRoute: Router;
 
     private objectTree: ObjectTree;
+    private access: AccessLike;
     private valueCache: ValueCache;
     private history: History;
     private subscriptions: SubscriptionManager;
@@ -244,6 +274,7 @@ export class APIv1 {
      **/
     constructor(opts: APIv1Opts) {
         this.objectTree = opts.objectTree;
+        this.access = opts.access;
         this.valueCache = opts.valueCache;
         this.history = opts.history;
         this.subscriptions = opts.subscriptions;
@@ -288,6 +319,7 @@ export class APIv1 {
         const api = this.routes;
         api.use(i3xEnvelope);
         api.use(this.check_ready.bind(this));
+        api.use(asyncHandler(this.load_grants.bind(this)));
 
         /* ---- Explore: Namespaces ---- */
         api.get("/namespaces", this.get_namespaces.bind(this));
@@ -339,6 +371,18 @@ export class APIv1 {
             err.status = 503;
             return next(err);
         }
+        next();
+    }
+
+    /**
+     * Middleware that reads the caller's grants and leaves what they
+     * may see in res.locals for the handlers. Fails with 503 when the
+     * Auth service cannot be reached.
+     **/
+    async load_grants(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const grants = await this.access.grants((req as any).auth);
+        res.locals.grants = grants;
+        res.locals.visible = this.access.visible(grants);
         next();
     }
 
@@ -461,15 +505,16 @@ export class APIv1 {
          * body in one piece, so this replaces it. */
         const rev = this.objectTree.revision?.();
         if (rev !== undefined) {
-            const etag = objectsEtag(rev, opts);
+            const etag = objectsEtag(rev, opts, scopeKey(res.locals.grants));
             res.setHeader("ETag", etag);
+            res.setHeader("Vary", "Authorization");
             if (etagMatches(req.headers["if-none-match"], etag)) {
                 res.status(304).end();
                 return;
             }
         }
 
-        const objects = this.objectTree.iterateObjects(opts);
+        const objects = this.objectTree.iterateObjects(opts, 1000, visibleTo(res));
         await streamJsonArray(res, '{"success":true,"result":[', objects, "]}");
     }
 
@@ -480,8 +525,9 @@ export class APIv1 {
      */
     list_objects(req: Request, res: Response): void {
         const { elementIds, includeMetadata } = req.body;
+        const visible = visibleTo(res);
         const results = (elementIds as string[]).map(id => {
-            const item = this.objectTree.getObject(id);
+            const item = this.objectTree.getObject(id, visible);
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
@@ -510,18 +556,24 @@ export class APIv1 {
             return next(badRequest("maxDepth must be a non-negative integer"));
         }
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
+        const visible = visibleTo(res);
+        /* A hidden object answers as one that does not exist. */
+        const shown = ids.map(id => !visible || !!this.objectTree.getObject(id, visible));
 
         // Try UNS cache first (real-time), fall back to InfluxDB last().
         // A cached composition's components are read as they are sent.
         const cached: Array<LazyValue | null> = [];
-        for (const id of ids) cached.push(await this.valueCache.getValueLazy(id, effective));
-        const misses = [...new Set(ids.filter((_, i) => !cached[i]))];
+        for (let i = 0; i < ids.length; i++)
+            cached.push(shown[i] ? await this.valueCache.getValueLazy(ids[i], effective, visible) : null);
+        const misses = [...new Set(ids.filter((_, i) => shown[i] && !cached[i]))];
         const fromInflux = misses.length > 0
-            ? await this.history.getValues(misses, effective)
+            ? await this.history.getValues(misses, effective, visible)
             : new Map();
 
         let influxHits = 0;
         const results = ids.map((id, i) => {
+            if (!shown[i])
+                return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
             const hit = cached[i];
             if (hit) {
                 return { success: true, elementId: id, hit };
@@ -572,8 +624,11 @@ export class APIv1 {
         if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
             return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
         }
+        const visible = visibleTo(res);
         const results = await Promise.all(
             (elementIds as string[]).map(async id => {
+                if (visible && !this.objectTree.getObject(id, visible))
+                    return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
                 try {
                     const values = await this.history.queryHistory(id, startTime, endTime, maxDepth);
                     return { success: true, elementId: id, result: { elementId: id, values } };
@@ -596,7 +651,8 @@ export class APIv1 {
         const ids = elementIds as string[];
         /* Existence first, for the envelope's success flag; the related
          * objects themselves are read as they are sent. */
-        const found = ids.map(id => !!this.objectTree.getObject(id));
+        const visible = visibleTo(res);
+        const found = ids.map(id => !!this.objectTree.getObject(id, visible));
         const allSuccess = found.every(Boolean);
         const tree = this.objectTree;
         await streamText(res, (function* () {
@@ -611,7 +667,7 @@ export class APIv1 {
                 }
                 yield `{"success":true,"elementId":${JSON.stringify(id)},"result":[`;
                 let first = true;
-                for (const o of tree.iterateRelated(id, relationshiptype)) {
+                for (const o of tree.iterateRelated(id, relationshiptype, 1000, visible)) {
                     yield (first ? "" : ",") + JSON.stringify(o);
                     first = false;
                 }
@@ -630,7 +686,9 @@ export class APIv1 {
      */
     async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
         const id = req.params.elementId;
-        const obj = this.objectTree.getObject(id);
+        const visible = visibleTo(res);
+        const obj = this.objectTree.getObject(id, visible);
+        if (visible && !obj) return next(notFound(`No value for ${id}`));
         /* Digits only: Number() would take "" as 0 (the whole
          * subtree), and " 1", "0x10" or "1e1" as other depths. */
         const raw = req.query.maxDepth;
@@ -640,7 +698,7 @@ export class APIv1 {
         const { effective, clamped } = this.clampDepth(raw === undefined ? 1 : Number(raw));
         if (clamped) res.status(206);
         // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = await this.valueCache.getValueLazy(id, effective);
+        const cached = await this.valueCache.getValueLazy(id, effective, visible);
         if (cached) {
             this.log("GET /objects/%s/value: UNS cache hit", id);
             if (!cached.components) {
@@ -657,7 +715,7 @@ export class APIv1 {
             return;
         }
         const result = obj?.isComposition
-            ? await this.history.getCompositionValue(id, effective)
+            ? await this.history.getCompositionValue(id, effective, visible)
             : await this.history.getCurrentValue(id);
         this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
             id, result ? "hit" : "no data");
@@ -676,6 +734,9 @@ export class APIv1 {
         if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
             return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
         }
+        const visible = visibleTo(res);
+        if (visible && !this.objectTree.getObject(req.params.elementId, visible))
+            return next(notFound(`Object ${req.params.elementId} not found`));
         const values = await this.history.queryHistory(req.params.elementId, startTime, endTime);
         res.json({ elementId: req.params.elementId, values });
     }
@@ -684,19 +745,20 @@ export class APIv1 {
      * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
      **/
     async get_object_related(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const obj = this.objectTree.getObject(req.params.elementId);
+        const visible = visibleTo(res);
+        const obj = this.objectTree.getObject(req.params.elementId, visible);
         if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
         const rt = req.query.relationshiptype as string | undefined;
         // An ISA-95 level can have tens of thousands of children.
         await streamJsonArray(res, '{"success":true,"result":[',
-            this.objectTree.iterateRelated(req.params.elementId, rt), "]}");
+            this.objectTree.iterateRelated(req.params.elementId, rt, 1000, visible), "]}");
     }
 
     /**
      * GET /objects/:elementId — returns one object, or 404 if unknown.
      **/
     get_object(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getObject(req.params.elementId);
+        const result = this.objectTree.getObject(req.params.elementId, visibleTo(res));
         if (!result) return next(notFound(`Object ${req.params.elementId} not found`));
         res.json(result);
     }
@@ -763,8 +825,9 @@ export class APIv1 {
     register_subscriptions(req: Request, res: Response): void {
         const owner = subscription_owner(req);
         const { subscriptionId, elementIds, maxDepth } = req.body;
+        const visible = visibleTo(res);
         const results = (elementIds as string[]).map(id => {
-            if (!this.objectTree.getObject(id)) {
+            if (!this.objectTree.getObject(id, visible)) {
                 return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
             }
             try {
@@ -792,8 +855,9 @@ export class APIv1 {
     unregister_subscriptions(req: Request, res: Response): void {
         const owner = subscription_owner(req);
         const { subscriptionId, elementIds } = req.body;
+        const visible = visibleTo(res);
         const results = (elementIds as string[]).map(id => {
-            if (!this.objectTree.getObject(id)) {
+            if (!this.objectTree.getObject(id, visible)) {
                 return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
             }
             try {

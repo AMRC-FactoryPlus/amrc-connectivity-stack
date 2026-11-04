@@ -15,8 +15,8 @@
     <Toaster visible-toasts="3" rich-colors/>
 
     <header class="flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 px-4">
-      <i class="fa-solid fa-shapes"></i>
-      <h3 class="text-lg font-bold tracking-tight">Schemas</h3>
+      <i class="fa-solid" :class="surface === 'i3x-isa95' ? 'fa-sitemap' : 'fa-shapes'"></i>
+      <h3 class="text-lg font-bold tracking-tight">{{ title }}</h3>
       <span class="ml-auto text-xs text-gray-400">Preview: {{ surface }}</span>
     </header>
 
@@ -40,6 +40,19 @@
       <RawSchemaDialog v-else-if="surface === 'raw'"
           :open="true" :body="drafts[0].draft.body"/>
 
+      <div v-else-if="surface === 'i3x-device'" class="p-6">
+        <div class="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+          <div class="flex flex-col">
+            <span class="font-semibold">{{ i3xTarget.name }}</span>
+            <span class="text-xs text-slate-500">{{ i3xPath }}</span>
+          </div>
+          <I3xAccessButton device :target="i3xTarget.uuid" :via="i3xTarget.via"
+              :name="i3xTarget.name" :path="i3xPath"/>
+        </div>
+      </div>
+
+      <ISA95 v-else-if="surface === 'i3x-isa95'"/>
+
       <div v-else class="p-10">
         <p class="text-sm text-gray-500">Unknown surface: {{ surface }}</p>
       </div>
@@ -57,23 +70,37 @@ import ComponentPickerDialog from '@components/Schemas/ComponentPickerDialog.vue
 import SchemaPicker from '@components/Schemas/SchemaPicker.vue'
 import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
 
+import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
+import ISA95 from '@pages/ISA95/ISA95.vue'
+
 import { devices, drafts, schemas } from './fixtures.js'
+import { target as i3xTarget } from './i3x-fixtures.js'
 
 export default {
   name: 'Preview',
 
   components: {
-    ComponentPickerDialog, PublishSchema, RawSchemaDialog, SchemaPicker,
-    Schemas, SchemaEditor, Toaster,
+    ComponentPickerDialog, I3xAccessButton, ISA95, PublishSchema,
+    RawSchemaDialog, SchemaPicker, Schemas, SchemaEditor, Toaster,
   },
 
   data () {
-    return { drafts, schemas, devices, pickerValue: schemas[0]?.uuid ?? null }
+    return { drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null }
   },
 
   computed: {
     surface () {
       return this.$route.query.surface ?? 'list'
+    },
+
+    title () {
+      if (this.surface === 'i3x-isa95') return 'ISA-95 Hierarchy'
+      if (this.surface === 'i3x-device') return 'Devices'
+      return 'Schemas'
+    },
+
+    i3xPath () {
+      return this.i3xTarget.via.map(n => n.name).join(' / ')
     },
 
     candidates () {

@@ -29,6 +29,7 @@ import { History } from "../lib/history.js";
 import { RelType } from "../lib/constants.js";
 // @ts-ignore - plain ESM benchmark fixture
 import { pipelineSnapshot } from "../bench/dataset.mjs";
+import { allowAll } from "./helpers/allow-all.js";
 
 function stack(devices: number, store = new I3xStore()) {
     const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
@@ -64,7 +65,7 @@ function oldValue(s: ReturnType<typeof stack>, id: string) {
 }
 
 function app(s: ReturnType<typeof stack>, maxDepthCap = 0) {
-    const api = new APIv1({
+    const api = new APIv1({ access: allowAll,
         maxDepthCap,
         objectTree: s.tree, valueCache: s.valueCache,
         history: {

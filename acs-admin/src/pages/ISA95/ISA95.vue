@@ -51,6 +51,14 @@
             </Button>
           </div>
         </div>
+        <!-- Who can read the devices under this node through i3X -->
+        <div class="flex flex-col items-start gap-2 p-4 border-b">
+          <I3xAccessButton :target="selectedNode.uuid" :via="selectedVia" :noun="selectedNode.level.toLowerCase()"
+                           :name="selectedNode.name" :path="[...selectedVia, selectedNode].map(n => n.name).join(' / ')"/>
+          <div class="text-xs text-gray-500">
+            A grant here covers every device under {{ selectedNode.name }}, and any added later.
+          </div>
+        </div>
         <div class="space-y-4 p-4">
           <SidebarDetail
             icon="key"
@@ -102,10 +110,12 @@ import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useDialog } from '@/composables/useDialog';
 import { useServiceClientStore } from "@store/serviceClientStore";
 import { toast } from "vue-sonner";
+import I3xAccessButton from "@components/Access/I3xAccessButton.vue";
+import { isa95_path } from "@/lib/access/i3x-access.js";
 
 export default {
   name: 'ISA95',
-  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState },
+  components: { SidebarDetail, DataTableSearchable, Skeleton, Button, BridgesContainer, EmptyState, I3xAccessButton },
 
   setup() {
     return {
@@ -144,6 +154,10 @@ export default {
     selectedNode() {
       if (!this.selectedUuid) return null;
       return this.isa95.by_uuid(this.selectedUuid) ?? null;
+    },
+    /* The nodes above the selected one, whose grants also cover it. */
+    selectedVia() {
+      return isa95_path(this.isa95.data, this.selectedUuid).slice(0, -1);
     },
     parentNames() {
       const parents = this.isa95.parents_of(this.selectedUuid).map(p => p.name);

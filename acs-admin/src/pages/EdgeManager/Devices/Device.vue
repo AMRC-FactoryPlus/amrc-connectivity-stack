@@ -61,7 +61,13 @@
                 </div>
             </template>
         </EmptyState>
-        <OriginMapEditor ref="originMapEditor" :device="device" :device-schema="schema" v-else></OriginMapEditor>
+        <OriginMapEditor ref="originMapEditor" :device="device" :device-schema="schema" v-else>
+          <!-- Who can read this device through i3X -->
+          <template #actions>
+            <I3xAccessButton v-if="device.uuid" :target="device.uuid" device :via="isa95Via" noun="device"
+                             :name="device.name" :path="isa95Path"/>
+          </template>
+        </OriginMapEditor>
       </div>
 
       <!-- Sidebar -->
@@ -198,6 +204,10 @@ import { useConnectionStore } from '@store/useConnectionStore.js'
 import ChangeConnectionDialog from '@components/EdgeManager/Devices/ChangeConnectionDialog.vue'
 import OriginMapEditor      from '@components/EdgeManager/Devices/OriginMapEditor/OriginMapEditor.vue'
 import ISA95HierarchyPanel  from '@components/EdgeManager/Devices/ISA95HierarchyPanel.vue'
+import I3xAccessButton      from '@components/Access/I3xAccessButton.vue'
+import { useISA95Store }    from '@store/useISA95Store.js'
+import { extract_hierarchy } from '@/composables/useISA95Migration.js'
+import { resolve_isa95 }    from '@/lib/access/i3x-access.js'
 
 export default {
   components: {
@@ -219,6 +229,7 @@ export default {
     Switch,
     ChangeConnectionDialog,
     ISA95HierarchyPanel,
+    I3xAccessButton,
   },
 
   setup () {
@@ -226,6 +237,7 @@ export default {
       d: useDeviceStore(),
       sch: useSchemaStore(),
       conn: useConnectionStore(),
+      isa95: useISA95Store(),
       inop,
       moment,
     }
@@ -254,6 +266,7 @@ export default {
     this.startRobotBeep()
     this.sch.start()
     this.conn.start()
+    this.isa95.start()
   },
 
   beforeUnmount() {
@@ -287,6 +300,17 @@ export default {
 
     newerSchemaVersion() {
       return versionOf(this.newerSchema)
+    },
+
+    /* The ISA-95 vocabulary nodes this device's hierarchy resolves
+     * through: grants on them let people read this device. */
+    isa95Via() {
+      const chain = extract_hierarchy(this.device)?.chain ?? []
+      return resolve_isa95(this.isa95.data, chain)
+    },
+
+    isa95Path() {
+      return (extract_hierarchy(this.device)?.chain ?? []).join(' / ')
     },
 
     connection() {

@@ -31,7 +31,7 @@ function isCorrupt(err: unknown): boolean {
         || /database file is truncated/.test(e?.message ?? "");
 }
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const TABLES = `
     -- The object tree. seq gives Map insertion order: an upsert keeps
@@ -43,9 +43,13 @@ const TABLES = `
         type_element_id text not null,
         display_name    text not null,
         is_composition  integer not null,
-        source          text not null           -- 'config' | 'uns'
+        source          text not null,          -- 'config' | 'uns'
+        -- The device this object belongs to; null for an ISA-95 level.
+        device_uuid     text
     );
     create index object_parent_ix on object (parent_id, seq);
+    -- The device rows, for ObjectTree.placement.
+    create index object_device_ix on object (element_id) where element_id = device_uuid;
     create index object_type_ix on object (type_element_id, seq);
     -- UNS-discovered rows only, for finding orphans without a scan.
     create index object_uns_ix on object (parent_id) where source = 'uns';

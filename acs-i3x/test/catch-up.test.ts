@@ -22,6 +22,7 @@ import { I3xStore } from "../lib/store.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { allowAll } from "./helpers/allow-all.js";
 
 const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 const DEV = "dev-1";
@@ -135,7 +136,7 @@ async function run(w: World, opts: Record<string, unknown> = {}) {
     (history as any).queryApi = { collectRows: w.influx.collectRows };
     const mqtt = fakeMqtt();
     await (valueCache as any).init(mqtt.fplus, history);
-    const v1 = new APIv1({ objectTree: w.tree, valueCache, history, subscriptions: {} as any });
+    const v1 = new APIv1({ access: allowAll, objectTree: w.tree, valueCache, history, subscriptions: {} as any });
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => { (req as any).auth = "p@R"; next(); });

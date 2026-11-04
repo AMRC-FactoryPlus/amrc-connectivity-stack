@@ -6,15 +6,14 @@
 import { UUIDs } from "@amrc-factoryplus/service-client";
 import { RxClient } from "@amrc-factoryplus/rx-client";
 import { WebAPI } from "@amrc-factoryplus/service-api";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { routes } from "../lib/routes.js";
 import { ObjectTree } from "../lib/object-tree.js";
 import { ValueCache } from "../lib/value-cache.js";
 import { parseConnectTimeout, parseStallTimeout } from "../lib/watchdog.js";
 import { History } from "../lib/history.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
-import { I3xRag } from "../lib/rag/i3x-rag.js";
-import { registerRagTools } from "../lib/mcp/tools.js";
+import { Access } from "../lib/access.js";
+import { Isa95Vocabulary } from "../lib/isa95.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
@@ -92,27 +91,27 @@ const history = new History({
 // Subscribe to UNS/v1/#, catching up stored values from InfluxDB.
 await valueCache.init(fplus, history);
 
+// The ISA-95 vocabulary, for grants on vocabulary nodes.
+const vocabulary = new Isa95Vocabulary({ log: fplus.debug.bound("isa95") });
+vocabulary.run(fplus);
+
+// What each caller may see: their ReadObject grants against the tree.
+const access = new Access({
+    auth: fplus.Auth,
+    objectTree,
+    vocabulary,
+    aclTimeoutMs: positiveInt("I3X_ACL_TIMEOUT_MS", 10_000),
+    log: fplus.debug.bound("access"),
+});
+
 // Subscription manager
 const subscriptions = new SubscriptionManager({
     valueCache,
+    viewers: access,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
     maxQueue: positiveInt("I3X_SUBSCRIPTION_QUEUE_MAX", 10_000),
     log: fplus.debug.bound("subscriptions"),
 });
-
-// The MCP endpoint and its RAG index (a graph and a search index of
-// the whole tree, about 47 KB of heap per device) are opt-in. When
-// off, nothing is built and /mcp answers 404.
-let mcpServer: McpServer | undefined;
-if (env.I3X_MCP_ENABLED === "true") {
-    // Built on the first MCP query, and again on the first query
-    // after any change to the tree.
-    const i3xRag = new I3xRag(objectTree, valueCache, history);
-    objectTree.onChange(() => i3xRag.markDirty());
-
-    mcpServer = new McpServer({ name: "acs-i3x-rag", version: "1.0.0" });
-    registerRagTools(mcpServer, i3xRag);
-}
 
 const api = await new WebAPI({
     ping: {
@@ -132,10 +131,10 @@ const api = await new WebAPI({
     public: "/v1/info",
     routes: routes({
         objectTree,
+        access,
         valueCache,
         history,
         subscriptions,
-        mcpServer,
         maxDepthCap: parseInt(env.I3X_MAX_DEPTH_CAP || "0"),
         debug: fplus.debug,
     }),

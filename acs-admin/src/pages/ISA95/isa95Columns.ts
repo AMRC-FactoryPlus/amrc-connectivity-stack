@@ -6,6 +6,9 @@ import type { ColumnDef } from '@tanstack/vue-table'
 import { h } from 'vue'
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
+import I3xAccessButton from '@/components/Access/I3xAccessButton.vue'
+import { useISA95Store } from '@/store/useISA95Store.js'
+import { isa95_path } from '@/lib/access/i3x-access.js'
 
 export interface ISA95Node {
     uuid: string,
@@ -70,5 +73,23 @@ export const isa95Columns: ColumnDef<ISA95Node>[] = [
                 ? h('div', { class: 'max-w-[300px] truncate' }, aliases.join(', '))
                 : h('div', { class: 'text-gray-400' }, 'None')
         },
+    },
+    {
+        // Opens the i3X access dialog for the node. The count is grants
+        // on this node only; the dialog shows the ones from above.
+        id: 'i3x',
+        header: () => h('div', { class: 'w-[200px]' }, 'i3X access'),
+        cell: ({ row }) => {
+            const path = isa95_path(useISA95Store().data, row.original.uuid)
+            return h(I3xAccessButton, {
+                target: row.original.uuid,
+                via: path.slice(0, -1),
+                noun: row.original.level.toLowerCase(),
+                name: row.original.name,
+                path: path.map(n => n.name).join(' / '),
+            })
+        },
+        enableSorting: false,
+        enableHiding: false,
     },
 ]

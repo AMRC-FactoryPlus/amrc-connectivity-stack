@@ -81,6 +81,23 @@ export interface MetricMeta {
  */
 export type NodeSource = "config" | "uns";
 
+/**
+ * Whether the caller may see an object. `deviceUuid` is the device the
+ * object belongs to, or null for an ISA-95 level. Read methods that
+ * take one leave hidden objects out, as if they did not exist.
+ */
+export type Visible = (elementId: string, deviceUuid: string | null) => boolean;
+
+/** Where every device and ISA-95 level sits; see ObjectTree.placement. */
+export interface Placement {
+    /** Changes whenever a device or a level is added, removed or moved. */
+    rev: number;
+    /** Device UUID to the elementId of its parent ISA-95 level. */
+    deviceParent: Map<string, string>;
+    /** ISA-95 level elementId to its parent ("/" at the top) and name. */
+    levels: Map<string, { parentId: string; name: string }>;
+}
+
 /** Filters for getObjects and iterateObjects. */
 export interface ObjectFilter {
     typeElementId?: string;
@@ -107,6 +124,7 @@ interface ObjectRow {
     type_element_id: string;
     parent_id: string | null;
     is_composition: number;
+    device_uuid: string | null;
 }
 
 interface SubtreeRow extends ObjectRow {
@@ -114,11 +132,16 @@ interface SubtreeRow extends ObjectRow {
     source: NodeSource;
 }
 
-const OBJECT_COLS = "element_id, display_name, type_element_id, parent_id, is_composition";
+const OBJECT_COLS = "element_id, display_name, type_element_id, parent_id, is_composition, device_uuid";
 
 function toObject(r: ObjectRow): I3xObject {
     return toI3xObject(r.element_id, r.display_name, r.type_element_id,
         r.parent_id, r.is_composition === 1);
+}
+
+/* An ISA-95 level is the only object without a device. */
+function shown(r: { element_id: string; device_uuid: string | null }, visible?: Visible): boolean {
+    return !visible || visible(r.element_id, r.device_uuid ?? null);
 }
 
 function toMeta(r: any): MetricMeta {
@@ -174,6 +197,9 @@ export class ObjectTree {
     /* Distinguishes this process's revisions from an earlier one's. */
     private readonly epoch: string = Date.now().toString(36);
     private isa95IdCache: Map<string, string[]> = new Map();
+    /* Bumped by every change to where devices and levels sit. */
+    private placementRev: number = 0;
+    private placementCache: Placement | null = null;
 
     constructor(opts: ObjectTreeOpts) {
         this.namespaceName = opts.namespaceName;
@@ -216,9 +242,35 @@ export class ObjectTree {
     }
 
     /**
-     * Call `listener` after every change to the tree. The RAG index
-     * uses this to know it must rebuild. Listeners must be cheap: they
-     * run on the UNS message path.
+     * Every device's parent level and every ISA-95 level, for access
+     * checks. Read from the database the first time after a change,
+     * then kept: two indexed queries, about 30 ms at 74k devices.
+     */
+    placement(): Placement {
+        const c = this.placementCache;
+        if (c && c.rev === this.placementRev) return c;
+        const deviceParent = new Map<string, string>();
+        for (const r of this.store.prepare(
+            "select element_id, parent_id from object where element_id = device_uuid",
+        ).all() as any[]) deviceParent.set(r.element_id, r.parent_id);
+        const levels = new Map<string, { parentId: string; name: string }>();
+        for (const r of this.store.prepare(
+            "select element_id, parent_id, display_name from object where type_element_id = 'isa95-level'",
+        ).all() as any[]) levels.set(r.element_id, { parentId: r.parent_id, name: r.display_name });
+        return this.placementCache = { rev: this.placementRev, deviceParent, levels };
+    }
+
+    /** The device an object belongs to, or null for an ISA-95 level or
+     * an unknown id. */
+    deviceOf(elementId: string): string | null {
+        const r = this.store.prepare("select device_uuid from object where element_id = ?")
+            .get(elementId) as any;
+        return r?.device_uuid ?? null;
+    }
+
+    /**
+     * Call `listener` after every change to the tree. Listeners must be
+     * cheap: they run on the UNS message path.
      */
     onChange(listener: () => void): void {
         this.listeners.add(listener);
@@ -324,6 +376,7 @@ export class ObjectTree {
                 where type_element_id = 'isa95-level'
                     and not exists (select 1 from object c where c.parent_id = object.element_id)
             `).all() as any[]).map(r => r.element_id as string);
+            if (levels.length) this.placementRev++;
             drop(levels);
             if (levels.length) any = true;
             yield levels;
@@ -364,6 +417,7 @@ export class ObjectTree {
     }
 
     private removeDeviceTx(uuid: string): void {
+        this.placementRev++;
         this.store.prepare("delete from device_schema where device_uuid = ?").run(uuid);
         const device = this.getObject(uuid);
         if (!device) return;
@@ -384,6 +438,7 @@ export class ObjectTree {
     }
 
     private replaceDeviceTx(uuid: string, devInfo: any, info: any): void {
+        this.placementRev++;
         const oldDevice = this.getObject(uuid);
         if (!oldDevice) {
             this.buildDevice(uuid, devInfo, info);
@@ -403,7 +458,7 @@ export class ObjectTree {
         for (const cap of unsCaptures) {
             if (!this.hasObject(cap.parentId)) continue; // orphan
             if (this.hasObject(cap.id)) continue;         // superseded by config
-            this.putObject(cap.obj, "uns");
+            this.putObject(cap.obj, "uns", uuid);
             if (cap.meta) this.putMeta(cap.id, cap.meta);
         }
     }
@@ -493,20 +548,23 @@ export class ObjectTree {
      * Insert an object, or replace the one with the same elementId. A
      * replaced object keeps its place in the order, as Map.set does.
      */
-    private putObject(obj: I3xObject, source: NodeSource): void {
+    /* `deviceUuid` is the device the object belongs to: the device
+     * itself and everything below it. Null for an ISA-95 level. */
+    private putObject(obj: I3xObject, source: NodeSource, deviceUuid: string | null): void {
         this.writes++;
         this.objectRev++;
         this.store.prepare(`
-            insert into object (element_id, parent_id, type_element_id, display_name, is_composition, source)
-            values (?, ?, ?, ?, ?, ?)
+            insert into object (element_id, parent_id, type_element_id, display_name, is_composition, source, device_uuid)
+            values (?, ?, ?, ?, ?, ?, ?)
             on conflict (element_id) do update set
                 parent_id = excluded.parent_id,
                 type_element_id = excluded.type_element_id,
                 display_name = excluded.display_name,
                 is_composition = excluded.is_composition,
-                source = excluded.source
+                source = excluded.source,
+                device_uuid = excluded.device_uuid
         `).run(obj.elementId, obj.parentId, obj.typeElementId, obj.displayName,
-            obj.isComposition ? 1 : 0, source);
+            obj.isComposition ? 1 : 0, source, deviceUuid);
     }
 
     private putMeta(id: string, m: MetricMeta): void {
@@ -552,6 +610,7 @@ export class ObjectTree {
         for (const ancestorId of ancestors) {
             if (s.prepare("select 1 from object where parent_id = ? limit 1").get(ancestorId)) break;
             this.objectRev++;
+            this.placementRev++;
             s.prepare("delete from object where element_id = ?").run(ancestorId);
         }
     }
@@ -653,10 +712,11 @@ export class ObjectTree {
      * All matching objects in one array. Use iterateObjects for the
      * whole tree: at 74k devices this array alone is hundreds of MB.
      */
-    getObjects(opts?: ObjectFilter): I3xObject[] {
+    getObjects(opts?: ObjectFilter, visible?: Visible): I3xObject[] {
         const { where, args } = this.objectWhere(opts);
         const sql = `select ${OBJECT_COLS} from object ${where ? `where ${where}` : ""} order by seq`;
-        return (this.store.prepare(sql).all(...args) as unknown as ObjectRow[]).map(toObject);
+        return (this.store.prepare(sql).all(...args) as unknown as ObjectRow[])
+            .filter(r => shown(r, visible)).map(toObject);
     }
 
     /**
@@ -679,12 +739,13 @@ export class ObjectTree {
      * page is a separate query on the main connection, and objects
      * changed between pages may be missed or repeated.
      */
-    *iterateObjects(opts?: ObjectFilter, pageSize: number = 1000): Generator<I3xObject> {
+    *iterateObjects(opts?: ObjectFilter, pageSize: number = 1000, visible?: Visible): Generator<I3xObject> {
         const { where, args } = this.objectWhere(opts);
         const sql = `select seq, ${OBJECT_COLS} from object
             where seq > ? ${where ? `and ${where}` : ""}
             order by seq limit ?`;
-        for (const r of this.snapshotPages(sql, args, pageSize)) yield toObject(r);
+        for (const r of this.snapshotPages(sql, args, pageSize))
+            if (shown(r, visible)) yield toObject(r);
     }
 
     /**
@@ -714,10 +775,10 @@ export class ObjectTree {
         }
     }
 
-    getObject(elementId: string): I3xObject | undefined {
+    getObject(elementId: string, visible?: Visible): I3xObject | undefined {
         const r = this.store.prepare(`select ${OBJECT_COLS} from object where element_id = ?`)
             .get(elementId) as unknown as ObjectRow | undefined;
-        return r ? toObject(r) : undefined;
+        return r && shown(r, visible) ? toObject(r) : undefined;
     }
 
     /* ---- Relationships ---- */
@@ -727,13 +788,14 @@ export class ObjectTree {
      * children read a page at a time from one snapshot: an ISA-95 level
      * can have tens of thousands of children.
      */
-    *iterateRelated(elementId: string, relationshipType?: string, pageSize: number = 1000): Generator<I3xObject> {
-        const obj = this.getObject(elementId);
+    *iterateRelated(elementId: string, relationshipType?: string, pageSize: number = 1000,
+            visible?: Visible): Generator<I3xObject> {
+        const obj = this.getObject(elementId, visible);
         if (!obj) return;
 
         if (relationshipType === undefined || relationshipType === RelType.HasParent) {
             if (obj.parentId !== null && obj.parentId !== "/") {
-                const parent = this.getObject(obj.parentId);
+                const parent = this.getObject(obj.parentId, visible);
                 if (parent) yield parent;
             }
         }
@@ -741,33 +803,13 @@ export class ObjectTree {
         if (relationshipType === undefined || relationshipType === RelType.HasChildren) {
             const sql = `select seq, ${OBJECT_COLS} from object
                 where seq > ? and parent_id = ? order by seq limit ?`;
-            for (const r of this.snapshotPages(sql, [elementId], pageSize)) yield toObject(r);
+            for (const r of this.snapshotPages(sql, [elementId], pageSize))
+                if (shown(r, visible)) yield toObject(r);
         }
     }
 
-    getRelated(elementId: string, relationshipType?: string): I3xObject[] {
-        const obj = this.getObject(elementId);
-        if (!obj) return [];
-
-        const result: I3xObject[] = [];
-
-        if (relationshipType === undefined || relationshipType === RelType.HasParent) {
-            if (obj.parentId !== null && obj.parentId !== "/") {
-                const parent = this.getObject(obj.parentId);
-                if (parent) result.push(parent);
-            }
-        }
-
-        if (relationshipType === undefined || relationshipType === RelType.HasChildren) {
-            result.push(...this.childObjects(elementId));
-        }
-
-        return result;
-    }
-
-    private childObjects(elementId: string): I3xObject[] {
-        return (this.store.prepare(`select ${OBJECT_COLS} from object where parent_id = ? order by seq`)
-            .all(elementId) as unknown as ObjectRow[]).map(toObject);
+    getRelated(elementId: string, relationshipType?: string, visible?: Visible): I3xObject[] {
+        return [...this.iterateRelated(elementId, relationshipType, 1000, visible)];
     }
 
     getRelationshipTypes(namespaceUri?: string): I3xRelationshipType[] {
@@ -823,9 +865,9 @@ export class ObjectTree {
      * caller can pause for the event loop. Near the top of the ISA-95
      * hierarchy the whole list is millions of ids.
      */
-    *iterateDescendantLeafIds(elementId: string, maxDepth: number = 0): Generator<string | null> {
+    *iterateDescendantLeafIds(elementId: string, maxDepth: number = 0, visible?: Visible): Generator<string | null> {
         const st = this.store.prepare(`
-            select seq, element_id, is_composition from object
+            select seq, element_id, is_composition, device_uuid from object
             where parent_id = ? and seq > ? order by seq limit ?`);
         const PAGE = 256;
         interface Level { id: string; depth: number; page: any[]; i: number; after: number; done: boolean }
@@ -847,6 +889,7 @@ export class ObjectTree {
                 continue;
             }
             const child = top.page[top.i++];
+            if (!shown(child, visible)) continue;
             if (child.is_composition !== 1) {
                 yield child.element_id;
                 continue;
@@ -860,17 +903,19 @@ export class ObjectTree {
         }
     }
 
-    getDescendantLeafIds(elementId: string, maxDepth: number = 0, depth: number = 0): string[] {
+    getDescendantLeafIds(elementId: string, maxDepth: number = 0, depth: number = 0,
+            visible?: Visible): string[] {
         if (maxDepth > 0 && depth >= maxDepth) return [];
         const children = this.store.prepare(
-            "select element_id, is_composition from object where parent_id = ? order by seq",
+            "select element_id, is_composition, device_uuid from object where parent_id = ? order by seq",
         ).all(elementId) as any[];
         const leaves: string[] = [];
         for (const child of children) {
+            if (!shown(child, visible)) continue;
             if (child.is_composition !== 1) {
                 leaves.push(child.element_id);
             } else {
-                leaves.push(...this.getDescendantLeafIds(child.element_id, maxDepth, depth + 1));
+                leaves.push(...this.getDescendantLeafIds(child.element_id, maxDepth, depth + 1, visible));
             }
         }
         return leaves;
@@ -917,7 +962,8 @@ export class ObjectTree {
                     parentId,
                     true,           // isComposition
                 );
-                this.putObject(obj, "config");
+                this.putObject(obj, "config", null);
+                this.placementRev++;
             }
 
             parentId = elementId;
@@ -927,6 +973,7 @@ export class ObjectTree {
         if (device && device.parentId !== parentId) {
             this.writes++;
             this.objectRev++;
+            this.placementRev++;
             this.store.prepare("update object set parent_id = ? where element_id = ?")
                 .run(parentId, deviceElementId);
         }
@@ -1022,7 +1069,7 @@ export class ObjectTree {
                         parentId,
                         !isLeaf,  // isComposition: true for branches, false for leaves
                     );
-                    this.putObject(obj, "uns");
+                    this.putObject(obj, "uns", deviceElementId);
                 }
 
                 parentId = elementId;
@@ -1124,7 +1171,7 @@ export class ObjectTree {
                     parentId,
                     !isLeaf,
                 );
-                this.putObject(obj, "config");
+                this.putObject(obj, "config", topLevelInstanceUuid);
             }
 
             // Store InfluxDB query metadata for leaf metrics
@@ -1232,8 +1279,9 @@ export class ObjectTree {
 
         const displayName = nameInfo?.name ?? devInfo.sparkplugName ?? uuid;
 
+        this.placementRev++;
         const obj = toI3xObject(uuid, displayName, schemaUuid, "/", true);
-        this.putObject(obj, "config");
+        this.putObject(obj, "config", uuid);
 
         if (isa95Segments.length > 0) {
             this.ensureIsa95Hierarchy(isa95Segments, uuid);

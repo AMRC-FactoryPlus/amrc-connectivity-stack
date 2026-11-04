@@ -5,7 +5,7 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 /**
- * Open an SSE stream against i3x's /v1/subscriptions/stream endpoint.
+ * Open an SSE stream against i3X's /v1/subscriptions/stream endpoint.
  *
  * `headers` should include any auth headers the caller wants on the
  * request (e.g. `Authorization: Bearer <token>` resolved via the

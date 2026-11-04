@@ -147,6 +147,7 @@ import { computed } from 'vue'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
+import { useISA95Store } from '@store/useISA95Store.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useCanRebirth } from '@/composables/useCanRebirth.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
@@ -206,6 +207,7 @@ export default {
       n: useNodeStore(),
       d,
       cn: useConnectionStore(),
+      isa95: useISA95Store(),
       canRebirthMap,
       inop,
       deviceColumns,
@@ -216,6 +218,8 @@ export default {
 
   mounted () {
     this.cn.start();
+    // The device list's i3X access column grants through these nodes.
+    this.isa95.start();
   },
 
   computed: {

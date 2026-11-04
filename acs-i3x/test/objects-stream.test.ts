@@ -24,6 +24,7 @@ import { ValueCache } from "../lib/value-cache.js";
 import { I3xStore } from "../lib/store.js";
 // @ts-ignore - plain ESM benchmark fixture
 import { pipelineSnapshot } from "../bench/dataset.mjs";
+import { allowAll } from "./helpers/allow-all.js";
 
 function tree(devices: number): ObjectTree {
     const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
@@ -35,7 +36,7 @@ function tree(devices: number): ObjectTree {
 /** The i3X routes alone, as routes.ts mounts them but without
  * compression, so byte counts are the body's. */
 function bareApp(objectTree: ObjectTree) {
-    const api = new APIv1({
+    const api = new APIv1({ access: allowAll,
         objectTree,
         valueCache: new ValueCache({ objectTree, staleThreshold: 60_000 }),
         history: {} as any,
@@ -79,7 +80,7 @@ describe("GET /v1/objects", () => {
     it("sends the same body through routes(), with gzip", async () => {
         const app = express();
         app.use((req, _res, next) => { (req as any).auth = "p@R"; next(); });
-        routes({
+        routes({ access: allowAll,
             objectTree: t,
             valueCache: new ValueCache({ objectTree: t, staleThreshold: 60_000 }),
             history: {} as any,
@@ -97,7 +98,7 @@ describe("GET /v1/objects", () => {
         const big = tree(1500);
         const app = express();
         app.use((req, _res, next) => { (req as any).auth = "p@R"; next(); });
-        routes({
+        routes({ access: allowAll,
             objectTree: big,
             valueCache: new ValueCache({ objectTree: big, staleThreshold: 60_000 }),
             history: {} as any,

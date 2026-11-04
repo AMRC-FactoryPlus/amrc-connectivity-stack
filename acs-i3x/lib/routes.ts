@@ -1,7 +1,6 @@
 import compression from "compression";
 import { APIv1 } from "./api-v1.js";
-import { mountMcpTransport } from "./mcp/transport.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AccessLike } from "./api-v1.js";
 import type { ObjectTree } from "./object-tree.js";
 import type { ValueCache } from "./value-cache.js";
 import type { History } from "./history.js";
@@ -9,10 +8,10 @@ import type { SubscriptionManager } from "./subscriptions.js";
 
 export function routes(opts: {
     objectTree: ObjectTree;
+    access: AccessLike;
     valueCache: ValueCache;
     history: History;
     subscriptions: SubscriptionManager;
-    mcpServer?: McpServer;
     maxDepthCap?: number;
     debug?: any;
 }) {
@@ -35,18 +34,5 @@ export function routes(opts: {
 
         // Mount all other i3X endpoints (authenticated)
         app.use("/v1", api.routes);
-
-        // Mount MCP Streamable HTTP endpoint (if configured)
-        if (opts.mcpServer) {
-            mountMcpTransport(app, opts.mcpServer);
-        } else {
-            app.all("/mcp", (_req: any, res: any) => {
-                res.status(404).json({
-                    jsonrpc: "2.0",
-                    error: { code: -32601, message: "MCP is not enabled on this server" },
-                    id: null,
-                });
-            });
-        }
     };
 }

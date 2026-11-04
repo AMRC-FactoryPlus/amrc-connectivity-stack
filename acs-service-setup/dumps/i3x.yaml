@@ -1,6 +1,7 @@
 # i3X northbound API service
-# Needs: ConfigDB read (schemas, registration), Directory read (devices,
-# links), UNS MQTT read (live values), Auth ACL check (incoming requests).
+# Needs: ConfigDB read (schemas, registration, ISA-95 vocabulary),
+# Directory read (devices, links), UNS MQTT read (live values), Auth ACL
+# read (incoming requests).
 #
 #-REQUIRE: auth directory sparkplug uns
 ---
@@ -16,6 +17,19 @@ objects:
 
   !u UUIDs.Class.Service:
     !u I3X.Service.I3X: { name: "i3X REST API" }
+
+  !u Auth.Class.ServicePerms:
+    !u I3X.Perm.All:
+      name: "i3X permission"
+      subclassOf:
+        - !u Auth.Class.Permission
+
+  # ReadObject targets a device, a class of devices, or an ISA-95
+  # vocabulary node. A grant on a node covers every device whose
+  # hierarchy lies under it.
+  !u I3X.Perm.All:
+    !u I3X.Perm.ReadObject:
+      name: "Read i3X objects"
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
@@ -25,11 +39,17 @@ grants:
     !u Directory.Perm.AdvertiseService:
       !u I3X.Service.I3X: false
 
+    # Read the ACLs of callers, for the i3X permissions only
+    !u Auth.Perm.ReadACL:
+      !u I3X.Perm.All: true
+
     # Read ConfigDB: object registration (class membership) and schemas
     !u ConfigDB.Perm.ReadConfig:
       !u UUIDs.App.Registration: false
       !u UUIDs.App.Schema: false
       !u UUIDs.App.Info: false
+      # The ISA-95 vocabulary, to resolve grants on ISA-95 nodes.
+      !u UUIDs.App.ISA95Vocabulary: false
       # Device originMap (Schema_UUID, Instance_UUID, ISA-95 hierarchy,
       # metric tree) — i3x reads this for every device in the Device
       # class to build the object tree.

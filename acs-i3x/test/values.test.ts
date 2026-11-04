@@ -19,6 +19,7 @@ import { History } from "../lib/history.js";
 import { APIv1 } from "../lib/api-v1.js";
 import { I3xStore } from "../lib/store.js";
 import { Semaphore } from "../lib/semaphore.js";
+import { allowAll } from "./helpers/allow-all.js";
 
 const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 const DEV = "dev-1";
@@ -87,7 +88,7 @@ function uns(vc: ValueCache, path: string[], value: unknown, ts: string, instanc
 }
 
 function api(s: ReturnType<typeof setup>) {
-    const v1 = new APIv1({
+    const v1 = new APIv1({ access: allowAll,
         objectTree: s.tree, valueCache: s.valueCache, history: s.history,
         subscriptions: {} as any,
     });

@@ -9,6 +9,7 @@
 import { DA, STRUCTURE, KIND_BY_ID } from './constants.js'
 import { to_iso, validate_window, device_dataset_for, direct_sources, normalise_tags } from './model.js'
 import { parse_series, series_error } from './series.js'
+import { pipe_with_stall_timeout } from '../stream-download.js'
 
 /** An error a page can show as it is. */
 export class DatasetError extends Error {
@@ -602,19 +603,8 @@ export async function download_csv (client, uuid, streamSaver, { metrics = null,
     const disposition = headers?.get?.('Content-Disposition') ?? ''
     const filename = /filename\*?=(?:UTF-8'')?("?)([^";]+)\1/i.exec(disposition)?.[2] ?? `${uuid}.csv`
     const out = streamSaver.createWriteStream(filename.replace(/[\/\\]/g, '_'))
-    if (window.WritableStream && stream.pipeTo) {
-        await stream.pipeTo(out)
-    }
-    else {
-        const writer = out.getWriter()
-        const reader = stream.getReader()
-        for (;;) {
-            const { done, value } = await reader.read()
-            if (done) break
-            await writer.write(value)
-        }
-        await writer.close()
-    }
+    // Rejects with a message people can act on if the browser never takes the data.
+    await pipe_with_stall_timeout(stream, out)
 }
 
 /**

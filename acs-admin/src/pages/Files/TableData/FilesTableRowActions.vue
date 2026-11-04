@@ -2,6 +2,7 @@
 import type {Row} from '@tanstack/vue-table'
 import type {Alert} from './columns'
 import {useFileDownload} from "@composables/useFileDownload.js";
+import {toast} from "vue-sonner";
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,} from '@/components/ui/dropdown-menu'
@@ -21,7 +22,13 @@ async function download(row){
   if(!row.original.uuid)
     return;
   const name = row?.original.filesConfiguration?.original_file_name ?? row.original.uuid;
-  await useFileDownload(s.client, name, row.original.uuid);
+  try {
+    await useFileDownload(s.client, name, row.original.uuid);
+  }
+  catch (err) {
+    console.error('File download failed', err);
+    toast.error('Download failed', { description: err?.message ?? 'The service did not return the file.' });
+  }
 }
 
 </script>

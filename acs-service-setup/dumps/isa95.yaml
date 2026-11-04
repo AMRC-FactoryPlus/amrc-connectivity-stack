@@ -22,6 +22,13 @@ objects:
       name: "ISA-95 vocabulary"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    # Each device's place in the vocabulary: the deepest node only.
+    # The levels above are derived from the vocabulary. ConfigDB
+    # refuses a node whose chain to its Enterprise is broken.
+    !u UUIDs.App.ISA95Placement:
+      name: "ISA-95 placement"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
 configs:
   !u UUIDs.App.ConfigSchema:
@@ -40,6 +47,21 @@ configs:
             format: uuid
           description: "UUIDs of the next-level ISA-95 nodes under this node"
       additionalProperties: false
+    !u UUIDs.App.ISA95Placement:
+      type: object
+      required: [node]
+      properties:
+        node:
+          type: string
+          format: uuid
+          description: "The ISA-95 vocabulary node the device sits at, at any level"
+        instances:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+          description: "Instance_UUIDs to reuse, by object path, so a device keeps its history keys"
+      additionalProperties: false
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
@@ -51,3 +73,6 @@ grants:
   !u Auth.Class.Principal:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u UUIDs.App.ISA95Vocabulary: false
+      # Placements are no more sensitive than the vocabulary, and the
+      # Manager UI shows them beside every device.
+      !u UUIDs.App.ISA95Placement: false

@@ -92,6 +92,7 @@ import {formatFileSize} from '@/lib/utils'
 import {useDirectStore} from "@store/useDirectStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 import {useFileDownload} from "@composables/useFileDownload.js";
+import {toast} from "vue-sonner";
 
 export default {
   emits: ['rowClick'],
@@ -141,7 +142,13 @@ export default {
       if(!this.selectedRow?.file_uuid)
         return;
       const name = this.selectedRow.original_file_name ?? this.selectedRow.file_uuid;
-      await useFileDownload(this.s.client, name, this.selectedRow.file_uuid);
+      try {
+        await useFileDownload(this.s.client, name, this.selectedRow.file_uuid);
+      }
+      catch (err) {
+        console.error('File download failed', err);
+        toast.error('Download failed', { description: err?.message ?? 'The service did not return the file.' });
+      }
     },
     resolveType(){
       if(!this.selectedRow?.file_uuid)

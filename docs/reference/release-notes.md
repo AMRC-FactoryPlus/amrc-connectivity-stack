@@ -91,6 +91,19 @@ answered with the ingress, which never replied. The `krb5.conf` now
 names each realm's `master_kdc` and turns off `dns_lookup_kdc`. Clusters
 without the redirect see no change.
 
+### Read access to a dataset shows what is in it
+
+Data Access has a new route, `GET v1/metadata/:uuid/contents`. It lists
+the devices a download of the dataset reads, with each device's name
+and its metrics: path, type, unit and description. It needs only
+`Read dataset` on the dataset. Until now a client that could download a
+dataset could not see what it contained: the structure needs
+`Edit dataset`, and a device's metric list needs `Use Sparkplug data`
+on the device. Such a client had to guess metric names from downloaded
+data, and missed metrics that rarely report. Each metric's `path` can
+be sent as a `metrics` filter to download only that metric. The
+service client has a matching `get_dataset_contents` method.
+
 ### Dataset downloads need a time window
 
 `POST v1/data/:uuid` on Data Access no longer downloads a dataset with

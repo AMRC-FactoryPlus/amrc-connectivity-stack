@@ -1,18 +1,19 @@
 <!--
   - ACS Admin
-  - The "Manage i3X Access" button: how many people and groups can read
-  - a device or ISA-95 node through i3X, and the dialog to change it.
+  - The "Manage access" button: how many people and groups can browse a
+  - device or ISA-95 node through i3X or build datasets from the device,
+  - and the dialog to change it.
   - Copyright 2026 University of Sheffield AMRC
   -->
 
-<!-- A device counts everyone who can read it, by any route. An ISA-95
+<!-- A device counts everyone with access to it, by any route. An ISA-95
      node counts only the grants on that node: the dialog shows the rest.
      The dialog mounts only while open, so a table of these buttons does
      not start the principal stores once per row. -->
 <template>
   <Button variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
     <i class="fa-solid fa-shield-halved text-sm"></i>
-    <span>Manage i3X Access</span>
+    <span>Manage access</span>
     <Badge variant="secondary" class="min-w-5 justify-center px-1.5" :aria-label="title">
       <i v-if="count === null && loading" class="fa-solid fa-circle-notch animate-spin text-[10px]"></i>
       <template v-else>{{ count ?? '?' }}</template>
@@ -44,7 +45,7 @@ const props = defineProps({
   noun: { type: String, default: 'device' },
   /* The target's name, for the dialog title. */
   name: { type: String, default: '' },
-  /* Where the target sits, e.g. "AMRC / AMRC Cymru / Machine Shop". */
+  /* Where the target sits, e.g. "Example Co / North Site / Machine Shop". */
   path: { type: String, default: '' },
 })
 
@@ -60,8 +61,8 @@ const count = computed(() => {
 })
 
 const title = computed(() => count.value === null
-  ? 'i3X access'
-  : `${count.value} ${count.value === 1 ? 'person or group' : 'people and groups'} ${props.device ? 'can read this device' : 'granted on this node'} through i3X`)
+  ? 'Access'
+  : `${count.value} ${count.value === 1 ? 'person or group' : 'people and groups'} ${props.device ? (count.value === 1 ? 'has access to this device' : 'have access to this device') : 'granted on this node'}`)
 
 async function load () {
   loading.value = true
@@ -74,7 +75,7 @@ async function load () {
     loadError.value = null
   }
   catch (err) {
-    console.error('i3X read access: loading grants failed', err)
+    console.error('Device access: loading grants failed', err)
     loadError.value = err
     rows.value = []
   }

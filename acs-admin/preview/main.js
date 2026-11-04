@@ -20,6 +20,10 @@ import { useSchemaStore } from '../src/store/useSchemaStore.js'
 import { useSchemaDraftStore } from '../src/store/useSchemaDraftStore.js'
 import { useDeviceStore } from '../src/store/useDeviceStore.js'
 import { useServiceClientStore } from '../src/store/serviceClientStore.js'
+import { useISA95Store } from '../src/store/useISA95Store.js'
+import { useObjectStore } from '../src/store/useObjectStore.js'
+import { usePrincipalStore } from '../src/store/usePrincipalStore.js'
+import * as i3x from './i3x-fixtures.js'
 
 window.events = mitt()
 
@@ -27,6 +31,7 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', component: Preview, meta: { name: 'Schemas' } },
+    { path: '/access-control/:kind/:id', component: Preview, meta: { name: 'Access Control' } },
     {
       path: '/schemas',
       component: Preview,
@@ -84,6 +89,18 @@ const seed = () => {
    * reached without taking a service down. */
   const live = new URL(window.location.hash.slice(1), window.location.origin)
     .searchParams.get('live')
+
+  const surface = new URL(window.location.hash.slice(1), window.location.origin)
+    .searchParams.get('surface') ?? ''
+  if (surface.startsWith('i3x')) {
+    stub(useDeviceStore(), i3x.i3xDevices)
+    stub(useISA95Store(), i3x.isa95)
+    stub(useObjectStore(), i3x.objects)
+    stub(usePrincipalStore(), i3x.principals)
+    usePrincipalStore().rxsub = { unsubscribe () {} }
+    s.client = i3x.i3xClient
+    return
+  }
 
   s.client = {
     Directory: {

@@ -34,6 +34,7 @@
 - Services
    - [File Service](./services/file-service.md)
    - [Git Server](./services/git-server.md)
+   - [ISA-95 Placement](./services/isa95-placement.md)
    - [Notify v2](./services/notify-v2.md)
    - [Schema Editor](./services/schema-editor.md)
 - Authentication

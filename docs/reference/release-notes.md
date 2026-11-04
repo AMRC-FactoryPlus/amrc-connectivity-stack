@@ -12,6 +12,72 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Upgrading: every device has an ISA-95 placement
+
+A device's ISA-95 position is now its **placement**: one node of the
+ISA-95 vocabulary, stored in a new ConfigDB app, ISA-95 Placement. The
+levels above the node come from the vocabulary. The placement is the
+only source of a device's position. The `ISA95_Hierarchy` values in
+origin maps are no longer read by anything once the upgrade has run.
+See [ISA-95 placement](../services/isa95-placement.md).
+
+- **service-setup places every device during the upgrade.** For each
+  device with no placement, it uses the hierarchy at
+  `Device_Information/ISA95_Hierarchy`, or else any hierarchy found
+  elsewhere in the origin map (such as the nested
+  `Device_Information/Base_Device_Information/ISA95_Hierarchy`). It
+  matches the names to the vocabulary by name or alias, ignoring case,
+  and creates the nodes that are missing. It keeps the hierarchy's
+  Instance_UUID, so UNS history keys do not change. It never changes an
+  origin map, and never replaces a placement.
+- **Devices with no hierarchy at all are placed at your organisation's
+  Enterprise**, the chart value `acs.organisation`. They join the UNS,
+  and i3X, under that Enterprise. Move them in the Manager UI, or with
+  a bulk import, if that is not where they belong.
+- **Merge duplicate vocabulary nodes before you upgrade.** The
+  migration matches names to the vocabulary. If the vocabulary has two
+  nodes for one place (for example "Site1" and "Site 1" under the same
+  Enterprise), devices are split between them. Use **Merge into** on
+  the ISA-95 page first; it keeps the merged name as an alias, so both
+  spellings then match one node.
+- **A new service, the placement watcher, runs by default.** It renders
+  each placement into its device's Edge Agent config, at
+  `Device_Information/ISA95_Hierarchy`, and does so again whenever a
+  placement or the vocabulary changes. Renaming a vocabulary node now
+  moves every device under it on the UNS. It needs a new Kerberos
+  principal, which the chart creates. Turn it off with
+  `placementWatcher.enabled: false` only if you will save each device
+  in the Manager UI instead.
+- **Devices that only had a nested hierarchy drop off the UNS briefly
+  after the upgrade, and come back on their own.** The UNS ingester
+  now accepts a hierarchy only at `Device_Information/ISA95_Hierarchy`.
+  Such a device returns once the watcher has patched its Edge Agent
+  config and the Edge Agent has rebirthed it, normally within a minute.
+- **A device whose Edge Agent config entry has no `Instance_UUID` tag
+  cannot be patched** (its origin map is empty). The watcher logs it.
+  It gets its hierarchy when its origin map is saved.
+- **A hierarchy that cannot go in a topic is not migrated.** A value
+  that contains `/`, `+`, `#` or NUL, or is the word `Edge`, leaves the
+  device unplaced. service-setup logs each one; place them by hand.
+- **New devices need a placement.** The new device dialog has a
+  required ISA-95 picker. The device page's ISA-95 panel now shows for
+  every device and edits the placement. Device tables mark devices
+  that are not on the UNS and can filter on them.
+- **Import placements in bulk.** The ISA-95 page's **Import from
+  Devices** is replaced by **Import placements**, which takes a CSV of
+  device UUIDs and level names, shows a preview, and writes placements
+  only. It fills devices with no placement unless you tick
+  **Overwrite existing placements**.
+- **ConfigDB refuses a placement whose vocabulary chain is broken**: a
+  node with two parents, or with no parent one level up. Fix the
+  vocabulary first.
+- **The i3X database is rebuilt on first start** after the upgrade,
+  because its schema changed. i3X now places devices from their
+  placement.
+- **The Manager UI saves Edge Agent configs with `If-Match`.** If the
+  config changed while the UI was building it, the UI builds it again
+  from fresh data instead of overwriting the change.
+
 ### Upgrading: i3X shows each caller only the devices they may read
 
 Until now any principal that could log in to i3X could read every

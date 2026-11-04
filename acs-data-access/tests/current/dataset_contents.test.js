@@ -29,6 +29,9 @@ const SUB_UNION = "88888888-8888-4888-8888-888888888888";
 const SESSION = "99999999-9999-4999-8999-999999999999";
 const INVALID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const MISSING = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const UNS_A = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const UNS_SUB_B = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const MIXED = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 
 const FROM = "2026-01-01T00:00:00.000Z";
 const TO = "2026-02-01T00:00:00.000Z";
@@ -76,6 +79,13 @@ const DATASETS = {
         config: { source: UNION, from: FROM, to: TO } },
     [SUB_UNION]: { structure: App.UnionComponents, config: [SUB_A, SUB_A], from: null, to: null },
     [INVALID]: { structure: Constants.Special.InvalidDataset, config: null, from: null, to: null },
+    [UNS_A]: { structure: App.UNSDevice, config: { source: DEV_A }, from: null, to: null },
+    [UNS_SUB_B]: { structure: App.UNSDeviceMetrics, from: null, to: null, config: {
+        source: DEV_B,
+        metrics: [{ instance: DEV_B, metric: "Pressure" }],
+    }},
+    /* Device A through both stores, and device B through the UNS. */
+    [MIXED]: { structure: App.UnionComponents, config: [WHOLE_A, UNS_A, UNS_SUB_B], from: null, to: null },
 };
 
 const INFOS = IMap({
@@ -148,6 +158,7 @@ describe("GET /metadata/:uuid/contents", () => {
             devices: [{
                 uuid: DEV_A,
                 name: "Press_1",
+                store: "sparkplug",
                 metrics: [
                     {
                         instance: DEV_A, metric: "Switch_Closed", path: "Switch_Closed",
@@ -172,11 +183,42 @@ describe("GET /metadata/:uuid/contents", () => {
         expect(res.body.devices).toEqual([{
             uuid: DEV_A,
             name: "Press_1",
+            store: "sparkplug",
             metrics: [{
                 instance: CHARS, metric: "Current_AC", path: "Characteristics/Current_AC",
                 type: "FloatLE", unit: "A", documentation: "True RMS current",
             }],
         }]);
+    });
+
+    test("a UNS device lists every metric recorded to the historian, from the UNS", async () => {
+        const { res } = await contents(UNS_A);
+
+        expect(res.body.devices).toHaveLength(1);
+        expect(res.body.devices[0]).toMatchObject({ uuid: DEV_A, name: "Press_1", store: "uns" });
+        expect(paths(res.body.devices[0])).toEqual([
+            "Switch_Closed", "Characteristics/Current_AC", "Characteristics/Voltage",
+        ]);
+    });
+
+    test("UNS device metrics list their selected metrics with device-relative paths", async () => {
+        const { res } = await contents(UNS_SUB_B);
+
+        expect(res.body.devices.map(d => [d.uuid, d.store])).toEqual([[DEV_B, "uns"]]);
+        expect(paths(res.body.devices[0])).toEqual(["Pressure"]);
+    });
+
+    test("a device reached through both stores appears once per store", async () => {
+        const { res } = await contents(MIXED);
+
+        expect(res.body.devices.map(d => [d.uuid, d.store])).toEqual([
+            [DEV_A, "sparkplug"],
+            [DEV_A, "uns"],
+            [DEV_B, "uns"],
+        ]);
+        expect(paths(res.body.devices[1])).toEqual([
+            "Switch_Closed", "Characteristics/Current_AC", "Characteristics/Voltage",
+        ]);
     });
 
     test("a Union lists each component's device", async () => {

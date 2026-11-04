@@ -69,8 +69,12 @@ function setup(opts: { flushInterval?: number; flushMaxRows?: number; influxConc
         for (const [leaf, s] of series) {
             const m = tree.getMetricMeta(leaf);
             if (!m) continue;
+            /* The UNS historian's path: device segment, then the
+             * metric's path within the device. */
+            const seg = tree.unsDeviceSegment(m.topLevelInstanceUuid);
             rows.push({ _measurement: `${m.metricName}:${m.typeSuffix}`,
-                topLevelInstance: m.topLevelInstanceUuid, path: m.metricPath || undefined, ...s });
+                topLevelInstance: m.topLevelInstanceUuid,
+                path: m.metricPath ? `${seg}/${m.metricPath}` : seg, ...s });
         }
         return rows;
     });
@@ -167,7 +171,7 @@ describe("UNS values", () => {
         uns(s.valueCache, ["Status"], "ok", "2026-10-05T12:00:00Z");
         s.valueCache.flush();
         uns(s.valueCache, ["Speed"], 1, "2026-10-05T12:00:00Z");   // still pending
-        s.tree.addDevice("dev-2", { schema: "top", originMap: { Schema_UUID: "top", Instance_UUID: "dev-2" } }, null);
+        s.tree.addDevice("dev-2", plainDevInfo("dev-2", "AMRC"), null);
         uns(s.valueCache, ["X"], 1, "2026-10-05T12:00:00Z", "dev-2:");
         s.valueCache.removeDevice(DEV);
         expect(s.valueCache.size()).toBe(1);
@@ -630,6 +634,7 @@ describe("InfluxDB write-back", () => {
 function plainDevInfo(uuid: string, enterprise?: string) {
     return {
         schema: "top",
+        sparkplugName: uuid,
         originMap: {
             Schema_UUID: "top",
             Instance_UUID: uuid,
@@ -653,99 +658,21 @@ function devInfoWithoutIsa95() {
 const lastValueRows = (store: I3xStore) =>
     store.prepare("select element_id, device_uuid, source from last_value order by element_id").all() as any[];
 
-describe("InfluxDB write-back for devices that do not publish to UNS", () => {
+describe("Devices that do not publish to UNS", () => {
     const T1 = "2026-10-05T11:00:00Z";
-    const T2 = "2026-10-05T11:00:10Z";
 
-    it("a leaf of a device without ISA-95 hierarchy is read from InfluxDB every time", async () => {
+    it("are left out of the tree, with no ISA-95 levels made for them", () => {
         const s = setup();
+        const objects = () => (s.store.prepare("select count(*) n from object").get() as any).n;
+        const before = objects();
         s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
-        const temp = s.leaf("Temp", "dev-2");
-        const app = api(s);
-
-        s.series.set(temp, { _value: 1, _time: T1 });
-        const first = await request(app).post("/v1/objects/value").send({ elementIds: [temp] });
-        expect(first.body.results[0].result.value).toBe(1);
-
-        // No UNS message will ever replace a kept value: none is kept.
-        expect(rowCount(s.store)).toBe(0);
-        s.series.set(temp, { _value: 2, _time: T2 });
-        const second = await request(app).post("/v1/objects/value").send({ elementIds: [temp] });
-        expect(second.body.results[0].result.value).toBe(2);
-        s.series.set(temp, { _value: 3, _time: T2 });
-        const one = await request(app).get(`/v1/objects/${temp}/value`);
-        expect(one.body.result.value).toBe(3);
-        expect(s.queries).toHaveLength(3);
-
-        (s.history as any).queryApi = { collectRows: async () => [{ _value: 4, _time: T2 }] };
-        expect((await s.history.getCurrentValue(temp))!.value).toBe(4);
-        expect(rowCount(s.store)).toBe(0);
+        expect(s.tree.getObject("dev-2")).toBeUndefined();
+        expect(s.tree.publishesToUns("dev-2")).toBe(false);
+        expect(objects()).toBe(before);
+        expect(s.tree.unsDeviceSegment("dev-2")).toBeUndefined();
     });
 
-    it("a composition of such a device gets no markers, and is read from InfluxDB every time", async () => {
-        const s = setup();
-        s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
-        const temp = s.leaf("Temp", "dev-2");
-        const app = api(s);
-
-        s.series.set(temp, { _value: 1, _time: T1 });
-        await request(app).post("/v1/objects/value").send({ elementIds: ["dev-2"], maxDepth: 0 });
-        expect(rowCount(s.store)).toBe(0);
-        expect(s.valueCache.getValue("dev-2")).toBeNull();
-
-        s.series.set(temp, { _value: 2, _time: T2 });
-        const r = await request(app).post("/v1/objects/value").send({ elementIds: ["dev-2"], maxDepth: 0 });
-        expect(r.body.results[0].result.components[temp].value).toBe(2);
-        expect(s.queries).toHaveLength(2);
-    });
-
-    it("a composition over devices with and without ISA-95 hierarchy is never complete", async () => {
-        const s = setup();
-        // dev-3 sits directly under the NS enterprise; dev-2, without
-        // hierarchy, under NS/Unknown. Both are under the NS level.
-        s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
-        s.tree.addDevice("dev-3", plainDevInfo("dev-3", "NS"), null);
-        const ns = s.tree.getObject("dev-3")!.parentId!;
-        expect(s.tree.getObject(s.tree.getObject("dev-2")!.parentId!)!.parentId).toBe(ns);
-        const temp2 = s.leaf("Temp", "dev-2");
-        const temp3 = s.leaf("Temp", "dev-3");
-        const app = api(s);
-
-        s.series.set(temp2, { _value: 1, _time: T1 });
-        s.series.set(temp3, { _value: 10, _time: T1 });
-        await request(app).post("/v1/objects/value").send({ elementIds: [ns], maxDepth: 0 });
-        // dev-3's value and marker are kept; nothing of dev-2's.
-        expect(lastValueRows(s.store)).toEqual([
-            { element_id: s.leaf("Mode", "dev-3"), device_uuid: "dev-3", source: "empty" },
-            { element_id: temp3, device_uuid: "dev-3", source: "influx" },
-        ].sort((a, b) => a.element_id < b.element_id ? -1 : 1));
-        expect(s.valueCache.getValue(ns)).toBeNull();
-
-        s.series.set(temp2, { _value: 2, _time: T2 });
-        const r = await request(app).post("/v1/objects/value").send({ elementIds: [ns], maxDepth: 0 });
-        expect(r.body.results[0].result.components[temp2].value).toBe(2);
-        expect(r.body.results[0].result.components[temp3].value).toBe(10);
-        expect(s.queries).toHaveLength(2);
-    });
-
-    it("a mixed composition with UNS values is answered from those alone, as on main", async () => {
-        const s = setup();
-        s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
-        s.tree.addDevice("dev-3", plainDevInfo("dev-3", "NS"), null);
-        const ns = s.tree.getObject("dev-3")!.parentId!;
-        s.series.set(s.leaf("Temp", "dev-2"), { _value: 1, _time: T1 });
-        s.valueCache.onUnsMessage("UNS/v1/NS/Edge/D3/Mode",
-            Buffer.from(JSON.stringify({ timestamp: T1, value: "auto" })),
-            { properties: { userProperties: { InstanceUUIDPath: "dev-3:", SchemaUUIDPath: "top:" } } });
-
-        // Never complete, so only UNS values: dev-2's leaves are left
-        // out and InfluxDB is not read, which is what main did.
-        const r = await request(api(s)).post("/v1/objects/value").send({ elementIds: [ns], maxDepth: 0 });
-        expect(Object.keys(r.body.results[0].result.components)).toEqual([s.leaf("Mode", "dev-3")]);
-        expect(s.queries).toHaveLength(0);
-    });
-
-    it("takes the hierarchy only from Device_Information/ISA95_Hierarchy, as the ingester does", async () => {
+    it("takes the hierarchy only from Device_Information/ISA95_Hierarchy, as the ingester does", () => {
         const s = setup();
         const info: any = plainDevInfo("dev-2");
         // Hierarchy-v1 elsewhere: uns-ingester-sparkplug ignores it.
@@ -754,11 +681,31 @@ describe("InfluxDB write-back for devices that do not publish to UNS", () => {
             ISA95_Hierarchy: { Schema_UUID: HIERARCHY, Enterprise: { Value: "AMRC" } },
         };
         s.tree.addDevice("dev-2", info, null);
-        expect(s.tree.publishesToUns("dev-2")).toBe(false);
-        const temp = s.leaf("Temp", "dev-2");
-        s.series.set(temp, { _value: 1, _time: T1 });
-        await request(api(s)).post("/v1/objects/value").send({ elementIds: [temp] });
-        expect(rowCount(s.store)).toBe(0);
+        expect(s.tree.getObject("dev-2")).toBeUndefined();
+    });
+
+    it("leave the tree when they lose their hierarchy, and join it when they gain one", () => {
+        const s = setup();
+        s.tree.addDevice("dev-2", plainDevInfo("dev-2", "Other"), null);
+        const other = s.tree.getObject("dev-2")!.parentId!;
+        s.tree.replaceDeviceSubtree("dev-2", plainDevInfo("dev-2"), null);
+        expect(s.tree.getObject("dev-2")).toBeUndefined();
+        // Its level had nothing else under it.
+        expect(s.tree.getObject(other)).toBeUndefined();
+
+        s.tree.replaceDeviceSubtree("dev-2", plainDevInfo("dev-2", "AMRC"), null);
+        expect(s.tree.publishesToUns("dev-2")).toBe(true);
+        expect(s.tree.getObject(s.tree.getObject("dev-2")!.parentId!)!.displayName).toBe("AMRC");
+    });
+
+    it("gain nothing from a UNS message naming them", () => {
+        const s = setup();
+        s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
+        s.valueCache.onUnsMessage("UNS/v1/AMRC/Edge/D2/Mode",
+            Buffer.from(JSON.stringify({ timestamp: T1, value: "auto" })),
+            { properties: { userProperties: { InstanceUUIDPath: "dev-2:", SchemaUUIDPath: "top:" } } });
+        expect(s.tree.getObject("dev-2")).toBeUndefined();
+        expect(s.valueCache.size()).toBe(0);
     });
 
     /* A device with 1,100 leaves, so History writes two chunks with a
@@ -816,48 +763,6 @@ describe("InfluxDB write-back for devices that do not publish to UNS", () => {
         expect(rowCount(s.store)).toBe(0);
     });
 
-    it("keeps values for a device once it gains a hierarchy, from ConfigDB or from UNS", async () => {
-        const s = setup();
-        s.tree.addDevice("dev-2", plainDevInfo("dev-2"), null);
-        s.tree.addDevice("dev-3", plainDevInfo("dev-3"), null);
-        const app = api(s);
-        s.series.set(s.leaf("Temp", "dev-2"), { _value: 1, _time: T1 });
-        s.series.set(s.leaf("Temp", "dev-3"), { _value: 1, _time: T1 });
-        const read = () => request(app).post("/v1/objects/value")
-            .send({ elementIds: [s.leaf("Temp", "dev-2"), s.leaf("Temp", "dev-3")] });
-        await read();
-        expect(rowCount(s.store)).toBe(0);
-
-        // dev-2's DeviceInformation gains a hierarchy.
-        s.tree.replaceDeviceSubtree("dev-2", plainDevInfo("dev-2", "AMRC"), null);
-        // dev-3 is published to UNS: its birth certificate has one.
-        s.valueCache.onUnsMessage("UNS/v1/AMRC/Site/Edge/D3/Mode",
-            Buffer.from(JSON.stringify({ timestamp: T1, value: "auto" })),
-            { properties: { userProperties: { InstanceUUIDPath: "dev-3:", SchemaUUIDPath: "top:" } } });
-        expect(s.tree.publishesToUns("dev-2")).toBe(true);
-        expect(s.tree.publishesToUns("dev-3")).toBe(true);
-
-        await read();
-        expect(s.valueCache.getValue(s.leaf("Temp", "dev-2"))!.value).toBe(1);
-        expect(s.valueCache.getValue(s.leaf("Temp", "dev-3"))!.value).toBe(1);
-        await read();
-        expect(s.queries).toHaveLength(2);
-    });
-
-    it("removeInfluxValues drops values and markers kept from InfluxDB, not UNS values", async () => {
-        const s = setup();
-        s.series.set(s.leaf("Speed"), { _value: 1, _time: T1 });
-        await request(api(s)).post("/v1/objects/value").send({ elementIds: [DEV], maxDepth: 0 });
-        uns(s.valueCache, ["Status"], "ok", "2026-10-05T12:00:00Z");
-        s.valueCache.flush();
-        expect(lastValueRows(s.store).map(r => r.source).sort())
-            .toEqual(["empty", "influx", "uns"]);
-
-        s.valueCache.removeInfluxValues(DEV);
-        expect(lastValueRows(s.store)).toEqual([
-            { element_id: s.leaf("Status"), device_uuid: DEV, source: "uns" },
-        ]);
-    });
 });
 
 describe("Flux concurrency", () => {
@@ -896,5 +801,55 @@ describe("Flux concurrency", () => {
         expect(sem.running).toBe(0);
         expect(sem.waiting).toBe(0);
         expect(() => new Semaphore(0)).toThrow(RangeError);
+    });
+});
+
+describe("Leaves found from UNS", () => {
+    const T1 = "2026-10-05T11:00:00Z";
+    const message = (s: ReturnType<typeof setup>, topic: string, type?: string) =>
+        s.valueCache.onUnsMessage(topic,
+            Buffer.from(JSON.stringify({ timestamp: T1, value: 7 })),
+            { properties: { userProperties: {
+                InstanceUUIDPath: `${DEV}:`, SchemaUUIDPath: "top:",
+                ...(type ? { Type: type } : {}),
+            } } });
+
+    it("get MetricMeta from the message, so their history can be read", async () => {
+        const s = setup();
+        message(s, "UNS/v1/AMRC/Edge/Dev/New/Deep/Torque", "Double");
+        const torque = s.leaf("Torque", s.leaf("Deep", s.leaf("New")));
+        expect(s.tree.getMetricMeta(torque)).toEqual({
+            topLevelInstanceUuid: DEV, metricPath: "New/Deep", metricName: "Torque",
+            sparkplugType: "Double", typeSuffix: "d",
+        });
+
+        let query = "";
+        (s.history as any).queryApi = { collectRows: async (q: string) => { query = q; return []; } };
+        await s.history.queryHistory(torque, T1, T1);
+        expect(query).toContain(`r["path"] == "Dev/New/Deep"`);
+        expect(query).toContain(`r["_measurement"] == "Torque:d"`);
+    });
+
+    it("map a missing Type to a string, as the historians do", () => {
+        const s = setup();
+        message(s, "UNS/v1/AMRC/Edge/Dev/Note");
+        expect(s.tree.getMetricMeta(s.leaf("Note"))!.typeSuffix).toBe("s");
+    });
+
+    it("leave a config leaf's MetricMeta alone", () => {
+        const s = setup();
+        const before = s.tree.getMetricMeta(s.leaf("Speed"));
+        message(s, "UNS/v1/AMRC/Edge/Dev/Speed", "String");
+        expect(s.tree.getMetricMeta(s.leaf("Speed"))).toEqual(before);
+    });
+
+    it("record the device segment seen on the topic, over the config stand-in", () => {
+        const s = setup();
+        expect(s.tree.unsDeviceSegment(DEV)).toBe("Dev");
+        message(s, "UNS/v1/AMRC/Edge/Device One/Speed", "Double");
+        expect(s.tree.unsDeviceSegment(DEV)).toBe("Device One");
+        // A config change does not put the stand-in back.
+        s.tree.replaceDeviceSubtree(DEV, devInfo(), { name: "Device 1" });
+        expect(s.tree.unsDeviceSegment(DEV)).toBe("Device One");
     });
 });

@@ -876,16 +876,6 @@ export class ValueCache {
         this.store.prepare("delete from last_value where device_uuid = ?").run(uuid);
     }
 
-    /**
-     * Drop the values and markers kept from InfluxDB for a device that
-     * no longer publishes to UNS (History keeps none for such a device):
-     * no UNS message would replace them, so they would be served as
-     * current for ever. Its UNS values stay.
-     */
-    removeInfluxValues(uuid: string): void {
-        this.store.prepare("delete from last_value where device_uuid = ? and source != 'uns'").run(uuid);
-    }
-
     /** clear(), logging a failure instead of throwing: it runs at start
      * and from an MQTT event handler, where a throw would end the
      * process. Stored values then stay until the next clear. */

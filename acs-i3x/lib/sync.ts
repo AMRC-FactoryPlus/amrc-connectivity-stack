@@ -72,7 +72,6 @@ export interface ConfigSyncOpts {
     valueCache?: {
         removeDevice(uuid: string): void;
         removeElements?(ids: string[]): void;
-        removeInfluxValues?(uuid: string): void;
     };
     /** Fetches in flight at once. */
     concurrency?: number;
@@ -563,12 +562,11 @@ export class ConfigSync {
             if (di) {
                 this.tree.replaceDeviceSubtree(uuid, di.config,
                     infoName === null ? null : { name: infoName });
-                /* A device that has lost its ISA-95 hierarchy no longer
-                 * publishes to UNS, so nothing would replace the values
-                 * kept from InfluxDB. Dropped here, once per change, not
-                 * checked on every read of a composition. */
+                /* A device without ISA-95 hierarchy is not published to
+                 * UNS, so buildDevice left it out of the tree. Its values
+                 * go with it, as for a removed device. */
                 if (!this.tree.publishesToUns(uuid))
-                    this.opts.valueCache?.removeInfluxValues?.(uuid);
+                    this.opts.valueCache?.removeDevice(uuid);
             } else {
                 this.tree.updateDeviceName(uuid, infoName ?? sparkplugName ?? uuid);
             }

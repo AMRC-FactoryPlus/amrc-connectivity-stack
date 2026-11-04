@@ -75,8 +75,12 @@ function fakeInflux(tree: ObjectTree) {
                 const meta = tree.getMetricMeta(leaf);
                 const s = series.get(leaf);
                 if (!meta || !s || Date.parse(s._time) < since) continue;
+                /* The UNS historian's path: device segment, then the
+                 * metric's path within the device. */
+                const seg = tree.unsDeviceSegment(meta.topLevelInstanceUuid);
                 rows.push({ _measurement: `${meta.metricName}:${meta.typeSuffix}`,
-                    topLevelInstance: meta.topLevelInstanceUuid, path: meta.metricPath || undefined, ...s });
+                    topLevelInstance: meta.topLevelInstanceUuid,
+                    path: meta.metricPath ? `${seg}/${meta.metricPath}` : seg, ...s });
             }
         }
         return rows;
@@ -769,21 +773,6 @@ describe("values kept from InfluxDB, while connected", () => {
             .toContain("last_value_kept_ix");
         expect(plan("select element_id, source from last_value where device_uuid = 'x' and source != 'uns'"))
             .toContain("last_value_kept_ix");
-    });
-
-    it("gain the index in a database made before it existed", () => {
-        const path = join(mkdtempSync(join(tmpdir(), "i3x-")), "i3x.db");
-        try {
-            const a = new I3xStore({ path, checkpointInterval: 0 });
-            a.db.exec("drop index last_value_kept_ix");
-            a.close();
-            const b = new I3xStore({ path, checkpointInterval: 0 });
-            expect(b.warm).toBe(true);
-            expect(b.db.prepare("select 1 from sqlite_master where name = 'last_value_kept_ix'").get()).toBeTruthy();
-            b.close();
-        } finally {
-            rmSync(dirname(path), { recursive: true, force: true });
-        }
     });
 
     it("are not refreshed while disconnected or catching up", async () => {

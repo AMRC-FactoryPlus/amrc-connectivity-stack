@@ -24,9 +24,12 @@ function createMockQueryApi() {
 function createMockObjectTree(opts?: {
     knownUuids?: Set<string>;
     metricMeta?: Map<string, any>;
+    /** UNS device segment by device; SEGMENT for any not listed. */
+    segments?: Map<string, string | undefined>;
 }): ObjectTree {
     const knownUuids = opts?.knownUuids ?? new Set<string>();
     const metricMeta = opts?.metricMeta ?? new Map<string, any>();
+    const segments = opts?.segments ?? new Map<string, string | undefined>();
 
     return {
         getObject: jest.fn((elementId: string) => {
@@ -44,10 +47,13 @@ function createMockObjectTree(opts?: {
         }),
         getMetricMeta: jest.fn((elementId: string) => metricMeta.get(elementId)),
         getDescendantLeafIds: jest.fn((_elementId: string) => []),
+        unsDeviceSegment: jest.fn((uuid: string) =>
+            segments.has(uuid) ? segments.get(uuid) : SEGMENT),
     } as unknown as ObjectTree;
 }
 
-const BUCKET = "factory-plus";
+const BUCKET = "uns";
+const SEGMENT = "Press 1";
 const INFLUX_URL = "http://influx:8086";
 const INFLUX_TOKEN = "test-token";
 const INFLUX_ORG = "amrc";
@@ -113,12 +119,12 @@ describe("History", () => {
             expect(query).toContain(`from(bucket: "${BUCKET}")`);
             expect(query).toContain(`r["_measurement"] == "Temperature:d"`);
             expect(query).toContain(`r["topLevelInstance"] == "aaaa-1111-2222-3333"`);
-            expect(query).toContain(`r["path"] == "Phases/1"`);
+            expect(query).toContain(`r["path"] == "${SEGMENT}/Phases/1"`);
             expect(query).toContain(`r["_field"] == "value"`);
             expect(query).toContain("sort(columns: [\"_time\"])");
         });
 
-        it("for a leaf metric without metricPath omits path filter", () => {
+        it("for a top-level metric matches the device segment alone, exactly", () => {
             const metricMeta = new Map([
                 ["leaf-no-path", {
                     topLevelInstanceUuid: "bbbb-2222-3333-4444",
@@ -139,7 +145,37 @@ describe("History", () => {
 
             expect(query).toContain(`r["_measurement"] == "Voltage:d"`);
             expect(query).toContain(`r["topLevelInstance"] == "bbbb-2222-3333-4444"`);
-            expect(query).not.toContain("path");
+            expect(query).toContain(`r["path"] == "${SEGMENT}")`);
+        });
+
+        it("returns null while the device's UNS segment is not known", () => {
+            const objectTree = createMockObjectTree({
+                metricMeta: leafMeta("leaf-1"),
+                segments: new Map([["aaaa-1111-2222-3333", undefined]]),
+            });
+            const { history } = makeHistory({ objectTree });
+
+            expect(history.buildFluxQuery("leaf-1",
+                "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z")).toBeNull();
+        });
+
+        it("quotes every tag value as a Flux string literal", () => {
+            const objectTree = createMockObjectTree({
+                metricMeta: new Map([["leaf-q", {
+                    topLevelInstanceUuid: "aaaa-1111-2222-3333",
+                    metricPath: 'A"B',
+                    metricName: "T\\x",
+                    sparkplugType: "Double",
+                    typeSuffix: "d",
+                }]]),
+                segments: new Map([["aaaa-1111-2222-3333", "Dev ${x}"]]),
+            });
+            const { history } = makeHistory({ objectTree });
+
+            const query = history.buildFluxQuery("leaf-q",
+                "2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z")!;
+            expect(query).toContain(`r["_measurement"] == "T\\\\x:d"`);
+            expect(query).toContain(`r["path"] == "Dev \\\${x}/A\\"B"`);
         });
 
         it("returns null for an elementId with no MetricMeta", () => {

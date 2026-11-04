@@ -4,15 +4,19 @@
 
 /*
  * History — Translates i3X value and history requests into InfluxDB
- * Flux queries against the sparkplug (default) bucket.
+ * Flux queries against the UNS historian's bucket.
  *
  * Uses MetricMeta from ObjectTree to map elementIds to InfluxDB
- * measurement names and tag filters.
+ * measurement names and tag filters. The UNS historian's path tag is
+ * every topic segment between "Edge" and the metric name
+ * (UnsTopic.GetMetricPath): the device segment, then "/" and the
+ * metric's path within its device, or the device segment alone for a
+ * metric at the top level. See seriesPath.
  */
 
 import { InfluxDB } from "@influxdata/influxdb-client";
 import type { QueryApi } from "@influxdata/influxdb-client";
-import type { ObjectTree, Visible } from "./object-tree.js";
+import type { MetricMeta, ObjectTree, Visible } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import type { InfluxValue } from "./value-cache.js";
 import { Semaphore } from "./semaphore.js";
@@ -66,11 +70,9 @@ interface LastRow {
     _time: string;
 }
 
-/** Map key for a series: measurement, device and (optionally) path. */
-function seriesKey(measurement: string, tli: string, path?: string): string {
-    return path === undefined
-        ? `${measurement}\u0000${tli}`
-        : `${measurement}\u0000${tli}\u0000${path}`;
+/** Map key for a series: measurement, device and path. */
+function seriesKey(measurement: string, tli: string, path: string): string {
+    return `${measurement}\u0000${tli}\u0000${path}`;
 }
 
 /** Quote a value as a Flux string literal. */
@@ -265,22 +267,11 @@ export class History {
     async getCurrentValue(elementId: string): Promise<I3xValueResponse | null> {
         const meta = this.objectTree.getMetricMeta(elementId);
         if (!meta) return null;
+        const path = this.seriesPath(meta);
+        if (path === undefined) return null;
 
-        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-        const pathFilter = meta.metricPath
-            ? `  |> filter(fn: (r) => r["path"] == "${meta.metricPath}")`
-            : "";
-
-        const query = [
-            `from(bucket: "${this.bucket}")`,
-            `  |> range(start: -30d)`,
-            `  |> filter(fn: (r) => r["_measurement"] == "${measurement}")`,
-            `  |> filter(fn: (r) => r["topLevelInstance"] == "${meta.topLevelInstanceUuid}")`,
-            pathFilter,
-            `  |> filter(fn: (r) => r["_field"] == "value")`,
-            `  |> last()`,
-        ].filter(Boolean).join("\n");
-
+        const query = this.buildSeriesQuery(meta, path,
+            `  |> range(start: -30d)`, `  |> last()`);
         const rows = await this.query<{ _value: unknown; _time: string }>(query);
 
         if (rows.length === 0) return null;
@@ -407,11 +398,9 @@ export class History {
      *
      * last() runs per series, so this returns one row per series of
      * each device, in the same series order that the per-leaf query
-     * sees. Each leaf then takes the first row whose measurement and
-     * topLevelInstance match, and whose path matches when the leaf
-     * has a path. That is the same row getCurrentValue returns as
-     * rows[0] when a leaf has more than one series (for example after
-     * a device rename changes the `device` tag).
+     * sees. Each leaf then takes the first row whose measurement,
+     * topLevelInstance and path match (see seriesPath). That is the
+     * same row getCurrentValue returns as rows[0].
      *
      * When a chunk's leaves need at most `bulkMeasurementFilterMax`
      * distinct measurements, the query also filters on those
@@ -420,8 +409,8 @@ export class History {
      * series. The filter only drops series no leaf in the chunk can
      * match, so the rows each leaf sees, and their order, are the same.
      *
-     * Leaves without MetricMeta, or with no data in the window, are
-     * absent from the returned map.
+     * Leaves without MetricMeta or a known device segment, or with no
+     * data in the window, are absent from the returned map.
      */
     async getCurrentValues(leafIds: string[]): Promise<Map<string, I3xValueResponse>> {
         const { values } = await this.readLast(leafIds, "-30d", this.bulkConcurrency);
@@ -461,14 +450,11 @@ export class History {
             await slicer.maybe();
             const meta = this.objectTree.getMetricMeta(leafId);
             if (!meta) continue;
+            const path = this.seriesPath(meta);
+            if (path === undefined) continue;
             known.add(leafId);
             const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-            // A leaf without a path is not filtered on path at all by
-            // the per-leaf query, so match it on measurement and
-            // device only.
-            const key = meta.metricPath
-                ? seriesKey(measurement, meta.topLevelInstanceUuid, meta.metricPath)
-                : seriesKey(measurement, meta.topLevelInstanceUuid);
+            const key = seriesKey(measurement, meta.topLevelInstanceUuid, path);
             wanted.push({ leafId, key });
             let measurements = devices.get(meta.topLevelInstanceUuid);
             if (!measurements) devices.set(meta.topLevelInstanceUuid, measurements = new Set());
@@ -478,8 +464,7 @@ export class History {
         const out = new Map<string, I3xValueResponse>();
         if (wanted.length === 0) return { known, values: out };
 
-        // First row seen per key. Both the path-qualified and the
-        // path-less key are recorded for every row.
+        // First row seen per key.
         const first = new Map<string, { _value: unknown; _time: string }>();
         const chunks = chunk([...devices.keys()], this.bulkChunkSize);
         await mapLimit(chunks, concurrency, async (tlis) => {
@@ -492,11 +477,8 @@ export class History {
                 : undefined;
             const rows = await this.query<LastRow>(this.buildBulkLastQuery(tlis, filter, start));
             for (const row of rows) {
-                const path = row.path ?? "";
-                const withPath = seriesKey(row._measurement, row.topLevelInstance, path);
-                const noPath = seriesKey(row._measurement, row.topLevelInstance);
-                if (!first.has(withPath)) first.set(withPath, row);
-                if (!first.has(noPath)) first.set(noPath, row);
+                const key = seriesKey(row._measurement, row.topLevelInstance, row.path ?? "");
+                if (!first.has(key)) first.set(key, row);
             }
         });
 
@@ -554,21 +536,45 @@ export class History {
     ): string | null {
         const meta = this.objectTree.getMetricMeta(elementId);
         if (!meta) return null;
+        const path = this.seriesPath(meta);
+        if (path === undefined) return null;
 
-        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
-        const pathFilter = meta.metricPath
-            ? `  |> filter(fn: (r) => r["path"] == "${meta.metricPath}")`
-            : "";
-
-        return [
-            `from(bucket: "${this.bucket}")`,
+        return this.buildSeriesQuery(meta, path,
             `  |> range(start: ${startTime}, stop: ${endTime})`,
-            `  |> filter(fn: (r) => r["_measurement"] == "${measurement}")`,
-            `  |> filter(fn: (r) => r["topLevelInstance"] == "${meta.topLevelInstanceUuid}")`,
-            pathFilter,
+            `  |> sort(columns: ["_time"])`);
+    }
+
+    /**
+     * The path tag of a leaf's series in the UNS bucket: the device
+     * segment of its UNS topics (ObjectTree.unsDeviceSegment), then "/"
+     * and the metric's path within the device, or the segment alone
+     * for a metric at the top level. Undefined while the segment is
+     * not known, as there is then no series to match.
+     */
+    seriesPath(meta: MetricMeta): string | undefined {
+        const segment = this.objectTree.unsDeviceSegment(meta.topLevelInstanceUuid);
+        if (!segment) return undefined;
+        return meta.metricPath ? `${segment}/${meta.metricPath}` : segment;
+    }
+
+    /**
+     * One leaf's query: the range, the series filters, then the final
+     * step. The path is matched exactly, so a same-named metric
+     * elsewhere in the device is never read in its place. Every tag
+     * value is quoted with fluxString; `range` and `final` are built
+     * here, never from client input.
+     */
+    private buildSeriesQuery(meta: MetricMeta, path: string, range: string, final: string): string {
+        const measurement = `${meta.metricName}:${meta.typeSuffix}`;
+        return [
+            `from(bucket: ${fluxString(this.bucket)})`,
+            range,
+            `  |> filter(fn: (r) => r["_measurement"] == ${fluxString(measurement)})`,
+            `  |> filter(fn: (r) => r["topLevelInstance"] == ${fluxString(meta.topLevelInstanceUuid)})`,
+            `  |> filter(fn: (r) => r["path"] == ${fluxString(path)})`,
             `  |> filter(fn: (r) => r["_field"] == "value")`,
-            `  |> sort(columns: ["_time"])`,
-        ].filter(Boolean).join("\n");
+            final,
+        ].join("\n");
     }
 
     /**

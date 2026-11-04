@@ -40,6 +40,11 @@ export function empty_state () {
  * Items
  * ------------------------------------------------------------------ */
 
+// The device datasets a picked device reuses: the builder makes only
+// UNS device datasets, so it reuses only those. An older device dataset
+// stays in a dataset that already has it (item_for keeps it).
+export const BUILDER_DEVICE_STRUCTURES = [STRUCTURE.UNS_DEVICE]
+
 /**
  * A builder item for a dataset UUID: device datasets of either kind
  * become devices, keeping the dataset, so edit and duplicate reuse it.
@@ -159,7 +164,7 @@ export function repeated_devices (items, byUuid) {
 export function device_dataset_plan (items, byUuid) {
     return items.filter(i => i.type === 'device').map(i => ({
         device: i.uuid,
-        existing: i.dataset ?? device_dataset_for(i.uuid, byUuid),
+        existing: i.dataset ?? device_dataset_for(i.uuid, byUuid, BUILDER_DEVICE_STRUCTURES),
     }))
 }
 
@@ -170,7 +175,7 @@ export function device_dataset_plan (items, byUuid) {
 export function item_datasets (items, map, byUuid) {
     const out = []
     for (const i of items) {
-        const u = i.type === 'device' ? (i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid)) : i.uuid
+        const u = i.type === 'device' ? (i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid, BUILDER_DEVICE_STRUCTURES)) : i.uuid
         if (u && !out.includes(u)) out.push(u)
     }
     return out
@@ -182,7 +187,7 @@ export function labels_by_dataset (items, map, byUuid) {
     for (const i of items) {
         const v = (i.label ?? '').trim()
         if (i.type !== 'device' || !v) continue
-        const u = i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid)
+        const u = i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid, BUILDER_DEVICE_STRUCTURES)
         if (u) out[u] = v
     }
     return out
@@ -323,28 +328,4 @@ export function text_match (query, strings) {
     if (!q) return true
     const hay = strings.filter(Boolean).join(' ').toLowerCase()
     return q.split(/\s+/).every(w => hay.includes(w))
-}
-
-/**
- * Group devices by site, then area, sorted by name.
- * Returns [{ site, areas: [{ area, devices }] }]. Missing values sort last.
- */
-export function group_devices (devices) {
-    const sites = new Map()
-    for (const d of devices) {
-        const site = d.site ?? 'No site'
-        const area = d.area ?? 'No area'
-        if (!sites.has(site)) sites.set(site, new Map())
-        const areas = sites.get(site)
-        if (!areas.has(area)) areas.set(area, [])
-        areas.get(area).push(d)
-    }
-    const order = (a, b, none) => (a === none) - (b === none) || a.localeCompare(b)
-    return [...sites].sort(([a], [b]) => order(a, b, 'No site')).map(([site, areas]) => ({
-        site,
-        areas: [...areas].sort(([a], [b]) => order(a, b, 'No area')).map(([area, list]) => ({
-            area,
-            devices: list.sort((x, y) => (x.name ?? '').localeCompare(y.name ?? '')),
-        })),
-    }))
 }

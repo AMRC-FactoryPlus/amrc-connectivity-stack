@@ -4,9 +4,12 @@
 
 <!-- i3X read access for the selected Explorer node: an ISA-95 level
      (granted on its vocabulary node) or a device. Other nodes are read
-     with their device, so show nothing for them. -->
+     with their device, so show nothing for them. A device also gets a
+     link to build a dataset from it. -->
 <script setup>
 import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { Button } from '@/components/ui/button'
 import { useExplorerStore } from '@store/useExplorerStore.js'
 import { useISA95Store, ISA95_LEVELS } from '@store/useISA95Store.js'
 import { resolve_isa95 } from '@/lib/access/i3x-access.js'
@@ -16,6 +19,7 @@ const ISA95_LEVEL_TYPE = 'isa95-level'
 
 const store = useExplorerStore()
 const isa95 = useISA95Store()
+const router = useRouter()
 onMounted(() => isa95.start())
 
 const nodeOf = id => store.nodes.get(id)?.node ?? null
@@ -44,9 +48,14 @@ const deviceVia = computed(() => isDevice.value
 </script>
 
 <template>
-  <div v-if="isDevice" class="p-4 border-t">
+  <div v-if="isDevice" class="flex flex-wrap gap-2 p-4 border-t">
     <I3xAccessButton :target="selected.elementId" device :via="deviceVia" noun="device"
                      :name="selected.displayName" :path="chainTo(selected.parentId).join(' / ')"/>
+    <Button variant="outline" size="sm" class="gap-2"
+            @click="router.push({ path: '/datasets/new', query: { devices: selected.elementId } })">
+      <i class="fa-solid fa-database text-sm"></i>
+      <span>Build dataset</span>
+    </Button>
   </div>
   <template v-else-if="isLevel && isa95.ready">
     <div v-if="levelMatched" class="p-4 border-t">

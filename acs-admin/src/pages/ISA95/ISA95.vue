@@ -16,9 +16,9 @@
       @row-click="e => nodeClick(e.original)"
     >
       <template #toolbar-right>
-        <Button variant="outline" class="gap-2" @click="importFromDevices">
+        <Button variant="outline" class="gap-2" @click="importPlacements">
           <i class="fa-solid fa-file-import"></i>
-          <span>Import from Devices</span>
+          <span>Import placements</span>
         </Button>
         <Button class="gap-2" @click="newNode">
           <i class="fa-solid fa-plus"></i>
@@ -28,7 +28,7 @@
       <template #empty>
         <EmptyState
           title="No ISA-95 Hierarchy"
-          description="No ISA-95 hierarchy has been configured yet. Create an Enterprise to start building the hierarchy, or import it from the values already saved on your devices."
+          description="No ISA-95 hierarchy has been configured yet. Create an Enterprise to start building the hierarchy."
           button-text="New Node"
           button-icon="plus"
           @button-click="newNode"/>
@@ -45,6 +45,9 @@
             </div>
             <Button title="Edit Node" size="xs" class="flex gap-1 ml-auto" @click="editNode" variant="ghost">
               <i class="fa-solid fa-pen text-gray-400"></i>
+            </Button>
+            <Button title="Merge into..." size="xs" class="flex gap-1" @click="mergeNode" variant="ghost">
+              <i class="fa-solid fa-code-merge text-gray-400"></i>
             </Button>
             <Button title="Delete Node" size="xs" class="flex gap-1" @click="deleteNode" variant="ghost">
               <i class="fa-solid fa-trash text-red-400"></i>
@@ -109,9 +112,11 @@ import { ref } from "vue";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 import { useDialog } from '@/composables/useDialog';
 import { useServiceClientStore } from "@store/serviceClientStore";
+import { useDeviceStore } from "@store/useDeviceStore.js";
 import { toast } from "vue-sonner";
 import I3xAccessButton from "@components/Access/I3xAccessButton.vue";
 import { isa95_path } from "@/lib/access/i3x-access.js";
+import { devices_placed_under } from "@/lib/isa95-placement.js";
 
 export default {
   name: 'ISA95',
@@ -123,10 +128,14 @@ export default {
       isa95: useISA95Store(),
       columns: isa95Columns,
       s: useServiceClientStore(),
+      d: useDeviceStore(),
     }
   },
 
   async mounted() {
+    /* Deleting and merging nodes need each device's placement. */
+    if (!this.d.rxsub) this.d.start();
+    window.events.on('isa95-node-merged', this.onMerged);
     await this.isa95.start();
   },
 
@@ -182,8 +191,15 @@ export default {
     editNode() {
       window.events.emit('show-new-isa95-node-dialog', this.selectedNode)
     },
-    importFromDevices() {
-      window.events.emit('show-isa95-import-dialog')
+    importPlacements() {
+      window.events.emit('show-isa95-placement-import-dialog')
+    },
+    mergeNode() {
+      window.events.emit('show-isa95-merge-dialog', this.selectedNode)
+    },
+    /* After a merge the selected node is gone; show the one it went into. */
+    onMerged(uuid) {
+      this.selectedUuid = uuid ?? null;
     },
     deleteNode() {
       const node = this.selectedNode;
@@ -193,9 +209,23 @@ export default {
         });
         return;
       }
+      if (!this.d.ready) {
+        toast.error('Devices are still loading', {
+          description: 'Try again in a moment.',
+        });
+        return;
+      }
+      const placements = new Map(this.d.data.map(d => [d.uuid, d.placement]));
+      const placed = devices_placed_under(this.isa95.vocabulary, placements, node.uuid);
+      if (placed.length > 0) {
+        toast.error(`${placed.length} device${placed.length === 1 ? ' is' : 's are'} placed on ${node.name}`, {
+          description: 'Move them to another node first, or merge this node into another one.',
+        });
+        return;
+      }
       useDialog({
         title: 'Delete Node',
-        message: `Are you sure you want to delete "${node.name}"? Devices using this value will no longer match the vocabulary. This action cannot be undone.`,
+        message: `Delete "${node.name}" from the ISA-95 vocabulary? No devices are placed on it. You cannot undo this.`,
         confirmText: 'Delete',
         onConfirm: async () => {
           try {
@@ -223,6 +253,7 @@ export default {
   },
 
   unmounted() {
+    window.events.off('isa95-node-merged', this.onMerged);
     this.isa95.stop();
   }
 }

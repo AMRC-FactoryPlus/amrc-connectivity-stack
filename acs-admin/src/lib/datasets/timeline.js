@@ -9,6 +9,7 @@
 
 import { REFERENCE_TYPES } from './constants.js'
 import { display_name, london_date_key, london_local_to_ms, london_start_of_day, snap } from './model.js'
+import { NO_PATH } from './i3x-devices.js'
 
 const HOUR = 3600e3
 const DAY = 24 * HOUR
@@ -151,7 +152,8 @@ export function equipment_devices (equipment, resolve, byUuid) {
  * @param p.ongoing        datasets with no window: [{ record, devices }]
  * @param p.equipment      equipment records
  * @param p.eq_devices     equipment uuid -> [{ device, dataset, label }]
- * @param p.devices        every device from the device store
+ * @param p.devices        every device the pages know of (the store's
+ *                         deviceIndex), each with its ISA-95 `path`
  * @param p.expanded       { ongoing, other, [equipment uuid] } booleans
  * @param p.query          the search box
  * Groups with nothing in them are left out.
@@ -178,12 +180,13 @@ export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, dev
             key,
             device: uuid,
             name: d?.name ?? uuid.slice(0, 8),
-            tag: tag ?? metric_count(d?.metrics?.length ?? 0),
+            // Metric lists come from the ConfigDB, which not everyone can read.
+            tag: tag ?? (Array.isArray(d?.metrics) ? metric_count(d.metrics.length) : null),
             status: d?.status ?? null,
             indent,
         }
     }
-    const device_text = d => [d?.name, d?.sparkplug, d?.address, d?.site, d?.area]
+    const device_text = d => [d?.name, d?.sparkplug, d?.address, ...(d?.path ?? [])]
 
     // Ongoing datasets.
     const bands = ongoing.filter(o => text_match(q, [display_name(o.record), ...(o.record.tags ?? []).map(t => `#${t}`)]))
@@ -229,12 +232,13 @@ export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, dev
         }
     }
 
-    // Devices in no equipment, by site and area.
+    // Devices in no equipment, under their ISA-95 path. Devices with
+    // no path come last.
     const others = devices
         .filter(d => !in_equipment.has(d.uuid) && text_match(q, device_text(d)))
-        .sort((a, b) => (a.site ?? '￿').localeCompare(b.site ?? '￿')
-            || (a.area ?? '￿').localeCompare(b.area ?? '￿')
-            || a.name.localeCompare(b.name))
+        .sort((a, b) => (a.path?.length ? 0 : 1) - (b.path?.length ? 0 : 1)
+            || place_label(a).localeCompare(place_label(b))
+            || (a.name ?? '').localeCompare(b.name ?? ''))
     matched += q ? others.length : 0
     if (others.length) {
         const open = q ? true : !!expanded.other
@@ -260,10 +264,9 @@ export function metric_count (n) {
     return `${n} ${n === 1 ? 'metric' : 'metrics'}`
 }
 
-/** "Site · Area", or what there is of it. */
+/** The device's ISA-95 path, "Enterprise / Site / Area". */
 export function place_label (d) {
-    if (d.site && d.area) return `${d.site} · ${d.area}`
-    return d.site ?? d.area ?? 'No site or area'
+    return d?.path?.length ? d.path.join(' / ') : NO_PATH
 }
 
 /** The index of the row at y (px from the top of the lanes), or -1. */
@@ -399,7 +402,9 @@ export function resolve_selection (sel, rows, step = 5 * 60 * 1000) {
 /** Device counts for the selection card. */
 export function selection_summary (device_uuids, device_by) {
     const devices = device_uuids.map(u => device_by[u] ?? { uuid: u, name: u.slice(0, 8), metrics: [] })
-    const metrics = devices.reduce((n, d) => n + (d.metrics?.length ?? 0), 0)
+    // Null when a device's metrics are not readable: unknown, not short.
+    const metrics = devices.some(d => !Array.isArray(d.metrics)) ? null
+        : devices.reduce((n, d) => n + d.metrics.length, 0)
     return {
         count: devices.length,
         metrics,

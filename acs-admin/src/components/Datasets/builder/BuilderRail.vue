@@ -16,7 +16,7 @@
           <div class="text-xs text-slate-500">{{ devices.length === 1 ? 'device' : 'devices' }}</div>
         </div>
         <div>
-          <div class="text-xl font-semibold leading-7 tabular-nums">{{ metrics }}</div>
+          <div class="text-xl font-semibold leading-7 tabular-nums">{{ metrics ?? '–' }}</div>
           <div class="text-xs text-slate-500">{{ metrics === 1 ? 'metric' : 'metrics' }}</div>
         </div>
       </div>
@@ -83,7 +83,7 @@ import { fetch_series } from '@/lib/datasets/api.js'
 import {
   series_request, window_strip, device_status, fmt_since, count_too_long,
   coverage_every, coverage_not_ready, COVERAGE_NOTE, usable_windows,
-  LAST_LOOKBACK, LIMITS, NO_WINDOW_SPAN,
+  LAST_LOOKBACK, LIMITS, NO_WINDOW_SPAN, DEVICE_STORE,
 } from '@/lib/datasets/series.js'
 import { window_gaps, gap_note } from '@/lib/datasets/gaps.js'
 import { fmt_window } from '@/lib/datasets/model.js'
@@ -104,8 +104,11 @@ const ds = useDatasetsStore()
 const showStore = ref(false)
 
 const covered = computed(() => covered_devices(props.items, ds.byUuid))
-const devices = computed(() => covered.value.devices.map(u => ds.deviceByUuid[u] ?? { uuid: u, name: u.slice(0, 8), metrics: [], status: null }))
-const metrics = computed(() => devices.value.reduce((n, d) => n + (d.metrics?.length ?? 0), 0))
+const devices = computed(() => covered.value.devices.map(u => ds.deviceIndexByUuid[u] ?? { uuid: u, name: u.slice(0, 8), metrics: [], status: null }))
+// Metric lists come from the ConfigDB. A device only i3X shows has
+// none here, so the total is unknown rather than short.
+const metrics = computed(() => devices.value.some(d => !Array.isArray(d.metrics)) ? null
+  : devices.value.reduce((n, d) => n + d.metrics.length, 0))
 const online = computed(() => devices.value.filter(d => d.status?.online).length)
 const offline = computed(() => devices.value.filter(d => d.status && !d.status.online))
 const unknownStatus = computed(() => devices.value.filter(d => !d.status).length)
@@ -171,8 +174,8 @@ async function loadStrips () {
   }
   // Windows over 14 days read the coverage summary.
   const body = count_too_long(from, to)
-    ? { devices: list, from, to, every: coverage_every(from, to, { max: 120 }), count: true }
-    : { devices: list, from, to, points: 60, count: true }
+    ? { devices: list, from, to, every: coverage_every(from, to, { max: 120 }), count: true, store: DEVICE_STORE }
+    : { devices: list, from, to, points: 60, count: true, store: DEVICE_STORE }
   try {
     const s = await fetch_series(sc.client, series_request(body))
     if (my !== gen) return
@@ -197,7 +200,7 @@ async function loadLasts () {
   for (const u of want) lastAt.set(u, now)
   const hour = Math.ceil(now / 3600e3) * 3600e3
   try {
-    const l = await fetch_series(sc.client, series_request({ devices: want, from: hour - 3600e3, to: hour, every: '1h', last: LAST_LOOKBACK }))
+    const l = await fetch_series(sc.client, series_request({ devices: want, from: hour - 3600e3, to: hour, every: '1h', last: LAST_LOOKBACK, store: DEVICE_STORE }))
     // A newer request took over: these were not stored, so ask again next time.
     if (my !== lastsGen) { for (const u of want) lastAt.delete(u); return }
     const got = {}
@@ -226,7 +229,7 @@ const gaps = computed(() => {
 })
 
 const preview = computed(() => shown.value.map(u => {
-  const d = ds.deviceByUuid[u]
+  const d = ds.deviceIndexByUuid[u]
   const s = counts.value
   const g = gaps.value?.devices[u]
   const strip = s ? window_strip(s.devices[u]?.count ?? [], { from: span.value.from, to: span.value.to, width: STRIP_W, cell: 4 }) : { cells: [] }

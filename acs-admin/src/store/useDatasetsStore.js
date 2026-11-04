@@ -16,6 +16,8 @@ import { useISA95Store } from '@store/useISA95Store.js'
 import { placement_path } from '@/lib/isa95-placement.js'
 import { merge_datasets, historised_metrics, display_name, resolve_devices } from '@/lib/datasets/model.js'
 import { DA } from '@/lib/datasets/constants.js'
+import { devices_from_tree, merge_device_index, ISA95_LEVEL_TYPE, HAS_CHILDREN } from '@/lib/datasets/i3x-devices.js'
+import { useI3xClient } from '@composables/useI3xClient.js'
 
 const STATUS_POLL_MS = 60 * 1000
 // Keep the subscriptions this long after the last page leaves, so moving
@@ -29,6 +31,10 @@ let subStoresStarted = false
 const RESUBSCRIBE_MS = 15 * 1000
 const retryTimers = new Set()
 let onVisible = null
+// The i3X device list load in progress, so callers share it.
+let i3xLoad = null
+// Levels asked about in one has-children lookup.
+const I3X_LEVELS_PER_CALL = 500
 
 export const useDatasetsStore = defineStore('datasets', {
     state: () => ({
@@ -48,6 +54,12 @@ export const useDatasetsStore = defineStore('datasets', {
         subs: [],
         statusTimer: null,
         lingerTimer: null,
+        // The devices i3X shows this person, with their ISA-95 paths
+        // (devices_from_tree). People who cannot read the ConfigDB's
+        // device list can still build datasets from these.
+        i3xDevices: [],
+        i3xReady: false,
+        i3xError: null,
     }),
 
     getters: {
@@ -145,6 +157,16 @@ export const useDatasetsStore = defineStore('datasets', {
         },
 
         devicesReady: () => useDeviceStore().ready,
+
+        /**
+         * Every device the pages know of: the ones i3X shows, with
+         * their ISA-95 path, and the ConfigDB's, with their details
+         * (merge_device_index). For names, the picker and the
+         * timeline's lanes.
+         */
+        deviceIndex () { return merge_device_index(this.i3xDevices, this.deviceInfo, this.status) },
+
+        deviceIndexByUuid () { return Object.fromEntries(this.deviceIndex.map(d => [d.uuid, d])) },
     },
 
     actions: {
@@ -202,6 +224,8 @@ export const useDatasetsStore = defineStore('datasets', {
                 }, STATUS_POLL_MS)
                 onVisible = () => { if (document.visibilityState === 'visible' && this.running) this.pollStatus() }
                 document.addEventListener('visibilitychange', onVisible)
+
+                this.loadI3xDevices()
             }
             catch (err) {
                 // Let the next page that needs the store start it again.
@@ -309,6 +333,37 @@ export const useDatasetsStore = defineStore('datasets', {
             catch (err) {
                 console.warn('Datasets: device status poll failed', err)
             }
+        },
+
+        /**
+         * Load the devices i3X shows this person: every ISA-95 level,
+         * then what sits under each. Called on start and each time the
+         * device picker opens, so new grants show up.
+         */
+        loadI3xDevices () {
+            if (i3xLoad) return i3xLoad
+            i3xLoad = (async () => {
+                try {
+                    const i3x = useI3xClient()
+                    const levels = await i3x.getObjects({ typeElementId: ISA95_LEVEL_TYPE }) ?? []
+                    const ids = levels.map(l => l.elementId).filter(Boolean)
+                    const related = []
+                    for (let i = 0; i < ids.length; i += I3X_LEVELS_PER_CALL) {
+                        related.push(...await i3x.getRelatedBulk(ids.slice(i, i + I3X_LEVELS_PER_CALL), HAS_CHILDREN))
+                    }
+                    this.i3xDevices = devices_from_tree(levels, related)
+                    this.i3xError = null
+                }
+                catch (err) {
+                    console.warn('Datasets: the device list did not load from i3X', err)
+                    this.i3xError = 'The device list did not load from i3X.'
+                }
+                finally {
+                    this.i3xReady = true
+                    i3xLoad = null
+                }
+            })()
+            return i3xLoad
         },
 
         name (uuid) { return display_name(this.byUuid[uuid]) },

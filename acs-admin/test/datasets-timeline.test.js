@@ -58,9 +58,9 @@ function fixture () {
     ]
     const byUuid = merge_datasets(metadata, structures)
     const devices = [
-        { uuid: D1, name: 'Meter 1', site: 'Site A', area: 'Hall 1', metrics: [{}, {}], status: { online: true } },
-        { uuid: D2, name: 'Spindle', site: 'Site A', area: 'Hall 1', metrics: [{}], status: null },
-        { uuid: D3, name: 'Chiller', site: 'Site A', area: 'Yard', metrics: [{}, {}, {}], status: { online: false, last_change: NOW } },
+        { uuid: D1, name: 'Meter 1', path: ['Works', 'Site A', 'Hall 1'], metrics: [{}, {}], status: { online: true } },
+        { uuid: D2, name: 'Spindle', path: ['Works', 'Site A', 'Hall 1'], metrics: [{}], status: null },
+        { uuid: D3, name: 'Chiller', path: ['Works', 'Site A', 'Yard'], metrics: [{}, {}, {}], status: { online: false, last_change: NOW } },
     ]
     return { byUuid, devices }
 }
@@ -152,7 +152,7 @@ describe('lanes', () => {
         expect(rows.map(r => r.kind)).toEqual(['ongoing-header', 'equipment', 'device', 'device', 'other-header', 'place', 'device'])
         expect(rows[2].tag).toBe('Energy')
         expect(rows[3].tag).toBe('1 metric')
-        expect(rows[5].name).toBe('Site A · Yard')
+        expect(rows[5].name).toBe('Works / Site A / Yard')
         expect(rows[6].status).toEqual({ online: false, last_change: NOW })
     })
 
@@ -169,10 +169,25 @@ describe('lanes', () => {
         expect(rows).toEqual([])
     })
 
-    it('labels places', () => {
-        expect(place_label({ site: 'S', area: 'A' })).toBe('S · A')
-        expect(place_label({ site: null, area: 'A' })).toBe('A')
-        expect(place_label({})).toBe('No site or area')
+    it('labels places by ISA-95 path', () => {
+        expect(place_label({ path: ['Works', 'Site A', 'Yard'] })).toBe('Works / Site A / Yard')
+        expect(place_label({ path: [] })).toBe('Not in the ISA-95 hierarchy')
+        expect(place_label({})).toBe('Not in the ISA-95 hierarchy')
+    })
+
+    it('groups other devices by path, unplaced last, and counts metrics only when known', () => {
+        const devices = [
+            { uuid: 'x', name: 'Unplaced', path: [], metrics: [{}] },
+            { uuid: 'y', name: 'Pump', path: ['Works', 'Site B'], metrics: null },
+            { uuid: 'z', name: 'Fan', path: ['Works', 'Site A'], metrics: [] },
+        ]
+        const { rows } = build_rows({ devices, expanded: { other: true } })
+        expect(rows.map(r => r.name)).toEqual([
+            'Other devices', 'Works / Site A', 'Fan', 'Works / Site B', 'Pump', 'Not in the ISA-95 hierarchy', 'Unplaced',
+        ])
+        expect(rows[2].tag).toBe('0 metrics')
+        expect(rows[4].tag).toBeNull()
+        expect(build_rows({ devices, query: 'site b' }).rows.map(r => r.name)).toEqual(['Other devices', 'Works / Site B', 'Pump'])
     })
 
     it('finds the row at a y position', () => {
@@ -254,6 +269,12 @@ describe('selection', () => {
     it('drops a selection whose rows have gone', () => {
         const { rows } = layout()
         expect(resolve_selection({ k0: 'gone', k1: 'gone', t0: 0, t1: 1 }, rows)).toBeNull()
+    })
+
+    it('leaves the metric count out when a device has no readable metric list', () => {
+        const s = selection_summary(['a', 'b'], { a: { uuid: 'a', name: 'A', metrics: [{}] }, b: { uuid: 'b', name: 'B', metrics: null } })
+        expect(s.metrics).toBeNull()
+        expect(s.count).toBe(2)
     })
 
     it('lists four devices and counts the rest', () => {

@@ -228,6 +228,70 @@ membership is transitive over subclasses, a dataset classified into a
 subclass of a functional class (e.g. a hypothetical `MES work order` ⊂
 `MES dataset`) is reported as a member of both.
 
+### `GET v1/metadata/:uuid/contents`
+
+Lists the devices and metrics that a download of the dataset reads.
+Read access to a dataset includes seeing what is in it, so this
+requires only `Read dataset` on `:uuid`, with the same checks as
+`GET v1/metadata/:uuid`: `403` without it, and `404` if the dataset
+does not exist or is structurally invalid. The caller needs no
+permission on the devices. Data Access reads their origin maps with its
+own rights, as it does for a download.
+
+The dataset is resolved the same way as for `POST v1/data/:uuid`:
+`Union components` recursively, `Session limits` down to their source,
+to a list of `Sparkplug source` and `Sub-device` sources. On success,
+returns:
+
+Property | Type | Meaning
+---|---|---
+`uuid` | UUID | Dataset UUID
+`from` / `to` | date | As for `GET v1/metadata/:uuid`; omitted where unbounded
+`devices` | array | One entry per device, in the order the dataset first reaches them
+
+Each device entry has:
+
+Property | Type | Meaning
+---|---|---
+`uuid` | UUID | Device UUID
+`name` | string or `null` | The device's `General Information` name. The edge agent uses it as the Sparkplug device ID, which is what the download's `device` column shows
+`metrics` | array | The metrics a download reads, in the shape `GET v1/sparkplug-sources/:uuid/metrics` returns
+
+A `Sparkplug source` gives every metric in the device's origin map with
+`Record_To_Historian` set. A `Sub-device` gives only its selected
+metrics; a selected metric whose object is no longer in the origin map
+is left out, as the download leaves it out. A device reached through
+several components appears once. If any of them is a `Sparkplug
+source`, the device lists all its metrics; otherwise it lists the
+union of what its `Sub-device` sources select. A device with no origin
+map has `"metrics": []`.
+
+A metric's `path` is its full Sparkplug metric name. Send it as a
+`metrics` selector to `POST v1/data/:uuid` to download only that
+metric.
+
+```json
+{
+  "uuid": "66666666-6666-6666-6666-666666666666",
+  "devices": [
+    {
+      "uuid": "55555555-5555-5555-5555-555555555555",
+      "name": "Press_1",
+      "metrics": [
+        {
+          "instance": "1e74e2b2-44a3-44ff-8b2c-8c14a5f15c0b",
+          "metric": "Current_AC",
+          "path": "Characteristics/Current_AC",
+          "type": "FloatLE",
+          "unit": "A",
+          "documentation": "True RMS current"
+        }
+      ]
+    }
+  ]
+}
+```
+
 
 ### `POST v1/data/:uuid`
 
@@ -648,7 +712,7 @@ also be granted plural, against a group.
 
 Permission | UUID | Targets | Grants
 ---|---|---|---
-`Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/data/:uuid` and `v1/series` for the dataset
+`Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/metadata/:uuid/contents`, `v1/data/:uuid` and `v1/series` for the dataset
 `Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT), the `v1/metadata/:uuid/<field>` writes, and inclusion in the `v1/structure` list
 `Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`Sparkplug source` / `Sub-device` / `Union components` / `Session limits`) | Creating a dataset of that structure via `POST v1/structure`
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`

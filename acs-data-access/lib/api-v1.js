@@ -101,6 +101,9 @@ export class APIv1 {
     api.route("/metadata/:uuid")
       .get(this.metadata_uuid.bind(this));
 
+    api.route("/metadata/:uuid/contents")
+      .get(this.metadata_contents.bind(this));
+
     api.route("/metadata/:uuid/name")
       .put(this.metadata_put_name.bind(this));
 
@@ -330,6 +333,98 @@ export class APIv1 {
       parts
     }
     return res.status(200).json(meta);
+  }
+
+  /** GET. Lists the devices and metrics a download of the dataset draws
+   * from. Requires READ_DATASET on the dataset, with the same checks as
+   * GET /metadata/:uuid: reading a dataset includes seeing what is in it.
+   * Data Access reads the device configs with its own rights, as it does
+   * for a download, so the caller needs no permission on the devices.
+   * @param uuid {request param}
+   * @returns object:
+              * uuid {UUID} - Dataset UUID
+              * from {date} - Dataset starting bound (if any)
+              * to {date} - Dataset finishing bound (if any)
+              * devices {array} - one entry per device, in the order the
+                dataset first reaches them:
+                  * uuid {UUID} - Device UUID
+                  * name {string|null} - Device name from General
+                    Information, which is the Sparkplug device ID the
+                    download's `device` column shows
+                  * metrics {array} - the metrics the download reads, in
+                    the shape GET /sparkplug-sources/:uuid/metrics returns.
+                    A Sparkplug source gives every metric recorded to the
+                    historian; a Sub-device gives only its selected metrics.
+   * Returns 404 if dataset is invalid.
+   */
+  async metadata_contents(req, res) {
+    const dataset_uuid = req.params.uuid;
+    if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `${dataset_uuid} is invalid uuid.`);
+
+    const ok = await this.auth.check_acl(
+      req.auth,
+      Constants.Perm.ReadDataset,
+      dataset_uuid,
+      true,
+    );
+
+    if (!ok) return fail(this.log, 403, `You don't have READ permissions for ${dataset_uuid}`);
+
+    const [datasets, infos] = await Promise.all([
+      rx.firstValueFrom(this.data.allowed_valid_datasets(req.auth, Constants.Perm.ReadDataset)),
+      rx.firstValueFrom(this.data.general_infos),
+    ]);
+
+    const dataset = datasets.get(dataset_uuid);
+    if (!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} is not found or invalid.`);
+
+    /* The same resolution a download uses, so this lists exactly what
+     * a download would read. */
+    const sources = await this.resolve_dataset(dataset_uuid);
+
+    return res.status(200).json({
+      uuid: dataset_uuid,
+      from: dataset.from ? dataset.from : undefined,
+      to: dataset.to ? dataset.to : undefined,
+      devices: await this.source_devices(sources, infos),
+    });
+  }
+
+  /** Merges resolved sources into one entry per device.
+   *
+   * A device can be reached through several components. A Sparkplug
+   * source (no `metrics`) covers the whole device, so it gives every
+   * metric recorded to the historian. Otherwise the device gives the
+   * union of the metrics its Sub-device sources select.
+   *
+   * @param sources Resolved sources, as resolve_dataset returns them.
+   * @param infos The General Information entries, by object UUID.
+   * @returns {Promise<Array<{uuid, name, metrics}>>}
+   */
+  async source_devices(sources, infos) {
+    const by_device = new Map();
+    for (const s of sources) {
+      const entry = by_device.get(s.device_uuid) ?? { whole: false, paths: new Set() };
+      if (!s.metrics)
+        entry.whole = true;
+      else
+        for (const m of s.metrics)
+          entry.paths.add(m.path ? `${m.path}/${m.name}` : m.name);
+      by_device.set(s.device_uuid, entry);
+    }
+
+    return Promise.all([...by_device].map(async ([device, entry]) => {
+      const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
+      const { metrics } = walk_origin_map(info?.originMap, device);
+
+      return {
+        uuid: device,
+        name: infos?.get(device)?.name ?? null,
+        metrics: entry.whole
+          ? metrics
+          : metrics.filter(m => entry.paths.has(m.path)),
+      };
+    }));
   }
 
 

@@ -261,3 +261,31 @@ export function pinned_entries (keys, deviceByUuid, devices = null) {
     }
     return out
 }
+
+/* ------------------------------------------------------------------
+ * Live values
+ * ------------------------------------------------------------------ */
+
+/**
+ * What the Live badge shows, from useChartSeries: 'live', 'denied', or
+ * null for nothing.
+ *
+ * At coarse buckets (`stream` false) the chart refetches its newest
+ * buckets and i3X is not used, so a live view is live. At fine buckets
+ * the values come from i3X: the badge shows only once i3X streams at
+ * least one metric, and says so when i3X refused them all.
+ *
+ * @param live    the view includes now
+ * @param stream  the view takes i3X values
+ * @param status  useI3xLive status: 'off', 'live', 'denied' or 'unavailable'
+ */
+export function live_badge (live, stream, status) {
+    if (!live) return null
+    if (!stream) return 'live'
+    if (status === 'live') return 'live'
+    if (status === 'denied') return 'denied'
+    return null
+}
+
+// Shown in place of Live when i3X does not show the person the devices.
+export const LIVE_DENIED = 'Live values need i3X access'

@@ -225,6 +225,10 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
 
   /* Live values from i3X. Nothing opens until there are IDs to watch. */
   const i3x = useI3xLive(items => onValues(items))
+  // The charted metrics i3X is streaming, by key.
+  const liveKeys = computed(() => [...byElement.value]
+    .filter(([id]) => i3x.subscribed.value.has(id))
+    .map(([, e]) => e.key))
   let watching = false
   function ensureLive () {
     const ids = live.value ? [...byElement.value.keys()] : []
@@ -297,6 +301,9 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
     axisTo,
     now: computed(() => nowDate.value.getTime()),
     live,
+    // i3X: 'off', 'live', 'denied' or 'unavailable' (useI3xLive).
+    liveStatus: i3x.status,
+    liveKeys,
     capped,
     reload: load,
     stepMs: computed(() => STEP_MS[series.value?.every] ?? null),

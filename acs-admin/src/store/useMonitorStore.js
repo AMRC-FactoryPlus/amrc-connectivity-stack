@@ -9,7 +9,7 @@ function generateClientId () {
   // crypto.randomUUID is only available in secure contexts (HTTPS /
   // localhost). On plain http deployments the API is undefined, so
   // fall back to a Math.random-derived id. This identifier is only a
-  // session handle for the i3x subscription registry — not security
+  // session handle for the i3X subscription registry — not security
   // critical — so a weaker generator is fine.
   const uuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
     ? crypto.randomUUID()

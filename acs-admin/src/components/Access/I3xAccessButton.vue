@@ -1,6 +1,6 @@
 <!--
   - ACS Admin
-  - The "Manage i3x Access" button: how many people and groups can read
+  - The "Manage i3X Access" button: how many people and groups can read
   - a device or ISA-95 node through i3X, and the dialog to change it.
   - Copyright 2026 University of Sheffield AMRC
   -->
@@ -12,7 +12,7 @@
 <template>
   <Button variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
     <i class="fa-solid fa-shield-halved text-sm"></i>
-    <span>Manage i3x Access</span>
+    <span>Manage i3X Access</span>
     <Badge variant="secondary" class="min-w-5 justify-center px-1.5" :aria-label="title">
       <i v-if="count === null && loading" class="fa-solid fa-circle-notch animate-spin text-[10px]"></i>
       <template v-else>{{ count ?? '?' }}</template>

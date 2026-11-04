@@ -30,7 +30,7 @@ any i3X data after the upgrade until you grant it.** Before you
 upgrade, list the people and service accounts that use the i3X API,
 and grant each of them the devices or ISA-95 nodes they need. The
 device page, the node page's device list, the ISA-95 page and the
-Explorer in the admin UI each have a **Manage i3x Access** button for
+Explorer in the admin UI each have a **Manage i3X Access** button for
 this. It opens a dialog that lists who can read the device or node and
 why, and gives or removes access.
 

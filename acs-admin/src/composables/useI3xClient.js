@@ -143,7 +143,7 @@ export function useI3xClient () {
     },
 
     /**
-     * Resolve the i3x service base URL (including `/v1`) via Directory.
+     * Resolve the i3X service base URL (including `/v1`) via Directory.
      * Async because Directory lookup may hit the network on first call.
      * SSE streams need this — fetchEventSource takes an absolute URL and
      * can't go through the service-client's Fetch wrapper.
@@ -154,7 +154,7 @@ export function useI3xClient () {
     },
 
     /**
-     * Open an authenticated SSE stream against i3x's subscriptions/stream
+     * Open an authenticated SSE stream against i3X's subscriptions/stream
      * endpoint. Resolves the service URL and a Bearer token via the
      * service-client (same path Fetch.fetch uses), then opens an SSE
      * connection with the token in the Authorization header.

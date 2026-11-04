@@ -119,12 +119,12 @@ describe("build_flux_query", () => {
     const q = build_flux_query({ bucket: "b", source, filter: { metrics } });
 
     /* Every literal is well formed and the query has exactly the literals
-     * the builder meant to write: bucket, start, stop, device, the five
+     * the builder meant to write: bucket, start, stop, device, the six
      * kept column names, plus five
      * per name selector and six per path selector. */
     const lits = flux_literals(q);
     expect(lits.every(l => parse_flux_string(l) !== null)).toBe(true);
-    expect(lits.length).toBe(4 + 5 + 5 + 6 + 6);
+    expect(lits.length).toBe(4 + 6 + 5 + 6 + 6);
 
     const values = lits.map(parse_flux_string);
     expect(values).toContain(`${hostile}:d`);
@@ -145,7 +145,7 @@ describe("build_flux_query", () => {
     const lits = flux_literals(q);
     expect(lits.every(l => parse_flux_string(l) !== null)).toBe(true);
     expect(lits.map(parse_flux_string)).toContain(hostile);
-    expect(lits.length).toBe(4 + 5 + 1);
+    expect(lits.length).toBe(4 + 6 + 1);
   });
 
   test("escapes the device and time range too", () => {
@@ -155,7 +155,7 @@ describe("build_flux_query", () => {
     });
     const values = flux_literals(q).map(parse_flux_string);
     expect(values).toEqual(['bu"cket', "2024\\", "${x}", 'd") |> drop(', "_time",
-      "_value", "_measurement", "device", "unit"]);
+      "_value", "_measurement", "device", "unit", "path"]);
   });
 });
 
@@ -332,12 +332,12 @@ describe("dataset_data", () => {
     expect(queries).toEqual([]);
   });
 
-  test("streams the unchanged CSV header and rows", async () => {
+  test("streams the CSV header and rows, with path last", async () => {
     const { api } = make_api();
     const { res, text } = await post(api, { from: FROM, to: TO });
     expect(res.code).toBe(200);
     expect(text).toBe(
-      "device,metric,timestamp,value,unit\nDev,Temp,2024-01-01T00:00:00Z,1,C\n");
+      "device,metric,timestamp,value,unit,path\nDev,Temp,2024-01-01T00:00:00Z,1,C,Temp\n");
   });
 
   test("passes a metrics filter to Influx", async () => {

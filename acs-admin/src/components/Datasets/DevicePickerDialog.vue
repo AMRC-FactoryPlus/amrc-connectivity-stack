@@ -2,10 +2,12 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<!-- Pick devices for the builder. Grouped by site, then area. About
-     450 devices is normal, so only the first page of matches renders;
-     "Show more" adds the next page. Devices already in the builder are
-     greyed out. Emits `add` with the chosen device UUIDs. -->
+<!-- Pick devices for the builder. The list comes from i3X, which shows
+     each person only the devices they may read, grouped under their
+     ISA-95 path. About 450 devices is normal, so only the first page of
+     matches renders; "Show more" adds the next page. Devices already in
+     the builder are greyed out. Emits `add` with the chosen device
+     UUIDs. -->
 <template>
   <Dialog :open="open" @update:open="v => emit('update:open', v)">
     <DialogContent class="sm:max-w-[720px] flex flex-col gap-3 h-[75vh] overflow-hidden">
@@ -16,49 +18,53 @@
 
       <div class="relative">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
-        <input v-model="search" type="search" placeholder="Search by name, area or Sparkplug address"
+        <input v-model="search" type="search" placeholder="Search by name, ISA-95 level or Sparkplug address"
                class="h-9 w-full rounded-md border border-slate-200 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-slate-950"/>
       </div>
 
-      <div v-if="areas.length > 1" class="flex flex-wrap gap-1.5">
-        <button v-for="a in ['all', ...areas]" :key="a" type="button"
+      <div v-if="chips" class="flex flex-wrap gap-1.5">
+        <button v-for="c in ['all', ...chips.values]" :key="c" type="button"
                 class="h-7 rounded-full border px-3 text-xs transition-colors"
-                :class="area === a ? 'border-slate-900 bg-slate-900 text-slate-50' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'"
-                @click="area = a">
-          {{ a === 'all' ? 'All areas' : a }}
+                :class="chip === c ? 'border-slate-900 bg-slate-900 text-slate-50' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'"
+                @click="chip = c">
+          {{ c === 'all' ? 'All' : c }}
         </button>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto rounded-md border border-slate-200">
-        <div v-if="!ds.devicesReady && !ds.devices.length" class="p-6 text-center text-sm text-slate-500">
+        <div v-if="!ds.i3xReady && !ds.i3xDevices.length" class="p-6 text-center text-sm text-slate-500">
           <i class="fa-solid fa-circle-notch animate-spin mr-2"></i>Loading devices
         </div>
+        <div v-else-if="ds.i3xError && !ds.i3xDevices.length" class="flex flex-col items-center gap-3 p-6 text-center text-sm text-slate-500">
+          {{ ds.i3xError }}
+          <Button variant="outline" size="xs" @click="ds.loadI3xDevices()">Try again</Button>
+        </div>
+        <div v-else-if="!ds.i3xDevices.length" class="p-6 text-center text-sm text-slate-500">
+          You can't see any devices in i3X. Ask an administrator for access.
+        </div>
         <div v-else-if="!matched.length" class="p-6 text-center text-sm text-slate-500">No devices match.</div>
-        <template v-for="g in groups" :key="g.site">
+        <template v-for="g in groups" :key="g.key">
           <div class="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-            <i class="fa-solid fa-sitemap text-slate-500"></i>{{ g.site }}
+            <i class="fa-solid fa-sitemap text-slate-500"></i>{{ g.label }}
           </div>
-          <template v-for="a in g.areas" :key="`${g.site}/${a.area}`">
-            <div class="px-3 pt-2 pb-1 text-xs font-medium text-slate-500">{{ a.area }}</div>
-            <label v-for="d in a.devices" :key="d.uuid"
-                   class="flex items-center gap-3 border-b border-slate-100 px-3 py-2 text-sm"
-                   :class="have.has(d.uuid) ? 'opacity-50 cursor-default' : 'cursor-pointer hover:bg-slate-50'">
-              <input type="checkbox" class="h-4 w-4 accent-slate-900"
-                     :checked="have.has(d.uuid) || chosen.has(d.uuid)" :disabled="have.has(d.uuid)"
-                     @change="toggle(d.uuid)"/>
-              <i class="fa-solid fa-fw fa-microchip text-xs text-slate-500"></i>
-              <div class="min-w-0 flex-1">
-                <div class="truncate font-medium" :title="d.name">{{ d.name }}</div>
-                <div class="truncate text-xs text-slate-500">
-                  {{ d.metrics.length }} {{ d.metrics.length === 1 ? 'metric' : 'metrics' }}<template v-if="rates[d.uuid]"> · {{ rates[d.uuid] }}</template><template v-if="inEquipment[d.uuid]"> · In {{ inEquipment[d.uuid].join(', ') }}</template>
-                </div>
+          <label v-for="d in g.devices" :key="d.uuid"
+                 class="flex items-center gap-3 border-b border-slate-100 px-3 py-2 text-sm"
+                 :class="have.has(d.uuid) ? 'opacity-50 cursor-default' : 'cursor-pointer hover:bg-slate-50'">
+            <input type="checkbox" class="h-4 w-4 accent-slate-900"
+                   :checked="have.has(d.uuid) || chosen.has(d.uuid)" :disabled="have.has(d.uuid)"
+                   @change="toggle(d.uuid)"/>
+            <i class="fa-solid fa-fw fa-microchip text-xs text-slate-500"></i>
+            <div class="min-w-0 flex-1">
+              <div class="truncate font-medium" :title="d.name">{{ d.name }}</div>
+              <div class="truncate text-xs text-slate-500">
+                {{ subOf(d) }}
               </div>
-              <span v-if="have.has(d.uuid)" class="text-xs text-slate-500">Added</span>
-              <span v-else class="flex shrink-0 items-center gap-1.5 text-xs" :class="statusOf(d).text">
-                <span class="h-1.5 w-1.5 rounded-full" :class="statusOf(d).dot"></span>{{ statusOf(d).label }}
-              </span>
-            </label>
-          </template>
+            </div>
+            <span v-if="have.has(d.uuid)" class="text-xs text-slate-500">Added</span>
+            <span v-else class="flex shrink-0 items-center gap-1.5 text-xs" :class="statusOf(d).text">
+              <span class="h-1.5 w-1.5 rounded-full" :class="statusOf(d).dot"></span>{{ statusOf(d).label }}
+            </span>
+          </label>
         </template>
         <div v-if="matched.length > limit" class="p-3 text-center">
           <Button variant="outline" size="xs" @click="limit += PAGE">
@@ -87,9 +93,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
-import { device_status, series_request, LAST_LOOKBACK, LIMITS } from '@/lib/datasets/series.js'
+import { device_status, series_request, LAST_LOOKBACK, LIMITS, DEVICE_STORE } from '@/lib/datasets/series.js'
 import { device_gaps, data_rate, fmt_rate } from '@/lib/datasets/gaps.js'
-import { group_devices, text_match, equipment_by_device } from './builder/builder.js'
+import { text_match, equipment_by_device } from './builder/builder.js'
+import { group_by_path, path_chips } from '@/lib/datasets/i3x-devices.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -101,48 +108,61 @@ const emit = defineEmits(['update:open', 'add'])
 const PAGE = 150
 const ds = useDatasetsStore()
 const search = ref('')
-const area = ref('all')
+const chip = ref('all')
 const chosen = ref(new Set())
 const limit = ref(PAGE)
 
-// Start fresh each time the dialog opens.
+// Start fresh each time the dialog opens, and ask i3X again so a new
+// grant shows up.
 watch(() => props.open, v => {
   if (!v) return
   search.value = ''
-  area.value = 'all'
+  chip.value = 'all'
   chosen.value = new Set()
   limit.value = PAGE
+  ds.loadI3xDevices()
 })
-watch([search, area], () => { limit.value = PAGE })
+watch([search, chip], () => { limit.value = PAGE })
 
 const have = computed(() => new Set(props.added))
 
-const areas = computed(() => [...new Set(ds.devices.map(d => d.area).filter(Boolean))].sort())
+// The devices i3X shows, with ConfigDB details where they are readable.
+const devices = computed(() => {
+  const index = ds.deviceIndexByUuid
+  return ds.i3xDevices.map(d => index[d.uuid] ?? d)
+})
+
+const chips = computed(() => path_chips(devices.value))
 
 const inEquipment = computed(() => props.open ? equipment_by_device(ds.equipment, ds.byUuid, u => ds.name(u)) : {})
 
-const matched = computed(() => ds.devices.filter(d =>
-  (area.value === 'all' || d.area === area.value)
-  && text_match(search.value, [d.name, d.sparkplug, d.address, d.site, d.area])))
+const matched = computed(() => devices.value.filter(d =>
+  (chip.value === 'all' || !chips.value || d.path?.[chips.value.depth] === chip.value)
+  && text_match(search.value, [d.name, d.sparkplug, d.address, ...(d.path ?? [])])))
 
-// Group the whole match so sites and areas sort properly, then render
-// only the first `limit` devices.
+// Group the whole match so paths sort properly, then render only the
+// first `limit` devices.
 const groups = computed(() => {
   let left = limit.value
   const out = []
-  for (const g of group_devices(matched.value)) {
+  for (const g of group_by_path(matched.value)) {
     if (left <= 0) break
-    const areas = []
-    for (const a of g.areas) {
-      if (left <= 0) break
-      const devices = a.devices.slice(0, left)
-      left -= devices.length
-      areas.push({ area: a.area, devices })
-    }
-    out.push({ site: g.site, areas })
+    const devices = g.devices.slice(0, left)
+    left -= devices.length
+    out.push({ ...g, devices })
   }
   return out
 })
+
+// What a row says under the name. The metric count needs the ConfigDB,
+// which not everyone can read.
+function subOf (d) {
+  const parts = []
+  if (Array.isArray(d.metrics)) parts.push(`${d.metrics.length} ${d.metrics.length === 1 ? 'metric' : 'metrics'}`)
+  if (rates.value[d.uuid]) parts.push(rates.value[d.uuid])
+  if (inEquipment.value[d.uuid]) parts.push(`In ${inEquipment.value[d.uuid].join(', ')}`)
+  return parts.join(' · ') || 'Device'
+}
 
 /* "Quiet since" and the data rate over the last hour for the devices
  * on screen, fetched once per dialog for each device as it is shown.
@@ -170,7 +190,7 @@ onBeforeUnmount(() => {
   clearTimeout(retryTimer)
 })
 
-const shownUuids = computed(() => groups.value.flatMap(g => g.areas.flatMap(a => a.devices.map(d => d.uuid))))
+const shownUuids = computed(() => groups.value.flatMap(g => g.devices.map(d => d.uuid)))
 
 watch([shownUuids, () => props.open], () => {
   clearTimeout(lastTimer)
@@ -187,7 +207,8 @@ async function loadLasts () {
   const to = Math.floor(Date.now() / RATE_STEP) * RATE_STEP
   const from = to - 3600e3
   try {
-    const s = await fetch_series(sc.client, series_request({ devices: want, from, to, every: RATE_EVERY, count: true, last: LAST_LOOKBACK }))
+    // New device datasets read the UNS, so the rate is the UNS's.
+    const s = await fetch_series(sc.client, series_request({ devices: want, from, to, every: RATE_EVERY, count: true, last: LAST_LOOKBACK, store: DEVICE_STORE }))
     if (my !== openGen) return
     const got = {}, rate = {}
     for (const u of want) {

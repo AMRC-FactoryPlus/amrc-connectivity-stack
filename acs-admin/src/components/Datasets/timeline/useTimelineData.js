@@ -8,7 +8,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
 import {
   LIMITS, LAST_LOOKBACK, STEP_MS, COVERAGE_NOTE, StripCache, series_request, chunk,
-  bucket_start, bucket_end, bucket_cells, sum_counts, strip_every, coverage_not_ready,
+  bucket_start, bucket_end, bucket_cells, sum_counts, strip_every, coverage_not_ready, DEVICE_STORE,
 } from '@/lib/datasets/series.js'
 import { t_of } from '@/lib/datasets/timeline.js'
 
@@ -95,7 +95,7 @@ export function useTimelineData ({ zoom, range, xWindow, rows, eqDevices }) {
   async function request (list, body) {
     const out = []
     for (const part of chunk(list, LIMITS.devices)) {
-      out.push([part, await fetch_series(sc.client, series_request({ ...body, devices: part }))])
+      out.push([part, await fetch_series(sc.client, series_request({ ...body, devices: part, store: DEVICE_STORE }))])
     }
     return out
   }

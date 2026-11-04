@@ -15,7 +15,7 @@
           {{ fmt_time(from, now) }} <span class="font-normal text-slate-400">to</span> {{ fmt_time(to, now) }}
         </div>
         <div class="text-xs text-slate-500">
-          {{ fmt_duration(to - from) }} · {{ summary.count }} {{ summary.count === 1 ? 'device' : 'devices' }} · {{ metric_count(summary.metrics) }}
+          {{ fmt_duration(to - from) }} · {{ summary.count }} {{ summary.count === 1 ? 'device' : 'devices' }}<template v-if="summary.metrics != null"> · {{ metric_count(summary.metrics) }}</template>
         </div>
       </div>
       <Button variant="ghost" size="plain" class="-mr-1 -mt-0.5 h-6 px-1.5" title="Clear selection" @click="emit('close')">

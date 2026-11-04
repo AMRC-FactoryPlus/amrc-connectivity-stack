@@ -120,17 +120,28 @@ export function mean_entry (device, metric) {
 }
 
 /**
+ * Where device requests read from. New device datasets read the UNS,
+ * so the pages that pick devices for them show the UNS's data.
+ */
+export const DEVICE_STORE = 'uns'
+
+/**
  * The request body. Exactly one of `devices` and `dataset`. Times are
  * ms or anything Date takes. Without `every`, the service picks a step
- * from `points`.
+ * from `points`. `store` ('sparkplug' or 'uns') picks what a device
+ * request reads; a dataset request reads what its dataset reads, so
+ * it never sends one.
  */
-export function series_request ({ devices = null, dataset = null, from, to, every = null, points = null, count = false, mean = [], last = null }) {
+export function series_request ({ devices = null, dataset = null, from, to, every = null, points = null, count = false, mean = [], last = null, store = null }) {
     const body = {
         from: new Date(from).toISOString(),
         to: new Date(to).toISOString(),
     }
     if (dataset) body.dataset = dataset
-    else body.devices = [...new Set(devices ?? [])]
+    else {
+        body.devices = [...new Set(devices ?? [])]
+        if (store) body.store = store
+    }
     if (every) body.every = every
     else if (points) body.points = points
     if (count) body.count = true

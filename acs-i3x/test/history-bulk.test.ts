@@ -75,6 +75,8 @@ function makeTree() {
         getObject: jest.fn((id: string) => objects[id] ? { elementId: id, ...objects[id] } : undefined),
         getMetricMeta: jest.fn((id: string) => metas[id]),
         getDescendantLeafIds: jest.fn(getDescendantLeafIds),
+        // The UNS device segment: the device's id, in these tests.
+        unsDeviceSegment: jest.fn((tli: string) => tli),
     } as unknown as ObjectTree;
 }
 
@@ -104,9 +106,9 @@ describe("History bulk current values", () => {
     describe("getCurrentValues", () => {
         it("reads every leaf of a device with one query", async () => {
             const { history, collectRows } = makeHistory([
-                { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 20, _time: T1 },
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Status", _value: 900, _time: T2 },
-                { _measurement: "X:d", topLevelInstance: "tli-A", path: "Status/Deep", _value: 1, _time: T3 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A", _value: 20, _time: T1 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Status", _value: 900, _time: T2 },
+                { _measurement: "X:d", topLevelInstance: "tli-A", path: "tli-A/Status/Deep", _value: 1, _time: T3 },
             ]);
             const out = await history.getCurrentValues(["a-temp", "a-status-rpm", "a-deep-x"]);
             expect(collectRows).toHaveBeenCalledTimes(1);
@@ -131,8 +133,8 @@ describe("History bulk current values", () => {
             // device rename. The per-leaf query returns rows[0], so the
             // first row wins even though the second is newer.
             const { history } = makeHistory([
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Status", _value: 1, _time: T1 },
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Status", _value: 2, _time: T3 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Status", _value: 1, _time: T1 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Status", _value: 2, _time: T3 },
             ]);
             const out = await history.getCurrentValues(["a-status-rpm"]);
             expect(out.get("a-status-rpm")?.value).toBe(1);
@@ -141,25 +143,39 @@ describe("History bulk current values", () => {
 
         it("matches a leaf with a path only on that exact path", async () => {
             const { history } = makeHistory([
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Other", _value: 1, _time: T1 },
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", _value: 2, _time: T1 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Other", _value: 1, _time: T1 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A", _value: 2, _time: T1 },
             ]);
             const out = await history.getCurrentValues(["a-status-rpm"]);
             expect(out.has("a-status-rpm")).toBe(false);
         });
 
-        it("matches a leaf without a path on the first row of any path, as the unfiltered per-leaf query does", async () => {
+        it("matches a top-level leaf only on the device segment, not a deeper series of the same name", async () => {
             const { history } = makeHistory([
-                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "Deep/Er", _value: 5, _time: T1 },
-                { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 6, _time: T3 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A/Deep/Er", _value: 5, _time: T1 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A", _value: 6, _time: T3 },
             ]);
             const out = await history.getCurrentValues(["a-temp"]);
-            expect(out.get("a-temp")?.value).toBe(5);
+            expect(out.get("a-temp")?.value).toBe(6);
+        });
+
+        it("skips a leaf whose device's UNS segment is not known", async () => {
+            const tree = makeTree();
+            (tree.unsDeviceSegment as any).mockImplementation((tli: string) => tli === "tli-A" ? undefined : tli);
+            const { history } = makeHistory([
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A", _value: 1, _time: T1 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-B", path: "tli-B", _value: 2, _time: T1 },
+            ], { tree });
+            const out = await history.getCurrentValues(["a-temp", "b-temp"]);
+            expect(out.has("a-temp")).toBe(false);
+            expect(out.get("b-temp")?.value).toBe(2);
+            const since = await history.lastValuesSince(["a-temp", "b-temp"], T1);
+            expect([...since.known]).toEqual(["b-temp"]);
         });
 
         it("does not match another device's row", async () => {
             const { history } = makeHistory([
-                { _measurement: "Temp:d", topLevelInstance: "tli-B", _value: 7, _time: T1 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-B", path: "tli-B", _value: 7, _time: T1 },
             ]);
             const out = await history.getCurrentValues(["a-temp", "b-temp"]);
             expect(out.has("a-temp")).toBe(false);
@@ -179,6 +195,7 @@ describe("History bulk current values", () => {
                 getObject: () => ({ isComposition: false }),
                 getMetricMeta: (id: string) => meta(id, "Temp"),
                 getDescendantLeafIds: () => [],
+                unsDeviceSegment: (tli: string) => tli,
             } as unknown as ObjectTree;
             let inFlight = 0;
             let maxInFlight = 0;
@@ -189,7 +206,7 @@ describe("History bulk current values", () => {
                 inFlight--;
                 return tlis
                     .filter((t) => q.includes(`"${t}"`))
-                    .map((t) => ({ _measurement: "Temp:d", topLevelInstance: t, _value: t, _time: T1 }));
+                    .map((t) => ({ _measurement: "Temp:d", topLevelInstance: t, path: t, _value: t, _time: T1 }));
             }, { tree, bulkChunkSize: 5, bulkConcurrency: 2 });
 
             const out = await history.getCurrentValues(tlis);
@@ -209,6 +226,7 @@ describe("History bulk current values", () => {
                 getObject: () => ({ isComposition: false }),
                 getMetricMeta: () => meta(`we"ird\\${"$"}{x}`, "Temp"),
                 getDescendantLeafIds: () => [],
+                unsDeviceSegment: (tli: string) => tli,
             } as unknown as ObjectTree;
             const { history, collectRows } = makeHistory([], { tree, bucket: `b"k` });
             await history.getCurrentValues(["x"]);
@@ -243,6 +261,7 @@ describe("History bulk current values", () => {
                 getObject: () => ({ isComposition: false }),
                 getMetricMeta: (id: string) => meta("tli-A", id),
                 getDescendantLeafIds: () => [],
+                unsDeviceSegment: (tli: string) => tli,
             } as unknown as ObjectTree;
             const { history, collectRows } = makeHistory([], { tree });
 
@@ -266,8 +285,8 @@ describe("History bulk current values", () => {
     describe("lastValuesSince", () => {
         it("reads only the window from the given time, matches like getCurrentValues, and keeps nothing", async () => {
             const { history, collectRows } = makeHistory([
-                { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 20, _time: T2 },
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Other", _value: 1, _time: T2 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A", _value: 20, _time: T2 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Other", _value: 1, _time: T2 },
             ], { bulkConcurrency: 4 });
             const remember = jest.spyOn(history as any, "remember");
             const out = await history.lastValuesSince(["a-temp", "a-status-rpm", "orphan-leaf"], T1);
@@ -294,10 +313,10 @@ describe("History bulk current values", () => {
 
     describe("getValues", () => {
         const rows: Row[] = [
-            { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 20, _time: T1 },
-            { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Status", _value: 900, _time: T3 },
-            { _measurement: "X:d", topLevelInstance: "tli-A", path: "Status/Deep", _value: 1, _time: T2 },
-            { _measurement: "Temp:d", topLevelInstance: "tli-B", _value: 30, _time: T2 },
+            { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A", _value: 20, _time: T1 },
+            { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Status", _value: 900, _time: T3 },
+            { _measurement: "X:d", topLevelInstance: "tli-A", path: "tli-A/Status/Deep", _value: 1, _time: T2 },
+            { _measurement: "Temp:d", topLevelInstance: "tli-B", path: "tli-B", _value: 30, _time: T2 },
         ];
 
         it("reads a whole batch of compositions and leaves with one query", async () => {
@@ -366,8 +385,8 @@ describe("History bulk current values", () => {
         it("uses one query for the whole composition and defaults maxDepth to 1", async () => {
             const tree = makeTree();
             const { history, collectRows } = makeHistory([
-                { _measurement: "Temp:d", topLevelInstance: "tli-A", _value: 20, _time: T1 },
-                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "Status", _value: 900, _time: T3 },
+                { _measurement: "Temp:d", topLevelInstance: "tli-A", path: "tli-A", _value: 20, _time: T1 },
+                { _measurement: "RPM:d", topLevelInstance: "tli-A", path: "tli-A/Status", _value: 900, _time: T3 },
             ], { tree });
             const v = await history.getCompositionValue("dev-A");
             expect(collectRows).toHaveBeenCalledTimes(1);

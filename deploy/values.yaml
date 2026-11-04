@@ -548,7 +548,9 @@ cmdesc:
 
 historians:
   uns:
-    enabled: false
+    # -- Whether or not to enable the UNS historian. i3X reads history
+    # from its bucket, so it is needed while i3x.enabled is true.
+    enabled: true
     # -- The minimum log level that the historian will log messages at (One of 'fatal', 'error', 'warn', 'info', 'debug', 'trace' or 'silent'.)
     logLevel: info
     # -- The number of messages to batch together before sending to InfluxDB

@@ -140,6 +140,7 @@ interface ObjectTreeLike {
         schemaUuidPath: string[],
         metricSegments: string[],
         isa95Segments?: string[],
+        uns?: { deviceSegment?: string; type?: string },
     ): string | null;
     getObject(elementId: string): { elementId: string; isComposition: boolean; parentId?: string | null } | undefined;
     getChildElementIds(elementId: string): string[];
@@ -635,11 +636,18 @@ export class ValueCache {
         // Also passes ISA-95 segments so the tree can create hierarchy above the device.
         // Returns the leaf elementId, or null if the device is not in
         // the tree: then nothing can find the value, so drop it.
+        // The device segment and Type let the tree give a leaf it
+        // creates MetricMeta, and History find the device's series in
+        // the UNS historian's bucket.
         const leafId = this.objectTree.addCompositionFromUns(
             instanceUuidPath,
             schemaUuidPath,
             metricSegments,
             isa95Segments,
+            {
+                deviceSegment: parts[deviceIdIdx],
+                type: typeof userProps.Type === "string" ? userProps.Type : undefined,
+            },
         );
         if (leafId === null) return;
         const elementId = leafId ?? `${bottomUuid}/${metricName}`;
@@ -866,16 +874,6 @@ export class ValueCache {
             if (p.device === uuid) this.pending.delete(id);
         }
         this.store.prepare("delete from last_value where device_uuid = ?").run(uuid);
-    }
-
-    /**
-     * Drop the values and markers kept from InfluxDB for a device that
-     * no longer publishes to UNS (History keeps none for such a device):
-     * no UNS message would replace them, so they would be served as
-     * current for ever. Its UNS values stay.
-     */
-    removeInfluxValues(uuid: string): void {
-        this.store.prepare("delete from last_value where device_uuid = ? and source != 'uns'").run(uuid);
     }
 
     /** clear(), logging a failure instead of throwing: it runs at start

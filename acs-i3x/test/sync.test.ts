@@ -760,7 +760,7 @@ describe("ConfigSync", () => {
         }
     });
 
-    it("drops the InfluxDB values of a device that loses its ISA-95 hierarchy, not its UNS values", async () => {
+    it("drops a device that loses its ISA-95 hierarchy from the tree, with all its values", async () => {
         const cdb = new FakeConfigDB();
         const uuids = seed(cdb);
         const s = start(stack(cdb));
@@ -795,7 +795,8 @@ describe("ConfigSync", () => {
             originMap: { ...d6.originMap, Added_Metric: { Sparkplug_Type: "Double" } } });
         await settle(s.sync);
 
-        expect(sources(uuids[5])).toEqual(["uns"]);
+        expect(s.tree.getObject(uuids[5])).toBeUndefined();
+        expect(sources(uuids[5])).toEqual([]);
         expect(sources(uuids[6])).toEqual(["empty", "influx", "uns"]);
     });
 

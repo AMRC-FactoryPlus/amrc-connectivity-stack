@@ -15,7 +15,7 @@ graph TB
     
     ConfigDB["ConfigDB<br/>DeviceInfo app<br/>Info app<br/>ConfigSchema app<br/>class_members"]
     MQTT["MQTT Broker<br/>UNS/v1/#"]
-    InfluxDB["InfluxDB<br/>(default bucket)"]
+    InfluxDB["InfluxDB<br/>(uns bucket)"]
     
     Client -->|"REST / SSE"| acs-i3x
     OT -->|"ETag SEARCH + GET on change"| ConfigDB
@@ -100,7 +100,7 @@ The tree builder walks this recursively:
 flowchart TD
     REQ["GET /objects/:id/value"]
     CACHE{"ValueCache<br/>has value?"}
-    INFLUX["InfluxDB last() query<br/>bucket: default"]
+    INFLUX["InfluxDB last() query<br/>bucket: uns"]
     MQTT["MQTT UNS/v1/#<br/>(continuous)"]
     RESP_CACHE["Return cached value<br/>(real-time, sub-second)"]
     RESP_INFLUX["Return InfluxDB value<br/>(~10s delayed)"]
@@ -126,7 +126,7 @@ of a composition, with one Flux query per 100 devices
 (`topLevelInstance`), and runs at most 4 of those queries at once:
 
 ```
-from(bucket: "default")
+from(bucket: "uns")
   |> range(start: -30d)
   |> filter(fn: (r) => r["_measurement"] == "<measurement 1>" or ...)
   |> filter(fn: (r) => r["topLevelInstance"] == "<device 1>" or ...)
@@ -160,7 +160,7 @@ sequenceDiagram
     OT-->>API: { topLevelInstanceUuid, metricPath, metricName, typeSuffix }
     API->>HI: queryHistory(elementId, start, end)
     
-    Note over HI: Builds Flux query:<br/>from(bucket: "default")<br/>  |> filter(measurement == "True_RMS_Current:d")<br/>  |> filter(topLevelInstance == "7192c247...")<br/>  |> filter(path == "Phases/1")<br/>  |> range(start, stop)<br/>  |> sort(columns: ["_time"])
+    Note over HI: Builds Flux query:<br/>from(bucket: "uns")<br/>  |> filter(measurement == "True_RMS_Current:d")<br/>  |> filter(topLevelInstance == "7192c247...")<br/>  |> filter(path == "Meter 1/Phases/1")<br/>  |> range(start, stop)<br/>  |> sort(columns: ["_time"])
     
     HI->>IDB: Flux query
     IDB-->>HI: rows
@@ -225,8 +225,8 @@ Only works for devices publishing to UNS. Devices not on UNS never trigger SSE e
 | Object names | ConfigDB Info app | Start, then each change | ETag SEARCH |
 | JSON Schemas | ConfigDB ConfigSchema app | Start, then each change | ETag SEARCH |
 | Current value (primary) | MQTT UNS/v1/# into SQLite `last_value` | Continuous | Real-time |
-| Current value (fallback) | InfluxDB default bucket, last(); kept in `last_value` for devices that publish to UNS | First read of a leaf (every read for other devices), and any read during a catch-up | ~10s |
-| Current value (catch-up) | InfluxDB default bucket, last() since the values were last current | After a restart or MQTT reconnect, and every refresh interval for values kept from InfluxDB | Margin (60 s) plus the query |
-| Historical values | InfluxDB default bucket, range query | On request | N/A |
+| Current value (fallback) | InfluxDB uns bucket, last(); kept in `last_value` for devices that publish to UNS | First read of a leaf, and any read during a catch-up | ~10s |
+| Current value (catch-up) | InfluxDB uns bucket, last() since the values were last current | After a restart or MQTT reconnect, and every refresh interval for values kept from InfluxDB | Margin (60 s) plus the query |
+| Historical values | InfluxDB uns bucket, range query | On request | N/A |
 | SSE streaming | MQTT UNS/v1/# via SSE bridge | Continuous | Real-time |
 | Device online/offline | Not currently used | -- | -- |

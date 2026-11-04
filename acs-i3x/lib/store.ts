@@ -31,7 +31,9 @@ function isCorrupt(err: unknown): boolean {
         || /database file is truncated/.test(e?.message ?? "");
 }
 
-export const SCHEMA_VERSION = 3;
+/* 4: devices without ISA-95 hierarchy are left out of the tree, and
+ * uns_device records each device's UNS topic segment. */
+export const SCHEMA_VERSION = 4;
 
 const TABLES = `
     -- The object tree. seq gives Map insertion order: an upsert keeps
@@ -113,6 +115,21 @@ const TABLES = `
     );
     create index last_value_anchor_ix on last_value (anchor, seq);
     create index last_value_device_ix on last_value (device_uuid);
+    -- Values not kept current by the UNS ('influx' and 'empty'), by
+    -- device, for ValueCache's refresh. Queries must say
+    -- source != 'uns' for SQLite to use it.
+    create index last_value_kept_ix on last_value (device_uuid) where source != 'uns';
+
+    -- The device segment of each device's UNS topics (the segment
+    -- after "Edge"), which the UNS historian puts at the start of its
+    -- path tag. source is 'uns' when seen on a UNS topic, or 'config'
+    -- when taken from DeviceInformation's sparkplugName before any
+    -- UNS message has been seen. See ObjectTree.unsDeviceSegment.
+    create table uns_device (
+        device_uuid     text primary key,
+        segment         text not null,
+        source          text not null           -- 'uns' | 'config'
+    ) without rowid;
 
     create table meta (
         key             text primary key,
@@ -121,15 +138,11 @@ const TABLES = `
 `;
 
 /**
- * Indexes added since SCHEMA_VERSION was last bumped. Created if
- * missing on every open, so an existing database gains them without a
- * rebuild (a few hundred ms at 3 million values).
+ * Indexes and tables added since SCHEMA_VERSION was last bumped.
+ * Created if missing on every open, so an existing database gains them
+ * without a rebuild (a few hundred ms at 3 million values).
  */
 const ADDED_INDEXES = `
-    -- Values not kept current by the UNS ('influx' and 'empty'), by
-    -- device, for ValueCache's refresh. Queries must say
-    -- source != 'uns' for SQLite to use it.
-    create index if not exists last_value_kept_ix on last_value (device_uuid) where source != 'uns';
 `;
 
 export interface I3xStoreOpts {

@@ -34,7 +34,9 @@ spec:
 {{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
 
         - name: create-bucket
-          image: "{{.Values.influxdb2.image.repository}}:{{.Values.influxdb2.image.tag}}"
+          # The influxdb2 subchart supplies the image; the fallbacks match its
+          # defaults so the chart still renders without its dependencies.
+          image: "{{ dig "image" "repository" "influxdb" .Values.influxdb2 }}:{{ dig "image" "tag" "2.3.0-alpine" .Values.influxdb2 }}"
           env:
             - name: INFLUX_TOKEN
               valueFrom:

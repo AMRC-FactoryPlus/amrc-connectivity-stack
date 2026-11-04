@@ -80,7 +80,8 @@ const history = new History({
     influxUrl: env.INFLUX_URL || "http://localhost:8086",
     influxToken: env.INFLUX_TOKEN || "",
     influxOrg: env.INFLUX_ORG || "default",
-    influxBucket: env.INFLUX_BUCKET || "default",
+    // The UNS historian's bucket: i3X serves the UNS.
+    influxBucket: env.INFLUX_BUCKET || "uns",
     objectTree,
     // Flux queries in flight across the whole process.
     influxConcurrency: positiveInt("I3X_INFLUX_CONCURRENCY", 4),

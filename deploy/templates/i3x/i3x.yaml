@@ -1,4 +1,7 @@
 {{- if .Values.i3x.enabled }}
+{{- if not .Values.historians.uns.enabled }}
+{{- fail "i3x.enabled needs historians.uns.enabled: i3X reads history from the UNS historian's bucket. Set historians.uns.enabled: true, or i3x.enabled: false." }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -97,8 +100,10 @@ spec:
               value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_ORG
               value: default
+            # The UNS historian's bucket. templates/historians/uns.yaml
+            # creates it under this fixed name.
             - name: INFLUX_BUCKET
-              value: default
+              value: uns
             - name: INFLUX_TOKEN
               valueFrom:
                 secretKeyRef:

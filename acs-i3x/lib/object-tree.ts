@@ -419,6 +419,7 @@ export class ObjectTree {
     private removeDeviceTx(uuid: string): void {
         this.placementRev++;
         this.store.prepare("delete from device_schema where device_uuid = ?").run(uuid);
+        this.store.prepare("delete from uns_device where device_uuid = ?").run(uuid);
         const device = this.getObject(uuid);
         if (!device) return;
 
@@ -829,24 +830,48 @@ export class ObjectTree {
 
     /**
      * Does this device publish to UNS? uns-ingester-sparkplug publishes
-     * only devices with an ISA-95 hierarchy (at least an Enterprise).
-     * buildDevice files a device without one under <namespace>/Unknown,
-     * and a UNS message moves a device under the levels it was
-     * published with, so: a device in the tree, not under Unknown. One
-     * indexed lookup. A real hierarchy of exactly <namespace>/Unknown
-     * counts as none, which costs only InfluxDB reads.
+     * only devices with an ISA-95 hierarchy (at least an Enterprise),
+     * and buildDevice leaves every other device out of the tree, so: a
+     * device in the tree, under a level. One indexed lookup.
      */
     publishesToUns(uuid: string): boolean {
         const r = this.store.prepare("select parent_id from object where element_id = ?")
             .get(uuid) as { parent_id: string | null } | undefined;
-        if (!r || r.parent_id === null || r.parent_id === "/") return false;
-        const unknown = this.isa95Ids(this.unknownIsa95());
-        return r.parent_id !== unknown[unknown.length - 1];
+        return !!r && r.parent_id !== null && r.parent_id !== "/";
     }
 
-    /** Where buildDevice files a device without ISA-95 hierarchy. */
-    private unknownIsa95(): string[] {
-        return [this.namespaceName, "Unknown"];
+    /**
+     * The device segment of a device's UNS topics: the topic segment
+     * after "Edge", which is the device's Sparkplug device ID. The UNS
+     * historian's path tag starts with it (see History). The segment
+     * seen on the device's latest UNS message wins; before any has
+     * been seen, DeviceInformation's sparkplugName stands in.
+     * Undefined when neither is known.
+     */
+    unsDeviceSegment(uuid: string): string | undefined {
+        const r = this.store.prepare("select segment from uns_device where device_uuid = ?")
+            .get(uuid) as { segment: string } | undefined;
+        return r?.segment;
+    }
+
+    /** Record a device's UNS device segment. A segment seen on a UNS
+     * topic ('uns') is not replaced by one from config. */
+    private putUnsDeviceSegment(uuid: string, segment: string, source: "uns" | "config"): void {
+        if (source === "uns") {
+            const r = this.store.prepare("select segment, source from uns_device where device_uuid = ?")
+                .get(uuid) as { segment: string; source: string } | undefined;
+            if (r && r.segment === segment && r.source === "uns") return;
+            this.store.prepare(`
+                insert into uns_device (device_uuid, segment, source) values (?, ?, 'uns')
+                on conflict (device_uuid) do update set segment = excluded.segment, source = 'uns'
+            `).run(uuid, segment);
+        } else {
+            this.store.prepare(`
+                insert into uns_device (device_uuid, segment, source) values (?, ?, 'config')
+                on conflict (device_uuid) do update set segment = excluded.segment
+                    where uns_device.source = 'config'
+            `).run(uuid, segment);
+        }
     }
 
     /** Get InfluxDB query metadata for a leaf metric. */
@@ -1000,11 +1025,24 @@ export class ObjectTree {
 
     /* ---- UNS composition ---- */
 
+    /**
+     * Add the nodes a UNS message implies, and return the leaf's
+     * elementId (null when the device is not in the tree).
+     *
+     * `uns` carries what the message says beyond its path: the device
+     * segment of the topic and the metric's Type user property. With
+     * it, the device segment is recorded (see unsDeviceSegment) and a
+     * leaf without MetricMeta is given some, derived exactly as both
+     * historians tag the metric: measurement "<name>:<suffix of
+     * Type>", topLevelInstance the first instance UUID (the device),
+     * and path the segments between the device and the metric name.
+     */
     addCompositionFromUns(
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         metricSegments: string[],
         isa95Segments?: string[],
+        uns?: { deviceSegment?: string; type?: string },
     ): string | null {
         // Nodes added here are tagged source:"uns"; replaceDeviceSubtree
         // keeps them as long as their parent survives.
@@ -1075,6 +1113,12 @@ export class ObjectTree {
                 parentId = elementId;
             }
 
+            if (uns) {
+                if (uns.deviceSegment)
+                    this.putUnsDeviceSegment(deviceElementId, uns.deviceSegment, "uns");
+                this.ensureUnsLeafMeta(parentId, deviceElementId, metricSegments, uns.type);
+            }
+
             // Return the leaf elementId (last in the chain)
             return parentId;
         });
@@ -1084,6 +1128,35 @@ export class ObjectTree {
     }
 
     /* ---- Private ---- */
+
+    /**
+     * Give a leaf found from UNS MetricMeta if it has none, so its
+     * history and InfluxDB current value can be read. A leaf from
+     * config already has it, from its originMap, and keeps it. A node
+     * that config made a composition gets none. The type maps to the
+     * measurement suffix as the historians map it: a missing or unknown
+     * Type is a string (":s") there too.
+     */
+    private ensureUnsLeafMeta(
+        leafId: string,
+        deviceElementId: string,
+        metricSegments: string[],
+        type: string | undefined,
+    ): void {
+        if (metricSegments.length === 0) return;
+        if (this.store.prepare("select 1 from metric_meta where element_id = ?").get(leafId)) return;
+        const obj = this.store.prepare("select is_composition from object where element_id = ?")
+            .get(leafId) as { is_composition: number } | undefined;
+        if (!obj || obj.is_composition === 1) return;
+        const sparkplugType = type ?? "";
+        this.putMeta(leafId, {
+            topLevelInstanceUuid: deviceElementId,
+            metricPath: metricSegments.slice(0, -1).join("/"),
+            metricName: metricSegments[metricSegments.length - 1],
+            sparkplugType,
+            typeSuffix: sparkplugTypeToSuffix(sparkplugType),
+        });
+    }
 
     /** Find an existing child of parentId by display name. */
     private findChildByName(parentId: string, name: string): string | undefined {
@@ -1263,19 +1336,18 @@ export class ObjectTree {
         // The ISA-95 hierarchy: a Hierarchy-v1 object at
         // Device_Information/ISA95_Hierarchy. uns-ingester-sparkplug
         // looks only there, and publishes a device to UNS only if it
-        // finds one; a hierarchy elsewhere must not count (see
-        // publishesToUns).
+        // finds one; a hierarchy elsewhere must not count. i3X serves
+        // the UNS, so a device it would not publish is left out.
         const candidate = devInfo.originMap?.Device_Information?.ISA95_Hierarchy;
         const hierarchyObj = candidate?.Schema_UUID === HIERARCHY_SCHEMA_UUID ? candidate : undefined;
         const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
 
         if (isa95Segments.length === 0) {
-            // Default to <namespace>/Unknown for devices without ISA-95
-            isa95Segments.push(...this.unknownIsa95());
-            this.log("buildDevice: no ISA-95 for %s, placing under Unknown", uuid);
-        } else {
-            this.log("buildDevice: ISA-95 hierarchy for %s: %o", uuid, isa95Segments);
+            this.log("buildDevice: no ISA-95 for %s, leaving it out", uuid);
+            this.store.prepare("delete from uns_device where device_uuid = ?").run(uuid);
+            return;
         }
+        this.log("buildDevice: ISA-95 hierarchy for %s: %o", uuid, isa95Segments);
 
         const displayName = nameInfo?.name ?? devInfo.sparkplugName ?? uuid;
 
@@ -1283,9 +1355,15 @@ export class ObjectTree {
         const obj = toI3xObject(uuid, displayName, schemaUuid, "/", true);
         this.putObject(obj, "config", uuid);
 
-        if (isa95Segments.length > 0) {
-            this.ensureIsa95Hierarchy(isa95Segments, uuid);
-        }
+        /* The UNS device segment is the Sparkplug device ID, which
+         * sparkplugName holds. Only a stand-in until a UNS message
+         * shows the segment actually used (see unsDeviceSegment). */
+        if (typeof devInfo.sparkplugName === "string" && devInfo.sparkplugName !== "")
+            this.putUnsDeviceSegment(uuid, devInfo.sparkplugName, "config");
+        else
+            this.store.prepare("delete from uns_device where device_uuid = ? and source = 'config'").run(uuid);
+
+        this.ensureIsa95Hierarchy(isa95Segments, uuid);
 
         if (devInfo.originMap) {
             this.buildTreeFromOriginMap(devInfo.originMap, uuid, uuid, "");

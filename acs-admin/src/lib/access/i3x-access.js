@@ -92,3 +92,31 @@ export async function read_access (client, { target, via = [] }) {
   }
   return rows
 }
+
+const ROUTE_ORDER = { direct: 0, node: 1, class: 2, all: 3 }
+
+/* One entry per principal from read_access rows, with every route that
+ * lets them in, the removable ones first. Principals with a grant on
+ * the target itself come first; the order is otherwise kept.
+ *
+ * @returns [{ principal, routes: [row], here: bool }] */
+export function by_principal (rows) {
+  const out = new Map()
+  for (const r of rows) {
+    const p = r.grant.principal
+    if (!out.has(p)) out.set(p, { principal: p, routes: [], here: false })
+    const e = out.get(p)
+    if (e.routes.some(o => o.grant.uuid === r.grant.uuid && o.reason === r.reason)) continue
+    e.routes.push(r)
+    if (r.reason === 'direct') e.here = true
+  }
+  const list = [...out.values()]
+  for (const e of list) e.routes.sort((a, b) => ROUTE_ORDER[a.reason] - ROUTE_ORDER[b.reason])
+  return [...list.filter(e => e.here), ...list.filter(e => !e.here)]
+}
+
+/* How many devices sit under the vocabulary node `uuid`, given each
+ * device's hierarchy names, Enterprise first. */
+export function devices_under (nodes, chains, uuid) {
+  return chains.filter(c => resolve_isa95(nodes, c).some(n => n.uuid === uuid)).length
+}

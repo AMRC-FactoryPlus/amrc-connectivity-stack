@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 
-import { resolve_isa95, isa95_path, read_access, READ_OBJECT, I3X_PERM_ALL }
+import { resolve_isa95, isa95_path, read_access, by_principal, devices_under, READ_OBJECT, I3X_PERM_ALL }
   from '../src/lib/access/i3x-access.js'
 
 const NODES = [
@@ -83,5 +83,39 @@ describe('read_access', () => {
       ['site-team', 'direct'],
       ['admins', 'all'],
     ])
+  })
+})
+
+describe('by_principal', () => {
+  const row = (uuid, principal, reason, through = null) =>
+    ({ grant: { uuid, principal }, reason, through })
+
+  it('gives one entry per principal with every route, direct grants first', () => {
+    const out = by_principal([
+      row('g1', 'eng', 'node', NODES[1]),
+      row('g2', 'tester', 'all'),
+      row('g3', 'tester', 'direct'),
+      row('g4', 'eng', 'class'),
+    ])
+    expect(out.map(e => e.principal)).toEqual(['tester', 'eng'])
+    expect(out[0].here).toBe(true)
+    expect(out[0].routes.map(r => r.reason)).toEqual(['direct', 'all'])
+    expect(out[1].here).toBe(false)
+    expect(out[1].routes.map(r => r.reason)).toEqual(['node', 'class'])
+  })
+
+  it('lists a grant only once per route', () => {
+    const out = by_principal([row('g1', 'a', 'direct'), row('g1', 'a', 'direct')])
+    expect(out[0].routes).toHaveLength(1)
+  })
+})
+
+describe('devices_under', () => {
+  it('counts the devices whose hierarchy resolves through the node', () => {
+    const chains = [['AMRC', 'F2050', 'North'], ['amrc', 'Factory 2050'], ['AMRC', 'Elsewhere'], ['Other']]
+    expect(devices_under(NODES, chains, 'f2050')).toBe(2)
+    expect(devices_under(NODES, chains, 'north')).toBe(1)
+    expect(devices_under(NODES, chains, 'amrc')).toBe(3)
+    expect(devices_under(NODES, chains, 'stray')).toBe(0)
   })
 })

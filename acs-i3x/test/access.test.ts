@@ -268,6 +268,16 @@ describe("Access", () => {
         expect(await s.access.grants(undefined)).toBe(NO_GRANTS);
     });
 
+    it("fails, rather than waiting for ever, when the Auth service does not answer", async () => {
+        /* RxClient waits for the notify interface, which never answers
+         * while Auth is down. */
+        const s = setup();
+        s.auth.fetch_auth_acl = () => new Promise(() => {});
+        const access = new Access({
+            auth: s.auth, objectTree: s.tree, vocabulary: s.vocabulary, aclTimeoutMs: 20 });
+        await expect(access.grants("jo@REALM")).rejects.toMatchObject({ status: 503 });
+    });
+
     it("follows a revoked grant live, for subscriptions", () => {
         const s = setup({ "ivy@REALM": [grant("dev-a")] });
         const viewer = s.access.track("ivy@REALM");

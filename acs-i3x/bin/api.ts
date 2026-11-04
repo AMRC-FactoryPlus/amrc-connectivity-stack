@@ -100,6 +100,7 @@ const access = new Access({
     auth: fplus.Auth,
     objectTree,
     vocabulary,
+    aclTimeoutMs: positiveInt("I3X_ACL_TIMEOUT_MS", 10_000),
     log: fplus.debug.bound("access"),
 });
 

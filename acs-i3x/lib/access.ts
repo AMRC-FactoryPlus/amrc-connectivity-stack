@@ -69,8 +69,15 @@ interface AccessOpts {
     auth: AuthLike;
     objectTree: TreeLike;
     vocabulary: VocabularyLike;
+    /** How long to wait for an ACL before answering 503. */
+    aclTimeoutMs?: number;
     log?: (msg: string, ...args: any[]) => void;
 }
+
+/* RxClient reads an ACL by waiting for the first value from the Auth
+ * service's notify interface. While Auth is down that never comes, so
+ * without a limit a request would wait for ever. */
+const ACL_TIMEOUT_MS = 10_000;
 
 /** The vocabulary node of each ISA-95 level in the tree. */
 interface LevelIndex {
@@ -99,6 +106,7 @@ export class Access {
     private tree: TreeLike;
     private vocabulary: VocabularyLike;
     private log: (msg: string, ...args: any[]) => void;
+    private aclTimeoutMs: number;
     /* RxClient hands out the same ACL array until the ACL changes. */
     private fromAcl: WeakMap<Ace[], Grants> = new WeakMap();
     private views: WeakMap<Grants, View> = new WeakMap();
@@ -109,13 +117,14 @@ export class Access {
         this.tree = opts.objectTree;
         this.vocabulary = opts.vocabulary;
         this.log = opts.log ?? (() => {});
+        this.aclTimeoutMs = opts.aclTimeoutMs ?? ACL_TIMEOUT_MS;
     }
 
     /**
      * The grants of the principal FplusHttpAuth put on req.auth: a
      * Kerberos UPN or a principal UUID. An ACL the Auth service refuses
      * (an unknown principal) grants nothing; an Auth service we cannot
-     * reach is a 503, never a grant.
+     * reach, or that does not answer in time, is a 503, never a grant.
      */
     async grants(principal: unknown): Promise<Grants> {
         const [type, name] = this.decode(principal);
@@ -123,8 +132,13 @@ export class Access {
         if (this.isRoot(type, name)) return ALL_GRANTS;
 
         let acl: Ace[];
+        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-            acl = await this.auth.fetch_auth_acl(type, name);
+            const late = new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error(
+                    `no answer from Auth in ${this.aclTimeoutMs}ms`)), this.aclTimeoutMs);
+            });
+            acl = await Promise.race([this.auth.fetch_auth_acl(type, name), late]);
         } catch (err: any) {
             const st = err?.status;
             if (Number.isInteger(st) && st >= 400 && st < 500) {
@@ -133,6 +147,8 @@ export class Access {
             }
             console.error("Access: cannot read the ACL for %s:", name, err?.message ?? err);
             throw failed(503, "Auth service unavailable");
+        } finally {
+            clearTimeout(timer);
         }
         return this.toGrants(acl);
     }

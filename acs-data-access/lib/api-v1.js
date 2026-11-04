@@ -924,17 +924,24 @@ export class APIv1 {
   /** GET. The state of the coverage summary. Any authenticated client
    * may read whether it is ready, stale or failing, as an error code;
    * the log has the detail. The bucket bounds and the task describe
-   * data across all devices, so only a caller with UseSparkplug on
-   * every device (a wildcard grant) sees them. */
+   * data across all devices, so only a caller with UseDevice on
+   * every device (a wildcard grant) sees them.
+   *
+   * The top level is the default bucket's summary. When the UNS bucket
+   * has its own summary, `uns` holds its state in the same shape. */
   async coverage_status(req, res) {
     const coverage = this.seriesReader?.coverage;
     if (!coverage)
       return res.status(200).json({ enabled: false });
     const detail = await this.may_read_all_devices(req.auth);
-    return res.status(200).json(coverage.status({ detail }));
+    const uns = this.seriesReader.coverages?.[Constants.Store.UNS];
+    return res.status(200).json({
+      ...coverage.status({ detail }),
+      ...(uns ? { uns: uns.status({ detail }) } : {}),
+    });
   }
 
-  /** Whether the principal has UseSparkplug on every device. Gives up
+  /** Whether the principal has UseDevice on every device. Gives up
    * (false) after 5 s, or if the ACL cannot be read. */
   async may_read_all_devices(principal) {
     let timer;

@@ -34,6 +34,14 @@ const influxClient = new InfluxDB({
   token: env.INFLUXDB_TOKEN
 });
 
+// The bucket each store reads. `sparkplug` is historian-sparkplug's
+// bucket, which existing datasets read. `uns` is historian-uns's
+// bucket, which the UNS device kinds read; without it they answer 503.
+const buckets = {
+  sparkplug: env.INFLUXDB_BUCKET,
+  ...(env.INFLUXDB_UNS_BUCKET ? { uns: env.INFLUXDB_UNS_BUCKET } : {}),
+};
+
 
 // the dataflow object is full of sequences that does most of the work of this service. Sequence means an RX observable.
 const data = new DataFlow({
@@ -46,7 +54,7 @@ const influxReader = new InfluxReader({
   debug,
   influx_client: influxClient,
   influx_org: env.INFLUXDB_ORG,
-  influx_bucket: env.INFLUXDB_BUCKET,
+  buckets,
 })
 
 // The coverage summary: Data Access creates its bucket and InfluxDB
@@ -55,17 +63,35 @@ const influxReader = new InfluxReader({
 // day returns nothing until InfluxDB has written it, so they get a long
 // timeout (COVERAGE_TIMEOUT_MS). A query that hits it is aborted, which
 // closes the connection so InfluxDB can cancel it.
+const influxAdmin = new InfluxAdmin({
+  url: env.INFLUXDB_URL,
+  token: env.INFLUXDB_TOKEN,
+  timeout_ms: Number(env.COVERAGE_TIMEOUT_MS) || COVERAGE_DEFAULTS.timeout_ms,
+});
 const coverage = new Coverage({
   debug,
-  admin: new InfluxAdmin({
-    url: env.INFLUXDB_URL,
-    token: env.INFLUXDB_TOKEN,
-    timeout_ms: Number(env.COVERAGE_TIMEOUT_MS) || COVERAGE_DEFAULTS.timeout_ms,
-  }),
+  admin: influxAdmin,
   org: env.INFLUXDB_ORG,
-  raw_bucket: env.INFLUXDB_BUCKET,
+  raw_bucket: buckets.sparkplug,
   env,
 });
+
+// The UNS bucket gets a summary of its own: both buckets key on the
+// device, so one summary of both would count every device twice.
+// historian-uns creates the bucket when it starts, which may be after
+// Data Access; until then this one keeps retrying.
+const uns_coverage = buckets.uns
+  ? new Coverage({
+      debug,
+      admin: influxAdmin,
+      org: env.INFLUXDB_ORG,
+      raw_bucket: buckets.uns,
+      suffix: "uns",
+      wait_for_raw: true,
+      env,
+    })
+  : null;
+const coverages = [coverage, uns_coverage].filter(c => c);
 
 // The series route has its own limiter and timeout, separate from the
 // CSV export, so a long download does not stall the timeline.
@@ -73,12 +99,15 @@ const seriesReader = new SeriesReader({
   debug,
   influx_client: influxClient,
   influx_org: env.INFLUXDB_ORG,
-  influx_bucket: env.INFLUXDB_BUCKET,
+  buckets,
   concurrency: env.SERIES_CONCURRENCY,
   timeout_ms: env.SERIES_TIMEOUT_MS,
   query_timeout_ms: env.SERIES_QUERY_TIMEOUT_MS,
   max_queue: env.SERIES_MAX_QUEUE,
-  coverage: coverage.enabled ? coverage : null,
+  coverages: {
+    sparkplug: coverage.enabled ? coverage : null,
+    uns: uns_coverage?.enabled ? uns_coverage : null,
+  },
 });
 
 const apiv1 = new APIv1({ 
@@ -88,6 +117,7 @@ const apiv1 = new APIv1({
   cdb: fplus.ConfigDB,
   influxReader,
   seriesReader,
+  buckets,
 });
 
 const api = await new WebAPI({
@@ -133,12 +163,12 @@ api.run();
 
 /* In the background: the series route counts raw data until the
  * summary is ready. */
-coverage.run();
+for (const c of coverages) c.run();
 
 /* Stop the background coverage work, then exit as the signal would. */
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.once(signal, () => {
-    coverage.stop();
+    for (const c of coverages) c.stop();
     process.kill(process.pid, signal);
   });
 }

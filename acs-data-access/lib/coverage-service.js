@@ -266,6 +266,13 @@ export class Coverage {
      * @param opts.admin An InfluxAdmin. Queries run through its query().
      * @param opts.org The InfluxDB org name.
      * @param opts.raw_bucket The raw data bucket.
+     * @param opts.suffix For a summary of another raw bucket: added to
+     *   the summary's bucket name (after `_`) and task name (after `-`),
+     *   so the two summaries never share a bucket. They count the same
+     *   devices, so a shared summary would count them twice.
+     * @param opts.wait_for_raw Wait, retrying, until the raw bucket
+     *   exists before creating the summary. For a raw bucket another
+     *   service creates when it starts.
      * @param opts.env Settings, usually process.env. See the docs for
      *   the COVERAGE_* variables.
      * @param opts.now A clock (for tests).
@@ -273,16 +280,20 @@ export class Coverage {
      */
     constructor(opts) {
         const env = opts.env ?? {};
-        this.log = opts.debug.bound("coverage");
+        const suffix = opts.suffix ?? "";
+        this.log = opts.debug.bound(suffix ? `coverage-${suffix}` : "coverage");
         this.admin = opts.admin;
         this.org = opts.org;
         this.raw_bucket = opts.raw_bucket;
+        this.wait_for_raw = opts.wait_for_raw ?? false;
         this.now = opts.now ?? Date.now;
         this.sleep = opts.sleep ?? sleep;
 
         this.enabled = env_bool(env.COVERAGE_ENABLED, true);
-        this.bucket = env.COVERAGE_BUCKET || COVERAGE_DEFAULTS.bucket;
-        this.task_name = env.COVERAGE_TASK || COVERAGE_DEFAULTS.task;
+        this.bucket = (env.COVERAGE_BUCKET || COVERAGE_DEFAULTS.bucket)
+            + (suffix ? `_${suffix}` : "");
+        this.task_name = (env.COVERAGE_TASK || COVERAGE_DEFAULTS.task)
+            + (suffix ? `-${suffix}` : "");
         this.recount_hours = env_num(env.COVERAGE_RECOUNT_HOURS, COVERAGE_DEFAULTS.recount_hours);
         this.backfill_enabled = env_bool(env.COVERAGE_BACKFILL, true);
         this.backfill_from = env.COVERAGE_BACKFILL_FROM
@@ -344,6 +355,10 @@ export class Coverage {
     async ensure() {
         const { admin } = this;
         const org_id = await admin.org_id(this.org);
+
+        /* run() retries a failed ensure, so this waits for the bucket. */
+        if (this.wait_for_raw && !await admin.find_bucket(org_id, this.raw_bucket))
+            throw new Error(`Raw bucket ${this.raw_bucket} does not exist yet`);
 
         let bucket = await admin.find_bucket(org_id, this.bucket);
         if (!bucket) {

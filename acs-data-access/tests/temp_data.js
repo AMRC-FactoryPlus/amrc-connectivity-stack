@@ -42,11 +42,11 @@ export const Test_Uuids = {
 
 export const Valid_Body = {
     SRC: {
-        structure: Constants.App.SparkplugSrc,
+        structure: Constants.App.UNSDevice,
         config: {
             source: Test_Uuids.Devices.Node2_TestDoubleDevice
         },
-        secondLevelPerm: Constants.Perm.UseSparkplug
+        secondLevelPerm: Constants.Perm.UseDevice
     },
 
     Session: {
@@ -99,18 +99,18 @@ export const Invalid_Body_Config = {
     SRC:[
         // no config
         {
-            structure: Constants.App.SparkplugSrc
+            structure: Constants.App.UNSDevice
         },
 
         // Invalid_No_Source
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {}
         },
 
         // Invalid_Bad_Source_Uuid for SRC
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: 'xxx'
             }
@@ -118,19 +118,19 @@ export const Invalid_Body_Config = {
 
         // Invalid_No_Config for SRC 
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             undefined
         },
 
         // Invalid_Config_Format for SRC
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: []
         },
 
         // Invalid_Bad_Child_Uuid for SRC
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: "xxx"
             }

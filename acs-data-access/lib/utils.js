@@ -4,6 +4,27 @@ export function fail(log, status, message) {
     throw new APIError(status);
 }
 
+/** A refusal the client can act on.
+ *
+ * fail() throws an APIError, which WebAPI answers with the status text
+ * alone. A Refusal carries a JSON body `{ error, message, ...extra }`
+ * with a stable machine-readable `error` code. The route that catches
+ * it sends that body; see APIv1#send_refusal.
+ */
+export class Refusal extends Error {
+    constructor(status, error, message, extra = {}) {
+        super(message);
+        this.status = status;
+        this.body = { error, message, ...extra };
+    }
+}
+
+/** Logs and throws a Refusal. */
+export function refuse(log, status, error, message, extra) {
+    log(message);
+    throw new Refusal(status, error, message, extra);
+}
+
 
 export function csv_escape(value) {
     if (value == null) return "";

@@ -27,6 +27,9 @@ const GONE = "99999999-9999-4999-8999-999999999999";
 const OWNER = "88888888-8888-4888-8888-888888888888";
 
 const SUBSET_APP = Constants.App.SparkplugSubset;
+/* New metrics datasets are UNS device metrics; Sub-device can no
+ * longer be created. Both share the handler code tested here. */
+const UNS_METRICS_APP = Constants.App.UNSDeviceMetrics;
 
 /* Shaped like a real DeviceInformation origin map: a metric on the
  * device itself, an object with an Instance_UUID, a plain folder with no
@@ -208,6 +211,7 @@ describe("build_flux_queries", () => {
 function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = {}) {
     const acl_checks = [];
     const calls = { get_config: 0, created: [], put: [] };
+    const PLACEMENT = Constants.External.ISA95Placement;
 
     const api = new APIv1({
         data: { datasets: rx.of(IMap(datasets)) },
@@ -223,7 +227,12 @@ function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = 
                 calls.get_config++;
                 if (app == UUIDs.App.DeviceInformation && obj == DEVICE && origin_map)
                     return { originMap: origin_map, sparkplugName: "Test" };
+                if (app == PLACEMENT && obj == DEVICE)
+                    return { node: "c0c0c0c0-0000-4000-8000-000000000001" };
                 return undefined;
+            },
+            async class_has_member (klass, obj) {
+                return klass == UUIDs.Class.Device && obj == DEVICE;
             },
             async create_object (klass) {
                 calls.created.push(klass);
@@ -235,6 +244,7 @@ function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = 
         },
         debug: { bound: () => () => {} },
         influxReader: {},
+        buckets: { sparkplug: "default", uns: "uns" },
     });
 
     return { api, acl_checks, calls, handler: api.handlers[SUBSET_APP] };
@@ -280,10 +290,14 @@ describe("SparkplugSubset handler", () => {
             expect.objectContaining({ status: 422 }));
     });
 
-    test("needs USE_SPARKPLUG on the source device", async () => {
+    test("needs UseDevice on the source device", async () => {
         const { handler, acl_checks } = make_api({ allowed: false });
         expect(await handler.check_sources_permissions("tester", valid)).toBe(false);
-        expect(acl_checks).toEqual([[Constants.Perm.UseSparkplug, DEVICE]]);
+        expect(acl_checks).toEqual([[Constants.Perm.UseDevice, DEVICE]]);
+    });
+
+    test("UseSparkplug is the old name of UseDevice", () => {
+        expect(Constants.Perm.UseSparkplug).toBe(Constants.Perm.UseDevice);
     });
 
     test("resolves references through the current origin map", async () => {
@@ -294,6 +308,7 @@ describe("SparkplugSubset handler", () => {
         expect(leaves).toEqual([{
             dataset_uuid: SUBSET,
             device_uuid: DEVICE,
+            store: "sparkplug",
             from: null, to: null,
             metrics: [
                 { path: "Axes/X/Position", name: "Actual" },
@@ -387,7 +402,7 @@ describe("SparkplugSubset path entries", () => {
 
 describe("POST v1/structure with path entries", () => {
     const body = {
-        structure: SUBSET_APP,
+        structure: UNS_METRICS_APP,
         config: { source: DEVICE, metrics: [{ path: "Axes/X/Position/Actual" }] },
     };
 
@@ -397,7 +412,7 @@ describe("POST v1/structure with path entries", () => {
         await api.structure_create({ body, auth: "tester" }, res);
 
         expect(res.code).toBe(200);
-        expect(calls.put).toEqual([{ app: SUBSET_APP, obj: SUBSET, config: {
+        expect(calls.put).toEqual([{ app: UNS_METRICS_APP, obj: SUBSET, config: {
             source: DEVICE,
             metrics: [{ instance: AXIS, metric: "Position/Actual" }],
         }}]);
@@ -414,7 +429,7 @@ describe("POST v1/structure with path entries", () => {
         expect(calls.put).toEqual([]);
     });
 
-    test("without USE_SPARKPLUG the origin map is never read", async () => {
+    test("without UseDevice neither the origin map nor the placement is read", async () => {
         const { api, calls } = make_api({ allowed: false });
         await expect(api.structure_create({ body, auth: "tester" }, make_res()))
             .rejects.toMatchObject({ status: 403 });
@@ -450,7 +465,7 @@ describe("GET /sparkplug-sources/:uuid/metrics", () => {
         expect(res.body.map(m => m.path)).toContain("Axes/X/Position/Actual");
     });
 
-    test("refuses without USE_SPARKPLUG", async () => {
+    test("refuses without UseDevice", async () => {
         const { api } = make_api({ allowed: false });
         await expect(api.sparkplug_source_metrics(
             { params: { uuid: DEVICE }, auth: "tester" }, make_res()))

@@ -84,7 +84,7 @@ export const deviceColumns: ColumnDef<Device>[] = [
         // Opens the i3X access dialog for the device. The button stops
         // the click, so the rest of the row still opens the device.
         id: 'i3x',
-        header: () => h('div', {class: 'w-[200px]'}, 'i3X access'),
+        header: () => h('div', {class: 'w-[200px]'}, 'Access'),
         cell: ({row}) => {
             const via = placement_chain(useISA95Store().vocabulary, row.original.placement)
             return h(I3xAccessButton, {

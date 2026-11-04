@@ -50,6 +50,8 @@ grants:
       !u UUIDs.App.Info: false
       # The ISA-95 vocabulary, to resolve grants on ISA-95 nodes.
       !u UUIDs.App.ISA95Vocabulary: false
+      # Each device's ISA-95 placement: where i3X puts it in the tree.
+      !u UUIDs.App.ISA95Placement: false
       # Device originMap (Schema_UUID, Instance_UUID, ISA-95 hierarchy,
       # metric tree) — i3x reads this for every device in the Device
       # class to build the object tree.

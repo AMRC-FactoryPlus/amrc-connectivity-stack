@@ -4,6 +4,7 @@
 
 import { jest } from "@jest/globals";
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { RelType } from "../lib/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 import { loadFromMock } from "./helpers/load-from-mock.js";
@@ -18,7 +19,7 @@ const NS_NAME = "Factory+";
 const NS_URI = "urn:factoryplus:ns";
 
 function makeTree(fplus?: ReturnType<typeof createMockFplus>) {
-    return new ObjectTree({
+    return new TestObjectTree({
         fplus: fplus ?? createMockFplus(),
         namespaceName: NS_NAME,
         namespaceUri: NS_URI,

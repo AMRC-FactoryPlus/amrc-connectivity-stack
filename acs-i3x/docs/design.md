@@ -195,8 +195,10 @@ a set of in-memory Maps, and objects come back field for field as before.
 List order is insertion order, as Map iteration was.
 
 Built from ConfigDB only; the Directory is not used. A device's
-DeviceInformation `originMap` gives its type (Schema_UUID), its ISA-95
-hierarchy and its metric tree; its Info config gives its display name.
+DeviceInformation `originMap` gives its type (Schema_UUID) and its metric
+tree; its ISA-95 Placement config, resolved through the vocabulary, gives
+its ISA-95 position (the origin map's own ISA95_Hierarchy is not read);
+its Info config gives its display name.
 
 - `addDevice`, `replaceDeviceSubtree`, `removeDevice`, `updateDeviceName`,
   `addObjectType`, `updateObjectType`, `removeObjectType`: one change each,

@@ -24,6 +24,7 @@
  */
 
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { History } from "../lib/history.js";
 import type { I3xValueResponse, I3xVqt } from "../lib/types/i3x.js";
 // @ts-ignore - plain ESM module shared with the benchmark
@@ -59,7 +60,7 @@ async function seedBucket(name: string, all: string[]): Promise<string> {
 /** A real ObjectTree built from the synthetic fleet. */
 function buildTree(devices: number, wide = 0): ObjectTree {
     const fplus = { debug: { bound: () => () => {} } };
-    const tree = new ObjectTree({ fplus, namespaceName: "AMRC", namespaceUri: "urn:test" });
+    const tree = new TestObjectTree({ fplus, namespaceName: "AMRC", namespaceUri: "urn:test" });
     (tree as any).buildNamespace();
     (tree as any).buildRelationshipTypes();
     tree.refreshFromSnapshot(pipelineSnapshot(devices, wide));

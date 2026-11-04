@@ -10,7 +10,9 @@
  *
  *  - one WATCH of the Device class members;
  *  - one ETag SEARCH (v2/app/:app/etag/) each for DeviceInformation,
- *    Info and Schema.
+ *    Info and Schema;
+ *  - the devices' ISA-95 positions, from their placements (see
+ *    placements.ts).
  *
  * The database records, per device and per referenced schema, the
  * ETags of the configs it last applied. Whenever a SEARCH sends a full
@@ -34,6 +36,7 @@ import {
     SCHEMA_APP_UUID,
 } from "./constants.js";
 import type { ObjectTree } from "./object-tree.js";
+import type { PlacementSource } from "./placements.js";
 import type { I3xStore } from "./store.js";
 import { Slicer } from "./slicer.js";
 
@@ -68,6 +71,8 @@ export interface ConfigSyncOpts {
     /** The ETag SEARCH of one Application. */
     etags: (app: string) => rx.Observable<EtagChange>;
     fetcher: ConfigFetcher;
+    /** Each device's ISA-95 position, from its placement. */
+    placements: PlacementSource;
     /** Told when a device leaves the tree, to drop its values. */
     valueCache?: {
         removeDevice(uuid: string): void;
@@ -107,6 +112,8 @@ interface DeviceRow {
     etag_info: string | null;
     sparkplug_name: string | null;
     info_name: any;
+    /** The ISA-95 position the device was placed at, as JSON. */
+    isa95: string | null;
 }
 
 interface SchemaRow {
@@ -262,6 +269,8 @@ export class ConfigSync {
             this.subs.push(this.opts.etags(APP[kind]).pipe(retry(`${kind} ETag search`))
                 .subscribe(guard(`${kind} ETag`, c => this.onEtags(kind, c))));
         }
+        this.subs.push(this.opts.placements.changes
+            .subscribe(guard("placement", ds => this.onPlacements(ds))));
         return this;
     }
 
@@ -284,7 +293,25 @@ export class ConfigSync {
 
     private haveAll(): boolean {
         return this.members !== null && this.etags.devinfo !== null
-            && this.etags.info !== null && this.etags.schema !== null;
+            && this.etags.info !== null && this.etags.schema !== null
+            && this.opts.placements.isReady();
+    }
+
+    /* Devices whose ISA-95 position changed: a placement was written
+     * or removed, or the vocabulary above it changed. */
+    private onPlacements(devices: string[]): void {
+        if (!this.haveAll()) return;
+        if (this.reconciling) this.reconcileAgain = true;
+        if (!this.reconciled) return this.scheduleReconcile();
+        for (const uuid of devices) {
+            if (this.members!.has(uuid)) this.checkDevice(uuid);
+        }
+        if (this.queue.size === 0) this.onIdle();
+    }
+
+    /* A device's current position, as stored in sync_device. */
+    private isa95Of(uuid: string): string {
+        return JSON.stringify(this.opts.placements.segments(uuid) ?? []);
     }
 
     private onMembers(next: MemberSet): void {
@@ -314,6 +341,7 @@ export class ConfigSync {
 
         const uuid = change.child;
         if (kind !== "schema" && this.members!.has(uuid)) this.checkDevice(uuid);
+
         if (kind !== "devinfo" && this.tree.isSchemaReferenced(uuid)) this.checkSchema(uuid);
     }
 
@@ -449,7 +477,8 @@ export class ConfigSync {
     private deviceNeeds(uuid: string, row: DeviceRow | undefined): boolean {
         return !row
             || row.etag_devinfo !== this.want("devinfo", uuid)
-            || row.etag_info !== this.want("info", uuid);
+            || row.etag_info !== this.want("info", uuid)
+            || row.isa95 !== this.isa95Of(uuid);
     }
 
     private schemaNeeds(uuid: string, row: SchemaRow | undefined): boolean {
@@ -540,7 +569,10 @@ export class ConfigSync {
     private async syncDevice(uuid: string): Promise<void> {
         if (!this.members?.has(uuid)) return;
         const row = this.deviceRow(uuid);
-        const needDI = !row || row.etag_devinfo !== this.want("devinfo", uuid);
+        /* A new position rebuilds the device, which needs its
+         * DeviceInformation. */
+        const needDI = !row || row.etag_devinfo !== this.want("devinfo", uuid)
+            || row.isa95 !== this.isa95Of(uuid);
         const needInfo = !row || row.etag_info !== this.want("info", uuid);
         if (!needDI && !needInfo) return;
 
@@ -557,11 +589,13 @@ export class ConfigSync {
         const oldSchemas = this.tree.getDeviceSchemaUuids(uuid);
         const infoName = info ? info.config?.name ?? null : cur?.info_name ?? null;
         const sparkplugName = di ? di.config?.sparkplugName ?? null : cur?.sparkplug_name ?? null;
+        /* The position now, which may be newer than what queued this. */
+        const isa95 = this.opts.placements.segments(uuid) ?? [];
 
         this.store.transaction(() => {
             if (di) {
                 this.tree.replaceDeviceSubtree(uuid, di.config,
-                    infoName === null ? null : { name: infoName });
+                    infoName === null ? null : { name: infoName }, isa95);
                 /* A device without ISA-95 hierarchy is not published to
                  * UNS, so buildDevice left it out of the tree. Its values
                  * go with it, as for a removed device. */
@@ -571,17 +605,19 @@ export class ConfigSync {
                 this.tree.updateDeviceName(uuid, infoName ?? sparkplugName ?? uuid);
             }
             this.store.prepare(`
-                insert into sync_device (uuid, etag_devinfo, etag_info, sparkplug_name, info_name)
-                values (?, ?, ?, ?, ?)
+                insert into sync_device (uuid, etag_devinfo, etag_info, sparkplug_name, info_name, isa95)
+                values (?, ?, ?, ?, ?, ?)
                 on conflict (uuid) do update set
                     etag_devinfo = excluded.etag_devinfo,
                     etag_info = excluded.etag_info,
                     sparkplug_name = excluded.sparkplug_name,
-                    info_name = excluded.info_name
+                    info_name = excluded.info_name,
+                    isa95 = excluded.isa95
             `).run(uuid,
                 di ? di.etag : cur?.etag_devinfo ?? null,
                 info ? info.etag : cur?.etag_info ?? null,
-                sparkplugName, infoName);
+                sparkplugName, infoName,
+                di ? JSON.stringify(isa95) : cur?.isa95 ?? null);
         });
 
         if (di) this.schemasChanged(oldSchemas, this.tree.getDeviceSchemaUuids(uuid));

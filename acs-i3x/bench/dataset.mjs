@@ -29,6 +29,7 @@
  */
 
 import { v5 as uuidv5 } from "uuid";
+import { isa95_segments } from "@amrc-factoryplus/service-client";
 
 const NS = "6f1c2c6e-4a1d-4f55-9a57-3b8a0f7d2b10";
 const HIERARCHY_SCHEMA_UUID = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
@@ -182,7 +183,10 @@ export function pipelineSnapshot(n, wide = 0) {
     const devices = new Map();
     for (let i = 0; i < n; i++) {
         const d = device(i, wide);
-        devices.set(d.uuid, { devInfo: { schema: SCHEMA.top, sparkplugName: d.name, originMap: d.originMap }, info: d.info });
+        /* Each device is placed where its origin map says, as the
+         * service-setup migration places it. */
+        devices.set(d.uuid, { devInfo: { schema: SCHEMA.top, sparkplugName: d.name, originMap: d.originMap }, info: d.info,
+            isa95: isa95_segments(d.originMap) ?? [] });
     }
     const schemas = new Map(Object.values(SCHEMA).map((s) => [s, { schema: null, info: { name: s } }]));
     return { devices, schemas };

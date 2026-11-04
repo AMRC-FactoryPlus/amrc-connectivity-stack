@@ -14,6 +14,24 @@ declare module "@amrc-factoryplus/service-client" {
     export const SpB: any;
     export const GSS: any;
     export const MQTT: any;
+
+    /* The shared ISA-95 rule (lib/js-service-client/lib/isa95.js). */
+    export const ISA95_LEVELS: readonly string[];
+    export interface Isa95VocabNode {
+        uuid: string;
+        name: string;
+        level?: string;
+        aliases: string[];
+        children: string[];
+    }
+    export interface Isa95VocabIndex {
+        nodes: Map<string, Isa95VocabNode>;
+        parents: Map<string, string[]>;
+    }
+    export function isa95_vocabulary(nodes: Iterable<Isa95VocabNode>): Isa95VocabIndex;
+    export function isa95_chain(vocab: Isa95VocabIndex, node: string):
+        { chain: Isa95VocabNode[]; error?: undefined } | { chain?: undefined; error: string };
+    export function isa95_value_problem(value: string): string | null;
 }
 
 declare module "@amrc-factoryplus/rx-client" {

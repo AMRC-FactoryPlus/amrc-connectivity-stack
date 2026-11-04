@@ -19,6 +19,7 @@ import { ConfigSync } from "../lib/sync.js";
 import { Slicer } from "../lib/slicer.js";
 import type { EtagChange } from "../lib/sync.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree, originMapPlacements } from "./helpers/isa95.js";
 import { I3xStore } from "../lib/store.js";
 import { ValueCache } from "../lib/value-cache.js";
 import {
@@ -128,20 +129,25 @@ function seed(cdb: FakeConfigDB, n = N) {
 }
 
 function stack(cdb: FakeConfigDB, store = new I3xStore(), opts: Partial<{ concurrency: number; retryDelay: number; readyGrace: number }> = {}) {
-    const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+    const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
     const removed: string[] = [];
+    const placements = originMapPlacements(uuid =>
+        cdb.configs.get(cdb.key(DI, uuid))?.config);
     const sync = new ConfigSync({
         objectTree: tree,
         store,
         members: cdb.members.pipe(rx.filter((m): m is Set<string> => m !== null)),
         etags: app => cdb.feed(app),
         fetcher: cdb.fetcher,
+        /* Each device is placed where its origin map's hierarchy says,
+         * as the migration would place it. */
+        placements,
         valueCache: { removeDevice: (uuid: string) => removed.push(uuid) },
         concurrency: opts.concurrency ?? 4,
         retryDelay: opts.retryDelay ?? 50,
         readyGrace: opts.readyGrace,
     });
-    return { tree, store, sync, removed };
+    return { tree, store, sync, removed, placements };
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -155,7 +161,7 @@ async function settle(sync: ConfigSync) {
 
 /** The tree a full build from the fake's current configs gives. */
 function reference(cdb: FakeConfigDB, members: string[]) {
-    const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
+    const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
     const get = (app: string, obj: string) => cdb.configs.get(cdb.key(app, obj))?.config ?? null;
     const devices = new Map(members.map(u => [u, { devInfo: get(DI, u), info: get(INFO, u) }]));
     tree.refreshFromSnapshot({ devices, schemas: new Map() });

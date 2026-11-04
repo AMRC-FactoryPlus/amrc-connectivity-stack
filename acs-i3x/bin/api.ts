@@ -14,6 +14,7 @@ import { History } from "../lib/history.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
 import { Access } from "../lib/access.js";
 import { Isa95Vocabulary } from "../lib/isa95.js";
+import { Isa95Placements } from "../lib/placements.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
@@ -92,9 +93,14 @@ const history = new History({
 // Subscribe to UNS/v1/#, catching up stored values from InfluxDB.
 await valueCache.init(fplus, history);
 
-// The ISA-95 vocabulary, for grants on vocabulary nodes.
+// The ISA-95 vocabulary, for grants on vocabulary nodes and to place
+// devices.
 const vocabulary = new Isa95Vocabulary({ log: fplus.debug.bound("isa95") });
 vocabulary.run(fplus);
+
+// Each device's ISA-95 position, from its placement.
+const placements = new Isa95Placements({ vocabulary, log: fplus.debug.bound("isa95") })
+    .run(fplus);
 
 // What each caller may see: their ReadObject grants against the tree.
 const access = new Access({
@@ -149,6 +155,7 @@ new ConfigSync({
     objectTree,
     store,
     ...configSyncFeeds(fplus),
+    placements,
     valueCache,
     concurrency: positiveInt("I3X_SYNC_CONCURRENCY", 16),
     readyGrace: positiveInt("I3X_READY_GRACE_MS", 120_000),

@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  devices_from_tree, group_by_path, path_chips, merge_device_index, path_label, NO_PATH,
+  devices_from_tree, device_tree, tree_rows, merge_device_index, path_label, NO_PATH,
 } from '../src/lib/datasets/i3x-devices.js'
 
 const DEV1 = 'aaaaaaaa-0000-4000-8000-000000000001'
@@ -89,34 +89,78 @@ describe('devices_from_tree', () => {
   })
 })
 
-describe('group_by_path', () => {
-  it('groups under each path, sorted, with unplaced devices last', () => {
-    const groups = group_by_path([
-      { uuid: '1', name: 'b', path: ['Works', 'South site'] },
-      { uuid: '2', name: 'z', path: [] },
-      { uuid: '3', name: 'c', path: ['Works', 'North site'] },
-      { uuid: '4', name: 'a', path: ['Works', 'South site'] },
-    ])
-    expect(groups.map(g => g.label)).toEqual(['Works / North site', 'Works / South site', NO_PATH])
-    expect(groups[1].devices.map(d => d.name)).toEqual(['a', 'b'])
-    expect(groups[2].path).toEqual([])
+describe('device_tree', () => {
+  const D = (uuid, name, path) => ({ uuid, name, path })
+  const tree = device_tree([
+    D('t2', 'Torque 2', ['Works', 'North site', 'Hall 1']),
+    D('t1', 'Torque 1', ['Works', 'North site', 'Hall 1']),
+    D('m', 'Meter', ['Works']),
+    D('l', 'Lathe', ['Works', 'South site']),
+    D('r', 'Rig', []),
+  ])
+
+  it('nests levels by path, sorted by name, with unplaced devices last', () => {
+    expect(tree.map(n => n.name)).toEqual(['Works', NO_PATH])
+    expect(tree[0].nodes.map(n => n.name)).toEqual(['North site', 'South site'])
+    expect(tree[0].nodes[0].nodes[0].devices.map(d => d.name)).toEqual(['Torque 1', 'Torque 2'])
+    expect(tree[1].unplaced).toBe(true)
   })
 
-  it('labels a path', () => {
-    expect(path_label(['Works', 'Hall 1'])).toBe('Works / Hall 1')
-    expect(path_label(null)).toBe(NO_PATH)
+  it('lists every device at or below each level', () => {
+    expect(tree[0].all.sort()).toEqual(['l', 'm', 't1', 't2'])
+    expect(tree[0].nodes[0].all.sort()).toEqual(['t1', 't2'])
+  })
+
+  it('keeps two levels with the same name apart when their parents differ', () => {
+    const t = device_tree([D('a', 'A', ['Works', 'North site', 'Machining']), D('b', 'B', ['Works', 'South site', 'Machining'])])
+    const [north, south] = t[0].nodes
+    expect(north.nodes[0].key).not.toBe(south.nodes[0].key)
+    expect(north.nodes[0].all).toEqual(['a'])
+  })
+
+  it('is empty with no devices', () => {
+    expect(device_tree([])).toEqual([])
   })
 })
 
-describe('path_chips', () => {
-  it('offers the first level at which the devices differ', () => {
-    const devices = devices_from_tree(LEVELS, RELATED)
-    expect(path_chips(devices)).toEqual({ depth: 1, values: ['North site', 'South site'] })
+describe('tree_rows', () => {
+  const D = (uuid, name, path) => ({ uuid, name, path })
+  const tree = device_tree([
+    D('t1', 'Torque 1', ['Works', 'North site']),
+    D('m', 'Meter', ['Works']),
+    D('l', 'Lathe', ['Works', 'South site']),
+  ])
+  const label = r => r.node ? `${'  '.repeat(r.depth)}[${r.node.name}]` : `${'  '.repeat(r.depth)}${r.device.name}`
+
+  it('shows only the closed top level by default', () => {
+    expect(tree_rows(tree).map(label)).toEqual(['[Works]'])
   })
 
-  it('offers nothing when every device shares its path', () => {
-    expect(path_chips([{ path: ['Works', 'Hall 1'] }, { path: ['Works', 'Hall 1'] }])).toBeNull()
-    expect(path_chips([])).toBeNull()
+  it('lists an open level\'s devices before its levels', () => {
+    const open = new Set([tree[0].key, tree[0].nodes[0].key])
+    expect(tree_rows(tree, { is_open: k => open.has(k) }).map(label))
+      .toEqual(['[Works]', '  Meter', '  [North site]', '    Torque 1', '  [South site]'])
+  })
+
+  it('while searching, opens every level with a match and hides the rest', () => {
+    const rows = tree_rows(tree, { match: d => d.name.startsWith('Torque') })
+    expect(rows.map(label)).toEqual(['[Works]', '  [North site]', '    Torque 1'])
+    expect(rows[0].uuids).toEqual(['t1'])
+  })
+
+  it('counts every device under a level when not searching', () => {
+    expect(tree_rows(tree)[0].uuids.sort()).toEqual(['l', 'm', 't1'])
+  })
+
+  it('shows nothing when no device matches', () => {
+    expect(tree_rows(tree, { match: () => false })).toEqual([])
+  })
+})
+
+describe('path_label', () => {
+  it('joins a path, or names a device with none', () => {
+    expect(path_label(['Works', 'Hall 1'])).toBe('Works / Hall 1')
+    expect(path_label(null)).toBe(NO_PATH)
   })
 })
 

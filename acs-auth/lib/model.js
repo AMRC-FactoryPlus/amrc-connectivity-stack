@@ -38,14 +38,18 @@ export default class Model extends Queries {
      * existing grant requires ManageACL on that entry's perm, and
      * changing the perm requires ManageACL on both perms. */
     async grant_request (r) {
-        if (r.grant && !r.permitted(r.grant.permission))
+        /* check_targ gives null when the caller has WriteACL on
+         * nothing. Calling it would throw inside the request pipeline
+         * and stop the service. */
+        const permitted = r.permitted ?? (() => false);
+        if (r.grant && !permitted(r.grant.permission))
             return { status: 403 };
 
         return this.txn(async q => {
             if (r.uuid == null)
                 return q.grant_new(r.grant);
 
-            const [status, id] = await q.grant_find(r.uuid, r.permitted);
+            const [status, id] = await q.grant_find(r.uuid, permitted);
             if (status != 200) return { status };
 
             if (r.grant == null)

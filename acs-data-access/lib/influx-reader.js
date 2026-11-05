@@ -8,7 +8,12 @@ import { DataAccess as Constants } from "./constants.js";
 
 /* `path` comes last so that clients reading the columns by position
  * still work. */
-const CSV_HEADER = "device,metric,timestamp,value,unit,path";
+/* The UUID columns come from tags both historians write on every
+ * point: the device, the instance that owns the metric's folder, and
+ * that instance's schema. A metric directly on the device has no
+ * bottom-level tags (Influx stores no empty tags), so its instance
+ * and schema are the device's own. New columns go at the end. */
+const CSV_HEADER = "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid";
 
 /** Whether an error is InfluxDB saying a bucket does not exist. */
 export function is_missing_bucket(err) {
@@ -138,6 +143,9 @@ export class InfluxReader {
                 csv_escape(o._value),
                 csv_escape(o.unit),
                 csv_escape(path),
+                csv_escape(o.topLevelInstance),
+                csv_escape(o.bottomLevelInstance || o.topLevelInstance),
+                csv_escape(o.bottomLevelSchema || o.topLevelSchema),
             ].join(",");
 
             await this.#write(writable, line + "\n");

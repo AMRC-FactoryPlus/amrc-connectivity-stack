@@ -210,7 +210,11 @@ export function build_flux_query({ bucket, source, filter = {}, subset }) {
                 "_measurement",
                 "device",
                 "unit",
-                "path"
+                "path",
+                "topLevelInstance",
+                "bottomLevelInstance",
+                "topLevelSchema",
+                "bottomLevelSchema"
             ])
         `;
 }

@@ -182,6 +182,14 @@ existing kinds, **Sparkplug source** and **Sub-device**, read the
   Sparkplug historian drops. The CSV columns are otherwise identical:
   `device`, `metric`, `path` and `unit` match a download of the same
   device from the `default` bucket.
+- **Every download, from either bucket, now ends with three UUID
+  columns:** `device_uuid`, `instance_uuid` (the object that holds the
+  metric, or the device itself for a metric directly on it) and
+  `schema_uuid` (that object's schema). A UNS device download has no
+  separate `Schema_UUID` and `Instance_UUID` rows, because the UNS does
+  not carry them as metrics, so these columns are where to find them.
+  The columns are added at the end, so readers that pick columns by
+  name keep working.
 - **The UNS historian must run for the new kinds.** The chart passes
   the `uns` bucket to Data Access when `historians.uns.enabled` is
   `true`, the default. Without it Data Access still starts, and the new

@@ -34,12 +34,22 @@ See [ISA-95 placement](../services/isa95-placement.md).
   Enterprise**, the chart value `acs.organisation`. They join the UNS,
   and i3X, under that Enterprise. Move them in the Manager UI, or with
   a bulk import, if that is not where they belong.
-- **Merge duplicate vocabulary nodes before you upgrade.** The
+- **If you upgrade with `helm upgrade --reuse-values`, use
+  `--reset-then-reuse-values` instead** (Helm 3.14 or later).
+  `--reuse-values` replays the values saved with the old release, which
+  have no `placementWatcher` section, and the upgrade fails with a nil
+  pointer on `.Values.placementWatcher.enabled`.
+  `--reset-then-reuse-values` starts from the new chart's defaults and
+  applies your old values over them. Tools that pass the full values
+  on every upgrade, such as Flux, are not affected.
+- **Merge duplicate vocabulary nodes after the upgrade.** The
   migration matches names to the vocabulary. If the vocabulary has two
   nodes for one place (for example "Site1" and "Site 1" under the same
-  Enterprise), devices are split between them. Use **Merge into** on
-  the ISA-95 page first; it keeps the merged name as an alias, so both
-  spellings then match one node.
+  Enterprise), devices are split between them. **Merge into** on the
+  ISA-95 page arrives with this release. It moves the merged node's
+  children and placements to the node you keep, and keeps the merged
+  name as an alias. Children with the same name end up side by side
+  under the kept node, so merge those as well.
 - **A new service, the placement watcher, runs by default.** It renders
   each placement into its device's Edge Agent config, at
   `Device_Information/ISA95_Hierarchy`, and does so again whenever a

@@ -2,10 +2,11 @@
  * Copyright (c) University of Sheffield AMRC 2026.
  */
 
-import { computed, reactive, toValue, watch } from 'vue'
+import { computed, reactive, shallowRef, toValue, watch } from 'vue'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { series_key, split_key } from '@/lib/datasets/series.js'
-import { pinned_entries, stale_pins } from './page-logic.js'
+import { pinned_entries, stale_pins, contents_devices } from './page-logic.js'
 
 export { pinned_entries, stale_pins }
 
@@ -75,12 +76,12 @@ export function usePins (uuid) {
  * @param record   ref or getter: the dataset record
  * @param resolved ref or getter: ds.devicesOf() for it
  */
-export function useDatasetPins (record, resolved) {
+export function useDatasetPins (record, resolved, byUuid = null) {
   const ds = useDatasetsStore()
   const pins = usePins(() => toValue(record)?.uuid)
   // The dataset's devices, or null when the structure is hidden.
   const devices = computed(() => toValue(record)?.structure ? (toValue(resolved)?.devices ?? []) : null)
-  const entries = computed(() => pinned_entries(pins.keys.value, ds.deviceByUuid, devices.value))
+  const entries = computed(() => pinned_entries(pins.keys.value, toValue(byUuid) ?? ds.deviceByUuid, devices.value))
 
   watch(() => [pins.keys.value, devices.value, ds.ready, toValue(resolved)?.unknown?.length ?? 0], () => {
     // Forget only when every part of the dataset is known.
@@ -90,4 +91,43 @@ export function useDatasetPins (record, resolved) {
   }, { immediate: true })
 
   return { pins, entries }
+}
+
+/**
+ * A dataset's devices with their metrics, as { devices, byUuid }.
+ * They come from the device store. Someone who can read the dataset
+ * but not its devices in ConfigDB gets the devices Data Access lists
+ * for the dataset instead. The store may never load for them, so the
+ * fetch does not wait for it.
+ *
+ * @param record   ref or getter: the dataset record
+ * @param resolved ref or getter: ds.devicesOf() for it
+ */
+export function useDatasetDevices (record, resolved) {
+  const ds = useDatasetsStore()
+  const sc = useServiceClientStore()
+  const fallback = shallowRef({})
+
+  const wanted = computed(() => toValue(resolved)?.devices ?? [])
+  const unknown = computed(() => wanted.value.filter(d => !ds.deviceByUuid[d]))
+
+  watch(() => [toValue(record)?.uuid, unknown.value.length], async ([uuid, n]) => {
+    if (!uuid || !n || unknown.value.every(d => fallback.value[d])) return
+    try {
+      const contents = await sc.client.DataAccess.get_dataset_contents(uuid)
+      if (toValue(record)?.uuid === uuid) fallback.value = contents_devices(contents)
+    }
+    catch (e) {
+      console.warn('Dataset contents unavailable', e)
+    }
+  }, { immediate: true })
+
+  const byUuid = computed(() => {
+    const extra = unknown.value.filter(d => fallback.value[d])
+    if (!extra.length) return ds.deviceByUuid
+    return { ...Object.fromEntries(extra.map(d => [d, fallback.value[d]])), ...ds.deviceByUuid }
+  })
+  const devices = computed(() => wanted.value.map(d => byUuid.value[d]).filter(Boolean))
+
+  return { devices, byUuid }
 }

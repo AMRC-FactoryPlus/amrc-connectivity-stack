@@ -293,3 +293,24 @@ export function live_badge (live, stream, status) {
 
 // Shown in place of Live when i3X does not show the person the devices.
 export const LIVE_DENIED = 'Live values need i3X access'
+
+/**
+ * Devices from a Data Access contents answer, by UUID, in the shape
+ * the device store gives ({ uuid, name, metrics: [{ path, name, type,
+ * unit }] }). Someone who can read a dataset may not be able to read
+ * its devices in ConfigDB, so the page falls back to these. A device
+ * listed once per store gets the union of its metrics.
+ */
+export function contents_devices (contents) {
+    const out = {}
+    for (const d of contents?.devices ?? []) {
+        const dev = out[d.uuid] ??= { uuid: d.uuid, name: d.name ?? d.uuid.slice(0, 8), metrics: [] }
+        const have = new Set(dev.metrics.map(m => m.path))
+        for (const m of d.metrics ?? []) {
+            if (have.has(m.path)) continue
+            have.add(m.path)
+            dev.metrics.push({ path: m.path, name: m.path.split('/').pop(), type: m.type ?? null, unit: m.unit ?? null })
+        }
+    }
+    return out
+}

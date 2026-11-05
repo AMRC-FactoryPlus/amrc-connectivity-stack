@@ -8,7 +8,7 @@ import { merge_datasets, structure_tree } from '../src/lib/datasets/model.js'
 import {
     tab_of, equipment_of, included_list, equipment_change, group_items,
     labels_for, metric_total, filter_metrics, tree_rows, structure_type,
-    live_badge,
+    live_badge, contents_devices,
 } from '../src/components/Datasets/page/page-logic.js'
 import {
     is_energy_metric, energy_applies, energy_sparkplug_ids, pick_meters, pick_intensity,
@@ -244,5 +244,38 @@ describe('live_badge', () => {
 
     it('says when i3X refused every metric', () => {
         expect(live_badge(true, true, 'denied')).toBe('denied')
+    })
+})
+
+describe('contents_devices', () => {
+    const D = 'd1d1d1d1-0000-4000-8000-000000000001'
+
+    it('gives each device the device store shape', () => {
+        const out = contents_devices({ devices: [{
+            uuid: D, name: 'Lathe', store: 'uns',
+            metrics: [{ instance: D, metric: 'Axes/X/Speed', path: 'Axes/X/Speed', type: 'Double', unit: 'mm/s' }],
+        }] })
+        expect(out[D]).toEqual({
+            uuid: D, name: 'Lathe',
+            metrics: [{ path: 'Axes/X/Speed', name: 'Speed', type: 'Double', unit: 'mm/s' }],
+        })
+        expect(metric_total(Object.values(out))).toBe(1)
+    })
+
+    it('joins a device listed once per store', () => {
+        const m = path => ({ path, type: 'Double' })
+        const out = contents_devices({ devices: [
+            { uuid: D, name: 'Lathe', store: 'sparkplug', metrics: [m('A'), m('B')] },
+            { uuid: D, name: 'Lathe', store: 'uns', metrics: [m('B'), m('C')] },
+        ] })
+        expect(out[D].metrics.map(x => x.path)).toEqual(['A', 'B', 'C'])
+    })
+
+    it('names an unnamed device by its UUID', () => {
+        expect(contents_devices({ devices: [{ uuid: D, name: null, metrics: [] }] })[D].name).toBe('d1d1d1d1')
+    })
+
+    it('is empty with no answer', () => {
+        expect(contents_devices(undefined)).toEqual({})
     })
 })

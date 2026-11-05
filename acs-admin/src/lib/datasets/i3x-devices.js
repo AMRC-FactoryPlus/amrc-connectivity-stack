@@ -124,8 +124,8 @@ export function device_tree (devices) {
 /**
  * The picker's rows, top down. A level row is { node, depth, open,
  * uuids }, `uuids` being the devices under it that the search shows;
- * a device row is { device, depth }. An open level lists its own
- * devices, then its levels. A level's contents show when it
+ * a device row is { device, depth }. An open level lists its levels,
+ * then its own devices. A level's contents show when it
  * is open. While searching, only levels with a matching device show,
  * and they are all open.
  *
@@ -151,14 +151,32 @@ export function tree_rows (tree, { match = null, is_open = () => false } = {}) {
     const emit = r => {
         rows.push({ node: r.node, depth: r.depth, open: r.open, uuids: r.uuids })
         if (!r.open) return
-        rows.push(...r.under)
         for (const k of r.kids) emit(k)
+        rows.push(...r.under)
     }
     for (const n of tree ?? []) {
         const r = walk(n, 0)
         if (r) emit(r)
     }
     return rows
+}
+
+/**
+ * Nest tree_rows output for rendering: [{ row, children }], where a
+ * level's children are the rows under it. The picker wraps each level
+ * round its children, so the level's header can stick only while its
+ * own rows are in view.
+ */
+export function nest_rows (rows) {
+    const out = []
+    const stack = []
+    for (const row of rows ?? []) {
+        while (stack.length && stack[stack.length - 1].depth >= row.depth) stack.pop()
+        const item = { row, children: [] }
+        ;(stack.length ? stack[stack.length - 1].children : out).push(item)
+        if (row.node) stack.push({ depth: row.depth, children: item.children })
+    }
+    return out
 }
 
 /**

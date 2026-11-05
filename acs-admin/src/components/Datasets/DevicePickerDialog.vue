@@ -27,7 +27,7 @@
       </div>
 
       <div class="flex min-h-0 flex-1 overflow-hidden rounded-md border border-slate-200">
-        <div class="min-w-0 flex-1 overflow-y-auto py-1">
+        <div class="min-w-0 flex-1 overflow-y-auto">
           <div v-if="!ds.i3xReady && !ds.i3xDevices.length" class="p-6 text-center text-sm text-slate-500">
             <i class="fa-solid fa-circle-notch animate-spin mr-2"></i>Loading devices
           </div>
@@ -39,41 +39,7 @@
             You can't see any devices in i3X. Ask an administrator for access.
           </div>
           <div v-else-if="!rows.length" class="p-6 text-center text-sm text-slate-500">No devices match "{{ search.trim() }}".</div>
-          <template v-for="r in shownRows" :key="r.node ? 'n' + r.node.key : 'd' + r.device.uuid">
-            <!-- An ISA-95 level -->
-            <div v-if="r.node" class="flex h-10 items-center gap-2 pr-4 hover:bg-slate-100" :style="{ paddingLeft: indent(r.depth) }">
-              <button type="button" class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-200"
-                      :aria-label="(r.open ? 'Collapse ' : 'Expand ') + r.node.name" :aria-expanded="r.open" @click="toggleOpen(r)">
-                <i class="fa-solid fa-chevron-right text-[10px] transition-transform duration-75" :class="r.open && 'rotate-90'"></i>
-              </button>
-              <TreeCheck :state="levelState(r)" :label="'Select every device in ' + r.node.name" @toggle="toggleLevel(r)"/>
-              <button type="button" class="flex h-10 min-w-0 flex-1 items-center gap-2 text-left" @click="toggleOpen(r)">
-                <i class="fa-solid fa-fw fa-sitemap text-xs text-slate-500"></i>
-                <span class="truncate text-sm" :class="r.depth ? 'font-medium' : 'font-semibold'" :title="r.node.name">{{ r.node.name }}</span>
-                <span class="ml-auto shrink-0 rounded bg-gray-100 px-1.5 py-px text-xs text-slate-600">{{ levelName(r) }}</span>
-                <span class="shrink-0 text-xs text-slate-600">{{ countOf(r) }}</span>
-              </button>
-            </div>
-            <!-- A device -->
-            <div v-else class="flex h-12 items-center gap-2 pr-4" :class="have.has(r.device.uuid) ? 'opacity-50' : 'hover:bg-slate-100'"
-                 :style="{ paddingLeft: indent(r.depth) }">
-              <span class="w-6 shrink-0" aria-hidden="true"></span>
-              <TreeCheck :state="have.has(r.device.uuid) || chosen.has(r.device.uuid) ? 'all' : 'none'"
-                         :disabled="have.has(r.device.uuid)" :label="'Select ' + r.device.name" @toggle="toggle(r.device.uuid)"/>
-              <button type="button" class="flex h-12 min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
-                      :disabled="have.has(r.device.uuid)" @click="toggle(r.device.uuid)">
-                <i class="fa-solid fa-fw fa-microchip text-xs text-slate-500"></i>
-                <span class="min-w-0">
-                  <span class="block truncate text-sm" :title="r.device.name">{{ r.device.name }}</span>
-                  <span class="block truncate text-xs text-slate-500">{{ subOf(r.device) }}</span>
-                </span>
-                <span v-if="have.has(r.device.uuid)" class="ml-auto shrink-0 text-xs text-slate-500">Added</span>
-                <span v-else class="ml-auto flex shrink-0 items-center gap-1.5 text-xs" :class="statusOf(r.device).text">
-                  <span class="h-1.5 w-1.5 rounded-full" :class="statusOf(r.device).dot"></span>{{ statusOf(r.device).label }}
-                </span>
-              </button>
-            </div>
-          </template>
+          <PickerTree :items="nested" :ctx="ctx"/>
           <div v-if="rows.length > limit" class="p-3 text-center">
             <Button variant="outline" size="xs" @click="limit += PAGE">
               Show more ({{ rows.length - limit }} more rows)
@@ -132,8 +98,8 @@ import { fetch_series } from '@/lib/datasets/api.js'
 import { device_status, series_request, LAST_LOOKBACK, LIMITS, DEVICE_STORE } from '@/lib/datasets/series.js'
 import { device_gaps, data_rate, fmt_rate } from '@/lib/datasets/gaps.js'
 import { text_match, equipment_by_device } from './builder/builder.js'
-import { device_tree, tree_rows, path_label } from '@/lib/datasets/i3x-devices.js'
-import TreeCheck from './TreeCheck.vue'
+import { device_tree, tree_rows, nest_rows, path_label } from '@/lib/datasets/i3x-devices.js'
+import PickerTree from './PickerTree.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -188,8 +154,9 @@ const rows = computed(() => {
     is_open: k => expanded.value.has(k),
   })
 })
-// Only the first `limit` rows render.
+// Only the first `limit` rows render, nested by level.
 const shownRows = computed(() => rows.value.slice(0, limit.value))
+const nested = computed(() => nest_rows(shownRows.value))
 
 function levelKeys (nodes) {
   return nodes.flatMap(n => [n.key, ...levelKeys(n.nodes)])
@@ -212,6 +179,8 @@ function toggleOpen (r) {
 }
 
 const indent = depth => `${12 + depth * 24}px`
+// A level header's height. Headers stack this far apart when they stick.
+const ROW_PX = 40
 
 function levelName (r) {
   if (r.node.unplaced) return 'No ISA-95 path'
@@ -242,6 +211,22 @@ function toggleLevel (r) {
   const all = can.every(u => next.has(u))
   for (const u of can) all ? next.delete(u) : next.add(u)
   chosen.value = next
+}
+
+// What PickerTree needs to draw and act on its rows.
+const ctx = {
+  ROW_PX,
+  indent,
+  levelName,
+  levelState,
+  countOf,
+  toggleOpen,
+  toggleLevel,
+  toggle,
+  subOf: d => subOf(d),
+  statusOf: d => statusOf(d),
+  isAdded: u => have.value.has(u),
+  isChosen: u => chosen.value.has(u),
 }
 
 const picked = computed(() => [...chosen.value].map(u => byUuid.value[u] ?? { uuid: u, name: u.slice(0, 8), path: [] }))

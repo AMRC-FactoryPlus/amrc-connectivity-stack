@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  devices_from_tree, device_tree, tree_rows, merge_device_index, path_label, NO_PATH,
+  devices_from_tree, device_tree, tree_rows, nest_rows, merge_device_index, path_label, NO_PATH,
 } from '../src/lib/datasets/i3x-devices.js'
 
 const DEV1 = 'aaaaaaaa-0000-4000-8000-000000000001'
@@ -136,10 +136,10 @@ describe('tree_rows', () => {
     expect(tree_rows(tree).map(label)).toEqual(['[Works]'])
   })
 
-  it('lists an open level\'s devices before its levels', () => {
+  it('lists an open level\'s levels before its devices', () => {
     const open = new Set([tree[0].key, tree[0].nodes[0].key])
     expect(tree_rows(tree, { is_open: k => open.has(k) }).map(label))
-      .toEqual(['[Works]', '  Meter', '  [North site]', '    Torque 1', '  [South site]'])
+      .toEqual(['[Works]', '  [North site]', '    Torque 1', '  [South site]', '  Meter'])
   })
 
   it('while searching, opens every level with a match and hides the rest', () => {
@@ -154,6 +154,29 @@ describe('tree_rows', () => {
 
   it('shows nothing when no device matches', () => {
     expect(tree_rows(tree, { match: () => false })).toEqual([])
+  })
+})
+
+describe('nest_rows', () => {
+  const D = (uuid, name, path) => ({ uuid, name, path })
+  const tree = device_tree([
+    D('t1', 'Torque 1', ['Works', 'North site']),
+    D('m', 'Meter', ['Works']),
+    D('l', 'Lathe', ['Works', 'South site']),
+    D('r', 'Rig', []),
+  ])
+  const all = new Set([tree[0].key, ...tree[0].nodes.map(n => n.key), tree[1].key])
+  const shape = items => items.map(i => i.row.node ? { [i.row.node.name]: shape(i.children) } : i.row.device.name)
+
+  it('puts each row inside the level above it', () => {
+    expect(shape(nest_rows(tree_rows(tree, { is_open: k => all.has(k) })))).toEqual([
+      { Works: [{ 'North site': ['Torque 1'] }, { 'South site': ['Lathe'] }, 'Meter'] },
+      { [NO_PATH]: ['Rig'] },
+    ])
+  })
+
+  it('keeps a closed level empty', () => {
+    expect(shape(nest_rows(tree_rows(tree)))).toEqual([{ Works: [] }, { [NO_PATH]: [] }])
   })
 })
 

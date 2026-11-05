@@ -282,7 +282,7 @@ export class SeriesReader {
             counts: c?.counts ?? null,
             source: c?.source ?? "raw",
             pending: c?.pending ?? [],
-            metrics: shape_means(m.flat(), req.mean, every),
+            metrics: shape_means(m.flat(), req.mean, every, store),
             last: l ?? (req.last ? new Map() : null),
         };
     }

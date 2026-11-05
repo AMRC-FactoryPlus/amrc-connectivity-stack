@@ -19,6 +19,7 @@ import { InfluxReader } from "../../lib/influx-reader.js";
 import { SeriesReader } from "../../lib/series-reader.js";
 import {
     parse_request, mean_query, merge_runs, check_coverage, SeriesError,
+    shape_means, uns_folder,
 } from "../../lib/series.js";
 import { csv_device_path } from "../../lib/utils.js";
 import {
@@ -293,26 +294,65 @@ describe("mean_query for the uns bucket", () => {
     ];
     const windows = [[Date.parse(FROM), Date.parse(TO)]];
 
-    test("tests the uns path form and strips the device segment before grouping", () => {
+    test("tests the uns path form and groups on the whole path, with no per-point map", () => {
         const q = mean_query({ bucket: "uns", metrics, windows, every: "1h", store: "uns" });
 
-        expect(q.startsWith(`import "regexp"\n`)).toBe(true);
         expect(q).toContain(String.raw`r.path =~ /^[^\/]+\/Axes\/X$/`);
         expect(q).toContain(String.raw`r.path =~ /^[^\/]+$/`);
-        expect(q).toContain(String.raw`regexp.replaceAllString(r: /^[^\/]+\/?/, v: r.path, t: "")`);
-        expect(q.indexOf("replaceAllString")).toBeLessThan(q.indexOf(`group(columns: ["topLevelInstance", "path", "_measurement"])`));
+        expect(q).toContain(`group(columns: ["topLevelInstance", "path", "_measurement"])`);
+        expect(q).not.toContain("map(");
+        expect(q).not.toContain("regexp");
         expect(q).not.toContain("[^/]");
     });
 
-    test("puts every import before the time zone option", () => {
+    test("puts the time zone option first on calendar steps", () => {
         const q = mean_query({ bucket: "uns", metrics, windows, every: "1d", store: "uns" });
-        expect(q.startsWith(`import "regexp"\nimport "timezone"\noption location`)).toBe(true);
+        expect(q.startsWith(`import "timezone"\noption location`)).toBe(true);
     });
 
     test("the default bucket's query is unchanged", () => {
         const q = mean_query({ bucket: "default", metrics, windows, every: "1h" });
         expect(q).not.toContain("regexp");
         expect(q).toContain(`r.path == "Axes/X"`);
+    });
+});
+
+describe("shape_means for the uns bucket", () => {
+    const T = s => Date.parse(s);
+    const t0 = "2026-01-01T00:00:00Z";
+    const row = (result, path, measurement, value) =>
+        ({ result, topLevelInstance: DEVICE, path, _measurement: measurement, _time: t0, _value: value });
+
+    test("uns_folder strips the device segment", () => {
+        expect(uns_folder("Mill_1/Axes/X")).toBe("Axes/X");
+        expect(uns_folder("Mill_1")).toBe("");
+        expect(uns_folder(undefined)).toBe("");
+    });
+
+    test("matches the requested folder from the whole uns path", () => {
+        const rows = [row("mean", "Mill_1/Axes/X", "Load:d", "2"), row("n", "Mill_1/Axes/X", "Load:d", "4"),
+                      row("mean", "Mill_1", "Speed:d", "7"), row("n", "Mill_1", "Speed:d", "1")];
+        const [load, speed] = shape_means(rows, [
+            { device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null },
+            { device: DEVICE, metric: "Speed", path: "", name: "Speed", type: "d" },
+        ], "5m", "uns");
+        expect(load.points).toEqual([[T(t0), 2, 4]]);
+        expect(speed.points).toEqual([[T(t0), 7, 1]]);
+    });
+
+    test("merges one folder's series under two device IDs by point count", () => {
+        const rows = [row("mean", "Mill_1/Axes/X", "Load:d", "2"), row("n", "Mill_1/Axes/X", "Load:d", "1"),
+                      row("mean", "Mill_A/Axes/X", "Load:d", "8"), row("n", "Mill_A/Axes/X", "Load:d", "3")];
+        const [m] = shape_means(rows,
+            [{ device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null }], "5m", "uns");
+        expect(m.points).toEqual([[T(t0), 6.5, 4]]);
+    });
+
+    test("the default store keeps the path as it is", () => {
+        const rows = [row("mean", "Axes/X", "Load:d", "3"), row("n", "Axes/X", "Load:d", "2")];
+        const [m] = shape_means(rows,
+            [{ device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null }], "5m");
+        expect(m.points).toEqual([[T(t0), 3, 2]]);
     });
 });
 

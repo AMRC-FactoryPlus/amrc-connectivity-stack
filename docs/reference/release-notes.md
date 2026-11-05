@@ -167,6 +167,19 @@ answered with the ingress, which never replied. The `krb5.conf` now
 names each realm's `master_kdc` and turns off `dns_lookup_kdc`. Clusters
 without the redirect see no change.
 
+### CSV and file downloads from the admin UI work on HTTPS sites
+
+On a site served over HTTPS, a dataset CSV download, or a download from
+the Files page, spun forever and saved nothing. The admin UI streams
+big downloads to disk with StreamSaver, which loaded a helper page from
+GitHub Pages in a hidden frame. The admin UI's Content-Security-Policy
+allows frames only from its own origin, so the browser blocked the
+helper and the download never started. The admin UI now serves
+StreamSaver's helper itself, under `/streamsaver/`, so downloads no
+longer depend on GitHub Pages. If the browser still does not take a
+download, the admin UI gives up after 30 seconds and says so instead of
+spinning.
+
 ### Read access to a dataset shows what is in it
 
 Data Access has a new route, `GET v1/metadata/:uuid/contents`. It lists

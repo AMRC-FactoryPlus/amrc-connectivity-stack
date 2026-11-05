@@ -280,6 +280,13 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+    # Share picks who to share with from the list of accounts. Auth
+    # lists only the principals whose Kerberos name the caller may
+    # read, and the Admin UI adds the members of the Principal class.
+    !u Auth.Perm.ReadKerberos:
+      !u Auth.Class.Principal: true
+    !u ConfigDB.Perm.ReadMembers:
+      !u Auth.Class.Principal: false
     # The kiosk's recording lock sits on the equipment, and any operator
     # at the machine starts and stops it, so it stays a direct write.
     !u UUIDs.Permission.ConfigDB.WriteConfig:
@@ -308,6 +315,11 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+    # Share lists accounts; as for Dataset maker.
+    !u Auth.Perm.ReadKerberos:
+      !u Auth.Class.Principal: true
+    !u ConfigDB.Perm.ReadMembers:
+      !u Auth.Class.Principal: false
     # The kiosk's recording lock sits on the equipment, and any operator
     # at the machine starts and stops it, so it stays a direct write.
     !u UUIDs.Permission.ConfigDB.WriteConfig:

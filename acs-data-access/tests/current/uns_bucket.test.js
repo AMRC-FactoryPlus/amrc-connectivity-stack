@@ -198,10 +198,10 @@ describe("CSV columns from the uns bucket", () => {
 
         expect(queries.map(q => /from\(bucket: "([^"]+)"\)/.exec(q)[1])).toEqual(["default", "uns"]);
         expect(lines).toEqual([
-            "device,metric,timestamp,value,unit,path",
-            `Press_1,Load,${T},1,N,Axes/X/Load`,
-            `Oven_2,Temp,${T},2,degC,Zone/Temp`,
-            `Oven_2,Door,${T},true,,Door`,
+            "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid",
+            `Press_1,Load,${T},1,N,Axes/X/Load,,,`,
+            `Oven_2,Temp,${T},2,degC,Zone/Temp,,,`,
+            `Oven_2,Door,${T},true,,Door,,,`,
         ]);
     });
 
@@ -224,8 +224,8 @@ describe("CSV columns from the uns bucket", () => {
             { device_uuid: DEVICE, store: "sparkplug", from: FROM, to: TO },
         ]);
         expect(lines).toEqual([
-            "device,metric,timestamp,value,unit,path",
-            `Press_1,S,${T},true,,S`,
+            "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid",
+            `Press_1,S,${T},true,,S,,,`,
         ]);
     });
 

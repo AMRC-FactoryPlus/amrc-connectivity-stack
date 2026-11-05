@@ -8,7 +8,7 @@
     <Card class="flex flex-col gap-3 p-5">
       <div class="font-semibold"><i class="fa-solid fa-file-csv mr-2 text-slate-500"></i>CSV</div>
       <p class="text-sm text-slate-600">
-        Every metric in the dataset, one row per reading: device, metric, timestamp, value, unit and the metric's full path.
+        Every metric in the dataset, one row per reading: device, metric, timestamp, value, unit, the metric's full path, and the UUIDs of the device, the instance that holds the metric and that instance's schema.
         Timestamps are in UTC.
       </p>
       <div>

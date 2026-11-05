@@ -80,37 +80,85 @@ function sort_devices (devices) {
 }
 
 /**
- * Group devices under their ISA-95 path, for the device picker.
- * @returns [{ key, path, label, devices }], groups and devices sorted
- *   by name. Devices with no path come last, under NO_PATH.
+ * The device picker's ISA-95 tree. Each level is a node:
+ * { key, name, depth, nodes, devices, all }. `nodes` are the levels
+ * directly under it and `devices` the devices directly under it, both
+ * sorted by name; `all` is the UUIDs of every device at or below it.
+ * Devices with no path go under one last root node, `unplaced: true`.
  */
-export function group_by_path (devices) {
-    const groups = new Map()
+export function device_tree (devices) {
+    const roots = new Map()
+    let unplaced = null
+    const node = (map, key, name, depth) => {
+        if (!map.has(name)) map.set(name, { key, name, depth, kids: new Map(), devices: [] })
+        return map.get(name)
+    }
     for (const d of devices ?? []) {
         const path = d.path ?? []
-        const key = path.join('\u0000')
-        if (!groups.has(key)) groups.set(key, { key, path, label: path_label(path), devices: [] })
-        groups.get(key).devices.push(d)
+        let at
+        if (!path.length) {
+            unplaced ??= { key: '\u0001', name: NO_PATH, depth: 0, kids: new Map(), devices: [], unplaced: true }
+            at = unplaced
+        }
+        else {
+            let map = roots
+            path.forEach((name, i) => {
+                at = node(map, path.slice(0, i + 1).join('\u0000'), name, i)
+                map = at.kids
+            })
+        }
+        at.devices.push(d)
     }
-    return [...groups.values()]
-        .sort((a, b) => compare_paths(a.path, b.path))
-        .map(g => ({ ...g, devices: g.devices.sort((x, y) => (x.name ?? '').localeCompare(y.name ?? '')) }))
+    const by_name = (a, b) => (a.name ?? '').localeCompare(b.name ?? '')
+    const finish = n => {
+        const nodes = [...n.kids.values()].sort(by_name).map(finish)
+        const devices = n.devices.sort(by_name)
+        const { kids, ...rest } = n
+        return { ...rest, nodes, devices, all: [...devices.map(d => d.uuid), ...nodes.flatMap(c => c.all)] }
+    }
+    const out = [...roots.values()].sort(by_name).map(finish)
+    if (unplaced) out.push(finish(unplaced))
+    return out
 }
 
 /**
- * The chips that filter the picker: the values of the first ISA-95
- * level at which the devices differ. Most sites have one Enterprise,
- * so this is usually its sites.
- * @returns { depth, values } or null when one value covers every level.
+ * The picker's rows, top down. A level row is { node, depth, open,
+ * uuids }, `uuids` being the devices under it that the search shows;
+ * a device row is { device, depth }. An open level lists its own
+ * devices, then its levels. A level's contents show when it
+ * is open. While searching, only levels with a matching device show,
+ * and they are all open.
+ *
+ * @param tree     from device_tree
+ * @param match    device => boolean, or null when not searching
+ * @param is_open  node key => boolean
  */
-export function path_chips (devices) {
-    const list = (devices ?? []).filter(d => d.path?.length)
-    const depth_max = Math.max(0, ...list.map(d => d.path.length))
-    for (let depth = 0; depth < depth_max; depth++) {
-        const values = [...new Set(list.map(d => d.path[depth]).filter(Boolean))]
-        if (values.length > 1) return { depth, values: values.sort((a, b) => a.localeCompare(b)) }
+export function tree_rows (tree, { match = null, is_open = () => false } = {}) {
+    const rows = []
+    const shows = d => !match || match(d)
+    const walk = (n, depth) => {
+        const uuids = []
+        const under = []
+        for (const d of n.devices) if (shows(d)) { uuids.push(d.uuid); under.push({ device: d, depth: depth + 1 }) }
+        const kids = []
+        for (const c of n.nodes) {
+            const sub = walk(c, depth + 1)
+            if (sub) { uuids.push(...sub.uuids); kids.push(sub) }
+        }
+        if (!uuids.length) return null
+        return { node: n, depth, uuids, kids, under, open: match ? true : !!is_open(n.key) }
     }
-    return null
+    const emit = r => {
+        rows.push({ node: r.node, depth: r.depth, open: r.open, uuids: r.uuids })
+        if (!r.open) return
+        rows.push(...r.under)
+        for (const k of r.kids) emit(k)
+    }
+    for (const n of tree ?? []) {
+        const r = walk(n, 0)
+        if (r) emit(r)
+    }
+    return rows
 }
 
 /**

@@ -174,7 +174,7 @@ import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
 import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since, STEP_MS } from '@/lib/datasets/series.js'
 import { metric_total, filter_metrics, live_badge, LIVE_DENIED } from './page-logic.js'
-import { useDatasetPins } from './usePins.js'
+import { useDatasetPins, useDatasetDevices } from './usePins.js'
 import { useChartSeries } from './useChartSeries.js'
 import TimelineToolbar from '../timeline/TimelineToolbar.vue'
 import { go_view, step_view, zoom_view, pan_view, view_labels, fmt_view_range, inside_x, at_now, clamp_view, zoom_span, nearest_zoom, fmt_span, CHART_ZOOMS } from '@/lib/datasets/chart-view.js'
@@ -198,11 +198,11 @@ const search = refDebounced(query, 200)
 // At most this many metric rows render at once, across all devices.
 const MAX_ROWS = 300
 
-const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
+const { devices, byUuid } = useDatasetDevices(() => props.record, () => props.resolved)
 const missing = computed(() => ds.devicesReady ? props.resolved.devices.length - devices.value.length : 0)
 const total = computed(() => metric_total(devices.value))
 
-const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved)
+const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved, byUuid)
 
 // Pinned metrics always show; otherwise the first few, or the matches,
 // up to MAX_ROWS in all.

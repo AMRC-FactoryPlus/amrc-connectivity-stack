@@ -128,7 +128,7 @@ import AddonsSummary from '../addons/AddonsSummary.vue'
 import RecordingsCard from './RecordingsCard.vue'
 import DevicesTable from './DevicesTable.vue'
 import PinnedCard from './PinnedCard.vue'
-import { useDatasetPins } from './usePins.js'
+import { useDatasetPins, useDatasetDevices } from './usePins.js'
 import { usable_windows, COVERAGE_NOTE } from '@/lib/datasets/series.js'
 import { useDatasetSeries } from './useDatasetSeries.js'
 import { useChartSeries } from './useChartSeries.js'
@@ -154,12 +154,12 @@ const elapsed = computed(() => recording.value ? fmt_elapsed(now.value.getTime()
 const isGroup = computed(() => props.record.kind === 'process' || props.record.kind === 'part')
 const items = computed(() => group_items(props.record, ds.byUuid))
 
-const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
+const { devices, byUuid } = useDatasetDevices(() => props.record, () => props.resolved)
 
 // Strips, coverage and quiet since, across the dataset's window. Strips
 // are 240 px wide, so about that many buckets.
 const STRIP_PX = 240
-const { entries: pinned } = useDatasetPins(() => props.record, () => props.resolved)
+const { entries: pinned } = useDatasetPins(() => props.record, () => props.resolved, byUuid)
 const data = useDatasetSeries(() => props.record, [], { width: STRIP_PX, count: true, last: true })
 
 // Sparklines: the pinned metrics over the chosen span, ending at now (or
@@ -206,7 +206,7 @@ const coverage = computed(() => {
   if (data.error.value) return { value: '–', sub: 'Did not load' }
   if (!gaps.value) return { value: '–', sub: data.loading.value ? 'Loading' : '' }
   if (gaps.value.coverage == null) return { value: '–', sub: 'The window has not started' }
-  const sub = coverage_sub(gaps.value, d => ds.deviceByUuid[d]?.name ?? d.slice(0, 8))
+  const sub = coverage_sub(gaps.value, d => byUuid.value[d]?.name ?? d.slice(0, 8))
   return { value: fmt_coverage(gaps.value.coverage), sub: sub.text, subCls: sub.cls }
 })
 

@@ -512,11 +512,14 @@ function metric_clause(m, types, store) {
     return flux`(r.topLevelInstance == ${m.device} and ${path_clause(m.path, store)} and (${names}))`;
 }
 
-/* The UNS bucket's path is `<device ID>/<folder>`. Series key on the
- * folder alone, as in the default bucket, so a device ID change does
- * not split a series. A root metric's path becomes "". */
-const STRIP_DEVICE = fluxExpression(
-    `\n  |> map(fn: (r) => ({r with path: regexp.replaceAllString(r: /^[^\\/]+\\/?/, v: r.path, t: "")}))`);
+/** The folder of a UNS bucket path. That path is `<device ID>/<folder>`,
+ * and a root metric's path is the device ID alone, so its folder is "".
+ * The query groups on the whole path and shape_means strips the device
+ * segment from the result rows: doing it in Flux needs a map() over
+ * every raw point, which made UNS means several times slower. */
+export function uns_folder(path) {
+    return String(path ?? "").replace(/^[^/]+\/?/, "");
+}
 
 const KEEP = `["topLevelInstance", "path", "_measurement", "_time", "_value"]`;
 const KEEP_UNIT = `["topLevelInstance", "path", "_measurement", "_time", "unit"]`;
@@ -526,14 +529,13 @@ function mean_branch({ bucket, name, metrics, types, windows, every, to_float, s
     const clauses = paren(join(metrics.map(m => metric_clause(m, types(m), store)), "or"));
     const wa = window_args(every);
     const conv = fluxExpression(to_float ? "\n  |> toFloat()" : "");
-    const strip = store == UNS ? STRIP_DEVICE : fluxExpression("");
     const id = fluxExpression(name);
     const y = n => flux`${n + suffix}`;
 
     return String(flux`${id} = from(bucket: ${bucket})
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => ${clauses})${time_filter(windows)}${strip}
+  |> filter(fn: (r) => ${clauses})${time_filter(windows)}
   |> group(columns: ["topLevelInstance", "path", "_measurement"])${conv}
 
 ${id} |> aggregateWindow(${wa}, fn: mean, createEmpty: false, timeSrc: "_start")
@@ -550,14 +552,14 @@ ${id} |> last()
  * storage, so they run in their own branch only when asked for.
  * String metrics have no mean and are not queried.
  * @param store The store the bucket holds; `uns` reads the UNS form of
- *   `path` and strips its device segment before grouping.
+ *   `path`, grouped on the whole path (see uns_folder).
  * @returns The Flux script, or null if nothing needs querying. */
 export function mean_query({ bucket, metrics, windows, every, store = null }) {
     const numeric = metrics.filter(m => m.type == null || NUMERIC_TYPES.includes(m.type));
     const bools = metrics.filter(m => m.type == "b");
     if (!numeric.length && !bools.length) return null;
 
-    let script = zone_header(every, store == UNS ? ["regexp"] : []);
+    let script = zone_header(every);
     if (numeric.length)
         script += mean_branch({
             bucket, name: "data", metrics: numeric, windows, every,
@@ -621,11 +623,15 @@ export function shape_counts(rows, every) {
 /** Turns mean, n and unit rows into one series per requested metric.
  * Rows of one device, path and name with different numeric suffixes
  * merge into one series, weighted by n.
+ * In the uns bucket the rows carry the whole path; series of one
+ * folder under different device IDs (a renamed device) merge too.
  * @param rows Rows with a `result` column naming the yield.
  * @param metrics The parsed `mean` entries, in request order.
+ * @param store The store the rows came from.
  */
-export function shape_means(rows, metrics, every) {
+export function shape_means(rows, metrics, every, store = null) {
     const series = new Map();
+    const folder = store == UNS ? uns_folder : p => p ?? "";
     const key = (device, path, name) => JSON.stringify([device, path ?? "", name]);
     const get = k => {
         if (!series.has(k)) series.set(k, { buckets: new Map(), unit: null });
@@ -634,7 +640,7 @@ export function shape_means(rows, metrics, every) {
 
     for (const r of rows) {
         const kind = String(r.result).replace(/_b$/, "");
-        const s = get(key(r.topLevelInstance, r.path, base_of(r._measurement)));
+        const s = get(key(r.topLevelInstance, folder(r.path), base_of(r._measurement)));
         const type = suffix_of(r._measurement);
         const t = Date.parse(r._time);
 
@@ -643,11 +649,14 @@ export function shape_means(rows, metrics, every) {
             continue;
         }
         const b = bucket_start(t, every);
-        const by_type = s.buckets.get(b) ?? new Map();
-        const cell = by_type.get(type) ?? { mean: null, n: null };
+        /* A cell is one series' mean and n in one bucket. The raw path
+         * keeps two device IDs' series apart until merge_cells. */
+        const by_cell = s.buckets.get(b) ?? new Map();
+        const ck = JSON.stringify([type, r.path ?? ""]);
+        const cell = by_cell.get(ck) ?? { type, mean: null, n: null };
         cell[kind] = Number(r._value);
-        by_type.set(type, cell);
-        s.buckets.set(b, by_type);
+        by_cell.set(ck, cell);
+        s.buckets.set(b, by_cell);
     }
 
     return metrics.map(m => {
@@ -662,9 +671,8 @@ export function shape_means(rows, metrics, every) {
         }
         out.points = [...s.buckets]
             .sort((a, b) => a[0] - b[0])
-            .map(([t, by_type]) => merge_cells(t, [...by_type]
-                .filter(([type]) => m.type ? type == m.type : NUMERIC_TYPES.includes(type))
-                .map(([, cell]) => cell)))
+            .map(([t, by_cell]) => merge_cells(t, [...by_cell.values()]
+                .filter(c => m.type ? c.type == m.type : NUMERIC_TYPES.includes(c.type))))
             .filter(p => p);
         return out;
     });

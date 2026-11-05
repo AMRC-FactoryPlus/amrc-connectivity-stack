@@ -23,6 +23,16 @@ export const DEVICE_INFORMATION_APP_UUID  = "a98ffed5-c613-4e70-bfd3-efeee250ade
 export const ISA95_LEVEL_CLASS_UUID       = "3866b165-6b31-46e3-a801-cb367e04e726";
 export const ISA95_ENTERPRISE_CLASS_UUID  = "2980293e-4a82-49a3-b121-9a8fa109d0a8";
 export const ISA95_VOCABULARY_APP_UUID    = "11096075-acc6-4eae-b682-9b27d776384d";
+// The level classes, by level name.
+export const ISA95_LEVEL_CLASSES: Record<string, string> = {
+    "Enterprise":   "2980293e-4a82-49a3-b121-9a8fa109d0a8",
+    "Site":         "70a948a7-7d99-400c-896a-ae63ab4362e0",
+    "Area":         "d0ac7371-41d6-45b2-8a42-781f8d4c8d54",
+    "Work Center":  "b0633e7c-e0c1-4350-9f86-72b83e3e9cb0",
+    "Work Unit":    "00074ce8-2142-40a6-aff3-1057a83ddad2",
+};
+// Each device's place in the vocabulary: { node, instances? }.
+export const ISA95_PLACEMENT_APP_UUID     = "f9345c57-14e3-4027-b76d-2b0b67eb8fed";
 
 // i3X permissions (acs-service-setup/dumps/i3x.yaml).
 export const Perm = {

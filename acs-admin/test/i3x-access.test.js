@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 
-import { resolve_isa95, isa95_path, read_access, by_principal, devices_under, READ_OBJECT, I3X_PERM_ALL }
+import { resolve_isa95, isa95_path, read_access, by_principal, READ_OBJECT, I3X_PERM_ALL }
   from '../src/lib/access/i3x-access.js'
 
 const NODES = [
@@ -107,15 +107,5 @@ describe('by_principal', () => {
   it('lists a grant only once per route', () => {
     const out = by_principal([row('g1', 'a', 'direct'), row('g1', 'a', 'direct')])
     expect(out[0].routes).toHaveLength(1)
-  })
-})
-
-describe('devices_under', () => {
-  it('counts the devices whose hierarchy resolves through the node', () => {
-    const chains = [['AMRC', 'F2050', 'North'], ['amrc', 'Factory 2050'], ['AMRC', 'Elsewhere'], ['Other']]
-    expect(devices_under(NODES, chains, 'f2050')).toBe(2)
-    expect(devices_under(NODES, chains, 'north')).toBe(1)
-    expect(devices_under(NODES, chains, 'amrc')).toBe(3)
-    expect(devices_under(NODES, chains, 'stray')).toBe(0)
   })
 })

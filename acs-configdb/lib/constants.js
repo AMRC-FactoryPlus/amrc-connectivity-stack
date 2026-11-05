@@ -29,6 +29,17 @@ export const App = {
     Info: "64a8bfa9-7772-45c4-9d1a-9e6290690957",
     SparkplugAddress: "8e32801b-f35a-4cbf-a5c3-2af64d3debd7",
     ConfigSchema: "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3",
+    ISA95Vocabulary: "11096075-acc6-4eae-b682-9b27d776384d",
+    ISA95Placement: "f9345c57-14e3-4027-b76d-2b0b67eb8fed",
+};
+
+/* The classes of ISA-95 vocabulary nodes, by level name. */
+export const ISA95Level = {
+    "Enterprise":   "2980293e-4a82-49a3-b121-9a8fa109d0a8",
+    "Site":         "70a948a7-7d99-400c-896a-ae63ab4362e0",
+    "Area":         "d0ac7371-41d6-45b2-8a42-781f8d4c8d54",
+    "Work Center":  "b0633e7c-e0c1-4350-9f86-72b83e3e9cb0",
+    "Work Unit":    "00074ce8-2142-40a6-aff3-1057a83ddad2",
 };
 
 export const SpecialObj = {

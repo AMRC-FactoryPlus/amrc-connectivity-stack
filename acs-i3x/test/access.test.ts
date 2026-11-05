@@ -17,6 +17,7 @@ import { APIv1 } from "../lib/api-v1.js";
 import { Isa95Vocabulary } from "../lib/isa95.js";
 import type { VocabNode } from "../lib/isa95.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { ValueCache } from "../lib/value-cache.js";
 import { I3xStore } from "../lib/store.js";
 import { SubscriptionManager } from "../lib/subscriptions.js";
@@ -68,7 +69,7 @@ const VOCAB: VocabNode[] = [
 
 function makeTree() {
     const store = new I3xStore();
-    const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+    const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
     for (const [uuid, chain] of Object.entries(DEVICES))
         tree.addDevice(uuid, devInfo(uuid, chain), { name: uuid });
     tree.setReady();

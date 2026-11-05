@@ -12,7 +12,7 @@
           <Tabs default-value="devices" class="flex flex-col flex-1 h-full">
             <TabsContent value="devices" class="flex-1">
               <div>
-                <DataTable :data="devices" :columns="deviceColumns" :filters="[]" :default-sort="initialNameSort" @rowClick="selectDevice">
+                <DataTable :data="devices" :columns="deviceColumns" :filters="deviceFilters" :default-sort="initialNameSort" @rowClick="selectDevice">
                   <template #toolbar-left>
                     <div class="flex items-center justify-between gap-2">
                       <TabsList>
@@ -148,6 +148,7 @@ import { useNodeStore } from '@store/useNodeStore.js'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useISA95Store } from '@store/useISA95Store.js'
+import { placement_state } from '@/lib/isa95-placement.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useCanRebirth } from '@/composables/useCanRebirth.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
@@ -218,7 +219,8 @@ export default {
 
   mounted () {
     this.cn.start();
-    // The device list's i3X access column grants through these nodes.
+    // The device list shows each device's placement, and its i3X access
+    // column grants through these nodes.
     this.isa95.start();
   },
 
@@ -241,11 +243,25 @@ export default {
 
     devices () {
       const filtered = Array.isArray(this.d.data) ? this.d.data.filter(e => e.deviceInformation?.node === this.node.uuid) : []
+      // Null until the vocabulary loads, so nothing shows as broken.
+      const vocab = this.isa95.ready ? this.isa95.vocabulary : null
       return filtered.map(d => ({
         ...d,
         _nodeAddress: this.node.sparkplugAddress,
-        _canRebirth: this.canRebirthMap?.get(d.uuid) ?? false
+        _canRebirth: this.canRebirthMap?.get(d.uuid) ?? false,
+        _placement: vocab ? placement_state(vocab, d.placement, d.uuid) : null,
       }))
+    },
+
+    deviceFilters () {
+      return [{
+        name: 'UNS',
+        property: 'uns',
+        options: [
+          { label: 'On UNS', value: 'on' },
+          { label: 'Not on UNS', value: 'off' },
+        ],
+      }]
     },
 
     connections () {

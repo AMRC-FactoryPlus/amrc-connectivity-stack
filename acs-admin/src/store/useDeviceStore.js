@@ -10,6 +10,8 @@ export const useDeviceStore = () => useStore(
   UUIDs.Class.Device,
   {
     deviceInformation: UUIDs.App.DeviceInformation,
-    sparkplugAddress: UUIDs.App.SparkplugAddress
+    sparkplugAddress: UUIDs.App.SparkplugAddress,
+    /* The device's ISA-95 placement, or null if it has none. */
+    placement: UUIDs.App.ISA95Placement,
   }
 )()

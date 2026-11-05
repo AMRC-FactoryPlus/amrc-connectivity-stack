@@ -15,6 +15,7 @@ import express from "express";
 import request from "supertest";
 
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { ValueCache } from "../lib/value-cache.js";
 import { History } from "../lib/history.js";
 import { APIv1 } from "../lib/api-v1.js";
@@ -115,7 +116,7 @@ const isCatchUp = (q: string) => !/range\(start: -/.test(q);
 
 function world() {
     const store = new I3xStore();
-    const tree = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+    const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
     tree.addDevice(DEV, devInfo(), { name: "Device 1" });
     tree.setReady();
     const influx = fakeInflux(tree);

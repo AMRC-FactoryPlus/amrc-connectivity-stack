@@ -57,6 +57,7 @@ subdirs+= acs-metadb
 subdirs+= acs-monitor
 subdirs+= acs-mqtt
 subdirs+= acs-opcua-server-edge
+subdirs+= acs-placement-watcher
 subdirs+= acs-service-setup
 subdirs+= acs-visualiser
 subdirs+= deploy

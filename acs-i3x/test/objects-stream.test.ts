@@ -20,6 +20,7 @@ import request from "supertest";
 import { APIv1 } from "../lib/api-v1.js";
 import { routes } from "../lib/routes.js";
 import { ObjectTree } from "../lib/object-tree.js";
+import { TestObjectTree } from "./helpers/isa95.js";
 import { ValueCache } from "../lib/value-cache.js";
 import { I3xStore } from "../lib/store.js";
 // @ts-ignore - plain ESM benchmark fixture
@@ -27,7 +28,7 @@ import { pipelineSnapshot } from "../bench/dataset.mjs";
 import { allowAll } from "./helpers/allow-all.js";
 
 function tree(devices: number): ObjectTree {
-    const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
+    const t = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
     t.refreshFromSnapshot(pipelineSnapshot(devices));
     t.setReady();
     return t;
@@ -138,7 +139,7 @@ describe("GET /v1/objects", () => {
     }, 60_000);
 
     it("answers 503 before the tree is ready", async () => {
-        const empty = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
+        const empty = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns" });
         const res = await request(bareApp(empty)).get("/v1/objects");
         expect(res.status).toBe(503);
     });
@@ -282,7 +283,7 @@ describe("GET /v1/objects snapshot", () => {
         const store = new I3xStore({ path: join(dir, "i3x.db") });
         const server = http.createServer();
         try {
-            const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+            const t = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
             const snap = pipelineSnapshot(1500);
             t.refreshFromSnapshot(snap);
             t.setReady();
@@ -324,7 +325,7 @@ describe("GET /v1/objects snapshot", () => {
         const store = new I3xStore({ path: join(dir, "i3x.db") });
         const server = http.createServer();
         try {
-            const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+            const t = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
             t.refreshFromSnapshot(pipelineSnapshot(1500));
             t.setReady();
             const readers: any[] = [];
@@ -361,7 +362,7 @@ describe("GET /v1/objects and a client that stops reading", () => {
         process.env.I3X_STREAM_IDLE_MS = "300";
         const err = jest.spyOn(console, "error").mockImplementation(() => {});
         try {
-            const t = new ObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+            const t = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
             t.refreshFromSnapshot(pipelineSnapshot(1500));
             t.setReady();
             const readers: any[] = [];

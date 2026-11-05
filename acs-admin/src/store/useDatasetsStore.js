@@ -12,7 +12,8 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
-import { ISA95_HIERARCHY_KEY } from '@store/useISA95Store.js'
+import { useISA95Store } from '@store/useISA95Store.js'
+import { placement_path } from '@/lib/isa95-placement.js'
 import { merge_datasets, historised_metrics, display_name, resolve_devices } from '@/lib/datasets/model.js'
 import { DA } from '@/lib/datasets/constants.js'
 
@@ -111,10 +112,12 @@ export const useDatasetsStore = defineStore('datasets', {
             const ds = useDeviceStore()
             const nodes = useNodeStore()
             const nodeByUuid = Object.fromEntries((nodes.data ?? []).map(n => [n.uuid, n]))
+            const vocab = useISA95Store().vocabulary
             return (ds.data ?? []).map(d => {
                 const info = d.deviceInformation ?? {}
                 const om = info.originMap ?? {}
-                const h = om?.Device_Information?.[ISA95_HIERARCHY_KEY] ?? {}
+                // Enterprise, Site, Area... from the device's placement.
+                const path = placement_path(vocab, d.placement)
                 const node = nodeByUuid[info.node]
                 const addr = node?.sparkplugAddress
                 const metrics = historised_metrics(om)
@@ -124,8 +127,8 @@ export const useDatasetsStore = defineStore('datasets', {
                     name: d.name && d.name !== 'UNKNOWN' ? d.name : (sparkplug ?? d.uuid.slice(0, 8)),
                     sparkplug,
                     address: addr && sparkplug ? `${addr.group_id}/${addr.node_id}/${sparkplug}` : null,
-                    site: String(h.Site?.Value ?? '').trim() || null,
-                    area: String(h.Area?.Value ?? '').trim() || null,
+                    site: path[1] ?? null,
+                    area: path[2] ?? null,
                     metrics,
                     originMap: om,
                 }
@@ -161,6 +164,10 @@ export const useDatasetsStore = defineStore('datasets', {
                     useDeviceStore().start()
                     useNodeStore().start()
                 }
+                // Device sites and areas come from the ISA-95 vocabulary.
+                // Its start is idempotent, and the ISA-95 page stops it
+                // when it leaves, so start it every time.
+                useISA95Store().start()
 
                 this.subscribe('metadata', da => da.search_metadata(), {
                     next: map => {

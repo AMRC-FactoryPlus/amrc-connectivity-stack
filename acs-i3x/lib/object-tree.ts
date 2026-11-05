@@ -27,7 +27,6 @@ import type {
 
 import {
     RelType,
-    HIERARCHY_SCHEMA_UUID,
 } from "./constants.js";
 import { I3xStore } from "./store.js";
 
@@ -54,10 +53,12 @@ interface ObjectTreeOpts {
  * Input to refreshFromSnapshot: the complete ConfigDB state the tree
  * should hold. Keys are the corresponding ConfigDB object UUIDs.
  * `devInfo`/`info`/`schema` are config bodies (or null when the entry
- * is missing or inaccessible).
+ * is missing or inaccessible). `isa95` is the device's ISA-95 position
+ * from its placement (see Isa95Placements), Enterprise first; empty
+ * when the device is not on the UNS.
  */
 export interface PipelineSnapshot {
-    devices: Map<string, { devInfo: any; info: any }>;
+    devices: Map<string, { devInfo: any; info: any; isa95: string[] }>;
     schemas: Map<string, { schema: any; info: any }>;
 }
 
@@ -301,8 +302,8 @@ export class ObjectTree {
             for (const uuid of this.getDeviceUuids()) {
                 if (!input.devices.has(uuid)) this.removeDeviceTx(uuid);
             }
-            for (const [uuid, { devInfo, info }] of input.devices) {
-                this.replaceDeviceTx(uuid, devInfo, info);
+            for (const [uuid, { devInfo, info, isa95 }] of input.devices) {
+                this.replaceDeviceTx(uuid, devInfo, info, isa95);
             }
             for (const t of this.objectTypeIds()) {
                 if (!input.schemas.has(t)) this.removeObjectTypeTx(t);
@@ -399,10 +400,11 @@ export class ObjectTree {
 
     /**
      * Add a device and its full subtree (including ISA-95 ancestors and
-     * metric tree from the originMap).
+     * metric tree from the originMap). `isa95` is the device's position
+     * from its placement, Enterprise first.
      */
-    addDevice(uuid: string, devInfo: any, info: any): void {
-        this.store.transaction(() => this.buildDevice(uuid, devInfo, info));
+    addDevice(uuid: string, devInfo: any, info: any, isa95: string[]): void {
+        this.store.transaction(() => this.buildDevice(uuid, devInfo, info, isa95));
         this.changed();
     }
 
@@ -433,16 +435,16 @@ export class ObjectTree {
      * config, preserving UNS-discovered descendants whose parents survive
      * the rebuild. The device's elementId is stable (its ConfigDB UUID).
      */
-    replaceDeviceSubtree(uuid: string, devInfo: any, info: any): void {
-        this.store.transaction(() => this.replaceDeviceTx(uuid, devInfo, info));
+    replaceDeviceSubtree(uuid: string, devInfo: any, info: any, isa95: string[]): void {
+        this.store.transaction(() => this.replaceDeviceTx(uuid, devInfo, info, isa95));
         this.changed();
     }
 
-    private replaceDeviceTx(uuid: string, devInfo: any, info: any): void {
+    private replaceDeviceTx(uuid: string, devInfo: any, info: any, isa95: string[]): void {
         this.placementRev++;
         const oldDevice = this.getObject(uuid);
         if (!oldDevice) {
-            this.buildDevice(uuid, devInfo, info);
+            this.buildDevice(uuid, devInfo, info, isa95);
             return;
         }
 
@@ -453,7 +455,7 @@ export class ObjectTree {
         this.removeSubtree(uuid);
         this.cleanupOrphanAncestors(oldAncestors);
 
-        this.buildDevice(uuid, devInfo, info);
+        this.buildDevice(uuid, devInfo, info, isa95);
 
         // Re-graft UNS descendants whose parent now exists in the new tree
         for (const cap of unsCaptures) {
@@ -1167,23 +1169,6 @@ export class ObjectTree {
     }
 
     /**
-     * Extract ISA-95 hierarchy values from an ISA95_Hierarchy object.
-     * Returns the segments in order (Enterprise, Site, Area, WorkCenter, WorkUnit),
-     * stopping at the first missing level (unbroken chain).
-     */
-    private extractIsa95Segments(hierarchy: any): string[] {
-        const levels = ["Enterprise", "Site", "Area", "Work Center", "Work Unit"];
-        const segments: string[] = [];
-        for (const level of levels) {
-            const entry = hierarchy[level];
-            const value = entry?.Value ?? entry?.value;
-            if (!value) break;
-            segments.push(value);
-        }
-        return segments;
-    }
-
-    /**
      * Keys in the originMap that are metadata, not metric/container nodes.
      * These should be skipped when building the object tree.
      */
@@ -1320,7 +1305,7 @@ export class ObjectTree {
      * DeviceInformation + Info config, and record the Schema_UUIDs its
      * originMap references so the matching ObjectTypes are kept.
      */
-    private buildDevice(uuid: string, devInfo: any, nameInfo: any): void {
+    private buildDevice(uuid: string, devInfo: any, nameInfo: any, isa95: string[]): void {
         if (!devInfo) {
             this.log("buildDevice: no DeviceInformation for %s, skipping", uuid);
             return;
@@ -1333,14 +1318,14 @@ export class ObjectTree {
         }
         const schemaUuids = new Set<string>([schemaUuid]);
 
-        // The ISA-95 hierarchy: a Hierarchy-v1 object at
-        // Device_Information/ISA95_Hierarchy. uns-ingester-sparkplug
-        // looks only there, and publishes a device to UNS only if it
-        // finds one; a hierarchy elsewhere must not count. i3X serves
-        // the UNS, so a device it would not publish is left out.
-        const candidate = devInfo.originMap?.Device_Information?.ISA95_Hierarchy;
-        const hierarchyObj = candidate?.Schema_UUID === HIERARCHY_SCHEMA_UUID ? candidate : undefined;
-        const isa95Segments = hierarchyObj ? this.extractIsa95Segments(hierarchyObj) : [];
+        // The ISA-95 position comes from the device's placement (see
+        // Isa95Placements), never from the origin map. The placement
+        // watcher renders the same placement into the device's Edge
+        // Agent config, so the device births it at
+        // Device_Information/ISA95_Hierarchy, the only place the UNS
+        // ingester accepts. i3X serves the UNS, so a device with no
+        // placement, which the ingester would not publish, is left out.
+        const isa95Segments = isa95 ?? [];
 
         if (isa95Segments.length === 0) {
             this.log("buildDevice: no ISA-95 for %s, leaving it out", uuid);

@@ -32,8 +32,10 @@ function isCorrupt(err: unknown): boolean {
 }
 
 /* 4: devices without ISA-95 hierarchy are left out of the tree, and
- * uns_device records each device's UNS topic segment. */
-export const SCHEMA_VERSION = 4;
+ * uns_device records each device's UNS topic segment.
+ * 5: a device's ISA-95 position comes from its placement, and
+ * sync_device records the position each device was placed at. */
+export const SCHEMA_VERSION = 5;
 
 const TABLES = `
     -- The object tree. seq gives Map insertion order: an upsert keeps
@@ -89,7 +91,9 @@ const TABLES = `
         etag_devinfo    text,
         etag_info       text,
         sparkplug_name  text,
-        info_name       text
+        info_name       text,
+        -- The ISA-95 position the device was placed at (JSON array).
+        isa95           text
     ) without rowid;
 
     create table sync_schema (

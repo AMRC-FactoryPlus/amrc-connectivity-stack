@@ -280,9 +280,12 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+      !u UUIDs.App.Registration: false
     # Share picks who to share with from the list of accounts. Auth
     # lists only the principals whose Kerberos name the caller may
     # read, and the Admin UI adds the members of the Principal class.
+    # The Admin UI names them from Info and Registration (above), and
+    # shows no accounts until it can read both.
     !u Auth.Perm.ReadKerberos:
       !u Auth.Class.Principal: true
     !u ConfigDB.Perm.ReadMembers:
@@ -315,6 +318,7 @@ grants:
     !u UUIDs.Permission.ConfigDB.ReadConfig:
       !u DataAccess.App.DatasetMetadata: true
       !u UUIDs.App.Info: false
+      !u UUIDs.App.Registration: false
     # Share lists accounts; as for Dataset maker.
     !u Auth.Perm.ReadKerberos:
       !u Auth.Class.Principal: true

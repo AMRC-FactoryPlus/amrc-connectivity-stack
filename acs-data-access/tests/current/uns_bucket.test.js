@@ -294,12 +294,16 @@ describe("mean_query for the uns bucket", () => {
     ];
     const windows = [[Date.parse(FROM), Date.parse(TO)]];
 
-    test("tests the uns path form and groups on the whole path, with no per-point map", () => {
+    test("tests the uns path form, with no group, shared stream or per-point map", () => {
         const q = mean_query({ bucket: "uns", metrics, windows, every: "1h", store: "uns" });
 
         expect(q).toContain(String.raw`r.path =~ /^[^\/]+\/Axes\/X$/`);
         expect(q).toContain(String.raw`r.path =~ /^[^\/]+$/`);
-        expect(q).toContain(`group(columns: ["topLevelInstance", "path", "_measurement"])`);
+        /* No group() and no shared stream: either stops InfluxDB
+         * aggregating in storage. */
+        expect(q).not.toContain("group(");
+        expect(q).not.toMatch(/^data =/m);
+        expect(q.match(/from\(bucket: "uns"\)/g)).toHaveLength(3);
         expect(q).not.toContain("map(");
         expect(q).not.toContain("regexp");
         expect(q).not.toContain("[^/]");
@@ -330,8 +334,8 @@ describe("shape_means for the uns bucket", () => {
     });
 
     test("matches the requested folder from the whole uns path", () => {
-        const rows = [row("mean", "Mill_1/Axes/X", "Load:d", "2"), row("n", "Mill_1/Axes/X", "Load:d", "4"),
-                      row("mean", "Mill_1", "Speed:d", "7"), row("n", "Mill_1", "Speed:d", "1")];
+        const rows = [row("sum", "Mill_1/Axes/X", "Load:d", "8"), row("n", "Mill_1/Axes/X", "Load:d", "4"),
+                      row("sum", "Mill_1", "Speed:d", "7"), row("n", "Mill_1", "Speed:d", "1")];
         const [load, speed] = shape_means(rows, [
             { device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null },
             { device: DEVICE, metric: "Speed", path: "", name: "Speed", type: "d" },
@@ -341,15 +345,25 @@ describe("shape_means for the uns bucket", () => {
     });
 
     test("merges one folder's series under two device IDs by point count", () => {
-        const rows = [row("mean", "Mill_1/Axes/X", "Load:d", "2"), row("n", "Mill_1/Axes/X", "Load:d", "1"),
-                      row("mean", "Mill_A/Axes/X", "Load:d", "8"), row("n", "Mill_A/Axes/X", "Load:d", "3")];
+        const rows = [row("sum", "Mill_1/Axes/X", "Load:d", "2"), row("n", "Mill_1/Axes/X", "Load:d", "1"),
+                      row("sum", "Mill_A/Axes/X", "Load:d", "24"), row("n", "Mill_A/Axes/X", "Load:d", "3")];
         const [m] = shape_means(rows,
             [{ device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null }], "5m", "uns");
         expect(m.points).toEqual([[T(t0), 6.5, 4]]);
     });
 
+    test("adds up raw series of one path that differ in other tags", () => {
+        /* A device moved in the ISA-95 tree mid-bucket: two raw series,
+         * same path and measurement, each with its own sum and n. */
+        const rows = [row("sum", "Mill_1/Axes/X", "Load:d", "10"), row("n", "Mill_1/Axes/X", "Load:d", "5"),
+                      row("sum", "Mill_1/Axes/X", "Load:d", "30"), row("n", "Mill_1/Axes/X", "Load:d", "5")];
+        const [m] = shape_means(rows,
+            [{ device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null }], "5m", "uns");
+        expect(m.points).toEqual([[T(t0), 4, 10]]);
+    });
+
     test("the default store keeps the path as it is", () => {
-        const rows = [row("mean", "Axes/X", "Load:d", "3"), row("n", "Axes/X", "Load:d", "2")];
+        const rows = [row("sum", "Axes/X", "Load:d", "6"), row("n", "Axes/X", "Load:d", "2")];
         const [m] = shape_means(rows,
             [{ device: DEVICE, metric: "Axes/X/Load", path: "Axes/X", name: "Load", type: null }], "5m");
         expect(m.points).toEqual([[T(t0), 3, 2]]);

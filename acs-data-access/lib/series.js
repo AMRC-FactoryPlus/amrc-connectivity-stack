@@ -514,9 +514,9 @@ function metric_clause(m, types, store) {
 
 /** The folder of a UNS bucket path. That path is `<device ID>/<folder>`,
  * and a root metric's path is the device ID alone, so its folder is "".
- * The query groups on the whole path and shape_means strips the device
- * segment from the result rows: doing it in Flux needs a map() over
- * every raw point, which made UNS means several times slower. */
+ * shape_means strips the device segment from the result rows: doing it
+ * in Flux needs a map() over every raw point, which made UNS means
+ * several times slower. */
 export function uns_folder(path) {
     return String(path ?? "").replace(/^[^/]+\/?/, "");
 }
@@ -524,35 +524,43 @@ export function uns_folder(path) {
 const KEEP = `["topLevelInstance", "path", "_measurement", "_time", "_value"]`;
 const KEEP_UNIT = `["topLevelInstance", "path", "_measurement", "_time", "unit"]`;
 
-function mean_branch({ bucket, name, metrics, types, windows, every, to_float, suffix, store }) {
+/* Sum, count and newest unit per raw series. Each yield reads from its
+ * own from(), with no group() before the aggregate, so InfluxDB works
+ * out each window in storage. A shared stream or a group() first makes
+ * it read every raw point instead: 24 h of a 25 Hz metric went from
+ * under a second to 30 s. One metric can be several raw series (its
+ * other tags changed), so shape_means adds them up per bucket. */
+function mean_branch({ bucket, metrics, types, windows, every, to_float, suffix, store }) {
     const { start, stop } = envelope(windows);
     const clauses = paren(join(metrics.map(m => metric_clause(m, types(m), store)), "or"));
     const wa = window_args(every);
     const conv = fluxExpression(to_float ? "\n  |> toFloat()" : "");
-    const id = fluxExpression(name);
     const y = n => flux`${n + suffix}`;
-
-    return String(flux`${id} = from(bucket: ${bucket})
+    const source = String(flux`from(bucket: ${bucket})
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => ${clauses})${time_filter(windows)}
-  |> group(columns: ["topLevelInstance", "path", "_measurement"])${conv}
+  |> filter(fn: (r) => ${clauses})${time_filter(windows)}${conv}`);
+    const src = fluxExpression(source);
 
-${id} |> aggregateWindow(${wa}, fn: mean, createEmpty: false, timeSrc: "_start")
-  |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("mean")})
-${id} |> aggregateWindow(${wa}, fn: count, createEmpty: false, timeSrc: "_start")
+    return String(flux`${src}
+  |> aggregateWindow(${wa}, fn: sum, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("sum")})
+${src}
+  |> aggregateWindow(${wa}, fn: count, createEmpty: false, timeSrc: "_start")
   |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("n")})
-${id} |> last()
+${src}
+  |> last()
   |> keep(columns: ${fluxExpression(KEEP_UNIT)}) |> yield(name: ${y("unit")})
 `);
 }
 
-/** Mean and point count per metric per bucket, plus the newest unit.
+/** Sum and point count per raw series per bucket, plus the newest unit.
+ * shape_means turns them into means.
  * Booleans need toFloat(), which stops the aggregate pushing down to
  * storage, so they run in their own branch only when asked for.
  * String metrics have no mean and are not queried.
  * @param store The store the bucket holds; `uns` reads the UNS form of
- *   `path`, grouped on the whole path (see uns_folder).
+ *   `path` (see uns_folder).
  * @returns The Flux script, or null if nothing needs querying. */
 export function mean_query({ bucket, metrics, windows, every, store = null }) {
     const numeric = metrics.filter(m => m.type == null || NUMERIC_TYPES.includes(m.type));
@@ -562,13 +570,13 @@ export function mean_query({ bucket, metrics, windows, every, store = null }) {
     let script = zone_header(every);
     if (numeric.length)
         script += mean_branch({
-            bucket, name: "data", metrics: numeric, windows, every,
+            bucket, metrics: numeric, windows, every,
             types: m => m.type ? [m.type] : NUMERIC_TYPES,
             to_float: false, suffix: "", store,
         });
     if (bools.length)
         script += mean_branch({
-            bucket, name: "bools", metrics: bools, windows, every,
+            bucket, metrics: bools, windows, every,
             types: () => ["b"],
             to_float: true, suffix: "_b", store,
         });
@@ -620,9 +628,10 @@ export function shape_counts(rows, every) {
         [d, [...per].sort((a, b) => a[0] - b[0])]));
 }
 
-/** Turns mean, n and unit rows into one series per requested metric.
+/** Turns sum, n and unit rows into one series per requested metric.
  * Rows of one device, path and name with different numeric suffixes
- * merge into one series, weighted by n.
+ * merge into one series, weighted by n. Rows of one raw path and type
+ * (series that differ only in other tags) add up.
  * In the uns bucket the rows carry the whole path; series of one
  * folder under different device IDs (a renamed device) merge too.
  * @param rows Rows with a `result` column naming the yield.
@@ -649,12 +658,12 @@ export function shape_means(rows, metrics, every, store = null) {
             continue;
         }
         const b = bucket_start(t, every);
-        /* A cell is one series' mean and n in one bucket. The raw path
-         * keeps two device IDs' series apart until merge_cells. */
+        /* A cell is one path and type's sum and n in one bucket. The
+         * raw path keeps two device IDs' series apart until merge_cells. */
         const by_cell = s.buckets.get(b) ?? new Map();
         const ck = JSON.stringify([type, r.path ?? ""]);
-        const cell = by_cell.get(ck) ?? { type, mean: null, n: null };
-        cell[kind] = Number(r._value);
+        const cell = by_cell.get(ck) ?? { type, sum: 0, n: 0 };
+        cell[kind] += Number(r._value);
         by_cell.set(ck, cell);
         s.buckets.set(b, by_cell);
     }
@@ -681,10 +690,8 @@ export function shape_means(rows, metrics, every, store = null) {
 function merge_cells(t, cells) {
     let n = 0, sum = 0;
     for (const c of cells) {
-        if (c.mean == null) continue;
-        const w = c.n ?? 1;
-        n += w;
-        sum += c.mean * w;
+        n += c.n;
+        sum += c.sum;
     }
     return n ? [t, sum / n, n] : null;
 }

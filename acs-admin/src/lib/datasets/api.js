@@ -80,6 +80,24 @@ const META_RETRY_MS = [0, 250, 500, 1000]
 // Passed by the create paths: the dataset was made a moment ago.
 const FRESH = { fresh: true }
 
+// Device datasets made at once when saving.
+const DEVICE_POOL = 4
+
+/** Runs `fn` over `items`, at most `size` at a time. Rejects with the
+ * first error, after the calls already running have settled. */
+async function in_pool (items, size, fn) {
+    const queue = [...items]
+    let failed = null
+    const worker = async () => {
+        while (queue.length && !failed) {
+            try { await fn(queue.shift()) }
+            catch (err) { failed ??= { err } }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(size, queue.length) }, worker))
+    if (failed) throw failed.err
+}
+
 /**
  * A metadata write through Data Access. It checks EditDataset on the
  * dataset, so a member of an own-scope role changes only their own.
@@ -189,9 +207,12 @@ export function device_refusal (err, name) {
 export async function ensure_device_datasets (client, devices, byUuid, nameOf = () => null, created = {}) {
     const out = {}
     const refused = []
-    for (const dev of devices) {
+    let site_refuses = false
+    const make = async (dev) => {
         const existing = device_dataset_for(dev, byUuid, [STRUCTURE.UNS_DEVICE]) ?? created[dev]
-        if (existing) { out[dev] = existing; continue }
+        if (existing) { out[dev] = existing; return }
+        // The whole site refuses: no point asking for the others.
+        if (site_refuses) return
         const name = nameOf(dev)
         let uuid
         try {
@@ -201,15 +222,16 @@ export async function ensure_device_datasets (client, devices, byUuid, nameOf = 
             const reason = device_refusal(err, name ?? `Device ${dev.slice(0, 8)}`)
             if (!reason) throw err
             refused.push({ device: dev, reason, code: err?.body?.error ?? null })
-            // The whole site refuses: no point asking for the others.
-            if (err?.body?.error === 'uns_unavailable') break
-            continue
+            if (err?.body?.error === 'uns_unavailable') site_refuses = true
+            return
         }
         if (!uuid) throw new DatasetError(`Could not make a dataset for device ${name ?? dev}.`)
         created[dev] = uuid
         if (name) await set_name(client, uuid, name, FRESH)
         out[dev] = uuid
     }
+    // A few at a time: each create takes about a second in Data Access.
+    await in_pool(devices, DEVICE_POOL, make)
     if (refused.length) {
         const n = refused.length
         throw new DatasetError(`Not saved. ${n === 1 ? 'One device' : `${n} devices`} could not be added.`, {
@@ -294,6 +316,9 @@ export async function create_from_spec (client, spec, progress = {}) {
                 progress.union = source
                 saved.push(source)
             }
+            // Before the session create: naming waits out the moment
+            // Data Access takes to see the new union as the caller's,
+            // which the session create's check of its source needs.
             await set_name(client, source, spec.window ? `${spec.name.trim()} (devices)` : spec.name.trim(), FRESH)
         }
 
@@ -311,11 +336,14 @@ export async function create_from_spec (client, spec, progress = {}) {
                 progress.session = uuid
                 saved.push(uuid)
             }
-            await set_name(client, uuid, spec.name.trim(), FRESH)
         }
 
-        step = 'to set the new dataset\'s kind, tags or details'
-        await write_metadata(client, uuid, spec)
+        step = 'to set the new dataset\'s name, kind, tags or details'
+        // Each field is its own config entry, so they are written together.
+        await Promise.all([
+            spec.window ? set_name(client, uuid, spec.name.trim(), FRESH) : null,
+            write_metadata(client, uuid, spec),
+        ])
         return uuid
     }
     catch (err) {
@@ -327,11 +355,18 @@ export async function create_from_spec (client, spec, progress = {}) {
     }
 }
 
-// Only called for a dataset just created.
+// Only called for a dataset just created. Each field is its own config
+// entry, so the writes run together.
 async function write_metadata (client, uuid, spec) {
-    if (spec.kind) await set_kind(client, uuid, spec.kind, null, FRESH)
-    if (spec.tags?.length) await set_tags(client, uuid, spec.tags, FRESH)
-    if (spec.kind === 'equipment' && spec.labels) await set_labels(client, uuid, spec.labels, FRESH)
+    await Promise.all([
+        spec.kind ? set_kind(client, uuid, spec.kind, null, FRESH) : null,
+        spec.tags?.length ? set_tags(client, uuid, spec.tags, FRESH) : null,
+        spec.kind === 'equipment' && spec.labels ? set_labels(client, uuid, spec.labels, FRESH) : null,
+        write_run_meta(client, uuid, spec),
+    ])
+}
+
+async function write_run_meta (client, uuid, spec) {
     await put_run_meta(client, uuid, {
         createdBy: spec.createdBy ?? null,
         createdAt: to_iso(Date.now()),

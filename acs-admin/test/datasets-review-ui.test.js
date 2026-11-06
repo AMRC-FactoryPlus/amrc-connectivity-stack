@@ -280,9 +280,24 @@ describe('saves that carry on after a part-way failure', () => {
             asked++
             throw Object.assign(new Error('refused'), { status: 503, body: { error: 'uns_unavailable' } })
         }
-        const err = await ensure_device_datasets(c, ['d1', 'd2'], {}, () => 'Name').catch(e => e)
-        expect(asked).toBe(1)
+        // Up to four run at once; none starts after the refusal.
+        const err = await ensure_device_datasets(c, ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'], {}, () => 'Name').catch(e => e)
+        expect(asked).toBe(4)
         expect(err.detail).toBe('New device datasets need the UNS historian, which this site does not run.')
+    })
+
+    it('makes several device datasets at once', async () => {
+        const c = client()
+        let running = 0, most = 0, n = 0
+        c.DataAccess.create_dataset = async () => {
+            running++; most = Math.max(most, running)
+            await new Promise(r => setTimeout(r, 5))
+            running--
+            return `dddddddd-0000-4000-8000-00000000000${n++}`
+        }
+        const map = await ensure_device_datasets(c, ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'], {}, () => null)
+        expect(Object.keys(map)).toHaveLength(6)
+        expect(most).toBe(4)
     })
 
     it('words the refusals it knows, and leaves the rest', () => {

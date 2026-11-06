@@ -26,16 +26,31 @@ export class Semaphore {
 
     /** Run `fn` when a slot is free; the slot is held until it settles. */
     async run<T>(fn: () => Promise<T>): Promise<T> {
+        const release = await this.acquire();
+        try {
+            return await fn();
+        } finally {
+            release();
+        }
+    }
+
+    /**
+     * Wait for a slot and hold it until the returned function is
+     * called, for work that is not one promise, such as a query read
+     * as a stream. Calling the function again does nothing.
+     */
+    async acquire(): Promise<() => void> {
         if (this.active >= this.limit) {
             await new Promise<void>(r => this.waiters.push(r));
         } else {
             this.active++;
         }
-        try {
-            return await fn();
-        } finally {
+        let held = true;
+        return () => {
+            if (!held) return;
+            held = false;
             this.release();
-        }
+        };
     }
 
     /* Hand the slot straight to the next waiter, if any, so a new

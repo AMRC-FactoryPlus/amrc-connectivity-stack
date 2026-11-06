@@ -617,7 +617,7 @@ export class APIv1 {
      * failing the whole batch.
      */
     async history_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const { elementIds, startTime, endTime, maxDepth } = req.body;
+        const { elementIds, startTime, endTime } = req.body;
         if (!startTime || !endTime) {
             return next(badRequest("startTime and endTime are required"));
         }
@@ -630,7 +630,7 @@ export class APIv1 {
                 if (visible && !this.objectTree.getObject(id, visible))
                     return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
                 try {
-                    const values = await this.history.queryHistory(id, startTime, endTime, maxDepth);
+                    const values = await this.history.queryHistory(id, startTime, endTime);
                     return { success: true, elementId: id, result: { elementId: id, values } };
                 } catch (err: any) {
                     return { success: false, elementId: id, error: { code: err.status ?? 500, message: err.message } };

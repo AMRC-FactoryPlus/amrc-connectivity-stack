@@ -21,6 +21,7 @@ import { APIv1 } from "../lib/api-v1.js";
 import { I3xStore } from "../lib/store.js";
 import { Semaphore } from "../lib/semaphore.js";
 import { allowAll } from "./helpers/allow-all.js";
+import { csvTransport } from "./helpers/influx-csv.js";
 
 const HIERARCHY = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 const DEV = "dev-1";
@@ -80,6 +81,9 @@ function setup(opts: { flushInterval?: number; flushMaxRows?: number; influxConc
         return rows;
     });
     (history as any).queryApi = { collectRows };
+    /* History is streamed through the transport; answer it from
+     * whatever queryApi a test has put in place. */
+    (history as any).streamTransport = csvTransport(q => (history as any).queryApi.collectRows(q));
 
     const leaf = (name: string, under: string = DEV) =>
         tree.getChildElementIds(under).find(id => tree.getObject(id)!.displayName === name)!;

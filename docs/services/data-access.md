@@ -12,23 +12,74 @@ measurements); the service itself is stateless.
 A dataset is a ConfigDB object in the `Dataset` class
 (`c31d3cbd-01cd-4833-8014-c4512aef1e5c`). What data a dataset actually
 contains is defined by exactly one config entry, filed under one of
-four **structural applications**. The application the entry is filed
+six **structural applications**. The application the entry is filed
 under determines the dataset's structure; the Data Access service
-inspects which of the four apps has an entry for a given dataset to
+inspects which of the six apps has an entry for a given dataset to
 decide how to resolve it.
 
 Structural app | UUID | `config` shape
 ---|---|---
-`Sparkplug source` | `f5d550c4-2831-11f1-b0b0-83fda3035799` | `{ "source": "<Sparkplug Device/Node UUID>" }`
-`Sub-device` | `7f7d40cc-4075-4f06-90cf-aa6261d68f18` | `{ "source": "<Sparkplug Device UUID>", "metrics": [{ "instance": "<Instance_UUID>", "metric": "<path>" }, ...] }`
+`UNS device` | `0d4ac57f-76b5-45c9-9c2d-4b0812be08ff` | `{ "source": "<Device UUID>" }`
+`UNS device metrics` | `bd9550fb-ef75-4523-81d6-25dd32c22925` | `{ "source": "<Device UUID>", "metrics": [{ "instance": "<Instance_UUID>", "metric": "<path>" }, ...] }`
+`Sparkplug source` (no longer created) | `f5d550c4-2831-11f1-b0b0-83fda3035799` | `{ "source": "<Sparkplug Device/Node UUID>" }`
+`Sub-device` (no longer created) | `7f7d40cc-4075-4f06-90cf-aa6261d68f18` | `{ "source": "<Sparkplug Device UUID>", "metrics": [{ "instance": "<Instance_UUID>", "metric": "<path>" }, ...] }`
 `Union components` | `1c4ca454-de38-44d9-92fb-aa5218bfa257` | `["<dataset UUID>", ...]`
 `Session limits` | `8754c000-3778-4ae6-b2b8-bbcd959bb775` | `{ "source": "<dataset UUID>", "from": "<ISO datetime>", "to": "<ISO datetime>" }`
+
+The four device structures each read one device. `UNS device` and
+`UNS device metrics` read the `uns` InfluxDB bucket, which the UNS
+historian writes and i3X reads, so a dataset of these kinds holds what
+i3X serves for the device. `Sparkplug source` and `Sub-device` read the
+`default` bucket, which the Sparkplug historian writes. Data Access no
+longer creates them: new device datasets use the UNS kinds. Existing
+`Sparkplug source` and `Sub-device` datasets keep working unchanged.
+You can read, download, edit and delete them, and use them in unions
+and sessions.
+
+### UNS device
+
+Identifies all the data of one device in the UNS. The source must be a
+device (a member of the `Device` class) with an ISA-95 placement: only
+a placed device is on the UNS, so only a placed device has data in the
+`uns` bucket. Data Access finds its points in Influx by the
+`topLevelInstance` tag, which holds the device UUID.
+
+A `UNS device` dataset has no data from before the device joined the
+UNS. The UNS historian starts writing a device when it first appears
+on the UNS, and Data Access does not fall back to the `default` bucket
+for earlier windows.
+
+The `uns` bucket holds some metrics the `default` bucket does not:
+metrics marked transient, which the Sparkplug historian drops. A
+download of a `UNS device` dataset returns everything the bucket holds
+for the device, so it can include these. It does not include the birth
+metadata (`Instance_UUID` and `Schema_UUID`) or the `Device Control`
+metrics, which the UNS historian does not write.
+
+### UNS device metrics
+
+Selects chosen metrics of one device in the UNS. The config and its
+rules are the same as for [Sub-device](#sub-device): each entry names a
+metric by `instance` and `metric`, or by `{ "path" }` on create and
+update, and the choice is limited to metrics in the device's origin map
+with `Record_To_Historian` set. The source must be a device with an
+ISA-95 placement, as for `UNS device`.
+
+Metric paths stay relative to the device, as for a `Sub-device`. The
+`uns` bucket's `path` tag starts with the device's Sparkplug device ID,
+for example `Press_1/Axes/X/Position`, or the ID alone for a metric at
+the top level of the device. Data Access matches it with a regular
+expression that accepts any first segment, followed by the metric's
+folder: `^[^/]+/Axes/X/Position$`. The `topLevelInstance` test beside
+it picks the device. A change of Sparkplug device ID therefore does not
+lose data. ISA-95 moves do not change `path`.
 
 ### Sparkplug source
 
 Identifies all measurements published by a given Sparkplug Device or
 Node. Measurements are located in Influx by matching the `topLevelInstance`
-tag against this UUID.
+tag against this UUID. Data Access no longer creates new datasets of
+this structure; use `UNS device`.
 
 ### Sub-device
 
@@ -64,8 +115,9 @@ them. A reference whose instance is no longer in the origin map, most
 often after the device's schema is changed, reads nothing; it never
 widens the read to the whole device.
 
-The admin UI's Datasets pages do not create or edit `Sub-device`
-datasets yet; use the API.
+The admin UI's Datasets pages do not create or edit `Sub-device` or
+`UNS device metrics` datasets yet; use the API. Data Access no longer
+creates new `Sub-device` datasets; use `UNS device metrics`.
 
 ### Union components
 
@@ -133,6 +185,8 @@ Group | `Structural dataset type` | `70ff7bea-bb2d-48c2-88fd-4f7a79b1aa3c`
 Group | `Functional dataset group` | `86e5b048-e956-4820-939e-3abf3eda4e03`
 Application | `Dataset definition` | `eae2d4ae-164d-4dc6-b646-7e0320057bd9`
 Application | `Dataset metadata` | `e3b9fd2c-9de1-470b-9675-739e2a55b77f`
+Application | `UNS device` | `0d4ac57f-76b5-45c9-9c2d-4b0812be08ff`
+Application | `UNS device metrics` | `bd9550fb-ef75-4523-81d6-25dd32c22925`
 Application | `Sparkplug source` | `f5d550c4-2831-11f1-b0b0-83fda3035799`
 Application | `Sub-device` | `7f7d40cc-4075-4f06-90cf-aa6261d68f18`
 Application | `Union components` | `1c4ca454-de38-44d9-92fb-aa5218bfa257`
@@ -144,6 +198,7 @@ Application | `Run metadata` * | `2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a`
 Application | `Recording in progress` * | `cf3f6103-0f0e-4839-953a-ad2cedc78c30`
 Client role | `Dataset maker` | `b7aa3036-fc1f-4869-b0f5-50f28b028905`
 Client role | `Dataset manager` | `4ab8468a-166b-4c01-afa6-7bd558db806b`
+Composite permission | `Device data` | `6abc1879-429d-4c0f-a5e4-00a655a09f26`
 Service function | `Data Access service` | `06cee697-29d3-4972-9479-bc392e24946e`
 Special | Structurally invalid dataset | `696396a0-2831-11f1-9b12-33d63b8c5115`
 
@@ -164,6 +219,24 @@ Both roles read every dataset and any device's data, and can use any
 dataset in a union or session. Both can write any equipment's
 `Recording in progress` entry: any operator at a machine starts and
 stops its recordings. Neither has any other ConfigDB write.
+
+Both roles also hold i3X's `Read i3X objects` on every device. The
+Admin UI lists the devices a person can pick for a dataset, and shows
+live values, through i3X, so a role member needs this to build
+datasets. These are direct grants rather than the `Device data`
+composite, so a member never loses them part way through a dump load.
+
+`dumps/data-access.yaml` defines both roles and all their grants.
+Service setup loads it on every run, and a dump load replaces every
+grant of each principal it names. A grant you add to either role by
+hand is removed on the next service-setup run. Give extra access to
+the people instead, or to a group of your own.
+
+Each role is defined with `Create dataset` on `Dataset definition`, the
+class of every structural app, as a plural grant. That covers the new
+`UNS device` kinds. A principal that holds `Create dataset` on single
+structural apps, such as `Sparkplug source`, needs new grants on
+`UNS device` or `UNS device metrics` to make device datasets.
 
 Both roles are subclasses of `Principal`. Auth only treats subclasses of
 `Principal` as groups, so a role declared without it grants nothing to
@@ -240,14 +313,13 @@ own rights, as it does for a download.
 
 The dataset is resolved the same way as for `POST v1/data/:uuid`:
 `Union components` recursively, `Session limits` down to their source,
-to a list of `Sparkplug source` and `Sub-device` sources. On success,
-returns:
+to a list of device sources. On success, returns:
 
 Property | Type | Meaning
 ---|---|---
 `uuid` | UUID | Dataset UUID
 `from` / `to` | date | As for `GET v1/metadata/:uuid`; omitted where unbounded
-`devices` | array | One entry per device, in the order the dataset first reaches them
+`devices` | array | One entry per device and store, in the order the dataset first reaches them
 
 Each device entry has:
 
@@ -255,16 +327,23 @@ Property | Type | Meaning
 ---|---|---
 `uuid` | UUID | Device UUID
 `name` | string or `null` | The device's `General Information` name. The edge agent uses it as the Sparkplug device ID, which is what the download's `device` column shows
+`store` | string | Where a download reads the device: `uns` (the `uns` bucket) for the `UNS device` kinds, `sparkplug` (the `default` bucket) for `Sparkplug source` and `Sub-device`
 `metrics` | array | The metrics a download reads, in the shape `GET v1/sparkplug-sources/:uuid/metrics` returns
 
-A `Sparkplug source` gives every metric in the device's origin map with
-`Record_To_Historian` set. A `Sub-device` gives only its selected
-metrics; a selected metric whose object is no longer in the origin map
-is left out, as the download leaves it out. A device reached through
-several components appears once. If any of them is a `Sparkplug
-source`, the device lists all its metrics; otherwise it lists the
-union of what its `Sub-device` sources select. A device with no origin
-map has `"metrics": []`.
+A whole-device source (`UNS device` or `Sparkplug source`) gives every
+metric in the device's origin map with `Record_To_Historian` set. A
+metrics source (`UNS device metrics` or `Sub-device`) gives only its
+selected metrics; a selected metric whose object is no longer in the
+origin map is left out, as the download leaves it out. A device reached
+through several components of one store appears once. If any of them
+is a whole-device source, the device lists all its metrics; otherwise
+it lists the union of what its metrics sources select. A device reached
+through both stores appears once for each, and a download reads it from
+both. A device with no origin map has `"metrics": []`.
+
+The list comes from the origin map, not from the bucket. A download of
+a `UNS device` dataset can also return transient metrics, which the
+list does not show (see [UNS device](#uns-device)).
 
 A metric's `path` is its full Sparkplug metric name. Send it as a
 `metrics` selector to `POST v1/data/:uuid` to download only that
@@ -277,6 +356,7 @@ metric.
     {
       "uuid": "55555555-5555-5555-5555-555555555555",
       "name": "Press_1",
+      "store": "uns",
       "metrics": [
         {
           "instance": "1e74e2b2-44a3-44ff-8b2c-8c14a5f15c0b",
@@ -296,18 +376,19 @@ metric.
 ### `POST v1/data/:uuid`
 
 Requires `Read dataset` on `:uuid`. Resolves the dataset's structure
-tree recursively into a flat list of `{ device, from, to }` triples
-(one per `Sparkplug source` or `Sub-device` contributing to the
-dataset, with time bounds intersected down through any enclosing
-sessions), then streams the
-result back as a **single CSV file** (`text/csv`, named
-`<dataset-uuid>.csv`). Each source is read with an Influx Flux query
-filtered on `topLevelInstance == "<device-uuid>"` and the resolved time
-range, and all sources are written into the same file. A `Sub-device`
-source also filters on its resolved metrics, as well as on any filter
-in the request; one with more than 100 metrics is read with several
-queries. The columns are,
-in this order:
+tree recursively into a flat list of `{ device, store, from, to }`
+sources (one per device structure contributing to the dataset, with
+time bounds intersected down through any enclosing sessions), then
+streams the result back as a **single CSV file** (`text/csv`, named
+`<dataset-uuid>.csv`). Each source is read from its store's bucket,
+`uns` or `default`, with an Influx Flux query filtered on
+`topLevelInstance == "<device-uuid>"` and the resolved time range, and
+all sources are written into the same file. A metrics source
+(`UNS device metrics` or `Sub-device`) also filters on its resolved
+metrics, as well as on any filter in the request; one with more than
+100 metrics is read with several queries. A dataset that reads the
+`uns` bucket on a site with no UNS historian gets `503` with
+`{"error": "uns_unavailable"}`. The columns are, in this order:
 
 Column | Content
 --- | ---
@@ -317,6 +398,13 @@ Column | Content
 `value` | The data value
 `unit` | The engineering unit, if the metric has one
 `path` | The full Sparkplug metric name, for example `Axes/X/Position/Actual`; for a metric at the top level of the device, its name
+
+The columns are the same whichever bucket a row comes from. A row from
+the `uns` bucket has no `device` tag: Data Access takes `device` from
+the first segment of the row's `path` tag, the Sparkplug device ID, and
+`path` from the rest. So a `UNS device` download and a `Sparkplug
+source` download of the same device have identical `device`, `metric`,
+`path` and `unit` columns.
 
 Two metrics with the same name under different folders have the same
 `metric` value but different `path` values. You can send a `path`
@@ -343,9 +431,11 @@ A refusal is JSON, `{"error": "<reason>"}`, where the reason says what to
 change. Otherwise the body can also contain one of these filters:
 
 * **`metrics`** (array of strings): export only the listed metrics.
-  The service reads one Influx bucket (`INFLUXDB_BUCKET`, by default the
-  Sparkplug historian's bucket), so these rules describe how the
-  Sparkplug historian stores points. Each entry is a metric selector:
+  These rules describe how the Sparkplug historian stores points. A
+  source in the `uns` bucket matches the same selectors: its `path`
+  tag starts with the Sparkplug device ID, which Data Access allows
+  for (see [UNS device metrics](#uns-device-metrics)). Each entry is a
+  metric selector:
   * An entry that contains `/` is a full Sparkplug metric path, for
     example `Axis/X/Position`. It matches points whose `path` tag is
     `Axis/X` and whose measurement name is `Position` (with any
@@ -372,8 +462,8 @@ change. Otherwise the body can also contain one of these filters:
 
 A request that sends both filters, or a filter that breaks these rules,
 gets `422` with a JSON body `{ "error": "<reason>" }`. Every filter
-value is escaped as a Flux string literal before it is placed in the
-query.
+value is escaped as a Flux string literal, or for a `uns` source's
+path as a regular expression, before it is placed in the query.
 
 ### `POST v1/series`
 
@@ -384,9 +474,13 @@ one dataset, over a time window. Per bucket, it returns:
 * `mean` and `n`: the mean and number of points of chosen metrics.
 * `last`: the time of each device's newest data point.
 
-The route reads the raw InfluxDB bucket (`INFLUXDB_BUCKET`). Counts
-at `1h` or coarser read the coverage summary instead, when it is ready
-(see [Coverage summary](#coverage-summary)).
+The route reads the raw InfluxDB buckets. A device request reads the
+bucket its `store` names. A dataset request reads each source from its
+own store's bucket, runs once per store, and merges the results by
+device: counts add up, means merge weighted by `n`, and `last` is the
+newer time. Counts at `1h` or coarser read the store's coverage
+summary instead, when it is ready (see
+[Coverage summary](#coverage-summary)).
 
 #### Request
 
@@ -408,6 +502,7 @@ at `1h` or coarser read the coverage summary instead, when it is ready
 Field | Rule
 ---|---
 `devices` / `dataset` | Give exactly one. `devices` is a list of device UUIDs (the Sparkplug `topLevelInstance` tag). `dataset` is one dataset UUID.
+`store` | Which bucket a device request reads: `sparkplug` (the `default` bucket, the default) or `uns`. Only with `devices`: a dataset's sources say where they are stored. The Admin UI sends `uns`, as new device datasets read the UNS.
 `from`, `to` | ISO 8601 date-times, `from` before `to`. Required. `to` may be in the future.
 `every` | Bucket size. One of `10s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `6h`, `1d`, `1w`. Optional.
 `points` | Target number of buckets, 1 to 2000, default 300. Used only when `every` is absent: the server picks the smallest step that gives at most `points` buckets.
@@ -486,7 +581,7 @@ otherwise.
 * A dataset request needs `Read dataset` on the dataset. It then covers
   every device of the dataset, within the dataset's windows, as for
   `POST v1/data/:uuid`.
-* A device request needs `Use Sparkplug data` on each device. Root and
+* A device request needs `Build datasets from device` on each device. Root and
   wildcard grants apply. The caller may be a Kerberos principal or a
   JWT caller identified by principal UUID. A principal the Auth service
   has no ACL for is denied every device. Devices without the grant are listed in
@@ -494,7 +589,7 @@ otherwise.
   denied.
 * `mean` and `last` entries follow the check of their device.
 * In a dataset request, a `mean` metric on a device the dataset reaches
-  through a `Sub-device` must be one of that sub-device's metrics, or
+  through a metrics source must be one of that source's metrics, or
   the request gets `422`. If the device is in the dataset more than
   once, the sources that include the metric (whole-device sources
   include every metric) must cover all of the device's windows. Counts
@@ -530,20 +625,28 @@ Status | When
 `403` | No `Read dataset` on the dataset, or every device denied.
 `404` | The dataset does not exist or is invalid.
 `413` | Too many devices or `mean` metrics, or the body is too large. The body names the limit.
-`422` | Both or neither of `devices` and `dataset`; a bad UUID, date or `every`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit; a `mean` device outside the request or the dataset; a dataset with more than 100 distinct window sets.
-`503` | InfluxDB or the Auth service is unreachable, or too many queries are waiting. The last case has `Retry-After: 5`.
+`422` | Both or neither of `devices` and `dataset`; a bad UUID, date, `every` or `store`; `store` with `dataset`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit, including a long count when the coverage summary of a store the dataset reads is not ready; a `mean` device outside the request or the dataset; a dataset with more than 100 distinct window sets across its stores.
+`503` | InfluxDB or the Auth service is unreachable, or too many queries are waiting. The last case has `Retry-After: 5`. A request that reads the `uns` bucket on a site with no UNS historian gets `uns_unavailable`.
 `504` | The request or one of its queries took longer than its time limit.
 
-`400`, `413` and `422` responses have a JSON body with `error` and
-`message` fields.
+`400`, `413`, `422` and `uns_unavailable` responses have a JSON body
+with `error` and `message` fields.
+
+The UNS historian creates the `uns` bucket when it starts, which may
+be after Data Access. Until the bucket exists, a `uns` query reads as
+empty rather than failing the request, and Data Access logs it once.
 
 ### `GET v1/coverage/status`
 
 Returns the state of the coverage summary. Any authenticated client may
 read `enabled`, `ready`, `stale` and `error`. The other fields describe
 data across all devices, such as how far back the raw bucket goes, so
-they are included only for a caller with `Use Sparkplug data` on every
-device (a wildcard grant).
+they are included only for a caller with `Build datasets from device`
+on every device (a wildcard grant).
+
+The top level describes the summary of the `default` bucket. When the
+site has a UNS historian, `uns` holds the state of the `uns` bucket's
+summary, in the same shape.
 
 ```json
 {
@@ -586,8 +689,9 @@ for the last failure: `provisioning_failed`, `backfill_failed` or
 
 ### `GET v1/sparkplug-sources/:uuid/metrics`
 
-Requires `Use Sparkplug data` on the device `:uuid`. Returns the metrics
-a `Sub-device` dataset can select, read from the device's origin map.
+Requires `Build datasets from device` on the device `:uuid`. Returns
+the metrics a `UNS device metrics` or `Sub-device` dataset can select,
+read from the device's origin map.
 Only metrics with `Record_To_Historian` set are listed, since nothing
 else reaches Influx. A device with no origin map returns `[]`.
 
@@ -602,7 +706,7 @@ Property | Meaning
 
 The service needs `ReadConfig` on `DeviceInformation`
 (`a98ffed5-c613-4e70-bfd3-efeee250ade5`) for this endpoint and to read
-`Sub-device` datasets; `dumps/data-access.yaml` grants it.
+metrics datasets; `dumps/data-access.yaml` grants it.
 
 ### `GET v1/structure`
 
@@ -634,15 +738,29 @@ On success, creates a new `Dataset` object, writes the config entry
 under `structure`, records the corresponding subclass relationship(s),
 and returns the new dataset's UUID as a JSON string.
 
-Once those checks pass, a `Sub-device` config's `{ "path" }` entries
-are converted to `{ "instance", "metric" }` (see
+A `UNS device` or `UNS device metrics` source is then checked to be a
+device with an ISA-95 placement. These checks run after the permission
+check, so a caller without permission learns nothing about the source.
+Once those checks pass, a metrics config's `{ "path" }` entries are
+converted to `{ "instance", "metric" }` (see
 [Sub-device](#sub-device)); a path that does not resolve returns `422`.
 
-For example, a `Sub-device` dataset named by path:
+The refusals below have a JSON body with a stable `error` code and a
+`message`. The service client's `create_dataset` passes the body
+through as the error's `body`.
+
+Status | `error` | When
+---|---|---
+`422` | `structure_retired` | `structure` is `Sparkplug source` or `Sub-device`, which can no longer be created. `use` lists the structures to use instead. Nothing else is checked.
+`422` | `device_required` | The source of a UNS kind is not a device, for example a Sparkplug Node. `device` names it.
+`422` | `placement_required` | The device has no ISA-95 placement, so it is not on the UNS. `device` names it.
+`503` | `uns_unavailable` | The site has no UNS historian, so it has no `uns` bucket.
+
+For example, a `UNS device metrics` dataset named by path:
 
 ```json
 {
-    "structure": "7f7d40cc-4075-4f06-90cf-aa6261d68f18",
+    "structure": "bd9550fb-ef75-4523-81d6-25dd32c22925",
     "config": {
         "source": "<device UUID>",
         "metrics": [
@@ -669,9 +787,15 @@ but must match the path if present. Requires `Edit dataset` on `:uuid`.
   doesn't have a coherent one.
 
 In both cases, only the per-source permission for the new config's
-source(s) is checked — `PUT` does **not** re-check `Create dataset` on
-the structural app the way `POST` does. `Sub-device` path entries are
-converted as for `POST`, before anything is removed.
+source(s) is checked, and `PUT` does **not** re-check `Create dataset`
+on the structural app the way `POST` does. A UNS kind's new source is
+checked as for `POST`, and metrics path entries are converted as for
+`POST`, before anything is removed.
+
+Rewriting an invalid dataset makes it anew, so it counts as a create:
+rewriting one as a `Sparkplug source` or `Sub-device` gets `422`
+`structure_retired`. A valid dataset of those structures can still be
+edited.
 
 ### `GET v1/delete/:uuid`
 
@@ -714,11 +838,22 @@ Permission | UUID | Targets | Grants
 ---|---|---|---
 `Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/metadata/:uuid/contents`, `v1/data/:uuid` and `v1/series` for the dataset
 `Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT), the `v1/metadata/:uuid/<field>` writes, and inclusion in the `v1/structure` list
-`Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`Sparkplug source` / `Sub-device` / `Union components` / `Session limits`) | Creating a dataset of that structure via `POST v1/structure`
+`Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`UNS device` / `UNS device metrics` / `Union components` / `Session limits`), or `Dataset definition` as a plural grant for all of them | Creating a dataset of that structure via `POST v1/structure`
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`
-`Use Sparkplug data` (`UseSparkplug`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Sparkplug Device/Node | Referencing it as a `Sparkplug source` or `Sub-device` source, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
+`Build datasets from device` (`UseDevice`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Device | Referencing it as the source of a device structure, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
 `Use for session` (`UseForSession`) | `c089b9a9-06cd-4211-94fc-9ad52a759987` | Dataset | Referencing it as a `Session limits` source
 `Include in union` (`IncludeInUnion`) | `94d51085-af83-4796-8059-fcd578e3f572` | Dataset | Referencing it as a `Union components` member
+
+`Build datasets from device` was called `Use Sparkplug data`
+(`UseSparkplug`, still an alias in `lib/constants.js`). It is a Data
+Access permission only, and has never given MQTT access.
+
+The **Device data** composite permission
+(`6abc1879-429d-4c0f-a5e4-00a655a09f26`) holds i3X's
+`Read i3X objects` and `Build datasets from device`. One grant of it on
+a device lets a person browse the device in i3X and build datasets from
+it. Each service sees its own half. The Admin UI's **Manage access**
+dialog gives either half, or both as `Device data`.
 
 The metadata routes cover the name, tags, equipment labels, kind and
 run details. Any other metadata config, and any other functional
@@ -752,6 +887,15 @@ filtering.
 Timelines show, for each device, how much data arrived in each hour,
 day or week. Counting the raw bucket over months is slow, so Data
 Access keeps a small summary in its own InfluxDB bucket.
+
+Each raw bucket has its own summary. `acs_coverage`, kept by the task
+`acs-coverage`, counts the `default` bucket. When the site has a UNS
+historian, `acs_coverage_uns`, kept by the task `acs-coverage-uns`,
+counts the `uns` bucket. Both buckets key on the device, so one summary
+of both would count each device twice. The two summaries work the same
+way and share the settings below; this section describes the first.
+The UNS historian creates the `uns` bucket when it starts, so the
+second summary waits, retrying, until that bucket exists.
 
 ### What it holds
 
@@ -882,6 +1026,11 @@ Helm value | Variable | Default
 `dataAccess.coverage.repairDays` | `COVERAGE_REPAIR_DAYS` | `7`
 `dataAccess.coverage.rebuild` | `COVERAGE_REBUILD` | (empty)
 
+The chart also sets `INFLUXDB_UNS_BUCKET` to `uns`, the bucket the UNS
+historian creates, when `historians.uns.enabled` is `true`. Without it
+Data Access still starts: it runs no `uns` summary, and the `UNS
+device` kinds answer `503` `uns_unavailable`.
+
 For example, to pause the backfill on a busy InfluxDB while keeping
 the hourly task and coverage reads:
 
@@ -908,8 +1057,8 @@ not set `COVERAGE_BUCKET`, `COVERAGE_TASK`, `COVERAGE_RECOUNT_HOURS` or
 Variable | Default | Meaning
 ---|---|---
 `COVERAGE_ENABLED` | `true` | `false` turns off provisioning, backfill, repair and coverage reads.
-`COVERAGE_BUCKET` | `acs_coverage` | The summary bucket.
-`COVERAGE_TASK` | `acs-coverage` | The InfluxDB task name.
+`COVERAGE_BUCKET` | `acs_coverage` | The summary bucket. The `uns` summary adds `_uns`.
+`COVERAGE_TASK` | `acs-coverage` | The InfluxDB task name. The `uns` summary adds `-uns`.
 `COVERAGE_RECOUNT_HOURS` | `6` | Closed hours each task run recounts (1 to 48).
 `COVERAGE_BACKFILL` | `true` | `false` skips the backfill. The summary is then not used until a marker exists.
 `COVERAGE_BACKFILL_FROM` | (empty) | An ISO date-time the backfill stops at. When set, the backfill walks down to it whatever gaps it meets, and `COVERAGE_BACKFILL_EMPTY_DAYS` does not apply.
@@ -951,7 +1100,12 @@ Compared to the original design notes for this service:
   references to the old ones read nothing until the dataset is edited.
 * **Overlapping sources are not deduplicated.** A union containing both
   a `Sparkplug source` and a `Sub-device` of the same device returns
-  the selected metrics twice.
+  the selected metrics twice. So does a union that reaches one device
+  through both stores, for example a `Sparkplug source` and a
+  `UNS device` of it.
+* **No history before a device joined the UNS.** A `UNS device` or
+  `UNS device metrics` dataset reads only the `uns` bucket, and does
+  not fall back to the `default` bucket for older windows.
 * **`Session limits` requires both `from` and `to`** — an open-ended
   session (design says "if either is omitted the interval is
   open-ended") is rejected with `422`.

@@ -101,12 +101,13 @@ device, and everything below it, only when they hold it:
   device under that node;
 - on every target (the wildcard).
 
-The Administrator group holds it on every target. **Nobody else sees
-any i3X data after the upgrade until you grant it.** Before you
+The Administrator group holds it on every target, and the Dataset
+maker and Dataset manager roles hold it on every device. **Nobody else
+sees any i3X data after the upgrade until you grant it.** Before you
 upgrade, list the people and service accounts that use the i3X API,
 and grant each of them the devices or ISA-95 nodes they need. The
 device page, the node page's device list, the ISA-95 page and the
-Explorer in the admin UI each have a **Manage i3X Access** button for
+Explorer in the admin UI each have a **Manage access** button for
 this. It opens a dialog that lists who can read the device or node and
 why, and gives or removes access.
 
@@ -148,6 +149,82 @@ at `Device_Information/ISA95_Hierarchy`.
 - **The i3X database is rebuilt on first start** after the upgrade,
   because its schema changed.
 
+### Upgrading: new datasets read the UNS
+
+New device datasets now read the same data i3X serves. Data Access has
+two new dataset structures, **UNS device** (a whole device) and **UNS
+device metrics** (chosen metrics of one device). They read the `uns`
+InfluxDB bucket, which the UNS historian writes and i3X reads. The
+existing kinds, **Sparkplug source** and **Sub-device**, read the
+`default` bucket, as before.
+
+- **Existing datasets do not change.** Every dataset you have keeps
+  reading the `default` bucket. You can still read, download, edit and
+  delete it, and use it in unions and sessions. A union can hold
+  datasets of both kinds, and its download holds both.
+- **The old kinds can no longer be created.** `POST v1/structure` with
+  Sparkplug source or Sub-device answers `422` with
+  `{"error": "structure_retired"}` and lists the kinds to use instead.
+  So does rewriting an invalid dataset as one of them. The Admin UI's
+  dataset builder now makes UNS device datasets. UNS device metrics
+  datasets are made through the API for now.
+- **A new device dataset needs a placed device.** Its source must be a
+  device with an ISA-95 placement, because only a placed device is on
+  the UNS. Otherwise Data Access answers `422` with `device_required` or
+  `placement_required`. Install the ISA-95 placement release first, so
+  every device has a placement.
+- **No history from before a device joined the UNS.** The UNS historian
+  starts writing a device when it first appears on the UNS. A UNS
+  device dataset has no data for earlier windows, and does not fall
+  back to the `default` bucket. If you need older data for a device,
+  keep its existing Sparkplug source dataset, and put both in a union.
+- **A UNS device download can include transient metrics,** which the
+  Sparkplug historian drops. The CSV columns are otherwise identical:
+  `device`, `metric`, `path` and `unit` match a download of the same
+  device from the `default` bucket.
+- **Every download, from either bucket, now ends with three UUID
+  columns:** `device_uuid`, `instance_uuid` (the object that holds the
+  metric, or the device itself for a metric directly on it) and
+  `schema_uuid` (that object's schema). A UNS device download has no
+  separate `Schema_UUID` and `Instance_UUID` rows, because the UNS does
+  not carry them as metrics, so these columns are where to find them.
+  The columns are added at the end, so readers that pick columns by
+  name keep working.
+- **The UNS historian must run for the new kinds.** The chart passes
+  the `uns` bucket to Data Access when `historians.uns.enabled` is
+  `true`, the default. Without it Data Access still starts, and the new
+  kinds answer `503` with `uns_unavailable`.
+- **A second coverage summary.** Data Access creates the
+  `acs_coverage_uns` bucket and the `acs-coverage-uns` task, and
+  backfills them from the `uns` bucket, as it does for `default`. This
+  takes InfluxDB time on the first start. `GET /v1/coverage/status`
+  reports it under `uns`.
+- **"Use Sparkplug data" is now "Build datasets from device".** The
+  permission keeps its UUID, and the name changes on the next
+  service-setup run. It is a Data Access permission only; it never
+  gave MQTT access.
+- **A new "Device data" permission.** This composite holds i3X's
+  **Read i3X objects** and **Build datasets from device**, so one grant
+  lets a person browse a device in i3X and build datasets from it. The
+  access dialog, now opened with **Manage access**, gives and removes
+  each half.
+- **Dataset makers and managers can read every device in i3X.** The
+  dataset builder picks devices, and the Data tab shows live values,
+  through i3X. **Dataset maker** and **Dataset manager** now hold **Read
+  i3X objects** on every device. Service setup owns these two roles'
+  grants and replaces them on every run, so do not add grants to them
+  by hand.
+- **Per-structure create grants need new grants.** A principal that
+  holds **Create dataset** on single structural apps, such as Sparkplug
+  source, needs it on UNS device or UNS device metrics to make device
+  datasets. A grant on **Dataset definition** covers them all, as the
+  two roles hold.
+- **New request and response fields.** `POST /v1/series` takes an
+  optional `store`, `sparkplug` or `uns`, for a device request. Each
+  device in `GET /v1/metadata/:uuid/contents` has a `store`. The
+  service client's `create_dataset` passes Data Access's JSON refusal
+  through as the error's `body`.
+
 ### i3X no longer serves MCP
 
 The `/mcp` endpoint and its search index are gone, and so is the
@@ -187,8 +264,8 @@ the devices a download of the dataset reads, with each device's name
 and its metrics: path, type, unit and description. It needs only
 `Read dataset` on the dataset. Until now a client that could download a
 dataset could not see what it contained: the structure needs
-`Edit dataset`, and a device's metric list needs `Use Sparkplug data`
-on the device. Such a client had to guess metric names from downloaded
+`Edit dataset`, and a device's metric list needs `Build datasets from
+device` (then called `Use Sparkplug data`) on the device. Such a client had to guess metric names from downloaded
 data, and missed metrics that rarely report. Each metric's `path` can
 be sent as a `metrics` filter to download only that metric. The
 service client has a matching `get_dataset_contents` method.
@@ -738,8 +815,9 @@ What changes on upgrade:
   now follow the same rules as single permission checks.
 - **Two roles for the Admin UI.** Both hold what the Admin UI needs to
   make datasets and record runs: create datasets, read, include and
-  use for a session every dataset, read every device's data, and start
-  and stop recordings on any equipment. A **Dataset maker** edits and
+  use for a session every dataset, read every device's data (and,
+  since the UNS datasets change, browse every device in i3X), and
+  start and stop recordings on any equipment. A **Dataset maker** edits and
   deletes only the datasets they created, including their names, tags,
   kinds and run details. A **Dataset manager** edits and deletes every
   dataset, including those created before Data Access recorded owners.
@@ -758,7 +836,7 @@ What changes on upgrade:
   history of the Sparkplug bucket, one day at a time with a pause
   between days, and repairs the last 7 days each night. On a large
   history the backfill takes hours; `GET /v1/coverage/status` reports
-  progress to callers with `Use Sparkplug data` on every device. Set `COVERAGE_ENABLED=false` on the
+  progress to callers with `Build datasets from device` on every device. Set `COVERAGE_ENABLED=false` on the
   Data Access deployment to turn it off. Other settings are documented
   in the Data Access service reference.
 - **New Data Access route `POST /v1/series`.** It returns, for a set of
@@ -774,7 +852,10 @@ What changes on upgrade:
 
 Data Access has a fourth dataset structure, **Sub-device**
 (`7f7d40cc-4075-4f06-90cf-aa6261d68f18`), which selects chosen metrics
-from one Sparkplug device instead of the whole device. Each metric is
+from one Sparkplug device instead of the whole device. New datasets of
+this kind can no longer be created: use **UNS device metrics**, which
+works the same way and reads the UNS (see "Upgrading: new datasets read
+the UNS"). Each metric is
 stored against the `Instance_UUID` of its nearest object, so it
 survives that object being renamed. A sub-device can be used inside a
 union or a session like any other dataset.

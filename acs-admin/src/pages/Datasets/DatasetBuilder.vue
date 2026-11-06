@@ -53,7 +53,15 @@
         <Alert v-if="saveError" variant="destructive">
           <AlertTitle><i class="fa-solid fa-circle-exclamation mr-2"></i>{{ saveError.message }}</AlertTitle>
           <AlertDescription class="text-slate-700">
-            <p v-if="saveError.detail">{{ saveError.detail }}</p>
+            <p v-if="saveError.detail && !saveError.refused?.length">{{ saveError.detail }}</p>
+            <div v-if="saveError.refused?.length" class="mt-1">
+              <ul class="list-disc pl-5">
+                <li v-for="r in saveError.refused" :key="r.device">{{ r.reason }}</li>
+              </ul>
+              <Button v-if="removable.length" size="xs" variant="outline" class="mt-2" @click="removeRefused">
+                Remove {{ removable.length === 1 ? 'this device' : 'these devices' }}
+              </Button>
+            </div>
             <div v-if="saveError.saved?.length" class="mt-2">
               <p>Saved before the failure:</p>
               <ul class="mt-1 list-disc pl-5">
@@ -235,6 +243,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { KINDS, KIND_BY_ID, kind_info } from '@/lib/datasets/constants.js'
+import { path_label } from '@/lib/datasets/i3x-devices.js'
 import {
   quick_window, london_local_to_ms, ms_to_london_local, fmt_window, fmt_time, included_in,
 } from '@/lib/datasets/model.js'
@@ -363,8 +372,10 @@ function addDatasets (uuids) {
   form.items = dedupe_items([...form.items, ...uuids.map(u => item_for(u, ds.byUuid))])
 }
 
+// Names from i3X as well as the ConfigDB, so a person who can read
+// only i3X still sees them.
 function deviceName (uuid) {
-  return ds.deviceByUuid[uuid]?.name ?? `Device ${uuid.slice(0, 8)}`
+  return ds.deviceIndexByUuid[uuid]?.name ?? `Device ${uuid.slice(0, 8)}`
 }
 
 function statusOf (d) {
@@ -377,12 +388,13 @@ function statusOf (d) {
 // What each item row shows.
 function rowOf (it) {
   if (it.type === 'device') {
-    const d = ds.deviceByUuid[it.uuid]
-    const n = d?.metrics?.length ?? 0
+    const d = ds.deviceIndexByUuid[it.uuid]
+    const n = Array.isArray(d?.metrics) ? d.metrics.length : null
     return {
       icon: 'microchip',
       name: deviceName(it.uuid),
-      sub: ['Device', d?.area, `${n} ${n === 1 ? 'metric' : 'metrics'}`].filter(Boolean).join(' · '),
+      sub: ['Device', d?.path?.length ? path_label(d.path) : d?.area, n == null ? null : `${n} ${n === 1 ? 'metric' : 'metrics'}`]
+        .filter(Boolean).join(' · '),
       status: statusOf(d),
     }
   }
@@ -473,7 +485,7 @@ async function save () {
     let map = {}
     if (need.length) {
       try {
-        map = await ensure_device_datasets(client, need, ds.byUuid, u => ds.deviceByUuid[u]?.name ?? null, createdDevices)
+        map = await ensure_device_datasets(client, need, ds.byUuid, u => ds.deviceIndexByUuid[u]?.name ?? null, createdDevices)
       }
       catch (err) {
         if (err instanceof DatasetError) throw err
@@ -514,6 +526,17 @@ async function save () {
   finally {
     saving.value = false
   }
+}
+
+// Devices Data Access refused that the person can take out: not the
+// ones refused for the whole site.
+const SITE_WIDE = ['uns_unavailable', 'structure_retired']
+const removable = computed(() => (saveError.value?.refused ?? []).filter(r => !SITE_WIDE.includes(r.code)))
+
+function removeRefused () {
+  const gone = new Set(removable.value.map(r => r.device))
+  form.items = form.items.filter(i => !(i.type === 'device' && gone.has(i.uuid)))
+  saveError.value = null
 }
 
 function cancel () {

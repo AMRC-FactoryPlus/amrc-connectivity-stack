@@ -77,7 +77,7 @@ import { ref, computed, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
-import { KINDS, OTHER_KIND, kind_info } from '@/lib/datasets/constants.js'
+import { KINDS, OTHER_KIND, kind_info, is_other_kind } from '@/lib/datasets/constants.js'
 import { fmt_window, matches } from '@/lib/datasets/model.js'
 import { picker_exclusions } from './builder/builder.js'
 
@@ -114,7 +114,8 @@ const excluded = computed(() => props.open ? picker_exclusions(props.exclude, ds
 
 const matched = computed(() => ds.visible
   .filter(r => !excluded.value.has(r.uuid))
-  .filter(r => props.runsOnly ? r.kind === 'run' : (kind.value === 'all' || r.kind === kind.value))
+  .filter(r => props.runsOnly ? r.kind === 'run'
+    : kind.value === 'all' || r.kind === kind.value || (kind.value === 'other' && is_other_kind(r.kind)))
   .filter(r => matches(r, search.value))
   .sort((a, b) => ds.name(a.uuid).localeCompare(ds.name(b.uuid))))
 

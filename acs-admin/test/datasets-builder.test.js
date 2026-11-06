@@ -16,7 +16,7 @@ import {
     dedupe_items, covered_devices, repeated_devices, device_dataset_plan,
     item_datasets, labels_by_dataset, shows_window, window_of, window_problem,
     problems, store_rows, ancestors, picker_exclusions, equipment_by_device,
-    text_match, group_devices,
+    text_match,
 } from '../src/components/Datasets/builder/builder.js'
 
 const D1 = 'aaaaaaaa-0000-4000-8000-000000000001'
@@ -24,6 +24,7 @@ const D2 = 'aaaaaaaa-0000-4000-8000-000000000002'
 const D3 = 'aaaaaaaa-0000-4000-8000-000000000003'
 const DS1 = 'bbbbbbbb-0000-4000-8000-000000000001'
 const DS2 = 'bbbbbbbb-0000-4000-8000-000000000002'
+const DSU = 'bbbbbbbb-0000-4000-8000-0000000000c1'
 const EQ = 'cccccccc-0000-4000-8000-000000000001'
 const RUN = 'dddddddd-0000-4000-8000-000000000001'
 const RUNU = 'dddddddd-0000-4000-8000-000000000002'
@@ -132,17 +133,31 @@ describe('devices and saving', () => {
         expect(repeated_devices([{ type: 'device', uuid: D3 }, { type: 'dataset', uuid: EQ }], by)).toEqual([])
     })
 
-    it('reuses existing device datasets and plans the rest', () => {
-        const items = [{ type: 'device', uuid: D1 }, { type: 'device', uuid: D3 }]
-        expect(device_dataset_plan(items, by)).toEqual([
-            { device: D1, existing: DS1 }, { device: D3, existing: null },
+    it('reuses only UNS device datasets for a picked device, and plans the rest', () => {
+        // D1 has an older device dataset (DS1), D2 a UNS one, D3 none.
+        const byU = { ...by, ...merge_datasets([], [{ uuid: DSU, structure: STRUCTURE.UNS_DEVICE, config: { source: D2 } }]) }
+        const items = [{ type: 'device', uuid: D1 }, { type: 'device', uuid: D2 }, { type: 'device', uuid: D3 }]
+        expect(device_dataset_plan(items, byU)).toEqual([
+            { device: D1, existing: null }, { device: D2, existing: DSU }, { device: D3, existing: null },
         ])
-        const map = { [D3]: 'new-ds' }
-        expect(item_datasets([...items, { type: 'dataset', uuid: EQ }], map, by)).toEqual([DS1, 'new-ds', EQ])
+        const map = { [D1]: 'new-1', [D3]: 'new-3' }
+        expect(item_datasets([...items, { type: 'dataset', uuid: EQ }], map, byU)).toEqual(['new-1', DSU, 'new-3', EQ])
+    })
+
+    it('keeps an older device dataset that an edit or duplicate brought in', () => {
+        const item = item_for(DS1, by)
+        expect(item).toEqual({ type: 'device', uuid: D1, label: '', dataset: DS1 })
+        expect(device_dataset_plan([item], by)).toEqual([{ device: D1, existing: DS1 }])
+        expect(item_datasets([item], {}, by)).toEqual([DS1])
+    })
+
+    it('maps a UNS device dataset to its device', () => {
+        const byU = merge_datasets([], [{ uuid: DSU, structure: STRUCTURE.UNS_DEVICE, config: { source: D2 } }])
+        expect(item_for(DSU, byU)).toEqual({ type: 'device', uuid: D2, label: '', dataset: DSU })
     })
 
     it('keys labels by device dataset', () => {
-        const items = [{ type: 'device', uuid: D1, label: ' Energy ' }, { type: 'device', uuid: D3, label: 'Fan' }, { type: 'device', uuid: D2, label: '' }]
+        const items = [{ type: 'device', uuid: D1, label: ' Energy ', dataset: DS1 }, { type: 'device', uuid: D3, label: 'Fan' }, { type: 'device', uuid: D2, label: '' }]
         expect(labels_by_dataset(items, { [D3]: 'new-ds' }, by)).toEqual({ [DS1]: 'Energy', 'new-ds': 'Fan' })
     })
 })
@@ -205,10 +220,12 @@ describe('what the service will store', () => {
             { structure: STRUCTURE.SESSION, ...window_of(s) },
         ]
         const rows = store_rows(s, by, { steps })
+        // D1's older device dataset is not reused: new ones read the UNS.
         expect(rows.map(r => r.text)).toEqual([
-            '1 device dataset reused', '1 device dataset created', 'Combines 2 items', 'Limited to a window', 'Kind: Run',
+            '2 device datasets created', 'Combines 2 items', 'Limited to a window', 'Kind: Run',
         ])
-        expect(rows[3].note).toBe(`${FROM} to ${TO}`)
+        expect(rows[0].type).toBe('Device')
+        expect(rows[2].note).toBe(`${FROM} to ${TO}`)
     })
 })
 
@@ -235,15 +252,4 @@ describe('pickers', () => {
         expect(text_match('', [])).toBe(true)
     })
 
-    it('groups devices by site and area, missing last', () => {
-        const g = group_devices([
-            { name: 'b', site: 'S1', area: 'A2' },
-            { name: 'a', site: 'S1', area: 'A2' },
-            { name: 'c', site: null, area: null },
-            { name: 'd', site: 'S1', area: null },
-        ])
-        expect(g.map(s => s.site)).toEqual(['S1', 'No site'])
-        expect(g[0].areas.map(a => a.area)).toEqual(['A2', 'No area'])
-        expect(g[0].areas[0].devices.map(d => d.name)).toEqual(['a', 'b'])
-    })
 })

@@ -23,7 +23,10 @@ export class SparkplugSubsetHandler extends BaseStructureHandler {
     super(api);
 
     this.structure = Constants.App.SparkplugSubset;
-    this.sourcePermission = Constants.Perm.UseSparkplug;
+    this.sourcePermission = Constants.Perm.UseDevice;
+    this.store = Constants.Store.Sparkplug;
+    /* New device datasets read the UNS. */
+    this.replaced_by = [Constants.App.UNSDevice, Constants.App.UNSDeviceMetrics];
   }
 
   /* config is { source, metrics: [...] }. Each stored entry is
@@ -41,7 +44,7 @@ export class SparkplugSubsetHandler extends BaseStructureHandler {
 
     const { metrics } = config;
     if(!Array.isArray(metrics) || metrics.length == 0)
-      return fail(this.log, 422, `config.metrics must be a non-empty array for SparkplugSubset structure.`);
+      return fail(this.log, 422, `config.metrics must be a non-empty array for structure ${this.structure}.`);
 
     if(metrics.length > MAX_METRICS)
       return fail(this.log, 422, `config.metrics has ${metrics.length} entries; the maximum is ${MAX_METRICS}.`);
@@ -138,13 +141,14 @@ export class SparkplugSubsetHandler extends BaseStructureHandler {
     return [{
       dataset_uuid,
       device_uuid: device,
+      store: this.store,
       metrics,
       from: inherited_range.from,
       to: inherited_range.to,
     }];
   }
 
-  /* A SparkplugSubset points at a device, not at another dataset, so it
+  /* A device metrics source points at a device, not at another dataset, so it
    * can never hold a dangling dataset reference. */
   references() {
     return false;

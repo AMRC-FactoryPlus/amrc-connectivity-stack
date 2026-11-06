@@ -62,9 +62,11 @@
         <div class="min-w-0">
           <div class="flex items-center gap-2 font-semibold">
             {{ heading }}
-            <span v-if="data.live.value && entries.length" class="inline-flex items-center gap-1 text-xs font-normal text-green-700">
+            <span v-if="badge === 'live' && entries.length" class="inline-flex items-center gap-1 text-xs font-normal text-green-700"
+                  :title="notLive ? `${notLive} of the pinned metrics have no live values` : undefined">
               <span class="size-1.5 rounded-full bg-green-500"></span>Live
             </span>
+            <span v-else-if="badge === 'denied' && entries.length" class="text-xs font-normal text-slate-500">{{ LIVE_DENIED }}</span>
             <span v-if="data.live.value && entries.length && data.hint.value" class="text-xs font-normal text-slate-400">{{ data.hint.value }}</span>
           </div>
           <div class="text-[13px] text-slate-500">Pinned metrics change this view and the CSV download. They do not change the dataset.</div>
@@ -171,8 +173,8 @@ import { fmt_window, fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
 import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since, STEP_MS } from '@/lib/datasets/series.js'
-import { metric_total, filter_metrics } from './page-logic.js'
-import { useDatasetPins } from './usePins.js'
+import { metric_total, filter_metrics, live_badge, LIVE_DENIED } from './page-logic.js'
+import { useDatasetPins, useDatasetDevices } from './usePins.js'
 import { useChartSeries } from './useChartSeries.js'
 import TimelineToolbar from '../timeline/TimelineToolbar.vue'
 import { go_view, step_view, zoom_view, pan_view, view_labels, fmt_view_range, inside_x, at_now, clamp_view, zoom_span, nearest_zoom, fmt_span, CHART_ZOOMS } from '@/lib/datasets/chart-view.js'
@@ -196,11 +198,11 @@ const search = refDebounced(query, 200)
 // At most this many metric rows render at once, across all devices.
 const MAX_ROWS = 300
 
-const devices = computed(() => props.resolved.devices.map(d => ds.deviceByUuid[d]).filter(Boolean))
+const { devices, byUuid } = useDatasetDevices(() => props.record, () => props.resolved)
 const missing = computed(() => ds.devicesReady ? props.resolved.devices.length - devices.value.length : 0)
 const total = computed(() => metric_total(devices.value))
 
-const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved)
+const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved, byUuid)
 
 // Pinned metrics always show; otherwise the first few, or the matches,
 // up to MAX_ROWS in all.
@@ -248,6 +250,11 @@ const data = useChartSeries(() => props.record, entries, {
 const series = computed(() => data.series.value)
 const win = computed(() => data.window.value)
 const nowMs = computed(() => data.now.value)
+// Live only once i3X streams a pinned metric; see live_badge.
+const badge = computed(() => live_badge(data.live.value, data.stream.value, data.liveStatus.value))
+// Pinned metrics i3X is not streaming, while it streams others.
+const notLive = computed(() => badge.value === 'live' && data.stream.value
+  ? Math.max(0, entries.value.filter(e => e.elementId).length - data.liveKeys.value.length) : 0)
 
 // The dataset takes live data: no window, or one that includes now.
 // Then a zoom change goes to now.

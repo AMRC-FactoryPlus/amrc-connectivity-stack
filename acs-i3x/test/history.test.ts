@@ -6,6 +6,7 @@ import { jest } from "@jest/globals";
 import { History } from "../lib/history.js";
 import type { ObjectTree } from "../lib/object-tree.js";
 import type { I3xVqt } from "../lib/types/i3x.js";
+import { csvTransport } from "./helpers/influx-csv.js";
 
 /*
  * Mock QueryApi: collectRows returns whatever we configure.
@@ -89,8 +90,10 @@ function makeHistory(opts?: {
         objectTree,
     });
 
-    // Inject the mock queryApi for testing
+    // Inject the mock queryApi for testing. History is streamed
+    // through the transport, which answers from the same mock.
     (history as any).queryApi = queryApi;
+    (history as any).streamTransport = csvTransport(q => queryApi.collectRows(q));
 
     return { history, queryApi, objectTree };
 }

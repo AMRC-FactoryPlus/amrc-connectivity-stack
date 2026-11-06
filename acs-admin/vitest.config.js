@@ -17,6 +17,7 @@ export default defineConfig({
       '@store': fileURLToPath(new URL('./src/store', import.meta.url)),
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
+      '@composables': fileURLToPath(new URL('./src/composables', import.meta.url)),
     },
     /* The rx libraries are linked from lib/, and resolve their own
      * dependencies from there. A checkout that has not installed them

@@ -20,6 +20,7 @@ lists the edge cases it contains.
 | `server.mjs` | Runs one i3X build (any compiled `dist/`) on a port. |
 | `run.mjs` | Starts servers, sends requests, records the numbers, prints a table. |
 | `compare.mjs` | Sends identical requests to two servers and compares the bodies byte for byte. |
+| `history.mjs` | Seeds one fast metric and benchmarks a long history read. See [History benchmark](#history-benchmark). |
 
 ## Run it
 
@@ -125,3 +126,29 @@ docker network rm i3xbulk-net
   defaults. `run.mjs` waits `--cooldown` seconds (default 35, longer
   than the macOS TIME_WAIT of 30 s) after any run that issued more
   than 1,000 queries.
+
+## History benchmark
+
+`history.mjs` measures one long history read: a single metric at 25 Hz
+for 24 hours (2,160,000 points), requested whole through
+`POST /v1/objects/history`. It runs the real routes and `History` from
+each build against a real InfluxDB, with a one-leaf object tree in
+place of ConfigDB. For each request it records the time to the first
+body byte, the total time, the bytes sent and the server's peak RSS.
+
+Start InfluxDB as above (the script defaults to port 58087), then seed
+the `history` bucket:
+
+```sh
+node bench/history.mjs --seed --influx http://127.0.0.1:58087 --hours 24 --hz 25
+```
+
+Build the old code as above, then run both builds:
+
+```sh
+node bench/history.mjs --influx http://127.0.0.1:58087 \
+  --build before=/tmp/i3x-before/acs-i3x/dist --build after=./dist --runs 3
+```
+
+Add `--gzip 0` to ask for an uncompressed response, or `--get` to use
+`GET /v1/objects/:elementId/history` instead.

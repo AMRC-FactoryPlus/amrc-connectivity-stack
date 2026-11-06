@@ -170,6 +170,7 @@ import SaveGroupDialog from '@/components/Datasets/list/SaveGroupDialog.vue'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import { display_name, direct_sources, fmt_window, matches } from '@/lib/datasets/model.js'
+import { is_other_kind } from '@/lib/datasets/constants.js'
 import { download_csv } from '@/lib/datasets/api.js'
 import { comparable, compare_problem, group_problem } from '@/lib/datasets/compare.js'
 
@@ -235,7 +236,7 @@ const narrowed = computed(() => rows.value.filter(row =>
 function inTab (r, t) {
   if (t === 'all') return true
   if (t === 'attention') return r.invalid
-  if (t === 'other') return r.kind === 'other' || r.kind === 'device'
+  if (t === 'other') return is_other_kind(r.kind)
   return r.kind === t
 }
 

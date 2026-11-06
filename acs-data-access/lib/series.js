@@ -11,6 +11,7 @@
 import { flux, fluxExpression } from "@influxdata/influxdb-client";
 
 import { valid_uuid } from "./validate.js";
+import { uns_path_test } from "./flux.js";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -54,6 +55,10 @@ export const LIMITS = {
 
 /** Steps whose counts the coverage summary can answer. */
 export const COVERAGE_STEPS = new Set(["1h", "6h", "1d", "1w"]);
+
+/** The stores a device request may read. See Constants.Store. */
+export const STORES = ["sparkplug", "uns"];
+const UNS = "uns";
 
 /* Birth metadata the historian writes on every rebirth. These are not
  * data, so they never count as data arriving. */
@@ -257,6 +262,18 @@ export function parse_request(body, now = Date.now(), opts = {}) {
     if (has_devices == has_dataset)
         throw invalid(`Give exactly one of "devices" and "dataset".`);
 
+    /* Which bucket a device request reads. A dataset's sources each
+     * carry their own. */
+    let store = null;
+    if (body.store != null) {
+        if (has_dataset)
+            throw invalid(`"store" applies only to "devices": a dataset's sources say where they are stored.`);
+        if (!STORES.includes(body.store))
+            throw invalid(`"store" must be one of ${STORES.join(", ")}.`);
+    }
+    if (has_devices)
+        store = body.store ?? STORES[0];
+
     let devices = null, dataset = null;
     if (has_devices) {
         if (!Array.isArray(body.devices) || body.devices.length == 0)
@@ -323,9 +340,7 @@ export function parse_request(body, now = Date.now(), opts = {}) {
                 `"count" over more than 14 days needs "every" of 1h or more.`,
                 { limit: "14d" });
         if (!opts.coverage)
-            throw invalid(
-                `"count" over more than 14 days needs the coverage summary, which is not available yet.`,
-                { limit: "14d" });
+            throw no_coverage();
         if (to - from > LIMITS.coverage_span)
             throw invalid(`"count" spans may be at most 10 years.`, { limit: "3653d" });
     }
@@ -339,7 +354,23 @@ export function parse_request(body, now = Date.now(), opts = {}) {
             throw invalid(`"mean" device ${stray.device} is not in "devices".`);
     }
 
-    return { devices, dataset, from, to, every, count, mean, last };
+    return { devices, dataset, store, from, to, every, count, mean, last };
+}
+
+const no_coverage = () => invalid(
+    `"count" over more than 14 days needs the coverage summary, which is not available yet.`,
+    { limit: "14d" });
+
+/** Checks that the coverage summary of every store a request reads is
+ * ready, when its counts need one. parse_request checks this for a
+ * device request; a dataset's stores are only known once it resolves.
+ * @param req The output of parse_request.
+ * @param ready Whether each store's summary is ready: store => boolean.
+ * @param stores The stores the request reads. */
+export function check_coverage(req, ready, stores) {
+    if (!req.count || req.to - req.from <= LIMITS.count_span) return;
+    if (stores.some(s => !ready(s)))
+        throw no_coverage();
 }
 
 
@@ -409,10 +440,14 @@ export function group_by_windows(windows) {
 const join = (parts, op) => fluxExpression(parts.map(String).join(` ${op} `));
 const paren = q => flux`(${q})`;
 
-function zone_header(every) {
-    return CALENDAR_STEPS.has(every)
-        ? `import "timezone"\noption location = timezone.location(name: ${String(flux`${TIME_ZONE}`)})\n`
-        : "";
+function zone_header(every, imports = []) {
+    const calendar = CALENDAR_STEPS.has(every);
+    const all = calendar ? [...imports, "timezone"] : imports;
+    /* Flux needs every import before the first option. */
+    return all.map(i => `import "${i}"\n`).join("")
+        + (calendar
+            ? `option location = timezone.location(name: ${String(flux`${TIME_ZONE}`)})\n`
+            : "");
 }
 
 /* Calendar weeks: Flux windows count from the Unix epoch, a Thursday.
@@ -462,50 +497,72 @@ export function count_query({ bucket, devices, windows, every }) {
 }
 
 /* InfluxDB stores no empty tags, so a top-level metric (empty path)
- * has no path column at all, and `r.path == ""` never matches it. */
-function path_clause(path) {
+ * has no path column at all, and `r.path == ""` never matches it.
+ * The UNS bucket's path starts with the Sparkplug device ID; see
+ * uns_path_test, which escapes the folder for a regex literal. */
+function path_clause(path, store) {
+    if (store == UNS) return fluxExpression(uns_path_test(path));
     return path == ""
         ? fluxExpression(`(not exists r.path or r.path == "")`)
         : flux`r.path == ${path}`;
 }
 
-function metric_clause(m, types) {
+function metric_clause(m, types, store) {
     const names = join(types.map(t => flux`r._measurement == ${`${m.name}:${t}`}`), "or");
-    return flux`(r.topLevelInstance == ${m.device} and ${path_clause(m.path)} and (${names}))`;
+    return flux`(r.topLevelInstance == ${m.device} and ${path_clause(m.path, store)} and (${names}))`;
+}
+
+/** The folder of a UNS bucket path. That path is `<device ID>/<folder>`,
+ * and a root metric's path is the device ID alone, so its folder is "".
+ * shape_means strips the device segment from the result rows: doing it
+ * in Flux needs a map() over every raw point, which made UNS means
+ * several times slower. */
+export function uns_folder(path) {
+    return String(path ?? "").replace(/^[^/]+\/?/, "");
 }
 
 const KEEP = `["topLevelInstance", "path", "_measurement", "_time", "_value"]`;
 const KEEP_UNIT = `["topLevelInstance", "path", "_measurement", "_time", "unit"]`;
 
-function mean_branch({ bucket, name, metrics, types, windows, every, to_float, suffix }) {
+/* Sum, count and newest unit per raw series. Each yield reads from its
+ * own from(), with no group() before the aggregate, so InfluxDB works
+ * out each window in storage. A shared stream or a group() first makes
+ * it read every raw point instead: 24 h of a 25 Hz metric went from
+ * under a second to 30 s. One metric can be several raw series (its
+ * other tags changed), so shape_means adds them up per bucket. */
+function mean_branch({ bucket, metrics, types, windows, every, to_float, suffix, store }) {
     const { start, stop } = envelope(windows);
-    const clauses = paren(join(metrics.map(m => metric_clause(m, types(m))), "or"));
+    const clauses = paren(join(metrics.map(m => metric_clause(m, types(m), store)), "or"));
     const wa = window_args(every);
     const conv = fluxExpression(to_float ? "\n  |> toFloat()" : "");
-    const id = fluxExpression(name);
     const y = n => flux`${n + suffix}`;
-
-    return String(flux`${id} = from(bucket: ${bucket})
+    const source = String(flux`from(bucket: ${bucket})
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => ${clauses})${time_filter(windows)}
-  |> group(columns: ["topLevelInstance", "path", "_measurement"])${conv}
+  |> filter(fn: (r) => ${clauses})${time_filter(windows)}${conv}`);
+    const src = fluxExpression(source);
 
-${id} |> aggregateWindow(${wa}, fn: mean, createEmpty: false, timeSrc: "_start")
-  |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("mean")})
-${id} |> aggregateWindow(${wa}, fn: count, createEmpty: false, timeSrc: "_start")
+    return String(flux`${src}
+  |> aggregateWindow(${wa}, fn: sum, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("sum")})
+${src}
+  |> aggregateWindow(${wa}, fn: count, createEmpty: false, timeSrc: "_start")
   |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("n")})
-${id} |> last()
+${src}
+  |> last()
   |> keep(columns: ${fluxExpression(KEEP_UNIT)}) |> yield(name: ${y("unit")})
 `);
 }
 
-/** Mean and point count per metric per bucket, plus the newest unit.
+/** Sum and point count per raw series per bucket, plus the newest unit.
+ * shape_means turns them into means.
  * Booleans need toFloat(), which stops the aggregate pushing down to
  * storage, so they run in their own branch only when asked for.
  * String metrics have no mean and are not queried.
+ * @param store The store the bucket holds; `uns` reads the UNS form of
+ *   `path` (see uns_folder).
  * @returns The Flux script, or null if nothing needs querying. */
-export function mean_query({ bucket, metrics, windows, every }) {
+export function mean_query({ bucket, metrics, windows, every, store = null }) {
     const numeric = metrics.filter(m => m.type == null || NUMERIC_TYPES.includes(m.type));
     const bools = metrics.filter(m => m.type == "b");
     if (!numeric.length && !bools.length) return null;
@@ -513,15 +570,15 @@ export function mean_query({ bucket, metrics, windows, every }) {
     let script = zone_header(every);
     if (numeric.length)
         script += mean_branch({
-            bucket, name: "data", metrics: numeric, windows, every,
+            bucket, metrics: numeric, windows, every,
             types: m => m.type ? [m.type] : NUMERIC_TYPES,
-            to_float: false, suffix: "",
+            to_float: false, suffix: "", store,
         });
     if (bools.length)
         script += mean_branch({
-            bucket, name: "bools", metrics: bools, windows, every,
+            bucket, metrics: bools, windows, every,
             types: () => ["b"],
-            to_float: true, suffix: "_b",
+            to_float: true, suffix: "_b", store,
         });
     return script;
 }
@@ -571,14 +628,19 @@ export function shape_counts(rows, every) {
         [d, [...per].sort((a, b) => a[0] - b[0])]));
 }
 
-/** Turns mean, n and unit rows into one series per requested metric.
+/** Turns sum, n and unit rows into one series per requested metric.
  * Rows of one device, path and name with different numeric suffixes
- * merge into one series, weighted by n.
+ * merge into one series, weighted by n. Rows of one raw path and type
+ * (series that differ only in other tags) add up.
+ * In the uns bucket the rows carry the whole path; series of one
+ * folder under different device IDs (a renamed device) merge too.
  * @param rows Rows with a `result` column naming the yield.
  * @param metrics The parsed `mean` entries, in request order.
+ * @param store The store the rows came from.
  */
-export function shape_means(rows, metrics, every) {
+export function shape_means(rows, metrics, every, store = null) {
     const series = new Map();
+    const folder = store == UNS ? uns_folder : p => p ?? "";
     const key = (device, path, name) => JSON.stringify([device, path ?? "", name]);
     const get = k => {
         if (!series.has(k)) series.set(k, { buckets: new Map(), unit: null });
@@ -587,7 +649,7 @@ export function shape_means(rows, metrics, every) {
 
     for (const r of rows) {
         const kind = String(r.result).replace(/_b$/, "");
-        const s = get(key(r.topLevelInstance, r.path, base_of(r._measurement)));
+        const s = get(key(r.topLevelInstance, folder(r.path), base_of(r._measurement)));
         const type = suffix_of(r._measurement);
         const t = Date.parse(r._time);
 
@@ -596,11 +658,14 @@ export function shape_means(rows, metrics, every) {
             continue;
         }
         const b = bucket_start(t, every);
-        const by_type = s.buckets.get(b) ?? new Map();
-        const cell = by_type.get(type) ?? { mean: null, n: null };
-        cell[kind] = Number(r._value);
-        by_type.set(type, cell);
-        s.buckets.set(b, by_type);
+        /* A cell is one path and type's sum and n in one bucket. The
+         * raw path keeps two device IDs' series apart until merge_cells. */
+        const by_cell = s.buckets.get(b) ?? new Map();
+        const ck = JSON.stringify([type, r.path ?? ""]);
+        const cell = by_cell.get(ck) ?? { type, sum: 0, n: 0 };
+        cell[kind] += Number(r._value);
+        by_cell.set(ck, cell);
+        s.buckets.set(b, by_cell);
     }
 
     return metrics.map(m => {
@@ -615,9 +680,8 @@ export function shape_means(rows, metrics, every) {
         }
         out.points = [...s.buckets]
             .sort((a, b) => a[0] - b[0])
-            .map(([t, by_type]) => merge_cells(t, [...by_type]
-                .filter(([type]) => m.type ? type == m.type : NUMERIC_TYPES.includes(type))
-                .map(([, cell]) => cell)))
+            .map(([t, by_cell]) => merge_cells(t, [...by_cell.values()]
+                .filter(c => m.type ? c.type == m.type : NUMERIC_TYPES.includes(c.type))))
             .filter(p => p);
         return out;
     });
@@ -626,12 +690,76 @@ export function shape_means(rows, metrics, every) {
 function merge_cells(t, cells) {
     let n = 0, sum = 0;
     for (const c of cells) {
-        if (c.mean == null) continue;
-        const w = c.n ?? 1;
-        n += w;
-        sum += c.mean * w;
+        n += c.n;
+        sum += c.sum;
     }
     return n ? [t, sum / n, n] : null;
+}
+
+/** Merges the results of one request run against several stores.
+ * A device a dataset reaches through both stores gets both stores'
+ * data: counts add up, means merge weighted by point count, and `last`
+ * is the newer time. This is the same as reading a device twice
+ * through one store's sources would give for a download.
+ * @param results The SeriesReader#run results, one per store.
+ * @returns One result in the same shape. */
+export function merge_runs(results) {
+    if (results.length == 1) return results[0];
+
+    const sum_counts = maps => {
+        const out = new Map();
+        for (const m of maps) for (const [d, pts] of m ?? []) {
+            const per = out.get(d) ?? new Map();
+            for (const [t, n] of pts) per.set(t, (per.get(t) ?? 0) + n);
+            out.set(d, per);
+        }
+        return new Map([...out].map(([d, per]) =>
+            [d, [...per].sort((a, b) => a[0] - b[0])]));
+    };
+
+    const merge_series = list => {
+        const first = list[0];
+        const out = { ...first, points: [] };
+        const by_t = new Map();
+        for (const s of list) {
+            out.unit ??= s.unit;
+            out.type ??= s.type;
+            for (const [t, mean, n] of s.points) {
+                const cell = by_t.get(t) ?? { sum: 0, n: 0 };
+                cell.sum += mean * n;
+                cell.n += n;
+                by_t.set(t, cell);
+            }
+        }
+        out.points = [...by_t]
+            .sort((a, b) => a[0] - b[0])
+            .map(([t, c]) => [t, c.sum / c.n, c.n]);
+        return out;
+    };
+
+    const last = results.some(r => r.last)
+        ? new Map(results.flatMap(r => [...r.last ?? []])
+            .sort((a, b) => a[1].localeCompare(b[1])))
+        : null;
+
+    const sources = new Set(results.map(r => r.source));
+    const pending = results.flatMap(r => r.pending)
+        .sort((a, b) => a[0] - b[0])
+        .reduce((out, [a, b]) => {
+            const prev = out[out.length - 1];
+            if (prev && a <= prev[1]) prev[1] = Math.max(prev[1], b);
+            else out.push([a, b]);
+            return out;
+        }, []);
+
+    return {
+        counts: results.some(r => r.counts) ? sum_counts(results.map(r => r.counts)) : null,
+        source: sources.size == 1 ? [...sources][0] : "mixed",
+        pending,
+        metrics: results[0].metrics.map((_, i) =>
+            merge_series(results.map(r => r.metrics[i]))),
+        last,
+    };
 }
 
 /** Turns last rows into a map of device UUID to ISO time. */

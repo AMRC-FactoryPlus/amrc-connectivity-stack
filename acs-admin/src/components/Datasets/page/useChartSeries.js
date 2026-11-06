@@ -193,6 +193,10 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     const next = append_live_items({ ...tails.value, every: every.value }, items, id => byElement.value.get(id))
     if (next.metrics !== tails.value.metrics) tails.value = { ...tails.value, metrics: next.metrics }
   })
+  // The pinned metrics i3X is streaming, by key.
+  const liveKeys = computed(() => [...byElement.value]
+    .filter(([id]) => i3x.subscribed.value.has(id))
+    .map(([, e]) => e.key))
   let watching = false
   function ensureLive () {
     const ids = mode.value.stream ? [...byElement.value.keys()] : []
@@ -273,6 +277,9 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     now,
     live: computed(() => mode.value.live),
     stream: computed(() => mode.value.stream),
+    // i3X: 'off', 'live', 'denied' or 'unavailable' (useI3xLive).
+    liveStatus: i3x.status,
+    liveKeys,
     hint: computed(() => mode.value.hint),
     capped,
     meanNote: computed(() => range.value.clamped ? 'Charts show at most 400 days at once.' : null),

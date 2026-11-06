@@ -4,6 +4,27 @@ export function fail(log, status, message) {
     throw new APIError(status);
 }
 
+/** A refusal the client can act on.
+ *
+ * fail() throws an APIError, which WebAPI answers with the status text
+ * alone. A Refusal carries a JSON body `{ error, message, ...extra }`
+ * with a stable machine-readable `error` code. The route that catches
+ * it sends that body; see APIv1#send_refusal.
+ */
+export class Refusal extends Error {
+    constructor(status, error, message, extra = {}) {
+        super(message);
+        this.status = status;
+        this.body = { error, message, ...extra };
+    }
+}
+
+/** Logs and throws a Refusal. */
+export function refuse(log, status, error, message, extra) {
+    log(message);
+    throw new Refusal(status, error, message, extra);
+}
+
 
 export function csv_escape(value) {
     if (value == null) return "";
@@ -47,6 +68,29 @@ export function metric_path(path, measurement) {
     const name = strip_metric_suffix(measurement);
     if (path == null || path === "") return name;
     return `${path}/${name}`;
+}
+
+/** The `device` and `path` columns of a CSV row.
+ *
+ * A row from the `default` bucket has a `device` tag (the Sparkplug
+ * device ID) and a `path` tag relative to the device. A row from the
+ * `uns` bucket has no `device` tag; its `path` is the Sparkplug device
+ * ID, then the folder. Both give the same columns.
+ *
+ * @param {object} row The Influx row, with `device`, `path` and
+ *   `_measurement`.
+ * @param {string} [store] The source's store, `sparkplug` or `uns`.
+ * @returns {{device: string, path: string}}
+ */
+export function csv_device_path(row, store) {
+    if (store != "uns")
+        return { device: row.device, path: metric_path(row.path, row._measurement) };
+
+    const p = row.path ?? "";
+    const at = p.indexOf("/");
+    const device = at < 0 ? p : p.slice(0, at);
+    const folder = at < 0 ? null : p.slice(at + 1);
+    return { device, path: metric_path(folder, row._measurement) };
 }
 
 

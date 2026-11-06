@@ -4,6 +4,11 @@ export const DataAccess = {
         DatasetMetadata: "e3b9fd2c-9de1-470b-9675-739e2a55b77f", 
         SparkplugSrc: "f5d550c4-2831-11f1-b0b0-83fda3035799",
         SparkplugSubset: "7f7d40cc-4075-4f06-90cf-aa6261d68f18",
+        /* The device kinds that read the UNS bucket. They must be in
+         * App: an edit to an invalid dataset deletes its entries in
+         * every app listed here. */
+        UNSDevice: "0d4ac57f-76b5-45c9-9c2d-4b0812be08ff",
+        UNSDeviceMetrics: "bd9550fb-ef75-4523-81d6-25dd32c22925",
         UnionComponents: "1c4ca454-de38-44d9-92fb-aa5218bfa257",
         SessionLimits: "8754c000-3778-4ae6-b2b8-bbcd959bb775",
         MESIdentifiers: "af178f0c-3b1e-44f2-9724-5cf06e8fd056",
@@ -60,6 +65,13 @@ export const DataAccess = {
         ServiceRole: "dd18050c-a9ab-4287-8af2-e983f20e89c8"
     }, 
 
+    /* Apps of other services that Data Access reads. The ISA-95
+     * Placement app belongs to the ISA-95 placement work: each device's
+     * placement, `{ node }`. See has_placement in api-v1.js. */
+    External: {
+        ISA95Placement: "f9345c57-14e3-4027-b76d-2b0b67eb8fed",
+    },
+
     Perm: {
         All: "1e3cb5aa-a3f7-4bb6-9ef1-c3bc08427f60",
         CreateDataset: "2d666b41-7a0d-4845-ad59-3113f25b469a",
@@ -68,6 +80,17 @@ export const DataAccess = {
         UseForSession: "c089b9a9-06cd-4211-94fc-9ad52a759987", 
         EditDataset: "af06b9e5-456a-43e4-b636-5b17de28fc7f",
         DeleteDataset: "6f301df8-0ad1-496f-8391-8de92c43ad8e",
+        /* "Build datasets from device". UseSparkplug is the old name;
+         * it is kept as an alias. */
+        UseDevice: "788b049c-2831-11f1-99fd-2b0bf86d6f77",
         UseSparkplug: "788b049c-2831-11f1-99fd-2b0bf86d6f77",
+    },
+
+    /* The logical names of the two InfluxDB buckets a resolved source
+     * can read. bin/api.js maps them to bucket names; no bucket name is
+     * ever stored in ConfigDB. */
+    Store: {
+        Sparkplug: "sparkplug",
+        UNS: "uns",
     }
 }

@@ -14,7 +14,7 @@ import { london_local_to_ms } from '../src/lib/datasets/model.js'
 import {
     LADDER, STEP_MS, I3X_UUID_NAMESPACE, QUIET_AFTER_MS,
     pick_every, chunk, type_suffix, chartable, series_key, split_key, mean_entry,
-    series_request, count_too_long, dataset_window, window_is_live, NO_WINDOW_SPAN, parse_series, series_error,
+    series_request, DEVICE_STORE, count_too_long, dataset_window, window_is_live, NO_WINDOW_SPAN, parse_series, series_error,
     bucket_start, bucket_end, live_number, tail_window, replace_tail,
     chart_pairs, extent, sparkline_path,
     density_alpha, density_colour, bucket_cells, bin_counts, window_strip, sum_counts, StripCache,
@@ -76,6 +76,15 @@ describe('the request', () => {
             count: true,
             last: { lookback: '30d' },
         })
+    })
+
+    it('names the store for a device request only', () => {
+        const d = series_request({ devices: [D1], from: T0, to: T0 + HOUR, every: '5m', store: DEVICE_STORE })
+        expect(d.store).toBe('uns')
+        // A dataset reads what its dataset reads.
+        const s = series_request({ dataset: DS, from: T0, to: T0 + HOUR, every: '5m', store: DEVICE_STORE })
+        expect(s.store).toBeUndefined()
+        expect(series_request({ devices: [D1], from: T0, to: T0 + HOUR }).store).toBeUndefined()
     })
 
     it('builds a dataset request with points and means', () => {

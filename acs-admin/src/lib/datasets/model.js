@@ -5,7 +5,7 @@
  * service, so all of it is unit-tested in test/datasets-model.test.js.
  */
 
-import { DA, STRUCTURE, KINDS } from './constants.js'
+import { DA, STRUCTURE, KINDS, is_device_structure, is_metrics_structure } from './constants.js'
 
 export const TZ = 'Europe/London'
 
@@ -100,14 +100,16 @@ export function normalise_tags (tags) {
 
 /**
  * The kind of a dataset, from its functional classes, or 'device' for
- * a bare Sparkplug source, or 'other'.
+ * a bare device dataset, 'device-metrics' for chosen metrics of one
+ * device, or 'other'.
  */
 export function dataset_kind (r) {
     const fns = r.functions ?? []
     for (const k of KINDS) {
         if (fns.includes(k.klass)) return k.id
     }
-    if (r.structure === STRUCTURE.DEVICE) return 'device'
+    if (is_device_structure(r.structure)) return 'device'
+    if (is_metrics_structure(r.structure)) return 'device-metrics'
     return 'other'
 }
 
@@ -157,13 +159,13 @@ export function resolve_devices (uuid, byUuid) {
         seen.add(id)
         const r = byUuid[id]
         if (!r || !r.structure || r.invalid) { unknown.add(id); return }
-        if (r.structure === STRUCTURE.DEVICE) {
+        if (is_device_structure(r.structure)) {
             if (r.config?.source) devices.add(r.config.source)
             device_datasets.add(id)
             return
         }
         // Not charted: its device's other metrics are not in the dataset.
-        if (r.structure === STRUCTURE.SUBSET) {
+        if (is_metrics_structure(r.structure)) {
             sub_devices.add(id)
             return
         }
@@ -178,10 +180,16 @@ export function resolve_devices (uuid, byUuid) {
     }
 }
 
-/** Find the device dataset (bare Sparkplug source) for a device. */
-export function device_dataset_for (device_uuid, byUuid) {
+/**
+ * Find the device dataset (a bare device dataset) for a device.
+ * `structures` limits it to some device kinds: the builder reuses only
+ * a UNS device dataset, as it makes no other kind. By default either
+ * kind is found.
+ */
+export function device_dataset_for (device_uuid, byUuid, structures = null) {
     const found = Object.values(byUuid)
-        .filter(r => r.structure === STRUCTURE.DEVICE && r.config?.source === device_uuid)
+        .filter(r => is_device_structure(r.structure) && r.config?.source === device_uuid)
+        .filter(r => !structures || structures.includes(r.structure))
         // Prefer a named one, then the oldest-looking (stable) choice.
         .sort((a, b) => (b.name ? 1 : 0) - (a.name ? 1 : 0) || a.uuid.localeCompare(b.uuid))
     return found[0]?.uuid ?? null

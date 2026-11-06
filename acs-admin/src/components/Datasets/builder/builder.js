@@ -11,7 +11,7 @@
  * unchanged item reuses exactly the dataset it came from.
  */
 
-import { STRUCTURE, KIND_BY_ID } from '@/lib/datasets/constants.js'
+import { STRUCTURE, KIND_BY_ID, is_device_structure } from '@/lib/datasets/constants.js'
 import {
     direct_sources, included_in, resolve_devices, device_dataset_for,
     validate_window, to_iso,
@@ -40,10 +40,18 @@ export function empty_state () {
  * Items
  * ------------------------------------------------------------------ */
 
-/** A builder item for a dataset UUID: device datasets become devices. */
+// The device datasets a picked device reuses: the builder makes only
+// UNS device datasets, so it reuses only those. An older device dataset
+// stays in a dataset that already has it (item_for keeps it).
+export const BUILDER_DEVICE_STRUCTURES = [STRUCTURE.UNS_DEVICE]
+
+/**
+ * A builder item for a dataset UUID: device datasets of either kind
+ * become devices, keeping the dataset, so edit and duplicate reuse it.
+ */
 export function item_for (uuid, byUuid, label = '') {
     const r = byUuid[uuid]
-    if (r?.structure === STRUCTURE.DEVICE && r.config?.source) {
+    if (is_device_structure(r?.structure) && r.config?.source) {
         return { type: 'device', uuid: r.config.source, label, dataset: uuid }
     }
     return { type: 'dataset', uuid, label }
@@ -62,7 +70,7 @@ export function source_items (rec, byUuid) {
         if (src?.structure === STRUCTURE.UNION && src.name === `${rec.name} (devices)`) return direct_sources(src)
         return rec.config?.source ? [rec.config.source] : []
     }
-    if (rec.structure === STRUCTURE.DEVICE) return [rec.uuid]
+    if (is_device_structure(rec.structure)) return [rec.uuid]
     return direct_sources(rec)
 }
 
@@ -156,7 +164,7 @@ export function repeated_devices (items, byUuid) {
 export function device_dataset_plan (items, byUuid) {
     return items.filter(i => i.type === 'device').map(i => ({
         device: i.uuid,
-        existing: i.dataset ?? device_dataset_for(i.uuid, byUuid),
+        existing: i.dataset ?? device_dataset_for(i.uuid, byUuid, BUILDER_DEVICE_STRUCTURES),
     }))
 }
 
@@ -167,7 +175,7 @@ export function device_dataset_plan (items, byUuid) {
 export function item_datasets (items, map, byUuid) {
     const out = []
     for (const i of items) {
-        const u = i.type === 'device' ? (i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid)) : i.uuid
+        const u = i.type === 'device' ? (i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid, BUILDER_DEVICE_STRUCTURES)) : i.uuid
         if (u && !out.includes(u)) out.push(u)
     }
     return out
@@ -179,7 +187,7 @@ export function labels_by_dataset (items, map, byUuid) {
     for (const i of items) {
         const v = (i.label ?? '').trim()
         if (i.type !== 'device' || !v) continue
-        const u = i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid)
+        const u = i.dataset ?? map[i.uuid] ?? device_dataset_for(i.uuid, byUuid, BUILDER_DEVICE_STRUCTURES)
         if (u) out[u] = v
     }
     return out
@@ -248,8 +256,8 @@ export function store_rows (state, byUuid, { steps = null, edit = null, record =
     const dd = device_dataset_plan(state.items, byUuid)
     const reused = dd.filter(d => d.existing).length
     const created = dd.length - reused
-    if (reused) rows.push({ text: `${reused} device ${reused === 1 ? 'dataset' : 'datasets'} reused`, note: 'Already exist for these devices.', type: 'Sparkplug source' })
-    if (created) rows.push({ text: `${created} device ${created === 1 ? 'dataset' : 'datasets'} created`, note: 'Made when you save.', type: 'Sparkplug source' })
+    if (reused) rows.push({ text: `${reused} device ${reused === 1 ? 'dataset' : 'datasets'} reused`, note: 'Already exist for these devices.', type: 'Device' })
+    if (created) rows.push({ text: `${created} device ${created === 1 ? 'dataset' : 'datasets'} created`, note: 'Made when you save.', type: 'Device' })
 
     if (steps) {
         for (const s of steps) {
@@ -320,28 +328,4 @@ export function text_match (query, strings) {
     if (!q) return true
     const hay = strings.filter(Boolean).join(' ').toLowerCase()
     return q.split(/\s+/).every(w => hay.includes(w))
-}
-
-/**
- * Group devices by site, then area, sorted by name.
- * Returns [{ site, areas: [{ area, devices }] }]. Missing values sort last.
- */
-export function group_devices (devices) {
-    const sites = new Map()
-    for (const d of devices) {
-        const site = d.site ?? 'No site'
-        const area = d.area ?? 'No area'
-        if (!sites.has(site)) sites.set(site, new Map())
-        const areas = sites.get(site)
-        if (!areas.has(area)) areas.set(area, [])
-        areas.get(area).push(d)
-    }
-    const order = (a, b, none) => (a === none) - (b === none) || a.localeCompare(b)
-    return [...sites].sort(([a], [b]) => order(a, b, 'No site')).map(([site, areas]) => ({
-        site,
-        areas: [...areas].sort(([a], [b]) => order(a, b, 'No area')).map(([area, list]) => ({
-            area,
-            devices: list.sort((x, y) => (x.name ?? '').localeCompare(y.name ?? '')),
-        })),
-    }))
 }

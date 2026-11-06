@@ -2,19 +2,39 @@ import { PassThrough } from "stream";
 import { once } from "events";
 import pLimit from "p-limit";
 
-import { csv_escape, metric_path, strip_metric_suffix } from "./utils.js";
+import { csv_escape, csv_device_path, strip_metric_suffix } from "./utils.js";
 import { build_flux_queries } from "./flux.js";
+import { DataAccess as Constants } from "./constants.js";
 
 /* `path` comes last so that clients reading the columns by position
  * still work. */
-const CSV_HEADER = "device,metric,timestamp,value,unit,path";
+/* The UUID columns come from tags both historians write on every
+ * point: the device, the instance that owns the metric's folder, and
+ * that instance's schema. A metric directly on the device has no
+ * bottom-level tags (Influx stores no empty tags), so its instance
+ * and schema are the device's own. New columns go at the end. */
+const CSV_HEADER = "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid";
+
+/** Whether an error is InfluxDB saying a bucket does not exist. */
+export function is_missing_bucket(err) {
+    return err?.statusCode == 404;
+}
 
 export class InfluxReader {
+    /**
+     * @param opts.buckets The bucket for each store, `{ sparkplug, uns }`.
+     *   A store with no bucket cannot be read.
+     * @param opts.influx_bucket The `sparkplug` bucket, when `buckets`
+     *   is not given.
+     */
     constructor(opts) {
         this.log = opts.debug.bound("influxReader");
 
-        this.influx_bucket = opts.influx_bucket;
+        this.buckets = opts.buckets
+            ?? { [Constants.Store.Sparkplug]: opts.influx_bucket };
         this.influx_org = opts.influx_org;
+        /* The UNS bucket may not exist yet when Data Access starts. */
+        this.warned_missing = false;
 
         this.influx_query_api =
             opts.influx_client.getQueryApi(
@@ -22,6 +42,12 @@ export class InfluxReader {
             );
 
         this.limit = pLimit(4);
+    }
+
+    /** The bucket a source reads. Sources resolved before stores
+     * existed read the `sparkplug` store. */
+    bucket_for(source) {
+        return this.buckets[source.store ?? Constants.Store.Sparkplug];
     }
 
     /** Combines the resolved device sources of a dataset into a single CSV
@@ -70,37 +96,59 @@ export class InfluxReader {
         meta
     ) {
         const queries = build_flux_queries({
-            bucket: this.influx_bucket,
+            bucket: this.bucket_for(source),
             source,
             filter: meta,
         });
 
         this.log(
-            "streaming %s (%d queries)",
+            "streaming %s from %s (%d queries)",
             source.device_uuid,
+            source.store ?? Constants.Store.Sparkplug,
             queries.length
         );
 
         for (const query of queries) {
-            const response =
-                this.influx_query_api.response(query);
-
-            for await (
-                const row of response.iterateRows()
-            ) {
-                const o = row.tableMeta.toObject(row.values);
-
-                const line = [
-                    csv_escape(o.device),
-                    csv_escape(strip_metric_suffix(o._measurement)),
-                    csv_escape(o._time),
-                    csv_escape(o._value),
-                    csv_escape(o.unit),
-                    csv_escape(metric_path(o.path, o._measurement)),
-                ].join(",");
-
-                await this.#write(writable, line + "\n");
+            try {
+                await this.#streamQuery(query, source.store, writable);
             }
+            catch (err) {
+                /* historian-uns creates its bucket when it starts, which
+                 * may be after Data Access. Until then the UNS has no
+                 * data to give. */
+                if (source.store != Constants.Store.UNS || !is_missing_bucket(err))
+                    throw err;
+                if (!this.warned_missing)
+                    this.log("The UNS bucket does not exist yet; reading it as empty");
+                this.warned_missing = true;
+                return;
+            }
+        }
+    }
+
+    async #streamQuery(query, store, writable) {
+        const response =
+            this.influx_query_api.response(query);
+
+        for await (
+            const row of response.iterateRows()
+        ) {
+            const o = row.tableMeta.toObject(row.values);
+            const { device, path } = csv_device_path(o, store);
+
+            const line = [
+                csv_escape(device),
+                csv_escape(strip_metric_suffix(o._measurement)),
+                csv_escape(o._time),
+                csv_escape(o._value),
+                csv_escape(o.unit),
+                csv_escape(path),
+                csv_escape(o.topLevelInstance),
+                csv_escape(o.bottomLevelInstance || o.topLevelInstance),
+                csv_escape(o.bottomLevelSchema || o.topLevelSchema),
+            ].join(",");
+
+            await this.#write(writable, line + "\n");
         }
     }
 

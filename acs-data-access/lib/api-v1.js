@@ -13,16 +13,18 @@ import { DataAccess as Constants } from "./constants.js";
 import {
   valid_uuid, valid_datetime, parse_download_filter, parse_download_window,
 } from "./validate.js";
-import { fail, maxDate, minDate } from './utils.js';
+import { fail, maxDate, minDate, Refusal, refuse } from './utils.js';
 
 import { SparkplugSourcesHandler } from "./sparkplug-sources-handler.js";
 import { SparkplugSubsetHandler } from "./sparkplug-subset-handler.js";
+import { UNSDeviceHandler } from "./uns-device-handler.js";
+import { UNSDeviceMetricsHandler } from "./uns-device-metrics-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
 import { walk_origin_map } from "./origin-map.js";
 import {
   SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
-  LIMITS as SeriesLimits,
+  check_coverage, LIMITS as SeriesLimits,
 } from "./series.js";
 import { SeriesAbort } from "./series-reader.js";
 
@@ -76,6 +78,9 @@ export class APIv1 {
     this.log = opts.debug.bound("apiv1");
     this.influxReader = opts.influxReader;
     this.seriesReader = opts.seriesReader;
+    /* The InfluxDB bucket of each store, { sparkplug, uns }. A site
+     * without the UNS historian has no `uns` bucket. */
+    this.buckets = opts.buckets ?? {};
     this.routes = this.setup_routes();
     this.handlers = {
       [Constants.App.SparkplugSrc]:
@@ -83,6 +88,12 @@ export class APIv1 {
 
       [Constants.App.SparkplugSubset]:
         new SparkplugSubsetHandler(this),
+
+      [Constants.App.UNSDevice]:
+        new UNSDeviceHandler(this),
+
+      [Constants.App.UNSDeviceMetrics]:
+        new UNSDeviceMetricsHandler(this),
 
       [Constants.App.SessionLimits]:
         new SessionLimitsHandler(this),
@@ -160,6 +171,70 @@ export class APIv1 {
       fail(this.log, 422, `Unknown structure ${structure}`);
 
     return handler;
+  }
+
+  /** Sends a Refusal as its JSON body. Anything else is rethrown, for
+   * WebAPI to answer as before. */
+  send_refusal(err, res) {
+    if (!(err instanceof Refusal)) throw err;
+    return res.status(err.status).json(err.body);
+  }
+
+  /** Whether this site has a UNS bucket for the new device kinds. */
+  uns_available() {
+    return !!this.buckets[Constants.Store.UNS];
+  }
+
+  /** Refuses with 503 when a source reads the UNS on a site without a
+   * UNS bucket. */
+  check_stores(sources) {
+    if (!this.uns_available() && sources.some(s => s.store == Constants.Store.UNS))
+      refuse(this.log, 503, "uns_unavailable",
+        "This dataset reads the UNS, and this site has no UNS bucket configured.");
+  }
+
+  /** Refuses a structure that can no longer be created. Existing
+   * datasets of it still work. */
+  check_creatable(structure) {
+    const handler = this._getHandler(structure);
+    if (handler.replaced_by)
+      refuse(this.log, 422, "structure_retired",
+        `New datasets of structure ${structure} can no longer be created. `
+        + `Use UNS device or UNS device metrics, which read the UNS.`,
+        { use: handler.replaced_by });
+  }
+
+  /** Whether a device has an ISA-95 placement.
+   *
+   * This is the one place Data Access depends on the ISA-95 placement
+   * work: it reads the device's entry in the ISA-95 Placement app,
+   * `{ node }`. A placed device is on the UNS. */
+  async has_placement(device) {
+    const placement = await this.cdb.get_config(
+      Constants.External.ISA95Placement, device);
+    return typeof placement?.node == "string" && placement.node != "";
+  }
+
+  /** Checks the source of a new or changed UNS device dataset.
+   * Call this after the source permission check: a caller without
+   * permission must learn nothing about the source. A root or wildcard
+   * grant passes the permission check for any UUID, so the source is
+   * checked to be a Device here. */
+  async check_uns_source(device) {
+    if (!this.uns_available())
+      refuse(this.log, 503, "uns_unavailable",
+        "This site has no UNS bucket configured, so it cannot make datasets that read the UNS.");
+
+    if (!await this.cdb.class_has_member(UUIDs.Class.Device, device))
+      refuse(this.log, 422, "device_required",
+        `${device} is not a device. A UNS device dataset needs a device.`,
+        { device });
+
+    if (!await this.has_placement(device))
+      refuse(this.log, 422, "placement_required",
+        `Device ${device} has no ISA-95 placement, so it is not on the UNS. `
+        + `Place it in the ISA-95 hierarchy first.`,
+        { device });
   }
 
 
@@ -345,16 +420,20 @@ export class APIv1 {
               * uuid {UUID} - Dataset UUID
               * from {date} - Dataset starting bound (if any)
               * to {date} - Dataset finishing bound (if any)
-              * devices {array} - one entry per device, in the order the
-                dataset first reaches them:
+              * devices {array} - one entry per device and store, in the
+                order the dataset first reaches them:
                   * uuid {UUID} - Device UUID
                   * name {string|null} - Device name from General
                     Information, which is the Sparkplug device ID the
                     download's `device` column shows
+                  * store {string} - where the download reads the device:
+                    `sparkplug` (the default bucket) or `uns`. A device
+                    reached through both has an entry for each.
                   * metrics {array} - the metrics the download reads, in
                     the shape GET /sparkplug-sources/:uuid/metrics returns.
-                    A Sparkplug source gives every metric recorded to the
-                    historian; a Sub-device gives only its selected metrics.
+                    A whole-device source gives every metric recorded to
+                    the historian; a metrics source gives only its
+                    selected metrics.
    * Returns 404 if dataset is invalid.
    */
   async metadata_contents(req, res) {
@@ -390,36 +469,42 @@ export class APIv1 {
     });
   }
 
-  /** Merges resolved sources into one entry per device.
+  /** Merges resolved sources into one entry per device and store.
    *
-   * A device can be reached through several components. A Sparkplug
-   * source (no `metrics`) covers the whole device, so it gives every
-   * metric recorded to the historian. Otherwise the device gives the
-   * union of the metrics its Sub-device sources select.
+   * A device can be reached through several components. A whole-device
+   * source (no `metrics`) gives every metric recorded to the
+   * historian. Otherwise the device gives the union of the metrics its
+   * metrics sources select. Metric paths are relative to the device in
+   * both stores, so one store's list reads like the other's.
    *
    * @param sources Resolved sources, as resolve_dataset returns them.
    * @param infos The General Information entries, by object UUID.
-   * @returns {Promise<Array<{uuid, name, metrics}>>}
+   * @returns {Promise<Array<{uuid, name, store, metrics}>>}
    */
   async source_devices(sources, infos) {
     const by_device = new Map();
     for (const s of sources) {
-      const entry = by_device.get(s.device_uuid) ?? { whole: false, paths: new Set() };
+      const store = s.store ?? Constants.Store.Sparkplug;
+      const key = `${s.device_uuid} ${store}`;
+      const entry = by_device.get(key)
+        ?? { device: s.device_uuid, store, whole: false, paths: new Set() };
       if (!s.metrics)
         entry.whole = true;
       else
         for (const m of s.metrics)
           entry.paths.add(m.path ? `${m.path}/${m.name}` : m.name);
-      by_device.set(s.device_uuid, entry);
+      by_device.set(key, entry);
     }
 
-    return Promise.all([...by_device].map(async ([device, entry]) => {
+    return Promise.all([...by_device.values()].map(async entry => {
+      const { device } = entry;
       const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
       const { metrics } = walk_origin_map(info?.originMap, device);
 
       return {
         uuid: device,
         name: infos?.get(device)?.name ?? null,
+        store: entry.store,
         metrics: entry.whole
           ? metrics
           : metrics.filter(m => entry.paths.has(m.path)),
@@ -591,7 +676,7 @@ export class APIv1 {
     const {structure, config} = dataset;
     
     if(!structure) return fail(this.log, 404, `Structure not found for dataset ${dataset_uuid}`);
-    if(!valid_uuid(structure)) return (this.log, 404, `Structure uuid is invalid ${structure}`);
+    if(!valid_uuid(structure)) return fail(this.log, 404, `Structure uuid is invalid ${structure}`);
     if(structure === Constants.Special.InvalidDataset) return fail(this.log, 404, `Invalid dataset ${dataset_uuid}`);
     if(!config) return fail(this.log, 404, `Config not found for ${dataset_uuid}`);
     
@@ -666,6 +751,7 @@ export class APIv1 {
     try {
         // Resolve dataset tree
         const resolved_sources = await this.resolve_dataset(dataset_uuid);
+        this.check_stores(resolved_sources);
 
         /* A download with no end in time would read the whole history
          * of every device in the dataset: for a machine dataset that is
@@ -692,6 +778,7 @@ export class APIv1 {
         csvStream.pipe(res);
 
        }catch (err) {
+        if (err instanceof Refusal) return this.send_refusal(err, res);
         this.log(err);
         return fail(this.log, 500);
     }
@@ -703,9 +790,12 @@ export class APIv1 {
    * See docs/services/data-access.md for the request and response.
    *
    * A dataset request needs ReadDataset on the dataset. A device request
-   * needs UseSparkplug on each device: devices without it are listed in
+   * needs UseDevice on each device: devices without it are listed in
    * `denied` and left out, and the request fails with 403 only when
    * every device is denied.
+   *
+   * Each source reads its own store. A dataset reaching devices in both
+   * stores runs once per store, and the results merge by device.
    */
   async series(req, res) {
     /* One time limit covers the whole request: the permission lookups
@@ -718,19 +808,31 @@ export class APIv1 {
 
     try {
       const as_of = Date.now();
-      /* Read the coverage state once, so validation and the queries
-       * agree on it. */
-      const coverage = this.seriesReader.coverage_state();
-      const parsed = parse_request(req.body, as_of, { coverage: coverage != null });
+      /* Read the coverage states once, so validation and the queries
+       * agree on them. A dataset's stores are known only once it
+       * resolves, so its check waits until then. */
+      const coverage = this.seriesReader.coverage_states();
+      const ready = store => coverage[store] != null;
+      const parsed = parse_request(req.body, as_of,
+        { coverage: store => store == null || ready(store) });
 
       const scope = await abortable(parsed.dataset
         ? this.series_dataset_scope(req.auth, parsed, as_of)
         : this.series_device_scope(req.auth, parsed), ctl.signal);
 
-      /* Each distinct window set is its own set of queries. */
-      const groups = Math.max(
-        group_by_windows(scope.windows).length,
-        group_by_windows(scope.last_windows).length);
+      const stores = [...scope.by_store.keys()];
+      if (stores.some(s => !this.seriesReader.has_store(s)))
+        throw new SeriesError(503, "uns_unavailable",
+          "This request reads the UNS, and this site has no UNS bucket configured.");
+      check_coverage(parsed, ready, stores);
+
+      /* Each distinct window set of each store is its own set of
+       * queries. */
+      let groups = 0;
+      for (const { windows, last_windows } of scope.by_store.values())
+        groups += Math.max(
+          group_by_windows(windows).length,
+          group_by_windows(last_windows).length);
       if (groups > SeriesLimits.groups)
         throw new SeriesError(422, "invalid_request",
           `The dataset's devices have more than ${SeriesLimits.groups} distinct window sets.`,
@@ -742,8 +844,8 @@ export class APIv1 {
         mean: parsed.mean.filter(m => scope.windows.has(m.device)),
       };
 
-      const result = await this.seriesReader.run(
-        run, scope.windows, as_of, ctl.signal, coverage, scope.last_windows);
+      const result = await this.seriesReader.run_stores(
+        run, scope.by_store, as_of, ctl.signal, coverage);
 
       const iso = t => new Date(t).toISOString();
       const devices = {};
@@ -806,13 +908,19 @@ export class APIv1 {
       return fail(this.log, 503, `Too many series queries waiting`);
     }
 
+    /* The InfluxDB client's own timeout. The query was slow, not the
+     * historian down: say so. */
+    if (err?.name == "RequestTimedOutError") {
+      this.log("Series query timed out in the InfluxDB client");
+      return fail(this.log, 504, `Series query timed out`);
+    }
+
     /* A 4xx from InfluxDB means we sent a bad query: that is our bug. */
     if (err?.name == "HttpError" && err.statusCode < 500) {
       this.log("Series query rejected by InfluxDB: %s", err.message);
       return fail(this.log, 500, `Series query failed`);
     }
-    if (err?.name == "HttpError" || err?.name == "RequestTimedOutError"
-        || typeof err?.code == "string") {
+    if (err?.name == "HttpError" || typeof err?.code == "string") {
       this.log("InfluxDB unavailable: %s", err.message);
       return fail(this.log, 503, `InfluxDB unavailable`);
     }
@@ -822,17 +930,24 @@ export class APIv1 {
   /** GET. The state of the coverage summary. Any authenticated client
    * may read whether it is ready, stale or failing, as an error code;
    * the log has the detail. The bucket bounds and the task describe
-   * data across all devices, so only a caller with UseSparkplug on
-   * every device (a wildcard grant) sees them. */
+   * data across all devices, so only a caller with UseDevice on
+   * every device (a wildcard grant) sees them.
+   *
+   * The top level is the default bucket's summary. When the UNS bucket
+   * has its own summary, `uns` holds its state in the same shape. */
   async coverage_status(req, res) {
     const coverage = this.seriesReader?.coverage;
     if (!coverage)
       return res.status(200).json({ enabled: false });
     const detail = await this.may_read_all_devices(req.auth);
-    return res.status(200).json(coverage.status({ detail }));
+    const uns = this.seriesReader.coverages?.[Constants.Store.UNS];
+    return res.status(200).json({
+      ...coverage.status({ detail }),
+      ...(uns ? { uns: uns.status({ detail }) } : {}),
+    });
   }
 
-  /** Whether the principal has UseSparkplug on every device. Gives up
+  /** Whether the principal has UseDevice on every device. Gives up
    * (false) after 5 s, or if the ACL cannot be read. */
   async may_read_all_devices(principal) {
     let timer;
@@ -840,7 +955,7 @@ export class APIv1 {
       timer = setTimeout(() => resolve(false), 5000);
     });
     const check = this.auth.check_acl(
-      principal, Constants.Perm.UseSparkplug, UUIDs.Special.Null, true)
+      principal, Constants.Perm.UseDevice, UUIDs.Special.Null, true)
       .catch(err => {
         this.log("Can't read the ACL for %s: %s", principal, err.message);
         return false;
@@ -859,7 +974,10 @@ export class APIv1 {
    * `windows` are clipped to the request, for counts and means.
    * `last_windows` are not: they end at their source's end, or at
    * `as_of` for an open source, so `last` shows the newest data the
-   * dataset grants even when the request ends earlier. */
+   * dataset grants even when the request ends earlier.
+   *
+   * `by_store` holds the same two maps for each store the sources
+   * read, for the queries; `windows` merges the stores. */
   async series_dataset_scope(principal, parsed, as_of) {
     const ok = await this.auth.check_acl(
       principal,
@@ -889,9 +1007,19 @@ export class APIv1 {
 
     const windows = new Map();
     const last_windows = new Map();
+    const by_store = new Map();
     for (const [device, list] of by_device) {
       windows.set(device, merge_windows(list, parsed.from, parsed.to));
       last_windows.set(device, merge_windows(list, -Infinity, as_of));
+
+      for (const store of new Set(list.map(s => s.store ?? Constants.Store.Sparkplug))) {
+        if (!by_store.has(store))
+          by_store.set(store, { windows: new Map(), last_windows: new Map() });
+        const in_store = list.filter(s => (s.store ?? Constants.Store.Sparkplug) == store);
+        const scope = by_store.get(store);
+        scope.windows.set(device, merge_windows(in_store, parsed.from, parsed.to));
+        scope.last_windows.set(device, merge_windows(in_store, -Infinity, as_of));
+      }
     }
 
     /* A sub-device source grants only its own metrics. Means are read
@@ -909,7 +1037,7 @@ export class APIv1 {
       throw new SeriesError(422, "invalid_request",
         `"mean" metric ${outside.metric} of device ${outside.device} is not in the dataset.`);
 
-    return { windows, last_windows, denied: [] };
+    return { windows, last_windows, by_store, denied: [] };
   }
 
   /** Permission and windows for a device request. One ACL fetch gives
@@ -935,16 +1063,17 @@ export class APIv1 {
     const windows = new Map();
     const denied = [];
     for (const device of parsed.devices) {
-      if (acl(Constants.Perm.UseSparkplug, device, true))
+      if (acl(Constants.Perm.UseDevice, device, true))
         windows.set(device, [[parsed.from, parsed.to]]);
       else
         denied.push(device);
     }
 
     if (!windows.size)
-      return fail(this.log, 403, `No UseSparkplug permission on any requested device`);
+      return fail(this.log, 403, `No UseDevice permission on any requested device`);
 
-    return { windows, last_windows: windows, denied };
+    const by_store = new Map([[parsed.store, { windows, last_windows: windows }]]);
+    return { windows, last_windows: windows, by_store, denied };
   }
 
   /** GET. 
@@ -979,8 +1108,9 @@ export class APIv1 {
     return res.status(200).json(uuids);
   }
 
-  /** GET. Lists the metrics of a Sparkplug device that a Sub-device
-   * dataset can select. Requires USE_SPARKPLUG on the device.
+  /** GET. Lists the metrics of a device that a device metrics dataset
+   * (UNS device metrics or Sub-device) can select. Requires UseDevice
+   * ("Build datasets from device") on the device.
    * Only metrics recorded to the historian are listed, as nothing else
    * can be read back. A device with no origin map has an empty list.
    * @returns array of objects:
@@ -997,11 +1127,11 @@ export class APIv1 {
 
     const ok = await this.auth.check_acl(
       req.auth,
-      Constants.Perm.UseSparkplug,
+      Constants.Perm.UseDevice,
       device,
       true,
     );
-    if (!ok) return fail(this.log, 403, `You don't have permission to use Sparkplug data from ${device}.`);
+    if (!ok) return fail(this.log, 403, `You don't have permission to build datasets from ${device}.`);
 
     const info = await this.cdb.get_config(UUIDs.App.DeviceInformation, device);
     const { metrics } = walk_origin_map(info?.originMap, device);
@@ -1049,10 +1179,12 @@ export class APIv1 {
   /** Checks a proposed config without writing anything.
    *
    * Runs the structure's own validation and the source permission
-   * checks, then converts the config to the form that is stored. Throws
-   * a 422 or 403 APIError if the config is not acceptable. Call this
-   * before removing or changing any existing state, so that a rejected
-   * request leaves the dataset exactly as it was.
+   * checks, then the structure's own source checks (a UNS device must
+   * be a placed device), then converts the config to the form that is
+   * stored. Throws a 422 or 403 APIError, or a Refusal, if the config
+   * is not acceptable. Call this before removing or changing any
+   * existing state, so that a rejected request leaves the dataset
+   * exactly as it was.
    *
    * @returns {{handler, config}} The handler for the structure, and the
    *   config to store.
@@ -1063,6 +1195,10 @@ export class APIv1 {
 
     const ok = await handler.check_sources_permissions(principal, config);
     if(!ok) return fail(this.log, 403, `You don't have permission for source(s) in config.`);
+
+    /* After the permission check, like normalising below, so a caller
+     * without permission learns nothing about the source. */
+    await handler.check_source(config);
 
     /* After the permission check: normalising can report what a source
      * contains, which only a principal allowed to use it may learn. */
@@ -1136,13 +1272,29 @@ export class APIv1 {
    * @param {*} req.body must be object (structure, config) without uuid.
    * @param {*} res 
    * @returns new dataset's UUID - JSON string 
+   *
+   * Refusals the client can act on are JSON `{ error, message }`:
+   * 422 `structure_retired` for Sparkplug source and Sub-device (with
+   * `use`, the structures to use instead), 422 `device_required` and
+   * `placement_required` for a UNS device that is not a placed device,
+   * and 503 `uns_unavailable` on a site with no UNS bucket.
    */
 
   async structure_create(req, res){
+    try {
+      return await this._structure_create(req, res);
+    }
+    catch (err) {
+      return this.send_refusal(err, res);
+    }
+  }
+
+  async _structure_create(req, res){
     const {structure, config} = req.body;
 
     if(!structure) return fail(this.log, 422, `Structure not provided in request body.`);
     if(!valid_uuid(structure)) return fail(this.log, 422, `Structure uuid ${structure} is invalid.`);
+    this.check_creatable(structure);
 
     if(!config) return fail(this.log, 422, `Config not provided in request body.`);
     this._getHandler(structure).validate_config(config);
@@ -1186,6 +1338,15 @@ export class APIv1 {
   */
 
   async structure_update(req, res){
+    try {
+      return await this._structure_update(req, res);
+    }
+    catch (err) {
+      return this.send_refusal(err, res);
+    }
+  }
+
+  async _structure_update(req, res){
     const dataset_uuid = req.params.uuid;
     if(!dataset_uuid) return fail(this.log, 422, `Dataset uuid not provided`);
     if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
@@ -1217,6 +1378,12 @@ export class APIv1 {
 
     if(is_valid && current_structure != structure)
       return fail(this.log, 409, `Changing structure type is not allowed (current: ${current_structure}, new: ${structure})`); 
+
+    /* Rewriting an invalid dataset makes it anew, so it must use a
+     * structure that can still be created. A valid dataset keeps its
+     * structure, and may still be edited. */
+    if(!is_valid)
+      this.check_creatable(structure);
 
     /* Check the new config completely before removing anything. Every
      * rejection (422, 403) must happen here, so a rejected update leaves

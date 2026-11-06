@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { DA, STRUCTURE } from '../src/lib/datasets/constants.js'
+import { DA, STRUCTURE, kind_info, is_other_kind, is_device_structure, is_metrics_structure } from '../src/lib/datasets/constants.js'
 import {
     merge_datasets, resolve_devices, included_in, device_dataset_for,
     overlapping_devices, dataset_status, structure_tree,
@@ -101,6 +101,25 @@ describe('structure', () => {
         expect(r.devices).toEqual([D1])
         expect(r.sub_devices).toEqual([SUB])
         expect(r.unknown).toEqual([])
+    })
+
+    it('resolves the UNS device kinds as the older ones', () => {
+        const UNS = 'aaaaaaaa-0000-4000-8000-0000000000c1'
+        const SUB = 'aaaaaaaa-0000-4000-8000-0000000000c2'
+        const by = merge_datasets([], [
+            { uuid: EQ, structure: STRUCTURE.UNION, config: [DS1, UNS, SUB] },
+            { uuid: DS1, structure: STRUCTURE.DEVICE, config: { source: D1 } },
+            { uuid: UNS, structure: STRUCTURE.UNS_DEVICE, config: { source: D2 } },
+            { uuid: SUB, structure: STRUCTURE.UNS_METRICS, config: { source: D2, metrics: [{ instance: D2, metric: 'Load' }] } },
+        ])
+        const r = resolve_devices(EQ, by)
+        expect(r.devices).toEqual([D1, D2])
+        expect(r.device_datasets).toEqual([DS1, UNS])
+        expect(r.sub_devices).toEqual([SUB])
+        expect(by[UNS].kind).toBe('device')
+        expect(by[SUB].kind).toBe('device-metrics')
+        expect(by[DS1].kind).toBe('device')
+        expect(device_dataset_for(D2, by)).toBe(UNS)
     })
 
     it('stops on a cycle and reports unknown datasets', () => {
@@ -245,5 +264,25 @@ describe('validate_window with numbers', () => {
     it('accepts ms as well as ISO strings', () => {
         expect(validate_window(Date.UTC(2026, 9, 7, 9), Date.UTC(2026, 9, 7, 10))).toBe(null)
         expect(validate_window(Date.UTC(2026, 9, 7, 10), Date.UTC(2026, 9, 7, 9))).toMatch(/before/)
+    })
+})
+
+describe('structure kinds', () => {
+    it('treats both device kinds alike', () => {
+        expect(is_device_structure(STRUCTURE.DEVICE)).toBe(true)
+        expect(is_device_structure(STRUCTURE.UNS_DEVICE)).toBe(true)
+        expect(is_device_structure(STRUCTURE.UNS_METRICS)).toBe(false)
+        expect(is_metrics_structure(STRUCTURE.SUBSET)).toBe(true)
+        expect(is_metrics_structure(STRUCTURE.UNS_METRICS)).toBe(true)
+        expect(is_metrics_structure(STRUCTURE.UNION)).toBe(false)
+    })
+
+    it('labels device metrics, and lists every unchosen kind under Other', () => {
+        expect(kind_info('device-metrics').label).toBe('Device metrics')
+        expect(kind_info('device').label).toBe('Device')
+        expect(is_other_kind('device-metrics')).toBe(true)
+        expect(is_other_kind('device')).toBe(true)
+        expect(is_other_kind('other')).toBe(true)
+        expect(is_other_kind('run')).toBe(false)
     })
 })

@@ -3,6 +3,10 @@
  * Helpers for building Flux queries from untrusted values.
  */
 
+/* The logical bucket names a resolved source carries. See
+ * Constants.Store. */
+const UNS = "uns";
+
 /* The datatype suffixes the historians append to every measurement name
  * on write (int, uint, double, boolean, string). See strip_metric_suffix
  * in utils.js. */
@@ -40,6 +44,42 @@ function measurement_clause(name) {
     return `(${tests.join(" or ")})`;
 }
 
+/** Quote a string for use inside a Flux regex literal.
+ *
+ * Escapes the RE2 metacharacters and `/`. A Flux regex literal ends at
+ * any unescaped `/`, even inside brackets, and Flux turns `\/` back
+ * into `/` before RE2 sees it. Control characters cannot appear in a
+ * regex literal at all, so they become `\x{..}` escapes.
+ *
+ * @param {string} value The text to match literally.
+ * @returns {string} Regex source, without the enclosing slashes.
+ */
+export function flux_regex_escape(value) {
+    return String(value)
+        .replace(/[\\^$.*+?()[\]{}|\/]/g, "\\$&")
+        .replace(/[\u0000-\u001f\u007f]/g,
+            c => `\\x{${c.charCodeAt(0).toString(16).padStart(2, "0")}}`);
+}
+
+/** The `path` test for a metric folder in the UNS bucket.
+ *
+ * historian-uns writes `path` as `<Sparkplug device ID>/<folder>`, or
+ * the device ID alone for a metric at the device root. The device ID
+ * can change, so the test accepts any first segment: the
+ * `topLevelInstance` test beside it picks the device. Never match on
+ * the first segment alone, as two devices on different nodes can share
+ * a device ID.
+ *
+ * @param {string|null} folder The folder relative to the device; null
+ *   or empty for the device root.
+ * @returns {string} A boolean Flux expression over `r`.
+ */
+export function uns_path_test(folder) {
+    if (folder == null || folder === "")
+        return "r.path =~ /^[^\\/]+$/";
+    return `r.path =~ /^[^\\/]+\\/${flux_regex_escape(folder)}$/`;
+}
+
 /** Split a metric selector into its path and name.
  *
  * The historians store a Sparkplug metric `a/b/c` as measurement `c:x`
@@ -58,14 +98,17 @@ export function split_metric(selector) {
 /** Build the Flux predicate body for a list of metric selectors.
  *
  * @param {string[]} metrics Validated selectors (see parse_download_filter).
+ * @param {string} [store] The source's store; `uns` sources test the
+ *   UNS form of `path`.
  * @returns {string} A boolean Flux expression over `r`.
  */
-export function metrics_predicate(metrics) {
+export function metrics_predicate(metrics, store) {
     const clauses = metrics.map(selector => {
         const { path, name } = split_metric(selector);
         const by_name = measurement_clause(name);
 
         if (path == null) return by_name;
+        if (store == UNS) return `(${uns_path_test(path)} and ${by_name})`;
         return `(r.path == ${flux_string(path)} and ${by_name})`;
     });
 
@@ -78,16 +121,19 @@ export const MAX_SUBSET_CLAUSES = 100;
 
 /** Build the Flux predicate body for a sub-device's resolved metrics.
  *
- * Unlike a selector, a null path here means the device root, where the
- * historians write no `path` tag at all.
+ * Unlike a selector, a null path here means the device root, where
+ * historian-sparkplug writes no `path` tag at all and historian-uns
+ * writes the device ID alone.
  *
  * @param {object[]} metrics `{ path, name }` from resolve_metric.
+ * @param {string} [store] The source's store.
  * @returns {string} A boolean Flux expression over `r`.
  */
-export function subset_predicate(metrics) {
+export function subset_predicate(metrics, store) {
     const clauses = metrics.map(({ path, name }) => {
         const by_name = measurement_clause(name);
 
+        if (store == UNS) return `(${uns_path_test(path)} and ${by_name})`;
         if (path == null) return `(not exists r.path and ${by_name})`;
         return `(r.path == ${flux_string(path)} and ${by_name})`;
     });
@@ -99,7 +145,9 @@ export function subset_predicate(metrics) {
  *
  * @param {object} opts
  * @param {string} opts.bucket Influx bucket name.
- * @param {object} opts.source `{ device_uuid, from, to }`.
+ * @param {object} opts.source `{ device_uuid, store, from, to }`. A
+ *   `uns` source tests the UNS form of `path`; the bucket's other tags
+ *   and the measurement names are the same in both stores.
  * @param {object} [opts.filter] `{ metrics }` or `{ measurement }`.
  * @param {object[]} [opts.subset] Sub-device metrics to restrict the
  *   source to, as `{ path, name }`. Applied as well as `filter`.
@@ -115,7 +163,7 @@ export function build_flux_query({ bucket, source, filter = {}, subset }) {
         metricFilter = `
             |> filter(
                 fn: (r) =>
-                        ${metrics_predicate(filter.metrics)}
+                        ${metrics_predicate(filter.metrics, source.store)}
             )
         `;
     }
@@ -133,7 +181,7 @@ export function build_flux_query({ bucket, source, filter = {}, subset }) {
         ? `
             |> filter(
                 fn: (r) =>
-                        ${subset_predicate(subset)}
+                        ${subset_predicate(subset, source.store)}
             )
         `
         : "";
@@ -162,7 +210,11 @@ export function build_flux_query({ bucket, source, filter = {}, subset }) {
                 "_measurement",
                 "device",
                 "unit",
-                "path"
+                "path",
+                "topLevelInstance",
+                "bottomLevelInstance",
+                "topLevelSchema",
+                "bottomLevelSchema"
             ])
         `;
 }

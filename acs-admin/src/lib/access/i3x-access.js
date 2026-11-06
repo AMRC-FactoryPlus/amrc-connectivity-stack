@@ -1,6 +1,7 @@
 /*
  * ACS Admin
- * Who can read a device or ISA-95 node through i3X, and why.
+ * Who can read a device or ISA-95 node through i3X, or build datasets
+ * from a device, and why.
  * Copyright 2026 University of Sheffield AMRC
  */
 
@@ -11,6 +12,24 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 export const READ_OBJECT = 'd24495fd-72a3-41cd-8b9f-f4ebabdade44'
 export const I3X_PERM_ALL = '6e00fd2b-1d57-4b78-96e1-9f789bbe1c52'
 export const I3X_PERMS = [READ_OBJECT, I3X_PERM_ALL]
+
+/* Data Access permissions (acs-service-setup/dumps/data-access.yaml).
+ * BUILD_DATASETS ("Build datasets from device", UseDevice) on a device
+ * lets someone make datasets from it; DATA_ACCESS_ALL is the group of
+ * every Data Access permission. DEVICE_DATA is the composite of
+ * READ_OBJECT and BUILD_DATASETS. lib/access/device-data.js works out
+ * which half each grant gives. */
+export const BUILD_DATASETS = '788b049c-2831-11f1-99fd-2b0bf86d6f77'
+export const DATA_ACCESS_ALL = '1e3cb5aa-a3f7-4bb6-9ef1-c3bc08427f60'
+export const DEVICE_DATA = '6abc1879-429d-4c0f-a5e4-00a655a09f26'
+export const ACCESS_PERMS = [...I3X_PERMS, BUILD_DATASETS, DATA_ACCESS_ALL, DEVICE_DATA]
+
+/* The dataset roles. acs-service-setup rewrites their grants on every
+ * run, so a grant on them is "set by role": it cannot be removed here,
+ * and nobody can give them one here either. */
+export const DATASET_MAKER = 'b7aa3036-fc1f-4869-b0f5-50f28b028905'
+export const DATASET_MANAGER = '4ab8468a-166b-4c01-afa6-7bd558db806b'
+export const ROLE_GROUPS = [DATASET_MAKER, DATASET_MANAGER]
 
 const fold = s => String(s ?? '').trim().toLowerCase()
 
@@ -53,7 +72,7 @@ export function isa95_path (nodes, uuid) {
 }
 
 async function grants_matching (auth, pattern) {
-  const all = await Promise.all(I3X_PERMS.map(permission =>
+  const all = await Promise.all(ACCESS_PERMS.map(permission =>
     auth.find_grants({ ...pattern, permission }).catch(() => [])))
   const ids = [...new Set(all.flat())]
   const grants = await Promise.all(ids.map(uuid =>
@@ -61,11 +80,13 @@ async function grants_matching (auth, pattern) {
   return grants.filter(Boolean)
 }
 
-/* Every grant that lets someone read `target`, with the reason:
+/* Every grant that lets someone read `target` through i3X or build
+ * datasets from it, with the reason:
  *  - 'direct': a grant on the target itself; these can be removed here;
  *  - 'node':   a grant on an ISA-95 node above it (`via` lists them);
  *  - 'class':  a plural grant on a class the device is a member of;
  *  - 'all':    the wildcard, every device.
+ * `role` is true for a grant to a dataset role (ROLE_GROUPS).
  * Grants the caller may not read are left out by the Auth service.
  *
  * @param client the service client
@@ -75,7 +96,8 @@ export async function read_access (client, { target, via = [] }) {
   const auth = client.Auth
   const rows = []
   const push = (grants, reason, through) => {
-    for (const g of grants) rows.push({ grant: g, reason, through })
+    for (const g of grants)
+      rows.push({ grant: g, reason, through, role: ROLE_GROUPS.includes(g.principal) })
   }
 
   push(await grants_matching(auth, { target: target.uuid, plural: false }), 'direct', null)

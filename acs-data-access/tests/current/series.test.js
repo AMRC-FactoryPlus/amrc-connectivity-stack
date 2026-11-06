@@ -914,6 +914,16 @@ describe("series route response", () => {
         expect(res.statusCode).toBe(503);
     });
 
+    test("504, not 503, when the InfluxDB client times out", async () => {
+        /* The client's own timeout means a slow query, not a down
+         * historian. The Data tab words the two differently. */
+        const slow = { queryRows: (q, consumer) => setImmediate(() =>
+            consumer.error(Object.assign(new Error("Request timed out"), { name: "RequestTimedOutError" }))) };
+        const { api } = make_api({ query_api: slow });
+        const res = await call(api, ROOT, { ...base, count: true, every: "1h" });
+        expect(res.statusCode).toBe(504);
+    });
+
     test("aborts the queries when the client goes away", async () => {
         let cancelled = false;
         const hang = { queryRows: (q, consumer) =>

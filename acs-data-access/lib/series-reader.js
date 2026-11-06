@@ -34,6 +34,14 @@ function merge_spans(spans) {
     return out;
 }
 
+/** Default time limits. The InfluxDB client the reader uses must
+ * allow at least query_timeout_ms, or its own timeout (10 s by
+ * default) ends a query first. */
+export const SERIES_DEFAULTS = {
+    query_timeout_ms: 90000,
+    timeout_ms: 120000,
+};
+
 /** Why a series request stopped early. */
 export class SeriesAbort extends Error {
     constructor(reason) {
@@ -52,9 +60,9 @@ export class SeriesReader {
      *   is not given.
      * @param opts.concurrency Queries to run at once (default 4).
      * @param opts.query_timeout_ms Time allowed for one query, counted
-     *   from when it starts running, not while it waits (default 30 s).
+     *   from when it starts running, not while it waits (default 90 s).
      * @param opts.timeout_ms Time allowed for one request, waiting
-     *   included (default 60 s).
+     *   included (default 120 s).
      * @param opts.max_queue Queries that may wait for a slot, across
      *   all requests (default 400). More fail with 503.
      * @param opts.coverage The `sparkplug` store's Coverage, or null to
@@ -69,8 +77,8 @@ export class SeriesReader {
         this.query_api = opts.query_api
             ?? opts.influx_client.getQueryApi(opts.influx_org);
         this.limit = pLimit(Number(opts.concurrency) || 4);
-        this.query_timeout_ms = Number(opts.query_timeout_ms) || 30000;
-        this.timeout_ms = Number(opts.timeout_ms) || 60000;
+        this.query_timeout_ms = Number(opts.query_timeout_ms) || SERIES_DEFAULTS.query_timeout_ms;
+        this.timeout_ms = Number(opts.timeout_ms) || SERIES_DEFAULTS.timeout_ms;
         this.max_queue = Number(opts.max_queue) || 400;
         this.coverages = opts.coverages ?? { [DEFAULT_STORE]: opts.coverage ?? null };
         /* The UNS bucket may not exist yet when Data Access starts. */

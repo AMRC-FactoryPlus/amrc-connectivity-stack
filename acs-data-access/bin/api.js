@@ -13,7 +13,7 @@ import {DataFlow} from '../lib/dataflow.js';
 import { APIv1 } from '../lib/api-v1.js';
 import {DataAccessNotify} from '../lib/notify.js';
 import { InfluxReader } from '../lib/influx-reader.js';
-import { SeriesReader } from '../lib/series-reader.js';
+import { SeriesReader, SERIES_DEFAULTS } from '../lib/series-reader.js';
 import { Coverage, InfluxAdmin } from '../lib/coverage-service.js';
 import { COVERAGE_DEFAULTS } from '../lib/coverage.js';
 import { body_errors } from '../lib/utils.js';
@@ -94,15 +94,25 @@ const uns_coverage = buckets.uns
 const coverages = [coverage, uns_coverage].filter(c => c);
 
 // The series route has its own limiter and timeout, separate from the
-// CSV export, so a long download does not stall the timeline.
+// CSV export, so a long download does not stall the timeline. Its
+// InfluxDB client waits a little longer than the query timeout:
+// InfluxDB sends an aggregate's rows only when it has them all, and
+// the client's default 10 s timeout ended slow queries first.
+const series_query_ms = Number(env.SERIES_QUERY_TIMEOUT_MS)
+  || SERIES_DEFAULTS.query_timeout_ms;
+const seriesInflux = new InfluxDB({
+  url: env.INFLUXDB_URL,
+  token: env.INFLUXDB_TOKEN,
+  timeout: series_query_ms + 5000,
+});
 const seriesReader = new SeriesReader({
   debug,
-  influx_client: influxClient,
+  influx_client: seriesInflux,
   influx_org: env.INFLUXDB_ORG,
   buckets,
   concurrency: env.SERIES_CONCURRENCY,
   timeout_ms: env.SERIES_TIMEOUT_MS,
-  query_timeout_ms: env.SERIES_QUERY_TIMEOUT_MS,
+  query_timeout_ms: series_query_ms,
   max_queue: env.SERIES_MAX_QUEUE,
   coverages: {
     sparkplug: coverage.enabled ? coverage : null,

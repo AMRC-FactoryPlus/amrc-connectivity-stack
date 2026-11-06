@@ -908,13 +908,19 @@ export class APIv1 {
       return fail(this.log, 503, `Too many series queries waiting`);
     }
 
+    /* The InfluxDB client's own timeout. The query was slow, not the
+     * historian down: say so. */
+    if (err?.name == "RequestTimedOutError") {
+      this.log("Series query timed out in the InfluxDB client");
+      return fail(this.log, 504, `Series query timed out`);
+    }
+
     /* A 4xx from InfluxDB means we sent a bad query: that is our bug. */
     if (err?.name == "HttpError" && err.statusCode < 500) {
       this.log("Series query rejected by InfluxDB: %s", err.message);
       return fail(this.log, 500, `Series query failed`);
     }
-    if (err?.name == "HttpError" || err?.name == "RequestTimedOutError"
-        || typeof err?.code == "string") {
+    if (err?.name == "HttpError" || typeof err?.code == "string") {
       this.log("InfluxDB unavailable: %s", err.message);
       return fail(this.log, 503, `InfluxDB unavailable`);
     }

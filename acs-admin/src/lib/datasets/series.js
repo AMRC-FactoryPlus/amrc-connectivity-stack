@@ -1330,3 +1330,46 @@ function london_hour (t) {
 function fmt_day_short (t) {
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(t)).replace(',', '')
 }
+
+/* ------------------------------------------------------------------
+ * One request at a time
+ * ------------------------------------------------------------------ */
+
+/**
+ * Runs the loads of one chart one at a time. Data Access keeps
+ * running a request after the page stops waiting for it, so starting
+ * a new request over a slow one stacks them up on InfluxDB, and each
+ * makes the next slower. A load asked for while one runs waits, and
+ * only the newest one waits: three asks during a slow request make
+ * one more request, not three.
+ *
+ * `run(fn)` runs fn now, or after the running one. `busy()` says
+ * whether one is running. `stop()` drops the waiting one and refuses
+ * new ones, for when the chart goes away.
+ */
+export function serial () {
+    let running = false
+    let next = null
+    let stopped = false
+
+    function run (fn) {
+        if (stopped) return
+        if (running) { next = fn; return }
+        running = true
+        Promise.resolve()
+            .then(fn)
+            .catch(err => console.error('Datasets: a chart load failed', err))
+            .finally(() => {
+                running = false
+                const n = next
+                next = null
+                if (n) run(n)
+            })
+    }
+
+    return {
+        run,
+        busy: () => running,
+        stop () { stopped = true; next = null },
+    }
+}

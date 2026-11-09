@@ -20,6 +20,7 @@ import {
     density_alpha, density_colour, bucket_cells, bin_counts, window_strip, sum_counts, StripCache,
     fmt_since, device_status, quiet_note,
     i3x_leaf_ids, i3x_leaf_id, metric_label, axis_ticks,
+    serial,
 } from '../src/lib/datasets/series.js'
 
 const D1 = 'aaaaaaaa-0000-4000-8000-000000000001'
@@ -530,5 +531,65 @@ describe('calling the service (fake client)', async () => {
         const client = fake(403)
         await expect(download_csv(client, DS, null)).rejects.toMatchObject({ status: 403 })
         expect(client.calls[0].body).toEqual({})
+    })
+})
+
+describe('one chart request at a time', () => {
+    // A request the test answers by hand.
+    function slow (log, name) {
+        let answer
+        const fn = () => {
+            log.push(`start ${name}`)
+            return new Promise(r => { answer = () => { log.push(`end ${name}`); r() } })
+        }
+        return { fn, answer: () => answer() }
+    }
+    const settle = () => new Promise(r => setTimeout(r, 0))
+
+    it('waits for a slow request, then makes only the newest one', async () => {
+        const log = []
+        const q = serial()
+        const a = slow(log, 'a'), b = slow(log, 'b'), c = slow(log, 'c'), d = slow(log, 'd')
+        q.run(a.fn)
+        await settle()
+        // Three more asks while the first is still running.
+        q.run(b.fn)
+        q.run(c.fn)
+        q.run(d.fn)
+        await settle()
+        expect(q.busy()).toBe(true)
+        expect(log).toEqual(['start a'])
+        a.answer()
+        await settle()
+        expect(log).toEqual(['start a', 'end a', 'start d'])
+        d.answer()
+        await settle()
+        expect(q.busy()).toBe(false)
+        expect(log).toEqual(['start a', 'end a', 'start d', 'end d'])
+    })
+
+    it('carries on after a request fails', async () => {
+        const log = []
+        const q = serial()
+        q.run(() => Promise.reject(new Error('timed out')))
+        q.run(() => { log.push('next') })
+        await settle()
+        await settle()
+        expect(log).toEqual(['next'])
+        expect(q.busy()).toBe(false)
+    })
+
+    it('makes no more requests once the chart has gone', async () => {
+        const log = []
+        const q = serial()
+        const a = slow(log, 'a')
+        q.run(a.fn)
+        await settle()
+        q.run(() => { log.push('queued') })
+        q.stop()
+        q.run(() => { log.push('late') })
+        a.answer()
+        await settle()
+        expect(log).toEqual(['start a', 'end a'])
     })
 })

@@ -64,6 +64,13 @@ spec:
               value: default
             - name: INFLUXDB_BUCKET
               value: default
+            {{- if .Values.historians.uns.enabled }}
+            # The UNS historian's bucket, which the UNS device dataset
+            # kinds read. templates/historians/uns.yaml creates it under
+            # this fixed name. Without it those kinds answer 503.
+            - name: INFLUXDB_UNS_BUCKET
+              value: uns
+            {{- end }}
             - name: INFLUXDB_TOKEN
               valueFrom:
                 secretKeyRef:

@@ -47,8 +47,13 @@ function make_api(datasets, denied = [], delete_errors = {}) {
       record("delete_config", app, uuid);
     },
     async create_object() { throw new Error("create_object not expected"); },
-    /* No device has an origin map, so no sub-device path resolves. */
-    async get_config() { return undefined; },
+    /* No device has an origin map, so no sub-device path resolves.
+     * Every device has an ISA-95 placement. */
+    async get_config(app) {
+      if (app == Constants.External.ISA95Placement) return { node: SRC_C };
+      return undefined;
+    },
+    async class_has_member() { return true; },
   };
 
   const auth = {
@@ -67,6 +72,7 @@ function make_api(datasets, denied = [], delete_errors = {}) {
     cdb,
     debug: { bound: () => () => {} },
     influxReader: {},
+    buckets: { sparkplug: "default", uns: "uns" },
   });
 
   return { api, calls };
@@ -172,17 +178,38 @@ describe("structure_update rejects before it removes anything", () => {
     expect(calls.writes).toEqual([]);
   });
 
-  test("invalid dataset: a sub-device path that does not resolve keeps its config entries", async () => {
+  test("invalid dataset: a metrics path that does not resolve keeps its config entries", async () => {
     const { api, calls } = make_api(invalid_dataset);
 
     await expect(api.structure_update(
-      make_req(UNION, Constants.App.SparkplugSubset,
+      make_req(UNION, Constants.App.UNSDeviceMetrics,
         { source: SRC_A, metrics: [{ path: "Axes/X/Position" }] }),
       make_res(),
     )).rejects.toMatchObject({ status: 422 });
 
     expect(calls.writes).toEqual([]);
   });
+
+  /* Rewriting an invalid dataset makes it anew, so it counts as a
+   * create: the retired device kinds are refused. */
+  test.each([
+    ["Sub-device", Constants.App.SparkplugSubset,
+      { source: SRC_A, metrics: [{ instance: SRC_A, metric: "Speed" }] }],
+    ["Sparkplug source", Constants.App.SparkplugSrc, { source: SRC_A }],
+  ])("invalid dataset: rewriting it as a %s is refused and keeps its config entries",
+    async (_, structure, config) => {
+      const { api, calls } = make_api(invalid_dataset);
+
+      const res = make_res();
+      await api.structure_update(make_req(UNION, structure, config), res);
+
+      expect(res.code).toBe(422);
+      expect(res.body).toMatchObject({
+        error: "structure_retired",
+        use: [Constants.App.UNSDevice, Constants.App.UNSDeviceMetrics],
+      });
+      expect(calls.writes).toEqual([]);
+    });
 
   test("changing structure type is refused without writes", async () => {
     const { api, calls } = make_api(union_dataset);
@@ -198,6 +225,22 @@ describe("structure_update rejects before it removes anything", () => {
 });
 
 describe("structure_update applies an accepted update", () => {
+  /* Existing datasets of the retired device kinds can still be edited. */
+  test.each([
+    ["Sparkplug source", Constants.App.SparkplugSrc, { source: SRC_A }, { source: SRC_B }],
+    ["Sub-device", Constants.App.SparkplugSubset,
+      { source: SRC_A, metrics: [{ instance: SRC_A, metric: "Speed" }] },
+      { source: SRC_A, metrics: [{ instance: SRC_A, metric: "Load" }] }],
+  ])("a valid %s dataset can still be edited", async (_, structure, before, after) => {
+    const { api, calls } = make_api({ [SESSION]: { structure, config: before } });
+
+    const res = make_res();
+    await api.structure_update(make_req(SESSION, structure, after), res);
+
+    expect(res.code).toBe(200);
+    expect(calls.writes).toEqual([["put_config", structure, SESSION, after]]);
+  });
+
   test("union: replaces the old links with the new ones", async () => {
     const { api, calls } = make_api(union_dataset);
 

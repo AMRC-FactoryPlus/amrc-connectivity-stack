@@ -11,7 +11,7 @@ import {
   LIMITS, STEP_MS, COVERAGE_NOTE, series_request, mean_entry, count_too_long,
   dataset_window, window_is_live, bucket_start, bucket_end, mean_window,
   append_live_items, tail_window, replace_tail, coverage_every, coverage_not_ready,
-  stray_mean_device, every_for_width,
+  stray_mean_device, every_for_width, serial,
 } from '@/lib/datasets/series.js'
 
 const MAX_TAIL_MS = 5 * 60 * 1000
@@ -97,6 +97,9 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
 
   let gen = 0
   let timer = null
+  // One request at a time: a slow one is never stacked under newer ones.
+  const loads = serial()
+  const load = () => loads.run(loadNow)
 
   // A window with no end reaches to now when it loads.
   const reqTo = () => win.value.open ? Math.max(win.value.to, Date.now()) : win.value.to
@@ -115,7 +118,7 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
     })
   }
 
-  async function load () {
+  async function loadNow () {
     const rec = toValue(record)
     clearTimeout(timer)
     const my = ++gen
@@ -193,8 +196,14 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
     timer = setTimeout(refreshTail, wait)
   }
 
-  async function refreshTail () {
+  // A load in progress plans the next refresh when it ends.
+  function refreshTail () {
     clearTimeout(timer)
+    if (loads.busy()) return
+    loads.run(refreshNow)
+  }
+
+  async function refreshNow () {
     const s = series.value
     if (!s) return
     // Hidden: the visibility watch below starts again when it is seen.
@@ -225,6 +234,10 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
 
   /* Live values from i3X. Nothing opens until there are IDs to watch. */
   const i3x = useI3xLive(items => onValues(items))
+  // The charted metrics i3X is streaming, by key.
+  const liveKeys = computed(() => [...byElement.value]
+    .filter(([id]) => i3x.subscribed.value.has(id))
+    .map(([, e]) => e.key))
   let watching = false
   function ensureLive () {
     const ids = live.value ? [...byElement.value.keys()] : []
@@ -270,6 +283,7 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
   }, ANCHOR_MS)
 
   onBeforeUnmount(() => {
+    loads.stop()
     gen++
     longGen++
     clearTimeout(timer)
@@ -297,6 +311,9 @@ export function useDatasetSeries (record, entries, { width = 600, count = false,
     axisTo,
     now: computed(() => nowDate.value.getTime()),
     live,
+    // i3X: 'off', 'live', 'denied' or 'unavailable' (useI3xLive).
+    liveStatus: i3x.status,
+    liveKeys,
     capped,
     reload: load,
     stepMs: computed(() => STEP_MS[series.value?.every] ?? null),

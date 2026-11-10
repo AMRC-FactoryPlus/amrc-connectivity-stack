@@ -289,3 +289,56 @@ async function history_newest(h: History, tli: string, measurement: string): Pro
         `from(bucket: "${bucket}") |> range(start: -30d) |> filter(fn: (r) => r.topLevelInstance == "${tli}" and r._measurement == "${measurement}") |> last() |> keep(columns: ["_time"]) |> group() |> max(column: "_time")`);
     return rows[0]._time;
 }
+
+describeInflux("History streamed against real InfluxDB", () => {
+    const name = `i3x-history-stream-${Date.now()}`;
+    let id = "";
+    /* One leaf per value type, at the top level of device "dev", whose
+     * UNS device segment is "Dev": the path tag is the segment alone. */
+    const types = { Double: "d", Int64: "i", UInt32: "u", Boolean: "b", String: "s" } as const;
+    const meta = (t: keyof typeof types) => ({ topLevelInstanceUuid: "dev", metricPath: "",
+        metricName: `M${t}`, sparkplugType: t, typeSuffix: types[t] });
+    const tree = {
+        getObject: (e: string) => ({ elementId: e, isComposition: false }),
+        getMetricMeta: (e: string) => meta(e as keyof typeof types),
+        unsDeviceSegment: () => "Dev",
+    } as unknown as ObjectTree;
+    const T0 = Date.parse("2026-11-01T00:00:00Z");
+    const N = 20_000;
+
+    beforeAll(async () => {
+        const all: string[] = [];
+        for (const t of Object.keys(types) as Array<keyof typeof types>) {
+            const s = types[t];
+            for (let i = 0; i < N; i++) {
+                const v = s === "d" ? `${i / 8}` : s === "i" ? `${i - 100}i` : s === "u" ? `${i}u`
+                    : s === "b" ? `${i % 3 === 0}` : `"v ${i}, \\"q\\""`;
+                all.push(`M${t}:${s},topLevelInstance=dev,path=Dev value=${v} ${T0 + i * 40}`);
+            }
+        }
+        id = await seedBucket(name, all);
+    }, 120_000);
+
+    afterAll(async () => {
+        if (id) await fetch(`${URL}/api/v2/buckets/${id}`, { method: "DELETE", headers });
+    });
+
+    it("gives exactly the values collectRows reads, for every value type", async () => {
+        const h = new History({ influxUrl: URL!, influxToken: TOKEN, influxOrg: ORG, influxBucket: name, objectTree: tree });
+        const start = "2026-11-01T00:00:00Z";
+        const end = "2026-11-02T00:00:00Z";
+        for (const t of Object.keys(types)) {
+            const ref: I3xVqt[] = (await (h as any).queryApi.collectRows(h.buildFluxQuery(t, start, end)))
+                .map((r: any) => ({ value: r._value, quality: "Good", timestamp: r._time }));
+            expect(ref).toHaveLength(N);
+            let batches = 0;
+            const streamed: I3xVqt[] = [];
+            for await (const b of h.streamHistory(t, start, end)) {
+                batches++;
+                for (const v of b) streamed.push(v);
+            }
+            expect(batches).toBeGreaterThan(1);
+            expect(JSON.stringify(streamed)).toBe(JSON.stringify(ref));
+        }
+    }, 120_000);
+});

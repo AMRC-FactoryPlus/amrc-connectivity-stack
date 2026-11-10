@@ -8,7 +8,10 @@ export class SparkplugSourcesHandler extends BaseStructureHandler {
     super(api);
 
     this.structure = Constants.App.SparkplugSrc;
-    this.sourcePermission = Constants.Perm.UseSparkplug;
+    this.sourcePermission = Constants.Perm.UseDevice;
+    this.store = Constants.Store.Sparkplug;
+    /* New device datasets read the UNS. */
+    this.replaced_by = [Constants.App.UNSDevice, Constants.App.UNSDeviceMetrics];
   }
 
   validate_config(config) {
@@ -43,12 +46,13 @@ export class SparkplugSourcesHandler extends BaseStructureHandler {
     return [{
         dataset_uuid, 
         device_uuid: config.source,
+        store: this.store,
         from: inherited_range.from,
         to: inherited_range.to,
       }];
   }
 
-  /* A SparkplugSrc points at a device, not at another dataset, so it can
+  /* A device source points at a device, not at another dataset, so it can
    * never hold a dangling dataset reference. */
   references() {
     return false;

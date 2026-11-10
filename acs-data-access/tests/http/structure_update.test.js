@@ -218,25 +218,25 @@ describe('PUT /structure', () => {
 
     test.each([
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: Temp_Data.Test_Uuids.Devices.TestDevice
             },
-            secondLevelPerm: Constants.Perm.UseSparkplug
+            secondLevelPerm: Constants.Perm.UseDevice
         },
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: Temp_Data.Test_Uuids.Devices.TestDoubleDevice
             },
-            secondLevelPerm: Constants.Perm.UseSparkplug
+            secondLevelPerm: Constants.Perm.UseDevice
         },
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: Temp_Data.Test_Uuids.Devices.TestFloatDevice
             },
-            secondLevelPerm: Constants.Perm.UseSparkplug
+            secondLevelPerm: Constants.Perm.UseDevice
         },
         
     ])('Update for Valid SRC - case %#', async (testCase) => {
@@ -397,25 +397,25 @@ describe('PUT /structure', () => {
 
     test.each([
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: Temp_Data.Test_Uuids.Devices.TestDevice
             },
-            secondLevelPerm: Constants.Perm.UseSparkplug
+            secondLevelPerm: Constants.Perm.UseDevice
         },
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: Temp_Data.Test_Uuids.Devices.TestDoubleDevice
             },
-            secondLevelPerm: Constants.Perm.UseSparkplug
+            secondLevelPerm: Constants.Perm.UseDevice
         },
         {
-            structure: Constants.App.SparkplugSrc,
+            structure: Constants.App.UNSDevice,
             config: {
                 source: Temp_Data.Test_Uuids.Devices.TestFloatDevice
             },
-            secondLevelPerm: Constants.Perm.UseSparkplug
+            secondLevelPerm: Constants.Perm.UseDevice
         },
     ])('Successful update for Invalid SRC', async (testCase) => {
         // create dataset and give edit grant

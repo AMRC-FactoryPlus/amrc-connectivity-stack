@@ -41,6 +41,30 @@ async function bulk (client, url, body) {
   return { status: res.status, results: res.body.results ?? [] }
 }
 
+/**
+ * Sort the per-id results of a subscription register into the ids that
+ * registered, the ids i3X does not show this principal (404: no access,
+ * or not served) and the ids that failed for another reason. An id with
+ * no result counts as failed.
+ *
+ * @param results  [{ success, elementId, error: { code } }]
+ * @param ids      the ids that were sent, if known
+ * @returns { ok, missing, failed }, each an array of ids
+ */
+export function register_outcome (results, ids = null) {
+  const ok = [], missing = [], failed = []
+  const seen = new Set()
+  for (const r of results ?? []) {
+    if (r?.elementId == null || seen.has(r.elementId)) continue
+    seen.add(r.elementId)
+    if (r.success) ok.push(r.elementId)
+    else if (r.error?.code === 404) missing.push(r.elementId)
+    else failed.push(r.elementId)
+  }
+  for (const id of ids ?? []) if (!seen.has(id)) failed.push(id)
+  return { ok, missing, failed }
+}
+
 function get (client, url, query) {
   return request(client, { url, method: 'GET', query })
 }
@@ -125,6 +149,8 @@ export function useI3xClient () {
       return post(c(), 'v1/subscriptions/delete', { clientId, subscriptionIds })
     },
 
+    // Throws when any id fails. The monitor registers one id at a
+    // time and relies on that.
     registerItems (clientId, subscriptionId, elementIds, maxDepth) {
       const body = { clientId, subscriptionId, elementIds }
       if (maxDepth != null) body.maxDepth = maxDepth
@@ -134,6 +160,20 @@ export function useI3xClient () {
     unregisterItems (clientId, subscriptionId, elementIds) {
       return post(c(), 'v1/subscriptions/unregister',
         { clientId, subscriptionId, elementIds })
+    },
+
+    // As registerItems, but returns the per-id results instead of
+    // throwing when some ids fail: one unknown id must not stop the
+    // others. Sort them with register_outcome.
+    registerEach (clientId, subscriptionId, elementIds, maxDepth) {
+      const body = { clientId, subscriptionId, elementIds }
+      if (maxDepth != null) body.maxDepth = maxDepth
+      return bulk(c(), 'v1/subscriptions/register', body).then(r => r.results)
+    },
+
+    unregisterEach (clientId, subscriptionId, elementIds) {
+      return bulk(c(), 'v1/subscriptions/unregister',
+        { clientId, subscriptionId, elementIds }).then(r => r.results)
     },
 
     syncSubscription (clientId, subscriptionId, lastSequenceNumber) {

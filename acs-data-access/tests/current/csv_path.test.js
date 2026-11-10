@@ -86,13 +86,13 @@ describe("CSV path column", () => {
     test("the header ends with path", async () => {
         const { reader } = make_reader([[]]);
         const [header] = await export_csv(reader, [{ device_uuid: DEVICE }]);
-        expect(header).toBe("device,metric,timestamp,value,unit,path");
+        expect(header).toBe("device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid");
     });
 
     test("a top-level metric has its name as its path", async () => {
         const { reader } = make_reader([[row("Switch_Closed:b")]]);
         const [, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
-        expect(line).toBe(`Dev,Switch_Closed,${TIME},1,mm,Switch_Closed`);
+        expect(line).toBe(`Dev,Switch_Closed,${TIME},1,mm,Switch_Closed,,,`);
     });
 
     test("a nested metric has its full name as its path", async () => {
@@ -101,7 +101,7 @@ describe("CSV path column", () => {
         ]]);
         const [, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
         expect(line).toBe(
-            `Dev,Actual,${TIME},1,mm,Axes/A_LF/Base_Axis/Feedrate/Actual`);
+            `Dev,Actual,${TIME},1,mm,Axes/A_LF/Base_Axis/Feedrate/Actual,,,`);
     });
 
     test("tells apart two metrics with the same name", async () => {
@@ -116,13 +116,35 @@ describe("CSV path column", () => {
         expect(b.split(",")[5]).toBe("Axes/A_LF/Base_Axis/Feedrate/Actual");
     });
 
+    test("ends each row with the device, instance and schema UUIDs", async () => {
+        const { reader } = make_reader([[
+            row("Actual:d", "Axes/X", {
+                topLevelInstance: DEVICE,
+                bottomLevelInstance: "a1a1a1a1-0000-4000-8000-000000000001",
+                bottomLevelSchema: "5c5c5c5c-0000-4000-8000-000000000001",
+            }),
+        ]]);
+        const [header, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
+        expect(header.split(",").slice(-3)).toEqual(["device_uuid", "instance_uuid", "schema_uuid"]);
+        expect(line).toBe(`Dev,Actual,${TIME},1,mm,Axes/X/Actual,${DEVICE},`
+            + "a1a1a1a1-0000-4000-8000-000000000001,5c5c5c5c-0000-4000-8000-000000000001");
+    });
+
+    test("a metric directly on the device takes the device's instance and schema", async () => {
+        const { reader } = make_reader([[
+            row("Speed:d", "", { topLevelInstance: DEVICE, topLevelSchema: "5c5c5c5c-0000-4000-8000-000000000002" }),
+        ]]);
+        const [, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
+        expect(line.split(",").slice(-3)).toEqual([DEVICE, DEVICE, "5c5c5c5c-0000-4000-8000-000000000002"]);
+    });
+
     test("escapes a path with a comma or a quote", async () => {
         const { reader } = make_reader([[
             row("Temp:d", 'Zone,1/Sensor "A"'),
         ]]);
         const [, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
         expect(line).toBe(
-            `Dev,Temp,${TIME},1,mm,"Zone,1/Sensor ""A""/Temp"`);
+            `Dev,Temp,${TIME},1,mm,"Zone,1/Sensor ""A""/Temp",,,`);
     });
 
     test("keeps the path column in the Flux query", () => {

@@ -10,7 +10,7 @@ import { useI3xLive } from '@composables/useI3xLive.js'
 import {
   LIMITS, STEP_MS, SeriesCache, series_request, mean_entry, count_too_long,
   dataset_window, window_is_live, bucket_start, bucket_end, every_for_width,
-  append_live_items, display_rows, live_mode, stray_mean_device, TAIL_REFRESH_MS, bucket_total,
+  append_live_items, display_rows, live_mode, stray_mean_device, TAIL_REFRESH_MS, bucket_total, serial,
 } from '@/lib/datasets/series.js'
 
 // Buckets fetched before the view, so a value that holds from earlier
@@ -103,8 +103,12 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     })
   }
 
+  // One request at a time: a slow one is never stacked under newer ones.
+  const loads = serial()
+  const load = () => loads.run(loadNow)
+
   let gen = 0
-  async function load () {
+  async function loadNow () {
     const rec = toValue(record)
     const my = ++gen
     if (!rec?.uuid || !means.value.length) { error.value = null; return }
@@ -162,8 +166,14 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     timer = setTimeout(refreshTail, wait)
   }
 
-  async function refreshTail () {
+  // A load in progress plans the next refresh when it ends.
+  function refreshTail () {
     clearTimeout(timer)
+    if (loads.busy()) return
+    loads.run(refreshNow)
+  }
+
+  async function refreshNow () {
     if (hidden() || !mode.value.live) return
     const my = gen
     const e = every.value
@@ -193,6 +203,10 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     const next = append_live_items({ ...tails.value, every: every.value }, items, id => byElement.value.get(id))
     if (next.metrics !== tails.value.metrics) tails.value = { ...tails.value, metrics: next.metrics }
   })
+  // The pinned metrics i3X is streaming, by key.
+  const liveKeys = computed(() => [...byElement.value]
+    .filter(([id]) => i3x.subscribed.value.has(id))
+    .map(([, e]) => e.key))
   let watching = false
   function ensureLive () {
     const ids = mode.value.stream ? [...byElement.value.keys()] : []
@@ -219,6 +233,7 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
   watch(visibility, v => { if (v === 'visible' && mode.value.live) refreshTail() })
 
   onBeforeUnmount(() => {
+    loads.stop()
     gen++
     clearTimeout(timer)
     clearTimeout(debounce)
@@ -273,6 +288,9 @@ export function useChartSeries (record, entries, { view = null, width = 600 } = 
     now,
     live: computed(() => mode.value.live),
     stream: computed(() => mode.value.stream),
+    // i3X: 'off', 'live', 'denied' or 'unavailable' (useI3xLive).
+    liveStatus: i3x.status,
+    liveKeys,
     hint: computed(() => mode.value.hint),
     capped,
     meanNote: computed(() => range.value.clamped ? 'Charts show at most 400 days at once.' : null),

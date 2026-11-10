@@ -1050,7 +1050,7 @@ describe("series route with the coverage summary", () => {
     test("the coverage state is read once per request", async () => {
         let reads = 0;
         const { api } = route({ state, rows: () => [] });
-        api.seriesReader.coverage = { bucket: "acs_coverage",
+        api.seriesReader.coverages.sparkplug = { bucket: "acs_coverage",
             read_state: () => (reads++ == 0 ? state : null) };
         const res = await post(api, { devices: [D1], count: true, every: "1d",
             from: iso(now_hour - 100 * DAY), to: iso(now_hour - 10 * DAY) });
@@ -1081,7 +1081,7 @@ describe("series route with the coverage summary", () => {
         const res = res_stub();
         await api.coverage_status({ auth: "user@EXAMPLE.ORG" }, res);
         expect(res.body).toEqual({ ready: true, detail: false });
-        expect(asked).toEqual([[Constants.Perm.UseSparkplug, UUIDs.Special.Null, true]]);
+        expect(asked).toEqual([[Constants.Perm.UseDevice, UUIDs.Special.Null, true]]);
 
         api.auth.check_acl = async () => { throw new Error("Auth down"); };
         const res2 = res_stub();

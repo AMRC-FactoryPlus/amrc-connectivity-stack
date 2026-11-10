@@ -17,6 +17,7 @@ import type { Grants } from "./access.js";
 import type { ValueCache, LazyValue } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
+import type { I3xVqt } from "./types/i3x.js";
 import validator from 'validator';
 
 /** What APIv1 needs from Access. */
@@ -151,16 +152,42 @@ function* lazyValueJson(v: LazyValue): Generator<string> {
     yield "}}";
 }
 
+interface StreamTextOpts {
+    /**
+     * What to do when producing the parts fails after the response has
+     * started. "destroy" (the default) closes the connection, so the
+     * client sees a transfer error. "end" sends what has gathered and
+     * ends the response normally: the JSON then has no closing
+     * brackets, so a client's parser fails rather than reading a cut
+     * off array as complete.
+     */
+    lateFailure?: "destroy" | "end";
+}
+
+/** Close an iterator of parts early, ignoring its errors. */
+function closeParts(parts: Iterator<string> | AsyncIterator<string>): void {
+    try {
+        const r = parts.return?.();
+        if (r instanceof Promise) r.catch(() => {});
+    } catch {
+        /* Already failing; the caller reports the first error. */
+    }
+}
+
 /**
  * Send a JSON body made of `parts`, a chunk at a time, waiting for the
  * socket to drain when it is full and stopping (closing `parts`) when
- * the client goes away. Nothing is sent until STREAM_CHUNK bytes have
+ * the client goes away. `parts` may be async, for a body read from
+ * InfluxDB as it is sent. Nothing is sent until STREAM_CHUNK bytes have
  * gathered, so a failure before then still goes to the error handler
  * as a proper response. A failure after that can no longer become an
- * error response, so it destroys the connection instead and the client
- * sees a truncated body.
+ * error response: see StreamTextOpts.lateFailure.
  */
-async function streamText(res: Response, parts: Iterator<string>): Promise<void> {
+async function streamText(
+    res: Response,
+    parts: Iterator<string> | AsyncIterator<string>,
+    opts: StreamTextOpts = {},
+): Promise<void> {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
 
     /* One 'drain' and one 'close' listener for the whole response.
@@ -182,11 +209,21 @@ async function streamText(res: Response, parts: Iterator<string>): Promise<void>
      * the event loop every SLICE_MS, even while the socket keeps up. */
     const slicer = new Slicer();
     try {
-        for (let next = parts.next(); !next.done; next = parts.next()) {
+        for (;;) {
+            /* Only an async iterator returns a promise: a sync one
+             * pays nothing extra per part. */
+            let next: IteratorResult<string> | Promise<IteratorResult<string>> = parts.next();
+            if (next instanceof Promise) next = await next;
+            if (next.done) break;
             buf += next.value;
             if (buf.length >= STREAM_CHUNK) {
+                const first = !res.headersSent;
                 const ok = res.write(buf);
                 buf = "";
+                /* With gzip, push the headers and the first bytes out
+                 * now rather than when zlib's buffer fills, so the
+                 * client knows the response has started. */
+                if (first) (res as any).flush?.();
                 if (!ok && !res.destroyed) {
                     /* A client that stops reading would hold the read
                      * snapshot open for ever, and a held snapshot stops
@@ -201,7 +238,7 @@ async function streamText(res: Response, parts: Iterator<string>): Promise<void>
                         wake = null;
                         console.error("%s %s: client read nothing for %d ms; closing",
                             res.req?.method, res.req?.originalUrl, streamIdleMs());
-                        parts.return?.();
+                        closeParts(parts);
                         res.destroy();
                         return;
                     }
@@ -209,16 +246,110 @@ async function streamText(res: Response, parts: Iterator<string>): Promise<void>
             }
             if (slicer.due()) await slicer.pause();
             if (res.destroyed || res.writableEnded) {
-                parts.return?.();
+                closeParts(parts);
                 return;
             }
         }
         res.end(buf);
     } catch (err) {
-        parts.return?.();
+        closeParts(parts);
+        /* The client went away: nothing to answer or report. */
+        if (res.destroyed) return;
         if (!res.headersSent) throw err;
         console.error("%s %s: failed while streaming:", res.req?.method, res.req?.originalUrl, err);
-        res.destroy(err as Error);
+        if (opts.lateFailure === "end") res.end(buf);
+        else res.destroy(err as Error);
+    }
+}
+
+/** A signal that aborts when the response closes: when it has been
+ * sent, or when the client has gone away. */
+function closeSignal(res: Response): AbortSignal {
+    const abort = new AbortController();
+    res.once("close", () => abort.abort());
+    return abort.signal;
+}
+
+/**
+ * Later ids whose history queries start while one id's history is
+ * sent, so a request for many short histories does not wait for each
+ * query's round trip in turn. Each holds an InfluxDB slot, paused,
+ * until its turn, so this stays small.
+ */
+const HISTORY_LOOKAHEAD = 2;
+
+/**
+ * The JSON of a POST /objects/history response, with each id's values
+ * read from InfluxDB as they are sent. An id whose query fails before
+ * any of its values are sent gets an error item, as when the body was
+ * built in memory; a failure after that throws, so streamText leaves
+ * the JSON visibly incomplete. The top-level `success` goes last, as
+ * it is only known once every query has run.
+ */
+async function* historyBulkJson(
+    history: History,
+    ids: string[],
+    shown: boolean[],
+    startTime: string,
+    endTime: string,
+    signal: AbortSignal,
+): AsyncGenerator<string> {
+    const pending: Array<{
+        rows: AsyncGenerator<I3xVqt[]>;
+        first: Promise<IteratorResult<I3xVqt[]>>;
+    } | undefined> = [];
+    const start = (i: number) => {
+        if (i >= ids.length || !shown[i] || pending[i]) return;
+        const rows = history.streamHistory(ids[i], startTime, endTime, { signal });
+        const first = rows.next();
+        /* Handled when its turn comes; this stops an early failure
+         * counting as unhandled meanwhile. */
+        first.catch(() => {});
+        pending[i] = { rows, first };
+    };
+
+    let allSuccess = true;
+    try {
+        yield '{"results":[';
+        for (let i = 0; i < ids.length; i++) {
+            for (let j = i; j <= i + HISTORY_LOOKAHEAD; j++) start(j);
+            if (i) yield ",";
+            const id = ids[i];
+            if (!shown[i]) {
+                allSuccess = false;
+                yield JSON.stringify({ success: false, elementId: id,
+                    error: { code: 404, message: `Object ${id} not found` } });
+                continue;
+            }
+            /* Left in `pending` until it is done, so the finally below
+             * closes it, and frees its InfluxDB slot, if we stop early. */
+            const { rows, first } = pending[i]!;
+            const head = `{"success":true,"elementId":${JSON.stringify(id)},`
+                + `"result":{"elementId":${JSON.stringify(id)},"values":[`;
+            let started = false;
+            try {
+                for (let step = await first; !step.done; step = await rows.next()) {
+                    let out = started ? "" : head;
+                    for (const v of step.value) {
+                        out += (started ? "," : "") + JSON.stringify(v);
+                        started = true;
+                    }
+                    yield out;
+                }
+            } catch (err: any) {
+                if (started || signal.aborted) throw err;
+                pending[i] = undefined;
+                allSuccess = false;
+                yield JSON.stringify({ success: false, elementId: id,
+                    error: { code: err.status ?? 500, message: err.message } });
+                continue;
+            }
+            pending[i] = undefined;
+            yield (started ? "" : head) + "]}}";
+        }
+        yield `],"success":${allSuccess}}`;
+    } finally {
+        for (const p of pending) p?.rows.return(undefined).catch(() => {});
     }
 }
 
@@ -615,30 +746,27 @@ export class APIv1 {
      * endTime]`. Both bounds are required (400 otherwise). Per-id
      * errors are caught and reported in the envelope rather than
      * failing the whole batch.
+     *
+     * A day of a fast metric is millions of values, so the body is not
+     * built in memory: each id's values are sent as InfluxDB returns
+     * them (see historyBulkJson). Everything that decides the status
+     * is checked before anything is sent.
      */
     async history_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const { elementIds, startTime, endTime, maxDepth } = req.body;
+        const { elementIds, startTime, endTime } = req.body;
         if (!startTime || !endTime) {
             return next(badRequest("startTime and endTime are required"));
         }
         if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
             return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
         }
+        const ids = elementIds as string[];
         const visible = visibleTo(res);
-        const results = await Promise.all(
-            (elementIds as string[]).map(async id => {
-                if (visible && !this.objectTree.getObject(id, visible))
-                    return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
-                try {
-                    const values = await this.history.queryHistory(id, startTime, endTime, maxDepth);
-                    return { success: true, elementId: id, result: { elementId: id, values } };
-                } catch (err: any) {
-                    return { success: false, elementId: id, error: { code: err.status ?? 500, message: err.message } };
-                }
-            }),
-        );
-        const allSuccess = results.every(r => r.success);
-        ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
+        /* A hidden object answers as one that does not exist. */
+        const shown = ids.map(id => !visible || !!this.objectTree.getObject(id, visible));
+        await streamText(res,
+            historyBulkJson(this.history, ids, shown, startTime, endTime, closeSignal(res)),
+            { lateFailure: "end" });
     }
 
     /**
@@ -725,6 +853,7 @@ export class APIv1 {
 
     /**
      * GET /objects/:elementId/history — requires `startTime`/`endTime` query params (400 otherwise).
+     * The values are streamed, as for POST /objects/history.
      **/
     async get_object_history(req: Request, res: Response, next: NextFunction): Promise<void> {
         const { startTime, endTime } = req.query as { startTime?: string; endTime?: string };
@@ -734,11 +863,27 @@ export class APIv1 {
         if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
             return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
         }
+        const id = req.params.elementId;
         const visible = visibleTo(res);
-        if (visible && !this.objectTree.getObject(req.params.elementId, visible))
-            return next(notFound(`Object ${req.params.elementId} not found`));
-        const values = await this.history.queryHistory(req.params.elementId, startTime, endTime);
-        res.json({ elementId: req.params.elementId, values });
+        if (visible && !this.objectTree.getObject(id, visible))
+            return next(notFound(`Object ${id} not found`));
+        /* Sent as InfluxDB returns it, as for POST /objects/history. A
+         * query that fails before STREAM_CHUNK bytes have gathered
+         * still gets an error response. */
+        const rows = this.history.streamHistory(id, startTime, endTime, { signal: closeSignal(res) });
+        await streamText(res, (async function* () {
+            yield `{"success":true,"result":{"elementId":${JSON.stringify(id)},"values":[`;
+            let first = true;
+            for await (const batch of rows) {
+                let out = "";
+                for (const v of batch) {
+                    out += (first ? "" : ",") + JSON.stringify(v);
+                    first = false;
+                }
+                yield out;
+            }
+            yield "]}}";
+        })(), { lateFailure: "end" });
     }
 
     /**

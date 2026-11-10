@@ -14,8 +14,10 @@
  * metric at the top level. See seriesPath.
  */
 
-import { InfluxDB } from "@influxdata/influxdb-client";
-import type { QueryApi } from "@influxdata/influxdb-client";
+import {
+    InfluxDB, RequestTimedOutError, chunksToLines, linesToTables,
+} from "@influxdata/influxdb-client";
+import type { FluxTableMetaData, QueryApi, Transport } from "@influxdata/influxdb-client";
 import type { MetricMeta, ObjectTree, Visible } from "./object-tree.js";
 import type { I3xVqt, I3xValueResponse } from "./types/i3x.js";
 import type { InfluxValue } from "./value-cache.js";
@@ -40,7 +42,9 @@ interface HistoryOpts {
     /**
      * InfluxDB query timeout in ms. Defaults to 10 s, the client's
      * own default, set explicitly so the bulk queries' time budget
-     * does not depend on the client library version.
+     * does not depend on the client library version. Like the
+     * client's, it limits how long InfluxDB may send nothing, so a
+     * history stream fails when InfluxDB stalls for this long.
      */
     queryTimeout?: number;
     /**
@@ -109,10 +113,28 @@ async function mapLimit<T>(
     );
 }
 
+/** The annotated CSV dialect QueryApi asks InfluxDB for. */
+const CSV_DIALECT = {
+    header: true,
+    delimiter: ",",
+    quoteChar: "\"",
+    commentPrefix: "#",
+    annotations: ["datatype", "group", "default"],
+};
+
+export interface StreamOpts {
+    /** Stops the stream and closes the InfluxDB request. */
+    signal?: AbortSignal;
+}
+
 export class History {
     private bucket: string;
+    private org: string;
     private objectTree: ObjectTree;
     private queryApi: QueryApi;
+    /** Transport for streamed queries; see the constructor. */
+    private streamTransport: Pick<Transport, "iterate">;
+    private queryTimeout: number;
     private bulkChunkSize: number;
     private bulkConcurrency: number;
     private bulkMeasurementFilterMax: number;
@@ -121,6 +143,7 @@ export class History {
 
     constructor(opts: HistoryOpts) {
         this.bucket = opts.influxBucket;
+        this.org = opts.influxOrg;
         this.objectTree = opts.objectTree;
         this.semaphore = opts.semaphore ?? new Semaphore(opts.influxConcurrency ?? 4);
         this.valueCache = opts.valueCache;
@@ -128,12 +151,24 @@ export class History {
         this.bulkConcurrency = opts.bulkConcurrency ?? 4;
         this.bulkMeasurementFilterMax = opts.bulkMeasurementFilterMax ?? 50;
 
+        this.queryTimeout = opts.queryTimeout ?? 10_000;
         const influx = new InfluxDB({
             url: opts.influxUrl,
             token: opts.influxToken,
-            timeout: opts.queryTimeout ?? 10_000,
+            timeout: this.queryTimeout,
         });
         this.queryApi = influx.getQueryApi(opts.influxOrg);
+
+        /* The client's timeout is the socket's idle timeout. A stream
+         * stops reading while the HTTP client is slow, so the socket
+         * would go idle and fail the query, although InfluxDB is fine.
+         * Streams use a client without that timeout and time only the
+         * waits for InfluxDB instead (see streamRows). */
+        this.streamTransport = new InfluxDB({
+            url: opts.influxUrl,
+            token: opts.influxToken,
+            timeout: 0,
+        }).transport;
     }
 
     /** Run one Flux query, waiting for a slot under the process-wide cap. */
@@ -578,32 +613,143 @@ export class History {
     }
 
     /**
-     * Query InfluxDB for historical data and return I3xVqt results.
+     * A leaf's history over `[startTime, endTime]`, read from InfluxDB
+     * as it arrives, a batch of values per network read. A long range
+     * of a fast metric is millions of rows, so the caller writes each
+     * batch out before asking for the next, and InfluxDB waits while
+     * it does. Holds one of the process's InfluxDB slots until the
+     * stream ends or is closed early with return().
+     *
+     * Yields nothing for a composition or an id without MetricMeta,
+     * which have no series to read. A failure, or the InfluxDB timeout,
+     * throws from the next call; `signal` stops the stream and closes
+     * the InfluxDB request.
      */
-    async queryHistory(
+    async *streamHistory(
         elementId: string,
         startTime: string,
         endTime: string,
-        _maxDepth?: number,
-    ): Promise<I3xVqt[]> {
+        opts: StreamOpts = {},
+    ): AsyncGenerator<I3xVqt[]> {
         // Only support history on leaf metrics (those with MetricMeta).
         // Composition objects would return all child metrics mixed together
         // which is not useful. The reference implementation behaves the same.
         const obj = this.objectTree.getObject(elementId);
-        if (obj?.isComposition) return [];
+        if (obj?.isComposition) return;
 
         // No MetricMeta means we cannot identify a metric series for this
         // elementId. Return no data rather than guessing at a filter: a
         // leaf with no meta is indistinguishable from an unknown element.
         const query = this.buildFluxQuery(elementId, startTime, endTime);
-        if (query === null) return [];
+        if (query === null) return;
 
-        const rows = await this.query<{ _value: unknown; _time: string }>(query);
+        const release = await this.semaphore.acquire();
+        try {
+            if (opts.signal?.aborted) return;
+            yield* this.streamRows(query, opts.signal);
+        } finally {
+            release();
+        }
+    }
 
-        return rows.map((row) => ({
-            value: row._value,
-            quality: "Good" as const,
-            timestamp: row._time,
+    /**
+     * Query InfluxDB for historical data and return I3xVqt results.
+     * Holds every value in memory: the routes use streamHistory.
+     */
+    async queryHistory(
+        elementId: string,
+        startTime: string,
+        endTime: string,
+    ): Promise<I3xVqt[]> {
+        const out: I3xVqt[] = [];
+        for await (const batch of this.streamHistory(elementId, startTime, endTime)) {
+            for (const v of batch) out.push(v);
+        }
+        return out;
+    }
+
+    /**
+     * Run a history query and yield its rows as VQTs, a batch per
+     * chunk read from InfluxDB. Only the waits for InfluxDB are timed,
+     * each against the query timeout, not the time the consumer takes.
+     * Ending early, by `signal` or return(), closes the request.
+     */
+    private async *streamRows(query: string, signal?: AbortSignal): AsyncGenerator<I3xVqt[]> {
+        const abort = new AbortController();
+        const onAbort = () => abort.abort();
+        signal?.addEventListener("abort", onAbort);
+        let timedOut = false;
+
+        let batch: I3xVqt[] = [];
+        let failed: Error | undefined;
+        let meta: FluxTableMetaData | undefined;
+        const parser = chunksToLines(linesToTables({
+            next (values, tableMeta) {
+                if (tableMeta !== meta) {
+                    meta = tableMeta;
+                    /* InfluxDB reports an error after the response has
+                     * started as a table with an error column. */
+                    if (!meta.columns.some(c => c.label === "_value")
+                            && meta.columns.some(c => c.label === "error")) {
+                        failed ??= new Error(`InfluxDB: ${meta.get(values, "error")}`);
+                    }
+                }
+                if (failed) return;
+                batch.push({
+                    value: tableMeta.get(values, "_value"),
+                    quality: "Good",
+                    timestamp: tableMeta.get(values, "_time"),
+                });
+            },
+            error (err) { failed ??= err; },
+            complete () {},
         }));
+
+        const chunks = this.streamTransport.iterate(
+            `/api/v2/query?org=${encodeURIComponent(this.org)}`,
+            JSON.stringify({ query, dialect: CSV_DIALECT, type: "flux" }),
+            {
+                method: "POST",
+                headers: {
+                    "accept": "text/csv",
+                    "accept-encoding": "identity",
+                    "content-type": "application/json; encoding=utf-8",
+                },
+                signal: abort.signal,
+            },
+        );
+        try {
+            for (;;) {
+                const timer = setTimeout(() => {
+                    timedOut = true;
+                    abort.abort();
+                }, this.queryTimeout);
+                let step: IteratorResult<Uint8Array>;
+                try {
+                    step = await chunks.next();
+                } catch (err) {
+                    if (timedOut) throw new RequestTimedOutError();
+                    throw err;
+                } finally {
+                    clearTimeout(timer);
+                }
+                if (step.done) break;
+                parser.next(step.value);
+                if (failed) throw failed;
+                if (batch.length) {
+                    const out = batch;
+                    batch = [];
+                    yield out;
+                }
+            }
+            parser.complete();
+            if (failed) throw failed;
+            if (batch.length) yield batch;
+        } finally {
+            signal?.removeEventListener("abort", onAbort);
+            /* Closes the request if we stop before the end. */
+            abort.abort();
+            await chunks.return?.(undefined).catch(() => {});
+        }
     }
 }

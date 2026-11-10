@@ -532,7 +532,7 @@ export class DataFlow {
 
           /*
           * --------------------------------------------------
-          * SPARKPLUG SOURCE / SUB-DEVICE
+          * SPARKPLUG SOURCE / SUB-DEVICE / UNS DEVICE (METRICS)
           * --------------------------------------------------
           */
 
@@ -540,7 +540,11 @@ export class DataFlow {
             structure ===
             Constants.App.SparkplugSrc ||
             structure ===
-            Constants.App.SparkplugSubset
+            Constants.App.SparkplugSubset ||
+            structure ===
+            Constants.App.UNSDevice ||
+            structure ===
+            Constants.App.UNSDeviceMetrics
           ) {
 
             const result = {

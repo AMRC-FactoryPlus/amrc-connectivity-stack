@@ -8,6 +8,7 @@ import { merge_datasets, structure_tree } from '../src/lib/datasets/model.js'
 import {
     tab_of, equipment_of, included_list, equipment_change, group_items,
     labels_for, metric_total, filter_metrics, tree_rows, structure_type,
+    live_badge, contents_devices,
 } from '../src/components/Datasets/page/page-logic.js'
 import {
     is_energy_metric, energy_applies, energy_sparkplug_ids, pick_meters, pick_intensity,
@@ -116,7 +117,22 @@ describe('page logic', () => {
             source: 'dev-a', metrics: [{ instance: 'dev-a', metric: 'A' }, { instance: 'dev-a', metric: 'B' }] } }])
         const rows = tree_rows(structure_tree('sub', by), { deviceName: u => ({ 'dev-a': 'Meter A' })[u] ?? null })
         expect(rows[0].wording).toBe('2 metrics of device Meter A')
-        expect(structure_type(STRUCTURE.SUBSET)).toBe('Sub-device')
+        expect(structure_type(STRUCTURE.SUBSET)).toBe('Device metrics')
+    })
+
+    it('words the UNS device kinds as the older ones', () => {
+        const by = merge_datasets([], [
+            { uuid: 'u', structure: STRUCTURE.UNION, config: ['dev', 'sub'] },
+            { uuid: 'dev', structure: STRUCTURE.UNS_DEVICE, config: { source: 'dev-a' } },
+            { uuid: 'sub', structure: STRUCTURE.UNS_METRICS, config: { source: 'dev-a', metrics: [{ instance: 'dev-a', metric: 'A' }] } },
+        ])
+        const rows = tree_rows(structure_tree('u', by), { deviceName: u => ({ 'dev-a': 'Meter A' })[u] ?? null })
+        expect(rows[1].wording).toBe('device Meter A')
+        expect(rows[2].wording).toBe('1 metric of device Meter A')
+        // No label names a structure app or a bucket.
+        expect(structure_type(STRUCTURE.UNS_DEVICE)).toBe('Device')
+        expect(structure_type(STRUCTURE.DEVICE)).toBe('Device')
+        expect(structure_type(STRUCTURE.UNS_METRICS)).toBe('Device metrics')
     })
 
     it('marks cycles and unknown nodes', () => {
@@ -206,5 +222,60 @@ describe('fmt_amount', () => {
         expect(fmt_amount(12.34)).toBe('12.3')
         expect(fmt_amount(1234.5)).toBe('1,235')
         expect(fmt_amount(0)).toBe('0')
+    })
+})
+
+describe('live_badge', () => {
+    it('shows nothing when the view does not include now', () => {
+        expect(live_badge(false, true, 'live')).toBeNull()
+        expect(live_badge(false, false, 'off')).toBeNull()
+    })
+
+    it('is live at coarse buckets, which refetch without i3X', () => {
+        expect(live_badge(true, false, 'off')).toBe('live')
+        expect(live_badge(true, false, 'denied')).toBe('live')
+    })
+
+    it('is live at fine buckets only once i3X streams', () => {
+        expect(live_badge(true, true, 'live')).toBe('live')
+        expect(live_badge(true, true, 'off')).toBeNull()
+        expect(live_badge(true, true, 'unavailable')).toBeNull()
+    })
+
+    it('says when i3X refused every metric', () => {
+        expect(live_badge(true, true, 'denied')).toBe('denied')
+    })
+})
+
+describe('contents_devices', () => {
+    const D = 'd1d1d1d1-0000-4000-8000-000000000001'
+
+    it('gives each device the device store shape', () => {
+        const out = contents_devices({ devices: [{
+            uuid: D, name: 'Lathe', store: 'uns',
+            metrics: [{ instance: D, metric: 'Axes/X/Speed', path: 'Axes/X/Speed', type: 'Double', unit: 'mm/s' }],
+        }] })
+        expect(out[D]).toEqual({
+            uuid: D, name: 'Lathe',
+            metrics: [{ path: 'Axes/X/Speed', name: 'Speed', type: 'Double', unit: 'mm/s' }],
+        })
+        expect(metric_total(Object.values(out))).toBe(1)
+    })
+
+    it('joins a device listed once per store', () => {
+        const m = path => ({ path, type: 'Double' })
+        const out = contents_devices({ devices: [
+            { uuid: D, name: 'Lathe', store: 'sparkplug', metrics: [m('A'), m('B')] },
+            { uuid: D, name: 'Lathe', store: 'uns', metrics: [m('B'), m('C')] },
+        ] })
+        expect(out[D].metrics.map(x => x.path)).toEqual(['A', 'B', 'C'])
+    })
+
+    it('names an unnamed device by its UUID', () => {
+        expect(contents_devices({ devices: [{ uuid: D, name: null, metrics: [] }] })[D].name).toBe('d1d1d1d1')
+    })
+
+    it('is empty with no answer', () => {
+        expect(contents_devices(undefined)).toEqual({})
     })
 })

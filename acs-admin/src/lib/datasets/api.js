@@ -6,25 +6,30 @@
  * and the page shows that nothing (or what) was saved.
  */
 
-import { DA, STRUCTURE, KIND_BY_ID } from './constants.js'
+import { DA, STRUCTURE, KIND_BY_ID, is_device_structure, is_metrics_structure } from './constants.js'
 import { to_iso, validate_window, device_dataset_for, direct_sources, normalise_tags } from './model.js'
 import { parse_series, series_error } from './series.js'
 import { pipe_with_stall_timeout } from '../stream-download.js'
 
 /** An error a page can show as it is. */
 export class DatasetError extends Error {
-    constructor (message, { status, detail, saved } = {}) {
+    constructor (message, { status, detail, saved, refused } = {}) {
         super(message)
         this.status = status
         this.detail = detail
         // What did get saved before the failure, so the page can say so.
         this.saved = saved ?? []
+        // Devices Data Access would not make a dataset for:
+        // [{ device, reason, code }].
+        this.refused = refused ?? []
     }
 }
 
-function why (err) {
+/* Why a write failed, in words. `step` says what was being written,
+ * for a refusal: "to create the dataset that combines the items". */
+function why (err, step = null) {
     const st = err?.status
-    if (st === 403) return 'You do not have permission for this.'
+    if (st === 403) return step ? `You do not have permission ${step}.` : 'You do not have permission for this.'
     if (st === 404) return 'The dataset no longer exists. Someone may have deleted it.'
     if (st === 409) return 'Another dataset includes this one.'
     if (st === 422) return 'The service refused the definition.'
@@ -74,6 +79,24 @@ const META_RETRY_MS = [0, 250, 500, 1000]
 
 // Passed by the create paths: the dataset was made a moment ago.
 const FRESH = { fresh: true }
+
+// Device datasets made at once when saving.
+const DEVICE_POOL = 4
+
+/** Runs `fn` over `items`, at most `size` at a time. Rejects with the
+ * first error, after the calls already running have settled. */
+async function in_pool (items, size, fn) {
+    const queue = [...items]
+    let failed = null
+    const worker = async () => {
+        while (queue.length && !failed) {
+            try { await fn(queue.shift()) }
+            catch (err) { failed ??= { err } }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(size, queue.length) }, worker))
+    if (failed) throw failed.err
+}
 
 /**
  * A metadata write through Data Access. It checks EditDataset on the
@@ -153,8 +176,29 @@ async function delete_quietly (client, app, uuid) {
  * ------------------------------------------------------------------ */
 
 /**
- * Make sure each device has a device dataset, creating missing ones
- * with the device's name. Returns { [device uuid]: dataset uuid }.
+ * Why Data Access would not make a device dataset, in words, from the
+ * code it sends with a refusal. Null for a failure it did not explain.
+ * `name` names the device.
+ */
+export function device_refusal (err, name) {
+    switch (err?.body?.error) {
+        case 'placement_required': return `${name} isn't placed in the ISA-95 hierarchy yet.`
+        case 'structure_retired':  return 'This older type of device dataset can no longer be made.'
+        case 'device_required':    return `${name} is not a device.`
+        case 'uns_unavailable':    return 'New device datasets need the UNS historian, which this site does not run.'
+    }
+    if (err?.status === 403) return `You do not have permission to make a dataset for ${name}.`
+    return null
+}
+
+/**
+ * Make sure each device has a UNS device dataset, creating missing ones
+ * with the device's name. Older device datasets are not reused: new
+ * datasets read the UNS. Returns { [device uuid]: dataset uuid }.
+ *
+ * Every device is tried. Devices Data Access refuses are listed
+ * together in one DatasetError, with `refused` as [{ device, reason }],
+ * so the person can deal with all of them at once.
  *
  * `created` ({ [device uuid]: dataset uuid }) remembers what earlier
  * attempts made. The caller keeps it across retries, so a retry after a
@@ -162,15 +206,39 @@ async function delete_quietly (client, app, uuid) {
  */
 export async function ensure_device_datasets (client, devices, byUuid, nameOf = () => null, created = {}) {
     const out = {}
-    for (const dev of devices) {
-        const existing = device_dataset_for(dev, byUuid) ?? created[dev]
-        if (existing) { out[dev] = existing; continue }
-        const uuid = await client.DataAccess.create_dataset(STRUCTURE.DEVICE, { source: dev })
-        if (!uuid) throw new DatasetError(`Could not make a dataset for device ${nameOf(dev) ?? dev}.`)
-        created[dev] = uuid
+    const refused = []
+    let site_refuses = false
+    const make = async (dev) => {
+        const existing = device_dataset_for(dev, byUuid, [STRUCTURE.UNS_DEVICE]) ?? created[dev]
+        if (existing) { out[dev] = existing; return }
+        // The whole site refuses: no point asking for the others.
+        if (site_refuses) return
         const name = nameOf(dev)
+        let uuid
+        try {
+            uuid = await client.DataAccess.create_dataset(STRUCTURE.UNS_DEVICE, { source: dev })
+        }
+        catch (err) {
+            const reason = device_refusal(err, name ?? `Device ${dev.slice(0, 8)}`)
+            if (!reason) throw err
+            refused.push({ device: dev, reason, code: err?.body?.error ?? null })
+            if (err?.body?.error === 'uns_unavailable') site_refuses = true
+            return
+        }
+        if (!uuid) throw new DatasetError(`Could not make a dataset for device ${name ?? dev}.`)
+        created[dev] = uuid
         if (name) await set_name(client, uuid, name, FRESH)
         out[dev] = uuid
+    }
+    // A few at a time: each create takes about a second in Data Access.
+    await in_pool(devices, DEVICE_POOL, make)
+    if (refused.length) {
+        const n = refused.length
+        throw new DatasetError(`Not saved. ${n === 1 ? 'One device' : `${n} devices`} could not be added.`, {
+            status: 422,
+            detail: [...new Set(refused.map(r => r.reason))].join(' '),
+            refused,
+        })
     }
     return out
 }
@@ -235,22 +303,29 @@ export async function create_from_spec (client, spec, progress = {}) {
         progress.session = null
     }
     const saved = [progress.union, progress.session].filter(Boolean)
+    // What is being written, for a permission refusal.
+    let step = null
     try {
         let source = spec.items.length === 1 ? spec.items[0] : null
         if (spec.items.length > 1 || !spec.window) {
             source = progress.union
+            step = 'to create the dataset that combines the items'
             if (!source) {
                 source = await client.DataAccess.create_dataset(STRUCTURE.UNION, spec.items)
                 if (!source) throw new DatasetError('The service did not return the new dataset.')
                 progress.union = source
                 saved.push(source)
             }
+            // Before the session create: naming waits out the moment
+            // Data Access takes to see the new union as the caller's,
+            // which the session create's check of its source needs.
             await set_name(client, source, spec.window ? `${spec.name.trim()} (devices)` : spec.name.trim(), FRESH)
         }
 
         let uuid = source
         if (spec.window) {
             uuid = progress.session
+            step = 'to create the dataset for the time window'
             if (!uuid) {
                 uuid = await client.DataAccess.create_dataset(STRUCTURE.SESSION, {
                     source,
@@ -261,10 +336,14 @@ export async function create_from_spec (client, spec, progress = {}) {
                 progress.session = uuid
                 saved.push(uuid)
             }
-            await set_name(client, uuid, spec.name.trim(), FRESH)
         }
 
-        await write_metadata(client, uuid, spec)
+        step = 'to set the new dataset\'s name, kind, tags or details'
+        // Each field is its own config entry, so they are written together.
+        await Promise.all([
+            spec.window ? set_name(client, uuid, spec.name.trim(), FRESH) : null,
+            write_metadata(client, uuid, spec),
+        ])
         return uuid
     }
     catch (err) {
@@ -272,15 +351,22 @@ export async function create_from_spec (client, spec, progress = {}) {
         throw new DatasetError(saved.length
             ? 'Only part of the dataset was saved.'
             : 'Not saved. Nothing was saved and your changes are still here.',
-        { status: err?.status, detail: why(err), saved })
+        { status: err?.status, detail: why(err, step), saved })
     }
 }
 
-// Only called for a dataset just created.
+// Only called for a dataset just created. Each field is its own config
+// entry, so the writes run together.
 async function write_metadata (client, uuid, spec) {
-    if (spec.kind) await set_kind(client, uuid, spec.kind, null, FRESH)
-    if (spec.tags?.length) await set_tags(client, uuid, spec.tags, FRESH)
-    if (spec.kind === 'equipment' && spec.labels) await set_labels(client, uuid, spec.labels, FRESH)
+    await Promise.all([
+        spec.kind ? set_kind(client, uuid, spec.kind, null, FRESH) : null,
+        spec.tags?.length ? set_tags(client, uuid, spec.tags, FRESH) : null,
+        spec.kind === 'equipment' && spec.labels ? set_labels(client, uuid, spec.labels, FRESH) : null,
+        write_run_meta(client, uuid, spec),
+    ])
+}
+
+async function write_run_meta (client, uuid, spec) {
     await put_run_meta(client, uuid, {
         createdBy: spec.createdBy ?? null,
         createdAt: to_iso(Date.now()),
@@ -311,8 +397,8 @@ export function own_helper (rec, byUuid) {
 export function edit_shape (rec, byUuid) {
     if (!rec?.editable) return { ok: false, reason: 'You cannot edit this dataset.' }
     if (rec.invalid) return { ok: false, reason: 'The service reports this dataset as invalid. Duplicate it instead.' }
-    if (rec.structure === STRUCTURE.DEVICE) return { ok: false, reason: 'A device dataset always covers one device.' }
-    if (rec.structure === STRUCTURE.SUBSET) return { ok: false, reason: 'A sub-device dataset can only be changed through the Data Access API.' }
+    if (is_device_structure(rec.structure)) return { ok: false, reason: 'A device dataset always covers one device.' }
+    if (is_metrics_structure(rec.structure)) return { ok: false, reason: 'A dataset of chosen device metrics can only be changed through the Data Access API.' }
     if (rec.structure === STRUCTURE.UNION) return { ok: true, has_window: false, items_uuid: rec.uuid, items: rec.config ?? [] }
     if (rec.structure === STRUCTURE.SESSION) {
         const src = byUuid[rec.config?.source]
@@ -376,7 +462,7 @@ export async function update_from_spec (client, rec, spec, byUuid) {
             }
             done.push('name')
         }
-        await set_kind(client, rec.uuid, spec.kind, rec.kind === 'other' || rec.kind === 'device' ? null : rec.kind)
+        await set_kind(client, rec.uuid, spec.kind, KIND_BY_ID[rec.kind] ? rec.kind : null)
         const same_list = (a, b) => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
         if (!same_list(normalise_tags(spec.tags), rec.tags)) await set_tags(client, rec.uuid, spec.tags ?? [])
         if (spec.kind === 'equipment' && JSON.stringify(spec.labels ?? {}) !== JSON.stringify(rec.labels ?? {})) {
@@ -570,19 +656,25 @@ async function data_response (client, uuid, { metrics = null, from = null, to = 
         body,
     })
     if (st === 403) throw new DatasetError('You do not have permission to read this dataset.', { status: st })
-    if (st === 422) {
-        // The service says why: no time window, a bad window or a bad filter.
+    if (st !== 200) {
+        // The service says why: no time window, a bad window, a bad
+        // filter, or a dataset this site cannot read.
         const reason = await refusal_reason(stream)
-        const fallback = metrics ? 'The service refused the pinned-only download.' : 'The service refused the download.'
+        const fallback = st !== 422 ? `The download failed (HTTP ${st}).`
+            : metrics ? 'The service refused the pinned-only download.' : 'The service refused the download.'
         throw new DatasetError(reason ?? fallback, { status: st })
     }
-    if (st !== 200) throw new DatasetError(`The download failed (HTTP ${st}).`, { status: st })
     return { stream, headers }
 }
 
-/** The `error` text of a JSON refusal body, or null. */
+/** Why the service refused, from a JSON refusal body, or null. A
+ * refusal with a code (`{ error, message }`) carries its words in
+ * `message`; an older one has only the words, in `error`. */
 async function refusal_reason (stream) {
-    try { return JSON.parse(await new Response(stream).text())?.error ?? null }
+    try {
+        const body = JSON.parse(await new Response(stream).text())
+        return body?.message ?? body?.error ?? null
+    }
     catch { return null }
 }
 

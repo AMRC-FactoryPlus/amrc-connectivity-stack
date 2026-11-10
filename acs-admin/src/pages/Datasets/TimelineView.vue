@@ -281,7 +281,7 @@ const layout = computed(() => build_rows({
   ongoing: ongoing.value,
   equipment: ds.equipment,
   eq_devices: eqDevices.value,
-  devices: ds.devices,
+  devices: ds.deviceIndex,
   expanded: expanded.value,
   query: query.value,
 }))
@@ -319,7 +319,7 @@ function quietNote (device) {
   if (!data.strips.value) return null
   const last = data.lastOf(device)
   if (last === undefined) return null
-  const row_status = ds.deviceByUuid[device]?.status ?? null
+  const row_status = ds.deviceIndexByUuid[device]?.status ?? null
   const st = device_status(row_status, last, now.value)
   if (st.state === 'live' || (last != null && st.since == null)) return null
   const r = range.value
@@ -355,7 +355,7 @@ const selTipStyle = computed(() => {
   const top = s.top >= 28 ? s.top - 26 : s.top + s.height + 4
   return { left: `${left}px`, top: `${top}px`, transform: rightEdge ? 'translateX(-100%)' : 'none' }
 })
-const summary = computed(() => selection_summary(selection.value?.devices ?? [], ds.deviceByUuid))
+const summary = computed(() => selection_summary(selection.value?.devices ?? [], ds.deviceIndexByUuid))
 
 /* Gaps in the selection, from the strip counts. Only at Hours zoom,
  * where the counts exist; null leaves the line out. */

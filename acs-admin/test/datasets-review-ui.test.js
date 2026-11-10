@@ -13,7 +13,8 @@ import { describe, it, expect } from 'vitest'
 import { parse_series } from '../src/lib/datasets/series.js'
 import { window_gaps } from '../src/lib/datasets/gaps.js'
 import { find_power_series, power_to_register, reports_by_exception, energy_and_carbon } from '../src/lib/datasets/energy.js'
-import { update_recording, stop_recording, create_from_spec, ensure_device_datasets, void_resumed, set_name, set_tags } from '../src/lib/datasets/api.js'
+import { update_recording, stop_recording, create_from_spec, ensure_device_datasets, device_refusal, void_resumed, set_name, set_tags, DatasetError } from '../src/lib/datasets/api.js'
+import { STRUCTURE } from '../src/lib/datasets/constants.js'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -233,6 +234,86 @@ describe('saves that carry on after a part-way failure', () => {
         await create_from_spec(c, { name: 'T', items: ['x', 'y'], window: null, createdBy: 'me' }, progress)
         expect(c.made).toHaveLength(1)
         expect(progress.union).toBe(c.made[0][1])
+    })
+
+    it('makes UNS device datasets, and does not reuse an older kind', async () => {
+        const c = client()
+        const by = { old: { uuid: 'old', structure: STRUCTURE.DEVICE, config: { source: 'd1' } } }
+        const out = await ensure_device_datasets(c, ['d1'], by, () => 'Name')
+        expect(c.made.map(m => m[0])).toEqual([STRUCTURE.UNS_DEVICE])
+        expect(out.d1).toBe(c.made[0][1])
+    })
+
+    it('reuses a UNS device dataset', async () => {
+        const c = client()
+        const by = { uns: { uuid: 'uns', structure: STRUCTURE.UNS_DEVICE, config: { source: 'd1' } } }
+        expect(await ensure_device_datasets(c, ['d1'], by, () => 'Name')).toEqual({ d1: 'uns' })
+        expect(c.made).toEqual([])
+    })
+
+    it('lists every device Data Access refuses, in words', async () => {
+        const c = client()
+        const refuse = { d1: 'placement_required', d3: 'device_required' }
+        const make = c.DataAccess.create_dataset
+        c.DataAccess.create_dataset = async (structure, config) => {
+            const code = refuse[config.source]
+            if (code) throw Object.assign(new Error('refused'), { status: 422, body: { error: code, message: 'no' } })
+            return make(structure, config)
+        }
+        const names = { d1: 'Press', d2: 'Oven', d3: 'Gateway' }
+        const created = {}
+        const err = await ensure_device_datasets(c, ['d1', 'd2', 'd3'], {}, u => names[u], created).catch(e => e)
+        expect(err).toBeInstanceOf(DatasetError)
+        expect(err.message).toBe('Not saved. 2 devices could not be added.')
+        expect(err.refused.map(r => r.reason)).toEqual([
+            "Press isn't placed in the ISA-95 hierarchy yet.",
+            'Gateway is not a device.',
+        ])
+        // The device in between was still made, for the retry to reuse.
+        expect(Object.keys(created)).toEqual(['d2'])
+    })
+
+    it('stops at a site-wide refusal', async () => {
+        const c = client()
+        let asked = 0
+        c.DataAccess.create_dataset = async () => {
+            asked++
+            throw Object.assign(new Error('refused'), { status: 503, body: { error: 'uns_unavailable' } })
+        }
+        // Up to four run at once; none starts after the refusal.
+        const err = await ensure_device_datasets(c, ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'], {}, () => 'Name').catch(e => e)
+        expect(asked).toBe(4)
+        expect(err.detail).toBe('New device datasets need the UNS historian, which this site does not run.')
+    })
+
+    it('makes several device datasets at once', async () => {
+        const c = client()
+        let running = 0, most = 0, n = 0
+        c.DataAccess.create_dataset = async () => {
+            running++; most = Math.max(most, running)
+            await new Promise(r => setTimeout(r, 5))
+            running--
+            return `dddddddd-0000-4000-8000-00000000000${n++}`
+        }
+        const map = await ensure_device_datasets(c, ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'], {}, () => null)
+        expect(Object.keys(map)).toHaveLength(6)
+        expect(most).toBe(4)
+    })
+
+    it('words the refusals it knows, and leaves the rest', () => {
+        expect(device_refusal({ body: { error: 'structure_retired' } }, 'Press')).toBe('This older type of device dataset can no longer be made.')
+        expect(device_refusal({ status: 403 }, 'Press')).toBe('You do not have permission to make a dataset for Press.')
+        expect(device_refusal({ status: 500 }, 'Press')).toBeNull()
+    })
+
+    it('says which step a permission refusal stopped', async () => {
+        const c = client()
+        c.DataAccess.create_dataset = async (structure) => {
+            if (structure === STRUCTURE.SESSION) throw Object.assign(new Error('no'), { status: 403 })
+            return 'dddddddd-0000-4000-8000-000000000009'
+        }
+        const err = await create_from_spec(c, { name: 'T', items: ['x', 'y'], window: { from: '2026-10-08T08:00:00.000Z', to: '2026-10-08T09:00:00.000Z' }, createdBy: 'me' }).catch(e => e)
+        expect(err.detail).toBe('You do not have permission to create the dataset for the time window.')
     })
 
     it('reuses device datasets made before the failure', async () => {

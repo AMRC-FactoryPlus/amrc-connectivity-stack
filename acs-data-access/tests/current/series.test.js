@@ -286,7 +286,7 @@ describe("Flux builders", () => {
         expect(q).toContain(`(not exists r.path or r.path == "") and (r._measurement == "Top:i")`);
         expect(q).not.toContain(":b");
         expect(q).not.toContain("toFloat");
-        expect(q).toContain(`yield(name: "mean")`);
+        expect(q).toContain(`yield(name: "sum")`);
         expect(q).toContain(`yield(name: "n")`);
         expect(q).toContain(`yield(name: "unit")`);
     });
@@ -297,7 +297,7 @@ describe("Flux builders", () => {
         ] });
         expect(q).toContain(`r._measurement == "Running:b"`);
         expect(q).toContain("|> toFloat()");
-        expect(q).toContain(`yield(name: "mean_b")`);
+        expect(q).toContain(`yield(name: "sum_b")`);
         expect(q).not.toMatch(/^data =/m);
     });
 
@@ -351,9 +351,9 @@ describe("result shaping", () => {
         const row = (result, m, _time, _value, extra = {}) =>
             ({ result, topLevelInstance: D1, path: "P", _measurement: m, _time, _value, ...extra });
         const rows = [
-            row("mean", "Power:i", t0, "10"), row("n", "Power:i", t0, "1"),
-            row("mean", "Power:d", t0, "20"), row("n", "Power:d", t0, "3"),
-            row("mean", "Power:d", t1, "4"), row("n", "Power:d", t1, "2"),
+            row("sum", "Power:i", t0, "10"), row("n", "Power:i", t0, "1"),
+            row("sum", "Power:d", t0, "60"), row("n", "Power:d", t0, "3"),
+            row("sum", "Power:d", t1, "8"), row("n", "Power:d", t1, "2"),
             row("unit", "Power:i", "2026-10-08T00:01:00Z", undefined, { unit: "W" }),
             row("unit", "Power:d", "2026-10-08T00:06:00Z", undefined, { unit: "kW" }),
         ];
@@ -366,7 +366,7 @@ describe("result shaping", () => {
 
     test("a requested type keeps only its own suffix; strings are empty", () => {
         const rows = [
-            { result: "mean", topLevelInstance: D1, path: "", _measurement: "X:i", _time: "2026-10-08T00:00:00Z", _value: "1" },
+            { result: "sum", topLevelInstance: D1, path: "", _measurement: "X:i", _time: "2026-10-08T00:00:00Z", _value: "1" },
             { result: "n", topLevelInstance: D1, path: "", _measurement: "X:i", _time: "2026-10-08T00:00:00Z", _value: "1" },
         ];
         const [i, d, s] = shape_means(rows, [
@@ -381,7 +381,7 @@ describe("result shaping", () => {
 
     test("boolean yields map back to the metric", () => {
         const rows = [
-            { result: "mean_b", topLevelInstance: D1, path: "A", _measurement: "On:b", _time: "2026-10-08T00:00:00Z", _value: "0.5" },
+            { result: "sum_b", topLevelInstance: D1, path: "A", _measurement: "On:b", _time: "2026-10-08T00:00:00Z", _value: "2" },
             { result: "n_b", topLevelInstance: D1, path: "A", _measurement: "On:b", _time: "2026-10-08T00:00:00Z", _value: "4" },
         ];
         const [m] = shape_means(rows, [{ device: D1, metric: "A/On", path: "A", name: "On", type: "b" }], "5m");
@@ -427,7 +427,7 @@ function fake_query_api(rows = {}) {
     };
 }
 
-/* grants: principal -> targets for UseSparkplug. A principal named in
+/* grants: principal -> targets for UseDevice. A principal named in
  * `refused` gets that status from Auth; `acl` replaces fetch_acl. `cdb`
  * answers ConfigDB reads, such as a sub-device's origin map. */
 function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
@@ -440,7 +440,7 @@ function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
         if (refused[principal] != null)
             throw Object.assign(new Error("Failed to read ACL"), { status: refused[principal] });
         const targets = grants[principal] ?? [];
-        return (perm, target, wild) => perm == Constants.Perm.UseSparkplug
+        return (perm, target, wild) => perm == Constants.Perm.UseDevice
             && (targets.includes(target) || (wild && targets.includes(UUIDs.Special.Null)));
     });
 
@@ -643,7 +643,7 @@ describe("series route principals", () => {
         const asked = [];
         const { api } = make_api({ rows: { count: count_rows },
             acl: async p => { asked.push(p);
-                return (perm, target) => perm == Constants.Perm.UseSparkplug && target == D1; } });
+                return (perm, target) => perm == Constants.Perm.UseDevice && target == D1; } });
         const res = await call(api, PU, req);
         expect(res.statusCode).toBe(200);
         expect(asked).toEqual([PU]);
@@ -862,7 +862,7 @@ describe("series route response", () => {
             count: count_rows,
             last: () => [{ topLevelInstance: D1, _time: "2026-10-08T07:55:54.302Z" }],
             mean: () => [
-                { result: "mean", topLevelInstance: D1, path: "A", _measurement: "B:d", _time: "2026-10-08T00:00:00Z", _value: "8.5" },
+                { result: "sum", topLevelInstance: D1, path: "A", _measurement: "B:d", _time: "2026-10-08T00:00:00Z", _value: "17" },
                 { result: "n", topLevelInstance: D1, path: "A", _measurement: "B:d", _time: "2026-10-08T00:00:00Z", _value: "2" },
                 { result: "unit", topLevelInstance: D1, path: "A", _measurement: "B:d", _time: "2026-10-08T00:00:01Z", unit: "kW" },
             ],
@@ -912,6 +912,16 @@ describe("series route response", () => {
         const { api } = make_api({ query_api: down });
         const res = await call(api, ROOT, { ...base, count: true, every: "1h" });
         expect(res.statusCode).toBe(503);
+    });
+
+    test("504, not 503, when the InfluxDB client times out", async () => {
+        /* The client's own timeout means a slow query, not a down
+         * historian. The Data tab words the two differently. */
+        const slow = { queryRows: (q, consumer) => setImmediate(() =>
+            consumer.error(Object.assign(new Error("Request timed out"), { name: "RequestTimedOutError" }))) };
+        const { api } = make_api({ query_api: slow });
+        const res = await call(api, ROOT, { ...base, count: true, every: "1h" });
+        expect(res.statusCode).toBe(504);
     });
 
     test("aborts the queries when the client goes away", async () => {

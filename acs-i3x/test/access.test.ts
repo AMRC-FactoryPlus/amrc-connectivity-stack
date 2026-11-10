@@ -302,7 +302,9 @@ describe("the API, scoped to the caller", () => {
                 getValues: async (ids: string[]) => new Map(ids.map(id => [id, null])),
                 getCompositionValue: async () => null,
                 getCurrentValue: async () => null,
-                queryHistory: async () => [{ value: 1, quality: "Good", timestamp: "2026-11-03T00:00:00Z" }],
+                streamHistory: async function* () {
+                    yield [{ value: 1, quality: "Good", timestamp: "2026-11-03T00:00:00Z" }];
+                },
             } as any,
             subscriptions,
         });

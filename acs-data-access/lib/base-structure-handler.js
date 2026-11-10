@@ -4,10 +4,28 @@ export class BaseStructureHandler {
     this.auth = api.auth;
     this.log = api.log;
     this.cdb = api.cdb;
+
+    /* The logical bucket a resolved source reads (Constants.Store),
+     * for structures that resolve to devices. */
+    this.store = null;
+    /* For a structure that can no longer be created, the structures to
+     * use instead. Existing datasets of it still work: they can be
+     * read, edited, used in unions and sessions, and deleted. */
+    this.replaced_by = null;
   }
 
   validate_config(config) {}
   check_source_permission(principal, config) {}
+
+  /** Checks a new or changed source beyond the caller's permission.
+   *
+   * Called on create and update after the source permission check, so
+   * a caller without permission learns nothing about the source.
+   * Throws a Refusal or an APIError if the source is not acceptable.
+   *
+   * @param config A config that has passed validate_config.
+   */
+  async check_source(config) {}
 
   /** Converts a validated config to the form that is stored.
    *

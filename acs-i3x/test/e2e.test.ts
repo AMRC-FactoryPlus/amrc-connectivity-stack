@@ -276,6 +276,12 @@ function createPreloadedMocks() {
                 }
                 return out;
             }),
+        /* The routes stream history; this serves whatever queryHistory
+         * is set up to return, as one batch. */
+        streamHistory: jest.fn(async function* (id: string, start: string, end: string) {
+            const values = await history.queryHistory(id, start, end);
+            if (values.length) yield values;
+        }),
         queryHistory: jest.fn<(id: string, start: string, end: string, maxDepth?: number) => Promise<I3xVqt[]>>()
             .mockImplementation(async (id: string) => {
                 if (id === "obj-cnc-1") return historyCnc1;

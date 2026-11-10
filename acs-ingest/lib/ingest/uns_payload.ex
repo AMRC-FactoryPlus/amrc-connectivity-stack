@@ -103,7 +103,9 @@ defmodule Ingest.UnsPayload do
   Decodes a payload as the JS UNS historian's `JSON.parse` read it:
   invalid UTF-8 replaced with U+FFFD, of duplicate keys the last, and
   a number too big for a float as `:infinity` or `:"-infinity"`.
-  Integers are exact.
+  Integers are exact. One difference: an integer of more than 310
+  digits makes the payload invalid, where JS read it as Infinity, as
+  Elixir's JSON refuses one (CVE-2026-115274).
 
   Returns the payload's object, then its batch's, in order, as maps
   with whatever keys they have. A `batch` of `null` counts as none.

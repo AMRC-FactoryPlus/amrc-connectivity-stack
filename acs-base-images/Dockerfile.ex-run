@@ -5,7 +5,7 @@
 # k5start: the services log in to Kerberos themselves.
 
 # The Alpine of Dockerfile.ex-build - see the note there.
-FROM alpine:3.24.2
+FROM alpine:3.24.4
 
 RUN apk add --no-cache libstdc++ ncurses-libs openssl lksctp-tools \
     && adduser -D -u 1000 elixir \

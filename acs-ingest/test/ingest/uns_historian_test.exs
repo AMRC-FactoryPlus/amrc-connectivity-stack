@@ -338,7 +338,11 @@ defmodule Ingest.UnsHistorianTest do
         {"Int32", "1e20", ~s(field "value" is outside int64)},
         {"Double", "1e400", ~s(field "value" is infinite)},
         {"Double", "-1e400", ~s(field "value" is infinite)},
-        {"Double", "1" <> String.duplicate("0", 400), ~s(field "value" is infinite)}
+        {"Double", "1" <> String.duplicate("0", 309), ~s(field "value" is infinite)},
+        # Elixir's JSON refuses an integer of more than 310 digits, so
+        # the whole message is skipped. JS read it as Infinity.
+        {"Double", "1" <> String.duplicate("0", 310),
+         "isn't valid JSON: {:integer_too_large, 311}"}
       ]
 
       for {type, value, reason} <- cases do

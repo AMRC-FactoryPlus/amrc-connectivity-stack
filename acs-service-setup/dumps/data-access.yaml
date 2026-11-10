@@ -223,6 +223,10 @@ grants:
       !u UUIDs.App.Info: false
     !u ConfigDB.Perm.CreateObject:
       !u DataAccess.Class.Dataset: false
+    # A device's default dataset has a UUID worked out from the
+    # device's, so Data Access names the UUID when it creates one.
+    !u ConfigDB.Perm.CreateSpecificObject:
+      !u DataAccess.Class.Dataset: false
     !u ConfigDB.Perm.ReadMembers:
       !u DataAccess.App.DatasetDefinition: false
       !u DataAccess.App.DatasetMetadata: false

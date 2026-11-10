@@ -9,10 +9,10 @@
      it with `top`; the label cell stays pinned on the left. -->
 <template>
   <div class="absolute left-0 flex border-b border-slate-200"
-       :style="{ top: `${row.top}px`, height: `${row.h}px`, width: `${LABEL_W + trackWidth}px` }">
+       :style="{ top: `${row.top}px`, height: `${row.h}px`, width: `${labelWidth + trackWidth}px` }">
     <!-- Label -->
     <div class="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-slate-200 pr-3"
-         :class="labelClass" :style="{ width: `${LABEL_W}px` }">
+         :class="labelClass" :style="{ width: `${labelWidth}px` }">
       <button v-if="toggles" type="button"
               class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-200"
               :title="row.open ? 'Hide' : 'Show'" :aria-expanded="row.open" @click="emit('toggle', row)">
@@ -30,7 +30,7 @@
       <RouterLink v-if="row.kind === 'band'" :to="`/datasets/${row.uuid}`" :title="row.name"
                   class="absolute inset-x-0 top-[5px] z-[3] flex h-[26px] items-center rounded border border-slate-200 text-xs text-slate-600 hover:border-slate-400"
                   :style="{ background: HATCH }">
-        <span class="sticky left-[268px] truncate px-2">{{ row.label }}</span>
+        <span class="sticky truncate px-2" :style="{ left: `${labelWidth + 8}px` }">{{ row.label }}</span>
       </RouterLink>
 
       <template v-if="row.kind === 'equipment'">
@@ -62,6 +62,8 @@ import { LABEL_W } from '@/lib/datasets/timeline.js'
 const props = defineProps({
   row: { type: Object, required: true },
   trackWidth: { type: Number, required: true },
+  // The label column's width, which the timeline lets people drag.
+  labelWidth: { type: Number, default: LABEL_W },
   // Placed blocks (place_blocks) for an equipment lane.
   blocks: { type: Array, default: () => [] },
   // Data-arrival cells for a collapsed equipment row, or null.

@@ -14,8 +14,13 @@ import { NO_PATH } from './i3x-devices.js'
 const HOUR = 3600e3
 const DAY = 24 * HOUR
 
-/** The pinned label column, in px. */
+/** The pinned label column, in px, until someone drags it. */
 export const LABEL_W = 260
+/** How narrow and how wide the label column can be dragged, in px. */
+export const LABEL_W_MIN = 200
+export const LABEL_W_MAX = 600
+/** The least track a wide label column must leave in view, in px. */
+export const TRACK_MIN = 240
 /** The tick header, in px. */
 export const HEADER_H = 36
 
@@ -45,18 +50,39 @@ export function t_of (x, range) {
 }
 
 /**
- * The scrollLeft that puts `t` at `anchor` (0 left, 0.5 middle) of
- * the part of the frame the track shows.
+ * The widths the label column can take in a frame `client_width` wide.
+ * The top limit drops in a narrow frame so some track always shows,
+ * but never below the bottom limit.
  */
-export function scroll_left_for (t, range, client_width, anchor = 0.5) {
-    const view = Math.max(0, client_width - LABEL_W)
+export function label_w_limits (client_width = Infinity) {
+    const room = Number.isFinite(client_width) ? client_width - TRACK_MIN : LABEL_W_MAX
+    return { min: LABEL_W_MIN, max: Math.max(LABEL_W_MIN, Math.min(LABEL_W_MAX, Math.floor(room))) }
+}
+
+/**
+ * A label column width that fits the limits. Anything that is not a
+ * number (nothing saved yet, or a bad saved value) gives the default.
+ */
+export function clamp_label_w (w, client_width = Infinity) {
+    const { min, max } = label_w_limits(client_width)
+    const n = typeof w === 'number' && Number.isFinite(w) ? Math.round(w) : LABEL_W
+    return Math.max(min, Math.min(max, n))
+}
+
+/**
+ * The scrollLeft that puts `t` at `anchor` (0 left, 0.5 middle) of
+ * the part of the frame the track shows. `label_w` is the label
+ * column's width, here and in the two functions below.
+ */
+export function scroll_left_for (t, range, client_width, anchor = 0.5, label_w = LABEL_W) {
+    const view = Math.max(0, client_width - label_w)
     const max = Math.max(0, range.width - view)
     return Math.max(0, Math.min(max, x_of(t, range) - view * anchor))
 }
 
 /** The time at the middle of the visible track. */
-export function view_centre (range, scroll_left, client_width) {
-    const view = Math.max(0, client_width - LABEL_W)
+export function view_centre (range, scroll_left, client_width, label_w = LABEL_W) {
+    const view = Math.max(0, client_width - label_w)
     return t_of(scroll_left + view / 2, range)
 }
 
@@ -70,8 +96,8 @@ export function in_track (t, range, margin = 0.1) {
 }
 
 /** The horizontal band of track (px) worth rendering: the view plus a buffer each side. */
-export function visible_x (scroll_left, client_width, buffer = null) {
-    const view = Math.max(0, client_width - LABEL_W)
+export function visible_x (scroll_left, client_width, buffer = null, label_w = LABEL_W) {
+    const view = Math.max(0, client_width - label_w)
     const b = buffer ?? Math.max(400, view)
     return { x0: scroll_left - b, x1: scroll_left + view + b }
 }

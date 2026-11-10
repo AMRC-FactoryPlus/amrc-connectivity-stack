@@ -14,7 +14,8 @@ import { describe, it, expect } from 'vitest'
 import { DA, STRUCTURE } from '../src/lib/datasets/constants.js'
 import { merge_datasets, resolve_devices, track_range, london_local_to_ms } from '../src/lib/datasets/model.js'
 import {
-    LABEL_W, HEADER_H, ROW_H,
+    LABEL_W, LABEL_W_MIN, LABEL_W_MAX, TRACK_MIN, HEADER_H, ROW_H,
+    label_w_limits, clamp_label_w,
     x_of, t_of, scroll_left_for, view_centre, in_track, visible_x, visible_ticks,
     quick_dates, date_input_to_ms,
     equipment_devices, build_rows, place_label, row_at, visible_rows,
@@ -103,6 +104,58 @@ describe('geometry', () => {
         const ticks = [{ x: 0 }, { x: 500 }, { x: 5000 }]
         const { x0, x1 } = visible_x(0, LABEL_W + 600)
         expect(visible_ticks(ticks, x0, x1)).toEqual([{ x: 0 }, { x: 500 }])
+    })
+})
+
+describe('label column width', () => {
+    const range = track_range('hours', NOW)
+
+    it('uses 260 px when no width is given', () => {
+        expect(LABEL_W).toBe(260)
+        expect(scroll_left_for(NOW, range, 1260)).toBe(scroll_left_for(NOW, range, 1260, 0.5, LABEL_W))
+        expect(view_centre(range, 5000, 1260)).toBe(view_centre(range, 5000, 1260, LABEL_W))
+        expect(visible_x(5000, 1260)).toEqual(visible_x(5000, 1260, null, LABEL_W))
+    })
+
+    it('centres a time in the track a wider column leaves', () => {
+        // 1260 px frame, 460 px of labels: 800 px of track in view.
+        const left = scroll_left_for(NOW, range, 1260, 0.5, 460)
+        expect(left).toBeCloseTo(x_of(NOW, range) - 400)
+        expect(view_centre(range, left, 1260, 460)).toBeCloseTo(NOW, -1)
+        // The same scroll position with the default column is centred later.
+        expect(view_centre(range, left, 1260)).toBeGreaterThan(NOW)
+        expect(scroll_left_for(NOW, range, 1260, 0, 460)).toBeCloseTo(x_of(NOW, range))
+    })
+
+    it('renders the band of track a wider column leaves in view', () => {
+        expect(visible_x(5000, 1260, 0, 460)).toEqual({ x0: 5000, x1: 5800 })
+        expect(visible_x(5000, 1260, 0)).toEqual({ x0: 5000, x1: 6000 })
+        // The default buffer is the view's own width, and at least 400 px.
+        expect(visible_x(5000, 1260, null, 460)).toEqual({ x0: 4200, x1: 6600 })
+        expect(visible_x(5000, 760, null, 460)).toEqual({ x0: 4600, x1: 5700 })
+        // A column wider than the frame leaves no track, not a negative one.
+        expect(visible_x(5000, 300, 0, 460)).toEqual({ x0: 5000, x1: 5000 })
+    })
+
+    it('keeps the width between its limits', () => {
+        expect(clamp_label_w(320)).toBe(320)
+        expect(clamp_label_w(320.6)).toBe(321)
+        expect(clamp_label_w(50)).toBe(LABEL_W_MIN)
+        expect(clamp_label_w(5000)).toBe(LABEL_W_MAX)
+    })
+
+    it('falls back to the default for a width that is not a number', () => {
+        for (const bad of [undefined, null, NaN, Infinity, '400', {}])
+            expect(clamp_label_w(bad)).toBe(LABEL_W)
+    })
+
+    it('always leaves some track in a narrow frame', () => {
+        expect(label_w_limits(1400)).toEqual({ min: LABEL_W_MIN, max: LABEL_W_MAX })
+        expect(label_w_limits(700)).toEqual({ min: LABEL_W_MIN, max: 700 - TRACK_MIN })
+        expect(clamp_label_w(600, 700)).toBe(460)
+        // Too narrow for both: the column stays at its smallest.
+        expect(label_w_limits(300)).toEqual({ min: LABEL_W_MIN, max: LABEL_W_MIN })
+        expect(clamp_label_w(600, 300)).toBe(LABEL_W_MIN)
     })
 })
 

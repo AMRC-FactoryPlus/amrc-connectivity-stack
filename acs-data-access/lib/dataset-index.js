@@ -310,10 +310,14 @@ export class DatasetIndex {
         return seen;
     }
 
-    /* The entry `id` should have, or null if it should have none. */
+    /* The entry `id` should have, or null if it should have none.
+     *
+     * A dataset whose inner map is there but empty gets the invalid
+     * entry, as it always has: it does not have exactly one structure
+     * entry. AppConfigs never gives an empty inner map. */
     _build_entry (id, grouped) {
         const defs = grouped.get(id);
-        if (defs == null || defs.size == 0) return null;
+        if (defs == null) return null;
 
         const win = this._resolve(id, grouped, new Set());
         if (win == null) return invalid_entry();
@@ -342,12 +346,13 @@ export class DatasetIndex {
 
         const defs = grouped.get(id);
         /* A missing dataset. Not recorded: it has no entry to keep. */
-        if (defs == null || defs.size == 0)
+        if (defs == null)
             return null;
 
         this.stats.resolved++;
         let win = null;
-        /* More than one structure entry makes a dataset invalid. */
+        /* A dataset is invalid unless it has exactly one structure
+         * entry. */
         if (defs.size == 1) {
             const [structure, config] = defs.entries().next().value;
             /* A stored config can be anything. One that cannot be read

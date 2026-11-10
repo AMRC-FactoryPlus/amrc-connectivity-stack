@@ -361,6 +361,46 @@ describe("DatasetIndex rules", () => {
         expect(site.index.invalid.size).toBe(0);
     });
 
+    /* AppConfigs never gives an inner map with no entries. The old
+     * whole-map code calls such a dataset invalid, so the index does
+     * too. */
+    test("an inner map with no entries is an invalid dataset, as before", () => {
+        const check = site => {
+            expect(Object.fromEntries(site.index.entries))
+                .toStrictEqual(Object.fromEntries(reference_datasets(site.defs)));
+        };
+        const site = new Site();
+        site.defs = imm.Map({
+            [ds(1)]: imm.Map(),
+            [ds(2)]: imm.Map({ [App.SessionLimits]: { source: ds(1) } }),
+        });
+        site.index.apply(site.defs, null);
+        expect(site.entry(ds(1))).toStrictEqual(INVALID);
+        expect(site.entry(ds(2))).toStrictEqual(INVALID);
+        check(site);
+
+        const filled = site.put(ds(1), App.SparkplugSrc, {});
+        expect(sorted(filled.changed)).toEqual([ds(1), ds(2)]);
+        expect(site.is_valid(ds(1))).toBe(true);
+        expect(site.is_valid(ds(2))).toBe(true);
+        check(site);
+
+        site.defs = site.defs.set(ds(1), imm.Map());
+        const emptied = site.index.apply(site.defs, new Set([ds(1)]));
+        expect(sorted(emptied.changed)).toEqual([ds(1), ds(2)]);
+        expect(site.entry(ds(1))).toStrictEqual(INVALID);
+        expect(site.entry(ds(2))).toStrictEqual(INVALID);
+        check(site);
+
+        site.defs = site.defs.delete(ds(1));
+        const gone = site.index.apply(site.defs, new Set([ds(1)]));
+        expect(sorted(gone.changed)).toEqual([ds(1)]);
+        expect(site.index.entries.has(ds(1))).toBe(false);
+        expect(site.index.windows.has(ds(1))).toBe(false);
+        expect(site.entry(ds(2))).toStrictEqual(INVALID);
+        check(site);
+    });
+
     test("a missing reference is invalid", () => {
         const site = new Site();
         site.load({

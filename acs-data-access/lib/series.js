@@ -42,6 +42,7 @@ export const TIME_ZONE = "Europe/London";
 export const LIMITS = {
     devices: 500,
     groups: 100,
+    ranges: 100,
     mean: 50,
     buckets: 2000,
     default_points: 300,
@@ -422,6 +423,41 @@ export function group_by_windows(windows) {
 }
 
 
+/** Splits window sets into single windows, so that each query has one
+ * `range` and needs no `_time` filter. InfluxDB cannot run a `_time`
+ * filter in storage, and then no aggregate runs in storage either: the
+ * query reads every raw point between the first window and the last.
+ *
+ * Every window is its own query, so a dataset with many windows could
+ * fill the query queue. The budget bounds that: the groups make at
+ * most `budget` queries between them, or one each if there are more
+ * groups than that. Groups with the fewest windows are split first.
+ * The windows that do not fit stay together in one query, which reads
+ * them with a `_time` filter as before.
+ * @param groups [{windows: [[start, end]], ...}], as group_by_windows.
+ * @param budget The most queries the groups may make.
+ * @returns The groups, each window set now one window where it fits. */
+export function split_windows(groups, budget = LIMITS.ranges) {
+    let spare = budget - groups.length;
+    const out = [];
+    const by_size = [...groups].sort((a, b) => a.windows.length - b.windows.length);
+    for (const g of by_size) {
+        const extra = g.windows.length - 1;
+        const n = Math.max(0, Math.min(extra, spare));
+        if (n == 0) {
+            out.push(g);
+            continue;
+        }
+        spare -= n;
+        /* All of them, or the first n with the rest in one query. */
+        const single = n == extra ? g.windows : g.windows.slice(0, n);
+        for (const w of single) out.push({ ...g, windows: [w] });
+        if (n < extra) out.push({ ...g, windows: g.windows.slice(n) });
+    }
+    return out;
+}
+
+
 /*
  * ---------------------------------------------------------------
  * Flux builders
@@ -464,7 +500,9 @@ function envelope(windows) {
     };
 }
 
-/* A _time filter, only when the envelope covers gaps. */
+/* A _time filter, only when the envelope covers gaps. Storage cannot
+ * run it, so the reader sends one window per query where it can: see
+ * split_windows. */
 function time_filter(windows) {
     if (windows.length < 2) return fluxExpression("");
     const parts = windows.map(([a, b]) =>
@@ -536,21 +574,30 @@ const KEEP_UNIT = `["topLevelInstance", "path", "_measurement", "_time", "unit"]
  * it read every raw point instead: 24 h of a 25 Hz metric went from
  * under a second to 30 s. So does a filter part that storage cannot
  * run (see path_clause). One metric can be several raw series (its
- * other tags changed), so shape_means adds them up per bucket. */
-function mean_branch({ bucket, metrics, types, windows, every, to_float, suffix, store }) {
+ * other tags changed), so shape_means adds them up per bucket.
+ *
+ * Storage has no sum of booleans, and toFloat() before the aggregate
+ * keeps the aggregate in Flux. The sum of a boolean read as 0 and 1 is
+ * its number of true points, and storage can count those: it runs a
+ * test of `_value` against a literal, and a count of any type. A bucket
+ * with no true point has no sum row, which shape_means reads as 0. */
+function mean_branch({ bucket, metrics, types, windows, every, bool, suffix, store }) {
     const { start, stop } = envelope(windows);
     const clauses = paren(join(metrics.map(m => metric_clause(m, types(m), store)), "or"));
     const wa = window_args(every);
-    const conv = fluxExpression(to_float ? "\n  |> toFloat()" : "");
     const y = n => flux`${n + suffix}`;
     const source = String(flux`from(bucket: ${bucket})
   |> range(start: ${start}, stop: ${stop})
   |> filter(fn: (r) => r._field == "value")
-  |> filter(fn: (r) => ${clauses})${time_filter(windows)}${conv}`);
+  |> filter(fn: (r) => ${clauses})${time_filter(windows)}`);
     const src = fluxExpression(source);
+    const sum_src = fluxExpression(bool
+        ? `${source}\n  |> filter(fn: (r) => r._value == true)`
+        : source);
+    const sum_fn = fluxExpression(bool ? "count" : "sum");
 
-    return String(flux`${src}
-  |> aggregateWindow(${wa}, fn: sum, createEmpty: false, timeSrc: "_start")
+    return String(flux`${sum_src}
+  |> aggregateWindow(${wa}, fn: ${sum_fn}, createEmpty: false, timeSrc: "_start")
   |> keep(columns: ${fluxExpression(KEEP)}) |> yield(name: ${y("sum")})
 ${src}
   |> aggregateWindow(${wa}, fn: count, createEmpty: false, timeSrc: "_start")
@@ -563,8 +610,8 @@ ${src}
 
 /** Sum and point count per raw series per bucket, plus the newest unit.
  * shape_means turns them into means.
- * Booleans need toFloat(), which stops the aggregate pushing down to
- * storage, so they run in their own branch only when asked for.
+ * Booleans run in their own branch, only when asked for: their sum is
+ * a count of true points (see mean_branch).
  * String metrics have no mean and are not queried.
  * @param store The store the bucket holds; `uns` reads the UNS form of
  *   `path` (see uns_folder).
@@ -579,13 +626,13 @@ export function mean_query({ bucket, metrics, windows, every, store = null }) {
         script += mean_branch({
             bucket, metrics: numeric, windows, every,
             types: m => m.type ? [m.type] : NUMERIC_TYPES,
-            to_float: false, suffix: "", store,
+            bool: false, suffix: "", store,
         });
     if (bools.length)
         script += mean_branch({
             bucket, metrics: bools, windows, every,
             types: () => ["b"],
-            to_float: true, suffix: "_b", store,
+            bool: true, suffix: "_b", store,
         });
     return script;
 }
@@ -769,10 +816,16 @@ export function merge_runs(results) {
     };
 }
 
-/** Turns last rows into a map of device UUID to ISO time. */
+/** Turns last rows into a map of device UUID to ISO time. A device
+ * read by several queries (one per window) keeps its newest time. */
 export function shape_last(rows) {
-    return new Map(rows.map(r =>
-        [r.topLevelInstance, new Date(Date.parse(r._time)).toISOString()]));
+    const newest = new Map();
+    for (const r of rows) {
+        const t = Date.parse(r._time);
+        if (!(t <= newest.get(r.topLevelInstance)))
+            newest.set(r.topLevelInstance, t);
+    }
+    return new Map([...newest].map(([d, t]) => [d, new Date(t).toISOString()]));
 }
 
 /** The Cache-Control value: closed history may be cached briefly. */

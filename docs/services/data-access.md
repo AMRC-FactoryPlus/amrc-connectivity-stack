@@ -551,7 +551,7 @@ Field | Rule
 `every` | Bucket size. One of `10s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `6h`, `1d`, `1w`. Optional.
 `points` | Target number of buckets, 1 to 2000, default 300. Used only when `every` is absent: the server picks the smallest step that gives at most `points` buckets.
 `count` | `true` to return per-device point counts. Birth metadata (`Schema_UUID` and `Instance_UUID`) does not count.
-`mean` | Metrics to return means for. `metric` is the full Sparkplug metric name, for example `Axes/X/Load`. `type` is optional: `d`, `i`, `u`, `b` or `s`. Without `type`, the server reads every numeric type (`d`, `i`, `u`) of the metric and merges them into one series, weighted by `n`. Booleans are read only with `type: "b"`, as 0 and 1. Strings have no mean: `type: "s"` returns empty `points`. In a device request, each `mean` device must also be in `devices`.
+`mean` | Metrics to return means for. `metric` is the full Sparkplug metric name, for example `Axes/X/Load`. `type` is optional: `d`, `i`, `u`, `b` or `s`. Without `type`, the server reads every numeric type (`d`, `i`, `u`) of the metric and merges them into one series, weighted by `n`. Booleans are read only with `type: "b"`, as 0 and 1: the mean is the share of points that are true. Strings have no mean: `type: "s"` returns empty `points`. In a device request, each `mean` device must also be in `devices`.
 `last` | `true`, or `{"lookback": "<n>m|h|d|w"}` (default `30d`, maximum `90d`), to return each device's newest data time. Birth metadata does not count. In a dataset request, only data inside the device's windows counts, and a device whose windows all end before the lookback gets `null`.
 
 Steps up to `6h` align to UTC. `1d` and `1w` buckets start at midnight
@@ -646,6 +646,7 @@ Limit | Value
 ---|---
 Devices per request (or per dataset) | 500
 Distinct window sets per dataset request | 100
+Queries that read one time window each, per request and per kind (counts, means, last times) | 100
 `mean` metrics per request | 50
 Buckets per series | 2000
 Span for `count` below `1h` | 14 days
@@ -657,10 +658,43 @@ Time for one query, from when it starts running | 90 seconds (`SERIES_QUERY_TIME
 Concurrent queries | 4 (`SERIES_CONCURRENCY`)
 Queries waiting to run, across all requests | 400 (`SERIES_MAX_QUEUE`)
 
+The four `SERIES_*` limits are environment variables on the Data
+Access deployment. The Helm chart always sets them, from these values,
+so a change survives an upgrade. Do not set them with
+`kubectl set env`: the next Helm upgrade replaces them.
+
+Helm value | Variable | Default
+---|---|---
+`dataAccess.series.concurrency` | `SERIES_CONCURRENCY` | `4`
+`dataAccess.series.maxQueue` | `SERIES_MAX_QUEUE` | `400`
+`dataAccess.series.timeoutMs` | `SERIES_TIMEOUT_MS` | `120000`
+`dataAccess.series.queryTimeoutMs` | `SERIES_QUERY_TIMEOUT_MS` | `90000`
+
+Keep `queryTimeoutMs` below `timeoutMs`. The InfluxDB client of the
+series route waits 5 seconds longer than `queryTimeoutMs`.
+
 The series route has its own query limiter, so a long `POST v1/data`
 export does not delay it. Devices of a dataset that share the same
 windows run as one set of queries, so the window-set limit bounds the
 queries one request makes.
+
+A dataset device can have several separate time windows, for example
+one per session. The route reads each window with its own query, for
+counts, means and last times alike. InfluxDB limits time in its storage
+engine only through the `range` of a query. A test of `_time` in a
+filter runs in Flux, and one query over several windows needs that
+test: InfluxDB then reads every raw point between the first window and
+the last. The part-hours that a count reads from raw data at the two
+edges of a window are read the same way, one query each.
+
+One query per window means more queries, so each request has a budget.
+Of each kind (counts, means, last times), a request makes at most 100
+queries, or one per window set if it has more window sets than that. A
+request that reads two stores gives each store half. When the windows
+do not all fit, the window sets with the fewest windows are split
+first. The windows left over are read together in one query with a
+`_time` filter. That query is correct but slower, because it reads raw
+points. No request is refused for having too many windows.
 
 When a request ends early, the server closes its open queries to
 InfluxDB, and InfluxDB stops running them. This happens when the
@@ -690,9 +724,21 @@ InfluxDB works out each bucket of a `mean` in its storage engine, for
 any number of metrics in one request. This needs every part of the
 metric filter to be a test that storage can run. A test of a tag
 against the empty string is not one, so a metric at the device root is
-matched with `not exists r.path`. Two cases still read every raw point
-and are slower: boolean metrics (`type: "b"`), and a dataset device
-with more than one separate time window.
+matched with `not exists r.path`.
+
+The storage engine has no sum of booleans. The mean of a boolean
+metric is its number of true points over its number of points, and
+storage can work out both: it counts points of any type, and it runs a
+test of `_value` against a literal. So a boolean `mean` runs in storage
+too, as two counts.
+
+Two cases still read raw points and are slower:
+
+* The windows of a dataset request that do not fit the budget of 100
+  queries (see above).
+* A `mean` at `1d` or `1w`, and a `count` at those steps that reads raw
+  data. Those steps follow the calendar in `Europe/London`, and
+  InfluxDB makes windows in storage only in UTC.
 
 `400`, `413`, `422` and `uns_unavailable` responses have a JSON body
 with `error` and `message` fields.

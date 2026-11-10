@@ -1,5 +1,28 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Flux builders > booleans get their own branch only when asked for, with no toFloat 1`] = `
+"from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "A" and (r._measurement == "Running:b"))))
+  |> filter(fn: (r) => r._value == true)
+  |> aggregateWindow(every: 5m, fn: count, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "_value"]) |> yield(name: "sum_b")
+from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "A" and (r._measurement == "Running:b"))))
+  |> aggregateWindow(every: 5m, fn: count, createEmpty: false, timeSrc: "_start")
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "_value"]) |> yield(name: "n_b")
+from(bucket: "default")
+  |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => ((r.topLevelInstance == "11111111-1111-1111-1111-111111111111" and r.path == "A" and (r._measurement == "Running:b"))))
+  |> last()
+  |> keep(columns: ["topLevelInstance", "path", "_measurement", "_time", "unit"]) |> yield(name: "unit_b")
+"
+`;
+
 exports[`Flux builders > count query excludes birth metadata and counts before summing 1`] = `
 "from(bucket: "default")
   |> range(start: 2026-10-08T00:00:00.000Z, stop: 2026-10-09T00:00:00.000Z)

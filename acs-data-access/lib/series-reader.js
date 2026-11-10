@@ -11,7 +11,7 @@ import pLimit from "p-limit";
 import {
     count_query, mean_query, last_query,
     shape_counts, shape_means, shape_last, merge_runs,
-    group_by_windows, COVERAGE_STEPS,
+    group_by_windows, split_windows, COVERAGE_STEPS, LIMITS,
 } from "./series.js";
 import {
     MEASUREMENT, plan_count, plan_source, intersect, split_coverage,
@@ -140,15 +140,18 @@ export class SeriesReader {
      * ready, the summary answers the hours it holds and raw data answers
      * the rest (the newest hours, and old hours the backfill has not
      * reached, if they fit within the raw count limit).
+     * Raw data is counted one window per query: see split_windows.
      * @param state The coverage state read once for this request.
      * @param store The store to count.
+     * @param ranges The most raw count queries to make.
      * @returns {counts: Map, source, pending: [[a, b]]} */
-    async counts(req, groups, signal, state, store = DEFAULT_STORE) {
+    async counts(req, groups, signal, state, store = DEFAULT_STORE,
+            ranges = LIMITS.ranges) {
         const { every } = req;
         const bucket = this.buckets[store];
 
         if (!this.uses_coverage(req, state)) {
-            const parts = await Promise.all(groups.map(g =>
+            const parts = await Promise.all(split_windows(groups, ranges).map(g =>
                 this.query_rows(count_query({ bucket, every, ...g }), signal, store)));
             return { counts: shape_counts(parts.flat(), every), source: "raw", pending: [] };
         }
@@ -156,6 +159,7 @@ export class SeriesReader {
         const plan = plan_count({ from: req.from, to: req.to, state });
         const cov_bucket = this.coverages[store].bucket;
         const queries = [];
+        const raw_groups = [];
         let edge_raw = false;
         for (const g of groups) {
             const { hourly, daily, raw: edges } = plan.coverage
@@ -167,7 +171,7 @@ export class SeriesReader {
             if (edges.length) edge_raw = true;
             const raw = merge_spans([...intersect(g.windows, plan.raw), ...edges]);
             if (raw.length)
-                queries.push(count_query({ bucket, every, devices: g.devices, windows: raw }));
+                raw_groups.push({ devices: g.devices, windows: raw });
 
             for (const [measurement, spans] of [
                 [MEASUREMENT.hourly, hourly], [MEASUREMENT.daily, daily],
@@ -178,6 +182,12 @@ export class SeriesReader {
                 if (q) queries.push(q);
             }
         }
+
+        /* The part-hours at the two edges of one window are two raw
+         * spans with the whole window between them. Read each on its
+         * own, so the raw read is the part-hours and no more. */
+        for (const g of split_windows(raw_groups, ranges))
+            queries.push(count_query({ bucket, every, ...g }));
 
         const parts = await Promise.all(queries.map(q => this.query_rows(q, signal, store)));
         return {
@@ -272,8 +282,10 @@ export class SeriesReader {
      * windows are not clipped to the request, so a live device shows
      * its newest data even when the request ends earlier.
      * @param last_windows Map of device UUID to its unclipped windows.
-     * @param store The store to read. */
-    async last(req, last_windows, as_of, signal, store = DEFAULT_STORE) {
+     * @param store The store to read.
+     * @param ranges The most queries to make. */
+    async last(req, last_windows, as_of, signal, store = DEFAULT_STORE,
+            ranges = LIMITS.ranges) {
         const bucket = this.buckets[store];
         const start = as_of - req.last.lookback;
 
@@ -284,12 +296,14 @@ export class SeriesReader {
                 last_query({ bucket, devices, start }), signal, store));
         }
 
-        const parts = await Promise.all(group_by_windows(last_windows).map(g => {
-            const ws = intersect(g.windows, [[start, Infinity]]);
-            return ws.length
-                ? this.query_rows(last_query({ bucket, devices: g.devices, start, windows: ws }), signal, store)
-                : [];
-        }));
+        const groups = group_by_windows(last_windows)
+            .map(g => ({
+                devices: g.devices,
+                windows: intersect(g.windows, [[start, Infinity]]),
+            }))
+            .filter(g => g.windows.length);
+        const parts = await Promise.all(split_windows(groups, ranges).map(g =>
+            this.query_rows(last_query({ bucket, start, ...g }), signal, store)));
         return shape_last(parts.flat());
     }
 
@@ -303,26 +317,35 @@ export class SeriesReader {
      * @param last_windows For a dataset, the device windows `last` may
      *   read, not clipped to the request (by default, `windows`).
      * @param store The store to read.
+     * @param ranges The most queries each of the counts, the means and
+     *   the last times may make by reading one window per query. See
+     *   split_windows.
      * @returns {counts: Map|null, source, pending, metrics: Array, last: Map|null}
      */
     async run(req, windows, as_of, signal, state = this.coverage_state(),
-            last_windows = windows, store = DEFAULT_STORE) {
+            last_windows = windows, store = DEFAULT_STORE, ranges = LIMITS.ranges) {
         const { every } = req;
         const bucket = this.buckets[store];
         const groups = group_by_windows(windows);
 
-        const counts = req.count ? this.counts(req, groups, signal, state, store) : null;
+        const counts = req.count
+            ? this.counts(req, groups, signal, state, store, ranges) : null;
 
-        const mean_rows = Promise.all(groups.map(g => {
-            const in_group = new Set(g.devices);
-            const metrics = req.mean.filter(m => in_group.has(m.device));
-            const query = metrics.length
-                ? mean_query({ bucket, metrics, windows: g.windows, every, store })
-                : null;
+        /* Only the groups that have a metric to read use the budget. */
+        const mean_groups = groups
+            .map(g => {
+                const in_group = new Set(g.devices);
+                return { ...g, metrics: req.mean.filter(m => in_group.has(m.device)) };
+            })
+            .filter(g => g.metrics.length);
+        const mean_rows = Promise.all(split_windows(mean_groups, ranges).map(g => {
+            const query = mean_query({
+                bucket, metrics: g.metrics, windows: g.windows, every, store });
             return query ? this.query_rows(query, signal, store) : [];
         }));
 
-        const last = req.last ? this.last(req, last_windows, as_of, signal, store) : null;
+        const last = req.last
+            ? this.last(req, last_windows, as_of, signal, store, ranges) : null;
 
         const [c, m, l] = await Promise.all([counts, mean_rows, last]);
         return {
@@ -339,12 +362,14 @@ export class SeriesReader {
      * @param by_store Map of store to `{ windows, last_windows }`.
      * @param states Each store's coverage state, read once for the
      *   request: store => state or null.
+     * The stores share the budget of single-window queries.
      * @returns As run(). */
     async run_stores(req, by_store, as_of, signal, states) {
+        const ranges = Math.floor(LIMITS.ranges / Math.max(1, by_store.size));
         const results = await Promise.all([...by_store].map(
             ([store, { windows, last_windows }]) => this.run(
                 req, windows, as_of, signal, states[store] ?? null,
-                last_windows, store)));
+                last_windows, store, ranges)));
         return merge_runs(results);
     }
 }

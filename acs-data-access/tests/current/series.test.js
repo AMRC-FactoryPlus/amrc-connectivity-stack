@@ -20,7 +20,7 @@ import { series_influx } from "../../lib/series-query.js";
 import {
     LIMITS as SeriesLimits,
     SeriesError, parse_request, bucket_start, next_bucket, bucket_count,
-    choose_every, merge_windows, group_by_windows, split_metric,
+    choose_every, merge_windows, group_by_windows, split_windows, split_metric,
     count_query, mean_query, last_query,
     shape_counts, shape_means, shape_last, cache_control,
 } from "../../lib/series.js";
@@ -409,6 +409,17 @@ describe("result shaping", () => {
             [T("2026-10-08T00:00:00Z"), 0, 4],
             [T("2026-10-08T00:05:00Z"), 1, 3],
         ]);
+    });
+
+    test("a device read by several last queries keeps its newest time", () => {
+        const rows = [
+            { topLevelInstance: D1, _time: "2026-10-08T05:30:00Z" },
+            { topLevelInstance: D1, _time: "2026-10-08T01:30:00Z" },
+            { topLevelInstance: D2, _time: "2026-10-08T01:00:00Z" },
+            { topLevelInstance: D2, _time: "2026-10-08T02:00:00Z" },
+        ];
+        expect(shape_last(rows)).toEqual(new Map([
+            [D1, "2026-10-08T05:30:00.000Z"], [D2, "2026-10-08T02:00:00.000Z"]]));
     });
 
     test("last rows become ISO strings", () => {
@@ -1087,6 +1098,25 @@ describe("mean queries run in storage", () => {
         expect(q.match(/^from\(/gm).length).toBe(6);
     });
 
+    test("a query over two windows cannot run in storage, so the reader never sends one that fits the budget", () => {
+        const two = [
+            [T("2026-10-08T01:00:00Z"), T("2026-10-08T02:00:00Z")],
+            [T("2026-10-08T05:00:00Z"), T("2026-10-08T06:00:00Z")],
+        ];
+        const metrics = [root(D1, "Float")];
+        expect(() => expect_storage_means(
+            mean_query({ bucket: "default", windows: two, every: "5m", metrics }))).toThrow();
+        expect(() => expect_storage_means(
+            count_query({ bucket: "default", windows: two, every: "5m", devices: [D1] }))).toThrow();
+        expect(() => expect_storage_means(
+            last_query({ bucket: "default", windows: two, start: 0, devices: [D1] }))).toThrow();
+        for (const g of split_windows([{ devices: [D1], windows: two }])) {
+            expect_storage_means(mean_query({ bucket: "default", every: "5m", metrics, ...g }));
+            expect_storage_means(count_query({ bucket: "default", every: "5m", ...g }));
+            expect_storage_means(last_query({ bucket: "default", start: 0, ...g }));
+        }
+    });
+
     test("one root metric of a sparkplug device", () => {
         const q = mean_query({ bucket: "default", windows, every: "5m",
             metrics: [root(D1, "Float")] });
@@ -1128,6 +1158,190 @@ describe("mean queries run in storage", () => {
         expect(metric_filter.split(" or ").length).toBe(names.length);
         /* Three reads, whatever the number of metrics. */
         expect(q.match(/^from\(/gm).length).toBe(3);
+    });
+});
+
+/*
+ * ---------------------------------------------------------------
+ * One window per query
+ *
+ * A device of a dataset can have several separate time windows. One
+ * query over all of them needs a `_time` filter, which storage cannot
+ * run. The reader sends one query per window instead, up to a budget.
+ * ---------------------------------------------------------------
+ */
+
+/* A dataset of sessions on one device: one window per session. */
+function sessions_dataset(spans, device = D1) {
+    const id = (p, i) => `${p}0000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+    const datasets = {
+        [DS]: { structure: Constants.App.UnionComponents, config: spans.map((_, i) => id(1, i)) },
+    };
+    spans.forEach(([from, to], i) => {
+        datasets[id(1, i)] = { structure: Constants.App.SessionLimits,
+            config: { source: id(2, i), from, to } };
+        datasets[id(2, i)] = { structure: Constants.App.SparkplugSrc, config: { source: device } };
+    });
+    return datasets;
+}
+
+describe("splitting window sets into single windows", () => {
+    const w = n => Array.from({ length: n }, (_, i) => [i * 10, i * 10 + 5]);
+    const sizes = out => out.map(g => g.windows.length);
+
+    test("every window is its own entry when they fit", () => {
+        const out = split_windows([
+            { devices: [D1], windows: w(3) }, { devices: [D2], windows: w(1) }], 10);
+        expect(out).toEqual([
+            { devices: [D2], windows: [[0, 5]] },
+            { devices: [D1], windows: [[0, 5]] },
+            { devices: [D1], windows: [[10, 15]] },
+            { devices: [D1], windows: [[20, 25]] },
+        ]);
+    });
+
+    test("other fields of a group go with each window", () => {
+        const out = split_windows([{ devices: [D1], metrics: ["m"], windows: w(2) }], 10);
+        expect(out.every(g => g.metrics[0] == "m" && g.devices[0] == D1)).toBe(true);
+    });
+
+    test("never more entries than the budget; the rest of a set stays together", () => {
+        const out = split_windows([{ devices: [D1], windows: w(150) }], 100);
+        expect(out.length).toBe(100);
+        expect(sizes(out).slice(0, 99).every(n => n == 1)).toBe(true);
+        expect(out[99].windows).toEqual(w(150).slice(99));
+        /* No window is lost or read twice. */
+        expect(out.flatMap(g => g.windows)).toEqual(w(150));
+    });
+
+    test("the smallest sets split first", () => {
+        const out = split_windows([
+            { devices: [D1], windows: w(8) },
+            { devices: [D2], windows: w(2) },
+            { devices: [D3], windows: w(3) },
+        ], 6);
+        /* D2 and D3 split in full (5 entries); D1 has no budget left. */
+        expect(out.map(g => [g.devices[0], g.windows.length])).toEqual([
+            [D2, 1], [D2, 1], [D3, 1], [D3, 1], [D3, 1], [D1, 8]]);
+    });
+
+    test("more sets than the budget: one entry each, unchanged", () => {
+        const groups = [
+            { devices: [D1], windows: w(2) }, { devices: [D2], windows: w(2) },
+            { devices: [D3], windows: w(2) }];
+        expect(split_windows(groups, 2)).toEqual(groups);
+        expect(split_windows([], 100)).toEqual([]);
+    });
+});
+
+describe("a dataset device with several windows", () => {
+    const spans = [
+        ["2026-10-08T01:00:00.000Z", "2026-10-08T02:00:00.000Z"],
+        ["2026-10-08T05:00:00.000Z", "2026-10-08T06:00:00.000Z"],
+    ];
+    const range = ([a, b]) => `range(start: ${a}, stop: ${b})`;
+    const body = { dataset: DS, from: base.from, to: base.to, every: "1h" };
+    const kinds = seen => ({
+        mean: seen.filter(q => q.includes("yield(name")),
+        last: seen.filter(q => q.includes("max(column")),
+        count: seen.filter(q => !q.includes("yield(name") && !q.includes("max(column")),
+    });
+
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(T("2026-10-09T00:00:00Z"));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    test("counts, means and last times read one window per query, with no _time filter", async () => {
+        const { api, query_api } = make_api({ read: [DS], datasets: sessions_dataset(spans) });
+        const res = await call(api, USER, { ...body, count: true, last: true,
+            mean: [{ device: D1, metric: "Float", type: "d" }, { device: D1, metric: "On", type: "b" }] });
+        expect(res.statusCode).toBe(200);
+
+        const { count, mean, last } = kinds(query_api.seen);
+        for (const queries of [count, mean, last]) {
+            expect(queries.length).toBe(2);
+            for (const q of queries) {
+                expect(q).not.toContain("r._time");
+                expect_storage_means(q);
+            }
+            expect(queries.filter(q => q.includes(range(spans[0]))).length).toBe(1);
+            expect(queries.filter(q => q.includes(range(spans[1]))).length).toBe(1);
+        }
+        expect(res.body.devices[D1].windows).toEqual(spans);
+    });
+
+    test("the windows' rows add up into one answer", async () => {
+        const first = q => q.includes(range(spans[0]));
+        const at = q => first(q) ? "2026-10-08T01:00:00Z" : "2026-10-08T05:00:00Z";
+        const row = { topLevelInstance: D1, _measurement: "Float:d" };
+        const { api } = make_api({ read: [DS], datasets: sessions_dataset(spans), rows: {
+            /* Both windows report into the day's one bucket. */
+            count: () => [{ topLevelInstance: D1, _time: "2026-10-08T00:00:00Z", _value: "7" }],
+            mean: q => [
+                { ...row, result: "sum", _time: at(q), _value: first(q) ? "10" : "30" },
+                { ...row, result: "n", _time: at(q), _value: "2" },
+                { ...row, result: "unit", _time: at(q), unit: first(q) ? "old" : "new" },
+            ],
+            /* The older window answers last, and must not win. */
+            last: q => [{ topLevelInstance: D1,
+                _time: first(q) ? "2026-10-08T01:30:00Z" : "2026-10-08T05:30:00Z" }],
+        } });
+        const res = await call(api, USER, { ...body, every: "1d", count: true, last: true,
+            mean: [{ device: D1, metric: "Float", type: "d" }] });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.devices[D1].count).toEqual([[bucket_start(T(base.from), "1d"), 14]]);
+        expect(res.body.devices[D1].last).toBe("2026-10-08T05:30:00.000Z");
+        expect(res.body.metrics[0].points).toEqual([[bucket_start(T(base.from), "1d"), 10, 4]]);
+        expect(res.body.metrics[0].unit).toBe("new");
+    });
+
+    test("a device with no mean metric gets no mean query", async () => {
+        const datasets = sessions_dataset(spans);
+        const { api, query_api } = make_api({ read: [DS], datasets });
+        await call(api, USER, { ...body, count: true });
+        expect(kinds(query_api.seen).mean).toEqual([]);
+    });
+
+    test("more windows than the budget: the queries stop at the budget, and no window is dropped", async () => {
+        const n = SeriesLimits.ranges + 50;
+        const minute = i => new Date(T(base.from) + i * 2 * 60000).toISOString();
+        const many = Array.from({ length: n }, (_, i) =>
+            [minute(i), new Date(Date.parse(minute(i)) + 60000).toISOString()]);
+        const { api, query_api } = make_api({ read: [DS], datasets: sessions_dataset(many) });
+        const res = await call(api, USER, { ...body, count: true,
+            mean: [{ device: D1, metric: "Float", type: "d" }] });
+        expect(res.statusCode).toBe(200);
+
+        const { count, mean } = kinds(query_api.seen);
+        for (const queries of [count, mean]) {
+            expect(queries.length).toBe(SeriesLimits.ranges);
+            const filtered = queries.filter(q => q.includes("r._time"));
+            expect(filtered.length).toBe(1);
+            /* The one filtered query holds every window that did not fit. */
+            const rest = many.slice(SeriesLimits.ranges - 1);
+            for (const [a, b] of rest)
+                expect(filtered[0]).toContain(`(r._time >= ${a} and r._time < ${b})`);
+            expect(filtered[0]).toContain(
+                `range(start: ${rest[0][0]}, stop: ${rest[rest.length - 1][1]})`);
+            for (const [a, b] of many.slice(0, SeriesLimits.ranges - 1))
+                expect(queries.filter(q => q.includes(`range(start: ${a}, stop: ${b})`)).length).toBe(1);
+        }
+    });
+
+    test("two stores share the budget", async () => {
+        const seen = [];
+        const reader = new SeriesReader({ debug, buckets: { sparkplug: "default", uns: "uns" },
+            query_api: fake_query_api() });
+        reader.run = async (...args) => {
+            seen.push(args[7]);
+            return { counts: null, source: "raw", pending: [], metrics: [], last: null };
+        };
+        const scope = { windows: new Map(), last_windows: new Map() };
+        await reader.run_stores({ mean: [] }, new Map([["sparkplug", scope], ["uns", scope]]),
+            0, new AbortController().signal, {});
+        expect(seen).toEqual([SeriesLimits.ranges / 2, SeriesLimits.ranges / 2]);
     });
 });
 

@@ -1047,6 +1047,24 @@ describe("series route with the coverage summary", () => {
         expect(cov).toContain(`range(start: ${iso(from + 40 * 60 * 1000)}, stop: ${iso(now_hour - 4 * DAY)})`);
     });
 
+    test("the part-hours at both edges of a window are two raw queries, with no _time filter", async () => {
+        /* One query over both would read every raw point between
+         * them: InfluxDB cannot run a _time filter in storage. */
+        const from = now_hour - 5 * DAY + 20 * 60 * 1000;
+        const to = now_hour - 4 * DAY + 10 * 60 * 1000;
+        const { api, seen } = route({ state, rows: () => [] });
+        const res = await post(api, { devices: [D1], count: true, every: "1h",
+            from: iso(from), to: iso(to) });
+        expect(res.statusCode).toBe(200);
+        const raw = seen.filter(q => q.includes(`from(bucket: "default")`));
+        expect(raw.length).toBe(2);
+        expect(raw.every(q => !q.includes("r._time"))).toBe(true);
+        expect(raw.some(q => q.includes(
+            `range(start: ${iso(from)}, stop: ${iso(from + 40 * 60 * 1000)})`))).toBe(true);
+        expect(raw.some(q => q.includes(
+            `range(start: ${iso(to - 10 * 60 * 1000)}, stop: ${iso(to)})`))).toBe(true);
+    });
+
     test("the coverage state is read once per request", async () => {
         let reads = 0;
         const { api } = route({ state, rows: () => [] });

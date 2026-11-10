@@ -42,6 +42,7 @@ export const TIME_ZONE = "Europe/London";
 export const LIMITS = {
     devices: 500,
     groups: 100,
+    ranges: 100,
     mean: 50,
     buckets: 2000,
     default_points: 300,
@@ -422,6 +423,41 @@ export function group_by_windows(windows) {
 }
 
 
+/** Splits window sets into single windows, so that each query has one
+ * `range` and needs no `_time` filter. InfluxDB cannot run a `_time`
+ * filter in storage, and then no aggregate runs in storage either: the
+ * query reads every raw point between the first window and the last.
+ *
+ * Every window is its own query, so a dataset with many windows could
+ * fill the query queue. The budget bounds that: the groups make at
+ * most `budget` queries between them, or one each if there are more
+ * groups than that. Groups with the fewest windows are split first.
+ * The windows that do not fit stay together in one query, which reads
+ * them with a `_time` filter as before.
+ * @param groups [{windows: [[start, end]], ...}], as group_by_windows.
+ * @param budget The most queries the groups may make.
+ * @returns The groups, each window set now one window where it fits. */
+export function split_windows(groups, budget = LIMITS.ranges) {
+    let spare = budget - groups.length;
+    const out = [];
+    const by_size = [...groups].sort((a, b) => a.windows.length - b.windows.length);
+    for (const g of by_size) {
+        const extra = g.windows.length - 1;
+        const n = Math.max(0, Math.min(extra, spare));
+        if (n == 0) {
+            out.push(g);
+            continue;
+        }
+        spare -= n;
+        /* All of them, or the first n with the rest in one query. */
+        const single = n == extra ? g.windows : g.windows.slice(0, n);
+        for (const w of single) out.push({ ...g, windows: [w] });
+        if (n < extra) out.push({ ...g, windows: g.windows.slice(n) });
+    }
+    return out;
+}
+
+
 /*
  * ---------------------------------------------------------------
  * Flux builders
@@ -464,7 +500,9 @@ function envelope(windows) {
     };
 }
 
-/* A _time filter, only when the envelope covers gaps. */
+/* A _time filter, only when the envelope covers gaps. Storage cannot
+ * run it, so the reader sends one window per query where it can: see
+ * split_windows. */
 function time_filter(windows) {
     if (windows.length < 2) return fluxExpression("");
     const parts = windows.map(([a, b]) =>
@@ -778,10 +816,16 @@ export function merge_runs(results) {
     };
 }
 
-/** Turns last rows into a map of device UUID to ISO time. */
+/** Turns last rows into a map of device UUID to ISO time. A device
+ * read by several queries (one per window) keeps its newest time. */
 export function shape_last(rows) {
-    return new Map(rows.map(r =>
-        [r.topLevelInstance, new Date(Date.parse(r._time)).toISOString()]));
+    const newest = new Map();
+    for (const r of rows) {
+        const t = Date.parse(r._time);
+        if (!(t <= newest.get(r.topLevelInstance)))
+            newest.set(r.topLevelInstance, t);
+    }
+    return new Map([...newest].map(([d, t]) => [d, new Date(t).toISOString()]));
 }
 
 /** The Cache-Control value: closed history may be cached briefly. */

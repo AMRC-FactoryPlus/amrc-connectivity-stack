@@ -417,8 +417,8 @@ WHY THIS STRUCTURE
 
 ## Open questions
 
-- Structure search and invalid datasets: the plan sends an invalid dataset as a child with body { structure: InvalidDataset, config: null }. Confirm this, or choose to leave invalid datasets out of SEARCH v2/structure/. Both end the hang.
-- Maker concurrency: the plan makes 4 datasets at a time by default. Say so if you want a different default or an environment variable for other sites.
+- DECIDED (Alex, 2026-11-10): Structure search and invalid datasets. Return an invalid dataset and show it as invalid: a child with body { structure: InvalidDataset, config: null }. This is what the plan builds.
+- DECIDED (Alex, 2026-11-10): Maker concurrency. Start with 4 datasets at a time. A test-cluster run with a few hundred placed devices shows whether to change it.
 - Parts: the plan opens the per-dataset subclass WATCHes only while a metadata SEARCH is open, as today. Holding them for the life of the process would make the first Datasets page load faster and would add one permanent WATCH per dataset on ConfigDB. Say so if you want that.
 - Malformed uuid on WATCH v2/metadata/:uuid or v2/structure/:uuid: the plan keeps today's WebSocket close and pins it with a test. A one-line change (return undefined from the handler) would give the client a clean 404. Say so if you want it in this PR.
 - Invalid default dataset: today the single check allows it through UseDevice and the lists do not. The plan pins both answers and changes neither. Say so if you want them aligned in a later PR, and in which direction.

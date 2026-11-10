@@ -122,20 +122,20 @@ export class APIv1 {
       .get(this.metadata_contents.bind(this));
 
     api.route("/metadata/:uuid/name")
-      .put(this.metadata_put_name.bind(this));
+      .put(this.refusable(this.metadata_put_name));
 
     api.route("/metadata/:uuid/tags")
-      .put(this.metadata_put_tags.bind(this));
+      .put(this.refusable(this.metadata_put_tags));
 
     api.route("/metadata/:uuid/labels")
-      .put(this.metadata_put_labels.bind(this));
+      .put(this.refusable(this.metadata_put_labels));
 
     api.route("/metadata/:uuid/kind")
-      .put(this.metadata_put_kind.bind(this));
+      .put(this.refusable(this.metadata_put_kind));
 
     api.route("/metadata/:uuid/run")
-      .put(this.metadata_put_run.bind(this))
-      .patch(this.metadata_patch_run.bind(this));
+      .put(this.refusable(this.metadata_put_run))
+      .patch(this.refusable(this.metadata_patch_run));
 
     api.route("/data/:uuid")
       .post(this.dataset_data.bind(this));
@@ -177,6 +177,18 @@ export class APIv1 {
       fail(this.log, 422, `Unknown structure ${structure}`);
 
     return handler;
+  }
+
+  /** Wraps a route handler so a Refusal it throws is sent as JSON. */
+  refusable(handler) {
+    return async (req, res) => {
+      try {
+        return await handler.call(this, req, res);
+      }
+      catch (err) {
+        return this.send_refusal(err, res);
+      }
+    };
   }
 
   /** Sends a Refusal as its JSON body. Anything else is rethrown, for
@@ -592,7 +604,8 @@ export class APIv1 {
    * be a dataset. */
 
   /** Checks that the caller may edit the metadata of a dataset.
-   * Throws a 422, 403 or 404 APIError if not.
+   * Throws a 422, 403 or 404 APIError if not, or a Refusal for a
+   * default dataset, which nobody may change.
    * @returns The dataset UUID.
    */
   async _check_metadata_edit(req) {
@@ -613,6 +626,9 @@ export class APIv1 {
     if (!await this.cdb.class_has_member(Constants.Class.Dataset, dataset_uuid))
       return fail(this.log, 404, `Dataset ${dataset_uuid} not found.`);
 
+    /* Data Access keeps a default dataset, name and all. */
+    await this.check_not_default(dataset_uuid, "change");
+
     return dataset_uuid;
   }
 
@@ -621,22 +637,11 @@ export class APIv1 {
    * Body: { name: string }
    */
   async metadata_put_name(req, res) {
-    try {
-      return await this._metadata_put_name(req, res);
-    }
-    catch (err) {
-      return this.send_refusal(err, res);
-    }
-  }
-
-  async _metadata_put_name(req, res) {
     const name = req.body?.name;
     if (typeof name != "string" || !name.trim())
       return fail(this.log, 422, `Name must be a non-empty string`);
 
     const uuid = await this._check_metadata_edit(req);
-    /* A default dataset has its device's name. */
-    await this.check_not_default(uuid, "rename");
 
     const current = await this.cdb.get_config(UUIDs.App.Info, uuid) ?? {};
     if (current.name !== name.trim())

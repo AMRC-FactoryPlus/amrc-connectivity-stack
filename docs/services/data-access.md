@@ -71,7 +71,8 @@ the only one:
   answers `409 use_default_dataset` with the default dataset's UUID.
   `UNS device` datasets made before this still work, and can still be
   deleted.
-- **Nobody can edit, rename or delete it.** Those routes answer
+- **Nobody can change or delete it.** Its structure, name, tags,
+  labels, kind and run details are all fixed: those routes answer
   `409 default_dataset`, whatever the caller holds. Data Access owns
   the dataset. One removed straight from ConfigDB is made again while
   the device is placed.
@@ -305,9 +306,13 @@ change them for any dataset, and through `General Information` rename
 any object. These routes keep those writes to datasets the caller may
 edit.
 
+Every one of these is refused with `409` `default_dataset` for a
+[default dataset](#default-device-datasets): Data Access keeps it, and
+its name is its device's.
+
 Method and path | Body | Writes
 ---|---|---
-`PUT v1/metadata/:uuid/name` | `{"name": string}` | `name` in `General Information`, keeping its other fields. Refused with `409` `default_dataset` for a default dataset, whose name is its device's
+`PUT v1/metadata/:uuid/name` | `{"name": string}` | `name` in `General Information`, keeping its other fields
 `PUT v1/metadata/:uuid/tags` | `{"tags": [string]}` | `Dataset tags`; an empty list removes the entry
 `PUT v1/metadata/:uuid/labels` | `{"labels": {UUID: string}}` | `Equipment device labels`; an empty object removes the entry
 `PUT v1/metadata/:uuid/kind` | `{"kind": UUID \| null}` | Direct membership of one kind class: `MES equipment`, `Run`, `MES operation` or `MES product`. The dataset leaves the others; `null` leaves them all

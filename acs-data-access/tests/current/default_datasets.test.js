@@ -339,14 +339,31 @@ describe("a default dataset is kept by Data Access", () => {
     expect(api.calls.deleted).toBe(OWN);
   });
 
-  test("nobody can rename it", async () => {
+  test.each([
+    ["name", "metadata_put_name", { name: "Mine" }],
+    ["tags", "metadata_put_tags", { tags: ["a"] }],
+    ["labels", "metadata_put_labels", { labels: {} }],
+    ["kind", "metadata_put_kind", { kind: null }],
+    ["run details", "metadata_put_run", { reference: "x" }],
+    ["run details, in part", "metadata_patch_run", { reference: "x" }],
+  ])("nobody can change its %s", async (_, route, body) => {
     const api = make_api({});
     const res = make_res();
-    await api.metadata_put_name(
-      { auth: ROOT, params: { uuid: DEF_A }, body: { name: "Mine" } }, res);
+    await api.refusable(api[route])(
+      { auth: ROOT, params: { uuid: DEF_A }, body }, res);
     expect(res.code).toBe(409);
-    expect(res.body.error).toBe("default_dataset");
+    expect(res.body).toMatchObject({ error: "default_dataset", dataset: DEF_A });
     expect(api.calls.put).toEqual([]);
+  });
+
+  test("the name of a dataset someone made can still be changed", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.refusable(api.metadata_put_name)(
+      { auth: ROOT, params: { uuid: OWN }, body: { name: "Mine" } }, res);
+    expect(res.code).toBe(204);
+    expect(api.calls.put).toEqual([
+      { app: UUIDs.App.Info, obj: OWN, config: { name: "Mine" } }]);
   });
 
   test("nobody can point it at another device", async () => {

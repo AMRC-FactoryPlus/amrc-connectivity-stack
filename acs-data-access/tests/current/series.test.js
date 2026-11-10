@@ -13,7 +13,7 @@ import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { APIv1 } from "../../lib/api-v1.js";
 import { DataFlow } from "../../lib/dataflow.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
-import { SeriesReader, SeriesAbort } from "../../lib/series-reader.js";
+import { SeriesReader, SeriesAbort, SeriesQueryError } from "../../lib/series-reader.js";
 import { body_errors } from "../../lib/utils.js";
 import {
     LIMITS as SeriesLimits,
@@ -1064,5 +1064,136 @@ describe("mean queries run in storage", () => {
         expect(metric_filter.split(" or ").length).toBe(names.length);
         /* Three reads, whatever the number of metrics. */
         expect(q.match(/^from\(/gm).length).toBe(3);
+    });
+});
+
+/*
+ * ---------------------------------------------------------------
+ * A query that InfluxDB gives up on
+ *
+ * Once InfluxDB has started a 200 response it reports a failure as a
+ * table with the columns `error` and `reference`. The client hands
+ * that table on as a row, and then completes.
+ * ---------------------------------------------------------------
+ */
+
+const data_meta = { columns: [], toObject: v => v };
+const error_meta = {
+    columns: [{ label: "error" }, { label: "reference" }],
+    toObject: ([error, reference]) => ({ error, reference }),
+};
+
+/* A query API whose queries end with an error table, after `rows`. */
+function failing_query_api(message, rows = []) {
+    const api = {
+        cancelled: 0,
+        queryRows(query, consumer) {
+            consumer.useCancellable({ cancel() { api.cancelled++; } });
+            setImmediate(() => {
+                for (const r of rows) consumer.next(r, data_meta);
+                consumer.next([message, ""], error_meta);
+                consumer.complete();
+            });
+        },
+    };
+    return api;
+}
+
+describe("a query InfluxDB gives up on", () => {
+    const two_means = { ...base, every: "5m", mean: [
+        { device: D1, metric: "Float", type: "d" },
+        { device: D1, metric: "Double", type: "d" },
+    ] };
+    const reader_for = query_api =>
+        new SeriesReader({ debug, influx_bucket: "default", query_api });
+
+    test("the reader rejects on an error table with no rows", async () => {
+        const qa = failing_query_api("context deadline exceeded");
+        const p = reader_for(qa).query_rows("x", new AbortController().signal);
+        await expect(p).rejects.toBeInstanceOf(SeriesQueryError);
+        await expect(p).rejects.toMatchObject({ timeout: true });
+        expect(qa.cancelled).toBe(1);
+    });
+
+    test("the reader rejects on an error table after some rows", async () => {
+        const row = { result: "n", topLevelInstance: D1, _measurement: "Float:d",
+            _time: base.from, _value: "5" };
+        const qa = failing_query_api("memory allocation limit reached", [row]);
+        const p = reader_for(qa).query_rows("x", new AbortController().signal);
+        await expect(p).rejects.toBeInstanceOf(SeriesQueryError);
+        await expect(p).rejects.toMatchObject({ timeout: false });
+    });
+
+    test("a cancelled query counts as a timeout", () => {
+        expect(new SeriesQueryError("context canceled").timeout).toBe(true);
+        expect(new SeriesQueryError("query timed out").timeout).toBe(true);
+        expect(new SeriesQueryError("schema collision").timeout).toBe(false);
+    });
+
+    test("data columns named error and reference among others are rows", async () => {
+        const meta = {
+            columns: [{ label: "error" }, { label: "reference" }, { label: "_value" }],
+            toObject: v => v,
+        };
+        const qa = { queryRows: (q, consumer) => setImmediate(() => {
+            consumer.next({ error: "e", reference: "r", _value: "1" }, meta);
+            consumer.complete();
+        }) };
+        const rows = await reader_for(qa).query_rows("x", new AbortController().signal);
+        expect(rows.length).toBe(1);
+    });
+
+    test("the reader rejects with a timeout when a query outlives its limit", async () => {
+        let cancelled = false;
+        const hang = { queryRows: (q, consumer) =>
+            consumer.useCancellable({ cancel() { cancelled = true; } }) };
+        const reader = reader_for(hang);
+        reader.query_timeout_ms = 20;
+        await expect(reader.query_rows("x", new AbortController().signal))
+            .rejects.toMatchObject({ reason: "timeout" });
+        expect(cancelled).toBe(true);
+    });
+
+    test("504, never an empty 200, when InfluxDB runs out of time on means", async () => {
+        const { api } = make_api({
+            query_api: failing_query_api("context deadline exceeded") });
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(504);
+        expect(res.body).toBeUndefined();
+    });
+
+    test("504 when one mean query outlives its limit", async () => {
+        const hang = { queryRows: (q, consumer) => consumer.useCancellable({ cancel() {} }) };
+        const { api } = make_api({ query_api: hang });
+        api.seriesReader.query_timeout_ms = 20;
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(504);
+    });
+
+    test("500 when InfluxDB fails a query for another reason", async () => {
+        const { api } = make_api({
+            query_api: failing_query_api("schema collision detected") });
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(500);
+    });
+
+    test("an error table fails a count request too", async () => {
+        const { api } = make_api({ query_api: failing_query_api("context canceled") });
+        const res = await call(api, ROOT, { ...base, count: true, every: "1h" });
+        expect(res.statusCode).toBe(504);
+    });
+
+    test("a query with no rows and no error is still an empty 200", async () => {
+        const { api } = make_api({ rows: {} });
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.metrics.map(m => m.points)).toEqual([[], []]);
+    });
+
+    test("two means of one device make one query", async () => {
+        const { api, query_api } = make_api({ rows: {} });
+        await call(api, ROOT, two_means);
+        expect(query_api.seen.length).toBe(1);
+        expect_storage_means(query_api.seen[0]);
     });
 });

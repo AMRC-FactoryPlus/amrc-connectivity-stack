@@ -29,7 +29,7 @@ import {
   SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
   check_coverage, LIMITS as SeriesLimits,
 } from "./series.js";
-import { SeriesAbort } from "./series-reader.js";
+import { SeriesAbort, SeriesQueryError } from "./series-reader.js";
 
 
 /** Settles with `promise`, or rejects with the signal's reason if the
@@ -993,6 +993,15 @@ export class APIv1 {
     if (err?.name == "RequestTimedOutError") {
       this.log("Series query timed out in the InfluxDB client");
       return fail(this.log, 504, `Series query timed out`);
+    }
+
+    /* InfluxDB gave up on a query after it began to answer. Never
+     * report that as a result with no data. */
+    if (err instanceof SeriesQueryError) {
+      this.log("%s", err.message);
+      return err.timeout
+        ? fail(this.log, 504, `Series query timed out`)
+        : fail(this.log, 500, `Series query failed`);
     }
 
     /* A 4xx from InfluxDB means we sent a bad query: that is our bug. */

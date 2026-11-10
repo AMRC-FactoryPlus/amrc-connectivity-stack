@@ -50,6 +50,26 @@ export class SeriesAbort extends Error {
     }
 }
 
+/** A query that InfluxDB started to answer and then gave up on.
+ * InfluxDB has sent `200` by then, so it reports the error as a table
+ * with the columns `error` and `reference` in place of the rows. */
+export class SeriesQueryError extends Error {
+    constructor(message) {
+        super(`InfluxDB ended the query: ${message}`);
+        /* InfluxDB ran out of time, or something cancelled the query. */
+        this.timeout = /deadline exceeded|cancell?ed|timed? ?out/i.test(message);
+    }
+}
+
+/* Whether a table is InfluxDB's error table. Every series query keeps
+ * a fixed set of data columns, so no result of ours has these two
+ * alone. */
+function is_error_table(meta) {
+    const labels = meta?.columns?.map(c => c.label);
+    return labels?.length == 2
+        && labels.includes("error") && labels.includes("reference");
+}
+
 export class SeriesReader {
     /**
      * @param opts.influx_client An InfluxDB client.
@@ -178,7 +198,9 @@ export class SeriesReader {
     /** Runs one Flux query and collects its rows as objects. Rows carry
      * a `result` column naming their yield. The query's own timeout
      * starts when it gets a slot. If too many queries are waiting, it
-     * fails with SeriesAbort("busy") without queueing.
+     * fails with SeriesAbort("busy") without queueing. If InfluxDB
+     * ends the query with an error table, it fails with
+     * SeriesQueryError.
      *
      * historian-uns creates the UNS bucket when it starts, which may be
      * after Data Access. Until then a `uns` query reads nothing, rather
@@ -218,8 +240,17 @@ export class SeriesReader {
                 () => stop(new SeriesAbort("timeout")), this.query_timeout_ms);
             signal.addEventListener("abort", on_abort, { once: true });
 
+            /* A query that fails part way arrives as an error table,
+             * not as an error. Without this test its rows are dropped
+             * or misread, and the caller sees less data than there is. */
+            const next = (values, meta) => {
+                if (is_error_table(meta))
+                    return stop(new SeriesQueryError(meta.toObject(values).error));
+                rows.push(meta.toObject(values));
+            };
+
             this.query_api.queryRows(query, {
-                next: (values, meta) => rows.push(meta.toObject(values)),
+                next,
                 error: err => { finish(); reject(err); },
                 complete: () => { finish(); resolve(rows); },
                 useCancellable: c => { cancellable = c; },

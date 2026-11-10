@@ -156,11 +156,14 @@ export function equipment_devices (equipment, resolve, byUuid) {
  *                         deviceIndex), each with its ISA-95 `path`
  * @param p.expanded       { ongoing, other, [equipment uuid] } booleans
  * @param p.query          the search box
+ * @param p.dataset_of     device uuid -> the uuid of the device's own
+ *                         dataset, or null when it has none the person
+ *                         can open
  * Groups with nothing in them are left out.
  * @returns {{ rows: Row[], height: number, matched: number }}
  *   `matched` counts bands, equipment and devices that pass the search.
  */
-export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, devices = [], expanded = {}, query = '' }) {
+export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, devices = [], expanded = {}, query = '', dataset_of = () => null }) {
     const rows = []
     let top = 0
     let matched = 0
@@ -183,6 +186,8 @@ export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, dev
             // Metric lists come from the ConfigDB, which not everyone can read.
             tag: tag ?? (Array.isArray(d?.metrics) ? metric_count(d.metrics.length) : null),
             status: d?.status ?? null,
+            // The device's own dataset: the row's name links to it.
+            dataset: dataset_of(uuid) ?? null,
             indent,
         }
     }

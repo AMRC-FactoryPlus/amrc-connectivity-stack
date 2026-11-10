@@ -356,7 +356,13 @@ export class DataFlow {
 
   /* dataset_parts in the shape of `parts_changes`, for a reader of
    * one dataset: `{ map, changed, parents }`. `map` holds the one
-   * entry, or none while the dataset is not a Dataset member. */
+   * entry, or none while the dataset is not a Dataset member.
+   * `parents` here holds only the dataset's current parts. It does not
+   * know a subclass before that subclass is a Dataset member, as the
+   * `parents` of `parts_changes` does. That is enough for a reader of
+   * one dataset: every value names the dataset in `changed`, so the
+   * reader looks at it again whatever changed. Do not read the two
+   * `parents` as the same set of links. */
   dataset_parts_changes(dataset_uuid) {
     return this.dataset_parts(dataset_uuid).pipe(
       rx.map(parts => {

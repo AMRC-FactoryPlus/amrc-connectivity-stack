@@ -102,6 +102,16 @@ spec:
               value: {{ $rebuild | toString | quote }}
             {{- end }}
             {{- end }}
+            {{- with .Values.dataAccess.series }}
+            - name: SERIES_CONCURRENCY
+              value: {{ .concurrency | int64 | quote }}
+            - name: SERIES_MAX_QUEUE
+              value: {{ .maxQueue | int64 | quote }}
+            - name: SERIES_TIMEOUT_MS
+              value: {{ .timeoutMs | int64 | quote }}
+            - name: SERIES_QUERY_TIMEOUT_MS
+              value: {{ .queryTimeoutMs | int64 | quote }}
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

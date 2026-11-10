@@ -284,6 +284,26 @@ dataAccess:
     # -- (COVERAGE_REBUILD) Any new value starts the backfill again from
     # today, once per value. Empty: no rebuild.
     rebuild: ""
+  # The limits of POST v1/series, which timelines and charts read. See
+  # docs/services/data-access.md#limits-and-errors. Each setting is
+  # passed to Data Access as the SERIES_* variable named below. The
+  # defaults need no change on most sites.
+  series:
+    # -- (SERIES_CONCURRENCY) Series queries Data Access runs in
+    # InfluxDB at once, across all requests. Lower it to make timelines
+    # gentler on a busy InfluxDB.
+    concurrency: 4
+    # -- (SERIES_MAX_QUEUE) Series queries that may wait for a slot,
+    # across all requests. Requests beyond it get 503 with Retry-After.
+    maxQueue: 400
+    # -- (SERIES_TIMEOUT_MS) Time allowed for one series request, in
+    # milliseconds, permission checks and waiting included.
+    timeoutMs: 120000
+    # -- (SERIES_QUERY_TIMEOUT_MS) Time allowed for one series query,
+    # in milliseconds, from when it starts running. Data Access then
+    # closes the connection, so InfluxDB stops the query. Keep it below
+    # `timeoutMs`.
+    queryTimeoutMs: 90000
 
 openid:
   # -- Whether or not to deploy the Keycloak OIDC server

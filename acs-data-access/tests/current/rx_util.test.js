@@ -483,6 +483,60 @@ describe("watch_each", () => {
         expect(sets.observed).toBe(false);
     });
 
+    /* A throw inside the handler of a Set must reach the output. Left
+     * alone it would reach only the process, as an uncaught exception,
+     * and the output would stay open with nobody told. */
+    test("an upstream value that is no Set errors the output and lets go of every source", () => {
+        const sets = new rx.Subject();
+        const { subjects, factory } = inner_sources();
+        const { seen } = record(sets.pipe(watch_each(factory)));
+
+        sets.next(new Set(["a"]));
+        /* No source sends this today: the library gives an empty Set
+         * for a list it cannot read. */
+        sets.next(null);
+
+        expect(seen.errored).toBe(true);
+        expect(seen.error).toBeInstanceOf(TypeError);
+        expect(seen.complete).toBe(false);
+        expect(subjects.get("a").observed).toBe(false);
+        expect(sets.observed).toBe(false);
+    });
+
+    test("an inner that throws when its key leaves errors the output and lets go of the rest", () => {
+        const failure = new Error("Cannot let go");
+        const sets = new rx.Subject();
+        const { subjects, unsubscribes, factory } = inner_sources();
+        const { seen } = record(sets.pipe(watch_each(key => key == "bad"
+            ? new rx.Observable(() => () => { throw failure; })
+            : factory(key))));
+
+        sets.next(new Set(["a", "bad", "b"]));
+        sets.next(new Set(["a"]));
+
+        expect(seen.errored).toBe(true);
+        /* rxjs wraps what a teardown throws. */
+        expect(seen.error.errors ?? [seen.error]).toEqual([failure]);
+        expect(unsubscribes.sort()).toEqual(["a", "b"]);
+        expect(subjects.get("a").observed).toBe(false);
+        expect(sets.observed).toBe(false);
+    });
+
+    test("an inner that throws when the output is unsubscribed does not keep the others open", () => {
+        const failure = new Error("Cannot let go");
+        const sets = new rx.Subject();
+        const { unsubscribes, factory } = inner_sources();
+        const sub = sets.pipe(watch_each(key => key == "bad"
+            ? new rx.Observable(() => () => { throw failure; })
+            : factory(key))).subscribe();
+        open.push(sub);
+
+        sets.next(new Set(["bad", "a", "b"]));
+        expect(() => sub.unsubscribe()).toThrow();
+        expect(unsubscribes.sort()).toEqual(["a", "b"]);
+        expect(sets.observed).toBe(false);
+    });
+
     test("an upstream error errors the output and lets go of every inner", () => {
         const sets = new rx.Subject();
         const { subjects, factory } = inner_sources();
@@ -637,6 +691,66 @@ describe("watch_each", () => {
         sets.next(new Set(["a", "b"]));
         expect(subscribes).toEqual([]);
         expect(sets.observed).toBe(false);
+    });
+
+    /* A replaying upstream gives its Set inside subscribe, before the
+     * operator's teardown exists. A consumer that has all it wants
+     * from the Set value must still cost no inner subscribe. */
+    test("unsubscribe while a replayed set event is handled starts no inner", () => {
+        const sets = new rx.BehaviorSubject(new Set(["a", "b", "c"]));
+        const { subscribes, unsubscribes, factory } = inner_sources();
+        const { seen } = record(sets.pipe(watch_each(factory), rx.take(1)));
+
+        expect(seen.values).toHaveLength(1);
+        expect(seen.values[0].added).toEqual(["a", "b", "c"]);
+        expect(seen.complete).toBe(true);
+        expect(subscribes).toEqual([]);
+        expect(unsubscribes).toEqual([]);
+        expect(sets.observed).toBe(false);
+    });
+
+    test("unsubscribe while a replayed inner value is handled starts no further inner", () => {
+        const sets = new rx.BehaviorSubject(new Set(["a", "b", "c"]));
+        const subscribes = [];
+        const { seen } = record(sets.pipe(
+            watch_each(key => rx.defer(() => {
+                subscribes.push(key);
+                return new rx.BehaviorSubject(`${key}-held`);
+            })),
+            rx.take(2)));
+
+        expect(seen.values[1]).toEqual({ key: "a", value: "a-held" });
+        expect(seen.complete).toBe(true);
+        expect(subscribes).toEqual(["a"]);
+        expect(sets.observed).toBe(false);
+    });
+
+    /* The key is out of the table before the Set value goes out, so
+     * what its inner sends while that value is handled is dropped. */
+    test("a key that has left sends nothing while its set event is handled", () => {
+        const sets = new rx.Subject();
+        const { subjects, unsubscribes, factory } = inner_sources();
+        const values = [];
+        const sub = sets.pipe(watch_each(factory)).subscribe(v => {
+            values.push(v);
+            if (is_set_event(v) && v.removed.includes("b")) {
+                /* Still subscribed: the operator lets go of it after
+                 * this handler returns. */
+                expect(unsubscribes).toEqual([]);
+                subjects.get("b").next("late");
+                subjects.get("a").next("in time");
+            }
+        });
+        open.push(sub);
+
+        sets.next(new Set(["a", "b"]));
+        sets.next(new Set(["a"]));
+
+        expect(values.slice(1)).toEqual([
+            { set: new Set(["a"]), added: [], removed: ["b"] },
+            { key: "a", value: "in time" },
+        ]);
+        expect(unsubscribes).toEqual(["b"]);
     });
 
     test("each subscription has its own inners", () => {

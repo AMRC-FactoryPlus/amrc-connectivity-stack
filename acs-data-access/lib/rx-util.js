@@ -88,8 +88,10 @@ export function coalesce (fn) {
  * one over the keys held, with native `has` calls and no copy.
  *
  * An error from the upstream or from any inner sequence errors the
- * output. The output completes when the upstream and every inner
- * sequence still held have completed.
+ * output. So does anything that goes wrong while a Set is handled: a
+ * value that is no Set, a factory that throws, or an inner sequence
+ * that throws when it is unsubscribed. The output completes when the
+ * upstream and every inner sequence still held have completed.
  *
  * `stats`, if given, is an object the operator counts its own work
  * on: `stats.scanned` rises by the size of each upstream Set. */
@@ -102,14 +104,44 @@ export function watch_each (factory, stats) {
         let upstream_done = false;
         let closed = false;
 
+        /* The consumer can unsubscribe while it handles a value. When
+         * the upstream answers inside subscribe, that happens before
+         * the teardown below exists, so `closed` alone does not show
+         * it. */
+        const stopped = () => closed || subscriber.closed;
+
+        /* Unsubscribe each inner sequence given. One that throws does
+         * not stop the rest: the first error is thrown at the end. */
+        const drop = recs => {
+            let failed = false;
+            let failure;
+            for (const rec of recs) {
+                try {
+                    rec.sub?.unsubscribe();
+                }
+                catch (err) {
+                    if (!failed) failure = err;
+                    failed = true;
+                }
+            }
+            if (failed) throw failure;
+        };
         const close = () => {
             closed = true;
-            for (const rec of inners.values()) rec.sub?.unsubscribe();
+            const held = [...inners.values()];
             inners.clear();
+            drop(held);
         };
         const fail = err => {
             if (closed) return;
-            close();
+            /* `err` is the failure to report, whatever letting go of
+             * the inner sequences throws after it. */
+            try {
+                close();
+            }
+            catch {
+                /* Nothing to do: every inner has been let go. */
+            }
             subscriber.error(err);
         };
         const finish = () => {
@@ -137,46 +169,52 @@ export function watch_each (factory, stats) {
             });
             /* A synchronous inner sequence can end, or the key can
              * leave, before subscribe returns. */
-            if (closed || inners.get(key) !== rec) sub.unsubscribe();
+            if (stopped() || inners.get(key) !== rec) sub.unsubscribe();
             else rec.sub = sub;
+        };
+
+        const handle = set => {
+            if (stats) stats.scanned = (stats.scanned ?? 0) + set.size;
+
+            const added = [];
+            for (const key of set)
+                if (!inners.has(key)) added.push(key);
+            const removed = [];
+            for (const key of inners.keys())
+                if (!set.has(key)) removed.push(key);
+
+            /* Take the keys that left out of the table first, so
+             * nothing they send while the Set value is handled gets
+             * through. */
+            const gone = removed.map(key => {
+                const rec = inners.get(key);
+                inners.delete(key);
+                if (!rec.done) live--;
+                return rec;
+            });
+            const fresh = added.map(key => {
+                const rec = { sub: null, done: false };
+                inners.set(key, rec);
+                live++;
+                return rec;
+            });
+
+            subscriber.next({ set, added, removed });
+
+            drop(gone);
+            added.forEach((key, i) => {
+                if (stopped() || inners.get(key) !== fresh[i]) return;
+                start(key, fresh[i]);
+            });
         };
 
         const upstream_sub = upstream.subscribe({
             next (set) {
-                if (closed) return;
-                if (stats) stats.scanned = (stats.scanned ?? 0) + set.size;
-
-                const added = [];
-                for (const key of set)
-                    if (!inners.has(key)) added.push(key);
-                const removed = [];
-                for (const key of inners.keys())
-                    if (!set.has(key)) removed.push(key);
-
-                /* Take the keys that left out of the table first, so
-                 * nothing they send while the Set value is handled
-                 * gets through. */
-                const gone = removed.map(key => {
-                    const rec = inners.get(key);
-                    inners.delete(key);
-                    if (!rec.done) live--;
-                    return rec;
-                });
-                const fresh = added.map(key => {
-                    const rec = { sub: null, done: false };
-                    inners.set(key, rec);
-                    live++;
-                    return rec;
-                });
-
-                subscriber.next({ set, added, removed });
-
-                for (const rec of gone) rec.sub?.unsubscribe();
+                if (stopped()) return;
+                /* A throw from here would leave the output open and
+                 * reach nobody but the process. */
                 try {
-                    added.forEach((key, i) => {
-                        if (closed || inners.get(key) !== fresh[i]) return;
-                        start(key, fresh[i]);
-                    });
+                    handle(set);
                 }
                 catch (err) {
                     fail(err);
@@ -190,8 +228,13 @@ export function watch_each (factory, stats) {
         });
 
         return () => {
-            close();
-            upstream_sub?.unsubscribe();
+            /* Let go of the upstream whatever an inner throws. */
+            try {
+                close();
+            }
+            finally {
+                upstream_sub?.unsubscribe();
+            }
         };
     });
 }

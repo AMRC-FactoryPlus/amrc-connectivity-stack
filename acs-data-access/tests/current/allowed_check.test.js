@@ -27,6 +27,7 @@ import {
     DEVICE_PERMS, READ_STRUCTURE, default_dataset_uuid,
 } from "../../lib/default-datasets.js";
 import { ROOT, make_site } from "../support/fake-site.js";
+import { reference_watch_allowed } from "../support/reference-datasets.js";
 import { STRUCTURE_APPS } from "../support/site-builder.js";
 
 const { App, Class, Perm, Special } = Constants;
@@ -294,6 +295,76 @@ describe("the one case where the lists and the single check differ", () => {
         await fx.site.settle();
         expect(await answers(fx, "device-b@EXAMPLE.ORG", Perm.ReadDataset, BROKEN_DEFAULT))
             .toEqual({ list: true, check: true, single: true });
+    });
+});
+
+describe("the list predicate as it was before the keyed check", () => {
+    /* reference_watch_allowed is the list predicate copied from the
+     * code before this rule was written down in one place. It reads
+     * the same Auth and the same default devices as the code under
+     * test, so any answer that differs is a permission that changed.
+     * The single check, APIv1.check_dataset_acl, is the same code
+     * before and after, so the tests above already hold it. */
+    const before = ({ site, data }, principal, permission) =>
+        rx.firstValueFrom(reference_watch_allowed(
+            { auth: site.auth, default_devices: data.default_devices },
+            principal, permission));
+
+    const table = PRINCIPALS.flatMap(principal =>
+        PERMS.map(permission => [principal, PERM_NAMES.get(permission), permission]));
+
+    test.each(table)("%s, %s: the same answer for every dataset, made or not", async (principal, _name, permission) => {
+        const fx = build();
+        const old = await before(fx, principal, permission);
+        const now = await rx.firstValueFrom(
+            fx.data.watch_allowed(principal, permission));
+        const [check, defaults] = await rx.firstValueFrom(rx.combineLatest([
+            fx.data.watch_allowed_check(principal, permission),
+            fx.data.default_devices,
+        ]));
+
+        for (const dataset of [...VALID, ...INVALID, MISSING, UNMADE]) {
+            const want = old(dataset);
+            expect([dataset, now(dataset), check.ok(dataset, defaults.get(dataset))])
+                .toEqual([dataset, want, want]);
+        }
+    });
+
+    /* The pinned difference is the answer the lists gave before, too:
+     * no right to an invalid default dataset through UseDevice. */
+    test.each([...DEVICE_PERMS, READ_STRUCTURE]
+        .map(permission => [PERM_NAMES.get(permission), permission])
+    )("%s on an invalid default dataset through UseDevice was refused by the lists before, as it is now", async (_name, permission) => {
+        const fx = build();
+        for (const principal of ["device-b@EXAMPLE.ORG", "device-all@EXAMPLE.ORG"]) {
+            const old = await before(fx, principal, permission);
+            expect([principal, old(BROKEN_DEFAULT)]).toEqual([principal, false]);
+            expect([principal, (await answers(fx, principal, permission, BROKEN_DEFAULT)).list])
+                .toEqual([principal, false]);
+            /* And it did give the right to a valid default dataset. */
+            expect([principal, old(DEFAULT)])
+                .toEqual([principal, principal == "device-all@EXAMPLE.ORG"]);
+        }
+    });
+
+    test("the answers follow a grant and a default dataset as they change", async () => {
+        const fx = build();
+        const principal = "device-b@EXAMPLE.ORG";
+        const both = async () => [
+            (await before(fx, principal, Perm.ReadDataset))(BROKEN_DEFAULT),
+            (await rx.firstValueFrom(
+                fx.data.watch_allowed(principal, Perm.ReadDataset)))(BROKEN_DEFAULT),
+        ];
+        expect(await both()).toEqual([false, false]);
+
+        /* Valid again: UseDevice on its device now reaches it. */
+        fx.site.del(App.SparkplugSrc, BROKEN_DEFAULT);
+        await fx.site.settle();
+        expect(await both()).toEqual([true, true]);
+
+        fx.site.revoke(principal, Perm.UseDevice, DEVICE_B);
+        await fx.site.settle();
+        expect(await both()).toEqual([false, false]);
     });
 });
 

@@ -14,10 +14,15 @@
  * from the original would make the comparison worthless. */
 
 import { List as IList, Map as IMap } from "immutable";
+import rx from "rxjs";
+
+import { UUIDs } from "@amrc-factoryplus/rx-client";
 
 import { DataAccess as Constants } from "../../lib/constants.js";
 import { minDate, maxDate } from "../../lib/utils.js";
-import { default_dataset_device } from "../../lib/default-datasets.js";
+import {
+  default_dataset_device, DEVICE_PERMS, READ_STRUCTURE,
+} from "../../lib/default-datasets.js";
 
 /** The grouping loop of _build_apps_configs.
  * @arg appEntries An array of [app UUID, Map object -> config], in the
@@ -101,6 +106,54 @@ export function reference_default_devices(datasets) {
     if (device) devices.set(uuid, device);
   }
   return devices;
+}
+
+/** watch_granted and watch_allowed, the permission rule behind every
+ * dataset list. The two method bodies are copied whole; `this` is the
+ * object given, which stands for the DataFlow.
+ * @arg flow `{ auth, default_devices }`: the Auth interface and the
+ * sequence of Maps default dataset UUID -> device UUID.
+ * @returns An Observable of predicates over a dataset UUID.
+ */
+export function reference_watch_allowed(flow, principal, permission) {
+  const reference = {
+    auth: flow.auth,
+    default_devices: flow.default_devices,
+
+  watch_granted(principal, permission) {
+    if (this.auth.root_principal && principal == this.auth.root_principal)
+      return rx.of(() => true);
+
+    return this.auth.watch_acl_with_perm(principal, permission).pipe(
+      rx.map(targets =>
+        targets.has(UUIDs.Special.Null)
+          ? () => true
+          : id => targets.has(id))
+    );
+  },
+
+  watch_allowed(principal, permission) {
+    const structure = permission == READ_STRUCTURE;
+    const granted = this.watch_granted(principal,
+      structure ? Constants.Perm.EditDataset : permission);
+    if (!structure && !DEVICE_PERMS.has(permission))
+      return granted;
+
+    return rx.combineLatest([
+      granted,
+      this.watch_granted(principal, Constants.Perm.UseDevice),
+      this.default_devices,
+    ]).pipe(
+      rx.map(([ok, device_ok, devices]) => id => {
+        if (ok(id)) return true;
+        const device = devices.get(id);
+        return device != null && device_ok(device);
+      })
+    );
+  },
+
+  };
+  return reference.watch_allowed(principal, permission);
 }
 
 /** The filter of _build_valid_datasets. */

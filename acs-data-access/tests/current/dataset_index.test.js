@@ -1147,14 +1147,22 @@ class CostSite {
 }
 
 describe.each([250, 1000, 4000])("DatasetIndex cost at %i datasets", total => {
-    const site = new CostSite(total);
-    const { index } = site;
-    const { unions, sessions, sparks, uns } = site.counts;
+    /* The tests after the first share this site and change it as they
+     * go. Each one measures the difference its own change makes, so it
+     * does not need the site to be as it was built. */
+    const shared = new CostSite(total);
+    const { unions, sessions, sparks, uns } = shared.counts;
 
     test("the site has the planned mix, all valid", () => {
+        /* A site of its own: these are the numbers of the first build,
+         * whatever ran before. */
+        const site = new CostSite(total);
+        const { index } = site;
+
         if (total == 1000)
             expect(site.counts).toEqual(
                 { uns: 700, sparks: 150, sessions: 100, unions: 50 });
+        expect(site.counts).toEqual(shared.counts);
         expect(uns + sparks + sessions + unions).toBe(total);
         expect(site.first.changed.size).toBe(total);
         expect(index.entries.size).toBe(total);
@@ -1167,6 +1175,9 @@ describe.each([250, 1000, 4000])("DatasetIndex cost at %i datasets", total => {
         expect(sorted(index.referrers_of(union_uuid(2))))
             .toEqual([union_uuid(3)]);
     });
+
+    const site = shared;
+    const { index } = site;
 
     test("adding one UNS device dataset resolves exactly 1", () => {
         const before = new Map(index.entries);

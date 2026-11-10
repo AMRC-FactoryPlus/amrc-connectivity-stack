@@ -39,9 +39,21 @@ export const DEVICE_PERMS = new Set([
  * the dataset, or UseDevice on the device of a default dataset. */
 export const READ_STRUCTURE = "read-structure";
 
+/* The default dataset UUID of each device asked for so far. Every list
+ * and every permission check asks for the same devices again, and each
+ * answer costs a SHA-1. */
+const DEFAULT_UUIDS = new Map();
+const DEFAULT_UUIDS_MAX = 50000;
+
 /** The UUID of a device's default dataset. */
 export function default_dataset_uuid(device) {
-  return uuidv5(device, Constants.Special.DefaultDatasetNamespace);
+  let dataset = DEFAULT_UUIDS.get(device);
+  if (dataset === undefined) {
+    dataset = uuidv5(device, Constants.Special.DefaultDatasetNamespace);
+    DEFAULT_UUIDS.set(device, dataset);
+    if (DEFAULT_UUIDS.size > DEFAULT_UUIDS_MAX) DEFAULT_UUIDS.clear();
+  }
+  return dataset;
 }
 
 /** The device a default dataset reads.

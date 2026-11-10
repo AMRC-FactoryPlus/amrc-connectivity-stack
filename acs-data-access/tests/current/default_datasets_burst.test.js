@@ -13,6 +13,7 @@
 
 import { Map as IMap } from "immutable";
 import * as rx from "rxjs";
+import { v5 as uuidv5 } from "uuid";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
@@ -961,5 +962,29 @@ describe("default dataset names under a burst", () => {
         fx.maker.stop();
         expect(await fx.maker.rename_drain()).toBe(0);
         expect(fx.log.calls).toHaveLength(0);
+    });
+});
+
+describe("default_dataset_uuid", () => {
+    const direct = device =>
+        uuidv5(device, Constants.Special.DefaultDatasetNamespace);
+    const device = n =>
+        `dddddddd-0000-4000-8000-${n.toString(16).padStart(12, "0")}`;
+
+    test("gives the same answer however many devices have been asked for", () => {
+        const first = device(0);
+        expect(default_dataset_uuid(first)).toBe(direct(first));
+
+        /* More than the 50,000 answers the function keeps. */
+        for (let n = 1; n <= 50100; n++) default_dataset_uuid(device(n));
+
+        expect(default_dataset_uuid(first)).toBe(direct(first));
+        for (const n of [1, 49999, 50000, 50001, 50100])
+            expect(default_dataset_uuid(device(n))).toBe(direct(device(n)));
+    });
+
+    test("keeps no answer for something that is not a device UUID", () => {
+        expect(() => default_dataset_uuid(undefined)).toThrow();
+        expect(() => default_dataset_uuid(undefined)).toThrow();
     });
 });

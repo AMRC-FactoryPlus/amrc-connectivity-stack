@@ -13,8 +13,10 @@ import { UUIDs } from "@amrc-factoryplus/rx-client";
 import { APIv1 } from "../../lib/api-v1.js";
 import { DataFlow } from "../../lib/dataflow.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
-import { SeriesReader, SeriesAbort } from "../../lib/series-reader.js";
+import { SeriesReader, SeriesAbort, SeriesQueryError } from "../../lib/series-reader.js";
 import { body_errors } from "../../lib/utils.js";
+import http from "node:http";
+import { series_influx } from "../../lib/series-query.js";
 import {
     LIMITS as SeriesLimits,
     SeriesError, parse_request, bucket_start, next_bucket, bucket_count,
@@ -283,7 +285,7 @@ describe("Flux builders", () => {
         expect(q).toMatchSnapshot();
         expect(q).toContain(`r.path == "Axes/X" and (r._measurement == "Load:d" or r._measurement == "Load:i" or r._measurement == "Load:u")`);
         /* InfluxDB drops empty tags: a top-level metric has no path. */
-        expect(q).toContain(`(not exists r.path or r.path == "") and (r._measurement == "Top:i")`);
+        expect(q).toContain(`(not exists r.path) and (r._measurement == "Top:i")`);
         expect(q).not.toContain(":b");
         expect(q).not.toContain("toFloat");
         expect(q).toContain(`yield(name: "sum")`);
@@ -947,5 +949,401 @@ describe("SeriesReader", () => {
         const p = reader.query_rows("x", ctl.signal);
         ctl.abort(new SeriesAbort("timeout"));
         await expect(p).rejects.toMatchObject({ reason: "timeout" });
+    });
+});
+
+
+/*
+ * ---------------------------------------------------------------
+ * Means that InfluxDB can work out in storage
+ *
+ * InfluxDB runs a windowed aggregate in storage only when the filter
+ * before it runs in storage too. Its planner (PushDownFilterRule in
+ * query/stdlib/influxdata/influxdb/rules.go) splits a filter at its
+ * top-level `and`s and sends on the parts made only of:
+ *   r.<tag> == or != a literal, but not == "";
+ *   r.<tag> =~ or !~ a regex;
+ *   exists r.<tag>, and not exists r.<tag>;
+ *   those joined with `and` and `or`.
+ * A part with anything else stays in Flux, and the aggregate with it.
+ * A filter that is one big `or` is a single part: one bad test in it
+ * keeps the whole filter in Flux, and the query reads the whole bucket.
+ * ---------------------------------------------------------------
+ */
+
+/* Whether storage can run a whole filter body. */
+function storage_can_run(body) {
+    let s = body
+        .replace(/"(?:[^"\\]|\\.)+"/g, "S")
+        .replace(/""/g, "E")
+        .replace(/\/(?:[^\/\\]|\\.)+\//g, "R")
+        .replace(/not exists r\.\w+/g, "T")
+        .replace(/exists r\.\w+/g, "T")
+        .replace(/r\.\w+ (?:==|!=) S/g, "T")
+        .replace(/r\.\w+ != E/g, "T")
+        .replace(/r\.\w+ (?:=~|!~) R/g, "T");
+    for (let prev = null; prev != s;) {
+        prev = s;
+        s = s.replace(/\(T\)/g, "T").replace(/T (?:and|or) T/g, "T");
+    }
+    return s == "T";
+}
+
+/* The bodies of every filter() in a script, and the lines between each
+ * from() and its aggregate. */
+const filter_bodies = q =>
+    [...q.matchAll(/^ {2}\|> filter\(fn: \(r\) => (.*)\)$/gm)].map(m => m[1]);
+
+function expect_storage_means(q) {
+    const bodies = filter_bodies(q);
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const b of bodies)
+        expect(storage_can_run(b), b).toBe(true);
+    /* Nothing but range and filter between a from() and its aggregate. */
+    for (const part of q.split(/^from\(/m).slice(1)) {
+        const steps = part.split("\n").slice(1)
+            .filter(l => l.startsWith("  |> "))
+            .map(l => /^ {2}\|> (\w+)/.exec(l)[1]);
+        const agg = steps.findIndex(s => s == "aggregateWindow" || s == "last");
+        expect(agg).toBeGreaterThan(0);
+        expect(steps.slice(0, agg).every(s => s == "range" || s == "filter"), part).toBe(true);
+    }
+}
+
+describe("mean queries run in storage", () => {
+    const windows = [[T(base.from), T(base.to)]];
+    const root = (device, name) => ({ device, path: "", name, type: "d" });
+
+    test("the checker refuses what InfluxDB refuses", () => {
+        expect(storage_can_run(`r._field == "value"`)).toBe(true);
+        expect(storage_can_run(`(r.a == "x" and (not exists r.path) and (r._measurement == "M:d"))`)).toBe(true);
+        expect(storage_can_run(`r.path =~ /^[^\\/]+\\/Axes$/`)).toBe(true);
+        /* The path test this service sent before. */
+        expect(storage_can_run(`(not exists r.path or r.path == "")`)).toBe(false);
+        expect(storage_can_run(`r.path == ""`)).toBe(false);
+        expect(storage_can_run(`r._time >= 2026-10-08T01:00:00.000Z`)).toBe(false);
+        expect(storage_can_run(`contains(value: r._measurement, set: ["a"])`)).toBe(false);
+    });
+
+    test("one root metric of a sparkplug device", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: [root(D1, "Float")] });
+        expect(q).not.toContain(`== ""`);
+        expect_storage_means(q);
+    });
+
+    test("two root metrics of one sparkplug device", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: [root(D1, "Float"), root(D1, "Double")] });
+        expect(q).toContain(
+            `(r.topLevelInstance == "${D1}" and (not exists r.path) and (r._measurement == "Float:d"))`
+            + ` or (r.topLevelInstance == "${D1}" and (not exists r.path) and (r._measurement == "Double:d"))`);
+        expect_storage_means(q);
+    });
+
+    test("root and nested metrics of two devices, typed and untyped", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m", metrics: [
+            root(D1, "Float"), root(D2, "Double"),
+            { device: D1, path: "Axes/X", name: "Load", type: null },
+            { device: D2, path: "Axes/Y", name: "Load", type: "i" },
+        ] });
+        expect_storage_means(q);
+    });
+
+    test("the uns store, root and nested", () => {
+        const q = mean_query({ bucket: "uns", store: "uns", windows, every: "5m", metrics: [
+            root(D1, "Float"),
+            { device: D2, path: "Axes/X", name: "Load", type: null },
+        ] });
+        expect_storage_means(q);
+    });
+
+    test("the metric filter of N metrics is N clauses joined with or", () => {
+        const names = ["A", "B", "C", "D", "E"];
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: names.map(n => root(D1, n)) });
+        const metric_filter = filter_bodies(q)[1];
+        expect(metric_filter.split(" or ").length).toBe(names.length);
+        /* Three reads, whatever the number of metrics. */
+        expect(q.match(/^from\(/gm).length).toBe(3);
+    });
+});
+
+/*
+ * ---------------------------------------------------------------
+ * A query that InfluxDB gives up on
+ *
+ * Once InfluxDB has started a 200 response it reports a failure as a
+ * table with the columns `error` and `reference`. The client hands
+ * that table on as a row, and then completes.
+ * ---------------------------------------------------------------
+ */
+
+const data_meta = { columns: [], toObject: v => v };
+const error_meta = {
+    columns: [{ label: "error" }, { label: "reference" }],
+    toObject: ([error, reference]) => ({ error, reference }),
+};
+
+/* A query API whose queries end with an error table, after `rows`. */
+function failing_query_api(message, rows = []) {
+    const api = {
+        cancelled: 0,
+        queryRows(query, consumer) {
+            consumer.useCancellable({ cancel() { api.cancelled++; } });
+            setImmediate(() => {
+                for (const r of rows) consumer.next(r, data_meta);
+                consumer.next([message, ""], error_meta);
+                consumer.complete();
+            });
+        },
+    };
+    return api;
+}
+
+describe("a query InfluxDB gives up on", () => {
+    const two_means = { ...base, every: "5m", mean: [
+        { device: D1, metric: "Float", type: "d" },
+        { device: D1, metric: "Double", type: "d" },
+    ] };
+    const reader_for = query_api =>
+        new SeriesReader({ debug, influx_bucket: "default", query_api });
+
+    test("the reader rejects on an error table with no rows", async () => {
+        const qa = failing_query_api("context deadline exceeded");
+        const p = reader_for(qa).query_rows("x", new AbortController().signal);
+        await expect(p).rejects.toBeInstanceOf(SeriesQueryError);
+        await expect(p).rejects.toMatchObject({ timeout: true });
+        expect(qa.cancelled).toBe(1);
+    });
+
+    test("the reader rejects on an error table after some rows", async () => {
+        const row = { result: "n", topLevelInstance: D1, _measurement: "Float:d",
+            _time: base.from, _value: "5" };
+        const qa = failing_query_api("memory allocation limit reached", [row]);
+        const p = reader_for(qa).query_rows("x", new AbortController().signal);
+        await expect(p).rejects.toBeInstanceOf(SeriesQueryError);
+        await expect(p).rejects.toMatchObject({ timeout: false });
+    });
+
+    test("a cancelled query counts as a timeout", () => {
+        expect(new SeriesQueryError("context canceled").timeout).toBe(true);
+        expect(new SeriesQueryError("query timed out").timeout).toBe(true);
+        expect(new SeriesQueryError("schema collision").timeout).toBe(false);
+    });
+
+    test("data columns named error and reference among others are rows", async () => {
+        const meta = {
+            columns: [{ label: "error" }, { label: "reference" }, { label: "_value" }],
+            toObject: v => v,
+        };
+        const qa = { queryRows: (q, consumer) => setImmediate(() => {
+            consumer.next({ error: "e", reference: "r", _value: "1" }, meta);
+            consumer.complete();
+        }) };
+        const rows = await reader_for(qa).query_rows("x", new AbortController().signal);
+        expect(rows.length).toBe(1);
+    });
+
+    test("the reader rejects with a timeout when a query outlives its limit", async () => {
+        let cancelled = false;
+        const hang = { queryRows: (q, consumer) =>
+            consumer.useCancellable({ cancel() { cancelled = true; } }) };
+        const reader = reader_for(hang);
+        reader.query_timeout_ms = 20;
+        await expect(reader.query_rows("x", new AbortController().signal))
+            .rejects.toMatchObject({ reason: "timeout" });
+        expect(cancelled).toBe(true);
+    });
+
+    test("504, never an empty 200, when InfluxDB runs out of time on means", async () => {
+        const { api } = make_api({
+            query_api: failing_query_api("context deadline exceeded") });
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(504);
+        expect(res.body).toBeUndefined();
+    });
+
+    test("504 when one mean query outlives its limit", async () => {
+        const hang = { queryRows: (q, consumer) => consumer.useCancellable({ cancel() {} }) };
+        const { api } = make_api({ query_api: hang });
+        api.seriesReader.query_timeout_ms = 20;
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(504);
+    });
+
+    test("500 when InfluxDB fails a query for another reason", async () => {
+        const { api } = make_api({
+            query_api: failing_query_api("schema collision detected") });
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(500);
+    });
+
+    test("an error table fails a count request too", async () => {
+        const { api } = make_api({ query_api: failing_query_api("context canceled") });
+        const res = await call(api, ROOT, { ...base, count: true, every: "1h" });
+        expect(res.statusCode).toBe(504);
+    });
+
+    test("a query with no rows and no error is still an empty 200", async () => {
+        const { api } = make_api({ rows: {} });
+        const res = await call(api, ROOT, two_means);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.metrics.map(m => m.points)).toEqual([[], []]);
+    });
+
+    test("two means of one device make one query", async () => {
+        const { api, query_api } = make_api({ rows: {} });
+        await call(api, ROOT, two_means);
+        expect(query_api.seen.length).toBe(1);
+        expect_storage_means(query_api.seen[0]);
+    });
+});
+
+
+/*
+ * ---------------------------------------------------------------
+ * Stopping a query in InfluxDB
+ *
+ * These run the reader against a local HTTP server, through the real
+ * InfluxDB client transport. InfluxDB cancels a query when its client
+ * closes the connection, so the tests watch for that close.
+ * ---------------------------------------------------------------
+ */
+
+/* A stand-in for InfluxDB. `answer(res)` replies, or does nothing to
+ * leave the query running. `closed` resolves when a client closes a
+ * request that has had no reply. */
+async function fake_influx(answer = () => {}) {
+    let abandoned;
+    const closed = new Promise(r => { abandoned = r; });
+    const requests = [];
+    const server = http.createServer((req, res) => {
+        let body = "";
+        req.on("data", d => { body += d; });
+        req.on("end", () => {
+            requests.push({ url: req.url, body: JSON.parse(body) });
+            res.on("close", () => { if (!res.writableEnded) abandoned(); });
+            answer(res);
+        });
+    });
+    await new Promise(r => server.listen(0, "127.0.0.1", r));
+    const reader = new SeriesReader({
+        debug, influx_bucket: "default", influx_org: "the org",
+        influx_client: series_influx({
+            url: `http://127.0.0.1:${server.address().port}`, token: "t" }),
+    });
+    const stop = () => new Promise(r => { server.closeAllConnections(); server.close(r); });
+    return { reader, requests, closed, stop };
+}
+
+const csv = lines => res => {
+    res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+    res.end(lines.join("\r\n") + "\r\n");
+};
+
+describe("stopping a query in InfluxDB", () => {
+    test("reads rows through the client transport", async () => {
+        const influx = await fake_influx(csv([
+            "#datatype,string,long,string,string,dateTime:RFC3339,double",
+            "#group,false,false,true,true,false,false",
+            "#default,sum,,,,,",
+            ",result,table,topLevelInstance,_measurement,_time,_value",
+            `,,0,${D1},Float:d,2026-10-08T00:00:00Z,12.5`,
+        ]));
+        try {
+            const rows = await influx.reader.query_rows("from(x)", new AbortController().signal);
+            expect(rows).toEqual([{ result: "sum", table: 0, topLevelInstance: D1,
+                _measurement: "Float:d", _time: "2026-10-08T00:00:00Z", _value: 12.5 }]);
+            expect(influx.requests[0].url).toBe("/api/v2/query?org=the%20org");
+            expect(influx.requests[0].body).toMatchObject({ query: "from(x)", type: "flux" });
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("the error table InfluxDB really sends rejects the query", async () => {
+        const influx = await fake_influx(csv([
+            "",
+            "#datatype,string,string",
+            "#group,true,true",
+            "#default,,",
+            ",error,reference",
+            ",context deadline exceeded,",
+        ]));
+        try {
+            await expect(influx.reader.query_rows("x", new AbortController().signal))
+                .rejects.toMatchObject({ timeout: true });
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("an empty 200 from InfluxDB is no rows", async () => {
+        const influx = await fake_influx(csv([""]));
+        try {
+            expect(await influx.reader.query_rows("x", new AbortController().signal))
+                .toEqual([]);
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("a query that outlives its limit is closed", async () => {
+        const influx = await fake_influx();
+        influx.reader.query_timeout_ms = 30;
+        try {
+            await expect(influx.reader.query_rows("x", new AbortController().signal))
+                .rejects.toMatchObject({ reason: "timeout" });
+            await influx.closed;
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("a query is closed when its request is aborted", async () => {
+        const influx = await fake_influx();
+        const ctl = new AbortController();
+        try {
+            const p = influx.reader.query_rows("x", ctl.signal);
+            p.catch(() => {});
+            while (!influx.requests.length) await new Promise(r => setTimeout(r, 5));
+            ctl.abort(new SeriesAbort("client closed"));
+            await expect(p).rejects.toMatchObject({ reason: "client closed" });
+            await influx.closed;
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("stopping after the whole response has arrived raises nothing", async () => {
+        /* The error table is the whole body, so the reader stops a
+         * request whose connection is already idle. */
+        const influx = await fake_influx(csv(["", ",error,reference", ",context canceled,"]));
+        const uncaught = [];
+        const on_uncaught = err => uncaught.push(err);
+        process.on("uncaughtException", on_uncaught);
+        try {
+            for (let i = 0; i < 10; i++)
+                await expect(influx.reader.query_rows("x", new AbortController().signal))
+                    .rejects.toBeInstanceOf(SeriesQueryError);
+            await new Promise(r => setTimeout(r, 30));
+            expect(uncaught).toEqual([]);
+        }
+        finally {
+            process.off("uncaughtException", on_uncaught);
+            await influx.stop();
+        }
+    });
+
+    test("a waiting query of an aborted request is never sent", async () => {
+        const influx = await fake_influx();
+        const ctl = new AbortController();
+        try {
+            /* The default limit runs 4 queries at once. */
+            const ps = [1, 2, 3, 4, 5].map(i => influx.reader.query_rows(`q${i}`, ctl.signal));
+            ps.forEach(p => p.catch(() => {}));
+            while (influx.requests.length < 4) await new Promise(r => setTimeout(r, 5));
+            ctl.abort(new SeriesAbort("failed"));
+            await Promise.allSettled(ps);
+            await new Promise(r => setTimeout(r, 30));
+            expect(influx.requests.map(r => r.body.query).sort()).toEqual(["q1", "q2", "q3", "q4"]);
+        }
+        finally { await influx.stop(); }
     });
 });

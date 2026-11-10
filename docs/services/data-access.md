@@ -191,7 +191,7 @@ They are excluded from `GET v1/metadata` and `GET v1/metadata/:uuid`,
 and cannot be downloaded, but they do appear in the structure endpoints
 (`GET v1/structure`, `GET v1/structure/:uuid`) so the problem can be
 found and fixed. `GET v1/structure/:uuid` on an invalid dataset returns
-this special UUID as `structure` and omits `config`.
+this special UUID as `structure` and `null` as `config`.
 
 ## ConfigDB objects
 
@@ -835,9 +835,10 @@ the device when `:uuid` is a default dataset; a caller with only
 
 Property | Type | Meaning
 ---|---|---
-`uuid` | UUID | Dataset UUID
 `structure` | UUID | The structural application UUID, or the special invalid-dataset UUID
-`config` | any | The structural config; absent when the dataset is invalid
+`config` | any | The structural config; `null` when the dataset is invalid
+
+The body does not hold the dataset UUID.
 
 ### `POST v1/structure`
 
@@ -1062,6 +1063,12 @@ as soon as the service knows the datasets and the principal's ACL. Just
 after the service starts, a body can therefore have the name
 `"UNKNOWN"`, no `function`, no `metadata` and an empty `parts`, and a
 `200` child update follows when the service has read the missing part.
+The parts are read only while a metadata search is open, so the first
+search after a quiet time can get an empty `parts` in every body, and
+then an update for each dataset that has parts.
+
+`parts` is a set: the order of the UUIDs in it is not specified, and it
+can differ between a search, a single watch and the HTTP route.
 
 The body of a structure search child is `{structure, config}`. The
 structure search includes
@@ -1087,6 +1094,10 @@ It differs from the HTTP route in these ways:
   invalid, or that the principal may not read, where the HTTP route
   answers `404` or `403`. It is also the first answer on a service that
   has just started, before the body is known.
+- The first body can have an empty `parts`. The service asks ConfigDB
+  for the parts of the one dataset when the watch starts, and does not
+  wait for the answer. A dataset that has parts gets a second update
+  with them when ConfigDB has answered.
 - It sends a new answer each time the body changes. A dataset that is
   deleted, becomes invalid or is no longer readable gets the `200` with
   no body again.

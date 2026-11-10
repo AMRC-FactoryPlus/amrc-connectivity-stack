@@ -821,27 +821,17 @@ describe("DatasetIndex rules", () => {
     /* The index follows references with a loop. When it called itself
      * for each reference it ran out of stack at about a third of the
      * depth the whole-map code reached, so a site whose chain was
-     * between the two would have lost its whole dataset map. */
-    test("a chain as deep as the whole-map code could follow gives the same map", () => {
-        /* Where the whole-map code runs out of stack depends on the
-         * Node version, so find it: the deepest chain it follows
-         * here, to within a tenth. */
-        let follows = 500;
-        let fails = 20_000;
-        while (fails > follows * 1.1) {
-            const middle = Math.round((follows + fails) / 2);
-            try {
-                reference_datasets(chain_of(middle));
-                follows = middle;
-            }
-            catch (err) {
-                if (!(err instanceof RangeError)) throw err;
-                fails = middle;
-            }
-        }
-        /* A little less, so the frames of this test do not matter. */
-        const depth = Math.round(follows * 0.9);
-        expect(depth).toBeGreaterThan(1000);
+     * between the two would have lost its whole dataset map.
+     *
+     * The depth here is fixed. Where the whole-map code runs out of
+     * stack changes from one call to the next in the same process, by
+     * a factor of three: it followed between 3,500 and 11,000 on Node
+     * 20 and between 5,000 and 11,000 on Node 24. So a depth found by
+     * trying is not one the next call can be sure to follow. 1,500 is
+     * less than half the least of those. The test after this one
+     * shows the index follows a far deeper chain. */
+    test("a chain the whole-map code can follow gives the same map", () => {
+        const depth = 1500;
         const grouped = chain_of(depth);
         const want = reference_datasets(grouped);
         expect(want.size).toBe(depth + 1);
@@ -854,8 +844,7 @@ describe("DatasetIndex rules", () => {
         expect(index.invalid.size).toBe(0);
         expect(index.stats.resolved).toBe(depth + 1);
         expect(index.entries.toJS()).toEqual(want.toJS());
-    /* The search for the depth takes a second or two. */
-    }, 30000);
+    });
 
     test("a chain too deep for the whole-map code is followed too", () => {
         const depth = 20_000;

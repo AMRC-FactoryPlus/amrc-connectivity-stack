@@ -70,7 +70,7 @@ the only one:
 - **Nobody can make another.** `POST v1/structure` for a `UNS device`
   answers `409 use_default_dataset` with the default dataset's UUID.
   `UNS device` datasets made before this still work, and can still be
-  deleted.
+  deleted, but cannot be pointed at another device.
 - **Nobody can change or delete it.** Its structure, name, tags,
   labels, kind and run details are all fixed: those routes answer
   `409 default_dataset`, whatever the caller holds. Data Access owns
@@ -844,7 +844,8 @@ Rewriting an invalid dataset makes it anew, so it counts as a create:
 rewriting one as a `Sparkplug source` or `Sub-device` gets `422`
 `structure_retired`. A valid dataset of those structures can still be
 edited. Rewriting one as a `UNS device` gets `409`
-`use_default_dataset`.
+`use_default_dataset`. So does changing the device of a `UNS device`
+dataset made before default datasets: the other device has its own.
 
 A [default dataset](#default-device-datasets) cannot be edited: the
 answer is `409` `default_dataset`.

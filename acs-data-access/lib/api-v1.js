@@ -1467,8 +1467,12 @@ export class APIv1 {
     const { handler, config: stored_config } =
       await this._check_dataset_config(req.auth, structure, new_config);
 
-    /* An invalid dataset rewritten as a UNS device would be a new one. */
-    if(!is_valid && structure == Constants.App.UNSDevice)
+    /* A device has one device dataset, its default one. An invalid
+     * dataset rewritten as a UNS device would be a second, and so would
+     * an older UNS device dataset pointed at another device: the checks
+     * above have shown that device is placed, so it has its own. */
+    if(structure == Constants.App.UNSDevice
+      && (!is_valid || stored_config.source != current_config?.source))
       await this.refuse_device_dataset(stored_config.source);
 
     // for currently VALID dataset

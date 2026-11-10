@@ -397,6 +397,24 @@ describe("new UNS device datasets", () => {
     expect(api.calls.create).toEqual([]);
   });
 
+  test("an older device dataset cannot be pointed at another device", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.structure_update({ auth: ROOT, params: { uuid: OWN },
+      body: { structure: App.UNSDevice, config: { source: DEV_B } } }, res);
+    expect(res.code).toBe(409);
+    expect(res.body).toMatchObject({ error: "use_default_dataset", device: DEV_B, dataset: DEF_B });
+    expect(api.calls.put).toEqual([]);
+  });
+
+  test("an older device dataset can be saved again with the device it has", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.structure_update({ auth: ROOT, params: { uuid: OWN },
+      body: { structure: App.UNSDevice, config: { source: DEV_A } } }, res);
+    expect(res.code).toBe(200);
+  });
+
   test("a caller who may not use the device gets 403, not the dataset's UUID", async () => {
     const api = make_api({ [Perm.CreateDataset]: [App.UNSDevice] });
     await expect(api.structure_create({ auth: USER,

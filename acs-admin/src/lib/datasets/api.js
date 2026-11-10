@@ -192,9 +192,12 @@ export function device_refusal (err, name) {
 }
 
 /**
- * Make sure each device has a UNS device dataset, creating missing ones
- * with the device's name. Older device datasets are not reused: new
- * datasets read the UNS. Returns { [device uuid]: dataset uuid }.
+ * Find the UNS device dataset to use for each device. Data Access
+ * makes one default dataset for every placed device, and refuses to
+ * make another, naming the default one; that refusal is how a device
+ * the store has not caught up with gets its dataset here. Older device
+ * datasets are not reused: new datasets read the UNS. Returns
+ * { [device uuid]: dataset uuid }.
  *
  * Every device is tried. Devices Data Access refuses are listed
  * together in one DatasetError, with `refused` as [{ device, reason }],
@@ -219,12 +222,15 @@ export async function ensure_device_datasets (client, devices, byUuid, nameOf = 
             uuid = await client.DataAccess.create_dataset(STRUCTURE.UNS_DEVICE, { source: dev })
         }
         catch (err) {
+            const dflt = err?.body?.error === 'use_default_dataset' ? err.body.dataset : null
+            if (dflt) { created[dev] = out[dev] = dflt; return }
             const reason = device_refusal(err, name ?? `Device ${dev.slice(0, 8)}`)
             if (!reason) throw err
             refused.push({ device: dev, reason, code: err?.body?.error ?? null })
             if (err?.body?.error === 'uns_unavailable') site_refuses = true
             return
         }
+        // Only a Data Access from before default datasets gets this far.
         if (!uuid) throw new DatasetError(`Could not make a dataset for device ${name ?? dev}.`)
         created[dev] = uuid
         if (name) await set_name(client, uuid, name, FRESH)

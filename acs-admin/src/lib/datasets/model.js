@@ -5,6 +5,7 @@
  * service, so all of it is unit-tested in test/datasets-model.test.js.
  */
 
+import { v5 as uuidv5 } from 'uuid'
 import { DA, STRUCTURE, KINDS, is_device_structure, is_metrics_structure } from './constants.js'
 
 export const TZ = 'Europe/London'
@@ -44,8 +45,10 @@ export function merge_datasets (metadata = [], structures = [], owners = {}) {
         const r = out[s.uuid] ?? (out[s.uuid] = base_record(s.uuid))
         r.structure = s.structure ?? null
         r.config = s.config ?? null
-        r.editable = true
         r.invalid = s.structure === STRUCTURE.INVALID
+        // Data Access keeps a default dataset: nobody edits it.
+        r.is_default = is_default_dataset(r)
+        r.editable = !r.is_default
     }
     for (const r of Object.values(out)) decorate(r, owners)
     return out
@@ -65,7 +68,23 @@ function base_record (uuid) {
         readable: false,
         editable: false,
         invalid: false,
+        is_default: false,
     }
+}
+
+/**
+ * The UUID of a device's default dataset. Data Access makes one UNS
+ * device dataset for every placed device and gives it this UUID.
+ */
+export function default_dataset_uuid (device_uuid) {
+    return uuidv5(device_uuid, DA.Special.DefaultDatasetNamespace)
+}
+
+/** Whether a record is the default dataset of the device it reads. */
+export function is_default_dataset (r) {
+    const device = r?.config?.source
+    return r?.structure === STRUCTURE.UNS_DEVICE && typeof device === 'string'
+        && default_dataset_uuid(device) === r.uuid
 }
 
 // Pull the Admin UI's own metadata apps out into named fields.
@@ -190,8 +209,10 @@ export function device_dataset_for (device_uuid, byUuid, structures = null) {
     const found = Object.values(byUuid)
         .filter(r => is_device_structure(r.structure) && r.config?.source === device_uuid)
         .filter(r => !structures || structures.includes(r.structure))
-        // Prefer a named one, then the oldest-looking (stable) choice.
-        .sort((a, b) => (b.name ? 1 : 0) - (a.name ? 1 : 0) || a.uuid.localeCompare(b.uuid))
+        // Prefer the device's default dataset, then a named one, then
+        // the oldest-looking (stable) choice.
+        .sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0)
+            || (b.name ? 1 : 0) - (a.name ? 1 : 0) || a.uuid.localeCompare(b.uuid))
     return found[0]?.uuid ?? null
 }
 

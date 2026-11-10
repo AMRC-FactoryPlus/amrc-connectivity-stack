@@ -431,7 +431,7 @@ function fake_query_api(rows = {}) {
  * `refused` gets that status from Auth; `acl` replaces fetch_acl. `cdb`
  * answers ConfigDB reads, such as a sub-device's origin map. */
 function make_api({ grants = {}, read = [], datasets = {}, rows, query_api,
-        refused = {}, acl, cdb = {} } = {}) {
+        refused = {}, acl, cdb = { get_config: async () => undefined } } = {}) {
     const flow = Object.create(DataFlow.prototype);
     flow.datasets = rx.of(new Map(Object.entries(datasets)));
 

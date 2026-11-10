@@ -35,12 +35,8 @@ export class UnionComponentsHandler extends BaseStructureHandler {
     if(config.length == 0) return true;
 
     for(let target of config){
-      const ok = await this.auth.check_acl(
-        principal, 
-        this.sourcePermission,
-        target,
-        true
-      );
+      const ok = await this.api.check_dataset_acl(
+        principal, this.sourcePermission, target);
 
       if(!ok) return false;
     }

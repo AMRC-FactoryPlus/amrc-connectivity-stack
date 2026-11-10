@@ -31,6 +31,7 @@ function make_api(datasets, raw_configs) {
   };
 
   const cdb = {
+    async get_config() { return undefined; },
     search_app(app) {
       /* raw_configs lets a test give ConfigDB a config document that the
        * derived dataset map does not carry, which is what happens when a

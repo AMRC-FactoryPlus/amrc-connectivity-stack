@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest'
 import { DA, STRUCTURE, kind_info, is_other_kind, is_device_structure, is_metrics_structure } from '../src/lib/datasets/constants.js'
 import {
     merge_datasets, resolve_devices, included_in, device_dataset_for,
+    default_dataset_uuid, is_default_dataset,
     overlapping_devices, dataset_status, structure_tree,
     to_iso, validate_window, fmt_duration, fmt_elapsed, fmt_window,
     london_local_to_ms, ms_to_london_local, london_offset_min,
@@ -140,6 +141,25 @@ describe('structure', () => {
         expect(included_in(DS1, by)).toEqual([EQ])
         expect(device_dataset_for(D2, by)).toBe(DS2)
         expect(device_dataset_for('nope', by)).toBe(null)
+    })
+
+    it('knows a default dataset, prefers it, and does not offer to edit it', () => {
+        const DFLT = default_dataset_uuid(D1)
+        expect(DFLT).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5/)
+        const by = merge_datasets(
+            [{ uuid: DFLT, name: 'Meter', function: [] }, { uuid: DS1, name: 'A meter of mine', function: [] }],
+            [
+                { uuid: DFLT, structure: STRUCTURE.UNS_DEVICE, config: { source: D1 } },
+                { uuid: DS1, structure: STRUCTURE.UNS_DEVICE, config: { source: D1 } },
+            ])
+        expect(by[DFLT].is_default).toBe(true)
+        expect(by[DFLT].editable).toBe(false)
+        expect(by[DS1].is_default).toBe(false)
+        expect(by[DS1].editable).toBe(true)
+        expect(device_dataset_for(D1, by, [STRUCTURE.UNS_DEVICE])).toBe(DFLT)
+        // The same UUID over another device, or another structure, is not one.
+        expect(is_default_dataset({ uuid: DFLT, structure: STRUCTURE.UNS_DEVICE, config: { source: D2 } })).toBe(false)
+        expect(is_default_dataset({ uuid: DFLT, structure: STRUCTURE.DEVICE, config: { source: D1 } })).toBe(false)
     })
 
     it('flags devices reached twice in a union', () => {

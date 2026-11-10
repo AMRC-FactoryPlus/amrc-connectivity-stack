@@ -42,6 +42,9 @@ export const DA = {
     },
     Special: {
         InvalidDataset:     '696396a0-2831-11f1-9b12-33d63b8c5115',
+        // A device's default dataset has the UUID v5(device UUID, this).
+        // It matches acs-data-access (lib/constants.js).
+        DefaultDatasetNamespace: '21892bf2-0d9d-4496-a84e-37ff1829b94c',
     },
 }
 

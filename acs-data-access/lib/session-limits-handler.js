@@ -41,12 +41,8 @@ export class SessionLimitsHandler extends BaseStructureHandler {
 
     if(!valid_uuid(target)) return fail(this.log, 422, `Source uuid ${target} is invalid.`);
 
-    const ok = await this.auth.check_acl(
-      principal, 
-      this.sourcePermission,
-      target,
-      true
-    );
+    const ok = await this.api.check_dataset_acl(
+        principal, this.sourcePermission, target);
     
     return ok; 
   }

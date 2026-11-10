@@ -244,6 +244,21 @@ describe('saves that carry on after a part-way failure', () => {
         expect(out.d1).toBe(c.made[0][1])
     })
 
+    it('uses the default dataset Data Access names when it refuses to make another', async () => {
+        const c = client()
+        const DFLT = 'aaaaaaaa-0000-5000-8000-000000000001'
+        let asked = 0
+        c.DataAccess.create_dataset = async () => {
+            asked++
+            throw Object.assign(new Error('refused'), { status: 409, body: { error: 'use_default_dataset', dataset: DFLT } })
+        }
+        const created = {}
+        expect(await ensure_device_datasets(c, ['d1'], {}, () => 'Name', created)).toEqual({ d1: DFLT })
+        // A retry does not ask again.
+        expect(await ensure_device_datasets(c, ['d1'], {}, () => 'Name', created)).toEqual({ d1: DFLT })
+        expect(asked).toBe(1)
+    })
+
     it('reuses a UNS device dataset', async () => {
         const c = client()
         const by = { uns: { uuid: 'uns', structure: STRUCTURE.UNS_DEVICE, config: { source: 'd1' } } }

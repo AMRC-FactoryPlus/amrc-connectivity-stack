@@ -12,6 +12,7 @@ import { Notify } from "@amrc-factoryplus/service-api";
 
 import { DataAccess as Constants } from "./constants.js";
 import { valid_uuid } from "./validate.js";
+import { READ_STRUCTURE } from "./default-datasets.js";
 import { response } from "express";
 
 export class DataAccessNotify {
@@ -348,7 +349,7 @@ export class DataAccessNotify {
   structure_list(sess) {
     return this.data.allowed_all_dataset_uuids(
       sess.principal,
-      Constants.Perm.EditDataset
+      READ_STRUCTURE
     ).pipe(
       rx.map(data => ({
         status: 200,
@@ -366,7 +367,7 @@ export class DataAccessNotify {
 
       return this.data.allowed_valid_datasets(
           sess.principal,
-          Constants.Perm.EditDataset
+          READ_STRUCTURE
       ).pipe(
           rx.map(datasets => datasets.get(uuid)),
 
@@ -397,7 +398,7 @@ export class DataAccessNotify {
       const dataset_uuids = this.data
           .allowed_all_dataset_uuids(
               sess.principal,
-              Constants.Perm.EditDataset
+              READ_STRUCTURE
           )
           .pipe(
               rx.switchMap(uuids => {

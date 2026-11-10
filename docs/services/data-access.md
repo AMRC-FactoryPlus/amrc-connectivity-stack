@@ -56,6 +56,44 @@ for the device, so it can include these. It does not include the birth
 metadata (`Instance_UUID` and `Schema_UUID`) or the `Device Control`
 metrics, which the UNS historian does not write.
 
+#### Default device datasets
+
+Data Access makes one `UNS device` dataset for every device with an
+ISA-95 placement: the device's default dataset. It makes them when it
+starts and whenever a device is placed, so a site that upgrades gets
+them for its existing devices with nothing to run. A site with no UNS
+bucket gets none.
+
+A device needs only one whole-device dataset, so the default one is
+the only one:
+
+- **Nobody can make another.** `POST v1/structure` for a `UNS device`
+  answers `409 use_default_dataset` with the default dataset's UUID.
+  `UNS device` datasets made before this still work, and can still be
+  deleted, but cannot be pointed at another device.
+- **Nobody can change or delete it.** Its structure, name, tags,
+  labels, kind and run details are all fixed: those routes answer
+  `409 default_dataset`, whatever the caller holds. Data Access owns
+  the dataset. One removed straight from ConfigDB is made again while
+  the device is placed.
+- **Its name is the device's name.** Data Access renames it when the
+  device is renamed.
+- **Its UUID follows from the device's.** It is the UUIDv5 of the
+  device UUID, as a lower-case string, in the namespace
+  `21892bf2-0d9d-4496-a84e-37ff1829b94c`. A client can work it out
+  without a lookup. `GET v1/metadata/:uuid/contents` goes the other
+  way, from a dataset to its device.
+- **Access follows the device.** `Build datasets from device` on the
+  device gives `Read dataset`, `Include in union` and `Use for session`
+  on its default dataset, and lets the holder read its structure. See
+  [Permissions](#permissions).
+- **It outlives the placement.** A device that loses its placement
+  keeps its default dataset, because unions and sessions may use it.
+  A device placed again uses the same one.
+
+Use the default dataset wherever a device goes into a union or a
+session. People who share a device then share one dataset for it.
+
 ### UNS device metrics
 
 Selects chosen metrics of one device in the UNS. The config and its
@@ -251,7 +289,9 @@ request/response bodies use the ISO format described above.
 ### `GET v1/metadata`
 
 Returns the JSON array of dataset UUIDs the caller has `Read dataset`
-permission on, restricted to structurally valid datasets. **The `from`
+permission on, restricted to structurally valid datasets. That
+includes the default dataset of every device the caller holds
+`Build datasets from device` on. **The `from`
 and `to` query parameters described in the original design are not
 implemented** — the endpoint always returns the full allowed list.
 
@@ -265,6 +305,10 @@ every object at once, so a caller writing these apps directly could
 change them for any dataset, and through `General Information` rename
 any object. These routes keep those writes to datasets the caller may
 edit.
+
+Every one of these is refused with `409` `default_dataset` for a
+[default dataset](#default-device-datasets): Data Access keeps it, and
+its name is its device's.
 
 Method and path | Body | Writes
 ---|---|---
@@ -710,14 +754,17 @@ metrics datasets; `dumps/data-access.yaml` grants it.
 
 ### `GET v1/structure`
 
-Returns the JSON array of dataset UUIDs the caller has `Edit dataset`
-permission on. Unlike `v1/metadata`, this includes structurally invalid
-datasets.
+Returns the JSON array of dataset UUIDs whose structure the caller may
+read: those they hold `Edit dataset` on, and the
+[default dataset](#default-device-datasets) of every device they hold
+`Build datasets from device` on. Unlike `v1/metadata`, this includes
+structurally invalid datasets.
 
 ### `GET v1/structure/:uuid`
 
-Requires `Edit dataset` on `:uuid`; a caller with only `Read dataset`
-gets `403`. Returns:
+Requires `Edit dataset` on `:uuid`, or `Build datasets from device` on
+the device when `:uuid` is a default dataset; a caller with only
+`Read dataset` gets `403`. Returns:
 
 Property | Type | Meaning
 ---|---|---
@@ -755,6 +802,7 @@ Status | `error` | When
 `422` | `device_required` | The source of a UNS kind is not a device, for example a Sparkplug Node. `device` names it.
 `422` | `placement_required` | The device has no ISA-95 placement, so it is not on the UNS. `device` names it.
 `503` | `uns_unavailable` | The site has no UNS historian, so it has no `uns` bucket.
+`409` | `use_default_dataset` | `structure` is `UNS device`. The device already has its [default dataset](#default-device-datasets), and needs no other. `dataset` is its UUID and `device` names the device. It comes after every check above, so the caller is known to hold the permissions and the device to be placed.
 
 For example, a `UNS device metrics` dataset named by path:
 
@@ -795,12 +843,20 @@ checked as for `POST`, and metrics path entries are converted as for
 Rewriting an invalid dataset makes it anew, so it counts as a create:
 rewriting one as a `Sparkplug source` or `Sub-device` gets `422`
 `structure_retired`. A valid dataset of those structures can still be
-edited.
+edited. Rewriting one as a `UNS device` gets `409`
+`use_default_dataset`. So does changing the device of a `UNS device`
+dataset made before default datasets: the other device has its own.
+
+A [default dataset](#default-device-datasets) cannot be edited: the
+answer is `409` `default_dataset`.
 
 ### `GET v1/delete/:uuid`
 
 Deletes a dataset. Note this is a `GET`, not a `DELETE`, request.
 Requires `Delete dataset` on `:uuid`.
+
+A [default dataset](#default-device-datasets) cannot be deleted, by
+anyone: the answer is `409` with `"error": "default_dataset"`.
 
 The delete is refused with `409 Conflict` while any other dataset still
 points at this one, that is while a `Union components` list contains it
@@ -854,6 +910,15 @@ The **Device data** composite permission
 a device lets a person browse the device in i3X and build datasets from
 it. Each service sees its own half. The Admin UI's **Manage access**
 dialog gives either half, or both as `Device data`.
+
+On a device's [default dataset](#default-device-datasets),
+`Build datasets from device` on the device also counts as
+`Read dataset`, `Include in union` and `Use for session`, and lets the
+holder read the dataset's structure through `v1/structure`. It never
+counts as `Edit dataset` or `Delete dataset`, and it applies to no
+other dataset of the device. So one grant of `Device data` on a device
+lets a person browse the device in i3X and read and combine its
+default dataset.
 
 The metadata routes cover the name, tags, equipment labels, kind and
 run details. Any other metadata config, and any other functional

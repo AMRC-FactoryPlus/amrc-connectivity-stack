@@ -23,6 +23,12 @@ import { Map as IMap, Set as ISet, is as imm_is } from "immutable";
  * A member that joins or leaves touches its own entry and the entries
  * of the datasets that list it as a subclass, and no other. A new
  * subclass list touches the entry of that one dataset.
+ *
+ * A result also gives `parents`: for a part, the datasets that list
+ * it. A reader uses it to find the datasets to look at again when
+ * something about a part changes, such as who may read it. It always
+ * covers the map of the last result, so that reader never misses a
+ * dataset. See the field below for what else it can hold.
  */
 export class PartsIndex {
     constructor () {
@@ -35,8 +41,22 @@ export class PartsIndex {
          *
          * This comes from the whole subclass lists, so it knows a part
          * before that part is a Dataset member. It is this index's own
-         * Map, changed in place: read it, do not change it. */
+         * Map, changed in place: read it, do not change it.
+         *
+         * A reader holds the map of the last result and this Map
+         * together, also while the index waits for a new member to
+         * answer, which can be a long time when many datasets are
+         * made at once. So a link the last result's map shows must
+         * stay here until the result that takes it out of the map. A
+         * new link goes in at once and a link that is gone comes out
+         * with the next result. Between results this Map can hold
+         * links that are gone, and never lacks one the reader's map
+         * has: the reader may look at a dataset it did not need to,
+         * and cannot miss one. */
         this.parents = new Map();
+        /* The links to take out of `parents` with the next result:
+         * subclass UUID -> the native Set of members that listed it. */
+        this.unlinked = new Map();
         /** Member UUID -> Set of the subclasses that are members. */
         this.map = IMap();
         /* The members whose entry changed since the last result, and
@@ -96,14 +116,15 @@ export class PartsIndex {
     }
 
     /* Move a member's links in `parents` from its old subclass Set to
-     * its new one. Either can be missing. */
+     * its new one. Either can be missing. A new link goes in now. A
+     * link that is gone is only noted: `_unlink` takes it out. */
     _link (member, before, after) {
         if (before) {
             for (const part of before) {
                 if (after?.has(part)) continue;
-                const listed = this.parents.get(part);
-                listed?.delete(member);
-                if (listed?.size === 0) this.parents.delete(part);
+                let gone = this.unlinked.get(part);
+                if (!gone) this.unlinked.set(part, gone = new Set());
+                gone.add(member);
             }
         }
         if (after) {
@@ -114,6 +135,21 @@ export class PartsIndex {
                 listed.add(member);
             }
         }
+    }
+
+    /* Take the noted links out of `parents`. Call this only when the
+     * map is the one the reader holds or is about to get. A link that
+     * came back since it was noted is in the member's subclass Set
+     * again, and stays. */
+    _unlink () {
+        for (const [part, gone] of this.unlinked) {
+            const listed = this.parents.get(part);
+            if (!listed) continue;
+            for (const member of gone)
+                if (!this.raw.get(member)?.has(part)) listed.delete(member);
+            if (listed.size == 0) this.parents.delete(part);
+        }
+        this.unlinked.clear();
     }
 
     /* Work out one member's entry again. The entry is always the
@@ -131,7 +167,9 @@ export class PartsIndex {
     }
 
     /* A UUID has joined or left the members. The datasets that list it
-     * as a subclass gain or lose it as a part. */
+     * as a subclass gain or lose it as a part. `parents` can name a
+     * dataset that no longer lists it; `_refresh` then finds nothing
+     * to change. */
     _refresh_parents_of (part) {
         const listed = this.parents.get(part);
         if (!listed) return;
@@ -146,6 +184,12 @@ export class PartsIndex {
 
     _flush () {
         if (!this._ready()) return null;
+
+        /* Every path below leaves the reader with the map as it is
+         * now: a result gives it, and with no result the map is back
+         * to the last one given. So `parents` can lose the links that
+         * map does not have. */
+        this._unlink();
 
         const { parents } = this;
         if (!this.started) {

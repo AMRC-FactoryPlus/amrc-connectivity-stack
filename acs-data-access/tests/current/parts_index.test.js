@@ -41,6 +41,8 @@ afterEach(async () => {
 function model () {
     const index = new PartsIndex();
     const members = new Set();
+    /* The members whose subclass watch has not answered yet. */
+    const unanswered = new Set();
     /* UUID -> array of subclasses, for members and for others. */
     const subclasses = new Map();
     let started = false;
@@ -50,7 +52,7 @@ function model () {
         index.apply({ set: new Set(members), added, removed });
 
     return {
-        index, members, subclasses,
+        index, members, unanswered, subclasses,
 
         /* The first Set, then every member's answer. Returns the
          * result of each call. */
@@ -77,23 +79,28 @@ function model () {
         /* A member joins and has not answered yet. */
         add_unanswered (id) {
             members.add(id);
+            unanswered.add(id);
             return set_event([id], []);
         },
 
         answer (id) {
+            unanswered.delete(id);
             return index.apply({ key: id, value: subs_of(id) });
         },
 
         remove (id) {
             members.delete(id);
+            unanswered.delete(id);
             return set_event([], [id]);
         },
 
         /* A new subclass list. ConfigDB tells only the watchers of a
-         * member. */
+         * member, and a watch that has not answered yet gives the
+         * list it finds when it does. */
         set_subclasses (id, list) {
             subclasses.set(id, list);
-            if (!started || !members.has(id)) return null;
+            if (!started || !members.has(id) || unanswered.has(id))
+                return null;
             return index.apply({ key: id, value: subs_of(id) });
         },
 
@@ -105,10 +112,12 @@ function model () {
                 member_set);
         },
 
-        /* `parents` worked out from nothing. */
+        /* `parents` worked out from nothing: the links of every
+         * member that has answered. */
         reference_parents () {
             const parents = new Map();
             for (const id of members) {
+                if (unanswered.has(id)) continue;
                 for (const part of subclasses.get(id) ?? []) {
                     if (!parents.has(part)) parents.set(part, new Set());
                     parents.get(part).add(id);
@@ -128,6 +137,21 @@ function differing (before, after) {
     return sorted([...keys].filter(key =>
         !(before.has(key) && after.has(key)
             && imm_is(before.get(key), after.get(key)))));
+}
+
+/* The links a map shows that `parents` does not have, as
+ * "part <- member". A reader finds the datasets to look at again for
+ * a part through `parents`, so this must be empty for the map and the
+ * `parents` of the last result, whatever the index has taken in
+ * since. */
+function uncovered (map, parents) {
+    const missing = [];
+    for (const [member, parts] of map) {
+        for (const part of parts)
+            if (!parents.get(part)?.has(member))
+                missing.push(`${part} <- ${member}`);
+    }
+    return missing;
 }
 
 const [A, B, C, D, X] = [1, 2, 3, 4, 5].map(uuid);
@@ -201,6 +225,127 @@ describe("PartsIndex readiness", () => {
         expect(m.index.apply({ key: X, value: ISet([A]) })).toBeNull();
         expect(m.index.parents.size).toBe(0);
         expect(m.index.raw.has(X)).toBe(false);
+    });
+});
+
+/* A reader holds the map and the `parents` of the last result until
+ * the next one. The index can wait a long time for a new member to
+ * answer, and the reader must still find every dataset that lists a
+ * part: that is how a dataset stops listing a part its reader may no
+ * longer read. */
+describe("PartsIndex parents while the index waits", () => {
+    test("a link the last map shows stays until the result that drops it", () => {
+        const m = model();
+        m.subclasses.set(A, [X]);
+        const last = m.start([A, X]).at(-1);
+        expect(plain(last.map)).toEqual({ [A]: [X], [X]: [] });
+        expect(sorted(last.parents.get(X))).toEqual([A]);
+
+        /* B joins and does not answer. A stops listing X meanwhile. */
+        expect(m.add_unanswered(B)).toBeNull();
+        expect(m.set_subclasses(A, [])).toBeNull();
+        /* The reader's map still says A lists X, so X must still lead
+         * to A. */
+        expect(plain(last.map)[A]).toEqual([X]);
+        expect(sorted(last.parents.get(X))).toEqual([A]);
+        expect(uncovered(last.map, last.parents)).toEqual([]);
+
+        /* The result that takes X out of A's entry takes the link. */
+        const result = m.answer(B);
+        expect(sorted(result.changed)).toEqual(sorted([A, B]));
+        expect(plain(result.map)).toEqual({ [A]: [], [B]: [], [X]: [] });
+        expect(result.parents).toBe(last.parents);
+        expect(result.parents.has(X)).toBe(false);
+    });
+
+    test("the links of a member that leaves stay until the result that drops it", () => {
+        const m = model();
+        m.subclasses.set(A, [X]);
+        m.subclasses.set(C, [X]);
+        const last = m.start([A, C, X]).at(-1);
+        expect(sorted(last.parents.get(X))).toEqual(sorted([A, C]));
+
+        expect(m.add_unanswered(B)).toBeNull();
+        expect(m.remove(A)).toBeNull();
+        expect(last.map.has(A)).toBe(true);
+        expect(sorted(last.parents.get(X))).toEqual(sorted([A, C]));
+        expect(uncovered(last.map, last.parents)).toEqual([]);
+
+        const result = m.answer(B);
+        expect(sorted(result.changed)).toEqual(sorted([A, B]));
+        expect(result.map.has(A)).toBe(false);
+        expect(sorted(result.parents.get(X))).toEqual([C]);
+    });
+
+    test("a member that leaves and comes back while the index waits keeps its old links until the result", () => {
+        const m = model();
+        m.subclasses.set(A, [X]);
+        const last = m.start([A, C, X]).at(-1);
+
+        expect(m.add_unanswered(B)).toBeNull();
+        expect(m.remove(A)).toBeNull();
+        /* A is back with another list, and has not answered. */
+        m.subclasses.set(A, [C]);
+        expect(m.add_unanswered(A)).toBeNull();
+        expect(m.answer(B)).toBeNull();
+        /* The reader's map is still the first one: A lists X. */
+        expect(plain(last.map)[A]).toEqual([X]);
+        expect(sorted(last.parents.get(X))).toEqual([A]);
+
+        const result = m.answer(A);
+        expect(sorted(result.changed)).toEqual(sorted([A, B]));
+        expect(plain(result.map))
+            .toEqual({ [A]: [C], [B]: [], [C]: [], [X]: [] });
+        expect(sorted(result.parents.get(C))).toEqual([A]);
+        expect(result.parents.has(X)).toBe(false);
+    });
+
+    test("a link that goes and comes back while the index waits is kept", () => {
+        const m = model();
+        m.subclasses.set(A, [X]);
+        const last = m.start([A, X]).at(-1);
+
+        expect(m.add_unanswered(B)).toBeNull();
+        expect(m.set_subclasses(A, [])).toBeNull();
+        expect(m.set_subclasses(A, [X])).toBeNull();
+
+        const result = m.answer(B);
+        expect(sorted(result.changed)).toEqual([B]);
+        expect(result.map.get(A)).toBe(last.map.get(A));
+        expect(sorted(result.parents.get(X))).toEqual([A]);
+    });
+
+    test("a new link goes in at once", () => {
+        const m = model();
+        const last = m.start([A, X]).at(-1);
+        expect(last.parents.size).toBe(0);
+
+        expect(m.add_unanswered(B)).toBeNull();
+        expect(m.set_subclasses(A, [X])).toBeNull();
+        expect(sorted(last.parents.get(X))).toEqual([A]);
+
+        /* And it is taken out again if it goes before the result. */
+        expect(m.set_subclasses(A, [])).toBeNull();
+        expect(m.answer(B).parents.has(X)).toBe(false);
+    });
+
+    test("links that are gone come out when there is no result to give", () => {
+        const m = model();
+        m.subclasses.set(A, [B, X]);
+        const last = m.start([A, B]).at(-1);
+        expect(sorted(last.parents.get(X))).toEqual([A]);
+
+        /* X is no member, so A's parts are the same: no result. */
+        expect(m.set_subclasses(A, [B])).toBeNull();
+        expect(last.parents.has(X)).toBe(false);
+        expect(m.index.unlinked.size).toBe(0);
+
+        /* The same after a wait that ends with nothing changed. */
+        m.subclasses.set(D, [C]);
+        expect(m.add_unanswered(D)).toBeNull();
+        expect(m.remove(D)).toBeNull();
+        expect(last.parents.has(C)).toBe(false);
+        expect(m.index.unlinked.size).toBe(0);
     });
 });
 
@@ -337,7 +482,8 @@ describe("PartsIndex changes", () => {
 describe("PartsIndex against the old formula", () => {
     const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    test.each(seeds)("seed %i: after every step of a random walk the map equals the old formula", seed => {
+    /* The dice of a walk over 24 UUIDs. */
+    function dice (seed) {
         const rand = prng(seed);
         const int = n => Math.floor(rand() * n);
         const universe = Array.from({ length: 24 }, (_, i) => uuid(0x100 + i));
@@ -350,6 +496,11 @@ describe("PartsIndex against the old formula", () => {
             }
             return list;
         };
+        return { rand, int, universe, pick, some };
+    }
+
+    test.each(seeds)("seed %i: after every step of a random walk the map equals the old formula", seed => {
+        const { rand, universe, pick, some } = dice(seed);
 
         const m = model();
         for (const id of universe)
@@ -397,6 +548,120 @@ describe("PartsIndex against the old formula", () => {
             expect(sorted(m.index.members)).toEqual(sorted(m.members));
             expect(sorted(m.index.raw.keys())).toEqual(sorted(m.members));
         }
+    });
+
+    /* The walk above answers every new member in the same step, so
+     * the index never waits. Here a new member often answers some
+     * steps later, several can wait at once, and one can leave before
+     * it answers. `last` is what a reader holds: the last result. */
+    test.each(seeds)("seed %i: a walk where members answer late gives exact results, and `parents` always covers the reader's map", seed => {
+        const { rand, int, universe, pick, some } = dice(1000 + seed);
+
+        const m = model();
+        for (const id of universe)
+            if (rand() < 0.5) m.subclasses.set(id, some());
+        let last = m.start(universe.filter(() => rand() < 0.5)).at(-1);
+        expect(imm_is(last.map, m.reference())).toBe(true);
+        expect(uncovered(last.map, last.parents)).toEqual([]);
+
+        /* Steps with a member waiting and with none, the most members
+         * waiting at once, the members that left before they answered
+         * and the waits that ended. */
+        const seen = { waiting: 0, ready: 0, most: 0, left: 0, waits: 0 };
+        let waited = false;
+
+        for (let step = 0; step < 600; step++) {
+            const id = pick();
+            const roll = rand();
+            let result;
+            let what;
+            if (roll < 0.3) {
+                what = "subclasses";
+                result = m.set_subclasses(id, some());
+            }
+            else if (roll < 0.5 && m.unanswered.size > 0) {
+                what = "answer";
+                const waiting = [...m.unanswered];
+                result = m.answer(waiting[int(waiting.length)]);
+            }
+            else if (m.members.has(id)) {
+                what = "remove";
+                if (m.unanswered.has(id)) seen.left++;
+                result = m.remove(id);
+            }
+            else if (rand() < 0.4) {
+                what = "add late";
+                result = m.add_unanswered(id);
+            }
+            else {
+                what = "add";
+                result = m.add(id).at(-1);
+            }
+
+            const at = `seed ${seed} step ${step} (${what} ${id})`;
+            seen.most = Math.max(seen.most, m.unanswered.size);
+
+            if (m.unanswered.size > 0) {
+                /* Nothing goes out while a member has not answered,
+                 * and the reader's map keeps every link. */
+                seen.waiting++;
+                waited = true;
+                expect([at, result]).toEqual([at, null]);
+                expect([at, uncovered(last.map, last.parents)])
+                    .toEqual([at, []]);
+                /* The links the index has been told of are there. */
+                const known = m.reference_parents();
+                for (const [part, listed] of known) {
+                    for (const member of listed) {
+                        expect([at, part, member, last.parents.get(part)?.has(member)])
+                            .toEqual([at, part, member, true]);
+                    }
+                }
+                continue;
+            }
+
+            seen.ready++;
+            if (waited) seen.waits++;
+            waited = false;
+
+            const want = m.reference();
+            const got = m.index.map;
+            expect([at, plain(got)]).toEqual([at, plain(want)]);
+            expect([at, imm_is(got, want)]).toEqual([at, true]);
+
+            /* `changed` names exactly the entries that differ from
+             * the last result, however long ago that was, and every
+             * other entry is the same object as in that result. */
+            const changed = differing(last.map, got);
+            expect([at, result == null ? [] : sorted(result.changed)])
+                .toEqual([at, changed]);
+            if (result == null) {
+                expect(got).toBe(last.map);
+            }
+            else {
+                expect(result.map).toBe(got);
+                expect(result.parents).toBe(last.parents);
+            }
+            for (const [key, value] of got)
+                if (!changed.includes(key)) expect(value).toBe(last.map.get(key));
+            if (result != null) last = result;
+
+            /* With every member answered `parents` is exact. */
+            expect([at, plain(last.parents)])
+                .toEqual([at, plain(m.reference_parents())]);
+            expect([at, uncovered(last.map, last.parents)]).toEqual([at, []]);
+            expect(m.index.unlinked.size).toBe(0);
+            expect(sorted(m.index.members)).toEqual(sorted(m.members));
+            expect(sorted(m.index.raw.keys())).toEqual(sorted(m.members));
+        }
+
+        /* The walk did wait, many times and with several members at
+         * once, and saw a member leave before it answered. */
+        expect(seen.waiting).toBeGreaterThanOrEqual(200);
+        expect(seen.ready).toBeGreaterThanOrEqual(200);
+        expect(seen.waits).toBeGreaterThanOrEqual(20);
+        expect(seen.most).toBeGreaterThanOrEqual(3);
+        expect(seen.left).toBeGreaterThanOrEqual(1);
     });
 });
 
@@ -591,6 +856,42 @@ describe("DataFlow.parts", () => {
         expect(seen.values).toHaveLength(2);
         expect(seen.values[1].has(part_pending)).toBe(true);
         expect(seen.values[1].get(part_parent).has(part_pending)).toBe(true);
+    });
+
+    test("while a new member has not answered, `parents` still covers the map a reader holds", async () => {
+        const { site, built, data } = fixture({ datasets: 60, seed: 82 });
+        const changes = record(data.parts_changes);
+        const first = changes.values[0];
+        const { part_pending } = built.named;
+        /* A dataset with a part. */
+        const [parent, parts] = [...first.map].find(([, set]) => set.size > 0);
+        const part = parts.first();
+        expect(first.parents.get(part).has(parent)).toBe(true);
+
+        /* Nothing goes out while the new member has not answered, and
+         * the parent drops its part meanwhile. */
+        site.hold("subclass", part_pending);
+        site.add_member(Class.Dataset, part_pending);
+        site.set_subclasses(parent, []);
+        expect(changes.values).toHaveLength(1);
+
+        /* A reader still holds a map where the parent lists the part,
+         * and so does one that joins now. Both must find the parent
+         * from the part. */
+        const late = await rx.firstValueFrom(data.parts_changes);
+        expect(late).toBe(first);
+        expect(late.map.get(parent).has(part)).toBe(true);
+        expect(late.parents.get(part).has(parent)).toBe(true);
+        expect(uncovered(late.map, late.parents)).toEqual([]);
+
+        site.release("subclass", part_pending);
+        expect(changes.values).toHaveLength(2);
+        const next = changes.values[1];
+        expect(next.changed.has(parent)).toBe(true);
+        expect(next.map.get(parent).size).toBe(0);
+        expect(next.parents.get(part)?.has(parent) ?? false).toBe(false);
+        expect(uncovered(next.map, next.parents)).toEqual([]);
+        expect(imm_is(next.map, site_parts(site))).toBe(true);
     });
 
     test("answers nothing while one member's subclasses have not answered", async () => {

@@ -995,8 +995,8 @@ directly to ConfigDB, subject to ordinary ConfigDB permissions.
 ## Notify interface
 
 `acs-data-access` runs a `notify/v2` WebSocket server (see
-[Standard change-notify API](notify-v2.md)) via `lib/notify.js`. The
-resources it makes watchable/searchable are registered as:
+[Standard change-notify API](notify-v2.md)) via `lib/notify.js`, on the
+WebSocket path `/notify/v2`. It registers eight resources:
 
     WATCH  v2/metadata/
     WATCH  v2/metadata/:uuid
@@ -1004,15 +1004,107 @@ resources it makes watchable/searchable are registered as:
     WATCH  v2/structure/
     WATCH  v2/structure/:uuid
     SEARCH v2/structure/
+    WATCH  v2/union-sources/
+    WATCH  v2/session-sources/
 
-Note the `v2/` prefix on these resource paths — they mirror the plain
-HTTP `v1/metadata` and `v1/structure` endpoints (same permission checks,
-same response shapes) but are registered under `v2/...`, not `v1/...`,
-so a client must subscribe using `v2/metadata/` etc. rather than the
-plain-HTTP path. `metadata_search`/`structure_search` build their child
-list from `allowed_valid_dataset_uuids`/`allowed_all_dataset_uuids`
-respectively, matching the GET-list endpoints' permission and validity
-filtering.
+The resource paths start with `v2/`, not `v1/`. A client must subscribe
+to `v2/metadata/` and so on, not to the plain HTTP path.
+
+Each resource applies the permission rule of the HTTP route with the
+same name, including what `Build datasets from device` gives on a
+[default dataset](#default-device-datasets). The responses are not the
+HTTP responses in every case. No notify resource answers `403` or
+`404` for the resource itself, and some bodies differ. The sections
+below say what each resource sends.
+
+A subscription gets a `500` and ends if the service loses one of the
+ConfigDB or Auth sources it reads. The client can subscribe again.
+
+### Lists
+
+Resource | The datasets it lists
+---|---
+`WATCH v2/metadata/` | Valid datasets the principal may read, as `GET v1/metadata`
+`WATCH v2/structure/` | Datasets whose structure the principal may read, invalid ones included, as `GET v1/structure`
+`WATCH v2/union-sources/` | Valid datasets the principal holds `Include in union` on, as `GET v1/union-sources`
+`WATCH v2/session-sources/` | Valid datasets the principal holds `Use for session` on, as `GET v1/session-sources`
+
+Each update has status `200` and a JSON array of dataset UUIDs as its
+body. A list WATCH sends the whole list when it first answers, and the
+whole list again each time a dataset joins or leaves it. It never sends
+only the difference. The order of the UUIDs is not specified, and it can
+differ from one update to the next and from the HTTP route. A principal
+with no rights gets an empty array.
+
+### Searches
+
+`SEARCH v2/metadata/` has one child for each dataset `WATCH v2/metadata/`
+lists. `SEARCH v2/structure/` has one child for each dataset
+`WATCH v2/structure/` lists. A child is named by the dataset UUID alone.
+
+A search sends one snapshot that holds every child, and after that only
+changes. Each change is one child update:
+
+Child status | Meaning
+---|---
+`201` | The dataset is new to the principal: it was made, it became valid (metadata search only), or the principal was granted it
+`200` | The body of a dataset the client already has changed
+`404` | The dataset is no longer visible: it was deleted, it became invalid (metadata search only), or the grant was revoked
+
+The snapshot is not followed by an update for each child that repeats
+it. The order of the children in a snapshot, and the order of the
+updates one change causes for different children, are not specified.
+A principal with no rights gets a snapshot with no children.
+
+The body of a metadata search child is the metadata body described
+under [single datasets](#single-datasets). The metadata search answers
+as soon as the service knows the datasets and the principal's ACL. Just
+after the service starts, a body can therefore have the name
+`"UNKNOWN"`, no `function`, no `metadata` and an empty `parts`, and a
+`200` child update follows when the service has read the missing part.
+
+The body of a structure search child is `{structure, config}`. The
+structure search includes
+[structurally invalid datasets](#structurally-invalid-datasets). An
+invalid dataset is a child with this body:
+
+    { "structure": "696396a0-2831-11f1-9b12-33d63b8c5115", "config": null }
+
+A dataset that becomes invalid while the search is open gets a `200`
+child update with that body, and another `200` update with its real
+structure when it is valid again.
+
+### Single datasets
+
+`WATCH v2/metadata/:uuid` sends the metadata of one dataset: an object
+with the keys `uuid`, `name`, `from`, `to`, `function`, `metadata` and
+`parts`, with the meanings `GET v1/metadata/:uuid` gives them. `from`,
+`to`, `function` and `metadata` are left out when the dataset has none.
+It differs from the HTTP route in these ways:
+
+- It answers at once. When it cannot give a body, it sends status `200`
+  with no body. That is the answer for a dataset that does not exist, is
+  invalid, or that the principal may not read, where the HTTP route
+  answers `404` or `403`. It is also the first answer on a service that
+  has just started, before the body is known.
+- It sends a new answer each time the body changes. A dataset that is
+  deleted, becomes invalid or is no longer readable gets the `200` with
+  no body again.
+- `name` is `"UNKNOWN"` only when the dataset has no name. An empty
+  name is sent as an empty string, where the HTTP route gives
+  `"UNKNOWN"`.
+
+`WATCH v2/structure/:uuid` sends `{structure, config}` for a valid
+dataset whose structure the principal may read, and again each time it
+changes. It sends nothing at all for a dataset that does not exist, is
+invalid, or that the principal may not read, and nothing when a dataset
+it has answered for goes away. It never sends the invalid marker: use
+`WATCH v2/structure/` or the structure search to find invalid datasets.
+
+A `:uuid` that is not a UUID makes the service close the WebSocket.
+
+A principal that Auth does not know gets the `200` with no body from
+`WATCH v2/metadata/:uuid` and no answer from the other seven resources.
 
 ## Coverage summary
 

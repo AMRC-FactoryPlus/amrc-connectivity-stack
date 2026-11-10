@@ -16,6 +16,12 @@ import { json_equal } from "@amrc-factoryplus/service-api";
 /* Marks "every object" in AppConfigs#pending. */
 const ALL = Symbol("all");
 
+/* json_equal does not look at the order of an object's keys. A write
+ * that only reorders the keys of a config would be dropped here, and
+ * the config held would keep its old key order. That cannot happen:
+ * ConfigDB stores a config as jsonb, which keeps keys in one fixed
+ * order whatever order they were written in, so the same content
+ * always arrives in the same order. */
 function same_value (a, b) {
     return a === b || json_equal(a, b);
 }

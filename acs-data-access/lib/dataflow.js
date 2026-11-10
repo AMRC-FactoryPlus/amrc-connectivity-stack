@@ -13,9 +13,9 @@ import { UUIDs } from '@amrc-factoryplus/rx-client';
 import { AppConfigs, AppMap } from './app-configs.js';
 import { DatasetIndex } from './dataset-index.js';
 import {
-  default_dataset_device, DEVICE_PERMS, READ_STRUCTURE,
+  default_dataset_device, default_dataset_uuid, DEVICE_PERMS, READ_STRUCTURE,
 } from './default-datasets.js';
-import { watch_each } from './rx-util.js';
+import { same_set, set_changes, watch_each } from './rx-util.js';
 
 /* One field of each value of a change sequence, sent on only when the
  * field is a new object. The reducers replace a map only when an entry
@@ -24,6 +24,42 @@ const field = name => rx.pipe(
   rx.map(change => change[name]),
   rx.distinctUntilChanged(),
 );
+
+/* Two grant states are the same when both allow every target, or when
+ * they name the same targets. */
+const same_grants = (a, b) =>
+  a.all && b.all
+    ? true
+    : a.all == b.all && same_set(a.targets, b.targets);
+
+/* A grant state as a predicate over targets. */
+const granted_by = state =>
+  state.all
+    ? () => true
+    : id => state.targets.has(id);
+
+/* The datasets whose answer can differ between two values of the grant
+ * states behind a permission check, as a native Set. Null means any
+ * dataset can differ: a grant on every target came or went.
+ *
+ * `direct` is the grant state of the permission on the dataset itself.
+ * `device` is the UseDevice grant state, or null where UseDevice does
+ * not count. A device that gains or loses UseDevice changes the answer
+ * for its default dataset and for no other. */
+function grant_changes (before, now) {
+  if (before.direct.all != now.direct.all) return null;
+  if (before.device?.all != now.device?.all) return null;
+  /* Every dataset was allowed and still is. */
+  if (now.direct.all) return new Set();
+
+  const changed = set_changes(before.direct.targets, now.direct.targets);
+  if (now.device && !now.device.all) {
+    const devices = set_changes(before.device.targets, now.device.targets);
+    for (const device of devices)
+      changed.add(default_dataset_uuid(device));
+  }
+  return changed;
+}
 
 export class DataFlow {
   constructor(opts) {
@@ -98,49 +134,97 @@ export class DataFlow {
    * ---------------------------------------------------
    */
 
-  /* Which targets a principal holds a permission on, as a predicate.
+  /* Which targets a principal holds a permission on, as
+   * `{ all, targets }`. `all` is true when every target is allowed;
+   * otherwise `targets` is the Set of the targets that are.
    *
    * Auth passes the root principal and wildcard grants on every single
    * check, so the lists must agree: root, or a grant on the wildcard
-   * target, allows every target. Otherwise only the grant targets do. */
-  watch_granted(principal, permission) {
+   * target, allows every target. Otherwise only the grant targets do.
+   *
+   * Auth sends a principal's whole ACL whenever any of it changes.
+   * This emits only when the grants of this one permission differ. */
+  watch_grant_state(principal, permission) {
     if (this.auth.root_principal && principal == this.auth.root_principal)
-      return rx.of(() => true);
+      return rx.of({ all: true });
 
     return this.auth.watch_acl_with_perm(principal, permission).pipe(
-      rx.map(targets =>
-        targets.has(UUIDs.Special.Null)
-          ? () => true
-          : id => targets.has(id))
+      rx.map(targets => ({
+        all: targets.has(UUIDs.Special.Null),
+        targets,
+      })),
+      rx.distinctUntilChanged(same_grants)
     );
   }
 
-  /* Which datasets a principal holds a permission on, as a predicate.
+  /* Which targets a principal holds a permission on, as a predicate. */
+  watch_granted(principal, permission) {
+    return this.watch_grant_state(principal, permission).pipe(
+      rx.map(granted_by)
+    );
+  }
+
+  /* Which datasets a principal holds a permission on, as
+   * `{ ok, changed }`. This is the one place the rule is written down;
+   * watch_allowed and the notify views read it from here.
    *
-   * A grant on the dataset allows it. So does UseDevice on a device,
-   * for the device's default dataset and the permissions in
-   * DEVICE_PERMS; APIv1.check_dataset_acl is the single check that
-   * must agree with this.
+   * `ok(id, device)` is the answer for dataset `id`, where `device` is
+   * the device the dataset is the default dataset of, or null or
+   * undefined when it is no valid default dataset. A grant on the
+   * dataset allows it. So does UseDevice on the device, for the
+   * permissions in DEVICE_PERMS; APIv1.check_dataset_acl is the single
+   * check that must agree with this.
    *
    * READ_STRUCTURE stands for "may read the structure": EditDataset on
-   * the dataset, or UseDevice on the device of a default dataset. */
-  watch_allowed(principal, permission) {
+   * the dataset, or UseDevice on the device of a default dataset.
+   *
+   * `changed` is a native Set of the datasets whose answer can differ
+   * from the value before. It is null on the first value, and when a
+   * grant on every target came or went: then any answer can differ. */
+  watch_allowed_check(principal, permission) {
     const structure = permission == READ_STRUCTURE;
-    const granted = this.watch_granted(principal,
+    const by_device = structure || DEVICE_PERMS.has(permission);
+    const direct = this.watch_grant_state(principal,
       structure ? Constants.Perm.EditDataset : permission);
-    if (!structure && !DEVICE_PERMS.has(permission))
-      return granted;
+
+    const grants = by_device
+      ? rx.combineLatest({
+          direct,
+          device: this.watch_grant_state(principal, Constants.Perm.UseDevice),
+        })
+      : direct.pipe(rx.map(state => ({ direct: state, device: null })));
+
+    return rx.defer(() => {
+      let held = null;
+
+      return grants.pipe(
+        rx.map(now => {
+          const is_direct = granted_by(now.direct);
+          const use_device = now.device && granted_by(now.device);
+          const ok = use_device
+            ? (id, device) =>
+                is_direct(id) || (device != null && use_device(device))
+            : id => is_direct(id);
+
+          const changed = held == null ? null : grant_changes(held, now);
+          held = now;
+          return { ok, changed };
+        })
+      );
+    });
+  }
+
+  /* Which datasets a principal holds a permission on, as a predicate
+   * over the dataset UUID alone. watch_allowed_check has the rule. */
+  watch_allowed(principal, permission) {
+    if (permission != READ_STRUCTURE && !DEVICE_PERMS.has(permission))
+      return this.watch_granted(principal, permission);
 
     return rx.combineLatest([
-      granted,
-      this.watch_granted(principal, Constants.Perm.UseDevice),
+      this.watch_allowed_check(principal, permission),
       this.default_devices,
     ]).pipe(
-      rx.map(([ok, device_ok, devices]) => id => {
-        if (ok(id)) return true;
-        const device = devices.get(id);
-        return device != null && device_ok(device);
-      })
+      rx.map(([{ ok }, devices]) => id => ok(id, devices.get(id)))
     );
   }
 

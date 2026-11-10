@@ -1282,6 +1282,99 @@ describe("permissions", () => {
             .toEqual(child(201, dataset, structure));
         expect(shown(by_editor).structure_search).toEqual(structure);
     });
+
+    /* A default dataset has the UUID its device gives it. Pointed at
+     * another device it is no default dataset, so the right the old
+     * device gave goes in the same change that brings the new config.
+     * A view reads the dataset map and the default devices as one
+     * value, so no message can show the new config with the old
+     * right. The dataset lists of DataFlow take the two one after the
+     * other, and for a moment hold the new config under the old
+     * right. Nothing but a read of the newest value uses those lists
+     * now. If a handler here is ever built on them again, this test
+     * fails. */
+    test("a default dataset pointed at another device: a principal with only UseDevice on the old device gets no message with the new config", async () => {
+        const fx = fixture(SMALL);
+        const { site, built } = fx;
+        const user = "user@EXAMPLE.ORG";
+        const { device, dataset } = built.defaults[0];
+        const other = built.defaults[1].device;
+        site.set_acl(user, [{ permission: Perm.UseDevice, target: device }]);
+
+        const open_all = principal => Object.fromEntries(Object.entries(ENDPOINTS)
+            .map(([name, make]) => [name, fx.client.open(principal, make(dataset))]));
+        const by_user = open_all(user);
+        const by_root = open_all(ROOT);
+        await site.settle();
+
+        const lists = ["metadata_list", "structure_list", "union_sources", "session_sources"];
+        const old_structure = { structure: App.UNSDevice, config: { source: device } };
+        const new_structure = { structure: App.UNSDevice, config: { source: other } };
+        /* The device gives the principal the dataset on every endpoint. */
+        for (const name of lists)
+            expect([name, by_user[name].state().body]).toEqual([name, [dataset]]);
+        expect(by_user.structure_search.state().children).toEqual({ [dataset]: old_structure });
+        expect(by_user.structure_uuid.state().body).toEqual(old_structure);
+        expect(Object.keys(by_user.metadata_search.state().children)).toEqual([dataset]);
+        expect(by_user.metadata_uuid.state().body.uuid).toBe(dataset);
+
+        const seen = Object.fromEntries(Object.entries(by_user)
+            .map(([name, rec]) => [name, rec.messages.length]));
+        const since = name => by_user[name].messages.slice(seen[name]);
+        const root_seen = by_root.structure_search.messages.length;
+
+        site.put(App.UNSDevice, dataset, { source: other });
+        await site.settle();
+
+        /* The change did reach the views: root has the new config. */
+        expect(by_root.structure_search.messages.slice(root_seen))
+            .toEqual([child(200, dataset, new_structure)]);
+        expect(by_root.structure_uuid.state().body).toEqual(new_structure);
+
+        /* No message to the principal names the new device, on any of
+         * the eight endpoints. */
+        for (const name of Object.keys(ENDPOINTS))
+            expect([name, JSON.stringify(since(name)).includes(other)])
+                .toEqual([name, false]);
+
+        /* What it did get: the dataset goes, once, everywhere. */
+        expect(since("structure_search")).toEqual([child(404, dataset)]);
+        expect(since("metadata_search")).toEqual([child(404, dataset)]);
+        expect(since("metadata_uuid"))
+            .toEqual([{ status: 200, response: { status: 200 } }]);
+        /* This watch sends nothing when its dataset goes away. */
+        expect(since("structure_uuid")).toEqual([]);
+        for (const name of lists)
+            expect([name, since(name)]).toEqual([name, [
+                { status: 200, response: { status: 200, body: [] } }]]);
+
+        await check_views(fx, "repointed default dataset");
+
+        /* UseDevice on the new device does not give the dataset
+         * either: it is not that device's default dataset. The grant
+         * gives that device's own default dataset, and no more. */
+        const others_default = built.defaults[1].dataset;
+        site.grant(user, Perm.UseDevice, other);
+        await site.settle();
+        expect(since("structure_search")).toEqual([
+            child(404, dataset),
+            child(201, others_default, new_structure),
+        ]);
+        for (const name of lists)
+            expect([name, by_user[name].state().body])
+                .toEqual([name, [others_default]]);
+        expect(since("metadata_uuid")).toHaveLength(1);
+        expect(since("structure_uuid")).toEqual([]);
+
+        /* Pointed back, the old device gives the dataset again, with
+         * the config the principal had. */
+        site.put(App.UNSDevice, dataset, { source: device });
+        await site.settle();
+        expect(since("structure_search").at(-1))
+            .toEqual(child(201, dataset, old_structure));
+        expect(since("structure_uuid")).toEqual([]);
+        expect(by_user.structure_uuid.state().body).toEqual(old_structure);
+    });
 });
 
 describe("a source that fails", () => {

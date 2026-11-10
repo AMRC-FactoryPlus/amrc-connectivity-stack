@@ -3,7 +3,8 @@
   -->
 
 <!-- One lane that is not a device: a group header (ongoing, other
-     devices), a site and area heading, an ongoing dataset band, or a
+     devices), an ISA-95 place heading (click it to open or close its
+     devices), an ongoing dataset band, or a
      piece of equipment with its recording blocks (and, when collapsed,
      a 3px strip of when its devices sent data). The timeline places
      it with `top`; the label cell stays pinned on the left. -->
@@ -12,10 +13,11 @@
        :style="{ top: `${row.top}px`, height: `${row.h}px`, width: `${labelWidth + trackWidth}px` }">
     <!-- Label -->
     <div class="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-slate-200 pr-3"
-         :class="labelClass" :style="{ width: `${labelWidth}px` }">
+         :class="labelClass" :style="{ width: `${labelWidth}px` }"
+         @click="row.kind === 'place' && emit('toggle', row)">
       <button v-if="toggles" type="button"
               class="flex size-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-200"
-              :title="row.open ? 'Hide' : 'Show'" :aria-expanded="row.open" @click="emit('toggle', row)">
+              :title="row.open ? 'Hide' : 'Show'" :aria-expanded="row.open" @click.stop="emit('toggle', row)">
         <i class="fa-solid text-[10px]" :class="row.open ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
       </button>
       <i class="fa-solid fa-fw shrink-0 text-[11px] text-slate-500" :class="`fa-${icon}`"></i>
@@ -81,7 +83,7 @@ const BLOCK_CLASS = {
   voided:    'border border-dashed border-slate-300 bg-transparent text-slate-400 hover:border-slate-400',
 }
 
-const toggles = computed(() => ['ongoing-header', 'other-header', 'equipment'].includes(props.row.kind))
+const toggles = computed(() => ['ongoing-header', 'other-header', 'equipment', 'place'].includes(props.row.kind))
 
 const icon = computed(() => ({
   'ongoing-header': 'thumbtack',
@@ -96,7 +98,7 @@ const labelClass = computed(() => ({
   'other-header':   'bg-slate-50 pl-2 text-[13px] font-semibold text-slate-600',
   'equipment':      'bg-white pl-2 text-sm font-semibold text-slate-950',
   'band':           'bg-white pl-6 text-[13px] font-medium text-slate-950',
-  'place':          'bg-white pl-8 text-xs text-slate-500',
+  'place':          'cursor-pointer bg-white pl-6 text-xs text-slate-500 hover:bg-slate-50',
 }[props.row.kind]))
 
 const trackClass = computed(() => props.row.kind.endsWith('-header') ? 'bg-slate-50' : '')

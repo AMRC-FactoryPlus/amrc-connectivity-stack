@@ -180,7 +180,10 @@ export function equipment_devices (equipment, resolve, byUuid) {
  * @param p.eq_devices     equipment uuid -> [{ device, dataset, label }]
  * @param p.devices        every device the pages know of (the store's
  *                         deviceIndex), each with its ISA-95 `path`
- * @param p.expanded       { ongoing, other, [equipment uuid] } booleans
+ * @param p.expanded       { ongoing, other, [equipment uuid],
+ *                         [place row key] } booleans. Places are open
+ *                         unless set to false; equipment and `other`
+ *                         are closed unless set to true.
  * @param p.query          the search box
  * @param p.dataset_of     device uuid -> the uuid of the device's own
  *                         dataset, or null when it has none the person
@@ -275,14 +278,20 @@ export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, dev
         const open = q ? true : !!expanded.other
         push({ kind: 'other-header', key: 'other', name: 'Other devices', tag: `${others.length} not in any equipment`, open })
         if (open) {
-            let place = null
+            // `others` is sorted by place, so each place is one run.
+            const places = []
             for (const d of others) {
                 const p = place_label(d)
-                if (p !== place) {
-                    place = p
-                    push({ kind: 'place', key: `place:${p}`, name: p })
-                }
-                push(device_row(`other:${d.uuid}`, d.uuid, null, 1))
+                if (places.at(-1)?.name !== p) places.push({ name: p, devices: [] })
+                places.at(-1).devices.push(d)
+            }
+            for (const p of places) {
+                const key = place_key(p.name)
+                const n = p.devices.length
+                const place_open = q ? true : expanded[key] !== false
+                push({ kind: 'place', key, name: p.name, tag: `${n} ${n === 1 ? 'device' : 'devices'}`, open: place_open })
+                if (!place_open) continue
+                for (const d of p.devices) push(device_row(`other:${d.uuid}`, d.uuid, null, 1))
             }
         }
     }
@@ -298,6 +307,11 @@ export function metric_count (n) {
 /** The device's ISA-95 path, "Enterprise / Site / Area". */
 export function place_label (d) {
     return d?.path?.length ? d.path.join(' / ') : NO_PATH
+}
+
+/** The row key of a place heading, which is also its key in `expanded`. */
+export function place_key (label) {
+    return `place:${label}`
 }
 
 /** The index of the row at y (px from the top of the lanes), or -1. */

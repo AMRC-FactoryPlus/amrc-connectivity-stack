@@ -1,0 +1,1037 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DataFlow streams, scenario A > after: a part becomes a Dataset member 1`] = `
+"~ parts = 60 entries
+~ parts 000000a1-05a0-4000-8000-000000000001 = ["000000a1-05b0-4000-8000-000000000003"]
++ parts 000000a1-05b0-4000-8000-000000000003 = []"
+`;
+
+exports[`DataFlow streams, scenario A > after: add a Dataset member 1`] = `
+"~ parts = 60 entries
++ parts 000000a1-05a0-4000-8000-00000000000e = []"
+`;
+
+exports[`DataFlow streams, scenario A > after: add a metadata application with an entry 1`] = `"~ metadata 000000a1-05e0-4000-8000-000000000001 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":1,"operator":"Operator 0"},"5eedab1e-0aaa-4000-8000-000000000006":{"sixth":true},"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]},"e87a0000-0aaa-4000-8000-000000000001":{"note":"Session 1"}}"`;
+
+exports[`DataFlow streams, scenario A > after: add a union component 1`] = `
+"~ datasets 000000a1-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["273becd9-e51b-5a23-a421-e79168b70ca8","000000a1-05a0-4000-8000-000000000003","6ae252ce-e0b3-5e39-9fea-0d43d36302a5"],"from":null,"to":null}
+~ valid_datasets 000000a1-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["273becd9-e51b-5a23-a421-e79168b70ca8","000000a1-05a0-4000-8000-000000000003","6ae252ce-e0b3-5e39-9fea-0d43d36302a5"],"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario A > after: add an empty structure application 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: change a dataset's kind 1`] = `"~ functional_types 000000a1-05e0-4000-8000-000000000001 = ["bd0354eb-b8f7-4bd9-8407-0588e545603c"]"`;
+
+exports[`DataFlow streams, scenario A > after: change a subclass list 1`] = `"~ parts 000000a1-05a0-4000-8000-000000000003 = ["000000a1-05e0-4000-8000-000000000001","000000a1-0e70-4000-8000-000000000001","000000a1-0e70-4000-8000-000000000002"]"`;
+
+exports[`DataFlow streams, scenario A > after: create the object of a new default dataset 1`] = `
+"~ parts = 59 entries
++ parts 6ae252ce-e0b3-5e39-9fea-0d43d36302a5 = []"
+`;
+
+exports[`DataFlow streams, scenario A > after: delete a dataset nothing refers to 1`] = `
+"~ datasets = 61 entries
+- datasets 000000a1-05a0-4000-8000-000000000002
+~ functional_types = 9 entries
+- functional_types 000000a1-05a0-4000-8000-000000000002
+~ general_infos = 120 entries
+- general_infos 000000a1-05a0-4000-8000-000000000002
+~ parts = 59 entries
+- parts 000000a1-05a0-4000-8000-000000000002
+~ valid_datasets = 61 entries
+- valid_datasets 000000a1-05a0-4000-8000-000000000002"
+`;
+
+exports[`DataFlow streams, scenario A > after: delete that metadata 1`] = `
+"~ metadata = 17 entries
+- metadata 000000a1-05a0-4000-8000-000000000006"
+`;
+
+exports[`DataFlow streams, scenario A > after: edit a session window 1`] = `
+"~ datasets 000000a1-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"7111b9b5-0538-5b1b-bf5f-edbeab5f00e7","from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"},"from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"}
+~ datasets 000000a1-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-0c00-4000-8000-000000000003","from":"2026-05-14T18:36:38.323Z"},"from":"2026-05-14T18:36:38.323Z","to":"2026-03-01T16:30:00.250Z"}
+~ datasets 000000a1-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000002","000000a1-05e0-4000-8000-000000000001"],"from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"}
+~ datasets 000000a1-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000003","911ef11c-b9dd-5294-9c1c-671a39c9f201"],"from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"}
+~ valid_datasets 000000a1-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"7111b9b5-0538-5b1b-bf5f-edbeab5f00e7","from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"},"from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"}
+~ valid_datasets 000000a1-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-0c00-4000-8000-000000000003","from":"2026-05-14T18:36:38.323Z"},"from":"2026-05-14T18:36:38.323Z","to":"2026-03-01T16:30:00.250Z"}
+~ valid_datasets 000000a1-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000002","000000a1-05e0-4000-8000-000000000001"],"from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"}
+~ valid_datasets 000000a1-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000003","911ef11c-b9dd-5294-9c1c-671a39c9f201"],"from":"2026-03-01T08:00:00.000Z","to":"2026-03-01T16:30:00.250Z"}"
+`;
+
+exports[`DataFlow streams, scenario A > after: give a principal a wildcard grant 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: grant EditDataset on a dataset 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: grant ReadDataset on a part 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: grant UseDevice on a device 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: make a second default dataset with the maker 1`] = `
+"~ datasets = 62 entries
++ datasets a0436032-87a6-5c32-afcf-12c834208283 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000001c"},"from":null,"to":null}
+~ default_devices = 28 entries
++ default_devices a0436032-87a6-5c32-afcf-12c834208283 = "000000a1-0de0-4000-8000-00000000001c"
+~ general_infos = 122 entries
++ general_infos a0436032-87a6-5c32-afcf-12c834208283 = {"name":"Device 28"}
+~ parts = 60 entries
++ parts a0436032-87a6-5c32-afcf-12c834208283 = []
+~ valid_datasets = 62 entries
++ valid_datasets a0436032-87a6-5c32-afcf-12c834208283 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000001c"},"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario A > after: name it after its device 1`] = `
+"~ general_infos = 121 entries
++ general_infos 6ae252ce-e0b3-5e39-9fea-0d43d36302a5 = {"name":"Device 27"}"
+`;
+
+exports[`DataFlow streams, scenario A > after: put its UNS device entry 1`] = `
+"~ datasets = 61 entries
++ datasets 6ae252ce-e0b3-5e39-9fea-0d43d36302a5 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000001b"},"from":null,"to":null}
+~ default_devices = 27 entries
++ default_devices 6ae252ce-e0b3-5e39-9fea-0d43d36302a5 = "000000a1-0de0-4000-8000-00000000001b"
+~ valid_datasets = 61 entries
++ valid_datasets 6ae252ce-e0b3-5e39-9fea-0d43d36302a5 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000001b"},"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario A > after: put metadata on a dataset 1`] = `
+"~ metadata = 18 entries
++ metadata 000000a1-05a0-4000-8000-000000000006 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["new","tags"]}}"
+`;
+
+exports[`DataFlow streams, scenario A > after: remove a Dataset member 1`] = `
+"~ parts = 59 entries
+~ parts 000000a1-05a0-4000-8000-000000000001 = []
+~ parts 000000a1-05a0-4000-8000-00000000000d = ["000000a1-05b0-4000-8000-000000000002"]
+- parts 000000a1-05b0-4000-8000-000000000001"
+`;
+
+exports[`DataFlow streams, scenario A > after: remove a dataset's name 1`] = `
+"~ general_infos = 121 entries
+- general_infos 000000a1-05a0-4000-8000-000000000007"
+`;
+
+exports[`DataFlow streams, scenario A > after: rename a dataset 1`] = `"~ general_infos 000000a1-05a0-4000-8000-000000000007 = {"name":"Renamed"}"`;
+
+exports[`DataFlow streams, scenario A > after: resync sources with equal content 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: revoke UseDevice on a device 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: revoke that EditDataset 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: start 1`] = `
+"+ datasets = 60 entries
++ datasets 000000a1-05a0-4000-8000-000000000001 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000002 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000009"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000003 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001b"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000004 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000005 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000006 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001d"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000007 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000008 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000018"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-000000000009 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001f"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-00000000000a = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000008"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-00000000000b = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001f"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-00000000000c = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-00000000000d = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000002"},"from":null,"to":null}
++ datasets 000000a1-05a0-4000-8000-00000000000e = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000006"},"from":null,"to":null}
++ datasets 000000a1-05b0-4000-8000-000000000001 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000a1-0de0-4000-8000-00000000001f","metrics":[{"instance":"000000a1-0de0-4000-8000-00000000001f","metric":"Metric_1"}]},"from":null,"to":null}
++ datasets 000000a1-05b0-4000-8000-000000000002 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000a1-0de0-4000-8000-00000000001f","metrics":[{"instance":"000000a1-0de0-4000-8000-00000000001f","metric":"Metric_2"}]},"from":null,"to":null}
++ datasets 000000a1-05b0-4000-8000-000000000003 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000a1-0de0-4000-8000-00000000001a","metrics":[{"instance":"000000a1-0de0-4000-8000-00000000001a","metric":"Metric_3"}]},"from":null,"to":null}
++ datasets 000000a1-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"7111b9b5-0538-5b1b-bf5f-edbeab5f00e7","from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"},"from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"}
++ datasets 000000a1-05e0-4000-8000-000000000002 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"273becd9-e51b-5a23-a421-e79168b70ca8","from":"2026-06-14T16:33:12.123Z","to":"2026-07-05T01:40:57.935Z"},"from":"2026-06-14T16:33:12.123Z","to":"2026-07-05T01:40:57.935Z"}
++ datasets 000000a1-05e0-4000-8000-000000000003 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05a0-4000-8000-00000000000d","from":"2026-02-07T06:00:46.593Z","to":"2026-03-05T22:34:39.249Z"},"from":"2026-02-07T06:00:46.593Z","to":"2026-03-05T22:34:39.249Z"}
++ datasets 000000a1-05e0-4000-8000-000000000004 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"6c882c4b-0b5c-59da-913c-dfa9de5de24d","from":"2026-04-07T13:16:09.944Z","to":"2026-04-15T07:47:10.579Z"},"from":"2026-04-07T13:16:09.944Z","to":"2026-04-15T07:47:10.579Z"}
++ datasets 000000a1-05e0-4000-8000-000000000005 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05e0-4000-8000-000000000004","from":"2026-01-25T21:35:31.753Z","to":"2026-02-09T10:17:55.542Z"},"from":"2026-04-07T13:16:09.944Z","to":"2026-02-09T10:17:55.542Z"}
++ datasets 000000a1-05e0-4000-8000-000000000006 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05e0-4000-8000-000000000004","to":"2026-04-20T16:23:42.285Z"},"from":"2026-04-07T13:16:09.944Z","to":"2026-04-15T07:47:10.579Z"}
++ datasets 000000a1-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-0c00-4000-8000-000000000003","from":"2026-05-14T18:36:38.323Z"},"from":"2026-05-14T18:36:38.323Z","to":"2026-04-14T23:08:00.804Z"}
++ datasets 000000a1-05e0-4000-8000-000000000008 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05e0-4000-8000-000000000002","from":"2026-01-02T00:45:46.913Z","to":"2026-01-08T17:28:48.356Z"},"from":"2026-06-14T16:33:12.123Z","to":"2026-01-08T17:28:48.356Z"}
++ datasets 000000a1-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["273becd9-e51b-5a23-a421-e79168b70ca8","000000a1-05a0-4000-8000-000000000003"],"from":null,"to":null}
++ datasets 000000a1-0c00-4000-8000-000000000002 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000001","79ebe158-6c28-59d0-87cd-cd3fca48ac4b"],"from":null,"to":null}
++ datasets 000000a1-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000002","000000a1-05e0-4000-8000-000000000001"],"from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"}
++ datasets 000000a1-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000003","911ef11c-b9dd-5294-9c1c-671a39c9f201"],"from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"}
++ datasets 000000a1-0c00-4000-8000-000000000005 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":[],"from":null,"to":null}
++ datasets 000000a1-0e70-4000-8000-000000000001 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000a1-0de0-4000-8000-000000000003","metrics":[{"instance":"000000a1-0de0-4000-8000-000000000003","metric":"Metric_1"},{"instance":"000000a1-0de0-4000-8000-000000000003","metric":"Metric_2"}]},"from":null,"to":null}
++ datasets 000000a1-0e70-4000-8000-000000000002 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000a1-0de0-4000-8000-000000000019","metrics":[{"instance":"000000a1-0de0-4000-8000-000000000019","metric":"Metric_1"},{"instance":"000000a1-0de0-4000-8000-000000000019","metric":"Metric_3"}]},"from":null,"to":null}
++ datasets 000000a1-0e70-4000-8000-000000000003 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000a1-0de0-4000-8000-000000000007","metrics":[{"instance":"000000a1-0de0-4000-8000-000000000007","metric":"Metric_1"},{"instance":"000000a1-0de0-4000-8000-000000000007","metric":"Metric_4"}]},"from":null,"to":null}
++ datasets 000000a1-0f00-4000-8000-000000000001 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ datasets 101bf09e-9ea8-5644-b3cb-3ceedaba1905 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000006"},"from":null,"to":null}
++ datasets 17ac27f9-5b6b-52ff-9a68-4785a6d38527 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000e"},"from":null,"to":null}
++ datasets 1976dab3-34db-5b0e-a83f-84d7e2cff6f4 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000012"},"from":null,"to":null}
++ datasets 273becd9-e51b-5a23-a421-e79168b70ca8 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000014"},"from":null,"to":null}
++ datasets 45b86849-610c-5171-9497-52065a1f47ad = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000009"},"from":null,"to":null}
++ datasets 4bc1b894-c380-5aa7-bb60-86fbc46d5311 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000016"},"from":null,"to":null}
++ datasets 5854f590-5d62-5d7a-a865-a7133818eca6 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000017"},"from":null,"to":null}
++ datasets 59f5d919-1841-5138-a33a-dec4e668135c = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000001a"},"from":null,"to":null}
++ datasets 5d577f8f-4573-5669-80c0-beae79a3fb4c = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ datasets 5ec8b35b-2234-5a84-8d5a-13fdbb453a82 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000005"},"from":null,"to":null}
++ datasets 6460f970-6471-51a4-9d64-3d241ff1df84 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000002"},"from":null,"to":null}
++ datasets 64cb204e-e5e0-5bd1-9693-b528e7e0a565 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000003"},"from":null,"to":null}
++ datasets 6c882c4b-0b5c-59da-913c-dfa9de5de24d = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000018"},"from":null,"to":null}
++ datasets 7111b9b5-0538-5b1b-bf5f-edbeab5f00e7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000008"},"from":null,"to":null}
++ datasets 79ebe158-6c28-59d0-87cd-cd3fca48ac4b = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000d"},"from":null,"to":null}
++ datasets 81840d51-edc5-58be-82ee-15b673f8cfd3 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000010"},"from":null,"to":null}
++ datasets 8456f5e0-ddd5-5fd8-b213-c44f411b3b0d = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000b"},"from":null,"to":null}
++ datasets 911ef11c-b9dd-5294-9c1c-671a39c9f201 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000001"},"from":null,"to":null}
++ datasets 9320f6c6-65c3-56fd-b9ca-8242fc043ca8 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000004"},"from":null,"to":null}
++ datasets a828778b-d780-5c51-9523-20ea2ac30d91 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ datasets b23d4fa7-d919-5409-99ca-fe2ba443176e = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ datasets b3e5be5c-503e-5955-8ab9-598868996d10 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000015"},"from":null,"to":null}
++ datasets c94c00f9-8efc-5ab1-ab72-4a3bddf07414 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000007"},"from":null,"to":null}
++ datasets c9d82a06-afea-5197-81b5-40afefec4962 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000f"},"from":null,"to":null}
++ datasets d198ec87-e56e-51e6-b1ef-39105fad8ee2 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000011"},"from":null,"to":null}
++ datasets f32d48cb-286a-567f-8385-4b709a229da3 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ default_devices = 26 entries
++ default_devices 101bf09e-9ea8-5644-b3cb-3ceedaba1905 = "000000a1-0de0-4000-8000-000000000006"
++ default_devices 17ac27f9-5b6b-52ff-9a68-4785a6d38527 = "000000a1-0de0-4000-8000-00000000000e"
++ default_devices 1976dab3-34db-5b0e-a83f-84d7e2cff6f4 = "000000a1-0de0-4000-8000-000000000012"
++ default_devices 273becd9-e51b-5a23-a421-e79168b70ca8 = "000000a1-0de0-4000-8000-000000000014"
++ default_devices 45b86849-610c-5171-9497-52065a1f47ad = "000000a1-0de0-4000-8000-000000000009"
++ default_devices 4bc1b894-c380-5aa7-bb60-86fbc46d5311 = "000000a1-0de0-4000-8000-000000000016"
++ default_devices 5854f590-5d62-5d7a-a865-a7133818eca6 = "000000a1-0de0-4000-8000-000000000017"
++ default_devices 59f5d919-1841-5138-a33a-dec4e668135c = "000000a1-0de0-4000-8000-00000000001a"
++ default_devices 5d577f8f-4573-5669-80c0-beae79a3fb4c = "000000a1-0de0-4000-8000-000000000013"
++ default_devices 5ec8b35b-2234-5a84-8d5a-13fdbb453a82 = "000000a1-0de0-4000-8000-000000000005"
++ default_devices 6460f970-6471-51a4-9d64-3d241ff1df84 = "000000a1-0de0-4000-8000-000000000002"
++ default_devices 64cb204e-e5e0-5bd1-9693-b528e7e0a565 = "000000a1-0de0-4000-8000-000000000003"
++ default_devices 6c882c4b-0b5c-59da-913c-dfa9de5de24d = "000000a1-0de0-4000-8000-000000000018"
++ default_devices 7111b9b5-0538-5b1b-bf5f-edbeab5f00e7 = "000000a1-0de0-4000-8000-000000000008"
++ default_devices 79ebe158-6c28-59d0-87cd-cd3fca48ac4b = "000000a1-0de0-4000-8000-00000000000d"
++ default_devices 81840d51-edc5-58be-82ee-15b673f8cfd3 = "000000a1-0de0-4000-8000-000000000010"
++ default_devices 8456f5e0-ddd5-5fd8-b213-c44f411b3b0d = "000000a1-0de0-4000-8000-00000000000b"
++ default_devices 911ef11c-b9dd-5294-9c1c-671a39c9f201 = "000000a1-0de0-4000-8000-000000000001"
++ default_devices 9320f6c6-65c3-56fd-b9ca-8242fc043ca8 = "000000a1-0de0-4000-8000-000000000004"
++ default_devices a828778b-d780-5c51-9523-20ea2ac30d91 = "000000a1-0de0-4000-8000-00000000000a"
++ default_devices b23d4fa7-d919-5409-99ca-fe2ba443176e = "000000a1-0de0-4000-8000-000000000019"
++ default_devices b3e5be5c-503e-5955-8ab9-598868996d10 = "000000a1-0de0-4000-8000-000000000015"
++ default_devices c94c00f9-8efc-5ab1-ab72-4a3bddf07414 = "000000a1-0de0-4000-8000-000000000007"
++ default_devices c9d82a06-afea-5197-81b5-40afefec4962 = "000000a1-0de0-4000-8000-00000000000f"
++ default_devices d198ec87-e56e-51e6-b1ef-39105fad8ee2 = "000000a1-0de0-4000-8000-000000000011"
++ default_devices f32d48cb-286a-567f-8385-4b709a229da3 = "000000a1-0de0-4000-8000-00000000000c"
++ functional_types = 10 entries
++ functional_types 000000a1-05a0-4000-8000-000000000002 = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000a1-05a0-4000-8000-000000000005 = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000a1-05a0-4000-8000-000000000008 = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000a1-05a0-4000-8000-00000000000b = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000a1-05a0-4000-8000-00000000000e = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000a1-05e0-4000-8000-000000000001 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000a1-05e0-4000-8000-000000000003 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000a1-05e0-4000-8000-000000000005 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000a1-05e0-4000-8000-000000000007 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000a1-0c00-4000-8000-000000000001 = ["414d2d10-6be8-4c27-8e9f-c716ef5432b9"]
++ general_infos = 120 entries
++ general_infos 000000a1-05a0-4000-8000-000000000001 = {"name":"Dataset 1"}
++ general_infos 000000a1-05a0-4000-8000-000000000002 = {"name":"Dataset 2"}
++ general_infos 000000a1-05a0-4000-8000-000000000003 = {"name":"Dataset 3"}
++ general_infos 000000a1-05a0-4000-8000-000000000005 = {"name":"Dataset 5"}
++ general_infos 000000a1-05a0-4000-8000-000000000006 = {"deleted":false}
++ general_infos 000000a1-05a0-4000-8000-000000000007 = {"name":"Dataset 7"}
++ general_infos 000000a1-05a0-4000-8000-000000000008 = {"name":"Dataset 8"}
++ general_infos 000000a1-05a0-4000-8000-000000000009 = {"name":"Dataset 9"}
++ general_infos 000000a1-05a0-4000-8000-00000000000a = {"name":"Dataset 10"}
++ general_infos 000000a1-05a0-4000-8000-00000000000c = {"name":"Dataset 12"}
++ general_infos 000000a1-05a0-4000-8000-00000000000d = {"name":"Dataset 13"}
++ general_infos 000000a1-05a0-4000-8000-00000000000e = {"name":"Dataset 14"}
++ general_infos 000000a1-05b0-4000-8000-000000000001 = {"name":"Dataset 15"}
++ general_infos 000000a1-05b0-4000-8000-000000000002 = {"name":"Dataset 16"}
++ general_infos 000000a1-05b0-4000-8000-000000000003 = {"name":"Dataset 17"}
++ general_infos 000000a1-05e0-4000-8000-000000000001 = {"name":"Dataset 22"}
++ general_infos 000000a1-05e0-4000-8000-000000000002 = {"name":"Dataset 23"}
++ general_infos 000000a1-05e0-4000-8000-000000000003 = {"name":"Dataset 24"}
++ general_infos 000000a1-05e0-4000-8000-000000000005 = {"name":"Dataset 31"}
++ general_infos 000000a1-05e0-4000-8000-000000000007 = {"name":"Dataset 33"}
++ general_infos 000000a1-05e0-4000-8000-000000000008 = {"name":"Dataset 34"}
++ general_infos 000000a1-0b0e-4000-8000-000000000001 = {"name":"Object 1"}
++ general_infos 000000a1-0b0e-4000-8000-000000000002 = {"name":"Object 2"}
++ general_infos 000000a1-0b0e-4000-8000-000000000003 = {"name":"Object 3"}
++ general_infos 000000a1-0b0e-4000-8000-000000000004 = {"name":"Object 4"}
++ general_infos 000000a1-0b0e-4000-8000-000000000005 = {"name":"Object 5"}
++ general_infos 000000a1-0b0e-4000-8000-000000000006 = {"name":"Object 6"}
++ general_infos 000000a1-0b0e-4000-8000-000000000007 = {"name":"Object 7"}
++ general_infos 000000a1-0b0e-4000-8000-000000000008 = {"name":"Object 8"}
++ general_infos 000000a1-0b0e-4000-8000-000000000009 = {"name":"Object 9"}
++ general_infos 000000a1-0b0e-4000-8000-00000000000a = {"name":"Object 10"}
++ general_infos 000000a1-0b0e-4000-8000-00000000000b = {"name":"Object 11"}
++ general_infos 000000a1-0b0e-4000-8000-00000000000c = {"name":"Object 12"}
++ general_infos 000000a1-0b0e-4000-8000-00000000000d = {"name":"Object 13"}
++ general_infos 000000a1-0b0e-4000-8000-00000000000e = {"name":"Object 14"}
++ general_infos 000000a1-0b0e-4000-8000-00000000000f = {"name":"Object 15"}
++ general_infos 000000a1-0b0e-4000-8000-000000000010 = {"name":"Object 16"}
++ general_infos 000000a1-0b0e-4000-8000-000000000011 = {"name":"Object 17"}
++ general_infos 000000a1-0b0e-4000-8000-000000000012 = {"name":"Object 18"}
++ general_infos 000000a1-0b0e-4000-8000-000000000013 = {"name":"Object 19"}
++ general_infos 000000a1-0b0e-4000-8000-000000000014 = {"name":"Object 20"}
++ general_infos 000000a1-0b0e-4000-8000-000000000015 = {"name":"Object 21"}
++ general_infos 000000a1-0b0e-4000-8000-000000000016 = {"name":"Object 22"}
++ general_infos 000000a1-0b0e-4000-8000-000000000017 = {"name":"Object 23"}
++ general_infos 000000a1-0b0e-4000-8000-000000000018 = {"name":"Object 24"}
++ general_infos 000000a1-0b0e-4000-8000-000000000019 = {"name":"Object 25"}
++ general_infos 000000a1-0b0e-4000-8000-00000000001a = {"name":"Object 26"}
++ general_infos 000000a1-0b0e-4000-8000-00000000001b = {"name":"Object 27"}
++ general_infos 000000a1-0b0e-4000-8000-00000000001c = {"name":"Object 28"}
++ general_infos 000000a1-0b0e-4000-8000-00000000001d = {"name":"Object 29"}
++ general_infos 000000a1-0b0e-4000-8000-00000000001e = {"name":"Object 30"}
++ general_infos 000000a1-0b0e-4000-8000-00000000001f = {"name":"Object 31"}
++ general_infos 000000a1-0c00-4000-8000-000000000001 = {"name":"Dataset 26"}
++ general_infos 000000a1-0c00-4000-8000-000000000002 = {"name":"Dataset 27"}
++ general_infos 000000a1-0c00-4000-8000-000000000003 = {"name":"Dataset 28"}
++ general_infos 000000a1-0c00-4000-8000-000000000004 = {"name":"Dataset 29"}
++ general_infos 000000a1-0c00-4000-8000-000000000005 = {"name":"Dataset 30"}
++ general_infos 000000a1-0de0-4000-8000-000000000001 = {"name":"Device 1"}
++ general_infos 000000a1-0de0-4000-8000-000000000002 = {"name":"Device 2"}
++ general_infos 000000a1-0de0-4000-8000-000000000003 = {"name":"Device 3"}
++ general_infos 000000a1-0de0-4000-8000-000000000004 = {"name":"Device 4"}
++ general_infos 000000a1-0de0-4000-8000-000000000005 = {"name":"Device 5"}
++ general_infos 000000a1-0de0-4000-8000-000000000006 = {"name":"Device 6"}
++ general_infos 000000a1-0de0-4000-8000-000000000007 = {"name":"Device 7"}
++ general_infos 000000a1-0de0-4000-8000-000000000008 = {"name":"Device 8"}
++ general_infos 000000a1-0de0-4000-8000-000000000009 = {"name":"Device 9"}
++ general_infos 000000a1-0de0-4000-8000-00000000000a = {"name":"Device 10"}
++ general_infos 000000a1-0de0-4000-8000-00000000000b = {"name":"Device 11"}
++ general_infos 000000a1-0de0-4000-8000-00000000000c = {"name":"Device 12"}
++ general_infos 000000a1-0de0-4000-8000-00000000000d = {"name":"Device 13"}
++ general_infos 000000a1-0de0-4000-8000-00000000000e = {"name":"Device 14"}
++ general_infos 000000a1-0de0-4000-8000-00000000000f = {"name":"Device 15"}
++ general_infos 000000a1-0de0-4000-8000-000000000010 = {"name":"Device 16"}
++ general_infos 000000a1-0de0-4000-8000-000000000011 = {"name":"Device 17"}
++ general_infos 000000a1-0de0-4000-8000-000000000012 = {"name":"Device 18"}
++ general_infos 000000a1-0de0-4000-8000-000000000013 = {"name":"Device 19"}
++ general_infos 000000a1-0de0-4000-8000-000000000014 = {"name":"Device 20"}
++ general_infos 000000a1-0de0-4000-8000-000000000015 = {"name":"Device 21"}
++ general_infos 000000a1-0de0-4000-8000-000000000016 = {"name":"Device 22"}
++ general_infos 000000a1-0de0-4000-8000-000000000017 = {"name":"Device 23"}
++ general_infos 000000a1-0de0-4000-8000-000000000018 = {"name":"Device 24"}
++ general_infos 000000a1-0de0-4000-8000-000000000019 = {"name":"Device 25"}
++ general_infos 000000a1-0de0-4000-8000-00000000001a = {"name":"Device 26"}
++ general_infos 000000a1-0de0-4000-8000-00000000001b = {"name":"Device 27"}
++ general_infos 000000a1-0de0-4000-8000-00000000001c = {"name":"Device 28"}
++ general_infos 000000a1-0de0-4000-8000-00000000001d = {"name":"Device 29"}
++ general_infos 000000a1-0de0-4000-8000-00000000001e = {"name":"Device 30"}
++ general_infos 000000a1-0de0-4000-8000-00000000001f = {"name":"Device 31"}
++ general_infos 000000a1-0de0-4000-8000-000000000020 = {"name":"Device 32"}
++ general_infos 000000a1-0de0-4000-8000-000000000021 = {"name":"Device 33"}
++ general_infos 000000a1-0de0-4000-8000-000000000022 = {"name":"Device 34"}
++ general_infos 000000a1-0e70-4000-8000-000000000002 = {"name":"Dataset 19"}
++ general_infos 000000a1-0e70-4000-8000-000000000003 = {"name":"Dataset 20"}
++ general_infos 000000a1-0f00-4000-8000-000000000001 = {"name":"Dataset 21"}
++ general_infos 101bf09e-9ea8-5644-b3cb-3ceedaba1905 = {"name":"Device 6"}
++ general_infos 17ac27f9-5b6b-52ff-9a68-4785a6d38527 = {"name":"Device 14"}
++ general_infos 1976dab3-34db-5b0e-a83f-84d7e2cff6f4 = {"name":"Device 18"}
++ general_infos 273becd9-e51b-5a23-a421-e79168b70ca8 = {"name":"Device 20"}
++ general_infos 45b86849-610c-5171-9497-52065a1f47ad = {"name":"Device 9"}
++ general_infos 4bc1b894-c380-5aa7-bb60-86fbc46d5311 = {"name":"Device 22"}
++ general_infos 5854f590-5d62-5d7a-a865-a7133818eca6 = {"name":"Device 23"}
++ general_infos 59f5d919-1841-5138-a33a-dec4e668135c = {"name":"Device 26"}
++ general_infos 5d577f8f-4573-5669-80c0-beae79a3fb4c = {"name":"Device 19"}
++ general_infos 5ec8b35b-2234-5a84-8d5a-13fdbb453a82 = {"name":"Device 5"}
++ general_infos 6460f970-6471-51a4-9d64-3d241ff1df84 = {"name":"Device 2"}
++ general_infos 64cb204e-e5e0-5bd1-9693-b528e7e0a565 = {"name":"Device 3"}
++ general_infos 6c882c4b-0b5c-59da-913c-dfa9de5de24d = {"name":"Device 24"}
++ general_infos 7111b9b5-0538-5b1b-bf5f-edbeab5f00e7 = {"name":"Device 8"}
++ general_infos 79ebe158-6c28-59d0-87cd-cd3fca48ac4b = {"name":"Device 13"}
++ general_infos 81840d51-edc5-58be-82ee-15b673f8cfd3 = {"name":"Device 16"}
++ general_infos 8456f5e0-ddd5-5fd8-b213-c44f411b3b0d = {"name":"Device 11"}
++ general_infos 911ef11c-b9dd-5294-9c1c-671a39c9f201 = {"name":"Device 1"}
++ general_infos 9320f6c6-65c3-56fd-b9ca-8242fc043ca8 = {"name":"Device 4"}
++ general_infos a828778b-d780-5c51-9523-20ea2ac30d91 = {"name":"Device 10"}
++ general_infos b23d4fa7-d919-5409-99ca-fe2ba443176e = {"name":"Device 25"}
++ general_infos b3e5be5c-503e-5955-8ab9-598868996d10 = {"name":"Device 21"}
++ general_infos c94c00f9-8efc-5ab1-ab72-4a3bddf07414 = {"name":"Device 7"}
++ general_infos c9d82a06-afea-5197-81b5-40afefec4962 = {"name":"Device 15"}
++ general_infos d198ec87-e56e-51e6-b1ef-39105fad8ee2 = {"name":"Device 17"}
++ general_infos f32d48cb-286a-567f-8385-4b709a229da3 = {"name":"Device 12"}
++ invalid_datasets = 0 entries
++ metadata = 17 entries
++ metadata 000000a1-05a0-4000-8000-000000000001 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-0","shared"]},"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000a1-0de0-4000-8000-000000000019":"Label 0"}}}
++ metadata 000000a1-05a0-4000-8000-000000000004 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-3","shared"]}}
++ metadata 000000a1-05a0-4000-8000-000000000005 = {"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000a1-0de0-4000-8000-00000000000e":"Label 4"}}}
++ metadata 000000a1-05a0-4000-8000-000000000007 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-2","shared"]}}
++ metadata 000000a1-05a0-4000-8000-000000000009 = {"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000a1-0de0-4000-8000-00000000001e":"Label 8"}}}
++ metadata 000000a1-05a0-4000-8000-00000000000a = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]}}
++ metadata 000000a1-05a0-4000-8000-00000000000d = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-0","shared"]},"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000a1-0de0-4000-8000-000000000012":"Label 12"}}}
++ metadata 000000a1-05b0-4000-8000-000000000002 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-3","shared"]}}
++ metadata 000000a1-05e0-4000-8000-000000000001 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":1,"operator":"Operator 0"},"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]},"e87a0000-0aaa-4000-8000-000000000001":{"note":"Session 1"}}
++ metadata 000000a1-05e0-4000-8000-000000000003 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":3,"operator":"Operator 2"}}
++ metadata 000000a1-05e0-4000-8000-000000000004 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-0","shared"]}}
++ metadata 000000a1-05e0-4000-8000-000000000005 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":5,"operator":"Operator 1"},"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-2","shared"]},"e87a0000-0aaa-4000-8000-000000000001":{"note":"Session 5"}}
++ metadata 000000a1-05e0-4000-8000-000000000007 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":7,"operator":"Operator 0"}}
++ metadata 000000a1-05e0-4000-8000-000000000008 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]}}
++ metadata 000000a1-0b0e-4000-8000-000000000001 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["not-a-dataset"]}}
++ metadata 000000a1-0c00-4000-8000-000000000003 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-3","shared"]}}
++ metadata 000000a1-0e70-4000-8000-000000000002 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-2","shared"]}}
++ parts = 58 entries
++ parts 000000a1-05a0-4000-8000-000000000001 = ["000000a1-05b0-4000-8000-000000000001"]
++ parts 000000a1-05a0-4000-8000-000000000002 = []
++ parts 000000a1-05a0-4000-8000-000000000003 = ["000000a1-0e70-4000-8000-000000000001","000000a1-0e70-4000-8000-000000000002"]
++ parts 000000a1-05a0-4000-8000-000000000004 = []
++ parts 000000a1-05a0-4000-8000-000000000005 = []
++ parts 000000a1-05a0-4000-8000-000000000006 = []
++ parts 000000a1-05a0-4000-8000-000000000007 = []
++ parts 000000a1-05a0-4000-8000-000000000008 = ["000000a1-05b0-4000-8000-000000000002","000000a1-0e70-4000-8000-000000000001"]
++ parts 000000a1-05a0-4000-8000-000000000009 = []
++ parts 000000a1-05a0-4000-8000-00000000000a = []
++ parts 000000a1-05a0-4000-8000-00000000000b = []
++ parts 000000a1-05a0-4000-8000-00000000000c = []
++ parts 000000a1-05a0-4000-8000-00000000000d = ["000000a1-05b0-4000-8000-000000000001","000000a1-05b0-4000-8000-000000000002"]
++ parts 000000a1-05b0-4000-8000-000000000001 = []
++ parts 000000a1-05b0-4000-8000-000000000002 = []
++ parts 000000a1-05e0-4000-8000-000000000001 = []
++ parts 000000a1-05e0-4000-8000-000000000002 = []
++ parts 000000a1-05e0-4000-8000-000000000003 = []
++ parts 000000a1-05e0-4000-8000-000000000004 = []
++ parts 000000a1-05e0-4000-8000-000000000005 = []
++ parts 000000a1-05e0-4000-8000-000000000006 = []
++ parts 000000a1-05e0-4000-8000-000000000007 = []
++ parts 000000a1-05e0-4000-8000-000000000008 = []
++ parts 000000a1-0c00-4000-8000-000000000001 = []
++ parts 000000a1-0c00-4000-8000-000000000002 = []
++ parts 000000a1-0c00-4000-8000-000000000003 = []
++ parts 000000a1-0c00-4000-8000-000000000004 = []
++ parts 000000a1-0c00-4000-8000-000000000005 = []
++ parts 000000a1-0e70-4000-8000-000000000001 = []
++ parts 000000a1-0e70-4000-8000-000000000002 = []
++ parts 000000a1-0e70-4000-8000-000000000003 = []
++ parts 000000a1-0f00-4000-8000-000000000001 = []
++ parts 101bf09e-9ea8-5644-b3cb-3ceedaba1905 = []
++ parts 17ac27f9-5b6b-52ff-9a68-4785a6d38527 = []
++ parts 1976dab3-34db-5b0e-a83f-84d7e2cff6f4 = []
++ parts 273becd9-e51b-5a23-a421-e79168b70ca8 = []
++ parts 45b86849-610c-5171-9497-52065a1f47ad = []
++ parts 4bc1b894-c380-5aa7-bb60-86fbc46d5311 = []
++ parts 5854f590-5d62-5d7a-a865-a7133818eca6 = []
++ parts 59f5d919-1841-5138-a33a-dec4e668135c = []
++ parts 5d577f8f-4573-5669-80c0-beae79a3fb4c = []
++ parts 5ec8b35b-2234-5a84-8d5a-13fdbb453a82 = []
++ parts 6460f970-6471-51a4-9d64-3d241ff1df84 = []
++ parts 64cb204e-e5e0-5bd1-9693-b528e7e0a565 = []
++ parts 6c882c4b-0b5c-59da-913c-dfa9de5de24d = []
++ parts 7111b9b5-0538-5b1b-bf5f-edbeab5f00e7 = []
++ parts 79ebe158-6c28-59d0-87cd-cd3fca48ac4b = []
++ parts 81840d51-edc5-58be-82ee-15b673f8cfd3 = []
++ parts 8456f5e0-ddd5-5fd8-b213-c44f411b3b0d = []
++ parts 911ef11c-b9dd-5294-9c1c-671a39c9f201 = []
++ parts 9320f6c6-65c3-56fd-b9ca-8242fc043ca8 = []
++ parts a828778b-d780-5c51-9523-20ea2ac30d91 = []
++ parts b23d4fa7-d919-5409-99ca-fe2ba443176e = []
++ parts b3e5be5c-503e-5955-8ab9-598868996d10 = []
++ parts c94c00f9-8efc-5ab1-ab72-4a3bddf07414 = []
++ parts c9d82a06-afea-5197-81b5-40afefec4962 = []
++ parts d198ec87-e56e-51e6-b1ef-39105fad8ee2 = []
++ parts f32d48cb-286a-567f-8385-4b709a229da3 = []
++ valid_datasets = 60 entries
++ valid_datasets 000000a1-05a0-4000-8000-000000000001 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000002 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000009"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000003 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001b"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000004 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000005 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000006 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001d"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000007 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000008 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000018"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-000000000009 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001f"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-00000000000a = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000008"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-00000000000b = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000001f"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-00000000000c = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-00000000000d = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000002"},"from":null,"to":null}
++ valid_datasets 000000a1-05a0-4000-8000-00000000000e = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000a1-0de0-4000-8000-000000000006"},"from":null,"to":null}
++ valid_datasets 000000a1-05b0-4000-8000-000000000001 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000a1-0de0-4000-8000-00000000001f","metrics":[{"instance":"000000a1-0de0-4000-8000-00000000001f","metric":"Metric_1"}]},"from":null,"to":null}
++ valid_datasets 000000a1-05b0-4000-8000-000000000002 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000a1-0de0-4000-8000-00000000001f","metrics":[{"instance":"000000a1-0de0-4000-8000-00000000001f","metric":"Metric_2"}]},"from":null,"to":null}
++ valid_datasets 000000a1-05b0-4000-8000-000000000003 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000a1-0de0-4000-8000-00000000001a","metrics":[{"instance":"000000a1-0de0-4000-8000-00000000001a","metric":"Metric_3"}]},"from":null,"to":null}
++ valid_datasets 000000a1-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"7111b9b5-0538-5b1b-bf5f-edbeab5f00e7","from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"},"from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000002 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"273becd9-e51b-5a23-a421-e79168b70ca8","from":"2026-06-14T16:33:12.123Z","to":"2026-07-05T01:40:57.935Z"},"from":"2026-06-14T16:33:12.123Z","to":"2026-07-05T01:40:57.935Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000003 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05a0-4000-8000-00000000000d","from":"2026-02-07T06:00:46.593Z","to":"2026-03-05T22:34:39.249Z"},"from":"2026-02-07T06:00:46.593Z","to":"2026-03-05T22:34:39.249Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000004 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"6c882c4b-0b5c-59da-913c-dfa9de5de24d","from":"2026-04-07T13:16:09.944Z","to":"2026-04-15T07:47:10.579Z"},"from":"2026-04-07T13:16:09.944Z","to":"2026-04-15T07:47:10.579Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000005 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05e0-4000-8000-000000000004","from":"2026-01-25T21:35:31.753Z","to":"2026-02-09T10:17:55.542Z"},"from":"2026-04-07T13:16:09.944Z","to":"2026-02-09T10:17:55.542Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000006 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05e0-4000-8000-000000000004","to":"2026-04-20T16:23:42.285Z"},"from":"2026-04-07T13:16:09.944Z","to":"2026-04-15T07:47:10.579Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-0c00-4000-8000-000000000003","from":"2026-05-14T18:36:38.323Z"},"from":"2026-05-14T18:36:38.323Z","to":"2026-04-14T23:08:00.804Z"}
++ valid_datasets 000000a1-05e0-4000-8000-000000000008 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000a1-05e0-4000-8000-000000000002","from":"2026-01-02T00:45:46.913Z","to":"2026-01-08T17:28:48.356Z"},"from":"2026-06-14T16:33:12.123Z","to":"2026-01-08T17:28:48.356Z"}
++ valid_datasets 000000a1-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["273becd9-e51b-5a23-a421-e79168b70ca8","000000a1-05a0-4000-8000-000000000003"],"from":null,"to":null}
++ valid_datasets 000000a1-0c00-4000-8000-000000000002 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000001","79ebe158-6c28-59d0-87cd-cd3fca48ac4b"],"from":null,"to":null}
++ valid_datasets 000000a1-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000002","000000a1-05e0-4000-8000-000000000001"],"from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"}
++ valid_datasets 000000a1-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000a1-0c00-4000-8000-000000000003","911ef11c-b9dd-5294-9c1c-671a39c9f201"],"from":"2026-04-11T07:57:24.466Z","to":"2026-04-14T23:08:00.804Z"}
++ valid_datasets 000000a1-0c00-4000-8000-000000000005 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":[],"from":null,"to":null}
++ valid_datasets 000000a1-0e70-4000-8000-000000000001 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000a1-0de0-4000-8000-000000000003","metrics":[{"instance":"000000a1-0de0-4000-8000-000000000003","metric":"Metric_1"},{"instance":"000000a1-0de0-4000-8000-000000000003","metric":"Metric_2"}]},"from":null,"to":null}
++ valid_datasets 000000a1-0e70-4000-8000-000000000002 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000a1-0de0-4000-8000-000000000019","metrics":[{"instance":"000000a1-0de0-4000-8000-000000000019","metric":"Metric_1"},{"instance":"000000a1-0de0-4000-8000-000000000019","metric":"Metric_3"}]},"from":null,"to":null}
++ valid_datasets 000000a1-0e70-4000-8000-000000000003 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000a1-0de0-4000-8000-000000000007","metrics":[{"instance":"000000a1-0de0-4000-8000-000000000007","metric":"Metric_1"},{"instance":"000000a1-0de0-4000-8000-000000000007","metric":"Metric_4"}]},"from":null,"to":null}
++ valid_datasets 000000a1-0f00-4000-8000-000000000001 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ valid_datasets 101bf09e-9ea8-5644-b3cb-3ceedaba1905 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000006"},"from":null,"to":null}
++ valid_datasets 17ac27f9-5b6b-52ff-9a68-4785a6d38527 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000e"},"from":null,"to":null}
++ valid_datasets 1976dab3-34db-5b0e-a83f-84d7e2cff6f4 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000012"},"from":null,"to":null}
++ valid_datasets 273becd9-e51b-5a23-a421-e79168b70ca8 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000014"},"from":null,"to":null}
++ valid_datasets 45b86849-610c-5171-9497-52065a1f47ad = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000009"},"from":null,"to":null}
++ valid_datasets 4bc1b894-c380-5aa7-bb60-86fbc46d5311 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000016"},"from":null,"to":null}
++ valid_datasets 5854f590-5d62-5d7a-a865-a7133818eca6 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000017"},"from":null,"to":null}
++ valid_datasets 59f5d919-1841-5138-a33a-dec4e668135c = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000001a"},"from":null,"to":null}
++ valid_datasets 5d577f8f-4573-5669-80c0-beae79a3fb4c = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ valid_datasets 5ec8b35b-2234-5a84-8d5a-13fdbb453a82 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000005"},"from":null,"to":null}
++ valid_datasets 6460f970-6471-51a4-9d64-3d241ff1df84 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000002"},"from":null,"to":null}
++ valid_datasets 64cb204e-e5e0-5bd1-9693-b528e7e0a565 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000003"},"from":null,"to":null}
++ valid_datasets 6c882c4b-0b5c-59da-913c-dfa9de5de24d = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000018"},"from":null,"to":null}
++ valid_datasets 7111b9b5-0538-5b1b-bf5f-edbeab5f00e7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000008"},"from":null,"to":null}
++ valid_datasets 79ebe158-6c28-59d0-87cd-cd3fca48ac4b = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000d"},"from":null,"to":null}
++ valid_datasets 81840d51-edc5-58be-82ee-15b673f8cfd3 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000010"},"from":null,"to":null}
++ valid_datasets 8456f5e0-ddd5-5fd8-b213-c44f411b3b0d = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000b"},"from":null,"to":null}
++ valid_datasets 911ef11c-b9dd-5294-9c1c-671a39c9f201 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000001"},"from":null,"to":null}
++ valid_datasets 9320f6c6-65c3-56fd-b9ca-8242fc043ca8 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000004"},"from":null,"to":null}
++ valid_datasets a828778b-d780-5c51-9523-20ea2ac30d91 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ valid_datasets b23d4fa7-d919-5409-99ca-fe2ba443176e = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ valid_datasets b3e5be5c-503e-5955-8ab9-598868996d10 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000015"},"from":null,"to":null}
++ valid_datasets c94c00f9-8efc-5ab1-ab72-4a3bddf07414 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000007"},"from":null,"to":null}
++ valid_datasets c9d82a06-afea-5197-81b5-40afefec4962 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000f"},"from":null,"to":null}
++ valid_datasets d198ec87-e56e-51e6-b1ef-39105fad8ee2 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-000000000011"},"from":null,"to":null}
++ valid_datasets f32d48cb-286a-567f-8385-4b709a229da3 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000a1-0de0-4000-8000-00000000000c"},"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario A > after: take the wildcard grant away 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario A > after: write unrelated General information 1`] = `"~ general_infos 000000a1-0b0e-4000-8000-000000000002 = {"name":"Something else"}"`;
+
+exports[`DataFlow streams, scenario B > after: add a session that points at a missing dataset 1`] = `
+"~ datasets = 61 entries
++ datasets 000000b2-0ffe-4000-8000-000000001001 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ general_infos = 121 entries
++ general_infos 000000b2-0ffe-4000-8000-000000001001 = {"name":"Dangling session"}
+~ invalid_datasets = 1 entries
++ invalid_datasets 000000b2-0ffe-4000-8000-000000001001 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ parts = 59 entries
++ parts 000000b2-0ffe-4000-8000-000000001001 = []"
+`;
+
+exports[`DataFlow streams, scenario B > after: add a structure application nobody knows 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario B > after: delete a dataset a session refers to 1`] = `
+"~ datasets = 61 entries
+- datasets 000000b2-05a0-4000-8000-000000000005
+~ datasets 000000b2-05e0-4000-8000-000000000002 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-05e0-4000-8000-000000000005 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-05e0-4000-8000-000000000008 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ functional_types = 9 entries
+- functional_types 000000b2-05a0-4000-8000-000000000005
+~ general_infos = 120 entries
+- general_infos 000000b2-05a0-4000-8000-000000000005
+~ invalid_datasets = 3 entries
++ invalid_datasets 000000b2-05e0-4000-8000-000000000002 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-05e0-4000-8000-000000000005 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-05e0-4000-8000-000000000008 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ metadata = 16 entries
+- metadata 000000b2-05a0-4000-8000-000000000005
+~ parts = 59 entries
+- parts 000000b2-05a0-4000-8000-000000000005
+~ valid_datasets = 58 entries
+- valid_datasets 000000b2-05a0-4000-8000-000000000005
+- valid_datasets 000000b2-05e0-4000-8000-000000000002
+- valid_datasets 000000b2-05e0-4000-8000-000000000005
+- valid_datasets 000000b2-05e0-4000-8000-000000000008"
+`;
+
+exports[`DataFlow streams, scenario B > after: delete the session left invalid 1`] = `
+"~ datasets = 60 entries
+- datasets 000000b2-05e0-4000-8000-000000000002
+~ general_infos = 119 entries
+- general_infos 000000b2-05e0-4000-8000-000000000002
+~ invalid_datasets = 2 entries
+- invalid_datasets 000000b2-05e0-4000-8000-000000000002
+~ parts = 58 entries
+- parts 000000b2-05e0-4000-8000-000000000002"
+`;
+
+exports[`DataFlow streams, scenario B > after: edit it while it stays invalid 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario B > after: give a default dataset a second definition 1`] = `
+"~ datasets bbd3fd90-309f-5641-90fd-8f3965a15481 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ default_devices = 25 entries
+- default_devices bbd3fd90-309f-5641-90fd-8f3965a15481
+~ invalid_datasets = 1 entries
++ invalid_datasets bbd3fd90-309f-5641-90fd-8f3965a15481 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ valid_datasets = 59 entries
+- valid_datasets bbd3fd90-309f-5641-90fd-8f3965a15481"
+`;
+
+exports[`DataFlow streams, scenario B > after: give a new object an entry in it 1`] = `
+"~ datasets = 61 entries
++ datasets 000000b2-0ffe-4000-8000-000000001003 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ invalid_datasets = 3 entries
++ invalid_datasets 000000b2-0ffe-4000-8000-000000001003 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ parts = 59 entries
++ parts 000000b2-0ffe-4000-8000-000000001003 = []"
+`;
+
+exports[`DataFlow streams, scenario B > after: give a session a second definition 1`] = `
+"~ datasets 000000b2-05e0-4000-8000-000000000001 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ invalid_datasets = 3 entries
++ invalid_datasets 000000b2-05e0-4000-8000-000000000001 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ valid_datasets = 57 entries
+- valid_datasets 000000b2-05e0-4000-8000-000000000001
+- valid_datasets 000000b2-0c00-4000-8000-000000000003
+- valid_datasets 000000b2-0c00-4000-8000-000000000004"
+`;
+
+exports[`DataFlow streams, scenario B > after: grant EditDataset on the invalid dataset 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario B > after: make a union cyclic 1`] = `
+"~ datasets 000000b2-05e0-4000-8000-000000000007 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000001 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000002 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ invalid_datasets = 5 entries
++ invalid_datasets 000000b2-05e0-4000-8000-000000000007 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-0c00-4000-8000-000000000001 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-0c00-4000-8000-000000000002 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
++ invalid_datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ valid_datasets = 57 entries
+- valid_datasets 000000b2-05e0-4000-8000-000000000007
+- valid_datasets 000000b2-0c00-4000-8000-000000000001
+- valid_datasets 000000b2-0c00-4000-8000-000000000002
+- valid_datasets 000000b2-0c00-4000-8000-000000000003
+- valid_datasets 000000b2-0c00-4000-8000-000000000004"
+`;
+
+exports[`DataFlow streams, scenario B > after: make the missing dataset 1`] = `
+"~ datasets = 62 entries
+~ datasets 000000b2-0ffe-4000-8000-000000001001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0ffe-4000-8000-000000001002","from":"2026-05-01T00:00:00.000Z","to":"2026-05-02T00:00:00.000Z"},"from":"2026-05-01T00:00:00.000Z","to":"2026-05-02T00:00:00.000Z"}
++ datasets 000000b2-0ffe-4000-8000-000000001002 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000002"},"from":null,"to":null}
+~ invalid_datasets = 0 entries
+- invalid_datasets 000000b2-0ffe-4000-8000-000000001001
+~ parts = 60 entries
++ parts 000000b2-0ffe-4000-8000-000000001002 = []
+~ valid_datasets = 62 entries
++ valid_datasets 000000b2-0ffe-4000-8000-000000001001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0ffe-4000-8000-000000001002","from":"2026-05-01T00:00:00.000Z","to":"2026-05-02T00:00:00.000Z"},"from":"2026-05-01T00:00:00.000Z","to":"2026-05-02T00:00:00.000Z"}
++ valid_datasets 000000b2-0ffe-4000-8000-000000001002 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000002"},"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario B > after: put it in a union 1`] = `
+"~ datasets 000000b2-0c00-4000-8000-000000000005 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ invalid_datasets = 4 entries
++ invalid_datasets 000000b2-0c00-4000-8000-000000000005 = {"structure":"696396a0-2831-11f1-9b12-33d63b8c5115","config":null,"from":null,"to":null}
+~ valid_datasets = 57 entries
+- valid_datasets 000000b2-0c00-4000-8000-000000000005"
+`;
+
+exports[`DataFlow streams, scenario B > after: remove its second definition 1`] = `
+"~ datasets bbd3fd90-309f-5641-90fd-8f3965a15481 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000001"},"from":null,"to":null}
+~ default_devices = 26 entries
++ default_devices bbd3fd90-309f-5641-90fd-8f3965a15481 = "000000b2-0de0-4000-8000-000000000001"
+~ invalid_datasets = 0 entries
+- invalid_datasets bbd3fd90-309f-5641-90fd-8f3965a15481
+~ valid_datasets = 60 entries
++ valid_datasets bbd3fd90-309f-5641-90fd-8f3965a15481 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000001"},"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario B > after: remove the second definition 1`] = `
+"~ datasets 000000b2-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0e70-4000-8000-000000000003","from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"},"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
+~ datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000002","000000b2-05e0-4000-8000-000000000001"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
+~ datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000003","000000b2-05a0-4000-8000-00000000000e"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
+~ invalid_datasets = 0 entries
+- invalid_datasets 000000b2-05e0-4000-8000-000000000001
+- invalid_datasets 000000b2-0c00-4000-8000-000000000003
+- invalid_datasets 000000b2-0c00-4000-8000-000000000004
+~ valid_datasets = 60 entries
++ valid_datasets 000000b2-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0e70-4000-8000-000000000003","from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"},"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
++ valid_datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000002","000000b2-05e0-4000-8000-000000000001"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
++ valid_datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000003","000000b2-05a0-4000-8000-00000000000e"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}"
+`;
+
+exports[`DataFlow streams, scenario B > after: remove the unknown structure application 1`] = `
+"~ datasets = 60 entries
+- datasets 000000b2-0ffe-4000-8000-000000001003
+~ invalid_datasets = 3 entries
+- invalid_datasets 000000b2-0ffe-4000-8000-000000001003"
+`;
+
+exports[`DataFlow streams, scenario B > after: rename the invalid default dataset 1`] = `"~ general_infos bbd3fd90-309f-5641-90fd-8f3965a15481 = {"name":"Renamed while invalid"}"`;
+
+exports[`DataFlow streams, scenario B > after: repair the cyclic union 1`] = `
+"~ datasets 000000b2-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0c00-4000-8000-000000000002","from":"2026-07-05T01:05:31.607Z"},"from":"2026-07-05T01:05:31.607Z","to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0e70-4000-8000-000000000002","000000b2-05a0-4000-8000-00000000000d"],"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000002 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000001","1727ab9f-3d66-5544-95c3-b388694f7404"],"from":null,"to":null}
+~ datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000002","000000b2-05e0-4000-8000-000000000001"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
+~ datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000003","000000b2-05a0-4000-8000-00000000000e"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
+~ invalid_datasets = 0 entries
+- invalid_datasets 000000b2-05e0-4000-8000-000000000007
+- invalid_datasets 000000b2-0c00-4000-8000-000000000001
+- invalid_datasets 000000b2-0c00-4000-8000-000000000002
+- invalid_datasets 000000b2-0c00-4000-8000-000000000003
+- invalid_datasets 000000b2-0c00-4000-8000-000000000004
+~ valid_datasets = 62 entries
++ valid_datasets 000000b2-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0c00-4000-8000-000000000002","from":"2026-07-05T01:05:31.607Z"},"from":"2026-07-05T01:05:31.607Z","to":null}
++ valid_datasets 000000b2-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0e70-4000-8000-000000000002","000000b2-05a0-4000-8000-00000000000d"],"from":null,"to":null}
++ valid_datasets 000000b2-0c00-4000-8000-000000000002 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000001","1727ab9f-3d66-5544-95c3-b388694f7404"],"from":null,"to":null}
++ valid_datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000002","000000b2-05e0-4000-8000-000000000001"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}
++ valid_datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000003","000000b2-05a0-4000-8000-00000000000e"],"from":"2026-07-07T12:31:43.177Z","to":"2027-01-01T00:00:00.000Z"}"
+`;
+
+exports[`DataFlow streams, scenario B > after: revoke that EditDataset 1`] = `"(no change)"`;
+
+exports[`DataFlow streams, scenario B > after: start 1`] = `
+"+ datasets = 60 entries
++ datasets 000000b2-05a0-4000-8000-000000000001 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000020"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000002 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000003 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000022"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000004 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000021"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000005 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000006 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000007"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000007 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000004"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000008 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-00000000000e"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-000000000009 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-00000000000a = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000021"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-00000000000b = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000014"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-00000000000c = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000015"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-00000000000d = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000003"},"from":null,"to":null}
++ datasets 000000b2-05a0-4000-8000-00000000000e = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000022"},"from":null,"to":null}
++ datasets 000000b2-05b0-4000-8000-000000000001 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000b2-0de0-4000-8000-000000000021","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000021","metric":"Metric_1"}]},"from":null,"to":null}
++ datasets 000000b2-05b0-4000-8000-000000000002 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000b2-0de0-4000-8000-000000000001","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000001","metric":"Metric_2"}]},"from":null,"to":null}
++ datasets 000000b2-05b0-4000-8000-000000000003 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000b2-0de0-4000-8000-000000000004","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000004","metric":"Metric_3"}]},"from":null,"to":null}
++ datasets 000000b2-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0e70-4000-8000-000000000003","from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"},"from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"}
++ datasets 000000b2-05e0-4000-8000-000000000002 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05a0-4000-8000-000000000005","from":"2026-03-08T20:55:22.294Z","to":"2026-04-02T03:03:54.786Z"},"from":"2026-03-08T20:55:22.294Z","to":"2026-04-02T03:03:54.786Z"}
++ datasets 000000b2-05e0-4000-8000-000000000003 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0e70-4000-8000-000000000001","from":"2026-06-12T09:11:28.930Z","to":"2026-06-15T18:57:10.392Z"},"from":"2026-06-12T09:11:28.930Z","to":"2026-06-15T18:57:10.392Z"}
++ datasets 000000b2-05e0-4000-8000-000000000004 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"6ceedbed-5a44-5d73-aced-6768dc827d1a","from":"2026-07-01T03:03:47.427Z","to":"2026-07-21T22:56:06.016Z"},"from":"2026-07-01T03:03:47.427Z","to":"2026-07-21T22:56:06.016Z"}
++ datasets 000000b2-05e0-4000-8000-000000000005 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05e0-4000-8000-000000000002","from":"2026-02-09T13:34:19.969Z","to":"2026-03-02T04:41:44.398Z"},"from":"2026-03-08T20:55:22.294Z","to":"2026-03-02T04:41:44.398Z"}
++ datasets 000000b2-05e0-4000-8000-000000000006 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05e0-4000-8000-000000000003","to":"2026-02-02T14:57:22.532Z"},"from":"2026-06-12T09:11:28.930Z","to":"2026-02-02T14:57:22.532Z"}
++ datasets 000000b2-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0c00-4000-8000-000000000002","from":"2026-07-05T01:05:31.607Z"},"from":"2026-07-05T01:05:31.607Z","to":null}
++ datasets 000000b2-05e0-4000-8000-000000000008 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05e0-4000-8000-000000000002","from":"2026-05-20T01:20:48.349Z","to":"2026-06-08T05:07:00.386Z"},"from":"2026-05-20T01:20:48.349Z","to":"2026-04-02T03:03:54.786Z"}
++ datasets 000000b2-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0e70-4000-8000-000000000002","000000b2-05a0-4000-8000-00000000000d"],"from":null,"to":null}
++ datasets 000000b2-0c00-4000-8000-000000000002 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000001","1727ab9f-3d66-5544-95c3-b388694f7404"],"from":null,"to":null}
++ datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000002","000000b2-05e0-4000-8000-000000000001"],"from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"}
++ datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000003","000000b2-05a0-4000-8000-00000000000e"],"from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"}
++ datasets 000000b2-0c00-4000-8000-000000000005 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":[],"from":null,"to":null}
++ datasets 000000b2-0e70-4000-8000-000000000001 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000b2-0de0-4000-8000-000000000006","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000006","metric":"Metric_1"},{"instance":"000000b2-0de0-4000-8000-000000000006","metric":"Metric_2"}]},"from":null,"to":null}
++ datasets 000000b2-0e70-4000-8000-000000000002 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000b2-0de0-4000-8000-00000000001e","metrics":[{"instance":"000000b2-0de0-4000-8000-00000000001e","metric":"Metric_1"},{"instance":"000000b2-0de0-4000-8000-00000000001e","metric":"Metric_3"}]},"from":null,"to":null}
++ datasets 000000b2-0e70-4000-8000-000000000003 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000b2-0de0-4000-8000-000000000011","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000011","metric":"Metric_1"},{"instance":"000000b2-0de0-4000-8000-000000000011","metric":"Metric_4"}]},"from":null,"to":null}
++ datasets 000000b2-0f00-4000-8000-000000000001 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ datasets 0a3556c4-8283-5c5d-be8e-a660d0cff11b = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000011"},"from":null,"to":null}
++ datasets 0db7eca7-fdb7-5408-9615-74a2fcebe6d7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000004"},"from":null,"to":null}
++ datasets 1559a894-8f4b-5644-aa54-155f8a85ad27 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000016"},"from":null,"to":null}
++ datasets 1727ab9f-3d66-5544-95c3-b388694f7404 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000006"},"from":null,"to":null}
++ datasets 175b8b72-b2f4-5387-a2c1-88fee087b818 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000003"},"from":null,"to":null}
++ datasets 17887af6-e4b5-541e-ae6b-4fdfe1bc3268 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000014"},"from":null,"to":null}
++ datasets 1c343a20-adef-5432-b216-75e5ccc97f1f = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ datasets 1cf3ea97-1b92-505f-9b8c-d8ffb465004d = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000d"},"from":null,"to":null}
++ datasets 5a1a8ae9-6890-5467-9763-03bee163ad86 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000010"},"from":null,"to":null}
++ datasets 69c7a0fa-86b7-5e3e-9101-8a109c3a5994 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000015"},"from":null,"to":null}
++ datasets 6ceedbed-5a44-5d73-aced-6768dc827d1a = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000b"},"from":null,"to":null}
++ datasets 74ff91b0-37cb-5071-9bc8-b47947d1d099 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000005"},"from":null,"to":null}
++ datasets 79437da3-0458-5ce5-b931-55551b3b5c82 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ datasets 7de539df-f4df-5625-83e3-9a32a140d500 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000018"},"from":null,"to":null}
++ datasets 98a99a59-9362-5406-8608-97f0bb0c5272 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000012"},"from":null,"to":null}
++ datasets 9aae1873-2f93-5ce2-9055-d66e49ae4157 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000007"},"from":null,"to":null}
++ datasets bb7ef05a-be7e-596d-8548-624e182cfcde = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000f"},"from":null,"to":null}
++ datasets bbd3fd90-309f-5641-90fd-8f3965a15481 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000001"},"from":null,"to":null}
++ datasets bd2f4855-9486-5195-9b5d-f1ee6f70c9a4 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000009"},"from":null,"to":null}
++ datasets bee14d4c-298d-526c-bd0c-4087c6d253d7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000001a"},"from":null,"to":null}
++ datasets cfc75a8c-a85e-5058-ad58-206a93ea017e = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000008"},"from":null,"to":null}
++ datasets d0fa0de3-9163-53ed-b839-d42c48d07856 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ datasets dc6bcac1-a416-5a22-a43a-5f8387c3be14 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ datasets dd16568b-f64c-57de-bd63-c1db696c33ec = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000002"},"from":null,"to":null}
++ datasets e32431ab-3970-5e02-bd28-f9e6879c6133 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000e"},"from":null,"to":null}
++ datasets e6d2f56a-9df9-574c-8f86-75ac5e125ef7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000017"},"from":null,"to":null}
++ default_devices = 26 entries
++ default_devices 0a3556c4-8283-5c5d-be8e-a660d0cff11b = "000000b2-0de0-4000-8000-000000000011"
++ default_devices 0db7eca7-fdb7-5408-9615-74a2fcebe6d7 = "000000b2-0de0-4000-8000-000000000004"
++ default_devices 1559a894-8f4b-5644-aa54-155f8a85ad27 = "000000b2-0de0-4000-8000-000000000016"
++ default_devices 1727ab9f-3d66-5544-95c3-b388694f7404 = "000000b2-0de0-4000-8000-000000000006"
++ default_devices 175b8b72-b2f4-5387-a2c1-88fee087b818 = "000000b2-0de0-4000-8000-000000000003"
++ default_devices 17887af6-e4b5-541e-ae6b-4fdfe1bc3268 = "000000b2-0de0-4000-8000-000000000014"
++ default_devices 1c343a20-adef-5432-b216-75e5ccc97f1f = "000000b2-0de0-4000-8000-00000000000a"
++ default_devices 1cf3ea97-1b92-505f-9b8c-d8ffb465004d = "000000b2-0de0-4000-8000-00000000000d"
++ default_devices 5a1a8ae9-6890-5467-9763-03bee163ad86 = "000000b2-0de0-4000-8000-000000000010"
++ default_devices 69c7a0fa-86b7-5e3e-9101-8a109c3a5994 = "000000b2-0de0-4000-8000-000000000015"
++ default_devices 6ceedbed-5a44-5d73-aced-6768dc827d1a = "000000b2-0de0-4000-8000-00000000000b"
++ default_devices 74ff91b0-37cb-5071-9bc8-b47947d1d099 = "000000b2-0de0-4000-8000-000000000005"
++ default_devices 79437da3-0458-5ce5-b931-55551b3b5c82 = "000000b2-0de0-4000-8000-00000000000c"
++ default_devices 7de539df-f4df-5625-83e3-9a32a140d500 = "000000b2-0de0-4000-8000-000000000018"
++ default_devices 98a99a59-9362-5406-8608-97f0bb0c5272 = "000000b2-0de0-4000-8000-000000000012"
++ default_devices 9aae1873-2f93-5ce2-9055-d66e49ae4157 = "000000b2-0de0-4000-8000-000000000007"
++ default_devices bb7ef05a-be7e-596d-8548-624e182cfcde = "000000b2-0de0-4000-8000-00000000000f"
++ default_devices bbd3fd90-309f-5641-90fd-8f3965a15481 = "000000b2-0de0-4000-8000-000000000001"
++ default_devices bd2f4855-9486-5195-9b5d-f1ee6f70c9a4 = "000000b2-0de0-4000-8000-000000000009"
++ default_devices bee14d4c-298d-526c-bd0c-4087c6d253d7 = "000000b2-0de0-4000-8000-00000000001a"
++ default_devices cfc75a8c-a85e-5058-ad58-206a93ea017e = "000000b2-0de0-4000-8000-000000000008"
++ default_devices d0fa0de3-9163-53ed-b839-d42c48d07856 = "000000b2-0de0-4000-8000-000000000019"
++ default_devices dc6bcac1-a416-5a22-a43a-5f8387c3be14 = "000000b2-0de0-4000-8000-000000000013"
++ default_devices dd16568b-f64c-57de-bd63-c1db696c33ec = "000000b2-0de0-4000-8000-000000000002"
++ default_devices e32431ab-3970-5e02-bd28-f9e6879c6133 = "000000b2-0de0-4000-8000-00000000000e"
++ default_devices e6d2f56a-9df9-574c-8f86-75ac5e125ef7 = "000000b2-0de0-4000-8000-000000000017"
++ functional_types = 10 entries
++ functional_types 000000b2-05a0-4000-8000-000000000002 = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000b2-05a0-4000-8000-000000000005 = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000b2-05a0-4000-8000-000000000008 = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000b2-05a0-4000-8000-00000000000b = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000b2-05a0-4000-8000-00000000000e = ["4c93ddc1-e610-4efe-91e3-a355f9ba1a09"]
++ functional_types 000000b2-05e0-4000-8000-000000000001 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000b2-05e0-4000-8000-000000000003 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000b2-05e0-4000-8000-000000000005 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000b2-05e0-4000-8000-000000000007 = ["3c866b35-66a1-4cb8-8db2-dae284883cf8"]
++ functional_types 000000b2-0c00-4000-8000-000000000001 = ["414d2d10-6be8-4c27-8e9f-c716ef5432b9"]
++ general_infos = 120 entries
++ general_infos 000000b2-05a0-4000-8000-000000000001 = {"name":"Dataset 1"}
++ general_infos 000000b2-05a0-4000-8000-000000000002 = {"name":"Dataset 2"}
++ general_infos 000000b2-05a0-4000-8000-000000000003 = {"name":"Dataset 3"}
++ general_infos 000000b2-05a0-4000-8000-000000000005 = {"name":"Dataset 5"}
++ general_infos 000000b2-05a0-4000-8000-000000000006 = {"deleted":false}
++ general_infos 000000b2-05a0-4000-8000-000000000007 = {"name":"Dataset 7"}
++ general_infos 000000b2-05a0-4000-8000-000000000008 = {"name":"Dataset 8"}
++ general_infos 000000b2-05a0-4000-8000-000000000009 = {"name":"Dataset 9"}
++ general_infos 000000b2-05a0-4000-8000-00000000000a = {"name":"Dataset 10"}
++ general_infos 000000b2-05a0-4000-8000-00000000000c = {"name":"Dataset 12"}
++ general_infos 000000b2-05a0-4000-8000-00000000000d = {"name":"Dataset 13"}
++ general_infos 000000b2-05a0-4000-8000-00000000000e = {"name":"Dataset 14"}
++ general_infos 000000b2-05b0-4000-8000-000000000001 = {"name":"Dataset 15"}
++ general_infos 000000b2-05b0-4000-8000-000000000002 = {"name":"Dataset 16"}
++ general_infos 000000b2-05b0-4000-8000-000000000003 = {"name":"Dataset 17"}
++ general_infos 000000b2-05e0-4000-8000-000000000001 = {"name":"Dataset 22"}
++ general_infos 000000b2-05e0-4000-8000-000000000002 = {"name":"Dataset 23"}
++ general_infos 000000b2-05e0-4000-8000-000000000003 = {"name":"Dataset 24"}
++ general_infos 000000b2-05e0-4000-8000-000000000005 = {"name":"Dataset 31"}
++ general_infos 000000b2-05e0-4000-8000-000000000007 = {"name":"Dataset 33"}
++ general_infos 000000b2-05e0-4000-8000-000000000008 = {"name":"Dataset 34"}
++ general_infos 000000b2-0b0e-4000-8000-000000000001 = {"name":"Object 1"}
++ general_infos 000000b2-0b0e-4000-8000-000000000002 = {"name":"Object 2"}
++ general_infos 000000b2-0b0e-4000-8000-000000000003 = {"name":"Object 3"}
++ general_infos 000000b2-0b0e-4000-8000-000000000004 = {"name":"Object 4"}
++ general_infos 000000b2-0b0e-4000-8000-000000000005 = {"name":"Object 5"}
++ general_infos 000000b2-0b0e-4000-8000-000000000006 = {"name":"Object 6"}
++ general_infos 000000b2-0b0e-4000-8000-000000000007 = {"name":"Object 7"}
++ general_infos 000000b2-0b0e-4000-8000-000000000008 = {"name":"Object 8"}
++ general_infos 000000b2-0b0e-4000-8000-000000000009 = {"name":"Object 9"}
++ general_infos 000000b2-0b0e-4000-8000-00000000000a = {"name":"Object 10"}
++ general_infos 000000b2-0b0e-4000-8000-00000000000b = {"name":"Object 11"}
++ general_infos 000000b2-0b0e-4000-8000-00000000000c = {"name":"Object 12"}
++ general_infos 000000b2-0b0e-4000-8000-00000000000d = {"name":"Object 13"}
++ general_infos 000000b2-0b0e-4000-8000-00000000000e = {"name":"Object 14"}
++ general_infos 000000b2-0b0e-4000-8000-00000000000f = {"name":"Object 15"}
++ general_infos 000000b2-0b0e-4000-8000-000000000010 = {"name":"Object 16"}
++ general_infos 000000b2-0b0e-4000-8000-000000000011 = {"name":"Object 17"}
++ general_infos 000000b2-0b0e-4000-8000-000000000012 = {"name":"Object 18"}
++ general_infos 000000b2-0b0e-4000-8000-000000000013 = {"name":"Object 19"}
++ general_infos 000000b2-0b0e-4000-8000-000000000014 = {"name":"Object 20"}
++ general_infos 000000b2-0b0e-4000-8000-000000000015 = {"name":"Object 21"}
++ general_infos 000000b2-0b0e-4000-8000-000000000016 = {"name":"Object 22"}
++ general_infos 000000b2-0b0e-4000-8000-000000000017 = {"name":"Object 23"}
++ general_infos 000000b2-0b0e-4000-8000-000000000018 = {"name":"Object 24"}
++ general_infos 000000b2-0b0e-4000-8000-000000000019 = {"name":"Object 25"}
++ general_infos 000000b2-0b0e-4000-8000-00000000001a = {"name":"Object 26"}
++ general_infos 000000b2-0b0e-4000-8000-00000000001b = {"name":"Object 27"}
++ general_infos 000000b2-0b0e-4000-8000-00000000001c = {"name":"Object 28"}
++ general_infos 000000b2-0b0e-4000-8000-00000000001d = {"name":"Object 29"}
++ general_infos 000000b2-0b0e-4000-8000-00000000001e = {"name":"Object 30"}
++ general_infos 000000b2-0b0e-4000-8000-00000000001f = {"name":"Object 31"}
++ general_infos 000000b2-0c00-4000-8000-000000000001 = {"name":"Dataset 26"}
++ general_infos 000000b2-0c00-4000-8000-000000000002 = {"name":"Dataset 27"}
++ general_infos 000000b2-0c00-4000-8000-000000000003 = {"name":"Dataset 28"}
++ general_infos 000000b2-0c00-4000-8000-000000000004 = {"name":"Dataset 29"}
++ general_infos 000000b2-0c00-4000-8000-000000000005 = {"name":"Dataset 30"}
++ general_infos 000000b2-0de0-4000-8000-000000000001 = {"name":"Device 1"}
++ general_infos 000000b2-0de0-4000-8000-000000000002 = {"name":"Device 2"}
++ general_infos 000000b2-0de0-4000-8000-000000000003 = {"name":"Device 3"}
++ general_infos 000000b2-0de0-4000-8000-000000000004 = {"name":"Device 4"}
++ general_infos 000000b2-0de0-4000-8000-000000000005 = {"name":"Device 5"}
++ general_infos 000000b2-0de0-4000-8000-000000000006 = {"name":"Device 6"}
++ general_infos 000000b2-0de0-4000-8000-000000000007 = {"name":"Device 7"}
++ general_infos 000000b2-0de0-4000-8000-000000000008 = {"name":"Device 8"}
++ general_infos 000000b2-0de0-4000-8000-000000000009 = {"name":"Device 9"}
++ general_infos 000000b2-0de0-4000-8000-00000000000a = {"name":"Device 10"}
++ general_infos 000000b2-0de0-4000-8000-00000000000b = {"name":"Device 11"}
++ general_infos 000000b2-0de0-4000-8000-00000000000c = {"name":"Device 12"}
++ general_infos 000000b2-0de0-4000-8000-00000000000d = {"name":"Device 13"}
++ general_infos 000000b2-0de0-4000-8000-00000000000e = {"name":"Device 14"}
++ general_infos 000000b2-0de0-4000-8000-00000000000f = {"name":"Device 15"}
++ general_infos 000000b2-0de0-4000-8000-000000000010 = {"name":"Device 16"}
++ general_infos 000000b2-0de0-4000-8000-000000000011 = {"name":"Device 17"}
++ general_infos 000000b2-0de0-4000-8000-000000000012 = {"name":"Device 18"}
++ general_infos 000000b2-0de0-4000-8000-000000000013 = {"name":"Device 19"}
++ general_infos 000000b2-0de0-4000-8000-000000000014 = {"name":"Device 20"}
++ general_infos 000000b2-0de0-4000-8000-000000000015 = {"name":"Device 21"}
++ general_infos 000000b2-0de0-4000-8000-000000000016 = {"name":"Device 22"}
++ general_infos 000000b2-0de0-4000-8000-000000000017 = {"name":"Device 23"}
++ general_infos 000000b2-0de0-4000-8000-000000000018 = {"name":"Device 24"}
++ general_infos 000000b2-0de0-4000-8000-000000000019 = {"name":"Device 25"}
++ general_infos 000000b2-0de0-4000-8000-00000000001a = {"name":"Device 26"}
++ general_infos 000000b2-0de0-4000-8000-00000000001b = {"name":"Device 27"}
++ general_infos 000000b2-0de0-4000-8000-00000000001c = {"name":"Device 28"}
++ general_infos 000000b2-0de0-4000-8000-00000000001d = {"name":"Device 29"}
++ general_infos 000000b2-0de0-4000-8000-00000000001e = {"name":"Device 30"}
++ general_infos 000000b2-0de0-4000-8000-00000000001f = {"name":"Device 31"}
++ general_infos 000000b2-0de0-4000-8000-000000000020 = {"name":"Device 32"}
++ general_infos 000000b2-0de0-4000-8000-000000000021 = {"name":"Device 33"}
++ general_infos 000000b2-0de0-4000-8000-000000000022 = {"name":"Device 34"}
++ general_infos 000000b2-0e70-4000-8000-000000000002 = {"name":"Dataset 19"}
++ general_infos 000000b2-0e70-4000-8000-000000000003 = {"name":"Dataset 20"}
++ general_infos 000000b2-0f00-4000-8000-000000000001 = {"name":"Dataset 21"}
++ general_infos 0a3556c4-8283-5c5d-be8e-a660d0cff11b = {"name":"Device 17"}
++ general_infos 0db7eca7-fdb7-5408-9615-74a2fcebe6d7 = {"name":"Device 4"}
++ general_infos 1559a894-8f4b-5644-aa54-155f8a85ad27 = {"name":"Device 22"}
++ general_infos 1727ab9f-3d66-5544-95c3-b388694f7404 = {"name":"Device 6"}
++ general_infos 175b8b72-b2f4-5387-a2c1-88fee087b818 = {"name":"Device 3"}
++ general_infos 17887af6-e4b5-541e-ae6b-4fdfe1bc3268 = {"name":"Device 20"}
++ general_infos 1c343a20-adef-5432-b216-75e5ccc97f1f = {"name":"Device 10"}
++ general_infos 1cf3ea97-1b92-505f-9b8c-d8ffb465004d = {"name":"Device 13"}
++ general_infos 5a1a8ae9-6890-5467-9763-03bee163ad86 = {"name":"Device 16"}
++ general_infos 69c7a0fa-86b7-5e3e-9101-8a109c3a5994 = {"name":"Device 21"}
++ general_infos 6ceedbed-5a44-5d73-aced-6768dc827d1a = {"name":"Device 11"}
++ general_infos 74ff91b0-37cb-5071-9bc8-b47947d1d099 = {"name":"Device 5"}
++ general_infos 79437da3-0458-5ce5-b931-55551b3b5c82 = {"name":"Device 12"}
++ general_infos 7de539df-f4df-5625-83e3-9a32a140d500 = {"name":"Device 24"}
++ general_infos 98a99a59-9362-5406-8608-97f0bb0c5272 = {"name":"Device 18"}
++ general_infos 9aae1873-2f93-5ce2-9055-d66e49ae4157 = {"name":"Device 7"}
++ general_infos bb7ef05a-be7e-596d-8548-624e182cfcde = {"name":"Device 15"}
++ general_infos bbd3fd90-309f-5641-90fd-8f3965a15481 = {"name":"Device 1"}
++ general_infos bd2f4855-9486-5195-9b5d-f1ee6f70c9a4 = {"name":"Device 9"}
++ general_infos bee14d4c-298d-526c-bd0c-4087c6d253d7 = {"name":"Device 26"}
++ general_infos cfc75a8c-a85e-5058-ad58-206a93ea017e = {"name":"Device 8"}
++ general_infos d0fa0de3-9163-53ed-b839-d42c48d07856 = {"name":"Device 25"}
++ general_infos dc6bcac1-a416-5a22-a43a-5f8387c3be14 = {"name":"Device 19"}
++ general_infos dd16568b-f64c-57de-bd63-c1db696c33ec = {"name":"Device 2"}
++ general_infos e32431ab-3970-5e02-bd28-f9e6879c6133 = {"name":"Device 14"}
++ general_infos e6d2f56a-9df9-574c-8f86-75ac5e125ef7 = {"name":"Device 23"}
++ invalid_datasets = 0 entries
++ metadata = 17 entries
++ metadata 000000b2-05a0-4000-8000-000000000001 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-0","shared"]},"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000b2-0de0-4000-8000-000000000002":"Label 0"}}}
++ metadata 000000b2-05a0-4000-8000-000000000004 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-3","shared"]}}
++ metadata 000000b2-05a0-4000-8000-000000000005 = {"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000b2-0de0-4000-8000-00000000001a":"Label 4"}}}
++ metadata 000000b2-05a0-4000-8000-000000000007 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-2","shared"]}}
++ metadata 000000b2-05a0-4000-8000-000000000009 = {"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000b2-0de0-4000-8000-000000000020":"Label 8"}}}
++ metadata 000000b2-05a0-4000-8000-00000000000a = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]}}
++ metadata 000000b2-05a0-4000-8000-00000000000d = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-0","shared"]},"dfc3983b-658c-4099-b76a-01ce7c18bde1":{"labels":{"000000b2-0de0-4000-8000-000000000021":"Label 12"}}}
++ metadata 000000b2-05b0-4000-8000-000000000002 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-3","shared"]}}
++ metadata 000000b2-05e0-4000-8000-000000000001 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":1,"operator":"Operator 0"},"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]},"e87a0000-0aaa-4000-8000-000000000001":{"note":"Session 1"}}
++ metadata 000000b2-05e0-4000-8000-000000000003 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":3,"operator":"Operator 2"}}
++ metadata 000000b2-05e0-4000-8000-000000000004 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-0","shared"]}}
++ metadata 000000b2-05e0-4000-8000-000000000005 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":5,"operator":"Operator 1"},"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-2","shared"]},"e87a0000-0aaa-4000-8000-000000000001":{"note":"Session 5"}}
++ metadata 000000b2-05e0-4000-8000-000000000007 = {"2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a":{"run":7,"operator":"Operator 0"}}
++ metadata 000000b2-05e0-4000-8000-000000000008 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-1","shared"]}}
++ metadata 000000b2-0b0e-4000-8000-000000000001 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["not-a-dataset"]}}
++ metadata 000000b2-0c00-4000-8000-000000000003 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-3","shared"]}}
++ metadata 000000b2-0e70-4000-8000-000000000002 = {"c95e372e-2fbe-45b9-9937-3235f94e22a3":{"tags":["tag-2","shared"]}}
++ parts = 58 entries
++ parts 000000b2-05a0-4000-8000-000000000001 = ["000000b2-05b0-4000-8000-000000000001"]
++ parts 000000b2-05a0-4000-8000-000000000002 = []
++ parts 000000b2-05a0-4000-8000-000000000003 = ["000000b2-05b0-4000-8000-000000000001","000000b2-0e70-4000-8000-000000000001"]
++ parts 000000b2-05a0-4000-8000-000000000004 = []
++ parts 000000b2-05a0-4000-8000-000000000005 = []
++ parts 000000b2-05a0-4000-8000-000000000006 = []
++ parts 000000b2-05a0-4000-8000-000000000007 = []
++ parts 000000b2-05a0-4000-8000-000000000008 = ["000000b2-05b0-4000-8000-000000000002","000000b2-0e70-4000-8000-000000000003"]
++ parts 000000b2-05a0-4000-8000-000000000009 = []
++ parts 000000b2-05a0-4000-8000-00000000000a = []
++ parts 000000b2-05a0-4000-8000-00000000000b = []
++ parts 000000b2-05a0-4000-8000-00000000000c = []
++ parts 000000b2-05a0-4000-8000-00000000000d = ["000000b2-0e70-4000-8000-000000000001"]
++ parts 000000b2-05b0-4000-8000-000000000001 = []
++ parts 000000b2-05b0-4000-8000-000000000002 = []
++ parts 000000b2-05e0-4000-8000-000000000001 = []
++ parts 000000b2-05e0-4000-8000-000000000002 = []
++ parts 000000b2-05e0-4000-8000-000000000003 = []
++ parts 000000b2-05e0-4000-8000-000000000004 = []
++ parts 000000b2-05e0-4000-8000-000000000005 = []
++ parts 000000b2-05e0-4000-8000-000000000006 = []
++ parts 000000b2-05e0-4000-8000-000000000007 = []
++ parts 000000b2-05e0-4000-8000-000000000008 = []
++ parts 000000b2-0c00-4000-8000-000000000001 = []
++ parts 000000b2-0c00-4000-8000-000000000002 = []
++ parts 000000b2-0c00-4000-8000-000000000003 = []
++ parts 000000b2-0c00-4000-8000-000000000004 = []
++ parts 000000b2-0c00-4000-8000-000000000005 = []
++ parts 000000b2-0e70-4000-8000-000000000001 = []
++ parts 000000b2-0e70-4000-8000-000000000002 = []
++ parts 000000b2-0e70-4000-8000-000000000003 = []
++ parts 000000b2-0f00-4000-8000-000000000001 = []
++ parts 0a3556c4-8283-5c5d-be8e-a660d0cff11b = []
++ parts 0db7eca7-fdb7-5408-9615-74a2fcebe6d7 = []
++ parts 1559a894-8f4b-5644-aa54-155f8a85ad27 = []
++ parts 1727ab9f-3d66-5544-95c3-b388694f7404 = []
++ parts 175b8b72-b2f4-5387-a2c1-88fee087b818 = []
++ parts 17887af6-e4b5-541e-ae6b-4fdfe1bc3268 = []
++ parts 1c343a20-adef-5432-b216-75e5ccc97f1f = []
++ parts 1cf3ea97-1b92-505f-9b8c-d8ffb465004d = []
++ parts 5a1a8ae9-6890-5467-9763-03bee163ad86 = []
++ parts 69c7a0fa-86b7-5e3e-9101-8a109c3a5994 = []
++ parts 6ceedbed-5a44-5d73-aced-6768dc827d1a = []
++ parts 74ff91b0-37cb-5071-9bc8-b47947d1d099 = []
++ parts 79437da3-0458-5ce5-b931-55551b3b5c82 = []
++ parts 7de539df-f4df-5625-83e3-9a32a140d500 = []
++ parts 98a99a59-9362-5406-8608-97f0bb0c5272 = []
++ parts 9aae1873-2f93-5ce2-9055-d66e49ae4157 = []
++ parts bb7ef05a-be7e-596d-8548-624e182cfcde = []
++ parts bbd3fd90-309f-5641-90fd-8f3965a15481 = []
++ parts bd2f4855-9486-5195-9b5d-f1ee6f70c9a4 = []
++ parts bee14d4c-298d-526c-bd0c-4087c6d253d7 = []
++ parts cfc75a8c-a85e-5058-ad58-206a93ea017e = []
++ parts d0fa0de3-9163-53ed-b839-d42c48d07856 = []
++ parts dc6bcac1-a416-5a22-a43a-5f8387c3be14 = []
++ parts dd16568b-f64c-57de-bd63-c1db696c33ec = []
++ parts e32431ab-3970-5e02-bd28-f9e6879c6133 = []
++ parts e6d2f56a-9df9-574c-8f86-75ac5e125ef7 = []
++ valid_datasets = 60 entries
++ valid_datasets 000000b2-05a0-4000-8000-000000000001 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000020"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000002 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000003 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000022"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000004 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000021"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000005 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000006 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000007"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000007 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000004"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000008 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-00000000000e"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-000000000009 = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-00000000000a = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000021"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-00000000000b = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000014"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-00000000000c = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000015"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-00000000000d = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000003"},"from":null,"to":null}
++ valid_datasets 000000b2-05a0-4000-8000-00000000000e = {"structure":"f5d550c4-2831-11f1-b0b0-83fda3035799","config":{"source":"000000b2-0de0-4000-8000-000000000022"},"from":null,"to":null}
++ valid_datasets 000000b2-05b0-4000-8000-000000000001 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000b2-0de0-4000-8000-000000000021","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000021","metric":"Metric_1"}]},"from":null,"to":null}
++ valid_datasets 000000b2-05b0-4000-8000-000000000002 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000b2-0de0-4000-8000-000000000001","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000001","metric":"Metric_2"}]},"from":null,"to":null}
++ valid_datasets 000000b2-05b0-4000-8000-000000000003 = {"structure":"7f7d40cc-4075-4f06-90cf-aa6261d68f18","config":{"source":"000000b2-0de0-4000-8000-000000000004","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000004","metric":"Metric_3"}]},"from":null,"to":null}
++ valid_datasets 000000b2-05e0-4000-8000-000000000001 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0e70-4000-8000-000000000003","from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"},"from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"}
++ valid_datasets 000000b2-05e0-4000-8000-000000000002 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05a0-4000-8000-000000000005","from":"2026-03-08T20:55:22.294Z","to":"2026-04-02T03:03:54.786Z"},"from":"2026-03-08T20:55:22.294Z","to":"2026-04-02T03:03:54.786Z"}
++ valid_datasets 000000b2-05e0-4000-8000-000000000003 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0e70-4000-8000-000000000001","from":"2026-06-12T09:11:28.930Z","to":"2026-06-15T18:57:10.392Z"},"from":"2026-06-12T09:11:28.930Z","to":"2026-06-15T18:57:10.392Z"}
++ valid_datasets 000000b2-05e0-4000-8000-000000000004 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"6ceedbed-5a44-5d73-aced-6768dc827d1a","from":"2026-07-01T03:03:47.427Z","to":"2026-07-21T22:56:06.016Z"},"from":"2026-07-01T03:03:47.427Z","to":"2026-07-21T22:56:06.016Z"}
++ valid_datasets 000000b2-05e0-4000-8000-000000000005 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05e0-4000-8000-000000000002","from":"2026-02-09T13:34:19.969Z","to":"2026-03-02T04:41:44.398Z"},"from":"2026-03-08T20:55:22.294Z","to":"2026-03-02T04:41:44.398Z"}
++ valid_datasets 000000b2-05e0-4000-8000-000000000006 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05e0-4000-8000-000000000003","to":"2026-02-02T14:57:22.532Z"},"from":"2026-06-12T09:11:28.930Z","to":"2026-02-02T14:57:22.532Z"}
++ valid_datasets 000000b2-05e0-4000-8000-000000000007 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-0c00-4000-8000-000000000002","from":"2026-07-05T01:05:31.607Z"},"from":"2026-07-05T01:05:31.607Z","to":null}
++ valid_datasets 000000b2-05e0-4000-8000-000000000008 = {"structure":"8754c000-3778-4ae6-b2b8-bbcd959bb775","config":{"source":"000000b2-05e0-4000-8000-000000000002","from":"2026-05-20T01:20:48.349Z","to":"2026-06-08T05:07:00.386Z"},"from":"2026-05-20T01:20:48.349Z","to":"2026-04-02T03:03:54.786Z"}
++ valid_datasets 000000b2-0c00-4000-8000-000000000001 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0e70-4000-8000-000000000002","000000b2-05a0-4000-8000-00000000000d"],"from":null,"to":null}
++ valid_datasets 000000b2-0c00-4000-8000-000000000002 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000001","1727ab9f-3d66-5544-95c3-b388694f7404"],"from":null,"to":null}
++ valid_datasets 000000b2-0c00-4000-8000-000000000003 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000002","000000b2-05e0-4000-8000-000000000001"],"from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"}
++ valid_datasets 000000b2-0c00-4000-8000-000000000004 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":["000000b2-0c00-4000-8000-000000000003","000000b2-05a0-4000-8000-00000000000e"],"from":"2026-07-07T12:31:43.177Z","to":"2026-07-24T11:13:03.836Z"}
++ valid_datasets 000000b2-0c00-4000-8000-000000000005 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":[],"from":null,"to":null}
++ valid_datasets 000000b2-0e70-4000-8000-000000000001 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000b2-0de0-4000-8000-000000000006","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000006","metric":"Metric_1"},{"instance":"000000b2-0de0-4000-8000-000000000006","metric":"Metric_2"}]},"from":null,"to":null}
++ valid_datasets 000000b2-0e70-4000-8000-000000000002 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000b2-0de0-4000-8000-00000000001e","metrics":[{"instance":"000000b2-0de0-4000-8000-00000000001e","metric":"Metric_1"},{"instance":"000000b2-0de0-4000-8000-00000000001e","metric":"Metric_3"}]},"from":null,"to":null}
++ valid_datasets 000000b2-0e70-4000-8000-000000000003 = {"structure":"bd9550fb-ef75-4523-81d6-25dd32c22925","config":{"source":"000000b2-0de0-4000-8000-000000000011","metrics":[{"instance":"000000b2-0de0-4000-8000-000000000011","metric":"Metric_1"},{"instance":"000000b2-0de0-4000-8000-000000000011","metric":"Metric_4"}]},"from":null,"to":null}
++ valid_datasets 000000b2-0f00-4000-8000-000000000001 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ valid_datasets 0a3556c4-8283-5c5d-be8e-a660d0cff11b = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000011"},"from":null,"to":null}
++ valid_datasets 0db7eca7-fdb7-5408-9615-74a2fcebe6d7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000004"},"from":null,"to":null}
++ valid_datasets 1559a894-8f4b-5644-aa54-155f8a85ad27 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000016"},"from":null,"to":null}
++ valid_datasets 1727ab9f-3d66-5544-95c3-b388694f7404 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000006"},"from":null,"to":null}
++ valid_datasets 175b8b72-b2f4-5387-a2c1-88fee087b818 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000003"},"from":null,"to":null}
++ valid_datasets 17887af6-e4b5-541e-ae6b-4fdfe1bc3268 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000014"},"from":null,"to":null}
++ valid_datasets 1c343a20-adef-5432-b216-75e5ccc97f1f = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000a"},"from":null,"to":null}
++ valid_datasets 1cf3ea97-1b92-505f-9b8c-d8ffb465004d = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000d"},"from":null,"to":null}
++ valid_datasets 5a1a8ae9-6890-5467-9763-03bee163ad86 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000010"},"from":null,"to":null}
++ valid_datasets 69c7a0fa-86b7-5e3e-9101-8a109c3a5994 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000015"},"from":null,"to":null}
++ valid_datasets 6ceedbed-5a44-5d73-aced-6768dc827d1a = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000b"},"from":null,"to":null}
++ valid_datasets 74ff91b0-37cb-5071-9bc8-b47947d1d099 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000005"},"from":null,"to":null}
++ valid_datasets 79437da3-0458-5ce5-b931-55551b3b5c82 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000c"},"from":null,"to":null}
++ valid_datasets 7de539df-f4df-5625-83e3-9a32a140d500 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000018"},"from":null,"to":null}
++ valid_datasets 98a99a59-9362-5406-8608-97f0bb0c5272 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000012"},"from":null,"to":null}
++ valid_datasets 9aae1873-2f93-5ce2-9055-d66e49ae4157 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000007"},"from":null,"to":null}
++ valid_datasets bb7ef05a-be7e-596d-8548-624e182cfcde = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000f"},"from":null,"to":null}
++ valid_datasets bbd3fd90-309f-5641-90fd-8f3965a15481 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000001"},"from":null,"to":null}
++ valid_datasets bd2f4855-9486-5195-9b5d-f1ee6f70c9a4 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000009"},"from":null,"to":null}
++ valid_datasets bee14d4c-298d-526c-bd0c-4087c6d253d7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000001a"},"from":null,"to":null}
++ valid_datasets cfc75a8c-a85e-5058-ad58-206a93ea017e = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000008"},"from":null,"to":null}
++ valid_datasets d0fa0de3-9163-53ed-b839-d42c48d07856 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000019"},"from":null,"to":null}
++ valid_datasets dc6bcac1-a416-5a22-a43a-5f8387c3be14 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000013"},"from":null,"to":null}
++ valid_datasets dd16568b-f64c-57de-bd63-c1db696c33ec = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000002"},"from":null,"to":null}
++ valid_datasets e32431ab-3970-5e02-bd28-f9e6879c6133 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-00000000000e"},"from":null,"to":null}
++ valid_datasets e6d2f56a-9df9-574c-8f86-75ac5e125ef7 = {"structure":"0d4ac57f-76b5-45c9-9c2d-4b0812be08ff","config":{"source":"000000b2-0de0-4000-8000-000000000017"},"from":null,"to":null}"
+`;
+
+exports[`DataFlow streams, scenario B > after: take it out of the union 1`] = `
+"~ datasets 000000b2-0c00-4000-8000-000000000005 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":[],"from":null,"to":null}
+~ invalid_datasets = 2 entries
+- invalid_datasets 000000b2-0c00-4000-8000-000000000005
+~ valid_datasets = 58 entries
++ valid_datasets 000000b2-0c00-4000-8000-000000000005 = {"structure":"1c4ca454-de38-44d9-92fb-aa5218bfa257","config":[],"from":null,"to":null}"
+`;

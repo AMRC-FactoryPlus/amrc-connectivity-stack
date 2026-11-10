@@ -25,11 +25,17 @@ import {
     DatasetView, member_body, metadata_body, search_source, structure_body,
     watch_key, watch_list,
 } from "../../lib/dataset-view.js";
-import { READ_STRUCTURE, default_dataset_uuid } from "../../lib/default-datasets.js";
+import {
+    DEVICE_PERMS, READ_STRUCTURE, default_dataset_uuid,
+} from "../../lib/default-datasets.js";
 import { ROOT, make_site } from "../support/fake-site.js";
 import { ENDPOINTS, make_client, search, watch } from "../support/notify-client.js";
 import {
-    METADATA_APPS, PRINCIPALS, STRUCTURE_APPS, build_site, prng,
+    reference_default_devices, reference_functional_types, reference_group,
+    reference_parts,
+} from "../support/reference-datasets.js";
+import {
+    METADATA_APPS, PRINCIPALS, STRUCTURE_APPS, build_site, prng, site_datasets,
 } from "../support/site-builder.js";
 
 const { App, Perm, Class, Kind, Group, Metadata, Special } = Constants;
@@ -706,6 +712,31 @@ describe("a SEARCH over a view", () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
+    test("an update that arrives while the held updates go out still goes out after them", async () => {
+        vi.useFakeTimers({ toFake: ["setImmediate", "clearImmediate"] });
+        const { s, view } = ready_search();
+        const names = [];
+        const sub = search_of(view).subscribe(m => {
+            if (!m.child) return;
+            names.push(m.response.body.name);
+            /* A change made while the first held update is handled,
+             * before the second has gone out. */
+            if (names.length == 1) rename(s, "Three");
+        });
+        cleanup.push(() => sub.unsubscribe());
+        await microtasks();
+
+        rename(s, "One");
+        rename(s, "Two");
+        expect(names).toEqual([]);
+        vi.runAllTimers();
+        expect(names).toEqual(["One", "Two", "Three"]);
+        expect(vi.getTimerCount()).toBe(0);
+
+        rename(s, "Four");
+        expect(names).toEqual(["One", "Two", "Three", "Four"]);
+    });
+
     test("a search stopped while it holds updates sends none of them and leaves no timer", async () => {
         vi.useFakeTimers({ toFake: ["setImmediate", "clearImmediate"] });
         const { s, view } = ready_search();
@@ -861,6 +892,34 @@ describe("a WATCH over a view", () => {
         s.feed.check.next(check_value(true, null));
         expect(rec.values.slice(4).map(m => sorted(m.response.body)))
             .toEqual([sorted([A, B, C])]);
+    });
+
+    /* The lists of the notify handlers are over views whose body is
+     * only `true`, which never changes. watch_list is for any view. */
+    test("watch_list sends nothing when the body of a listed dataset changes", () => {
+        const s = scripted(["data", "check"]);
+        s.feed.data.next(data_value({ [A]: entry({ n: 1 }) }));
+        s.feed.check.next(check_value(true));
+        const view = new DatasetView({
+            sources: s.sources,
+            required: ["data", "check"],
+            candidates: st => st.data.valid,
+            body: (st, id) => structure_body(st, id, true),
+        });
+        const rec = record(watch_list(view));
+        expect(rec.values).toEqual([update([A])]);
+
+        s.feed.data.next(data_value({ [A]: entry({ n: 2 }) }, [A]));
+        /* The view reported the change. The list did not move. */
+        expect(view.stats.sent).toBe(1);
+        expect(rec.values).toHaveLength(1);
+
+        /* A change and a new dataset in one value: one list. */
+        s.feed.data.next(
+            data_value({ [A]: entry({ n: 3 }), [B]: entry() }, [A, B]));
+        expect(view.stats.sent).toBe(3);
+        expect(rec.values.slice(1).map(m => sorted(m.response.body)))
+            .toEqual([sorted([A, B])]);
     });
 
     test.each([
@@ -1085,10 +1144,18 @@ describe("what a client gets", () => {
     });
 
     test("a closed subscription lets go of its view and of every source it held", async () => {
+        /* The timers of the shared streams, and not setImmediate,
+         * which the search handoff and settle() need. */
+        vi.useFakeTimers({ toFake: [
+            "setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
         const fx = fixture(SMALL);
         const { site, built } = fx;
         const { some } = PRINCIPALS;
+        await site.settle();
         expect(site.subs.acl.get(some)).toBeUndefined();
+        /* What the running DataFlow holds for itself. */
+        const held = site.open_watches();
+        expect(held.subclass).toBe(0);
 
         const recs = Object.values(ENDPOINTS)
             .map(make => fx.client.open(some, make(built.kinds.sessions[0])));
@@ -1096,10 +1163,21 @@ describe("what a client gets", () => {
         expect(fx.client.dan.views.size).toBe(8);
         /* A permission and UseDevice, for each of the eight. */
         expect(site.subs.acl.get(some).size).toBe(16);
+        /* The parts of every dataset for the search, and of the one
+         * dataset for the single watch. */
+        const members = site.members(Class.Dataset).size;
+        expect(site.open_watches().subclass).toBe(members + 1);
+        expect(site.open_watches().member).toBeGreaterThan(held.member);
 
         for (const rec of recs) rec.close();
         expect(fx.client.dan.views.size).toBe(0);
         expect(site.subs.acl.get(some)).toBeUndefined();
+        /* The single watch let go of its dataset's subclasses at
+         * once. The parts of every dataset are a shared stream, which
+         * keeps its sources for 1 s in case a reader comes back. */
+        expect(site.open_watches().subclass).toBe(members);
+        await vi.advanceTimersByTimeAsync(1100);
+        expect(site.open_watches()).toEqual(held);
 
         /* Nothing is sent to a closed subscription. */
         const counts = recs.map(rec => rec.messages.length);
@@ -1311,6 +1389,46 @@ describe("single watches cost one dataset", () => {
         expect(view_of(fx, "structure_uuid", ROOT).stats.computed).toBe(1);
         expect(view_of(fx, "metadata_uuid", ROOT).stats.computed).toBe(1);
     });
+
+    /* The fake ConfigDB answers a WATCH inside subscribe, so the test
+     * above gets one message. A real ConfigDB answers later. The watch
+     * does not wait for it: the first body has no parts, and a second
+     * message brings them. Only the parts can be late, because the
+     * running service holds every other source. */
+    test("a WATCH v2/metadata/:uuid on a running service answers before ConfigDB has given the parts, and again when it has", async () => {
+        const fx = fixture(SMALL);
+        const { site, built } = fx;
+        await site.settle();
+        const dataset = built.named.part_parent;
+        const part = built.kinds.subset[0];
+        site.hold("subclass", dataset);
+
+        const rec = await settled(fx, ROOT, watch(`v2/metadata/${dataset}`));
+        expect(rec.messages).toHaveLength(1);
+        const [first] = rec.messages;
+        expect([first.status, first.response.status]).toEqual([200, 200]);
+        expect(first.response.body.parts).toEqual([]);
+        expect(first.response.body.name).toBe(site.app(Info).get(dataset).name);
+
+        const later = await after(fx, rec, () => site.release("subclass", dataset));
+        expect(later).toEqual([{
+            status: 200,
+            response: {
+                status: 200,
+                body: { ...first.response.body, parts: [part] },
+            },
+        }]);
+
+        /* A dataset with no parts gets the one message: its body does
+         * not change when ConfigDB answers. */
+        const alone = built.kinds.sessions[0];
+        expect(site.subclasses(alone).size).toBe(0);
+        site.hold("subclass", alone);
+        const single = await settled(fx, ROOT, watch(`v2/metadata/${alone}`));
+        expect(single.messages).toHaveLength(1);
+        expect(await after(fx, single, () => site.release("subclass", alone)))
+            .toEqual([]);
+    });
 });
 
 /* ---- The oracle ---- */
@@ -1351,12 +1469,87 @@ function plain (body) {
 const plain_children = map => Object.fromEntries(
     sorted(map.keys()).map(key => [key, plain(map.get(key))]));
 
-/* Compare every open view with a computation from scratch: a body for
- * every candidate, from the sources as they are now. And compare the
- * datasets it shows with the dataset list of DataFlow. */
+/* Everything a body is made from, worked out from what the site
+ * stores, by the whole-map reference code. Nothing here comes from
+ * DataFlow or from a view. */
+function site_world (site) {
+    const datasets = site_datasets(site);
+    const members = imm.Set(site.members(Class.Dataset));
+    return {
+        datasets,
+        defaults:   reference_default_devices(datasets),
+        metadata:   reference_group([...site.members(App.DatasetMetadata)]
+            .map(app => [app, site.app(app)])),
+        kinds:      reference_functional_types(imm.Map(
+            [...site.members(Group.FunctionalDatasetGroup)]
+                .map(group => [group, imm.Set(site.members(group))]))),
+        parts:      reference_parts(
+            imm.Map([...members].map(m => [m, imm.Set(site.subclasses(m))])),
+            members),
+    };
+}
+
+/* The permission rule, written out from the ACL alone. */
+function site_allows (site, world, principal, permission, uuid) {
+    if (principal == ROOT) return true;
+    const acl = site.acl(principal) ?? [];
+    const has = (perm, target) => acl.some(e => e.permission == perm
+        && (e.target == target || e.target == UUIDs.Special.Null));
+
+    const structure = permission == READ_STRUCTURE;
+    if (has(structure ? Perm.EditDataset : permission, uuid)) return true;
+    if (!structure && !DEVICE_PERMS.has(permission)) return false;
+    const device = world.defaults.get(uuid);
+    return device != null && has(Perm.UseDevice, device);
+}
+
+/* The body a view should hold for a dataset, from the site alone. */
+function site_body (site, world, view, uuid) {
+    const [permission, map] = RULES[view.name];
+    const dataset = world.datasets.get(uuid);
+    if (!dataset) return undefined;
+    const invalid = dataset.structure == Special.InvalidDataset;
+    if (invalid && map == "valid") return undefined;
+    if (!site_allows(site, world, view.principal, permission, uuid))
+        return undefined;
+
+    if (view.name.endsWith("_list")) return true;
+    if (view.name.startsWith("structure"))
+        return { structure: dataset.structure, config: dataset.config };
+    return {
+        uuid,
+        name:       site.app(Info).get(uuid)?.name ?? "UNKNOWN",
+        from:       dataset.from ?? undefined,
+        to:         dataset.to ?? undefined,
+        "function": world.kinds.get(uuid),
+        metadata:   world.metadata.get(uuid),
+        parts:      [...world.parts.get(uuid) ?? []].filter(part =>
+            site_allows(site, world, view.principal, Perm.ReadDataset, part)),
+    };
+}
+
+/* Compare every open view with two computations from scratch.
+ *
+ * The first works each body out from the site's stored state, with
+ * the whole-map reference code and the permission rule written out
+ * again: it proves the content of every body. The second asks the
+ * view's own body function for every candidate, from the sources as
+ * they are now: it proves no key was missed when a source changed.
+ * Last, the datasets shown are the dataset list of DataFlow. */
 async function check_views (fx, label) {
+    const world = site_world(fx.site);
+
     for (const view of fx.client.dan.views) {
         const where = `${label}: ${view.principal} ${view.name}`;
+
+        const stored = new Map();
+        for (const key of view.fixed ?? world.datasets.keys()) {
+            const body = site_body(fx.site, world, view, key);
+            if (body !== undefined) stored.set(key, body);
+        }
+        expect([where, plain_children(view.children)])
+            .toEqual([where, plain_children(stored)]);
+
         const state = fresh_state(view);
         const keys = view.fixed ?? view.candidates(state).keys();
         const expected = new Map();

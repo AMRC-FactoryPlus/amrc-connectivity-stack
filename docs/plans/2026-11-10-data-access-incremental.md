@@ -468,7 +468,7 @@ Stage 6
 
 Stage 7
 - Stage 7 also changed tests/support/fake-site.js and tests/current/scale_baseline.test.js, which are not in its file list, for items 1 and 2 under stage 1 above.
-- The burst test runs the plan's site and smaller ones, with and without a notify lag. The blocked-time limits (50 ms and 2 s) are checked only without a lag, and they catch only a large regression: the measured values are about 0.6 ms and 0.4 s. The exact counts are the proof.
+- The burst test runs the plan's site and smaller ones, with and without a notify lag. The blocked-time limits are checked only without a lag, and they catch only a large regression. They are 500 ms for the longest block and 20 s for the total, not the 50 ms and 2 s of S7: the test reads the real clock, and the smaller limits failed twice while the machine ran other suites. The measured values are about 0.7 ms and 0.44 s. The old handlers blocked for 2.9 s per dataset with one session, so they pass neither limit. The exact counts are the proof.
 - docs/services/data-access.md said in two places that GET v1/structure/:uuid omits `config` for an invalid dataset and returns a `uuid` property. The route returns { structure, config } with config null. The docs now say so.
 - The PR text is a draft outside the repository until the branch is pushed.
 

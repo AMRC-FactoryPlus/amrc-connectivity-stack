@@ -121,16 +121,6 @@ const seriesReader = new SeriesReader({
   },
 });
 
-const apiv1 = new APIv1({ 
-  data,
-  debug,
-  auth: fplus.Auth,
-  cdb: fplus.ConfigDB,
-  influxReader,
-  seriesReader,
-  buckets,
-});
-
 // Every placed device gets a default UNS device dataset. A site with
 // no UNS bucket cannot read one, so it makes none.
 const defaults = new DefaultDatasets({
@@ -138,6 +128,17 @@ const defaults = new DefaultDatasets({
   debug,
   cdb: fplus.ConfigDB,
   enabled: !!buckets.uns,
+});
+
+const apiv1 = new APIv1({ 
+  defaults,
+  data,
+  debug,
+  auth: fplus.Auth,
+  cdb: fplus.ConfigDB,
+  influxReader,
+  seriesReader,
+  buckets,
 });
 
 const api = await new WebAPI({

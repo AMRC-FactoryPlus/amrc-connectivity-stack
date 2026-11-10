@@ -11,7 +11,9 @@ import * as rxu from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from './constants.js';
 import { UUIDs } from '@amrc-factoryplus/rx-client';
 import { minDate, maxDate } from './utils.js';
-import { default_dataset_device, DEVICE_PERMS } from './default-datasets.js';
+import {
+  default_dataset_device, DEVICE_PERMS, READ_STRUCTURE,
+} from './default-datasets.js';
 
 export class DataFlow {
   constructor(opts) {
@@ -67,10 +69,15 @@ export class DataFlow {
    * A grant on the dataset allows it. So does UseDevice on a device,
    * for the device's default dataset and the permissions in
    * DEVICE_PERMS; APIv1.check_dataset_acl is the single check that
-   * must agree with this. */
+   * must agree with this.
+   *
+   * READ_STRUCTURE stands for "may read the structure": EditDataset on
+   * the dataset, or UseDevice on the device of a default dataset. */
   watch_allowed(principal, permission) {
-    const granted = this.watch_granted(principal, permission);
-    if (!DEVICE_PERMS.has(permission))
+    const structure = permission == READ_STRUCTURE;
+    const granted = this.watch_granted(principal,
+      structure ? Constants.Perm.EditDataset : permission);
+    if (!structure && !DEVICE_PERMS.has(permission))
       return granted;
 
     return rx.combineLatest([

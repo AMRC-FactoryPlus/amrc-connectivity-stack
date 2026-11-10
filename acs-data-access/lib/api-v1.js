@@ -22,7 +22,9 @@ import { UNSDeviceMetricsHandler } from "./uns-device-metrics-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
 import { walk_origin_map } from "./origin-map.js";
-import { default_dataset_device, DEVICE_PERMS } from "./default-datasets.js";
+import {
+  default_dataset_device, default_dataset_uuid, DEVICE_PERMS, READ_STRUCTURE,
+} from "./default-datasets.js";
 import {
   SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
   check_coverage, LIMITS as SeriesLimits,
@@ -82,6 +84,9 @@ export class APIv1 {
     /* The InfluxDB bucket of each store, { sparkplug, uns }. A site
      * without the UNS historian has no `uns` bucket. */
     this.buckets = opts.buckets ?? {};
+    /* The DefaultDatasets maker, to make a device's default dataset
+     * before pointing a caller at it. */
+    this.defaults = opts.defaults;
     this.routes = this.setup_routes();
     this.handlers = {
       [Constants.App.SparkplugSrc]:
@@ -181,26 +186,63 @@ export class APIv1 {
     return res.status(err.status).json(err.body);
   }
 
+  /** The device a dataset is the default dataset of, or null.
+   * Asks ConfigDB rather than the dataset map, which lags a write. */
+  async default_device_of(dataset) {
+    const config = await this.cdb.get_config(Constants.App.UNSDevice, dataset);
+    return default_dataset_device(dataset,
+      { structure: Constants.App.UNSDevice, config });
+  }
+
   /** Whether the principal holds a permission on a dataset.
    *
    * A grant on the dataset allows it. So does UseDevice on a device,
    * for the device's default dataset and the permissions in
    * DEVICE_PERMS (see default-datasets.js). Every Read, IncludeInUnion
    * and UseForSession check on a dataset goes through here, and
-   * DataFlow.watch_allowed gives the lists the same answer. */
+   * DataFlow.watch_allowed gives the lists the same answer.
+   *
+   * READ_STRUCTURE stands for "may read the structure": EditDataset on
+   * the dataset, or UseDevice on the device of a default dataset. */
   async check_dataset_acl(principal, permission, dataset) {
-    if (await this.auth.check_acl(principal, permission, dataset, true))
+    const structure = permission == READ_STRUCTURE;
+    const granted = structure ? Constants.Perm.EditDataset : permission;
+    if (await this.auth.check_acl(principal, granted, dataset, true))
       return true;
-    if (!DEVICE_PERMS.has(permission)) return false;
+    if (!structure && !DEVICE_PERMS.has(permission)) return false;
 
-    /* Ask ConfigDB rather than the dataset map, which lags a write. */
-    const config = await this.cdb.get_config(Constants.App.UNSDevice, dataset);
-    const device = default_dataset_device(dataset,
-      { structure: Constants.App.UNSDevice, config });
+    const device = await this.default_device_of(dataset);
     if (!device) return false;
 
     return this.auth.check_acl(
       principal, Constants.Perm.UseDevice, device, true);
+  }
+
+  /** Refuses a change to a default dataset. Nobody may edit, rename or
+   * delete one: Data Access keeps it. Call this after the permission
+   * check, so a caller without permission learns nothing. */
+  async check_not_default(dataset, action) {
+    const device = await this.default_device_of(dataset);
+    if (device)
+      refuse(this.log, 409, "default_dataset",
+        `Dataset ${dataset} is the default dataset of device ${device}. `
+        + `Data Access keeps it, so nobody can ${action} it.`,
+        { device, dataset });
+  }
+
+  /** Refuses a new UNS device dataset. A placed device has a default
+   * dataset, which is the only whole-device dataset it needs; the
+   * refusal names it. UNS device datasets made before this still work.
+   * Call this after the source checks, so the device is known to be a
+   * placed device the caller may use. */
+  async refuse_device_dataset(device) {
+    const dataset = this.defaults
+      ? await this.defaults.ensure(device)
+      : default_dataset_uuid(device);
+    refuse(this.log, 409, "use_default_dataset",
+      `Device ${device} already has a dataset, ${dataset}. `
+      + `Use that one: a device needs only one.`,
+      { device, dataset });
   }
 
   /** Whether this site has a UNS bucket for the new device kinds. */
@@ -296,6 +338,15 @@ export class APIv1 {
    * comment below for why we refuse rather than rewrite the referrers.
    */
   async delete_dataset(req, res){
+    try {
+      return await this._delete_dataset(req, res);
+    }
+    catch (err) {
+      return this.send_refusal(err, res);
+    }
+  }
+
+  async _delete_dataset(req, res){
     const dataset_uuid = req.params.uuid;
     if(!dataset_uuid) return fail(this.log, 422, `No req.params.uuid`);
     if(!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Invalid uuid ${dataset_uuid}`);
@@ -308,6 +359,8 @@ export class APIv1 {
     );
 
     if (!ok) return fail(this.log, 403, `You don't have DELETE permissions for ${dataset_uuid}`);
+
+    await this.check_not_default(dataset_uuid, "delete");
 
     this.log(`Delete dataset called by ${req.auth} for ${dataset_uuid}`);
 
@@ -568,11 +621,22 @@ export class APIv1 {
    * Body: { name: string }
    */
   async metadata_put_name(req, res) {
+    try {
+      return await this._metadata_put_name(req, res);
+    }
+    catch (err) {
+      return this.send_refusal(err, res);
+    }
+  }
+
+  async _metadata_put_name(req, res) {
     const name = req.body?.name;
     if (typeof name != "string" || !name.trim())
       return fail(this.log, 422, `Name must be a non-empty string`);
 
     const uuid = await this._check_metadata_edit(req);
+    /* A default dataset has its device's name. */
+    await this.check_not_default(uuid, "rename");
 
     const current = await this.cdb.get_config(UUIDs.App.Info, uuid) ?? {};
     if (current.name !== name.trim())
@@ -1091,7 +1155,7 @@ export class APIv1 {
    * the response includes invalid datasets 
    */
   async structure_list(req, res){
-    const uuids = await rx.firstValueFrom(this.data.allowed_all_dataset_uuids(req.auth, Constants.Perm.EditDataset));
+    const uuids = await rx.firstValueFrom(this.data.allowed_all_dataset_uuids(req.auth, READ_STRUCTURE));
     return res.status(200).json(uuids);
   }
 
@@ -1162,17 +1226,13 @@ export class APIv1 {
     const dataset_uuid = req.params.uuid;
     if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `Dataset uuid ${dataset_uuid} is invalid.`);
 
-    const ok = await this.auth.check_acl(
-      req.auth,
-      Constants.Perm.EditDataset,
-      dataset_uuid,
-      true,
-    );
+    const ok = await this.check_dataset_acl(
+      req.auth, READ_STRUCTURE, dataset_uuid);
 
     if (!ok) return fail(this.log, 403, `You don't have permission to Edit dataset ${dataset_uuid}.`);
 
     const dataset = await rx.firstValueFrom(
-      this.data.allowed_all_datasets(req.auth, Constants.Perm.EditDataset).pipe(
+      this.data.allowed_all_datasets(req.auth, READ_STRUCTURE).pipe(
         rx.map(datasets => datasets.get(dataset_uuid))
       )
     );
@@ -1315,6 +1375,8 @@ export class APIv1 {
     if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
 
     const checked = await this._check_dataset_config(req.auth, structure, config);
+    if (structure == Constants.App.UNSDevice)
+      await this.refuse_device_dataset(checked.config.source);
     const owner = await this._resolve_owner(req.auth);
     const dataset_uuid = await this._write_dataset_config(
       structure,
@@ -1375,6 +1437,8 @@ export class APIv1 {
     );
     if (!ok) return fail(this.log, 403, `You don't have Edit permission for dataset ${dataset_uuid}`);
 
+    await this.check_not_default(dataset_uuid, "edit");
+
     const datasets = await rx.firstValueFrom(this.data.allowed_all_datasets(req.auth, Constants.Perm.EditDataset));
     const dataset = datasets.get(dataset_uuid);
     if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} not found.`);
@@ -1397,6 +1461,10 @@ export class APIv1 {
      * the old config and subclass relationships in place. */
     const { handler, config: stored_config } =
       await this._check_dataset_config(req.auth, structure, new_config);
+
+    /* An invalid dataset rewritten as a UNS device would be a new one. */
+    if(!is_valid && structure == Constants.App.UNSDevice)
+      await this.refuse_device_dataset(stored_config.source);
 
     // for currently VALID dataset
     if(is_valid){

@@ -18,11 +18,11 @@ import { DataAccess as Constants } from "./constants.js";
  * marker anyone could add or remove.
  *
  * Anyone who may build datasets from the device (UseDevice) may read
- * its default dataset and use it in unions and sessions. They could
- * make a UNS device dataset of their own for the device and do the
- * same with that, so this grants nothing new; it means people who
- * share a device share one dataset for it. Nobody gets Edit or Delete
- * this way. */
+ * its default dataset and use it in unions and sessions, so people who
+ * share a device share one dataset for it. The default dataset is the
+ * only whole-device dataset a device needs, so nobody can make another
+ * UNS device dataset, and nobody can edit, rename or delete a default
+ * one: Data Access keeps it, and keeps its name the device's name. */
 
 /* The permissions UseDevice on a device gives on its default dataset. */
 export const DEVICE_PERMS = new Set([
@@ -30,6 +30,11 @@ export const DEVICE_PERMS = new Set([
   Constants.Perm.IncludeInUnion,
   Constants.Perm.UseForSession,
 ]);
+
+/* Not a permission anyone can be granted. The dataset lists take it in
+ * place of one for "may read this dataset's structure": EditDataset on
+ * the dataset, or UseDevice on the device of a default dataset. */
+export const READ_STRUCTURE = "read-structure";
 
 /** The UUID of a device's default dataset. */
 export function default_dataset_uuid(device) {
@@ -71,6 +76,24 @@ export function missing_defaults(placements, devices, datasets) {
     if (!devices.has(device)) continue;
     const dataset = default_dataset_uuid(device);
     if (!datasets.has(dataset)) out.push({ device, dataset });
+  }
+  return out;
+}
+
+/** The default datasets whose name is not their device's name.
+ *
+ * @param defaults Map dataset UUID -> device UUID.
+ * @param infos The General information of every object; anything with
+ * `get`. A device with no name leaves its dataset's name alone.
+ * @returns An array of `{ dataset, name }`.
+ */
+export function stale_names(defaults, infos) {
+  const out = [];
+  if (!defaults || !infos) return out;
+  for (const [dataset, device] of defaults) {
+    const name = infos.get(device)?.name;
+    if (typeof name != "string" || name == "") continue;
+    if (infos.get(dataset)?.name !== name) out.push({ dataset, name });
   }
   return out;
 }
@@ -123,6 +146,18 @@ export class DefaultDatasets {
       rx.filter(missing => missing.length > 0));
   }
 
+  /** The names to set, as arrays of `{ dataset, name }`. Emits
+   * whenever a default dataset or a name changes. */
+  renames() {
+    return rx.combineLatest({
+      defaults: this.data.default_devices,
+      infos:    this.data.general_infos,
+    }).pipe(
+      rx.debounceTime(this.debounce),
+      rx.map(({ defaults, infos }) => stale_names(defaults, infos)),
+      rx.filter(stale => stale.length > 0));
+  }
+
   run() {
     if (!this.enabled) {
       this.log("No UNS bucket: not making default device datasets");
@@ -134,6 +169,11 @@ export class DefaultDatasets {
     ).subscribe({
       error: e => this.log("Default device datasets stopped: %s", e),
     });
+    this.subscription.add(this.renames().pipe(
+      rx.concatMap(stale => this.rename_all(stale)),
+    ).subscribe({
+      error: e => this.log("Default device dataset names stopped: %s", e),
+    }));
     this.log("Making default device datasets");
     return this;
   }
@@ -161,6 +201,41 @@ export class DefaultDatasets {
     return made;
   }
 
+  /** Set each stale name. Never throws. Each write keeps the other
+   * fields of the dataset's General information. */
+  async rename_all(stale) {
+    let renamed = 0;
+    for (const { dataset, name } of stale) {
+      try {
+        const info = await this.cdb.get_config(UUIDs.App.Info, dataset) ?? {};
+        if (info.name === name) continue;
+        await this.cdb.put_config(UUIDs.App.Info, dataset, { ...info, name });
+        this.log("Named default dataset %s %s", dataset, name);
+        renamed++;
+      }
+      catch (e) {
+        this.log("Can't name the default dataset %s: %s", dataset, e);
+      }
+    }
+    return renamed;
+  }
+
+  /** Make a device's default dataset now if it has none. For a caller
+   * that is about to point someone at it. Never throws.
+   * @returns The dataset's UUID. */
+  async ensure(device) {
+    const dataset = default_dataset_uuid(device);
+    if (!this.enabled) return dataset;
+    try {
+      if (!await this.cdb.get_config(Constants.App.UNSDevice, dataset))
+        await this.make(device, dataset);
+    }
+    catch (e) {
+      this.log("Can't make the default dataset of %s: %s", device, e);
+    }
+    return dataset;
+  }
+
   /* Every write here can be repeated, so a dataset left half made by
    * a failure is completed by the next attempt. Data Access owns the
    * object. */
@@ -170,11 +245,11 @@ export class DefaultDatasets {
     await cdb.create_object(Constants.Class.Dataset, dataset, false);
     await cdb.put_config(Constants.App.UNSDevice, dataset, { source: device });
 
-    /* Name it after the device, once: an existing name is kept. */
-    const info = await cdb.get_config(UUIDs.App.Info, dataset);
-    if (typeof info?.name != "string" || info.name == "") {
-      const name = (await cdb.get_config(UUIDs.App.Info, device))?.name;
-      if (typeof name == "string" && name != "")
+    /* Name it after the device. `renames` keeps it that way. */
+    const name = (await cdb.get_config(UUIDs.App.Info, device))?.name;
+    if (typeof name == "string" && name != "") {
+      const info = await cdb.get_config(UUIDs.App.Info, dataset) ?? {};
+      if (info.name !== name)
         await cdb.put_config(UUIDs.App.Info, dataset, { ...info, name });
     }
 

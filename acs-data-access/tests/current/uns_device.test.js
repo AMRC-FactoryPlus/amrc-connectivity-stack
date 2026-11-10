@@ -12,6 +12,7 @@ import { describe, expect, test } from "vitest";
 
 import { DataFlow } from "../../lib/dataflow.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
+import { default_dataset_uuid } from "../../lib/default-datasets.js";
 import {
     App, DEVICE, OTHER_DEVICE, NODE, UNPLACED, CREATED, AXIS,
     UNS_DS, UNS_SUB, SESSION, FROM, TO, DATASETS, debug,
@@ -45,13 +46,17 @@ describe("creating device datasets", () => {
         expect(calls.put).toEqual([]);
     });
 
-    test("a UNS device over a placed device is created", async () => {
+    /* A placed device has a default dataset, so nobody makes another. */
+    test("a UNS device over a placed device is refused, naming the default dataset", async () => {
         const { api, calls } = make_api();
         const res = await create(api, App.UNSDevice, { source: DEVICE });
 
-        expect(res.code).toBe(200);
-        expect(res.body).toBe(CREATED);
-        expect(calls.put).toEqual([{ app: App.UNSDevice, obj: CREATED, config: { source: DEVICE } }]);
+        expect(res.code).toBe(409);
+        expect(res.body.error).toBe("use_default_dataset");
+        expect(res.body.device).toBe(DEVICE);
+        expect(res.body.dataset).toBe(default_dataset_uuid(DEVICE));
+        expect(calls.created).toEqual([]);
+        expect(calls.put).toEqual([]);
         expect(calls.acl).toContainEqual([Constants.Perm.UseDevice, DEVICE]);
     });
 

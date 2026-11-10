@@ -16,8 +16,8 @@ import { APIv1 } from "../../lib/api-v1.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
 import { DataFlow } from "../../lib/dataflow.js";
 import {
-  DEVICE_PERMS, DefaultDatasets,
-  default_dataset_device, default_dataset_uuid, missing_defaults,
+  DEVICE_PERMS, DefaultDatasets, READ_STRUCTURE,
+  default_dataset_device, default_dataset_uuid, missing_defaults, stale_names,
 } from "../../lib/default-datasets.js";
 
 const { Perm, App } = Constants;
@@ -116,12 +116,12 @@ function fake_cdb(configs = {}, { fail_on } = {}) {
 
 function maker(opts = {}) {
   return new DefaultDatasets({
-    data: { datasets: opts.datasets ?? rx.of(IMap()) },
     debug,
     placements: opts.placements ?? rx.of(new Map()),
     devices: opts.devices ?? rx.of(new Set()),
     debounce: 0,
     ...opts,
+    data: opts.data ?? { datasets: opts.datasets ?? rx.of(IMap()) },
   });
 }
 
@@ -138,13 +138,26 @@ describe("DefaultDatasets", () => {
     ]);
   });
 
-  test("keeps a name the dataset already has", async () => {
+  test("does not write a name the dataset already has", async () => {
     const { cdb, calls } = fake_cdb({
       [`${UUIDs.App.Info}/${DEV_A}`]: { name: "Lathe" },
-      [`${UUIDs.App.Info}/${DEF_A}`]: { name: "Renamed" },
+      [`${UUIDs.App.Info}/${DEF_A}`]: { name: "Lathe" },
     });
     await maker({ cdb }).make(DEV_A, DEF_A);
     expect(calls.put.map(p => p.app)).toEqual([App.UNSDevice]);
+  });
+
+  test("ensure makes a missing dataset and leaves an existing one", async () => {
+    const { cdb, calls } = fake_cdb();
+    const m = maker({ cdb });
+    expect(await m.ensure(DEV_A)).toBe(DEF_A);
+    expect(await m.ensure(DEV_A)).toBe(DEF_A);
+    expect(calls.create.map(c => c.obj)).toEqual([DEF_A]);
+  });
+
+  test("ensure still names the dataset when ConfigDB fails", async () => {
+    const { cdb } = fake_cdb({}, { fail_on: DEF_A });
+    expect(await maker({ cdb }).ensure(DEV_A)).toBe(DEF_A);
   });
 
   test("leaves the dataset unnamed when the device has no name", async () => {
@@ -206,6 +219,47 @@ describe("DefaultDatasets", () => {
   });
 });
 
+describe("default dataset names", () => {
+  const defaults = new Map([[DEF_A, DEV_A], [DEF_B, DEV_B]]);
+
+  test("lists a dataset whose name is not its device's", () => {
+    const infos = IMap({
+      [DEV_A]: { name: "Lathe 2" }, [DEF_A]: { name: "Lathe" },
+      [DEV_B]: { name: "Mill" }, [DEF_B]: { name: "Mill" },
+    });
+    expect(stale_names(defaults, infos)).toEqual([{ dataset: DEF_A, name: "Lathe 2" }]);
+  });
+
+  test("lists a dataset with no name, and skips a device with none", () => {
+    const infos = IMap({ [DEV_A]: { name: "Lathe" }, [DEF_B]: { name: "Old" } });
+    expect(stale_names(defaults, infos)).toEqual([{ dataset: DEF_A, name: "Lathe" }]);
+  });
+
+  test("a device rename renames its default dataset, keeping other fields", async () => {
+    const { cdb, calls } = fake_cdb({
+      [`${UUIDs.App.Info}/${DEF_A}`]: { name: "Lathe", deleted: false },
+    });
+    const m = maker({ cdb });
+    expect(await m.rename_all([{ dataset: DEF_A, name: "Lathe 2" }])).toBe(1);
+    expect(calls.put).toEqual([
+      { app: UUIDs.App.Info, obj: DEF_A, config: { name: "Lathe 2", deleted: false } }]);
+    /* The map may lag the write: a second pass writes nothing. */
+    expect(await m.rename_all([{ dataset: DEF_A, name: "Lathe 2" }])).toBe(0);
+  });
+
+  test("renames follows the dataset map and the names", async () => {
+    const m = maker({
+      cdb: fake_cdb().cdb,
+      data: {
+        default_devices: rx.of(defaults),
+        general_infos: rx.of(IMap({ [DEV_A]: { name: "Lathe" } })),
+      },
+    });
+    expect(await rx.firstValueFrom(m.renames()))
+      .toEqual([{ dataset: DEF_A, name: "Lathe" }]);
+  });
+});
+
 /* A fake Auth: `grants` maps a permission to the targets USER holds it
  * on. */
 function fake_auth(grants) {
@@ -231,15 +285,108 @@ const DATASETS = IMap({
 function make_api(grants) {
   const configs = {};
   for (const [uuid, d] of DATASETS) configs[`${d.structure}/${uuid}`] = d.config;
-  const { cdb } = fake_cdb(configs);
-  return new APIv1({
-    data: { datasets: rx.of(DATASETS) },
+  for (const device of [DEV_A, DEV_B])
+    configs[`${Constants.External.ISA95Placement}/${device}`] = { node: NODE };
+  const { cdb, calls } = fake_cdb(configs);
+  Object.assign(cdb, {
+    async class_has_member() { return true; },
+    async class_direct_subclasses() { return []; },
+    async delete_object(uuid) { calls.deleted = uuid; },
+    search_app: () => rx.of(IMap()),
+  });
+  const api = new APIv1({
+    data: {
+      datasets: rx.of(DATASETS),
+      allowed_all_datasets: () => rx.of(DATASETS),
+    },
     auth: fake_auth(grants),
     cdb,
     debug,
     influxReader: {},
+    buckets: { uns: "uns" },
   });
+  api.calls = calls;
+  return api;
 }
+
+function make_res() {
+  return {
+    code: null,
+    body: null,
+    status(code) { this.code = code; return this; },
+    json(body) { this.body = body; return this; },
+    end() { return this; },
+  };
+}
+
+/* Root holds every permission, so these show the refusal does not
+ * depend on what the caller was granted. */
+describe("a default dataset is kept by Data Access", () => {
+  test("nobody can delete it", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.delete_dataset({ auth: ROOT, params: { uuid: DEF_A } }, res);
+    expect(res.code).toBe(409);
+    expect(res.body).toMatchObject({ error: "default_dataset", device: DEV_A, dataset: DEF_A });
+    expect(api.calls.deleted).toBeUndefined();
+  });
+
+  test("a dataset someone made for the device can still be deleted", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.delete_dataset({ auth: ROOT, params: { uuid: OWN } }, res);
+    expect(res.code).toBe(200);
+    expect(api.calls.deleted).toBe(OWN);
+  });
+
+  test("nobody can rename it", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.metadata_put_name(
+      { auth: ROOT, params: { uuid: DEF_A }, body: { name: "Mine" } }, res);
+    expect(res.code).toBe(409);
+    expect(res.body.error).toBe("default_dataset");
+    expect(api.calls.put).toEqual([]);
+  });
+
+  test("nobody can point it at another device", async () => {
+    const api = make_api({});
+    const res = make_res();
+    await api.structure_update({ auth: ROOT, params: { uuid: DEF_A },
+      body: { structure: App.UNSDevice, config: { source: DEV_B } } }, res);
+    expect(res.code).toBe(409);
+    expect(res.body.error).toBe("default_dataset");
+    expect(api.calls.put).toEqual([]);
+  });
+
+  test("a caller without Delete learns nothing about it", async () => {
+    const api = make_api({ [Perm.UseDevice]: [DEV_A] });
+    await expect(api.delete_dataset({ auth: USER, params: { uuid: DEF_A } }, make_res()))
+      .rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("new UNS device datasets", () => {
+  test("are refused for everyone, and the refusal makes sure the default exists", async () => {
+    const api = make_api({});
+    const ensured = [];
+    api.defaults = { ensure: async d => { ensured.push(d); return default_dataset_uuid(d); } };
+    const res = make_res();
+    await api.structure_create({ auth: ROOT,
+      body: { structure: App.UNSDevice, config: { source: DEV_B } } }, res);
+    expect(res.code).toBe(409);
+    expect(res.body).toMatchObject({ error: "use_default_dataset", device: DEV_B, dataset: DEF_B });
+    expect(ensured).toEqual([DEV_B]);
+    expect(api.calls.create).toEqual([]);
+  });
+
+  test("a caller who may not use the device gets 403, not the dataset's UUID", async () => {
+    const api = make_api({ [Perm.CreateDataset]: [App.UNSDevice] });
+    await expect(api.structure_create({ auth: USER,
+      body: { structure: App.UNSDevice, config: { source: DEV_B } } }, make_res()))
+      .rejects.toMatchObject({ status: 403 });
+  });
+});
 
 describe("check_dataset_acl", () => {
   test.each([...DEVICE_PERMS])("UseDevice on a device allows %s on its default dataset", async perm => {
@@ -302,6 +449,15 @@ describe("dataset lists", () => {
   test("UseDevice on every device lists every default dataset, and no other", async () => {
     expect(await listed({ [Perm.UseDevice]: [UUIDs.Special.Null] }, Perm.ReadDataset))
       .toEqual([DEF_A, DEF_B].sort());
+  });
+
+  test("the structure list gains default datasets, beside the ones the caller may edit", async () => {
+    expect(await listed({ [Perm.UseDevice]: [DEV_A], [Perm.EditDataset]: [OWN] }, READ_STRUCTURE))
+      .toEqual([DEF_A, OWN].sort());
+    const api = make_api({ [Perm.UseDevice]: [DEV_A], [Perm.EditDataset]: [OWN] });
+    expect(await api.check_dataset_acl(USER, READ_STRUCTURE, DEF_A)).toBe(true);
+    expect(await api.check_dataset_acl(USER, READ_STRUCTURE, OWN)).toBe(true);
+    expect(await api.check_dataset_acl(USER, READ_STRUCTURE, DEF_B)).toBe(false);
   });
 
   test("the Edit list does not gain default datasets", async () => {

@@ -17,6 +17,7 @@ import { SeriesReader, SERIES_DEFAULTS } from '../lib/series-reader.js';
 import { Coverage, InfluxAdmin } from '../lib/coverage-service.js';
 import { COVERAGE_DEFAULTS } from '../lib/coverage.js';
 import { body_errors } from '../lib/utils.js';
+import { DefaultDatasets } from '../lib/default-datasets.js';
 
 const { env } = process;
 
@@ -130,6 +131,15 @@ const apiv1 = new APIv1({
   buckets,
 });
 
+// Every placed device gets a default UNS device dataset. A site with
+// no UNS bucket cannot read one, so it makes none.
+const defaults = new DefaultDatasets({
+  data,
+  debug,
+  cdb: fplus.ConfigDB,
+  enabled: !!buckets.uns,
+});
+
 const api = await new WebAPI({
   debug: fplus.debug,
   ping: {
@@ -175,10 +185,14 @@ api.run();
  * summary is ready. */
 for (const c of coverages) c.run();
 
+debug.log("app", "Running Data Access default datasets");
+defaults.run();
+
 /* Stop the background coverage work, then exit as the signal would. */
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.once(signal, () => {
     for (const c of coverages) c.stop();
+    defaults.stop();
     process.kill(process.pid, signal);
   });
 }

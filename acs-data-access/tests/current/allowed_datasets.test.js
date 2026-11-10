@@ -34,6 +34,7 @@ function fake_auth(acls) {
 async function listed(acls, principal) {
   const flow = Object.create(DataFlow.prototype);
   flow.auth = fake_auth(acls);
+  flow.default_devices = rx.of(new Map());
   const datasets = IMap({ [A]: { structure: "s" }, [B]: { structure: "s" } });
   const out = await rx.firstValueFrom(
     rx.of(datasets).pipe(flow.filter_allowed_datasets(principal, READ)));

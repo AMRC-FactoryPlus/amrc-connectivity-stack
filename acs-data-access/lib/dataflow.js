@@ -11,6 +11,7 @@ import * as rxu from "@amrc-factoryplus/rx-util";
 import { DataAccess as Constants } from './constants.js';
 import { UUIDs } from '@amrc-factoryplus/rx-client';
 import { minDate, maxDate } from './utils.js';
+import { default_dataset_device, DEVICE_PERMS } from './default-datasets.js';
 
 export class DataFlow {
   constructor(opts) {
@@ -23,6 +24,8 @@ export class DataFlow {
     this.valid_datasets = this._build_valid_datasets();
 
     this.invalid_datasets = this._build_invalid_datasets();
+
+    this.default_devices = this._build_default_devices();
 
     this.general_infos = this._build_general_info();
     this.metadata = this._build_metadata();
@@ -42,12 +45,12 @@ export class DataFlow {
    * ---------------------------------------------------
    */
 
-  /* Which datasets a principal holds a permission on, as a predicate.
+  /* Which targets a principal holds a permission on, as a predicate.
    *
    * Auth passes the root principal and wildcard grants on every single
    * check, so the lists must agree: root, or a grant on the wildcard
-   * target, allows every dataset. Otherwise only the grant targets do. */
-  watch_allowed(principal, permission) {
+   * target, allows every target. Otherwise only the grant targets do. */
+  watch_granted(principal, permission) {
     if (this.auth.root_principal && principal == this.auth.root_principal)
       return rx.of(() => true);
 
@@ -56,6 +59,30 @@ export class DataFlow {
         targets.has(UUIDs.Special.Null)
           ? () => true
           : id => targets.has(id))
+    );
+  }
+
+  /* Which datasets a principal holds a permission on, as a predicate.
+   *
+   * A grant on the dataset allows it. So does UseDevice on a device,
+   * for the device's default dataset and the permissions in
+   * DEVICE_PERMS; APIv1.check_dataset_acl is the single check that
+   * must agree with this. */
+  watch_allowed(principal, permission) {
+    const granted = this.watch_granted(principal, permission);
+    if (!DEVICE_PERMS.has(permission))
+      return granted;
+
+    return rx.combineLatest([
+      granted,
+      this.watch_granted(principal, Constants.Perm.UseDevice),
+      this.default_devices,
+    ]).pipe(
+      rx.map(([ok, device_ok, devices]) => id => {
+        if (ok(id)) return true;
+        const device = devices.get(id);
+        return device != null && device_ok(device);
+      })
     );
   }
 
@@ -687,6 +714,25 @@ export class DataFlow {
             };
           }
         );
+      }),
+
+      rxu.shareLatest()
+    );
+  }
+
+  /* The default device datasets, as a Map from dataset UUID to the
+   * device it reads. */
+  _build_default_devices() {
+    return rxu.rx(
+      this.datasets,
+
+      rx.map(datasets => {
+        const devices = new Map();
+        for (const [uuid, dataset] of datasets) {
+          const device = default_dataset_device(uuid, dataset);
+          if (device) devices.set(uuid, device);
+        }
+        return devices;
       }),
 
       rxu.shareLatest()

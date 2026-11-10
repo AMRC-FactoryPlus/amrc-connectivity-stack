@@ -59,6 +59,10 @@ export const DataAccess = {
 
     Special: {
         InvalidDataset: "696396a0-2831-11f1-9b12-33d63b8c5115",
+        /* The UUIDv5 namespace of default device datasets: a device's
+         * default dataset has the UUID v5(device UUID, this). See
+         * default-datasets.js. */
+        DefaultDatasetNamespace: "21892bf2-0d9d-4496-a84e-37ff1829b94c",
     },
 
     Requirement: {

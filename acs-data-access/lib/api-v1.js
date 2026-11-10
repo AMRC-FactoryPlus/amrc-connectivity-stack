@@ -22,6 +22,7 @@ import { UNSDeviceMetricsHandler } from "./uns-device-metrics-handler.js";
 import { SessionLimitsHandler } from "./session-limits-handler.js";
 import { UnionComponentsHandler } from "./unions-components-handler.js";
 import { walk_origin_map } from "./origin-map.js";
+import { default_dataset_device, DEVICE_PERMS } from "./default-datasets.js";
 import {
   SeriesError, parse_request, merge_windows, group_by_windows, cache_control,
   check_coverage, LIMITS as SeriesLimits,
@@ -178,6 +179,28 @@ export class APIv1 {
   send_refusal(err, res) {
     if (!(err instanceof Refusal)) throw err;
     return res.status(err.status).json(err.body);
+  }
+
+  /** Whether the principal holds a permission on a dataset.
+   *
+   * A grant on the dataset allows it. So does UseDevice on a device,
+   * for the device's default dataset and the permissions in
+   * DEVICE_PERMS (see default-datasets.js). Every Read, IncludeInUnion
+   * and UseForSession check on a dataset goes through here, and
+   * DataFlow.watch_allowed gives the lists the same answer. */
+  async check_dataset_acl(principal, permission, dataset) {
+    if (await this.auth.check_acl(principal, permission, dataset, true))
+      return true;
+    if (!DEVICE_PERMS.has(permission)) return false;
+
+    /* Ask ConfigDB rather than the dataset map, which lags a write. */
+    const config = await this.cdb.get_config(Constants.App.UNSDevice, dataset);
+    const device = default_dataset_device(dataset,
+      { structure: Constants.App.UNSDevice, config });
+    if (!device) return false;
+
+    return this.auth.check_acl(
+      principal, Constants.Perm.UseDevice, device, true);
   }
 
   /** Whether this site has a UNS bucket for the new device kinds. */
@@ -367,12 +390,8 @@ export class APIv1 {
     const dataset_uuid  = req.params.uuid;
     if (!valid_uuid(dataset_uuid)) fail(this.log, 422, `${dataset_uuid} is invalid uuid.`);
 
-    const ok = await this.auth.check_acl(
-      req.auth,
-      Constants.Perm.ReadDataset,
-      dataset_uuid,
-      true,
-    );
+    const ok = await this.check_dataset_acl(
+      req.auth, Constants.Perm.ReadDataset, dataset_uuid);
     
     if (!ok) return fail(this.log, 403, `You don't have READ permissions for ${dataset_uuid}`);
 
@@ -440,12 +459,8 @@ export class APIv1 {
     const dataset_uuid = req.params.uuid;
     if (!valid_uuid(dataset_uuid)) return fail(this.log, 422, `${dataset_uuid} is invalid uuid.`);
 
-    const ok = await this.auth.check_acl(
-      req.auth,
-      Constants.Perm.ReadDataset,
-      dataset_uuid,
-      true,
-    );
+    const ok = await this.check_dataset_acl(
+      req.auth, Constants.Perm.ReadDataset, dataset_uuid);
 
     if (!ok) return fail(this.log, 403, `You don't have READ permissions for ${dataset_uuid}`);
 
@@ -739,12 +754,8 @@ export class APIv1 {
       return res.status(422).json({ error: error ?? window_error });
     }
 
-    const ok = await this.auth.check_acl(
-        req.auth,
-        Constants.Perm.ReadDataset,
-        dataset_uuid,
-        true,
-    );
+    const ok = await this.check_dataset_acl(
+      req.auth, Constants.Perm.ReadDataset, dataset_uuid);
 
     if (!ok) return fail(this.log, 403, `Unauthorised to read ${dataset_uuid}`);
 
@@ -979,12 +990,8 @@ export class APIv1 {
    * `by_store` holds the same two maps for each store the sources
    * read, for the queries; `windows` merges the stores. */
   async series_dataset_scope(principal, parsed, as_of) {
-    const ok = await this.auth.check_acl(
-      principal,
-      Constants.Perm.ReadDataset,
-      parsed.dataset,
-      true,
-    );
+    const ok = await this.check_dataset_acl(
+      principal, Constants.Perm.ReadDataset, parsed.dataset);
     if (!ok) return fail(this.log, 403, `Unauthorised to read ${parsed.dataset}`);
 
     const sources = await this.resolve_dataset(parsed.dataset);

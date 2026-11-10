@@ -29,6 +29,8 @@ defmodule Ingest.UnsIngesterTest do
     "Work Unit": "Robot"
   ]
   @prefix "UNS/v1/AMRC/F2050/Shop/Cell 1/Robot/Edge/D1/"
+  @root "Device_Information/ISA95_Hierarchy"
+  @no_hierarchy "its birth has no ISA-95 hierarchy at Device_Information/ISA95_Hierarchy"
 
   setup do
     name = :"sparkplug_#{System.unique_integer([:positive])}"
@@ -304,9 +306,15 @@ defmodule Ingest.UnsIngesterTest do
              )
     end
 
-    test "keeps an empty level, and writes numbers", ctx do
-      assert "UNS/v1/E//A/Edge/EmptySite/A/V" in topics(
-               device(ctx, "EmptySite", Enterprise: "E", Site: "", Area: "A")
+    # JS before the shared rule: kept an empty level, as "E//A", and
+    # didn't trim.
+    test "stops at an empty level, trims, and writes numbers", ctx do
+      assert "UNS/v1/E/Edge/EmptySite/A/V" in topics(
+               device(ctx, "EmptySite", Enterprise: "E", Site: " ", Area: "A")
+             )
+
+      assert "UNS/v1/E/S/Edge/Trimmed/A/V" in topics(
+               device(ctx, "Trimmed", Enterprise: " E", Site: "S ")
              )
 
       assert "UNS/v1/E/5/Edge/NumSite/A/V" in topics(
@@ -314,12 +322,14 @@ defmodule Ingest.UnsIngesterTest do
              )
     end
 
-    test "uses the last one under Device_Information/ISA95_Hierarchy", ctx do
+    # JS before the shared rule: took the last Hierarchy-v1 schema at any
+    # path containing Device_Information/ISA95_Hierarchy.
+    test "uses only the one at Device_Information/ISA95_Hierarchy", ctx do
       metrics =
         tops() ++
-          hierarchy([Enterprise: "Wrong"], "Other/ISA95") ++
+          hierarchy(Enterprise: "Right") ++
           Enum.map(
-            hierarchy(Enterprise: "Right"),
+            hierarchy([Enterprise: "Wrong"], "Safety/#{@root}"),
             &Keyword.update!(&1, :alias, fn a -> a + 50 end)
           ) ++
           [[name: "A/V", type: :double, value: 1.0, alias: 1, timestamp: @t0 + 1]]
@@ -328,21 +338,22 @@ defmodule Ingest.UnsIngesterTest do
         with_log(fn -> dbirth(ctx, fplus_payload(metrics, timestamp: @t0), "Two") end)
 
       assert Enum.map(messages, &elem(&1, 0)) == [
-               "UNS/v1/Right/Edge/Two/Other/ISA95/Enterprise",
                "UNS/v1/Right/Edge/Two/Device_Information/ISA95_Hierarchy/Enterprise",
+               "UNS/v1/Right/Edge/Two/Safety/Device_Information/ISA95_Hierarchy/Enterprise",
                "UNS/v1/Right/Edge/Two/A/V"
              ]
 
-      assert log =~
-               ~s(Ignored the Hierarchy-v1 schema at "Other/ISA95" in the birth of G1/N1/Two: ) <>
-                 "it isn't under Device_Information/ISA95_Hierarchy"
+      refute log =~ "Won't publish"
     end
 
     test "a device without one isn't published, and its birth says why", ctx do
       for {name, levels, at, reason} <- [
-            {"None", [], nil, "its birth has no ISA-95 hierarchy"},
-            {"EmptyEnt", [Enterprise: "", Site: "S"], nil, ~s(its ISA-95 enterprise is "")},
-            {"Wrong place", [Enterprise: "E"], "Hierarchy", "its birth has no ISA-95 hierarchy"}
+            {"None", [], nil, @no_hierarchy},
+            {"EmptyEnt", [Enterprise: " ", Site: "S"], nil, "its ISA-95 Enterprise is missing"},
+            {"Wrong place", [Enterprise: "E"], "Hierarchy", @no_hierarchy},
+            {"Nested", [Enterprise: "E"], "Base_Robot/#{@root}", @no_hierarchy},
+            {"Slash", [Enterprise: "E", Site: "A/B"], nil, ~s(its ISA-95 Site, "A/B", has /)},
+            {"Reserved", [Enterprise: "Edge"], nil, ~s(its ISA-95 Enterprise is "Edge")}
           ] do
         metrics =
           tops() ++
@@ -375,7 +386,7 @@ defmodule Ingest.UnsIngesterTest do
 
       {messages, log} = with_log(fn -> dbirth(ctx, payload(metrics, timestamp: @t0), "NotFP") end)
       assert messages == []
-      assert log =~ "Won't publish G1/N1/NotFP to the UNS: its birth has no ISA-95 hierarchy"
+      assert log =~ "Won't publish G1/N1/NotFP to the UNS: its birth isn't a Factory+ payload"
     end
 
     # JS: warned for every topic of every message.
@@ -397,13 +408,12 @@ defmodule Ingest.UnsIngesterTest do
       end
     end
 
-    # JS: published to topics with + and # in them, which MQTT forbids.
+    # The hierarchy can't put +, # or U+0000 in a topic (see above), but
+    # a device ID can have U+0000 in it.
     test "a device whose topics MQTT forbids isn't published", ctx do
-      {messages, log} = device(ctx, "Slashes", Enterprise: "E/x", Site: "S+#")
+      {messages, log} = device(ctx, "D\0", Enterprise: "E")
       assert messages == []
-
-      assert log =~
-               "Won't publish G1/N1/Slashes to the UNS: its topics would have +, # or U+0000 in them"
+      assert log =~ "to the UNS: its topics would have +, # or U+0000 in them"
     end
 
     test "a metric at the top level has no path", ctx do

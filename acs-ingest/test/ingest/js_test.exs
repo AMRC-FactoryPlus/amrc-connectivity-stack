@@ -23,4 +23,17 @@ defmodule Ingest.JSTest do
     assert JS.string({:int_value, 300}) == :error
     assert JS.string(%{}) == :error
   end
+
+  test "trim/1 strips what JS's trim() strips" do
+    spaces = " \t\n\v\f\r\u00A0\u1680\u2000\u2005\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF"
+    assert JS.trim(spaces <> "a b" <> spaces) == "a b"
+    assert JS.trim(spaces) == ""
+    assert JS.trim("") == ""
+    assert JS.trim("é") == "é"
+
+    # Unicode counts U+0085 and U+180E as white space, or once did; JS
+    # doesn't strip them.
+    assert JS.trim("\u0085a\u180E") == "\u0085a\u180E"
+    assert JS.trim(<<0xFF, ?\s>>) == <<0xFF>>
+  end
 end

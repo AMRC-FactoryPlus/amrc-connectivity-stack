@@ -5,9 +5,15 @@
 defmodule Ingest.JS do
   @moduledoc """
   The parts of JS's semantics that the services ported from JS depend
-  on, for the values `SparkplugB` decodes: which values are truthy, and
-  what `String()` makes of a value.
+  on, for the values `SparkplugB` decodes: which values are truthy,
+  what `String()` makes of a value, and what `trim()` strips.
   """
+
+  # The code points JS's trim() strips, its WhiteSpace and
+  # LineTerminator, besides U+0009 to U+000D and U+2000 to U+200A.
+  @js_spaces [0x20, 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF]
+
+  defguardp is_js_space(c) when c in 0x09..0x0D or c in 0x2000..0x200A or c in @js_spaces
 
   @doc """
   Whether JS counts a value as truthy. `nil`, `false`, `""`, zero and
@@ -33,6 +39,32 @@ defmodule Ingest.JS do
     do: {:ok, number(value)}
 
   def string(_value), do: :error
+
+  @doc """
+  What JS's `trim()` makes of a string: the string without the
+  whitespace and line terminators at its ends. JS strips U+FEFF but not
+  U+0085, so this isn't `String.trim/1`.
+
+      iex> Ingest.JS.trim("\\u00A0 Acme\\uFEFF")
+      "Acme"
+  """
+  @spec trim(String.t()) :: String.t()
+  def trim(string), do: string |> trim_leading() |> trim_trailing()
+
+  defp trim_leading(<<c::utf8, rest::binary>>) when is_js_space(c), do: trim_leading(rest)
+  defp trim_leading(string), do: string
+
+  # The string up to the end of its last code point that isn't a space.
+  defp trim_trailing(string), do: binary_part(string, 0, kept(string, byte_size(string), 0))
+
+  defp kept(<<c::utf8, rest::binary>>, size, kept) do
+    kept = if is_js_space(c), do: kept, else: size - byte_size(rest)
+    kept(rest, size, kept)
+  end
+
+  # A byte that isn't UTF-8 isn't a space.
+  defp kept(<<_byte, rest::binary>>, size, _kept), do: kept(rest, size, size - byte_size(rest))
+  defp kept(<<>>, _size, kept), do: kept
 
   @doc """
   A number as JS writes it: an integer exactly, a float in its shortest

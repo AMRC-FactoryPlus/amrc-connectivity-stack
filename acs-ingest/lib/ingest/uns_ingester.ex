@@ -16,11 +16,11 @@ defmodule Ingest.UnsIngester do
 
       UNS/v1/<enterprise>/<site>/<area>/<work center>/<work unit>/Edge/<device>/<name>
 
-  The levels are the device's ISA-95 hierarchy (see
-  `Ingest.Sparkplug.Hierarchy`), from the enterprise down to the first
-  it doesn't have. A level of `""` stays, as an empty level, and a
-  number is written as JS writes it (`Ingest.JS.string/1`). `<name>`
-  is the metric's name from its birth.
+  The levels are the device's ISA-95 hierarchy, by the rule the UNS
+  ingester shares with i3X and the admin UI (see
+  `Ingest.Sparkplug.Hierarchy`): trimmed, from the enterprise down to
+  the first empty level. A number is written as JS writes it
+  (`Ingest.JS.string/1`). `<name>` is the metric's name from its birth.
 
   ## Messages
 
@@ -52,10 +52,10 @@ defmodule Ingest.UnsIngester do
   Transient metrics are published.
 
   A device isn't published at all when its birth has no ISA-95
-  enterprise (or a falsy one, as JS sees it, such as `""`), or no
-  top-level `Instance_UUID` or `Schema_UUID`, or when its hierarchy
-  would make topics MQTT doesn't allow. Its birth logs a warning, and
-  its DATA is skipped silently.
+  hierarchy by that rule, or no top-level `Instance_UUID` or
+  `Schema_UUID`, or when its device ID would make topics MQTT doesn't
+  allow. Its birth logs a warning saying why, and its DATA is skipped
+  silently.
 
   As in the historian, a value is never published with the wrong type
   or the wrong value. A sample is skipped, with a warning:
@@ -84,7 +84,6 @@ defmodule Ingest.UnsIngester do
   require Logger
 
   alias Ingest.JS
-  alias Ingest.Sparkplug.Hierarchy
   alias Ingest.Sparkplug.Metadata
   alias Ingest.Sparkplug.Simulated
   alias Ingest.Sparkplug.Update
@@ -153,8 +152,6 @@ defmodule Ingest.UnsIngester do
   def messages(%Update{metrics: []}), do: []
 
   def messages(%Update{metrics: [{_metric, meta} | _]} = update) do
-    if update.kind == :birth, do: log_misplaced(update.address, meta.hierarchy)
-
     case prefix(update.address, meta) do
       {:ok, prefix} ->
         device_messages(update, prefix)
@@ -182,28 +179,8 @@ defmodule Ingest.UnsIngester do
     end
   end
 
-  defp levels(%Hierarchy{enterprise: nil}), do: {:skip, "its birth has no ISA-95 hierarchy"}
-
-  defp levels(%Hierarchy{enterprise: enterprise} = hierarchy) do
-    if JS.truthy?(enterprise) do
-      hierarchy
-      |> Hierarchy.levels()
-      |> Enum.take_while(fn {_level, value} -> value != nil end)
-      |> Enum.reduce_while({:ok, []}, &level_string/2)
-    else
-      {:skip, "its ISA-95 enterprise is #{inspect(enterprise)}"}
-    end
-  end
-
-  defp level_string({level, value}, {:ok, strings}) do
-    case JS.string(value) do
-      {:ok, string} ->
-        {:cont, {:ok, strings ++ [string]}}
-
-      :error ->
-        {:halt, {:skip, "its ISA-95 #{level}, #{inspect(value)}, isn't a string or a number"}}
-    end
-  end
+  defp levels({:ok, levels}), do: {:ok, levels}
+  defp levels({:error, reason}), do: {:skip, reason}
 
   defp top(value, _name) when is_binary(value) and value != "", do: :ok
 
@@ -376,15 +353,6 @@ defmodule Ingest.UnsIngester do
 
   defp log_skipped({:bad_topic, reason}, update, name),
     do: Logger.debug("Skipped #{inspect(name)} from #{name(update.address)}: #{reason}")
-
-  defp log_misplaced(_address, %Hierarchy{misplaced: []}), do: :ok
-
-  defp log_misplaced(address, %Hierarchy{misplaced: paths}) do
-    Logger.warning(
-      "Ignored the Hierarchy-v1 schema at #{Enum.map_join(paths, ", ", &inspect/1)} " <>
-        "in the birth of #{name(address)}: it isn't under Device_Information/ISA95_Hierarchy"
-    )
-  end
 
   defp log_unpublished(_update, []), do: :ok
 

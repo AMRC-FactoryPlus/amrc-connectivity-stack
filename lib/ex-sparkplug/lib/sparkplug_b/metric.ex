@@ -12,7 +12,8 @@ defmodule SparkplugB.Metric do
     * `:float`, `:double`: a float, or `:nan`, `:infinity` or
       `:"-infinity"`, which the BEAM has no float for
     * `:boolean`: a boolean
-    * `:string`, `:text`, `:uuid`: a string
+    * `:string`, `:text`, `:uuid`: a string, with any invalid UTF-8
+      replaced by U+FFFD, as Tahu JS decodes it
     * `:date_time`: the integer as sent (milliseconds since the Unix
       epoch, per the spec)
     * `:bytes`, `:file`: a binary
@@ -27,6 +28,10 @@ defmodule SparkplugB.Metric do
     * for datatypes not converted yet: datasets, templates, arrays and
       extensions.
     * when the wire field doesn't match the datatype.
+    * when an integer is out of range for its type, such as an Int8
+      sent as 300. Signed types accept two's complement at the type's
+      own width, or sign-extended to 32 or 64 bits, so an Int8 -5 may be
+      251, 4294967291 or 18446744073709551611.
 
   `timestamp` is integer nanoseconds since the Unix epoch; see
   `SparkplugB.decode/2`. `properties` is a map from key to
@@ -82,7 +87,7 @@ defmodule SparkplugB.Metric do
     datatype = DataType.from_wire(metric.datatype)
 
     %__MODULE__{
-      name: metric.name,
+      name: Value.text(metric.name),
       alias: metric.alias,
       timestamp: Timestamp.to_ns(metric.timestamp, unit),
       datatype: datatype,
@@ -101,5 +106,9 @@ defmodule SparkplugB.Metric do
     |> Map.from_struct()
     |> Map.delete(:__uf__)
     |> Map.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new(fn
+      {key, value} when is_binary(value) -> {key, Value.text(value)}
+      pair -> pair
+    end)
   end
 end

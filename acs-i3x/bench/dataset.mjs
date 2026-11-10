@@ -7,7 +7,7 @@
  * The shape copies a real device class on the dev cluster (a traffic
  * signal with Address, Cyber_Profile, Device_Information/ISA95_Hierarchy
  * and Location sub-objects) and the tag schema that historian-sparkplug
- * writes (historian-sparkplug/lib/mqttclient.ts, writeToInfluxDB).
+ * writes (acs-ingest/lib/ingest/sparkplug_historian.ex).
  *
  * Edge cases seen on the dev cluster, or needed for equivalence, are
  * spread across the fleet by device index:

@@ -85,11 +85,15 @@ init([Type, Msg, Expect, ProtoFSM]) ->
 wait(enter, _PrevState, _S0 = #?MODULE{}) ->
     keep_state_and_data;
 wait({call, From}, await, S0 = #?MODULE{awaiters = Aws0, type = Type,
-                                        msg = Msg}) ->
+                                        msg = Msg, proto = FSM}) ->
     S1 = S0#?MODULE{awaiters = [From | Aws0]},
     {ok, Bytes} = krb_proto:encode(Type, Msg),
+    % ACS patch: as MIT Kerberos does, send a message larger than
+    % udp_preference_limit by TCP first. kerlberos used a fixed 1500
+    % bytes; ACS's krb5.conf sets 1, as its KDC only listens on TCP.
+    Limit = krb_proto_srv:udp_preference_limit(FSM),
     if
-        (byte_size(Bytes) < 1500) ->
+        (byte_size(Bytes) =< Limit) ->
             {next_state, udp_single, S1};
         true ->
             {next_state, tcp, S1}

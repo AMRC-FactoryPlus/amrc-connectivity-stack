@@ -19,7 +19,9 @@
 import { beforeAll, describe, expect, test } from "vitest";
 
 import { APIv1 } from "../../lib/api-v1.js";
-import { run_scenario, step_names } from "../support/scenario.js";
+import {
+    committed_snapshots, golden_snapshots, run_scenario, step_names,
+} from "../support/scenario.js";
 import { site_datasets } from "../support/site-builder.js";
 
 const debug = { bound: () => () => {} };
@@ -118,7 +120,19 @@ function observer () {
     };
 }
 
-describe.each(["A", "B"])("HTTP read routes, scenario %s", name => {
+const TITLE = "HTTP read routes, scenario %s";
+/* Read now, before vitest can write to the file. */
+const committed = committed_snapshots(import.meta.url);
+
+describe("the committed snapshots", () => {
+    /* A missing snapshot is written, not failed, so a renamed step
+     * would be compared with nothing. This fails first. */
+    test("are one for every step of both scenarios, and no other", () => {
+        expect([...committed].sort()).toEqual(golden_snapshots(TITLE).sort());
+    });
+});
+
+describe.each(["A", "B"])(TITLE, name => {
     let records;
 
     beforeAll(async () => {

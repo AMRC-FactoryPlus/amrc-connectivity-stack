@@ -22,7 +22,9 @@ import { beforeAll, describe, expect, test } from "vitest";
 import {
     ENDPOINTS, make_client, message_shape,
 } from "../support/notify-client.js";
-import { run_scenario, step_names } from "../support/scenario.js";
+import {
+    committed_snapshots, golden_snapshots, run_scenario, step_names,
+} from "../support/scenario.js";
 
 const SINGLE = new Set(["metadata_uuid", "structure_uuid"]);
 
@@ -154,16 +156,39 @@ function observer (shapes = new Set()) {
     };
 }
 
+const TITLE = "notify client state, scenario %s";
+/* Read now, before vitest can write to the file. */
+const committed = committed_snapshots(import.meta.url);
+
 const shapes = new Set();
 
-describe.each(["A", "B"])("notify client state, scenario %s", name => {
+/* One recording of each scenario, made when a test first asks for it
+ * and read by every test that needs it. So a test run alone, with a
+ * filter, still has the recording it reads. */
+const recordings = new Map();
+function recorded (name) {
+    if (!recordings.has(name)) {
+        const obs = observer(shapes);
+        recordings.set(name, run_scenario(name, obs)
+            .then(records => ({ records, result: obs.result })));
+    }
+    return recordings.get(name);
+}
+
+describe("the committed snapshots", () => {
+    /* A missing snapshot is written, not failed, so a renamed step
+     * would be compared with nothing. This fails first. */
+    test("are one for every step of both scenarios, and no other", () => {
+        expect([...committed].sort()).toEqual(golden_snapshots(TITLE).sort());
+    });
+});
+
+describe.each(["A", "B"])(TITLE, name => {
     let records;
     let result;
 
     beforeAll(async () => {
-        const obs = observer(shapes);
-        records = await run_scenario(name, obs);
-        result = obs.result;
+        ({ records, result } = await recorded(name));
     }, 120000);
 
     test.each(step_names(name))("after: %s", step => {
@@ -175,22 +200,19 @@ describe.each(["A", "B"])("notify client state, scenario %s", name => {
         expect(result.late.fresh).toEqual(result.late.held);
     });
 
-    /* The old handlers take about ten seconds a scenario, so only one
-     * is recorded twice here. The DataFlow and HTTP goldens record
-     * both twice. */
-    if (name == "A") {
-        test("recording it again gives the same records", async () => {
-            expect(await run_scenario(name, observer())).toEqual(records);
-        }, 120000);
-    }
+    test("recording it again gives the same records", async () => {
+        expect(await run_scenario(name, observer())).toEqual(records);
+    }, 120000);
 });
 
 describe("message shapes", () => {
     /* The handlers the catalogue was taken from sent exactly these
      * shapes. The keyed views may send fewer, and never a new one. */
-    test("the two scenarios send only catalogued shapes", () => {
+    test("the two scenarios send only catalogued shapes", async () => {
+        await Promise.all(["A", "B"].map(recorded));
+
         expect(shapes.size).toBeGreaterThan(0);
         const catalogue = new Set(SHAPE_CATALOGUE);
         expect([...shapes].filter(shape => !catalogue.has(shape))).toEqual([]);
-    });
+    }, 120000);
 });

@@ -20,6 +20,10 @@
  * changed or removed. A step that changes nothing a client can see
  * records "(no change)", which is pinned like anything else. */
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import * as imm from "immutable";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
@@ -370,6 +374,37 @@ export const SCENARIOS = {
  * records run_scenario returns. */
 export function step_names (name) {
     return ["start", ...SCENARIOS[name].steps.map(([step]) => step)];
+}
+
+/** The names of the snapshots a golden test file has committed.
+ *
+ * Call this as the test file loads, before vitest can write to the
+ * snapshot file. Vitest fails a snapshot that differs, but one that is
+ * missing it writes and passes, unless CI is set. So a step or a
+ * describe block that is renamed gets a new snapshot taken from the
+ * code as it is now, and proves nothing. A golden test file compares
+ * these names with the names its tests ask for.
+ *
+ * @arg test_url `import.meta.url` of the test file.
+ * @returns An array of names, as vitest writes them: the titles
+ * joined with " > ", then a count.
+ */
+export function committed_snapshots (test_url) {
+    const file = fileURLToPath(test_url);
+    const snap = path.join(
+        path.dirname(file), "__snapshots__", `${path.basename(file)}.snap`);
+    const text = fs.readFileSync(snap, "utf8");
+    return [...text.matchAll(/^exports\[`((?:[^`\\]|\\.)*)`\] = /gm)]
+        .map(m => m[1].replace(/\\(.)/g, "$1"));
+}
+
+/** The snapshot names a golden test file asks for: one for each step
+ * of scenarios A and B.
+ * @arg title The describe.each title, with %s for the scenario. */
+export function golden_snapshots (title) {
+    return Object.keys(SCENARIOS).flatMap(name =>
+        step_names(name).map(step =>
+            `${title.replace("%s", name)} > after: ${step} 1`));
 }
 
 /** Build a scenario's site and a DataFlow over it.

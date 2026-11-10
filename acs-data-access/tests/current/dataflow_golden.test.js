@@ -21,7 +21,8 @@ import {
     reference_invalid, reference_parts, reference_valid,
 } from "../support/reference-datasets.js";
 import {
-    golden, map_lines, run_scenario, step_names,
+    committed_snapshots, golden, golden_snapshots, map_lines, run_scenario,
+    step_names,
 } from "../support/scenario.js";
 import { site_datasets } from "../support/site-builder.js";
 
@@ -93,7 +94,19 @@ function observer () {
     };
 }
 
-describe.each(["A", "B"])("DataFlow streams, scenario %s", name => {
+const TITLE = "DataFlow streams, scenario %s";
+/* Read now, before vitest can write to the file. */
+const committed = committed_snapshots(import.meta.url);
+
+describe("the committed snapshots", () => {
+    /* A missing snapshot is written, not failed, so a renamed step
+     * would be compared with nothing. This fails first. */
+    test("are one for every step of both scenarios, and no other", () => {
+        expect([...committed].sort()).toEqual(golden_snapshots(TITLE).sort());
+    });
+});
+
+describe.each(["A", "B"])(TITLE, name => {
     let records;
 
     beforeAll(async () => {

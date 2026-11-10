@@ -67,6 +67,36 @@ export function coalesce (fn) {
     });
 }
 
+/* A retry whose delay the caller can put back to the start.
+ *
+ * `retry()` gives an operator that subscribes to its source again
+ * after an error. The first wait is `delay` ms and each error after
+ * it waits twice as long, up to 64 times `delay`: the same waits as
+ * `retryBackoff` in @amrc-factoryplus/rx-util. `log`, if given, is
+ * called with each error.
+ *
+ * `retryBackoff` goes back to the first wait when a value comes out
+ * of the retried sequence. That is no use when the sequence says
+ * nothing while its source is well: every error then counts as one
+ * more in a row, for the life of the process. Here the caller calls
+ * `reset()` when it knows the source has answered, wherever in the
+ * pipeline that shows. */
+export function backoff (delay, log) {
+    let failures = 0;
+    return {
+        reset () { failures = 0; },
+        retry () {
+            return rx.retry({
+                delay: err => {
+                    log?.(err);
+                    const doublings = Math.min(failures++, 6);
+                    return rx.timer(delay * (2 ** doublings));
+                },
+            });
+        },
+    };
+}
+
 /* Follow a changing set of keys, with one inner sequence per key.
  *
  * The upstream is a sequence of Sets: anything with `size`, `has` and

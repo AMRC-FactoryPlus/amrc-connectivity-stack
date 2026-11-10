@@ -9,10 +9,9 @@ import * as rx from "rxjs";
 import { v5 as uuidv5 } from "uuid";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
-import * as rxu from "@amrc-factoryplus/rx-util";
 
 import { DataAccess as Constants } from "./constants.js";
-import { coalesce } from "./rx-util.js";
+import { backoff, coalesce } from "./rx-util.js";
 
 /* Every device with an ISA-95 placement gets one UNS device dataset,
  * its default dataset, which Data Access makes and owns. The dataset's
@@ -130,6 +129,8 @@ export class DefaultDatasets {
    * @arg opts.devices An Observable of Sets of device UUIDs.
    * @arg opts.concurrency How many datasets to make at a time.
    * @arg opts.clock A function that gives the time in milliseconds.
+   * @arg opts.retry_delay How long to wait, in milliseconds, before
+   * reading the inputs again after the first error.
    */
   constructor(opts) {
     this.data = opts.data;
@@ -149,6 +150,18 @@ export class DefaultDatasets {
      * had this long to show it. */
     this.settle = opts.settle ?? 60*1000;
     this.made = new Map();
+
+    /* An input that fails is read again after this long, and after
+     * twice as long for each further error in a row, up to 64 times.
+     * The wait goes back to the start when the inputs have answered
+     * and stayed up for the debounce: see jobs() and renames(). The
+     * retried pipelines say nothing while nothing is missing and no
+     * name is stale, so the retry cannot tell that from its output. */
+    this.retry_delay = opts.retry_delay ?? 5000;
+    this.jobs_retry = backoff(this.retry_delay,
+      e => this.log("Default device datasets failed, will retry: %s", e));
+    this.names_retry = backoff(this.retry_delay,
+      e => this.log("Default device dataset names failed, will retry: %s", e));
 
     /* How many datasets are made at a time. */
     this.concurrency = opts.concurrency ?? 4;
@@ -189,6 +202,7 @@ export class DefaultDatasets {
   jobs() {
     return this.inputs().pipe(
       rx.debounceTime(this.debounce),
+      rx.tap(() => this.jobs_retry.reset()),
       rx.map(({ placements, devices, datasets }) =>
         missing_defaults(placements, devices, datasets)),
       rx.filter(missing => missing.length > 0));
@@ -203,6 +217,7 @@ export class DefaultDatasets {
     }).pipe(
       rx.tap(v => this.latest_names = v),
       rx.debounceTime(this.debounce),
+      rx.tap(() => this.names_retry.reset()),
       rx.map(({ defaults, infos }) => stale_names(defaults, infos)),
       rx.filter(stale => stale.length > 0));
   }
@@ -214,6 +229,8 @@ export class DefaultDatasets {
     }
 
     this.stopped = false;
+    this.jobs_retry.reset();
+    this.names_retry.reset();
 
     /* A list from `jobs` or `renames` only says there is work. The
      * pass reads the newest inputs, and lists that arrive while it
@@ -221,15 +238,13 @@ export class DefaultDatasets {
      * turn. An input error is retried: it does not stop the maker. */
     this.subscription = this.jobs().pipe(
       coalesce(() => this.drain()),
-      rxu.retryBackoff(5000,
-        e => this.log("Default device datasets failed, will retry: %s", e)),
+      this.jobs_retry.retry(),
     ).subscribe({
       error: e => this.log("Default device datasets stopped: %s", e),
     });
     this.subscription.add(this.renames().pipe(
       coalesce(() => this.rename_drain()),
-      rxu.retryBackoff(5000,
-        e => this.log("Default device dataset names failed, will retry: %s", e)),
+      this.names_retry.retry(),
     ).subscribe({
       error: e => this.log("Default device dataset names stopped: %s", e),
     }));

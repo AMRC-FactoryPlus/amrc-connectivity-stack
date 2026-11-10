@@ -253,11 +253,12 @@ describe("the timings these tests assume", () => {
         expect(maker.debounce).toBe(DEBOUNCE);
         expect(maker.settle).toBe(SETTLE);
         expect(maker.retry_interval).toBe(RETRY_INTERVAL);
+        expect(maker.retry_delay).toBe(RETRY_DELAY);
         expect(maker.concurrency).toBe(4);
     });
 
-    /* The delay is written in run(), so it shows only in when the
-     * maker subscribes again. */
+    /* What the delay does shows only in when the maker subscribes
+     * again. */
     test("include the delay before a failed input is subscribed again", async () => {
         const fx = rig(2, { site: { latency: 100 } });
         const placements = restartable(placements_of(fx.built));
@@ -496,6 +497,113 @@ describe("an input error", () => {
         await advance(10 * SECOND);
         await fx.site.settle();
         expect_each_once(fx.log.creates(), fx.missing.map(m => m.dataset));
+    });
+
+    /* The delay doubles for errors in a row. An error that comes
+     * after the inputs have answered and stayed up is a new one: a
+     * site that has had a handful of ConfigDB errors over some days
+     * must not make a newly placed device wait minutes for its
+     * dataset. Every dataset is made before the first error here, so
+     * no list and no pass follows a retry: only the inputs show that
+     * the retry worked. */
+    test("after the inputs have answered again is retried at the first delay, every time", async () => {
+        const fx = rig(2, { site: { latency: 100 } });
+        const placements = restartable(placements_of(fx.built));
+        fx.maker.placements = placements.source;
+        cleanup.push(() => placements.close());
+
+        fx.maker.run();
+        await advance(10 * SECOND);
+        await fx.site.settle();
+        expect(fx.log.creates()).toHaveLength(2);
+
+        for (let errors = 1; errors <= 5; errors++) {
+            placements.fail();
+            await advance(RETRY_DELAY - 100);
+            expect(placements.subscribes).toBe(errors);
+            await advance(200);
+            expect(placements.subscribes).toBe(errors + 1);
+            /* The inputs answer, and nothing is missing. */
+            await advance(MINUTE);
+        }
+        expect(fx.seen.triggers).toBe(1);
+        expect(fx.log.creates()).toHaveLength(2);
+    });
+
+    test("after an input that answered for less than the debounce is still retried later", async () => {
+        const fx = rig(2, { site: { latency: 100 } });
+        const placements = restartable(placements_of(fx.built));
+        fx.maker.placements = placements.source;
+        cleanup.push(() => placements.close());
+
+        fx.maker.run();
+        await advance(10 * SECOND);
+        await fx.site.settle();
+
+        /* Each retry gets an answer and loses it half a second
+         * later, so the waits are 5, 10 and 20 s. */
+        let waited = RETRY_DELAY;
+        for (let errors = 1; errors <= 3; errors++) {
+            placements.fail();
+            await advance(waited - 100);
+            expect(placements.subscribes).toBe(errors);
+            await advance(200);
+            expect(placements.subscribes).toBe(errors + 1);
+            await advance(DEBOUNCE - 600);
+            waited *= 2;
+        }
+    });
+
+    test("on every try is retried after 5, 10, 20 ... 320 s, then at the first delay once the inputs answer", async () => {
+        const fx = rig(2, { site: { latency: 100 } });
+        /* The first nine subscriptions fail at once. Those after
+         * them answer, and the test can fail them. */
+        const working = restartable(placements_of(fx.built));
+        cleanup.push(() => working.close());
+        const tries = [];
+        fx.maker.placements = rx.defer(() => {
+            tries.push(Date.now());
+            return tries.length <= 9
+                ? rx.throwError(() => new Error("The source failed"))
+                : working.source;
+        });
+
+        fx.maker.run();
+        await advance(30 * MINUTE);
+        await fx.site.settle();
+
+        expect(tries).toHaveLength(10);
+        expect(tries.slice(1).map((t, i) => (t - tries[i]) / SECOND))
+            .toEqual([5, 10, 20, 40, 80, 160, 320, 320, 320]);
+        expect_each_once(fx.log.creates(), fx.missing.map(m => m.dataset));
+
+        working.fail();
+        await advance(RETRY_DELAY - 100);
+        expect(tries).toHaveLength(10);
+        await advance(200);
+        expect(tries).toHaveLength(11);
+    });
+
+    test("is retried at the first delay by a maker that was stopped and run again", async () => {
+        const fx = rig(2, { site: { latency: 100 } });
+        const tries = [];
+        fx.maker.placements = rx.defer(() => {
+            tries.push(Date.now());
+            return rx.throwError(() => new Error("The source failed"));
+        });
+
+        fx.maker.run();
+        await advance(MINUTE);
+        /* Tries at 0, 5, 15 and 35 s: the next would wait 40 s. */
+        expect(tries).toHaveLength(4);
+
+        fx.maker.stop();
+        fx.maker.run();
+        expect(tries).toHaveLength(5);
+        await advance(RETRY_DELAY - 100);
+        expect(tries).toHaveLength(5);
+        await advance(200);
+        expect(tries).toHaveLength(6);
     });
 });
 
@@ -1159,6 +1267,49 @@ describe("default dataset names under a burst", () => {
         expect(fx.seen.most_renaming).toBe(1);
         /* Each name was written once. */
         expect(fx.log.of("put_config")).toHaveLength(3);
+        expect_names(fx.site, "First");
+    });
+
+    /* Every name is right here, so no list and no pass follows a
+     * retry: only the inputs show that the retry worked. */
+    test("errors on the names with an answer between them are each retried at the first delay", async () => {
+        const fx = rename_rig(0);
+        const right = names("First").merge(IMap(
+            [...defaults].map(([dataset, device]) =>
+                [dataset, names("First").get(device)])));
+        fx.infos.next(right);
+
+        fx.maker.run();
+        await advance(MINUTE);
+
+        for (let errors = 1; errors <= 5; errors++) {
+            fx.infos.fail();
+            await advance(RETRY_DELAY - 100);
+            expect(fx.infos.subscribes).toBe(errors);
+            await advance(200);
+            expect(fx.infos.subscribes).toBe(errors + 1);
+            await advance(MINUTE);
+        }
+        expect(fx.seen.rename_triggers).toBe(0);
+        expect(fx.log.calls).toHaveLength(0);
+    });
+
+    test("errors on the names in a row are retried later each time", async () => {
+        const fx = rename_rig(0);
+        const tries = [];
+        fx.maker.data.general_infos = rx.defer(() => {
+            tries.push(Date.now());
+            return tries.length <= 4
+                ? rx.throwError(() => new Error("The source failed"))
+                : fx.infos.source;
+        });
+
+        fx.maker.run();
+        await advance(5 * MINUTE);
+        await fx.site.settle();
+
+        expect(tries.slice(1).map((t, i) => (t - tries[i]) / SECOND))
+            .toEqual([5, 10, 20, 40]);
         expect_names(fx.site, "First");
     });
 

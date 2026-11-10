@@ -456,7 +456,7 @@ describe("PartsIndex changes", () => {
         expect(m.index.apply({ key: A, value: ISet([B]) })).toBeNull();
     });
 
-    test("the parts keep the order ConfigDB listed the subclasses in", () => {
+    test("a part that joins takes its place in the order of the subclass list", () => {
         const m = model();
         const listed = [D, X, B, C];
         m.subclasses.set(A, listed);
@@ -467,6 +467,34 @@ describe("PartsIndex changes", () => {
         const want = ISet(listed).filter(id => m.members.has(id));
         expect([...m.index.map.get(A)]).toEqual([...want]);
         expect([...m.index.map.get(A)]).toEqual(listed);
+    });
+
+    /* The whole-map code built every entry again from the newest
+     * list, so it gave the new order. Here a value that has the same
+     * parts is the same value: nobody is told, and the Set held stays.
+     * A reader that starts later can hold the same parts in another
+     * order. No client may rely on the order of `parts`. */
+    test("a new list with the same parts in another order is no change, and the Set held stays", () => {
+        const index = new PartsIndex();
+        index.apply({ set: new Set([A, B, C]), added: [A, B, C], removed: [] });
+        index.apply({ key: A, value: ISet([B, C]) });
+        index.apply({ key: B, value: ISet() });
+        const first = index.apply({ key: C, value: ISet() });
+        const held = first.map.get(A);
+        expect([...held]).toEqual([B, C]);
+
+        /* The other order, and one more subclass that is no member. */
+        expect(index.apply({ key: A, value: ISet([X, C, B]) })).toBeNull();
+        expect(index.map.get(A)).toBe(held);
+
+        /* A fresh index over the same lists holds the new order. */
+        const fresh = new PartsIndex();
+        fresh.apply({ set: new Set([A, B, C]), added: [A, B, C], removed: [] });
+        fresh.apply({ key: A, value: ISet([X, C, B]) });
+        fresh.apply({ key: B, value: ISet() });
+        const again = fresh.apply({ key: C, value: ISet() });
+        expect([...again.map.get(A)]).toEqual([C, B]);
+        expect(imm_is(again.map, index.map)).toBe(true);
     });
 
     test("takes a native Set of subclasses", () => {
@@ -918,7 +946,7 @@ describe("DataFlow.parts", () => {
         expect(imm_is(again, site_parts(site))).toBe(true);
     });
 
-    test("a late reader gets the whole map, with changed: null first for its own index", async () => {
+    test("a late reader gets the last result again: the whole map, with a `changed` that names one key", async () => {
         const { site, built, data } = fixture({ datasets: 60, seed: 78 });
         const first = record(data.parts_changes);
         site.set_subclasses(built.kinds.sparkplug[1], [built.kinds.subset[0]]);
@@ -928,6 +956,7 @@ describe("DataFlow.parts", () => {
          * must still count every key as changed; the map is whole. */
         const late = await rx.firstValueFrom(data.parts_changes);
         expect(late).toBe(first.values.at(-1));
+        expect(late.changed).toEqual(new Set([built.kinds.sparkplug[1]]));
         expect(imm_is(late.map, site_parts(site))).toBe(true);
     });
 

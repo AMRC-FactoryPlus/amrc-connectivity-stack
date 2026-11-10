@@ -22,7 +22,9 @@ import { Map as IMap, Set as ISet, is as imm_is } from "immutable";
  *
  * A member that joins or leaves touches its own entry and the entries
  * of the datasets that list it as a subclass, and no other. A new
- * subclass list touches the entry of that one dataset.
+ * subclass list touches the entry of that one dataset, and only when
+ * it changes which parts the dataset has: the order of the parts is
+ * not part of the value.
  *
  * A result also gives `parents`: for a part, the datasets that list
  * it. A reader uses it to find the datasets to look at again when
@@ -154,8 +156,11 @@ export class PartsIndex {
 
     /* Work out one member's entry again. The entry is always the
      * member's whole subclass Set filtered, never the old entry with
-     * one part added or removed, so the parts keep the order ConfigDB
-     * listed them in. */
+     * one part added or removed, so a part that joins takes its place
+     * in the order of the subclass list. An entry that comes out with
+     * the same parts keeps the Set it had, whatever order a new list
+     * gives them: no reader is told of a change that is only a new
+     * order. The parts are a Set, and their order means nothing. */
     _refresh (member) {
         const raw = this.raw.get(member);
         if (raw === undefined) return;

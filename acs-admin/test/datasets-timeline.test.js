@@ -182,11 +182,17 @@ describe('lanes', () => {
             { uuid: 'z', name: 'Fan', path: ['Works', 'Site A'], metrics: [] },
         ]
         const { rows } = build_rows({ devices, expanded: { other: true } })
+        // No dataset lookup given: no row links anywhere.
+        expect(rows.filter(r => r.kind === 'device').every(r => r.dataset === null)).toBe(true)
         expect(rows.map(r => r.name)).toEqual([
             'Other devices', 'Works / Site A', 'Fan', 'Works / Site B', 'Pump', 'Not in the ISA-95 hierarchy', 'Unplaced',
         ])
         expect(rows[2].tag).toBe('0 metrics')
         expect(rows[4].tag).toBeNull()
+        // A device with a dataset of its own links to it.
+        const linked = build_rows({ devices, expanded: { other: true }, dataset_of: u => (u === 'y' ? 'ds-y' : null) }).rows
+        expect(linked.filter(r => r.kind === 'device').map(r => [r.name, r.dataset]))
+            .toEqual([['Fan', null], ['Pump', 'ds-y'], ['Unplaced', null]])
         expect(build_rows({ devices, query: 'site b' }).rows.map(r => r.name)).toEqual(['Other devices', 'Works / Site B', 'Pump'])
     })
 

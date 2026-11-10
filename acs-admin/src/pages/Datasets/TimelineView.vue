@@ -125,6 +125,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useDatasetsStore } from '@store/useDatasetsStore.js'
 import {
   ZOOMS, track_range, ticks, centre_label, snap, fmt_clock, london_date_key,
+  default_dataset_uuid,
 } from '@/lib/datasets/model.js'
 import {
   LABEL_W, HEADER_H,
@@ -277,6 +278,13 @@ const ongoing = computed(() => ds.visible
 
 const eqDevices = computed(() => equipment_devices(ds.equipment, u => ds.devicesOf(u), ds.byUuid))
 
+// Every placed device has a default dataset. A device row links to it
+// when the person can read it.
+function deviceDataset (device) {
+  const uuid = default_dataset_uuid(device)
+  return ds.byUuid[uuid]?.readable ? uuid : null
+}
+
 const layout = computed(() => build_rows({
   ongoing: ongoing.value,
   equipment: ds.equipment,
@@ -284,6 +292,7 @@ const layout = computed(() => build_rows({
   devices: ds.deviceIndex,
   expanded: expanded.value,
   query: query.value,
+  dataset_of: deviceDataset,
 }))
 
 const shownRows = computed(() => visible_rows(layout.value.rows, view.top, view.height))

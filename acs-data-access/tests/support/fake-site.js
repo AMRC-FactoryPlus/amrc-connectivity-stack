@@ -35,6 +35,10 @@ const real_now = performance.now.bind(performance);
 
 const quiet = () => {};
 
+/* How long the rx-client library keeps a class relation WATCH that has
+ * no subscriber, in ms (cacheSeq in rx-util). */
+const IDLE_WATCH = 5000;
+
 /* The notify sources. An `app` source is one ConfigDB SEARCH over an
  * application. `member` and `subclass` are ConfigDB class relation
  * WATCHes. `acl` is an Auth ACL watch for one principal. */
@@ -57,8 +61,9 @@ export class Counter extends Map {
     }
 }
 
-/* The Set of targets Auth gives for one permission. It counts `has`,
- * which is the grant check Data Access makes per dataset. */
+/* The Set of targets Auth gives for one permission. It counts `has`:
+ * the grant check Data Access makes per dataset, and the calls it
+ * makes to compare a pushed ACL with the one before. */
 class GrantSet extends Set {
     constructor (items, counters) {
         super(items);
@@ -100,6 +105,11 @@ export class FakeSite {
         this.subs = Object.fromEntries(KINDS.map(k => [k, new Map()]));
         /* The shared class relation sequences, as cacheSeq keeps them. */
         this.shared = { member: new Map(), subclass: new Map() };
+        /* The subscriptions callers hold on watch_members and
+         * watch_subclasses now, by class. `subs` cannot show these: the
+         * library shares one WATCH between them and keeps it for a
+         * while after the last one has gone. */
+        this.watching = { member: new Counter(), subclass: new Counter() };
         this.held = new Set();
         this.closed = false;
 
@@ -137,7 +147,13 @@ export class FakeSite {
             acl:        new Counter(),
             /* Async ConfigDB calls, by method name. */
             calls:      new Counter(),
-            /* has() calls on the grant Sets Auth gave out. */
+            /* has() calls on the grant Sets Auth gave out, whoever
+             * made them. Data Access makes one for each dataset it
+             * checks. It also makes some on every ACL push, to see
+             * whether the grants of a permission changed: one for the
+             * Null UUID and up to three for each target, for each
+             * open permission watch. So count the checks of a change
+             * that is no ACL push, or allow for these. */
             grant_has:  0,
             /* ACL entries filtered: the ACL size, once per open
              * permission watch, per push. */
@@ -253,10 +269,22 @@ export class FakeSite {
         return this._relate("member", klass, set => set.delete(uuid));
     }
 
+    /** Replace the member list of a class. ConfigDB sends one message
+     * with the new list, however many members came and went. */
+    set_members (klass, uuids) {
+        const want = new Set(uuids);
+        for (const u of want)
+            if (!this.objects.has(u)) this.objects.set(u, klass);
+        return this._replace("member", klass, want);
+    }
+
     /** Replace the subclass list of a class. */
     set_subclasses (klass, uuids) {
-        const want = new Set(uuids);
-        return this._relate("subclass", klass, set => {
+        return this._replace("subclass", klass, new Set(uuids));
+    }
+
+    _replace (rel, key, want) {
+        return this._relate(rel, key, set => {
             for (const u of [...set])
                 if (!want.has(u)) set.delete(u);
             for (const u of want) set.add(u);
@@ -380,12 +408,25 @@ export class FakeSite {
         }
     }
 
-    /** The number of open subscriptions to the fake services. */
+    /** The number of open subscriptions to the fake services. A class
+     * relation WATCH counts once however many callers share it, and
+     * for 5 s after the last of them has gone. See `open_watches` for
+     * what the callers hold. */
     open_subscriptions () {
         let n = 0;
         for (const k of KINDS)
             for (const subs of this.subs[k].values()) n += subs.size;
         return n;
+    }
+
+    /** The subscriptions callers hold on watch_members and
+     * watch_subclasses now: `{ member, subclass }`, each a number. A
+     * caller that does not unsubscribe shows here at once. */
+    open_watches () {
+        return {
+            member:     this.watching.member.total(),
+            subclass:   this.watching.subclass.total(),
+        };
     }
 
     /** Wait until nothing is happening.
@@ -548,10 +589,11 @@ export class FakeSite {
 
     /* A class relation as the library gives it: the list ConfigDB
      * sent, made into an Immutable Set and compared with the last one
-     * (configdb.js _watch_set), shared between callers and replayed
-     * (cacheSeq). The library drops an unused WATCH after 5 s; this
-     * keeps it until close(), which is the same for any test shorter
-     * than that and leaves no timer behind. */
+     * (configdb.js _watch_set), shared between callers and replayed,
+     * and dropped when it has had no subscriber for 5 s (cacheSeq). A
+     * caller that comes after that opens a new WATCH. close() ends
+     * every WATCH and the timer of each one that is waiting to be
+     * dropped. */
     _watch_relation (rel, key) {
         return rx.defer(() => {
             this.counters.watch[rel].add(key);
@@ -562,18 +604,27 @@ export class FakeSite {
                     this.counters.opened[rel].add(key);
                     return this._source(rel, key);
                 });
-                seq = opened.pipe(
+                const shared = opened.pipe(
                     rx.map(list => imm.Set(list)),
                     rx.distinctUntilChanged(imm.is),
+                    rx.finalize(() => {
+                        if (cache.get(key) === shared) cache.delete(key);
+                    }),
                     rx.share({
                         connector:              () => new rx.ReplaySubject(1),
                         resetOnError:           true,
                         resetOnComplete:        true,
-                        resetOnRefCountZero:    false,
+                        resetOnRefCountZero:    () => rx.timer(IDLE_WATCH),
                     }));
-                cache.set(key, seq);
+                cache.set(key, seq = shared);
             }
-            return seq;
+
+            const held = this.watching[rel];
+            held.add(key);
+            return seq.pipe(rx.finalize(() => {
+                held.add(key, -1);
+                if (!held.get(key)) held.delete(key);
+            }));
         });
     }
 

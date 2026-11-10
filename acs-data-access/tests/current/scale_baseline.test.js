@@ -715,6 +715,118 @@ describe("the scale harness", () => {
         expect(third.get("b")).not.toBe(latest[1].get("b"));
     });
 
+    /* counters.grant_has is not only the per-dataset checks. A test
+     * that counts checks across an ACL push counts these too. */
+    test("grant checks count the comparison of a pushed ACL with the one before", async () => {
+        const fx = fixture({ datasets: 20, seed: 33 });
+        const { site, built, data } = fx;
+        const who = "counted@EXAMPLE.ORG";
+        const targets = built.datasets.slice(0, 10);
+        site.set_acl(who, targets.map(target =>
+            ({ permission: Perm.ReadDataset, target })));
+
+        const states = [];
+        const sub = data.watch_grant_state(who, Perm.ReadDataset)
+            .subscribe(state => states.push(state));
+        cleanup.push(() => sub.unsubscribe());
+        expect(states).toHaveLength(1);
+
+        /* The same ACL again: one check for the Null UUID, and one
+         * for each target to find that nothing changed. No dataset
+         * was checked. */
+        const before = site.counters.grant_has;
+        site.repush_acl(who);
+        expect(states).toHaveLength(1);
+        expect(site.counters.grant_has - before).toBe(1 + targets.length);
+
+        /* One more target: the sizes differ, so the Null UUID check
+         * is the only one. */
+        const then = site.counters.grant_has;
+        site.grant(who, Perm.ReadDataset, built.datasets[10]);
+        expect(states).toHaveLength(2);
+        expect(site.counters.grant_has - then).toBe(1);
+    });
+
+    test("open_watches counts the class watches callers hold, and a shared WATCH counts once", () => {
+        const site = make_site();
+        cleanup.push(() => site.close());
+        site.add_member(Class.Dataset, "a");
+        expect(site.open_watches()).toEqual({ member: 0, subclass: 0 });
+
+        const subs = [
+            site.cdb.watch_members(Class.Dataset).subscribe(),
+            site.cdb.watch_members(Class.Dataset).subscribe(),
+            site.cdb.watch_subclasses("a").subscribe(),
+        ];
+        expect(site.open_watches()).toEqual({ member: 2, subclass: 1 });
+        /* The library shares one WATCH between the two callers. */
+        expect(site.counters.opened.member.get(Class.Dataset)).toBe(1);
+        expect(site.open_subscriptions()).toBe(2);
+
+        subs[0].unsubscribe();
+        expect(site.open_watches()).toEqual({ member: 1, subclass: 1 });
+        subs[1].unsubscribe();
+        subs[2].unsubscribe();
+        expect(site.open_watches()).toEqual({ member: 0, subclass: 0 });
+    });
+
+    test("a class WATCH with no caller is dropped after 5 s, and the next caller opens a new one", async () => {
+        vi.useFakeTimers();
+        const site = make_site();
+        cleanup.push(() => site.close());
+        site.add_member(Class.Dataset, "a");
+        const read = () => {
+            let value;
+            site.cdb.watch_members(Class.Dataset)
+                .subscribe(v => { value = v; }).unsubscribe();
+            return [...value];
+        };
+
+        expect(read()).toEqual(["a"]);
+        expect(site.open_subscriptions()).toBe(1);
+
+        /* A caller within the 5 s shares the WATCH that is open. */
+        await vi.advanceTimersByTimeAsync(4000);
+        site.add_member(Class.Dataset, "b");
+        expect(read()).toEqual(["a", "b"]);
+        expect(site.counters.opened.member.get(Class.Dataset)).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(site.open_subscriptions()).toBe(1);
+        await vi.advanceTimersByTimeAsync(1100);
+        expect(site.open_subscriptions()).toBe(0);
+
+        expect(read()).toEqual(["a", "b"]);
+        expect(site.counters.opened.member.get(Class.Dataset)).toBe(2);
+        expect(site.counters.watch.member.get(Class.Dataset)).toBe(3);
+    });
+
+    test("close ends a class WATCH that is waiting to be dropped, and its timer", async () => {
+        vi.useFakeTimers();
+        const site = make_site();
+        site.cdb.watch_members(Class.Dataset).subscribe().unsubscribe();
+        expect(vi.getTimerCount()).toBe(1);
+
+        site.close();
+        expect(vi.getTimerCount()).toBe(0);
+        expect(site.open_subscriptions()).toBe(0);
+    });
+
+    test("set_members sends the new list in one message", () => {
+        const site = make_site();
+        cleanup.push(() => site.close());
+        const seen = [];
+        const sub = site.cdb.watch_members(Class.Dataset)
+            .subscribe(v => seen.push([...v].sort()));
+        cleanup.push(() => sub.unsubscribe());
+
+        expect(site.set_members(Class.Dataset, ["a", "b", "c"])).toBe(true);
+        expect(site.set_members(Class.Dataset, ["c", "d"])).toBe(true);
+        expect(site.set_members(Class.Dataset, ["c", "d"])).toBe(false);
+        expect(site.set_members(Class.Dataset, [])).toBe(true);
+        expect(seen).toEqual([[], ["a", "b", "c"], ["c", "d"], []]);
+    });
+
     test("deleting an object sends what a ConfigDB sends: its entries and its class links go", async () => {
         const site = make_site();
         cleanup.push(() => site.close());

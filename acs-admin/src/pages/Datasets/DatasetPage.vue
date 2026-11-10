@@ -287,7 +287,11 @@ const menu = computed(() => {
       : { id: 'void', label: 'Void', icon: 'ban', reason: null, go: () => voidDialog.value?.open(r) })
   }
   items.push({ id: 'duplicate', label: 'Duplicate', icon: 'copy', reason: null, go: () => router.push(`/datasets/new?duplicate=${r.uuid}`) })
-  items.push({ id: 'delete', label: 'Delete', icon: 'trash', danger: true, reason: null, go: () => deleteDialog.value?.open(r) })
+  items.push({
+    id: 'delete', label: 'Delete', icon: 'trash', danger: true,
+    reason: r.is_default ? 'Every placed device has this dataset. It cannot be deleted.' : null,
+    go: () => deleteDialog.value?.open(r),
+  })
   return items
 })
 

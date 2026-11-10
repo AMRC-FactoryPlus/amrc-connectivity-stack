@@ -5,7 +5,7 @@
  */
 
 const Style = {
-    background:     "rgb(0, 0, 0)",
+    background:     "rgb(24,27,31)",
     circles:        "rgb(0, 159, 227)",
     offline:        "rgb(200, 200, 200)",
     lines:        "rgb(0, 159, 227)",

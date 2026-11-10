@@ -3,17 +3,27 @@
 * Data-Flow / sequence management
 */
 
-import { List as IList, Map as IMap } from "immutable";
+import { List as IList, Map as IMap, is as imm_is } from "immutable";
 import rx from "rxjs";
 
 import * as rxu from "@amrc-factoryplus/rx-util";
 
 import { DataAccess as Constants } from './constants.js';
 import { UUIDs } from '@amrc-factoryplus/rx-client';
-import { minDate, maxDate } from './utils.js';
+import { AppConfigs, AppMap } from './app-configs.js';
+import { DatasetIndex } from './dataset-index.js';
 import {
   default_dataset_device, DEVICE_PERMS, READ_STRUCTURE,
 } from './default-datasets.js';
+import { watch_each } from './rx-util.js';
+
+/* One field of each value of a change sequence, sent on only when the
+ * field is a new object. The reducers replace a map only when an entry
+ * of it differs, so this is "only when it changed". */
+const field = name => rx.pipe(
+  rx.map(change => change[name]),
+  rx.distinctUntilChanged(),
+);
 
 export class DataFlow {
   constructor(opts) {
@@ -21,24 +31,65 @@ export class DataFlow {
     this.cdb = opts.cdb;
     this.auth = opts.auth;
 
-    this.datasets = this._build_datasets();
+    /* The DatasetIndex the dataset map comes from, once something has
+     * subscribed. Its `stats` count the datasets worked out. */
+    this.index = null;
 
-    this.valid_datasets = this._build_valid_datasets();
+    /* Each `*_changes` sequence carries `{ map, changed }`, or for
+     * `changes` the four dataset maps and `changed`: what the maps
+     * hold now, and the keys the last change touched. A subscriber
+     * that joins late gets the latest value again, so the first value
+     * it reads says nothing about which keys changed: it must count
+     * every key as changed.
+     *
+     * The plain sequences below them are those maps alone. Each emits
+     * only when its own map changes. */
+    this.changes = this._build_changes();
+    this.datasets = this.changes.pipe(field("datasets"));
+    this.valid_datasets = this.changes.pipe(field("valid"));
+    this.invalid_datasets = this.changes.pipe(field("invalid"));
+    /* Default dataset UUID -> the device it reads, as an Immutable
+     * Map. */
+    this.default_devices = this.changes.pipe(field("defaults"));
 
-    this.invalid_datasets = this._build_invalid_datasets();
+    this.info_changes = this._build_info_changes();
+    this.general_infos = this.info_changes.pipe(field("map"));
 
-    this.default_devices = this._build_default_devices();
+    this.metadata_changes = this._build_app_changes(
+      Constants.App.DatasetMetadata
+    );
+    this.metadata = this.metadata_changes.pipe(field("map"));
 
-    this.general_infos = this._build_general_info();
-    this.metadata = this._build_metadata();
-    this.functional_types = this._build_functional_types();
+    this.functional_changes = this._build_functional_changes();
+    this.functional_types = this.functional_changes.pipe(field("map"));
+
     this.parts = this._build_parts();
   }
 
+  /* Hold the dataset map, the names, the metadata and the functional
+   * types for the life of the process, so no request and no notify
+   * subscription has to wait for ConfigDB to answer again. A source
+   * that fails still fails its current subscribers, as it always has;
+   * this then connects again without waiting for a client to ask. */
   run() {
-    // this.datasets.subscribe(ss =>
-    //   this.log("Dataset Definitions UPDATE %o", ss.toJS())
-    // );
+    if (this.running) return;
+
+    const hold = (name, seq) => seq.pipe(
+      rxu.retryBackoff(5000,
+        e => this.log("%s failed, will retry: %s", name, e)),
+    ).subscribe();
+
+    this.running = [
+      hold("Dataset map", this.changes),
+      hold("General information", this.info_changes),
+      hold("Dataset metadata", this.metadata_changes),
+      hold("Functional types", this.functional_changes),
+    ];
+  }
+
+  stop() {
+    for (const sub of this.running ?? []) sub.unsubscribe();
+    this.running = null;
   }
 
   /*
@@ -245,30 +296,58 @@ export class DataFlow {
    * ----------------------------------------------------
    */
 
-  _build_functional_types() {
-    return rxu.rx(
-      this.cdb.watch_member_members(
+  /* Functional group -> its members, turned round: dataset -> the
+   * groups it is in. A list that did not change stays the same object,
+   * and `changed` names the datasets whose list did. */
+  _build_functional_changes() {
+    return rx.defer(() => {
+      let held = null;
+
+      return this.cdb.watch_member_members(
         Constants.Group.FunctionalDatasetGroup
-      ),
+      ).pipe(
+        rx.map(data => {
+          let result = IMap();
 
-      rx.map(data => {
-        let result = IMap();
-
-        data.forEach((memberIds, groupId) => {
-          memberIds.forEach(memberId => {
-            result = result.update(
-              memberId,
-              list =>
-                list
-                  ? list.push(groupId)
-                  : IList([groupId])
-            );
+          data.forEach((memberIds, groupId) => {
+            memberIds.forEach(memberId => {
+              result = result.update(
+                memberId,
+                list =>
+                  list
+                    ? list.push(groupId)
+                    : IList([groupId])
+              );
+            });
           });
-        });
 
-        return result;
-      }),
+          return result;
+        }),
 
+        rx.map(next => {
+          if (held == null) {
+            held = next;
+            return { map: next, changed: null };
+          }
+
+          const changed = new Set();
+          const map = next.map((list, memberId) => {
+            const old = held.get(memberId);
+            if (old !== undefined && imm_is(old, list)) return old;
+            changed.add(memberId);
+            return list;
+          });
+          for (const memberId of held.keys())
+            if (!next.has(memberId)) changed.add(memberId);
+
+          if (changed.size == 0) return null;
+          held = map;
+          return { map, changed };
+        }),
+
+        rx.filter(change => change != null)
+      );
+    }).pipe(
       rxu.shareLatest()
     );
   }
@@ -279,76 +358,28 @@ export class DataFlow {
    * ----------------------------------------------------
    */
 
-  _build_apps_configs(app_klass) {
-    return rxu.rx(
-      this.cdb.watch_members(app_klass),
-
-      rx.switchMap((membersSet) => {
-        const appUuids =
-          membersSet.toArray();
-
-        if (appUuids.length === 0) {
-          return rx.of(IMap());
-        }
-
-        const dataStreams =
-          appUuids.map(appId =>
-            this.cdb.search_app(appId).pipe(
-              rxu.shareLatest(),
-
-              rx.map(config => [
-                appId,
-                config
-              ])
-            )
-          );
-
-        return rx.combineLatest(
-          dataStreams
-        ).pipe(
-          rx.map(appEntries => {
-            let result = IMap();
-
-            for (const [appId, config]
-              of appEntries) {
-
-              for (const [datasetId, payload]
-                of config) {
-
-                const existing =
-                  result.get(
-                    datasetId,
-                    IMap()
-                  );
-
-                result = result.set(
-                  datasetId,
-                  existing.set(
-                    appId,
-                    payload
-                  )
-                );
-              }
-            }
-
-            return result;
-          })
-        );
-      }),
-
-      rxu.shareLatest()
+  /* The entries of every application in a class, one change at a
+   * time. An application that joins the class costs one SEARCH; the
+   * others are left alone. */
+  _watch_apps(app_klass) {
+    return this.cdb.watch_members(app_klass).pipe(
+      watch_each(appId => this.cdb.search_app_changes(appId))
     );
   }
 
-  /*
-   * -------------------------------------------------
-   * Metadata
-   * ---------------------------------------------------
-   */
+  /* object -> application -> config for a class of applications, as
+   * `{ map, changed }`. Nothing is emitted until every application
+   * has answered. */
+  _build_app_changes(app_klass) {
+    return rx.defer(() => {
+      const configs = new AppConfigs();
 
-  _build_metadata() {
-    return this._build_apps_configs(
-      Constants.App.DatasetMetadata
+      return this._watch_apps(app_klass).pipe(
+        rx.map(event => configs.apply(event)),
+        rx.filter(change => change != null)
+      );
+    }).pipe(
+      rxu.shareLatest()
     );
   }
 
@@ -358,12 +389,17 @@ export class DataFlow {
    * ------------------------------------------------
    */
 
-  _build_general_info() {
-    return rxu.rx(
-      this.cdb.search_app(
-        UUIDs.App.Info
-      ),
+  _build_info_changes() {
+    return rx.defer(() => {
+      const infos = new AppMap();
 
+      return this.cdb.search_app_changes(
+        UUIDs.App.Info
+      ).pipe(
+        rx.map(change => infos.apply(change)),
+        rx.filter(change => change != null)
+      );
+    }).pipe(
       rxu.shareLatest()
     );
   }
@@ -374,361 +410,30 @@ export class DataFlow {
    * -------------------------------------------------
    */
 
-  _build_datasets() {
-    return rxu.rx(
-      this._build_apps_configs(
+  /* The dataset map and the maps derived from it, as
+   * `{ datasets, valid, invalid, defaults, changed }`. A change to a
+   * structure entry works out that dataset and the datasets that
+   * refer to it again, and no other. DatasetIndex has the rules. */
+  _build_changes() {
+    return rx.defer(() => {
+      const index = new DatasetIndex();
+      this.index = index;
+
+      return this._build_app_changes(
         Constants.App.DatasetDefinition
-      ),
-
-      rx.map((groupedConfigs) => {
-
-        /*
-        * ------------------------------------------------------------
-        * 1. Normalise duplicate definitions
-        * ------------------------------------------------------------
-        *
-        * Convert:
-        *
-        * datasetId => IMap({
-        *   appId => payload
-        * })
-        *
-        * into:
-        *
-        * datasetId => {
-        *   structure,
-        *   config
-        * }
-        *
-        * Invalid datasets are represented directly by:
-        *
-        * structure === Constants.Special.InvalidDataset
-        */
-
-        let map = groupedConfigs.map(
-          (definitions) => {
-
-            const entries =
-              definitions
-                .entrySeq()
-                .toArray();
-
-            /*
-            * Multiple structural definitions
-            * => invalid dataset
-            */
-
-            if (entries.length !== 1) {
-              return {
-                structure:
-                  Constants.Special.InvalidDataset,
-
-                config: null,
-                from: null,
-                to: null
-              };
-            }
-
-            const [structure, config] =
-              entries[0];
-
-            return {
-              structure,
-              config
-            };
-          }
-        );
-
-        /*
-        * ------------------------------------------------------------
-        * 2. Recursive resolution
-        * ------------------------------------------------------------
-        *
-        * resolve(datasetId)
-        *
-        * Returns:
-        *
-        *   { from, to }
-        *
-        * or:
-        *
-        *   null
-        *
-        * where null means invalid.
-        */
-
-        const cache = new Map();
-
-        const resolve =
-          (datasetId, visited = new Set()) => {
-
-          /*
-          * Cached result
-          */
-
-          if (cache.has(datasetId))
-            return cache.get(datasetId);
-
-          /*
-          * Cycle detection
-          */
-
-          if (visited.has(datasetId)) {
-            cache.set(datasetId, null);
-            return null;
-          }
-
-          visited.add(datasetId);
-
-          const def =
-            map.get(datasetId);
-
-          /*
-          * Missing dataset
-          */
-
-          if (!def) {
-            cache.set(datasetId, null);
-            return null;
-          }
-
-          /*
-          * Already invalid
-          */
-
-          if (
-            def.structure ===
-            Constants.Special.InvalidDataset
-          ) {
-            cache.set(datasetId, null);
-            return null;
-          }
-
-          const {
-            structure,
-            config
-          } = def;
-
-          /*
-          * --------------------------------------------------
-          * SESSION LIMITS
-          * --------------------------------------------------
-          */
-
-          if (
-            structure ===
-            Constants.App.SessionLimits
-          ) {
-
-            const child =
-              resolve(
-                config.source,
-                new Set(visited)
-              );
-
-            /*
-            * Invalid child
-            */
-
-            if (!child) {
-              cache.set(datasetId, null);
-              return null;
-            }
-
-            const from =
-              config.from
-                ? new Date(config.from)
-                : null;
-
-            const to =
-              config.to
-                ? new Date(config.to)
-                : null;
-
-            const result = {
-              from:
-                maxDate(
-                  from,
-                  child.from
-                ),
-
-              to:
-                minDate(
-                  to,
-                  child.to
-                )
-            };
-
-            cache.set(datasetId, result);
-
-            return result;
-          }
-
-          /*
-          * --------------------------------------------------
-          * SPARKPLUG SOURCE / SUB-DEVICE / UNS DEVICE (METRICS)
-          * --------------------------------------------------
-          */
-
-          if (
-            structure ===
-            Constants.App.SparkplugSrc ||
-            structure ===
-            Constants.App.SparkplugSubset ||
-            structure ===
-            Constants.App.UNSDevice ||
-            structure ===
-            Constants.App.UNSDeviceMetrics
-          ) {
-
-            const result = {
-              from: null,
-              to: null
-            };
-
-            cache.set(datasetId, result);
-
-            return result;
-          }
-
-          /*
-          * --------------------------------------------------
-          * UNION COMPONENTS
-          * --------------------------------------------------
-          */
-
-          if (
-            structure ===
-            Constants.App.UnionComponents
-          ) {
-
-            const children =
-              config.map(id =>
-                resolve(
-                  id,
-                  new Set(visited)
-                )
-              );
-
-            /*
-            * Any invalid child
-            */
-
-            if (children.some(c => !c)) {
-              cache.set(datasetId, null);
-              return null;
-            }
-
-            const fromTimes =
-              children
-                .map(v =>
-                  v.from?.getTime()
-                )
-                .filter(t =>
-                  !isNaN(t)
-                );
-
-            const toTimes =
-              children
-                .map(v =>
-                  v.to?.getTime()
-                )
-                .filter(t =>
-                  !isNaN(t)
-                );
-
-            const result = {
-              from:
-                fromTimes.length
-                  ? new Date(
-                      Math.min(
-                        ...fromTimes
-                      )
-                    )
-                  : null,
-
-              to:
-                toTimes.length
-                  ? new Date(
-                      Math.max(
-                        ...toTimes
-                      )
-                    )
-                  : null
-            };
-
-            cache.set(datasetId, result);
-
-            return result;
-          }
-
-          /*
-          * --------------------------------------------------
-          * Unknown structure
-          * --------------------------------------------------
-          */
-
-          cache.set(datasetId, null);
-
-          return null;
-        };
-
-        /*
-        * ------------------------------------------------------------
-        * 3. Resolve all datasets
-        * ------------------------------------------------------------
-        */
-
-        return map.map(
-          (def, datasetId) => {
-
-            /*
-            * Already invalid due to duplicate defs
-            */
-
-            if (
-              def.structure ===
-              Constants.Special.InvalidDataset
-            ) {
-              return def;
-            }
-
-            const resolved =
-              resolve(datasetId);
-
-            /*
-            * Invalid dependency graph
-            */
-
-            if (!resolved) {
-              return {
-                structure:
-                  Constants.Special.InvalidDataset,
-
-                config: null,
-                from: null,
-                to: null
-              };
-            }
-
-            /*
-            * Valid dataset
-            */
-
-            return {
-              ...def,
-              ...resolved
-            };
-          }
-        );
-      }),
-
+      ).pipe(
+        rx.map(({ map, changed }) => index.apply(map, changed)),
+        rx.filter(change => change != null)
+      );
+    }).pipe(
       rxu.shareLatest()
     );
   }
 
-  /* The default device datasets, as a Map from dataset UUID to the
-   * device it reads. */
+  /* The default device datasets, as a native Map from dataset UUID to
+   * the device it reads, worked out from the whole dataset map.
+   * `default_devices` no longer comes from this: DatasetIndex keeps
+   * the same entries up to date one change at a time. */
   _build_default_devices() {
     return rxu.rx(
       this.datasets,
@@ -745,24 +450,4 @@ export class DataFlow {
       rxu.shareLatest()
     );
   }
-
-  _build_valid_datasets(){
-    return this.datasets.pipe(
-      rx.map(map => map.filter(
-        def => def.structure !== Constants.Special.InvalidDataset
-      )),
-      rxu.shareLatest()
-    );
-  }
-
-  _build_invalid_datasets(){
-    return this.datasets.pipe(
-      rx.map(map => map.filter(
-        def => def.structure === Constants.Special.InvalidDataset
-      )),
-      rxu.shareLatest()
-    );
-  }
 }
-
-

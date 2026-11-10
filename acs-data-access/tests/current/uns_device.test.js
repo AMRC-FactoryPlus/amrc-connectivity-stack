@@ -206,6 +206,9 @@ describe("DataFlow", () => {
             watch_members_subclasses: () => rx.of(IMap()),
             watch_members: () => rx.of(ISet(Object.keys(configs))),
             search_app: app => rx.of(configs[app] ?? IMap()),
+            search_app_changes: app => rx.of({
+                map: configs[app] ?? IMap(), child: null, previous: null,
+            }),
         };
         const data = new DataFlow({ debug, cdb, auth: {} });
 

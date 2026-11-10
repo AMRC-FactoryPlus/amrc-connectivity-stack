@@ -195,6 +195,7 @@ for (const signal of ["SIGTERM", "SIGINT"]) {
   process.once(signal, () => {
     for (const c of coverages) c.stop();
     defaults.stop();
+    data.stop();
     process.kill(process.pid, signal);
   });
 }

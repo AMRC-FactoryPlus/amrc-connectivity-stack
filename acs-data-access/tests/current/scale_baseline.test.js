@@ -146,14 +146,57 @@ describe("known defects", () => {
         expect(site.counters.calls.get("create_object")).toBe(40);
     });
 
-    /* D4. Flips in stage 4: the one dataset is invalid and every
-     * other dataset resolves. */
-    test("D4: a null Session limits config errors the dataset map", async () => {
+    /* D4. Flipped in stage 4. Before it, reading this config threw,
+     * which errored the dataset map for every route and every notify
+     * subscription. Now the one dataset is invalid, with the datasets
+     * that read it, and every other dataset resolves. */
+    test("D4: a null Session limits config makes that one dataset invalid, and the rest resolve", async () => {
         const fx = fixture({ datasets: 20, seed: 14 });
-        fx.site.put(App.SessionLimits, fx.built.kinds.sessions[0], null);
+        const session = fx.built.kinds.sessions[0];
+        const before = await rx.firstValueFrom(fx.data.datasets);
+        expect(before.size).toBe(20);
 
-        await expect(rx.firstValueFrom(fx.data.datasets)).rejects.toThrow(TypeError);
-        await expect(rx.firstValueFrom(fx.data.valid_datasets)).rejects.toThrow(TypeError);
+        fx.site.put(App.SessionLimits, session, null);
+        await fx.site.settle();
+
+        /* The session, and every dataset that reads it through any
+         * number of others. */
+        const broken = new Set([session]);
+        for (let grew = true; grew;) {
+            grew = false;
+            const reads = [
+                ...[...fx.site.app(App.SessionLimits)]
+                    .map(([id, config]) => [id, [config?.source]]),
+                ...[...fx.site.app(App.UnionComponents)],
+            ];
+            for (const [id, sources] of reads) {
+                if (broken.has(id) || !sources.some(s => broken.has(s))) continue;
+                broken.add(id);
+                grew = true;
+            }
+        }
+
+        const datasets = await rx.firstValueFrom(fx.data.datasets);
+        const valid = await rx.firstValueFrom(fx.data.valid_datasets);
+        const invalid = await rx.firstValueFrom(fx.data.invalid_datasets);
+
+        expect(datasets.size).toBe(20);
+        expect([...invalid.keys()].sort()).toEqual([...broken].sort());
+        expect(invalid.get(session)).toEqual({
+            structure: Constants.Special.InvalidDataset,
+            config: null, from: null, to: null,
+        });
+        expect(valid.size).toBe(20 - broken.size);
+        /* Nothing else was touched. */
+        for (const [uuid, entry] of valid)
+            expect(entry).toBe(before.get(uuid));
+
+        /* A config that can be read makes it valid again. */
+        fx.site.put(App.SessionLimits, session, before.get(session).config);
+        await fx.site.settle();
+        expect((await rx.firstValueFrom(fx.data.invalid_datasets)).size).toBe(0);
+        expect(await rx.firstValueFrom(fx.data.valid_datasets))
+            .toEqual(before);
     });
 });
 
@@ -199,8 +242,10 @@ describe("baselines", () => {
         expect(large).toBeGreaterThan(3 * small);
     }, 120000);
 
-    /* B3. Flips in stage 4: every untouched entry is the same object. */
-    test("B3: after one structure put, no untouched dataset entry is the same object", async () => {
+    /* B3. Flipped in stage 4. Before it, every structure change built
+     * the whole dataset map again, so no entry was the same object
+     * after one put. Now only the entry that changed is new. */
+    test("B3: after one structure put, every untouched dataset entry is the same object", async () => {
         const fx = fixture({ datasets: 60, seed: 23 });
         let latest;
         const sub = fx.data.datasets.subscribe(v => { latest = v; });
@@ -218,11 +263,12 @@ describe("baselines", () => {
         await fx.site.settle();
         const after = latest;
         expect(after).not.toBe(before);
+        expect(after.get(session)).not.toBe(before.get(session));
 
         const untouched = [...before.keys()].filter(uuid => uuid != session);
         const same = untouched.filter(uuid => after.get(uuid) === before.get(uuid));
         expect(untouched).toHaveLength(59);
-        expect(same).toHaveLength(0);
+        expect(same).toHaveLength(59);
     });
 
     /* B4. Flips in stage 6: at most 1, across general_infos and

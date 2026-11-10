@@ -221,10 +221,12 @@ export class FakeSite {
         const had = map.has(uuid);
         if (had && same_json(map.get(uuid), body)) return false;
         map.set(uuid, body);
+        /* Each subscriber parses the message for itself, so each gets
+         * a body of its own. */
         this._send("app", app, () => ({
             status:     200,
             child:      uuid,
-            response:   { status: had ? 200 : 201, body },
+            response:   { status: had ? 200 : 201, body: clone(body) },
         }));
         return true;
     }
@@ -305,9 +307,12 @@ export class FakeSite {
 
     /** Send every SEARCH subscriber of an application a new snapshot
      * with the same content, as a reconnect does. The bodies are new
-     * objects, as they are when parsed from the wire again. */
+     * objects, as they are when parsed from the wire again. The
+     * snapshot holds the entries as they are now, however late a
+     * notify lag delivers it. */
     resync (app) {
-        this._send("app", app, () => this._app_snapshot(app, true));
+        const entries = [...this.app(app)];
+        this._send("app", app, () => this._app_snapshot(entries));
     }
 
     /** Send a class relation's list again, unchanged. */
@@ -451,7 +456,7 @@ export class FakeSite {
         rec.ready = true;
         switch (kind) {
             case "app":
-                return this._deliver(rec, this._app_snapshot(id, false));
+                return this._deliver(rec, this._app_snapshot(this.app(id)));
             case "member":
             case "subclass": {
                 const list = [...this._relation_set(kind, id)];
@@ -468,10 +473,14 @@ export class FakeSite {
         }
     }
 
-    _app_snapshot (app, fresh) {
+    /* A SEARCH snapshot of `entries`, the [object, config] pairs of
+     * one application. A real client parses the snapshot from its own
+     * WebSocket, so every snapshot has bodies of its own: no subscriber
+     * shares a body with another, or with the site. */
+    _app_snapshot (entries) {
         const children = {};
-        for (const [uuid, body] of this.app(app))
-            children[uuid] = { status: 200, body: fresh ? clone(body) : body };
+        for (const [uuid, body] of entries)
+            children[uuid] = { status: 200, body: clone(body) };
         return { status: 201, response: { status: 204 }, children };
     }
 
@@ -485,13 +494,22 @@ export class FakeSite {
     }
 
     /* Send one notification to every subscriber of a source that has
-     * had its first answer. */
+     * had its first answer.
+     *
+     * Who gets it is settled now, when the change is made, and not
+     * when a notify lag delivers it. A subscriber that arrives in
+     * between gets a first answer that already holds this change, so
+     * it must not get the change again after it: a real ConfigDB never
+     * sends a subscriber a change older than its snapshot.
+     * `message_for` must build its message from what it captured when
+     * the change was made, for the same reason. */
     _send (kind, id, message_for) {
         const subs = this.subs[kind].get(id);
         if (!subs?.size) return;
+        const recipients = [...subs].filter(rec => !rec.done && rec.ready);
         this._notify(() => {
-            for (const rec of [...subs]) {
-                if (rec.done || !rec.ready) continue;
+            for (const rec of recipients) {
+                if (rec.done) continue;
                 this._deliver(rec, message_for(rec));
             }
         });

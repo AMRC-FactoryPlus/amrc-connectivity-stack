@@ -541,6 +541,180 @@ describe("the scale harness", () => {
         expect(site.counters.blocks.count).toBe(2);
     });
 
+    /* A real ConfigDB never sends a subscriber a change older than
+     * its snapshot. The fake once chose who got a lagged change when
+     * the lag ended, so a subscriber that arrived in between got its
+     * snapshot and then the older changes after it. */
+    test("under a notify lag, a subscriber gets no change older than its snapshot", async () => {
+        const site = make_site({ notify_lag: 5 });
+        cleanup.push(() => site.close());
+        site.put(Info, "x", { name: "X" });
+
+        const early = [];
+        const late = [];
+        const subs = [site.cdb.search_app(Info).subscribe(m => early.push(m.toJS()))];
+        cleanup.push(() => subs.forEach(s => s.unsubscribe()));
+
+        site.put(Info, "a", { v: 1 });
+        site.put(Info, "a", { v: 2 });
+        site.del(Info, "a");
+        site.put(Info, "a", { v: 3 });
+        expect(site.pending).toBe(4);
+        subs.push(site.cdb.search_app(Info).subscribe(m => late.push(m.toJS())));
+
+        const x = { name: "X" };
+        expect(late).toEqual([{ x, a: { v: 3 } }]);
+        await site.settle();
+        /* The snapshot held all four changes, so none follows it. */
+        expect(late).toEqual([{ x, a: { v: 3 } }]);
+        /* The subscriber that was there gets each one, in order. */
+        expect(early).toEqual([
+            { x }, { x, a: { v: 1 } }, { x, a: { v: 2 } }, { x }, { x, a: { v: 3 } },
+        ]);
+
+        /* From here both get every change, once. */
+        site.put(Info, "a", { v: 4 });
+        await site.settle();
+        expect(late).toEqual([{ x, a: { v: 3 } }, { x, a: { v: 4 } }]);
+        expect(early).toHaveLength(6);
+    });
+
+    test("under a notify lag, a late subscriber to a class or an ACL gets only what is true now", async () => {
+        const owner = "owner@EXAMPLE.ORG";
+        const site = make_site({ notify_lag: 5 });
+        cleanup.push(() => site.close());
+
+        /* Something must be subscribed for a change to be sent at all.
+         * The class is read from the fake ConfigDB itself here: the
+         * library shares one WATCH per class and replays its last list
+         * to a new caller, which is a different thing. */
+        const first = [
+            site._source("member", Class.Dataset).subscribe(),
+            site.auth.watch_acl_with_perm(owner, Perm.ReadDataset).subscribe(),
+        ];
+        cleanup.push(() => first.forEach(s => s.unsubscribe()));
+
+        site.add_member(Class.Dataset, "a");
+        site.add_member(Class.Dataset, "b");
+        site.remove_member(Class.Dataset, "a");
+        site.set_acl(owner, []);
+        site.grant(owner, Perm.ReadDataset, "x");
+        site.grant(owner, Perm.ReadDataset, "y");
+        site.revoke(owner, Perm.ReadDataset, "x");
+        expect(site.pending).toBe(7);
+
+        const seen = { members: [], acl: [] };
+        const subs = [
+            site.cdb.watch_members(Class.Dataset)
+                .subscribe(set => seen.members.push(set.toArray())),
+            site.auth.watch_acl_with_perm(owner, Perm.ReadDataset)
+                .subscribe(set => seen.acl.push([...set])),
+        ];
+        cleanup.push(() => subs.forEach(s => s.unsubscribe()));
+
+        await site.settle();
+        expect(seen).toEqual({ members: [["b"]], acl: [["y"]] });
+    });
+
+    test("under a notify lag, a source released from a hold gets no change made while it was held", async () => {
+        const site = make_site({ notify_lag: 5 });
+        cleanup.push(() => site.close());
+        site.hold("app", Info);
+
+        const seen = [];
+        const subs = [
+            site.cdb.search_app_changes(Info).subscribe(c => seen.push([c.child, c.map.toJS()])),
+            /* A subscriber that goes before the lag ends gets nothing. */
+            site.cdb.search_app_changes(Info).subscribe(() => seen.push("gone")),
+        ];
+        cleanup.push(() => subs.forEach(s => s.unsubscribe()));
+
+        site.put(Info, "a", { v: 1 });
+        site.release("app", Info);
+        expect(seen).toEqual([[null, { a: { v: 1 } }], "gone"]);
+        site.put(Info, "a", { v: 2 });
+        subs[1].unsubscribe();
+
+        await site.settle();
+        expect(seen).toEqual([
+            [null, { a: { v: 1 } }], "gone", ["a", { a: { v: 2 } }],
+        ]);
+    });
+
+    test("under a notify lag, a resync holds the entries as they were when it was asked for", async () => {
+        const site = make_site({ notify_lag: 5 });
+        cleanup.push(() => site.close());
+        site.put(Info, "a", { v: 1 });
+
+        const seen = [];
+        const sub = site.cdb.search_app_changes(Info)
+            .subscribe(c => seen.push([c.child, c.map.toJS()]));
+        cleanup.push(() => sub.unsubscribe());
+
+        site.resync(Info);
+        site.put(Info, "b", { v: 2 });
+        await site.settle();
+        expect(seen).toEqual([
+            [null, { a: { v: 1 } }],
+            [null, { a: { v: 1 } }],
+            ["b", { a: { v: 1 }, b: { v: 2 } }],
+        ]);
+    });
+
+    /* A real client parses each message from its own WebSocket. */
+    test.each([0, 5])("with a notify lag of %i ms, each SEARCH subscriber gets config bodies of its own",
+    async notify_lag => {
+        const site = make_site({ notify_lag });
+        cleanup.push(() => site.close());
+        site.put(Info, "a", { name: "A", tags: ["one"] });
+
+        const latest = [null, null];
+        const subs = latest.map((_, i) =>
+            site.cdb.search_app_changes(Info).subscribe(c => { latest[i] = c.map; }));
+        cleanup.push(() => subs.forEach(s => s.unsubscribe()));
+
+        const check = key => {
+            const stored = site.app(Info).get(key);
+            const [one, two] = latest.map(map => map.get(key));
+            expect(one).toEqual(stored);
+            expect(two).toEqual(stored);
+            expect(one).not.toBe(two);
+            expect(one).not.toBe(stored);
+            expect(two).not.toBe(stored);
+            expect(one.tags).not.toBe(two.tags);
+
+            /* What one subscriber does to its copy, no other sees. */
+            one.tags.push("scribble");
+            one.name = "Changed";
+            expect(two).toEqual(stored);
+            expect(site.app(Info).get(key)).toEqual(stored);
+        };
+
+        /* In the snapshot. */
+        check("a");
+        /* In a new entry and in a changed one. */
+        site.put(Info, "b", { name: "B", tags: ["two"] });
+        await site.settle();
+        check("b");
+        site.put(Info, "a", { name: "A2", tags: ["three"] });
+        await site.settle();
+        check("a");
+        expect(site.app(Info).get("a")).toEqual({ name: "A2", tags: ["three"] });
+
+        /* And in a snapshot sent again. */
+        site.resync(Info);
+        await site.settle();
+        check("a");
+        check("b");
+
+        /* A third subscriber's snapshot is its own too. */
+        let third = null;
+        subs.push(site.cdb.search_app_changes(Info).subscribe(c => { third = c.map; }));
+        expect(third.get("b")).toEqual({ name: "B", tags: ["two"] });
+        expect(third.get("b")).not.toBe(site.app(Info).get("b"));
+        expect(third.get("b")).not.toBe(latest[1].get("b"));
+    });
+
     test("deleting an object sends what a ConfigDB sends: its entries and its class links go", async () => {
         const site = make_site();
         cleanup.push(() => site.close());

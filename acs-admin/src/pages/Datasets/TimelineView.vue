@@ -43,8 +43,23 @@
         <div class="sticky top-0 z-30 flex border-b border-slate-200 bg-white"
              :style="{ height: `${HEADER_H}px`, width: `${fullWidth}px` }">
           <div class="sticky left-0 z-10 flex shrink-0 items-center border-r border-slate-200 bg-white px-3 text-sm font-medium text-slate-500"
-               :style="{ width: `${LABEL_W}px` }">
-            Equipment and devices
+               :style="{ width: `${labelW}px` }">
+            <span class="truncate">Equipment and devices</span>
+            <!-- Drag (or focus and use the arrow keys) to change the
+                 label column's width. It hangs off the header so it
+                 stays pinned, and runs the height of the frame. -->
+            <div role="separator" aria-orientation="vertical" tabindex="0" data-no-drag
+                 aria-label="Width of the names column"
+                 title="Drag to change the width of the names column. Double-click to reset it."
+                 :aria-valuenow="labelW" :aria-valuemin="labelLimits.min" :aria-valuemax="labelLimits.max"
+                 class="group absolute -right-[5px] top-0 z-20 w-[9px] cursor-col-resize touch-none outline-none"
+                 :style="{ height: `${view.height}px` }"
+                 @pointerdown="onResizeDown" @pointermove="onResizeMove"
+                 @pointerup="onResizeUp" @pointercancel="onResizeUp"
+                 @keydown="onResizeKey" @dblclick="resetLabelW">
+              <span class="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 group-hover:bg-slate-400 group-focus-visible:bg-slate-900"
+                    :class="resizing ? '!bg-slate-900' : ''"></span>
+            </div>
           </div>
           <div class="relative shrink-0 overflow-hidden text-xs text-slate-500" :style="{ width: `${range.width}px` }">
             <span v-for="t in shownTicks" :key="t.t"
@@ -61,12 +76,12 @@
         <div ref="lanes" class="relative" :style="{ height: `${layout.height}px`, width: `${fullWidth}px` }"
              @pointerdown="onPointerDown">
           <!-- Gridlines, future, now and selection sit over the track. -->
-          <div class="pointer-events-none absolute inset-y-0" :style="{ left: `${LABEL_W}px`, width: `${range.width}px` }">
+          <div class="pointer-events-none absolute inset-y-0" :style="{ left: `${labelW}px`, width: `${range.width}px` }">
             <span v-for="t in shownTicks" :key="t.t" class="absolute inset-y-0 z-[1] w-px"
                   :class="t.major ? 'bg-slate-400' : 'bg-[#eef2f6]'" :style="{ left: `${t.x}px` }"></span>
             <div v-if="futureX < range.width" class="absolute inset-y-0 z-[2]"
                  :style="{ left: `${futureX}px`, width: `${range.width - futureX}px`, background: FUTURE_HATCH }">
-              <span class="sticky left-[272px] ml-[72px] mt-1.5 inline-block text-[11px] text-slate-500">
+              <span class="sticky ml-[72px] mt-1.5 inline-block text-[11px] text-slate-500" :style="{ left: `${labelW + 12}px` }">
                 Future. No data yet. Selections here make a dataset that fills in as data arrives.
               </span>
             </div>
@@ -79,10 +94,10 @@
           </div>
 
           <template v-for="row in shownRows" :key="row.key">
-            <DeviceLane v-if="row.kind === 'device'" :row="row" :track-width="range.width"
+            <DeviceLane v-if="row.kind === 'device'" :row="row" :track-width="range.width" :label-width="labelW"
                         :strip="data.deviceCells(row.device)" :last="data.lastOf(row.device)"
                         :quiet="quietNote(row.device)" :now="now"/>
-            <TimelineLane v-else :row="row" :track-width="range.width"
+            <TimelineLane v-else :row="row" :track-width="range.width" :label-width="labelW"
                           :blocks="row.kind === 'equipment' ? placed(row.uuid) : undefined"
                           :strip="row.kind === 'equipment' && !row.open ? data.equipmentCells(row.uuid) : null"
                           @toggle="toggle"/>
@@ -128,7 +143,7 @@ import {
   default_dataset_uuid,
 } from '@/lib/datasets/model.js'
 import {
-  LABEL_W, HEADER_H,
+  LABEL_W, HEADER_H, label_w_limits, clamp_label_w,
   x_of, t_of, scroll_left_for, view_centre, in_track, visible_x, visible_ticks,
   equipment_devices, build_rows, row_at, visible_rows,
   equipment_blocks, place_blocks, resolve_selection, selection_summary, make_dataset_query,
@@ -149,7 +164,8 @@ const FUTURE_HATCH = 'repeating-linear-gradient(135deg, rgba(241,245,249,0.7) 0 
 const MIN_SELECTION_MS = 5 * 60 * 1000
 
 /* ------------------------------------------------------------------
- * View state. Zoom and open groups are remembered in this browser.
+ * View state. Zoom, open groups and the label column's width are
+ * remembered in this browser.
  * ------------------------------------------------------------------ */
 
 const STORE_KEY = 'acs-admin.datasets.timeline'
@@ -162,10 +178,16 @@ const saved = load()
 
 const zoom = ref(saved.zoom in ZOOMS ? saved.zoom : 'hours')
 const expanded = ref(saved.expanded && typeof saved.expanded === 'object' ? saved.expanded : {})
+// The width the person asked for. `labelW`, below, is what fits the frame.
+const labelWanted = ref(clamp_label_w(saved.label_w))
 const query = ref('')
 
-watch([zoom, expanded], () => {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ zoom: zoom.value, expanded: expanded.value })) }
+watch([zoom, expanded, labelWanted], () => {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      zoom: zoom.value, expanded: expanded.value, label_w: labelWanted.value,
+    }))
+  }
   catch { /* storage blocked: the view still works */ }
 }, { deep: true })
 
@@ -177,7 +199,7 @@ const now = computed(() => nowDate.value.getTime())
 const centre = ref(Date.now())
 const range = computed(() => track_range(zoom.value, centre.value))
 const allTicks = computed(() => ticks(zoom.value, range.value))
-const fullWidth = computed(() => LABEL_W + range.value.width)
+const fullWidth = computed(() => labelW.value + range.value.width)
 
 /* ------------------------------------------------------------------
  * Scroll position, read once per frame.
@@ -203,9 +225,61 @@ function onScroll () {
 onBeforeUnmount(() => cancelAnimationFrame(raf))
 useResizeObserver(frame, readView)
 
-const xWindow = computed(() => visible_x(view.left, view.width))
+/* ------------------------------------------------------------------
+ * The label column's width. A narrow frame can hold it below what was
+ * asked for; the asked-for width comes back when there is room.
+ * ------------------------------------------------------------------ */
+
+const labelLimits = computed(() => label_w_limits(view.width))
+const labelW = computed(() => clamp_label_w(labelWanted.value, view.width))
+
+const RESIZE_STEP = 16
+// { x, w }: where the drag started and the width then.
+let resizeFrom = null
+const resizing = ref(false)
+
+function onResizeDown (e) {
+  if (e.button !== 0) return
+  // Not a selection, and no text selection while dragging.
+  e.preventDefault()
+  e.stopPropagation()
+  e.currentTarget.focus?.()
+  e.currentTarget.setPointerCapture?.(e.pointerId)
+  resizeFrom = { x: e.clientX, w: labelW.value }
+  resizing.value = true
+}
+
+function onResizeMove (e) {
+  if (!resizeFrom) return
+  labelWanted.value = clamp_label_w(resizeFrom.w + e.clientX - resizeFrom.x, view.width)
+}
+
+function onResizeUp () {
+  resizeFrom = null
+  resizing.value = false
+}
+
+function onResizeKey (e) {
+  const { min, max } = labelLimits.value
+  const to = {
+    ArrowLeft:  labelW.value - RESIZE_STEP,
+    ArrowRight: labelW.value + RESIZE_STEP,
+    Home:       min,
+    End:        max,
+  }[e.key]
+  if (to == null) return
+  // The frame would otherwise scroll on these keys.
+  e.preventDefault()
+  labelWanted.value = clamp_label_w(to, view.width)
+}
+
+function resetLabelW () {
+  labelWanted.value = LABEL_W
+}
+
+const xWindow = computed(() => visible_x(view.left, view.width, null, labelW.value))
 const shownTicks = computed(() => visible_ticks(allTicks.value, xWindow.value.x0, xWindow.value.x1))
-const viewCentre = computed(() => view_centre(range.value, view.left, view.width))
+const viewCentre = computed(() => view_centre(range.value, view.left, view.width, labelW.value))
 const label = computed(() => centre_label(zoom.value, viewCentre.value, now.value))
 const dateValue = computed(() => london_date_key(viewCentre.value))
 
@@ -222,7 +296,7 @@ const futureX = computed(() => Math.max(0, Math.min(range.value.width, x_of(now.
 function scrollTo (t, smooth) {
   const el = frame.value
   if (!el) return
-  const left = scroll_left_for(t, range.value, el.clientWidth)
+  const left = scroll_left_for(t, range.value, el.clientWidth, 0.5, clamp_label_w(labelWanted.value, el.clientWidth))
   if (smooth) el.scrollTo({ left, behavior: 'smooth' })
   else el.scrollLeft = left
   readView()
@@ -357,7 +431,7 @@ const selTipStyle = computed(() => {
   if (!s) return {}
   const rightEdge = (sel.value?.t1 ?? 0) >= (sel.value?.t0 ?? 0)
   const x = rightEdge ? selX.value.right : selX.value.left
-  const right = view.left + view.width - LABEL_W
+  const right = view.left + view.width - labelW.value
   // About the tooltip's width, so one opening rightwards stays in view.
   const room = rightEdge ? 0 : 260
   const left = Math.max(view.left + (rightEdge ? 260 : 0), Math.min(x, right - room))
@@ -403,8 +477,8 @@ const cardPos = computed(() => {
   const el = lanes.value
   if (!el || !selection.value) return { left: 0, top: 0 }
   const r = el.getBoundingClientRect()
-  const right = r.left + LABEL_W + selX.value.right + GAP
-  const left = r.left + LABEL_W + selX.value.left - GAP - CARD_W
+  const right = r.left + labelW.value + selX.value.right + GAP
+  const left = r.left + labelW.value + selX.value.left - GAP - CARD_W
   const maxX = window.innerWidth - CARD_W - EDGE
   const x = right <= maxX ? right : left >= EDGE ? left : maxX
   const y = r.top + selection.value.top
@@ -420,7 +494,7 @@ function pointer (e) {
   const vx = e.clientX - rect.left
   return {
     vx,
-    x: vx + el.scrollLeft - LABEL_W,
+    x: vx + el.scrollLeft - labelW.value,
     y: e.clientY - rect.top + el.scrollTop - HEADER_H,
   }
 }
@@ -437,7 +511,7 @@ function onPointerDown (e) {
   if (e.button !== 0 || !frame.value) return
   if (e.target.closest?.('a, button, [data-no-drag]')) return
   const p = pointer(e)
-  if (p.vx < LABEL_W) return
+  if (p.vx < labelW.value) return
   const i = row_at(layout.value.rows, p.y)
   const row = layout.value.rows[i]
   if (!row || row.kind !== 'device') { sel.value = null; return }

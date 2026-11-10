@@ -689,6 +689,51 @@ describe("stop", () => {
         expect_all_made(fx);
     });
 
+    /* After an input error the retried subscription asks for a pass
+     * while the first pass still runs, and that call waits. It
+     * belongs to the subscription stop() ends. When the old pass
+     * ends the maker is running again, so only the count of stops
+     * shows the call is not the new run's. */
+    test("and at once run, with a pass waiting behind another: the waiting pass is never started", async () => {
+        const latency = 2500;
+        const fx = rig(12, { site: { latency } });
+        const placements = restartable(placements_of(fx.built));
+        fx.maker.placements = placements.source;
+        cleanup.push(() => placements.close());
+
+        fx.maker.run();
+        await advance(DEBOUNCE + 8 * SECOND);
+        placements.fail();
+        await advance(RETRY_DELAY + DEBOUNCE + SECOND);
+        /* The second call waits for the first pass, which is on its
+         * second batch of four. */
+        expect(fx.seen.drains).toHaveLength(2);
+        expect(fx.seen.drains[1].end).toBe(null);
+        expect(fx.seen.passes).toHaveLength(1);
+        const [old] = fx.seen.passes;
+
+        fx.maker.stop();
+        fx.maker.run();
+        await advance(10 * MINUTE);
+        await fx.site.settle();
+
+        /* The call that waited made nothing and started no pass. The
+         * new run asked for its own, which made the rest. */
+        expect(old.result).toBe(8);
+        expect(fx.seen.drains[1].result).toBe(0);
+        expect(fx.seen.drains[1].end).toBeGreaterThanOrEqual(old.end);
+        expect(fx.seen.drains).toHaveLength(3);
+        expect(fx.seen.passes).toHaveLength(2);
+        const [, next] = fx.seen.passes;
+        expect(next.start).toBeGreaterThanOrEqual(old.end);
+        expect(next.result).toBe(4);
+        expect(fx.seen.drains[2].result).toBe(4);
+        expect(fx.seen.most_running).toBe(1);
+
+        expect_each_once(fx.log.creates(), fx.missing.map(m => m.dataset));
+        expect_all_made(fx);
+    });
+
     test("before the first list: nothing is made", async () => {
         const fx = rig(5);
 
@@ -1266,6 +1311,37 @@ describe("default dataset names under a burst", () => {
         expect(next.start).toBeGreaterThanOrEqual(old.end);
         expect(fx.seen.most_renaming).toBe(1);
         /* Each name was written once. */
+        expect(fx.log.of("put_config")).toHaveLength(3);
+        expect_names(fx.site, "First");
+    });
+
+    test("stop and at once run, with a pass waiting behind another: the waiting pass is never started", async () => {
+        const fx = rename_rig(3000);
+
+        fx.maker.run();
+        await advance(DEBOUNCE + 3 * SECOND);
+        fx.infos.fail();
+        await advance(RETRY_DELAY + DEBOUNCE + SECOND);
+        /* The second call waits for the first pass, which is setting
+         * its second name. */
+        expect(fx.seen.rename_drains).toHaveLength(2);
+        expect(fx.seen.rename_drains[1].end).toBe(null);
+        expect(fx.seen.rename_passes).toHaveLength(1);
+        const [old] = fx.seen.rename_passes;
+
+        fx.maker.stop();
+        fx.maker.run();
+        await advance(5 * MINUTE);
+        await fx.site.settle();
+
+        expect(old.result).toBe(2);
+        expect(fx.seen.rename_drains[1].result).toBe(0);
+        expect(fx.seen.rename_drains).toHaveLength(3);
+        expect(fx.seen.rename_passes).toHaveLength(2);
+        const [, next] = fx.seen.rename_passes;
+        expect(next.start).toBeGreaterThanOrEqual(old.end);
+        expect(next.result).toBe(1);
+        expect(fx.seen.most_renaming).toBe(1);
         expect(fx.log.of("put_config")).toHaveLength(3);
         expect_names(fx.site, "First");
     });

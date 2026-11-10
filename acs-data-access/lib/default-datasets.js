@@ -268,10 +268,16 @@ export class DefaultDatasets {
    * `coalesce`, because an input error ends the subscription while
    * its pass still runs, and the retried subscription would start a
    * second pass beside it.
+   *
+   * A call that waits for a running pass belongs to the subscription
+   * that made it. If the maker is stopped while the call waits, the
+   * call starts nothing, even when run() has been called since: the
+   * new run asks for its own pass, after its own debounce.
    * @returns How many datasets the pass made. */
   async drain() {
+    const stops = this.stops;
     while (this.draining) await this.draining;
-    if (this.stopped || !this.latest) return 0;
+    if (this.stopped || this.stops != stops || !this.latest) return 0;
 
     const { placements, devices, datasets } = this.latest;
     const pass = this.make_all(missing_defaults(placements, devices, datasets));
@@ -285,8 +291,9 @@ export class DefaultDatasets {
    * the same guard as `drain`.
    * @returns How many names the pass set. */
   async rename_drain() {
+    const stops = this.stops;
     while (this.renaming) await this.renaming;
-    if (this.stopped || !this.latest_names) return 0;
+    if (this.stopped || this.stops != stops || !this.latest_names) return 0;
 
     const { defaults, infos } = this.latest_names;
     const pass = this.rename_all(stale_names(defaults, infos));

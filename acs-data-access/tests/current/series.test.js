@@ -293,13 +293,19 @@ describe("Flux builders", () => {
         expect(q).toContain(`yield(name: "unit")`);
     });
 
-    test("booleans get their own toFloat branch only when asked for", () => {
+    test("booleans get their own branch only when asked for, with no toFloat", () => {
         const q = mean_query({ bucket: "default", windows, every: "5m", metrics: [
             { device: D1, path: "A", name: "Running", type: "b" },
         ] });
+        expect(q).toMatchSnapshot();
         expect(q).toContain(`r._measurement == "Running:b"`);
-        expect(q).toContain("|> toFloat()");
-        expect(q).toContain(`yield(name: "sum_b")`);
+        expect(q).not.toContain("toFloat");
+        /* The sum of 0s and 1s is the count of true points. */
+        expect(q).toMatch(
+            /filter\(fn: \(r\) => r\._value == true\)\n {2}\|> aggregateWindow\(every: 5m, fn: count, .*\n.*yield\(name: "sum_b"\)/);
+        expect(q).toContain(`yield(name: "n_b")`);
+        expect(q).toContain(`yield(name: "unit_b")`);
+        expect(q).not.toContain("fn: sum");
         expect(q).not.toMatch(/^data =/m);
     });
 
@@ -389,6 +395,20 @@ describe("result shaping", () => {
         const [m] = shape_means(rows, [{ device: D1, metric: "A/On", path: "A", name: "On", type: "b" }], "5m");
         expect(m.points).toEqual([[T("2026-10-08T00:00:00Z"), 0.5, 4]]);
         expect(m.type).toBe("b");
+    });
+
+    test("a boolean bucket with no true point has a mean of 0", () => {
+        /* The sum is a count of true points, so it has no row here. */
+        const rows = [
+            { result: "n_b", topLevelInstance: D1, path: "A", _measurement: "On:b", _time: "2026-10-08T00:00:00Z", _value: "4" },
+            { result: "n_b", topLevelInstance: D1, path: "A", _measurement: "On:b", _time: "2026-10-08T00:05:00Z", _value: "3" },
+            { result: "sum_b", topLevelInstance: D1, path: "A", _measurement: "On:b", _time: "2026-10-08T00:05:00Z", _value: "3" },
+        ];
+        const [m] = shape_means(rows, [{ device: D1, metric: "A/On", path: "A", name: "On", type: "b" }], "5m");
+        expect(m.points).toEqual([
+            [T("2026-10-08T00:00:00Z"), 0, 4],
+            [T("2026-10-08T00:05:00Z"), 1, 3],
+        ]);
     });
 
     test("last rows become ISO strings", () => {
@@ -964,10 +984,16 @@ describe("SeriesReader", () => {
  *   r.<tag> == or != a literal, but not == "";
  *   r.<tag> =~ or !~ a regex;
  *   exists r.<tag>, and not exists r.<tag>;
+ *   r._value compared (== != < <= > >=) with a boolean or a number;
  *   those joined with `and` and `or`.
  * A part with anything else stays in Flux, and the aggregate with it.
  * A filter that is one big `or` is a single part: one bad test in it
  * keeps the whole filter in Flux, and the query reads the whole bucket.
+ * A time literal is not a literal that storage takes, so no test of
+ * `_time` runs there: only range() limits time in storage.
+ *
+ * Storage then runs the aggregate only if nothing but range and filter
+ * comes before it, and for booleans it has count but no sum.
  * ---------------------------------------------------------------
  */
 
@@ -981,7 +1007,8 @@ function storage_can_run(body) {
         .replace(/exists r\.\w+/g, "T")
         .replace(/r\.\w+ (?:==|!=) S/g, "T")
         .replace(/r\.\w+ != E/g, "T")
-        .replace(/r\.\w+ (?:=~|!~) R/g, "T");
+        .replace(/r\.\w+ (?:=~|!~) R/g, "T")
+        .replace(/r\._value (?:==|!=|<=?|>=?) (?:true|false|-?\d+(?:\.\d+)?)(?![\w.:-])/g, "T");
     for (let prev = null; prev != s;) {
         prev = s;
         s = s.replace(/\(T\)/g, "T").replace(/T (?:and|or) T/g, "T");
@@ -1023,6 +1050,41 @@ describe("mean queries run in storage", () => {
         expect(storage_can_run(`r.path == ""`)).toBe(false);
         expect(storage_can_run(`r._time >= 2026-10-08T01:00:00.000Z`)).toBe(false);
         expect(storage_can_run(`contains(value: r._measurement, set: ["a"])`)).toBe(false);
+        /* A field value against a literal runs in storage. */
+        expect(storage_can_run(`r._value == true`)).toBe(true);
+        expect(storage_can_run(`r._value > 0.5`)).toBe(true);
+        expect(storage_can_run(`r._value == r.other`)).toBe(false);
+        expect(storage_can_run(`float(v: r._value) > 0.5`)).toBe(false);
+        expect(storage_can_run(`r._value >= 2026-10-08T01:00:00.000Z`)).toBe(false);
+    });
+
+    test("the checker refuses a conversion before the aggregate", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: [root(D1, "Float")] });
+        expect_storage_means(q);
+        const converted = q.replace(/^ {2}\|> aggregateWindow/m, "  |> toFloat()\n  |> aggregateWindow");
+        expect(converted).not.toBe(q);
+        expect(() => expect_storage_means(converted)).toThrow();
+    });
+
+    test("boolean metrics, root and nested, in both stores", () => {
+        const metrics = [
+            { device: D1, path: "", name: "Running", type: "b" },
+            { device: D2, path: "Axes/X", name: "Homed", type: "b" },
+        ];
+        for (const store of [null, "uns"]) {
+            const q = mean_query({ bucket: "b", store, windows, every: "5m", metrics });
+            expect_storage_means(q);
+            expect(q.match(/^from\(/gm).length).toBe(3);
+        }
+    });
+
+    test("numeric and boolean metrics in one request", () => {
+        const q = mean_query({ bucket: "default", windows, every: "1h", metrics: [
+            root(D1, "Float"), { device: D1, path: "A", name: "Running", type: "b" },
+        ] });
+        expect_storage_means(q);
+        expect(q.match(/^from\(/gm).length).toBe(6);
     });
 
     test("one root metric of a sparkplug device", () => {

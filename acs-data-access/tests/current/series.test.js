@@ -283,7 +283,7 @@ describe("Flux builders", () => {
         expect(q).toMatchSnapshot();
         expect(q).toContain(`r.path == "Axes/X" and (r._measurement == "Load:d" or r._measurement == "Load:i" or r._measurement == "Load:u")`);
         /* InfluxDB drops empty tags: a top-level metric has no path. */
-        expect(q).toContain(`(not exists r.path or r.path == "") and (r._measurement == "Top:i")`);
+        expect(q).toContain(`(not exists r.path) and (r._measurement == "Top:i")`);
         expect(q).not.toContain(":b");
         expect(q).not.toContain("toFloat");
         expect(q).toContain(`yield(name: "sum")`);
@@ -947,5 +947,122 @@ describe("SeriesReader", () => {
         const p = reader.query_rows("x", ctl.signal);
         ctl.abort(new SeriesAbort("timeout"));
         await expect(p).rejects.toMatchObject({ reason: "timeout" });
+    });
+});
+
+
+/*
+ * ---------------------------------------------------------------
+ * Means that InfluxDB can work out in storage
+ *
+ * InfluxDB runs a windowed aggregate in storage only when the filter
+ * before it runs in storage too. Its planner (PushDownFilterRule in
+ * query/stdlib/influxdata/influxdb/rules.go) splits a filter at its
+ * top-level `and`s and sends on the parts made only of:
+ *   r.<tag> == or != a literal, but not == "";
+ *   r.<tag> =~ or !~ a regex;
+ *   exists r.<tag>, and not exists r.<tag>;
+ *   those joined with `and` and `or`.
+ * A part with anything else stays in Flux, and the aggregate with it.
+ * A filter that is one big `or` is a single part: one bad test in it
+ * keeps the whole filter in Flux, and the query reads the whole bucket.
+ * ---------------------------------------------------------------
+ */
+
+/* Whether storage can run a whole filter body. */
+function storage_can_run(body) {
+    let s = body
+        .replace(/"(?:[^"\\]|\\.)+"/g, "S")
+        .replace(/""/g, "E")
+        .replace(/\/(?:[^\/\\]|\\.)+\//g, "R")
+        .replace(/not exists r\.\w+/g, "T")
+        .replace(/exists r\.\w+/g, "T")
+        .replace(/r\.\w+ (?:==|!=) S/g, "T")
+        .replace(/r\.\w+ != E/g, "T")
+        .replace(/r\.\w+ (?:=~|!~) R/g, "T");
+    for (let prev = null; prev != s;) {
+        prev = s;
+        s = s.replace(/\(T\)/g, "T").replace(/T (?:and|or) T/g, "T");
+    }
+    return s == "T";
+}
+
+/* The bodies of every filter() in a script, and the lines between each
+ * from() and its aggregate. */
+const filter_bodies = q =>
+    [...q.matchAll(/^ {2}\|> filter\(fn: \(r\) => (.*)\)$/gm)].map(m => m[1]);
+
+function expect_storage_means(q) {
+    const bodies = filter_bodies(q);
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const b of bodies)
+        expect(storage_can_run(b), b).toBe(true);
+    /* Nothing but range and filter between a from() and its aggregate. */
+    for (const part of q.split(/^from\(/m).slice(1)) {
+        const steps = part.split("\n").slice(1)
+            .filter(l => l.startsWith("  |> "))
+            .map(l => /^ {2}\|> (\w+)/.exec(l)[1]);
+        const agg = steps.findIndex(s => s == "aggregateWindow" || s == "last");
+        expect(agg).toBeGreaterThan(0);
+        expect(steps.slice(0, agg).every(s => s == "range" || s == "filter"), part).toBe(true);
+    }
+}
+
+describe("mean queries run in storage", () => {
+    const windows = [[T(base.from), T(base.to)]];
+    const root = (device, name) => ({ device, path: "", name, type: "d" });
+
+    test("the checker refuses what InfluxDB refuses", () => {
+        expect(storage_can_run(`r._field == "value"`)).toBe(true);
+        expect(storage_can_run(`(r.a == "x" and (not exists r.path) and (r._measurement == "M:d"))`)).toBe(true);
+        expect(storage_can_run(`r.path =~ /^[^\\/]+\\/Axes$/`)).toBe(true);
+        /* The path test this service sent before. */
+        expect(storage_can_run(`(not exists r.path or r.path == "")`)).toBe(false);
+        expect(storage_can_run(`r.path == ""`)).toBe(false);
+        expect(storage_can_run(`r._time >= 2026-10-08T01:00:00.000Z`)).toBe(false);
+        expect(storage_can_run(`contains(value: r._measurement, set: ["a"])`)).toBe(false);
+    });
+
+    test("one root metric of a sparkplug device", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: [root(D1, "Float")] });
+        expect(q).not.toContain(`== ""`);
+        expect_storage_means(q);
+    });
+
+    test("two root metrics of one sparkplug device", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: [root(D1, "Float"), root(D1, "Double")] });
+        expect(q).toContain(
+            `(r.topLevelInstance == "${D1}" and (not exists r.path) and (r._measurement == "Float:d"))`
+            + ` or (r.topLevelInstance == "${D1}" and (not exists r.path) and (r._measurement == "Double:d"))`);
+        expect_storage_means(q);
+    });
+
+    test("root and nested metrics of two devices, typed and untyped", () => {
+        const q = mean_query({ bucket: "default", windows, every: "5m", metrics: [
+            root(D1, "Float"), root(D2, "Double"),
+            { device: D1, path: "Axes/X", name: "Load", type: null },
+            { device: D2, path: "Axes/Y", name: "Load", type: "i" },
+        ] });
+        expect_storage_means(q);
+    });
+
+    test("the uns store, root and nested", () => {
+        const q = mean_query({ bucket: "uns", store: "uns", windows, every: "5m", metrics: [
+            root(D1, "Float"),
+            { device: D2, path: "Axes/X", name: "Load", type: null },
+        ] });
+        expect_storage_means(q);
+    });
+
+    test("the metric filter of N metrics is N clauses joined with or", () => {
+        const names = ["A", "B", "C", "D", "E"];
+        const q = mean_query({ bucket: "default", windows, every: "5m",
+            metrics: names.map(n => root(D1, n)) });
+        const metric_filter = filter_bodies(q)[1];
+        expect(metric_filter.split(" or ").length).toBe(names.length);
+        /* Three reads, whatever the number of metrics. */
+        expect(q.match(/^from\(/gm).length).toBe(3);
     });
 });

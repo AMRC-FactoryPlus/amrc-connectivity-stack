@@ -499,11 +499,17 @@ export function count_query({ bucket, devices, windows, every }) {
 /* InfluxDB stores no empty tags, so a top-level metric (empty path)
  * has no path column at all, and `r.path == ""` never matches it.
  * The UNS bucket's path starts with the Sparkplug device ID; see
- * uns_path_test, which escapes the folder for a regex literal. */
+ * uns_path_test, which escapes the folder for a regex literal.
+ *
+ * Never test a tag against "" here. InfluxDB cannot run that test in
+ * storage, and one such test anywhere in an `or` of metric clauses
+ * keeps the whole filter out of storage: the query then reads every
+ * series in the bucket, and no aggregate runs in storage either.
+ * `not exists` is the form storage accepts. */
 function path_clause(path, store) {
     if (store == UNS) return fluxExpression(uns_path_test(path));
     return path == ""
-        ? fluxExpression(`(not exists r.path or r.path == "")`)
+        ? fluxExpression(`(not exists r.path)`)
         : flux`r.path == ${path}`;
 }
 
@@ -528,7 +534,8 @@ const KEEP_UNIT = `["topLevelInstance", "path", "_measurement", "_time", "unit"]
  * own from(), with no group() before the aggregate, so InfluxDB works
  * out each window in storage. A shared stream or a group() first makes
  * it read every raw point instead: 24 h of a 25 Hz metric went from
- * under a second to 30 s. One metric can be several raw series (its
+ * under a second to 30 s. So does a filter part that storage cannot
+ * run (see path_clause). One metric can be several raw series (its
  * other tags changed), so shape_means adds them up per bucket. */
 function mean_branch({ bucket, metrics, types, windows, every, to_float, suffix, store }) {
     const { start, stop } = envelope(windows);

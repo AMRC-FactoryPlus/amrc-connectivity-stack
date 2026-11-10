@@ -18,6 +18,8 @@ import {
 } from "../../lib/dataset-index.js";
 import { default_dataset_uuid } from "../../lib/default-datasets.js";
 
+import { reference_datasets } from "../support/reference-datasets.js";
+
 const { App, Special } = Constants;
 
 const UNKNOWN_APP = "f0000000-0000-4000-8000-00000000000f";
@@ -196,6 +198,54 @@ describe("DatasetIndex rules", () => {
         expect(first.valid).toBe(site.index.valid);
         expect(first.invalid).toBe(site.index.invalid);
         expect(first.defaults).toBe(site.index.defaults);
+    });
+
+    /* An index that starts on a sequence already under way reads a
+     * replay of the latest value first. That value's `changed` names
+     * the last change, not the datasets a new index has yet to see. */
+    test.each([
+        ["a Set of one", () => new Set([ds(2)])],
+        ["an array of one", () => [ds(2)]],
+        ["an empty Set", () => new Set()],
+    ])("the first apply looks at every dataset when changed is %s", (_, changed) => {
+        const grouped = imm.Map({
+            [ds(1)]: imm.Map({ [App.SparkplugSrc]: { a: 1 } }),
+            [ds(2)]: imm.Map({ [App.SparkplugSrc]: { a: 2 } }),
+            [ds(3)]: imm.Map({ [App.SessionLimits]: {
+                source: ds(1),
+                from:   "2026-01-01T00:00:00.000Z",
+                to:     "2026-01-10T00:00:00.000Z",
+            } }),
+        });
+        const index = new DatasetIndex();
+        const first = index.apply(grouped, changed());
+
+        expect(index.entries.size).toBe(3);
+        expect(sorted(first.changed)).toEqual([ds(1), ds(2), ds(3)]);
+        expect(first.datasets).toBe(index.entries);
+        expect(Object.fromEntries(first.datasets))
+            .toStrictEqual(Object.fromEntries(reference_datasets(grouped)));
+        expect(sorted(first.valid.keys())).toEqual([ds(1), ds(2), ds(3)]);
+        expect(sorted(index.referrers_of(ds(1)))).toEqual([ds(3)]);
+        expect(index.stats).toEqual({ applies: 1, resolved: 3 });
+    });
+
+    test("only the first apply ignores changed", () => {
+        const before = imm.Map({
+            [ds(1)]: imm.Map({ [App.SparkplugSrc]: { a: 1 } }),
+            [ds(2)]: imm.Map({ [App.SparkplugSrc]: { a: 2 } }),
+        });
+        const index = new DatasetIndex();
+        index.apply(before, new Set([ds(2)]));
+        const held = index.entries.get(ds(1));
+
+        const after = before
+            .set(ds(2), imm.Map({ [App.SparkplugSrc]: { a: 3 } }));
+        const second = index.apply(after, new Set([ds(2)]));
+
+        expect([...second.changed]).toEqual([ds(2)]);
+        expect(index.stats).toEqual({ applies: 2, resolved: 3 });
+        expect(index.entries.get(ds(1))).toBe(held);
     });
 
     test("the entry key order and the stored config object", () => {

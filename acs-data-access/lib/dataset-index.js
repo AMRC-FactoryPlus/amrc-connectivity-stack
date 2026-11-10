@@ -172,7 +172,8 @@ export class DatasetIndex {
      * -> config, as AppConfigs gives it.
      * @arg changed The dataset UUIDs whose inner map differs from the
      * call before, as a Set or an array. Null means any of them can
-     * differ.
+     * differ. The first call does not read this: it has no call before
+     * it, so it looks at every dataset.
      * @returns `{ datasets, valid, invalid, defaults, changed }`, or
      * null if no entry differs. `changed` is a native Set of the
      * dataset UUIDs whose entry was added, replaced or removed. The
@@ -181,6 +182,12 @@ export class DatasetIndex {
      */
     apply (grouped, changed) {
         this.stats.applies++;
+
+        /* The first value read from a shared sequence can be a replay
+         * of its latest value. Its map is complete, but its `changed`
+         * names an older change, and an index built from only those
+         * datasets would be missing the rest. */
+        if (!this.started) changed = null;
 
         let ids = changed;
         if (ids == null) {

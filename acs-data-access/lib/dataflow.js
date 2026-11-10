@@ -71,6 +71,8 @@ export class DataFlow {
     /* The DatasetIndex the dataset map comes from, once something has
      * subscribed. Its `stats` count the datasets worked out. */
     this.index = null;
+    /* The subscriptions run() holds, or null while it holds none. */
+    this.running = null;
 
     /* Each `*_changes` sequence carries `{ map, changed }`, or for
      * `changes` the four dataset maps and `changed`: what the maps
@@ -507,8 +509,8 @@ export class DataFlow {
 
   /* object -> application -> config for a class of applications, as
    * `{ map, changed }`. Nothing is emitted until every application
-   * has answered. */
-  _build_app_changes(app_klass) {
+   * has answered. Each subscriber gets a sequence of its own. */
+  _app_changes(app_klass) {
     return rx.defer(() => {
       const configs = new AppConfigs();
 
@@ -516,7 +518,12 @@ export class DataFlow {
         rx.map(event => configs.apply(event)),
         rx.filter(change => change != null)
       );
-    }).pipe(
+    });
+  }
+
+  /* _app_changes, shared between its subscribers. */
+  _build_app_changes(app_klass) {
+    return this._app_changes(app_klass).pipe(
       rxu.shareLatest()
     );
   }
@@ -557,7 +564,11 @@ export class DataFlow {
       const index = new DatasetIndex();
       this.index = index;
 
-      return this._build_app_changes(
+      /* Not shared: this sequence is the only reader of the structure
+       * entries, and it is shared itself. A second share below it
+       * would keep the ConfigDB searches open for a second time-out
+       * after this one has let go of them. */
+      return this._app_changes(
         Constants.App.DatasetDefinition
       ).pipe(
         rx.map(({ map, changed }) => index.apply(map, changed)),

@@ -73,6 +73,10 @@ function observe (data, names = STREAMS) {
     return seen;
 }
 
+/* The first value of a sequence. A sequence that never answers fails
+ * the test after `ms` and is unsubscribed, so no wait is left open. */
+const first_of = (seq, ms = 3000) => rx.firstValueFrom(seq.pipe(rx.timeout(ms)));
+
 const no_emissions = Object.fromEntries(STREAMS.map(name => [name, 0]));
 
 /* A built site, a running DataFlow over it and an observer of every
@@ -161,7 +165,9 @@ describe("one change on a site of 1,000 datasets", () => {
         expect(site.report()).toMatchObject({
             search_subscribes: 0, member_subscribes: 0, subclass_subscribes: 0,
         });
-    });
+    /* Building the largest site takes a second or more of the usual
+     * 5 s on a fast machine, so these have a limit of their own. */
+    }, 30000);
 
     test("an edit to a session gives no default_devices and no invalid_datasets emission", async () => {
         const fx = await fixture({ ...LARGE, seed: 42 });
@@ -489,7 +495,7 @@ describe("the set of structure applications", () => {
 
         /* One message with an empty list, as ConfigDB sends while the
          * class cannot be read. */
-        site._relate("member", App.DatasetDefinition, set => set.clear());
+        site.set_members(App.DatasetDefinition, []);
         await site.settle();
 
         expect(seen.counts).toEqual({
@@ -502,9 +508,7 @@ describe("the set of structure applications", () => {
         expect(site.subs.app.size).toBe(METADATA_APPS.length + 1);
 
         seen.reset();
-        site._relate("member", App.DatasetDefinition, set => {
-            for (const app of STRUCTURE_APPS) set.add(app);
-        });
+        site.set_members(App.DatasetDefinition, STRUCTURE_APPS);
         await site.settle();
 
         expect(seen.counts).toEqual({
@@ -608,7 +612,7 @@ describe("a DataFlow over sources that complete", () => {
             structure: App.SparkplugSrc, config: { source: device },
             from: null, to: null,
         };
-        const read = name => rx.firstValueFrom(data[name]);
+        const read = name => first_of(data[name]);
         expect((await read("datasets")).toJS()).toEqual({ [dataset]: entry });
         expect((await read("valid_datasets")).toJS()).toEqual({ [dataset]: entry });
         expect((await read("invalid_datasets")).size).toBe(0);
@@ -633,20 +637,20 @@ describe("a subscriber that joins late", () => {
             { source: fx.built.devices[0] });
         await site.settle();
 
-        const changes = await rx.firstValueFrom(data.changes);
+        const changes = await first_of(data.changes);
         expect(Object.keys(changes))
             .toEqual(["datasets", "valid", "invalid", "defaults", "changed"]);
         expect(changes.datasets.size).toBe(60);
         expect(changes.valid.size).toBe(60);
-        expect(changes.datasets).toBe(await rx.firstValueFrom(data.datasets));
+        expect(changes.datasets).toBe(await first_of(data.datasets));
 
         for (const name of ["info_changes", "metadata_changes", "functional_changes"]) {
-            const value = await rx.firstValueFrom(data[name]);
+            const value = await first_of(data[name]);
             expect([name, Object.keys(value)]).toEqual([name, ["map", "changed"]]);
             expect(imm.Map.isMap(value.map)).toBe(true);
         }
-        expect((await rx.firstValueFrom(data.info_changes)).map)
-            .toBe(await rx.firstValueFrom(data.general_infos));
+        expect((await first_of(data.info_changes)).map)
+            .toBe(await first_of(data.general_infos));
         expect(site.counters.search.total()).toBe(0);
     });
 });
@@ -685,7 +689,7 @@ describe("errors and reconnects", () => {
 
         /* It starts from a new index, and a read needs no new search. */
         expect(data.index).not.toBe(first);
-        const datasets = await rx.firstValueFrom(data.datasets);
+        const datasets = await first_of(data.datasets);
         expect(golden(datasets)).toEqual(golden(site_datasets(site)));
         expect(structure_searches(site)).toEqual([1, 1, 1, 1, 1, 1]);
         expect(site.counters.search.total()).toBe(6);
@@ -698,7 +702,7 @@ describe("errors and reconnects", () => {
         site.error("app", App.UnionComponents, new Error("search failed"));
         expect(seen.errors).toHaveLength(4);
 
-        const datasets = await rx.firstValueFrom(data.datasets);
+        const datasets = await first_of(data.datasets);
         expect(golden(datasets)).toEqual(golden(site_datasets(site)));
         expect(structure_searches(site)).toEqual([1, 1, 1, 1, 1, 1]);
     });
@@ -725,7 +729,7 @@ describe("errors and reconnects", () => {
         await site.settle();
         site.reset_counters();
 
-        expect(golden(await rx.firstValueFrom(data[name]))).toEqual(before);
+        expect(golden(await first_of(data[name]))).toEqual(before);
         expect(site.report()).toMatchObject({
             search_subscribes: 0, member_subscribes: 0,
         });
@@ -765,7 +769,7 @@ describe("errors and reconnects", () => {
         expect(one.code).toBe(200);
 
         for (const name of STREAMS.filter(s => s != "parts")) {
-            const value = await rx.firstValueFrom(data[name]);
+            const value = await first_of(data[name]);
             expect([name, imm.Map.isMap(value)]).toEqual([name, true]);
         }
 
@@ -782,14 +786,51 @@ describe("errors and reconnects", () => {
         const data = new DataFlow({ debug, cdb: site.cdb, auth: site.auth });
         cleanup.push(() => site.close());
 
-        expect((await rx.firstValueFrom(data.datasets)).size).toBe(60);
+        expect((await first_of(data.datasets)).size).toBe(60);
         expect(site.counters.search.total()).toBe(6);
         await vi.advanceTimersByTimeAsync(2000);
         expect(site.subs.app.size).toBe(0);
 
-        expect((await rx.firstValueFrom(data.datasets)).size).toBe(60);
+        expect((await first_of(data.datasets)).size).toBe(60);
         expect(site.counters.search.total()).toBe(12);
         await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    /* A shared stream keeps its source for 1 s with nobody subscribed.
+     * The dataset map is one shared stream over the structure
+     * searches, not two, so the searches go after that 1 s and a
+     * reader who comes later never has two sets open. */
+    test("without run(), the structure searches close 1 s after the last reader, and a later reader opens one set", async () => {
+        vi.useFakeTimers();
+        const site = make_site();
+        build_site(site, { datasets: 60, seed: 66 });
+        const data = new DataFlow({ debug, cdb: site.cdb, auth: site.auth });
+        cleanup.push(() => site.close());
+        const open_searches = () =>
+            STRUCTURE_APPS.filter(app => site.subs.app.has(app)).length;
+
+        expect((await first_of(data.datasets)).size).toBe(60);
+        expect(open_searches()).toBe(6);
+        await vi.advanceTimersByTimeAsync(900);
+        expect(open_searches()).toBe(6);
+        await vi.advanceTimersByTimeAsync(200);
+        expect(open_searches()).toBe(0);
+
+        /* 1.5 s after the first reader left. */
+        await vi.advanceTimersByTimeAsync(400);
+        expect((await first_of(data.datasets)).size).toBe(60);
+        expect(open_searches()).toBe(6);
+        for (const app of STRUCTURE_APPS)
+            expect(site.subs.app.get(app).size).toBe(1);
+        expect(site.counters.search.total()).toBe(12);
+
+        await vi.advanceTimersByTimeAsync(1100);
+        expect(open_searches()).toBe(0);
+        expect(site.open_watches()).toEqual({ member: 0, subclass: 0 });
+        /* The library keeps the class WATCH a while longer. */
+        expect(site.open_subscriptions()).toBe(1);
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(site.open_subscriptions()).toBe(0);
     });
 
     test("run() twice subscribes once, and stop() lets the sources go", async () => {
@@ -823,7 +864,7 @@ describe("errors and reconnects", () => {
         data.run();
         await site.settle();
         expect(site.subs.app.size).toBe(6 + METADATA_APPS.length + 1);
-        expect((await rx.firstValueFrom(data.datasets)).size).toBe(60);
+        expect((await first_of(data.datasets)).size).toBe(60);
     });
 
     /* The code before the per-change index ran out of stack on a
@@ -841,7 +882,7 @@ describe("errors and reconnects", () => {
             site.put(App.SessionLimits, id(i), { source: id(i - 1) });
 
         const data = new DataFlow({ debug, cdb: site.cdb, auth: site.auth });
-        const datasets = await rx.firstValueFrom(data.datasets);
+        const datasets = await first_of(data.datasets);
         expect(datasets.size).toBe(depth + 1);
         expect(datasets.filter(d => d.structure === Special.InvalidDataset).size)
             .toBe(0);

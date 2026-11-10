@@ -345,6 +345,11 @@ membership is transitive over subclasses, a dataset classified into a
 subclass of a functional class (e.g. a hypothetical `MES work order` ⊂
 `MES dataset`) is reported as a member of both.
 
+The service holds `function` and `metadata` in memory and updates them
+from ConfigDB notifications. A read sent straight after a write to a
+dataset's metadata or to its functional class can therefore return the
+previous value, until the notification arrives.
+
 ### `GET v1/metadata/:uuid/contents`
 
 Lists the devices and metrics that a download of the dataset reads.
@@ -1111,6 +1116,14 @@ changes. It sends nothing at all for a dataset that does not exist, is
 invalid, or that the principal may not read, and nothing when a dataset
 it has answered for goes away. It never sends the invalid marker: use
 `WATCH v2/structure/` or the structure search to find invalid datasets.
+
+Because the watch sends nothing when a dataset goes away, the client
+keeps the last body the principal was allowed to see. One case is a
+[default dataset](#default-device-datasets) whose stored config is
+changed in ConfigDB to name another device. A principal who had the
+dataset only through the old device gets no message with the new
+config, on this watch or on the structure search. The search sends a
+`404` child update for the dataset.
 
 A `:uuid` that is not a UUID makes the service close the WebSocket.
 

@@ -790,9 +790,9 @@ describe("DatasetIndex rules", () => {
     });
 
     /* A config that cannot be read makes one dataset invalid. The
-     * stack running out is a different thing: it is no fault of the
-     * config where it happens, and which config that is depends on the
-     * order the datasets are asked for. */
+     * stack running out is a different thing: it comes from the size
+     * of a config, not from a wrong reference in it, and the whole-map
+     * code failed on it too. */
     test("a RangeError from a resolve is thrown, not turned into an invalid dataset", () => {
         const components = [ds(1)];
         components.map = () => { throw new RangeError("too deep"); };
@@ -804,24 +804,97 @@ describe("DatasetIndex rules", () => {
         }), null)).toThrow(RangeError);
     });
 
-    test("a chain of references too deep to follow fails, as before", () => {
-        const depth = 20_000;
+    /* A chain of sessions, each reading the one before: ds(0) is a
+     * device dataset and ds(depth) the top. */
+    function chain_of (depth) {
         const chain = new Map([[ds(0), imm.Map({ [App.SparkplugSrc]: {} })]]);
         for (let i = 1; i <= depth; i++)
             chain.set(ds(i),
                 imm.Map({ [App.SessionLimits]: { source: ds(i - 1) } }));
-        const grouped = imm.Map(chain);
+        return imm.Map(chain);
+    }
+    /* Top of the chain first, so the whole chain has to be followed
+     * to work out the first dataset asked for. */
+    const top_first = depth =>
+        Array.from({ length: depth + 1 }, (_, i) => ds(depth - i));
 
-        expect(() => reference_datasets(grouped)).toThrow(RangeError);
+    /* The index follows references with a loop. When it called itself
+     * for each reference it ran out of stack at about a third of the
+     * depth the whole-map code reached, so a site whose chain was
+     * between the two would have lost its whole dataset map. */
+    test("a chain as deep as the whole-map code could follow gives the same map", () => {
+        /* Where the whole-map code runs out of stack depends on the
+         * Node version, so find it: the deepest chain it follows
+         * here, to within a tenth. */
+        let follows = 500;
+        let fails = 20_000;
+        while (fails > follows * 1.1) {
+            const middle = Math.round((follows + fails) / 2);
+            try {
+                reference_datasets(chain_of(middle));
+                follows = middle;
+            }
+            catch (err) {
+                if (!(err instanceof RangeError)) throw err;
+                fails = middle;
+            }
+        }
+        /* A little less, so the frames of this test do not matter. */
+        const depth = Math.round(follows * 0.9);
+        expect(depth).toBeGreaterThan(1000);
+        const grouped = chain_of(depth);
+        const want = reference_datasets(grouped);
+        expect(want.size).toBe(depth + 1);
 
-        /* Ask for the top of the chain first, so the whole chain is on
-         * the stack at once. */
-        const top_first = [];
-        for (let i = depth; i >= 0; i--) top_first.push(ds(i));
         const index = new DatasetIndex();
         index.apply(imm.Map(), null);
-        expect(() => index.apply(grouped, top_first)).toThrow(RangeError);
-        expect(index.entries.size).toBe(0);
+        const result = index.apply(grouped, top_first(depth));
+
+        expect(result.changed.size).toBe(depth + 1);
+        expect(index.invalid.size).toBe(0);
+        expect(index.stats.resolved).toBe(depth + 1);
+        expect(index.entries.toJS()).toEqual(want.toJS());
+    /* The search for the depth takes a second or two. */
+    }, 30000);
+
+    test("a chain too deep for the whole-map code is followed too", () => {
+        const depth = 20_000;
+        const grouped = chain_of(depth);
+        expect(() => reference_datasets(grouped)).toThrow(RangeError);
+
+        const index = new DatasetIndex();
+        index.apply(imm.Map(), null);
+        const result = index.apply(grouped, top_first(depth));
+
+        expect(result.changed.size).toBe(depth + 1);
+        expect(index.entries.size).toBe(depth + 1);
+        expect(index.invalid.size).toBe(0);
+        expect(index.stats.resolved).toBe(depth + 1);
+
+        /* A cycle at the bottom makes the whole chain invalid, and one
+         * change to mend it makes it valid again. */
+        const broken = grouped.set(ds(0),
+            imm.Map({ [App.SessionLimits]: { source: ds(depth) } }));
+        expect(index.apply(broken, [ds(0)]).changed.size).toBe(depth + 1);
+        expect(index.valid.size).toBe(0);
+        expect(index.apply(grouped, [ds(0)]).changed.size).toBe(depth + 1);
+        expect(index.invalid.size).toBe(0);
+    }, 30000);
+
+    test("a dataset reached through two references is worked out once", () => {
+        const site = new Site();
+        /* 4 reads 3 and 2, 3 reads 2 and 1, 2 reads 1. Listed both
+         * ways round, so a dataset is asked for again before it has
+         * been worked out. */
+        site.load({
+            [ds(1)]: { [App.SparkplugSrc]: {} },
+            [ds(2)]: { [App.SessionLimits]: { source: ds(1) } },
+            [ds(3)]: { [App.UnionComponents]: [ds(2), ds(1)] },
+            [ds(4)]: { [App.UnionComponents]: [ds(3), ds(2)] },
+            [ds(5)]: { [App.UnionComponents]: [ds(2), ds(3)] },
+        });
+        expect(site.index.stats.resolved).toBe(5);
+        expect(site.index.invalid.size).toBe(0);
     });
 
     test("a reference that is not a string is a missing reference", () => {

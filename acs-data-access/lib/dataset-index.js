@@ -179,9 +179,10 @@ export class DatasetIndex {
      * dataset UUIDs whose entry was added, replaced or removed. The
      * first call always returns a value, and its `changed` holds every
      * dataset.
-     * @throws RangeError if a chain of references is too deep to
-     * follow. The index is then out of step with `grouped`: make a new
-     * one.
+     * @throws RangeError if working out one window runs out of stack,
+     * which only a union of a hundred thousand components or more can
+     * do. The index is then out of step with `grouped`: make a new
+     * one. A chain of references of any length is followed.
      */
     apply (grouped, changed) {
         this.stats.applies++;
@@ -319,7 +320,7 @@ export class DatasetIndex {
         const defs = grouped.get(id);
         if (defs == null) return null;
 
-        const win = this._resolve(id, grouped, new Set());
+        const win = this._resolve(id, grouped);
         if (win == null) return invalid_entry();
 
         const [structure, config] = defs.entries().next().value;
@@ -328,52 +329,95 @@ export class DatasetIndex {
 
     /* The window of a dataset, or null if it is missing or invalid.
      *
-     * `visited` holds the datasets on the path from the dataset first
-     * asked for down to this one, and each reference gets its own
-     * copy. So a dataset is found in `visited` only when it is its own
-     * ancestor, and a result never depends on the order datasets are
-     * asked for. That is what makes it safe to keep results across
-     * calls. */
-    _resolve (id, grouped, visited) {
+     * A window is worked out from the windows of the datasets the
+     * dataset refers to, so those come first. `path` holds the dataset
+     * asked for and, above it, the datasets still to look at; `open`
+     * holds the ones whose references are being worked out now, which
+     * are the dataset asked for and the chain of references from it
+     * down to the one in hand. This is a list and a loop, not a
+     * function that calls itself, so a chain of references of any
+     * length can be followed: the whole-map code ran out of stack on
+     * a chain a few thousand datasets long.
+     *
+     * A reference to a dataset in `open` is a cycle. It reads as
+     * null, which makes that dataset invalid, and with it every
+     * dataset on the cycle and every dataset that reaches it. A
+     * dataset is in `open` only when it is its own ancestor, so a
+     * result never depends on the order datasets are asked for. That
+     * is what makes it safe to keep results across calls. */
+    _resolve (id, grouped) {
         if (this.windows.has(id))
             return this.windows.get(id);
 
-        /* A cycle. The call that put `id` in `visited` is still
-         * running and will record null for it when this returns. */
-        if (visited.has(id))
-            return null;
-        visited.add(id);
+        /* The window of a reference: one worked out already, or null
+         * for a dataset that is missing, invalid or in `open`. */
+        const lookup = ref => this.windows.get(ref) ?? null;
+        const path = [id];
+        const open = new Set();
 
-        const defs = grouped.get(id);
-        /* A missing dataset. Not recorded: it has no entry to keep. */
-        if (defs == null)
-            return null;
+        while (path.length > 0) {
+            const top = path[path.length - 1];
+            /* Worked out since it was put on the path, through another
+             * reference to it. */
+            if (this.windows.has(top)) {
+                path.pop();
+                continue;
+            }
+            const defs = grouped.get(top);
+            /* A missing dataset. Not recorded: it has no entry to
+             * keep. */
+            if (defs == null) {
+                path.pop();
+                continue;
+            }
 
-        this.stats.resolved++;
-        let win = null;
-        /* A dataset is invalid unless it has exactly one structure
-         * entry. */
-        if (defs.size == 1) {
-            const [structure, config] = defs.entries().next().value;
-            /* A stored config can be anything. One that cannot be read
-             * makes this dataset invalid, and through the null result
-             * every dataset that refers to it. */
-            try {
-                win = resolve_window(structure, config,
-                    ref => this._resolve(ref, grouped, new Set(visited)));
+            /* A dataset is invalid unless it has exactly one structure
+             * entry, and then it refers to nothing. */
+            const [structure, config] = defs.size == 1
+                ? defs.entries().next().value : [];
+
+            if (!open.has(top)) {
+                open.add(top);
+                this.stats.resolved++;
+
+                let waiting = false;
+                if (defs.size == 1) {
+                    for (const ref of dataset_refs(structure, config)) {
+                        if (this.windows.has(ref) || open.has(ref)
+                            || !grouped.has(ref))
+                            continue;
+                        path.push(ref);
+                        waiting = true;
+                    }
+                }
+                /* Come back to this dataset when they are done. */
+                if (waiting) continue;
             }
-            catch (err) {
-                /* A RangeError is the stack running out on a chain of
-                 * references too deep to follow. It says nothing about
-                 * this config. Where the stack runs out depends on
-                 * which dataset was asked for first, so a null here
-                 * would be kept for datasets that are valid. Fail, as
-                 * the whole-map code did. */
-                if (err instanceof RangeError) throw err;
-                win = null;
+
+            let win = null;
+            if (defs.size == 1) {
+                /* A stored config can be anything. One that cannot be
+                 * read makes this dataset invalid, and through the
+                 * null result every dataset that refers to it. */
+                try {
+                    win = resolve_window(structure, config, lookup);
+                }
+                catch (err) {
+                    /* A RangeError is the stack running out, on a
+                     * union with too many components to take the
+                     * earliest and latest of in one call. The
+                     * whole-map code failed on that too, and so does
+                     * this: such a config is not a wrong reference
+                     * that should make one dataset invalid. */
+                    if (err instanceof RangeError) throw err;
+                    win = null;
+                }
             }
+            this.windows.set(top, win);
+            open.delete(top);
+            path.pop();
         }
-        this.windows.set(id, win);
-        return win;
+
+        return this.windows.get(id) ?? null;
     }
 }

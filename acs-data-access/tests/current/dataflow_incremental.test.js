@@ -826,7 +826,9 @@ describe("errors and reconnects", () => {
         expect((await rx.firstValueFrom(data.datasets)).size).toBe(60);
     });
 
-    test("a reference chain too deep to follow errors the dataset map, and a shorter one reads again", async () => {
+    /* The code before the per-change index ran out of stack on a
+     * chain like this, and every route failed. */
+    test("a chain of 20,000 references reads, and every dataset in it is valid", async () => {
         const site = make_site();
         cleanup.push(() => site.close());
         const id = n => `5eedab1e-0ccc-4000-8000-${n.toString(16).padStart(12, "0")}`;
@@ -839,15 +841,10 @@ describe("errors and reconnects", () => {
             site.put(App.SessionLimits, id(i), { source: id(i - 1) });
 
         const data = new DataFlow({ debug, cdb: site.cdb, auth: site.auth });
-        await expect(rx.firstValueFrom(data.datasets)).rejects.toThrow(RangeError);
-
-        /* Cut the chain into short pieces. The next read starts from a
-         * new index, because the old one stopped part of the way. */
-        for (let i = 100; i <= depth; i += 100)
-            site.put(App.SessionLimits, id(i), { source: id(0) });
         const datasets = await rx.firstValueFrom(data.datasets);
         expect(datasets.size).toBe(depth + 1);
         expect(datasets.filter(d => d.structure === Special.InvalidDataset).size)
             .toBe(0);
-    });
+        expect(data.index.stats.resolved).toBe(depth + 1);
+    }, 30000);
 });

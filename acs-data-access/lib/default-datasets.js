@@ -44,12 +44,18 @@ export const READ_STRUCTURE = "read-structure";
  * answer costs a SHA-1. */
 const DEFAULT_UUIDS = new Map();
 const DEFAULT_UUIDS_MAX = 50000;
+const UUID_LENGTH = 36;
 
 /** The UUID of a device's default dataset. */
 export function default_dataset_uuid(device) {
   let dataset = DEFAULT_UUIDS.get(device);
   if (dataset === undefined) {
     dataset = uuidv5(device, Constants.Special.DefaultDatasetNamespace);
+    /* A stored UNS device config can name anything as its device, of
+     * any length. Only a string as long as a UUID is kept, so nothing
+     * but device UUIDs can fill the Map. */
+    if (typeof device != "string" || device.length != UUID_LENGTH)
+      return dataset;
     DEFAULT_UUIDS.set(device, dataset);
     if (DEFAULT_UUIDS.size > DEFAULT_UUIDS_MAX) DEFAULT_UUIDS.clear();
   }

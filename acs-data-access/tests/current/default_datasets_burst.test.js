@@ -1193,4 +1193,26 @@ describe("default_dataset_uuid", () => {
         expect(() => default_dataset_uuid(undefined)).toThrow();
         expect(() => default_dataset_uuid(undefined)).toThrow();
     });
+
+    /* A stored UNS device config can name any string as its device,
+     * and every dataset list asks for the default dataset of each. */
+    test("keeps the answer for a device UUID, and none for a string of another length", () => {
+        const junk = "x".repeat(5000);
+        const known = device(60000);
+        const kept = vi.spyOn(Map.prototype, "set");
+        try {
+            expect(default_dataset_uuid(junk)).toBe(direct(junk));
+            expect(default_dataset_uuid(junk)).toBe(direct(junk));
+            expect(default_dataset_uuid("")).toBe(direct(""));
+            expect(default_dataset_uuid(known)).toBe(direct(known));
+            expect(default_dataset_uuid(known)).toBe(direct(known));
+
+            const keys = kept.mock.calls.map(([key]) => key);
+            expect(keys.filter(key => key === known)).toHaveLength(1);
+            expect(keys.filter(key => key === junk || key === "")).toEqual([]);
+        }
+        finally {
+            kept.mockRestore();
+        }
+    });
 });

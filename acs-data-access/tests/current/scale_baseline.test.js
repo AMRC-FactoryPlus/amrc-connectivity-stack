@@ -64,12 +64,16 @@ function make_default (fx, device) {
 }
 
 describe("known defects", () => {
-    /* D1. Flips in stage 6: no message follows a snapshot until
+    /* D1. Flipped in stage 6. Before it, each SEARCH sent its snapshot
+     * and then one child update per child that repeated it: 20 here.
+     * The notify library queued them behind the snapshot, and on a
+     * site of a few hundred datasets that queue overflowed the stack
+     * and the search went quiet. Now nothing follows a snapshot until
      * something changes. */
     test.each([
         ["v2/metadata/", "metadata"],
         ["v2/structure/", "structure"],
-    ])("D1: a SEARCH %s snapshot of 20 children is followed by 20 updates that repeat it",
+    ])("D1: a SEARCH %s snapshot of 20 children is followed by nothing until a dataset changes",
     async (parent, list) => {
         const fx = fixture({ datasets: 20, seed: 11 });
         const visible = fx.built.expected[ROOT][list];
@@ -80,17 +84,35 @@ describe("known defects", () => {
 
         const [snapshot, ...repeats] = rec.messages;
         expect(Object.keys(snapshot.children).sort()).toEqual(visible);
-        expect(repeats).toHaveLength(20);
-        expect(repeats.map(m => m.child).sort()).toEqual(visible);
-        for (const m of repeats)
-            expect([m.status, m.response.status]).toEqual([200, 201]);
+        expect(repeats).toEqual([]);
+
+        /* One change to one dataset: one message. A new name changes
+         * a metadata body, and a new window a structure body. */
+        const session = fx.built.kinds.sessions.at(-1);
+        if (list == "metadata") {
+            fx.site.put(Info, session, { name: "Renamed" });
+        }
+        else {
+            const config = fx.site.app(App.SessionLimits).get(session);
+            fx.site.put(App.SessionLimits, session,
+                { ...config, to: "2027-06-01T00:00:00.000Z" });
+        }
+        await fx.site.settle();
+
+        expect(rec.messages).toHaveLength(2);
+        expect(rec.messages[1].child).toBe(session);
+        expect([rec.messages[1].status, rec.messages[1].response.status])
+            .toEqual([200, 200]);
     });
 
-    /* D2. Flips in stage 6: the search answers, and the invalid
-     * dataset is a child with the invalid marker. */
-    test("D2: SEARCH v2/structure/ sends nothing while an invalid dataset is visible", async () => {
+    /* D2. Flipped in stage 6. Before it, this search sent nothing at
+     * all while the principal could see one invalid dataset. Now it
+     * answers, and the invalid dataset is a child with the invalid
+     * marker, which is what GET /v1/structure/:uuid gives for it. */
+    test("D2: SEARCH v2/structure/ answers while an invalid dataset is visible, and shows it as invalid", async () => {
         const fx = fixture({ datasets: 20, seed: 12 });
         const broken = fx.built.kinds.sparkplug[1];
+        const config = fx.site.app(App.SparkplugSrc).get(broken);
         /* A second definition makes it invalid. */
         fx.site.put(App.UnionComponents, broken, []);
 
@@ -99,12 +121,41 @@ describe("known defects", () => {
         await fx.site.settle();
 
         expect(list.state().body).toContain(broken);
-        expect(rec.messages).toEqual([]);
+        expect(rec.messages).toHaveLength(1);
+        const [snapshot] = rec.messages;
+        expect(Object.keys(snapshot.children)).toHaveLength(20);
+        expect(snapshot.children[broken]).toEqual({
+            status: 200,
+            body: { structure: Constants.Special.InvalidDataset, config: null },
+        });
+        expect(JSON.stringify(snapshot.children[broken].body)).toBe(JSON.stringify(
+            { structure: Constants.Special.InvalidDataset, config: null }));
 
-        /* It is the invalid dataset that stops it. */
+        /* Mended, it is a changed child with its structure back. */
         fx.site.del(App.UnionComponents, broken);
         await fx.site.settle();
+        expect(rec.messages.slice(1)).toEqual([{
+            status: 200,
+            child: broken,
+            response: {
+                status: 200,
+                body: { structure: App.SparkplugSrc, config },
+            },
+        }]);
         expect(Object.keys(rec.state().children)).toHaveLength(20);
+
+        /* A dataset that turns invalid while the search is open is a
+         * changed child too, not a child that goes away. */
+        fx.site.put(App.UnionComponents, broken, []);
+        await fx.site.settle();
+        expect(rec.messages.slice(2)).toEqual([{
+            status: 200,
+            child: broken,
+            response: {
+                status: 200,
+                body: { structure: Constants.Special.InvalidDataset, config: null },
+            },
+        }]);
     });
 
     /* D3. Flipped in stage 2. Before it, the maker queued every list
@@ -233,13 +284,18 @@ describe("baselines", () => {
         return fx.site.counters.grant_has - before;
     }
 
-    /* B1. Flips in stage 6: the same count at both sizes. */
-    test("B1: grant checks for one new dataset grow more than 3 times when the site doubles", async () => {
+    /* B1. Flipped in stage 6. Before it, every dataset change made
+     * each search check every dataset again, once per child, so the
+     * checks for one new dataset grew more than 3 times when the site
+     * doubled. Now a search checks the dataset that changed: once for
+     * the structure search, and once each for the two metadata bodies
+     * (the dataset, then its name). */
+    test("B1: grant checks for one new dataset are the same when the site doubles", async () => {
         const small = await grant_checks_for_one_dataset(60);
         const large = await grant_checks_for_one_dataset(120);
 
-        expect(small).toBeGreaterThan(0);
-        expect(large).toBeGreaterThan(3 * small);
+        expect(small).toBe(3);
+        expect(large).toBe(small);
     }, 120000);
 
     /* B3. Flipped in stage 4. Before it, every structure change built
@@ -271,24 +327,29 @@ describe("baselines", () => {
         expect(same).toHaveLength(59);
     });
 
-    /* B4. Flips in stage 6: at most 1, across general_infos and
-     * info_changes. */
-    test("B4: one metadata SEARCH holds one General information subscriber per child", async () => {
+    /* B4. Flipped in stage 6. Before it, a metadata SEARCH held one
+     * General information subscriber per child: 60 here. So one name
+     * written anywhere on the site woke every child of every open
+     * search. Now the search holds one subscriber, whatever the number
+     * of children. */
+    test("B4: one metadata SEARCH holds one General information subscriber", async () => {
         const fx = fixture({ datasets: 60, seed: 24 });
         const visible = fx.built.expected[ROOT].metadata.length;
         expect(visible).toBe(60);
 
         let subscribers = 0;
-        const infos = fx.data.general_infos;
-        fx.data.general_infos = rx.defer(() => {
-            subscribers++;
-            return infos;
-        });
+        for (const name of ["general_infos", "info_changes"]) {
+            const source = fx.data[name];
+            fx.data[name] = rx.defer(() => {
+                subscribers++;
+                return source;
+            });
+        }
 
         const rec = fx.client.open(ROOT, search("v2/metadata/"));
         await fx.site.settle();
         expect(Object.keys(rec.state().children)).toHaveLength(60);
-        expect(subscribers).toBe(60);
+        expect(subscribers).toBe(1);
     });
 
     /* B5. Flipped in stage 5. Before it, the parts of one dataset came

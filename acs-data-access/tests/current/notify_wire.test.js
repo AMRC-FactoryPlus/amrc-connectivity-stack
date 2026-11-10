@@ -613,7 +613,9 @@ describe("when each endpoint first answers", () => {
         }
     });
 
-    /* R3. Known change W1: stage 6 sends parts as [] here. */
+    /* R3. W1, flipped in stage 6: while the parts of a dataset are
+     * not known its body has `parts: []`. Before stage 6 it had
+     * `parts: {}` there. */
     test("SEARCH v2/metadata/ answers once the dataset map and the ACL have, with partial bodies", async () => {
         const fx = fixture(site => {
             site.hold("app", Info);
@@ -623,27 +625,47 @@ describe("when each endpoint first answers", () => {
         });
         const rec = await settled(fx, USER, search("v2/metadata/"));
 
-        expect(rec.messages[0]).toEqual({
+        expect(rec.messages).toEqual([{
             children: {
                 [SOURCE]:   { status: 200, body: {
-                    uuid: SOURCE, name: "UNKNOWN", parts: {} } },
+                    uuid: SOURCE, name: "UNKNOWN", parts: [] } },
                 [SESSION]:  { status: 200, body: {
-                    uuid: SESSION, name: "UNKNOWN", from: FROM, to: TO, parts: {} } },
+                    uuid: SESSION, name: "UNKNOWN", from: FROM, to: TO, parts: [] } },
             },
             response: { status: 204 },
             status: 201,
-        });
+        }]);
         expect(JSON.stringify(rec.messages[0].children[SESSION].body)).toBe(
-            JSON.stringify({ uuid: SESSION, name: "UNKNOWN", from: FROM, to: TO, parts: {} }));
+            JSON.stringify({ uuid: SESSION, name: "UNKNOWN", from: FROM, to: TO, parts: [] }));
 
-        /* When the held sources answer, the client ends up with the
-         * full bodies. */
-        fx.site.release();
-        await fx.site.settle();
+        /* When the held sources answer, each child gets one update for
+         * each source that changes its body. SOURCE gains a name; USER
+         * may not read its one part. SESSION gains a name, a metadata
+         * entry and a kind. */
+        const sent = await after(fx, rec, () => fx.site.release());
+        for (const m of sent)
+            expect([m.status, m.response.status]).toEqual([200, 200]);
+        expect(sent.filter(m => m.child == SOURCE).map(m => m.response.body))
+            .toEqual([{ ...SOURCE_BODY, parts: [] }]);
+        const session = sent.filter(m => m.child == SESSION)
+            .map(m => m.response.body);
+        expect(session).toHaveLength(3);
+        expect(session[2]).toEqual(SESSION_BODY);
+        /* Each one adds something: no update repeats the one before. */
+        expect(new Set(session.map(body => JSON.stringify(body))).size).toBe(3);
+        for (const body of session)
+            expect(body).toMatchObject({ uuid: SESSION, from: FROM, to: TO, parts: [] });
+        expect(sent).toHaveLength(4);
+
+        /* The client ends up with the full bodies, as a client that
+         * subscribes now does. */
         expect(rec.state().children).toEqual({
             [SOURCE]:   { ...SOURCE_BODY, parts: [] },
             [SESSION]:  SESSION_BODY,
         });
+        const fresh = await settled(fx, USER, search("v2/metadata/"));
+        expect(fresh.messages).toHaveLength(1);
+        expect(fresh.state()).toEqual(rec.state());
     });
 
     test("the six other endpoints wait for the dataset map and the ACL only", async () => {

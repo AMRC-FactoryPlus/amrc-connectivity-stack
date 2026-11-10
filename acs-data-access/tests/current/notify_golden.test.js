@@ -28,7 +28,8 @@ const SINGLE = new Set(["metadata_uuid", "structure_uuid"]);
 
 /* Every shape of message the old handlers send in the two scenarios:
  * the endpoint, then the message's keys and statuses and the type of
- * each body. A later stage may send fewer shapes, never a new one. */
+ * each body. A later stage may send fewer shapes, never a new one. Do
+ * not add to this list. */
 const SHAPE_CATALOGUE = [
     "SEARCH v2/metadata/ :: status=200 child response=200/object",
     "SEARCH v2/metadata/ :: status=200 child response=201/object",
@@ -185,7 +186,11 @@ describe.each(["A", "B"])("notify client state, scenario %s", name => {
 });
 
 describe("message shapes", () => {
-    test("the two scenarios send exactly the catalogued shapes", () => {
-        expect([...shapes].sort()).toEqual([...SHAPE_CATALOGUE].sort());
+    /* The handlers the catalogue was taken from sent exactly these
+     * shapes. The keyed views may send fewer, and never a new one. */
+    test("the two scenarios send only catalogued shapes", () => {
+        expect(shapes.size).toBeGreaterThan(0);
+        const catalogue = new Set(SHAPE_CATALOGUE);
+        expect([...shapes].filter(shape => !catalogue.has(shape))).toEqual([]);
     });
 });

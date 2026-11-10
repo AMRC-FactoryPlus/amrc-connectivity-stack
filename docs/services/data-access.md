@@ -660,8 +660,15 @@ Queries waiting to run, across all requests | 400 (`SERIES_MAX_QUEUE`)
 The series route has its own query limiter, so a long `POST v1/data`
 export does not delay it. Devices of a dataset that share the same
 windows run as one set of queries, so the window-set limit bounds the
-queries one request makes. The server cancels the queries when the
-client disconnects.
+queries one request makes.
+
+When a request ends early, the server closes its open queries to
+InfluxDB, and InfluxDB stops running them. This happens when the
+client disconnects, when the request or a query reaches its time
+limit, and when one query of the request fails. Queries of that
+request that are still waiting for a slot are never sent. A slow
+request that a page sends again and again therefore costs InfluxDB at
+most its time limit each time, and the queries do not pile up.
 
 Status | When
 ---|---

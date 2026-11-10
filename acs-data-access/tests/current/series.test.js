@@ -15,6 +15,8 @@ import { DataFlow } from "../../lib/dataflow.js";
 import { DataAccess as Constants } from "../../lib/constants.js";
 import { SeriesReader, SeriesAbort, SeriesQueryError } from "../../lib/series-reader.js";
 import { body_errors } from "../../lib/utils.js";
+import http from "node:http";
+import { series_influx } from "../../lib/series-query.js";
 import {
     LIMITS as SeriesLimits,
     SeriesError, parse_request, bucket_start, next_bucket, bucket_count,
@@ -1195,5 +1197,153 @@ describe("a query InfluxDB gives up on", () => {
         await call(api, ROOT, two_means);
         expect(query_api.seen.length).toBe(1);
         expect_storage_means(query_api.seen[0]);
+    });
+});
+
+
+/*
+ * ---------------------------------------------------------------
+ * Stopping a query in InfluxDB
+ *
+ * These run the reader against a local HTTP server, through the real
+ * InfluxDB client transport. InfluxDB cancels a query when its client
+ * closes the connection, so the tests watch for that close.
+ * ---------------------------------------------------------------
+ */
+
+/* A stand-in for InfluxDB. `answer(res)` replies, or does nothing to
+ * leave the query running. `closed` resolves when a client closes a
+ * request that has had no reply. */
+async function fake_influx(answer = () => {}) {
+    let abandoned;
+    const closed = new Promise(r => { abandoned = r; });
+    const requests = [];
+    const server = http.createServer((req, res) => {
+        let body = "";
+        req.on("data", d => { body += d; });
+        req.on("end", () => {
+            requests.push({ url: req.url, body: JSON.parse(body) });
+            res.on("close", () => { if (!res.writableEnded) abandoned(); });
+            answer(res);
+        });
+    });
+    await new Promise(r => server.listen(0, "127.0.0.1", r));
+    const reader = new SeriesReader({
+        debug, influx_bucket: "default", influx_org: "the org",
+        influx_client: series_influx({
+            url: `http://127.0.0.1:${server.address().port}`, token: "t" }),
+    });
+    const stop = () => new Promise(r => { server.closeAllConnections(); server.close(r); });
+    return { reader, requests, closed, stop };
+}
+
+const csv = lines => res => {
+    res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+    res.end(lines.join("\r\n") + "\r\n");
+};
+
+describe("stopping a query in InfluxDB", () => {
+    test("reads rows through the client transport", async () => {
+        const influx = await fake_influx(csv([
+            "#datatype,string,long,string,string,dateTime:RFC3339,double",
+            "#group,false,false,true,true,false,false",
+            "#default,sum,,,,,",
+            ",result,table,topLevelInstance,_measurement,_time,_value",
+            `,,0,${D1},Float:d,2026-10-08T00:00:00Z,12.5`,
+        ]));
+        try {
+            const rows = await influx.reader.query_rows("from(x)", new AbortController().signal);
+            expect(rows).toEqual([{ result: "sum", table: 0, topLevelInstance: D1,
+                _measurement: "Float:d", _time: "2026-10-08T00:00:00Z", _value: 12.5 }]);
+            expect(influx.requests[0].url).toBe("/api/v2/query?org=the%20org");
+            expect(influx.requests[0].body).toMatchObject({ query: "from(x)", type: "flux" });
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("the error table InfluxDB really sends rejects the query", async () => {
+        const influx = await fake_influx(csv([
+            "",
+            "#datatype,string,string",
+            "#group,true,true",
+            "#default,,",
+            ",error,reference",
+            ",context deadline exceeded,",
+        ]));
+        try {
+            await expect(influx.reader.query_rows("x", new AbortController().signal))
+                .rejects.toMatchObject({ timeout: true });
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("an empty 200 from InfluxDB is no rows", async () => {
+        const influx = await fake_influx(csv([""]));
+        try {
+            expect(await influx.reader.query_rows("x", new AbortController().signal))
+                .toEqual([]);
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("a query that outlives its limit is closed", async () => {
+        const influx = await fake_influx();
+        influx.reader.query_timeout_ms = 30;
+        try {
+            await expect(influx.reader.query_rows("x", new AbortController().signal))
+                .rejects.toMatchObject({ reason: "timeout" });
+            await influx.closed;
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("a query is closed when its request is aborted", async () => {
+        const influx = await fake_influx();
+        const ctl = new AbortController();
+        try {
+            const p = influx.reader.query_rows("x", ctl.signal);
+            p.catch(() => {});
+            while (!influx.requests.length) await new Promise(r => setTimeout(r, 5));
+            ctl.abort(new SeriesAbort("client closed"));
+            await expect(p).rejects.toMatchObject({ reason: "client closed" });
+            await influx.closed;
+        }
+        finally { await influx.stop(); }
+    });
+
+    test("stopping after the whole response has arrived raises nothing", async () => {
+        /* The error table is the whole body, so the reader stops a
+         * request whose connection is already idle. */
+        const influx = await fake_influx(csv(["", ",error,reference", ",context canceled,"]));
+        const uncaught = [];
+        const on_uncaught = err => uncaught.push(err);
+        process.on("uncaughtException", on_uncaught);
+        try {
+            for (let i = 0; i < 10; i++)
+                await expect(influx.reader.query_rows("x", new AbortController().signal))
+                    .rejects.toBeInstanceOf(SeriesQueryError);
+            await new Promise(r => setTimeout(r, 30));
+            expect(uncaught).toEqual([]);
+        }
+        finally {
+            process.off("uncaughtException", on_uncaught);
+            await influx.stop();
+        }
+    });
+
+    test("a waiting query of an aborted request is never sent", async () => {
+        const influx = await fake_influx();
+        const ctl = new AbortController();
+        try {
+            /* The default limit runs 4 queries at once. */
+            const ps = [1, 2, 3, 4, 5].map(i => influx.reader.query_rows(`q${i}`, ctl.signal));
+            ps.forEach(p => p.catch(() => {}));
+            while (influx.requests.length < 4) await new Promise(r => setTimeout(r, 5));
+            ctl.abort(new SeriesAbort("failed"));
+            await Promise.allSettled(ps);
+            await new Promise(r => setTimeout(r, 30));
+            expect(influx.requests.map(r => r.body.query).sort()).toEqual(["q1", "q2", "q3", "q4"]);
+        }
+        finally { await influx.stop(); }
     });
 });

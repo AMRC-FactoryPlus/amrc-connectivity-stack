@@ -18,6 +18,7 @@ import {
     coverage_query,
 } from "./coverage.js";
 import { is_missing_bucket } from "./influx-reader.js";
+import { SeriesQuery } from "./series-query.js";
 
 /* The store a source reads when it names none. See Constants.Store. */
 const DEFAULT_STORE = "sparkplug";
@@ -94,8 +95,9 @@ export class SeriesReader {
     constructor(opts) {
         this.log = opts.debug.bound("series");
         this.buckets = opts.buckets ?? { [DEFAULT_STORE]: opts.influx_bucket };
-        this.query_api = opts.query_api
-            ?? opts.influx_client.getQueryApi(opts.influx_org);
+        /* Not the client's own query API: that cannot stop a query
+         * in InfluxDB. See SeriesQuery. */
+        this.query_api = opts.query_api ?? new SeriesQuery(opts);
         this.limit = pLimit(Number(opts.concurrency) || 4);
         this.query_timeout_ms = Number(opts.query_timeout_ms) || SERIES_DEFAULTS.query_timeout_ms;
         this.timeout_ms = Number(opts.timeout_ms) || SERIES_DEFAULTS.timeout_ms;
@@ -200,7 +202,8 @@ export class SeriesReader {
      * starts when it gets a slot. If too many queries are waiting, it
      * fails with SeriesAbort("busy") without queueing. If InfluxDB
      * ends the query with an error table, it fails with
-     * SeriesQueryError.
+     * SeriesQueryError. However a query fails or is abandoned, its
+     * request to InfluxDB is closed, so InfluxDB stops running it.
      *
      * historian-uns creates the UNS bucket when it starts, which may be
      * after Data Access. Until then a `uns` query reads nothing, rather
@@ -230,10 +233,15 @@ export class SeriesReader {
                 clearTimeout(timer);
                 signal.removeEventListener("abort", on_abort);
             };
+            /* Closes the request, so InfluxDB stops the query too.
+             * Settle the promise first: closing reports an error of
+             * its own. */
+            const request = new AbortController();
             const stop = reason => {
                 finish();
-                cancellable?.cancel();
                 reject(reason);
+                cancellable?.cancel();
+                request.abort();
             };
             const on_abort = () => stop(signal.reason);
             const timer = setTimeout(
@@ -251,10 +259,10 @@ export class SeriesReader {
 
             this.query_api.queryRows(query, {
                 next,
-                error: err => { finish(); reject(err); },
+                error: err => stop(err),
                 complete: () => { finish(); resolve(rows); },
                 useCancellable: c => { cancellable = c; },
-            });
+            }, request.signal);
         }));
     }
 

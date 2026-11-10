@@ -14,6 +14,7 @@ import { APIv1 } from '../lib/api-v1.js';
 import {DataAccessNotify} from '../lib/notify.js';
 import { InfluxReader } from '../lib/influx-reader.js';
 import { SeriesReader, SERIES_DEFAULTS } from '../lib/series-reader.js';
+import { series_influx } from '../lib/series-query.js';
 import { Coverage, InfluxAdmin } from '../lib/coverage-service.js';
 import { COVERAGE_DEFAULTS } from '../lib/coverage.js';
 import { body_errors } from '../lib/utils.js';
@@ -101,7 +102,7 @@ const coverages = [coverage, uns_coverage].filter(c => c);
 // the client's default 10 s timeout ended slow queries first.
 const series_query_ms = Number(env.SERIES_QUERY_TIMEOUT_MS)
   || SERIES_DEFAULTS.query_timeout_ms;
-const seriesInflux = new InfluxDB({
+const seriesInflux = series_influx({
   url: env.INFLUXDB_URL,
   token: env.INFLUXDB_TOKEN,
   timeout: series_query_ms + 5000,

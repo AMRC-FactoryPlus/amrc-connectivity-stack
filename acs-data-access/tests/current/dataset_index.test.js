@@ -749,6 +749,41 @@ describe("DatasetIndex rules", () => {
         expect(site.index.invalid.size).toBe(0);
     });
 
+    /* A config that cannot be read makes one dataset invalid. The
+     * stack running out is a different thing: it is no fault of the
+     * config where it happens, and which config that is depends on the
+     * order the datasets are asked for. */
+    test("a RangeError from a resolve is thrown, not turned into an invalid dataset", () => {
+        const components = [ds(1)];
+        components.map = () => { throw new RangeError("too deep"); };
+        const index = new DatasetIndex();
+
+        expect(() => index.apply(imm.Map({
+            [ds(1)]: imm.Map({ [App.SparkplugSrc]: {} }),
+            [ds(2)]: imm.Map({ [App.UnionComponents]: components }),
+        }), null)).toThrow(RangeError);
+    });
+
+    test("a chain of references too deep to follow fails, as before", () => {
+        const depth = 20_000;
+        const chain = new Map([[ds(0), imm.Map({ [App.SparkplugSrc]: {} })]]);
+        for (let i = 1; i <= depth; i++)
+            chain.set(ds(i),
+                imm.Map({ [App.SessionLimits]: { source: ds(i - 1) } }));
+        const grouped = imm.Map(chain);
+
+        expect(() => reference_datasets(grouped)).toThrow(RangeError);
+
+        /* Ask for the top of the chain first, so the whole chain is on
+         * the stack at once. */
+        const top_first = [];
+        for (let i = depth; i >= 0; i--) top_first.push(ds(i));
+        const index = new DatasetIndex();
+        index.apply(imm.Map(), null);
+        expect(() => index.apply(grouped, top_first)).toThrow(RangeError);
+        expect(index.entries.size).toBe(0);
+    });
+
     test("a reference that is not a string is a missing reference", () => {
         const site = new Site();
         site.load({

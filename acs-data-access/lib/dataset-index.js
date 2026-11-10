@@ -179,6 +179,9 @@ export class DatasetIndex {
      * dataset UUIDs whose entry was added, replaced or removed. The
      * first call always returns a value, and its `changed` holds every
      * dataset.
+     * @throws RangeError if a chain of references is too deep to
+     * follow. The index is then out of step with `grouped`: make a new
+     * one.
      */
     apply (grouped, changed) {
         this.stats.applies++;
@@ -354,7 +357,14 @@ export class DatasetIndex {
                 win = resolve_window(structure, config,
                     ref => this._resolve(ref, grouped, new Set(visited)));
             }
-            catch {
+            catch (err) {
+                /* A RangeError is the stack running out on a chain of
+                 * references too deep to follow. It says nothing about
+                 * this config. Where the stack runs out depends on
+                 * which dataset was asked for first, so a null here
+                 * would be kept for datasets that are valid. Fail, as
+                 * the whole-map code did. */
+                if (err instanceof RangeError) throw err;
                 win = null;
             }
         }

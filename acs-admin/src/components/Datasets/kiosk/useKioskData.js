@@ -6,7 +6,7 @@ import { onBeforeUnmount, ref, shallowRef, toValue, watch } from 'vue'
 import { useDocumentVisibility } from '@vueuse/core'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fetch_series } from '@/lib/datasets/api.js'
-import { series_request, sum_counts, LAST_LOOKBACK, LIMITS } from '@/lib/datasets/series.js'
+import { series_request, sum_counts, LAST_LOOKBACK, LIMITS, DEVICE_STORE } from '@/lib/datasets/series.js'
 import { lane_range } from '@/lib/datasets/kiosk.js'
 import { window_gaps } from '@/lib/datasets/gaps.js'
 
@@ -22,7 +22,8 @@ const LANE_EVERY = '5m'
  * equipment's devices added together, polled every 20 s), each
  * device's newest data time (polled every 60 s, with a short lookback
  * after the first answer) and the gaps in the last saved recording.
- * Nothing polls while the page is hidden.
+ * Nothing polls while the page is hidden. Every request reads the UNS,
+ * like the builder and the timeline.
  *
  * @param devices  getter: the equipment's device UUIDs
  * @param saved    getter: the saved summary ({ run, from, to, deviceList }) or null
@@ -48,7 +49,7 @@ export function useKioskData (devices, saved) {
     const r = lane_range(Date.now())
     try {
       const s = await fetch_series(sc.client, series_request({
-        devices: l, from: r.from, to: r.to, every: LANE_EVERY, count: true,
+        devices: l, from: r.from, to: r.to, every: LANE_EVERY, count: true, store: DEVICE_STORE,
       }))
       if (my !== laneGen) return
       lane.value = { every: s.every, counts: sum_counts(l.map(d => s.devices[d]?.count ?? [])) }
@@ -71,7 +72,7 @@ export function useKioskData (devices, saved) {
     const hour = Math.ceil(Date.now() / 3600e3) * 3600e3
     try {
       const s = await fetch_series(sc.client, series_request({
-        devices: l, from: hour - 3600e3, to: hour, every: '1h', last: known ? SHORT_LOOKBACK : LAST_LOOKBACK,
+        devices: l, from: hour - 3600e3, to: hour, every: '1h', last: known ? SHORT_LOOKBACK : LAST_LOOKBACK, store: DEVICE_STORE,
       }))
       if (my !== lastGen) return
       const got = {}
@@ -109,7 +110,7 @@ export function useKioskData (devices, saved) {
     const from = Date.parse(s?.from), to = Date.parse(s?.to)
     if (!s?.run || !list.length || !(from < to)) return
     try {
-      const res = await fetch_series(sc.client, series_request({ devices: list, from, to, points: 120, count: true }))
+      const res = await fetch_series(sc.client, series_request({ devices: list, from, to, points: 120, count: true, store: DEVICE_STORE }))
       if (my !== savedGen) return
       const counts = {}
       for (const d of list) if (!res.denied.includes(d)) counts[d] = res.devices[d]?.count ?? []

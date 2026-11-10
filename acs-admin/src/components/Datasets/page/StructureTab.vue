@@ -38,7 +38,14 @@
 
     <IncludedIn :record="record"/>
 
-    <Card class="flex flex-wrap items-center justify-between gap-4 p-5">
+    <Card v-if="record.is_default" class="p-5 text-sm">
+      <div class="font-semibold text-gray-900">This dataset cannot be deleted</div>
+      <p class="mt-1 max-w-prose text-slate-600">
+        Every placed device has one dataset of its own. The service makes it,
+        names it after the device and keeps it.
+      </p>
+    </Card>
+    <Card v-else class="flex flex-wrap items-center justify-between gap-4 p-5">
       <div class="max-w-prose text-sm">
         <div class="font-semibold text-gray-900">Delete this dataset</div>
         <p class="mt-1 text-slate-600">

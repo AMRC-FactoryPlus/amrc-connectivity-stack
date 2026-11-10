@@ -2,18 +2,22 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<!-- One device lane: the device's name, its status and its equipment
+<!-- One device lane: the device's name (a link to the device's own
+     dataset when it has one), its status and its equipment
      label or metric count, and a track you drag across to select. The
      timeline handles the drag for all lanes. The track shows when data
      arrived, and a quiet device gets an amber note from
      the time its data stopped. -->
 <template>
   <div class="absolute left-0 flex border-b border-slate-200"
-       :style="{ top: `${row.top}px`, height: `${row.h}px`, width: `${LABEL_W + trackWidth}px` }">
+       :style="{ top: `${row.top}px`, height: `${row.h}px`, width: `${labelWidth + trackWidth}px` }">
     <div class="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-slate-200 bg-white pl-10 pr-3 text-[13px] text-slate-700"
-         :style="{ width: `${LABEL_W}px` }">
+         :style="{ width: `${labelWidth}px` }">
       <i class="fa-solid fa-microchip fa-fw shrink-0 text-[11px] text-slate-500"></i>
-      <span class="min-w-0 flex-1 truncate" :title="row.name">{{ row.name }}</span>
+      <RouterLink v-if="row.dataset" :to="`/datasets/${row.dataset}`"
+                  class="min-w-0 flex-1 truncate hover:text-slate-950 hover:underline"
+                  :title="`${row.name}: open this device's dataset`">{{ row.name }}</RouterLink>
+      <span v-else class="min-w-0 flex-1 truncate" :title="row.name">{{ row.name }}</span>
       <span v-if="status" class="size-2 shrink-0 rounded-full" :class="status.dot" :title="status.label">
         <span class="sr-only">{{ status.label }}</span>
       </span>
@@ -40,6 +44,8 @@ import { device_status } from '@/lib/datasets/series.js'
 const props = defineProps({
   row: { type: Object, required: true },
   trackWidth: { type: Number, required: true },
+  // The label column's width, which the timeline lets people drag.
+  labelWidth: { type: Number, default: LABEL_W },
   // Data-arrival cells, [{ x, w, colour }], or null when strips are off.
   strip: { type: Array, default: null },
   // Newest data time: ms, null for none in 30 days, undefined if not known.

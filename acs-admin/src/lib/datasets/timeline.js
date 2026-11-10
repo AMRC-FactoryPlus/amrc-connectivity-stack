@@ -14,8 +14,13 @@ import { NO_PATH } from './i3x-devices.js'
 const HOUR = 3600e3
 const DAY = 24 * HOUR
 
-/** The pinned label column, in px. */
+/** The pinned label column, in px, until someone drags it. */
 export const LABEL_W = 260
+/** How narrow and how wide the label column can be dragged, in px. */
+export const LABEL_W_MIN = 200
+export const LABEL_W_MAX = 600
+/** The least track a wide label column must leave in view, in px. */
+export const TRACK_MIN = 240
 /** The tick header, in px. */
 export const HEADER_H = 36
 
@@ -45,18 +50,39 @@ export function t_of (x, range) {
 }
 
 /**
- * The scrollLeft that puts `t` at `anchor` (0 left, 0.5 middle) of
- * the part of the frame the track shows.
+ * The widths the label column can take in a frame `client_width` wide.
+ * The top limit drops in a narrow frame so some track always shows,
+ * but never below the bottom limit.
  */
-export function scroll_left_for (t, range, client_width, anchor = 0.5) {
-    const view = Math.max(0, client_width - LABEL_W)
+export function label_w_limits (client_width = Infinity) {
+    const room = Number.isFinite(client_width) ? client_width - TRACK_MIN : LABEL_W_MAX
+    return { min: LABEL_W_MIN, max: Math.max(LABEL_W_MIN, Math.min(LABEL_W_MAX, Math.floor(room))) }
+}
+
+/**
+ * A label column width that fits the limits. Anything that is not a
+ * number (nothing saved yet, or a bad saved value) gives the default.
+ */
+export function clamp_label_w (w, client_width = Infinity) {
+    const { min, max } = label_w_limits(client_width)
+    const n = typeof w === 'number' && Number.isFinite(w) ? Math.round(w) : LABEL_W
+    return Math.max(min, Math.min(max, n))
+}
+
+/**
+ * The scrollLeft that puts `t` at `anchor` (0 left, 0.5 middle) of
+ * the part of the frame the track shows. `label_w` is the label
+ * column's width, here and in the two functions below.
+ */
+export function scroll_left_for (t, range, client_width, anchor = 0.5, label_w = LABEL_W) {
+    const view = Math.max(0, client_width - label_w)
     const max = Math.max(0, range.width - view)
     return Math.max(0, Math.min(max, x_of(t, range) - view * anchor))
 }
 
 /** The time at the middle of the visible track. */
-export function view_centre (range, scroll_left, client_width) {
-    const view = Math.max(0, client_width - LABEL_W)
+export function view_centre (range, scroll_left, client_width, label_w = LABEL_W) {
+    const view = Math.max(0, client_width - label_w)
     return t_of(scroll_left + view / 2, range)
 }
 
@@ -70,8 +96,8 @@ export function in_track (t, range, margin = 0.1) {
 }
 
 /** The horizontal band of track (px) worth rendering: the view plus a buffer each side. */
-export function visible_x (scroll_left, client_width, buffer = null) {
-    const view = Math.max(0, client_width - LABEL_W)
+export function visible_x (scroll_left, client_width, buffer = null, label_w = LABEL_W) {
+    const view = Math.max(0, client_width - label_w)
     const b = buffer ?? Math.max(400, view)
     return { x0: scroll_left - b, x1: scroll_left + view + b }
 }
@@ -154,13 +180,19 @@ export function equipment_devices (equipment, resolve, byUuid) {
  * @param p.eq_devices     equipment uuid -> [{ device, dataset, label }]
  * @param p.devices        every device the pages know of (the store's
  *                         deviceIndex), each with its ISA-95 `path`
- * @param p.expanded       { ongoing, other, [equipment uuid] } booleans
+ * @param p.expanded       { ongoing, other, [equipment uuid],
+ *                         [place row key] } booleans. Places are open
+ *                         unless set to false; equipment and `other`
+ *                         are closed unless set to true.
  * @param p.query          the search box
+ * @param p.dataset_of     device uuid -> the uuid of the device's own
+ *                         dataset, or null when it has none the person
+ *                         can open
  * Groups with nothing in them are left out.
  * @returns {{ rows: Row[], height: number, matched: number }}
  *   `matched` counts bands, equipment and devices that pass the search.
  */
-export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, devices = [], expanded = {}, query = '' }) {
+export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, devices = [], expanded = {}, query = '', dataset_of = () => null }) {
     const rows = []
     let top = 0
     let matched = 0
@@ -183,6 +215,8 @@ export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, dev
             // Metric lists come from the ConfigDB, which not everyone can read.
             tag: tag ?? (Array.isArray(d?.metrics) ? metric_count(d.metrics.length) : null),
             status: d?.status ?? null,
+            // The device's own dataset: the row's name links to it.
+            dataset: dataset_of(uuid) ?? null,
             indent,
         }
     }
@@ -244,14 +278,20 @@ export function build_rows ({ ongoing = [], equipment = [], eq_devices = {}, dev
         const open = q ? true : !!expanded.other
         push({ kind: 'other-header', key: 'other', name: 'Other devices', tag: `${others.length} not in any equipment`, open })
         if (open) {
-            let place = null
+            // `others` is sorted by place, so each place is one run.
+            const places = []
             for (const d of others) {
                 const p = place_label(d)
-                if (p !== place) {
-                    place = p
-                    push({ kind: 'place', key: `place:${p}`, name: p })
-                }
-                push(device_row(`other:${d.uuid}`, d.uuid, null, 1))
+                if (places.at(-1)?.name !== p) places.push({ name: p, devices: [] })
+                places.at(-1).devices.push(d)
+            }
+            for (const p of places) {
+                const key = place_key(p.name)
+                const n = p.devices.length
+                const place_open = q ? true : expanded[key] !== false
+                push({ kind: 'place', key, name: p.name, tag: `${n} ${n === 1 ? 'device' : 'devices'}`, open: place_open })
+                if (!place_open) continue
+                for (const d of p.devices) push(device_row(`other:${d.uuid}`, d.uuid, null, 1))
             }
         }
     }
@@ -267,6 +307,11 @@ export function metric_count (n) {
 /** The device's ISA-95 path, "Enterprise / Site / Area". */
 export function place_label (d) {
     return d?.path?.length ? d.path.join(' / ') : NO_PATH
+}
+
+/** The row key of a place heading, which is also its key in `expanded`. */
+export function place_key (label) {
+    return `place:${label}`
 }
 
 /** The index of the row at y (px from the top of the lanes), or -1. */

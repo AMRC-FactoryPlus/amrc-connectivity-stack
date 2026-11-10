@@ -652,8 +652,8 @@ Span for `count` below `1h` | 14 days
 Span for `count` at `1h` or coarser | 10 years with the coverage summary ready; 14 days without it
 Span for `mean` | 400 days
 `last` lookback | 90 days
-Time for one request, permission checks and waiting included | 60 seconds (`SERIES_TIMEOUT_MS`)
-Time for one query, from when it starts running | 30 seconds (`SERIES_QUERY_TIMEOUT_MS`)
+Time for one request, permission checks and waiting included | 120 seconds (`SERIES_TIMEOUT_MS`)
+Time for one query, from when it starts running | 90 seconds (`SERIES_QUERY_TIMEOUT_MS`)
 Concurrent queries | 4 (`SERIES_CONCURRENCY`)
 Queries waiting to run, across all requests | 400 (`SERIES_MAX_QUEUE`)
 
@@ -671,7 +671,21 @@ Status | When
 `413` | Too many devices or `mean` metrics, or the body is too large. The body names the limit.
 `422` | Both or neither of `devices` and `dataset`; a bad UUID, date, `every` or `store`; `store` with `dataset`; `from` not before `to`; more than 2000 buckets (the body suggests the smallest valid `every`); a span over its limit, including a long count when the coverage summary of a store the dataset reads is not ready; a `mean` device outside the request or the dataset; a dataset with more than 100 distinct window sets across its stores.
 `503` | InfluxDB or the Auth service is unreachable, or too many queries are waiting. The last case has `Retry-After: 5`. A request that reads the `uns` bucket on a site with no UNS historian gets `uns_unavailable`.
-`504` | The request or one of its queries took longer than its time limit.
+`500` | InfluxDB failed a query part way through, for a reason other than time. The service log has InfluxDB's message.
+`504` | The request or one of its queries took longer than its time limit, or InfluxDB ended a query early because it ran out of time or the query was cancelled.
+
+A query that does not finish never answers `200`. InfluxDB reports a
+query that fails after it has begun to answer inside the result, as a
+table with the columns `error` and `reference`. The route reads that
+table as a failure, so a slow chart shows a timeout and not "no data".
+
+InfluxDB works out each bucket of a `mean` in its storage engine, for
+any number of metrics in one request. This needs every part of the
+metric filter to be a test that storage can run. A test of a tag
+against the empty string is not one, so a metric at the device root is
+matched with `not exists r.path`. Two cases still read every raw point
+and are slower: boolean metrics (`type: "b"`), and a dataset device
+with more than one separate time window.
 
 `400`, `413`, `422` and `uns_unavailable` responses have a JSON body
 with `error` and `message` fields.

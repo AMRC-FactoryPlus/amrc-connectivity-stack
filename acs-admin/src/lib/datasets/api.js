@@ -656,19 +656,25 @@ async function data_response (client, uuid, { metrics = null, from = null, to = 
         body,
     })
     if (st === 403) throw new DatasetError('You do not have permission to read this dataset.', { status: st })
-    if (st === 422) {
-        // The service says why: no time window, a bad window or a bad filter.
+    if (st !== 200) {
+        // The service says why: no time window, a bad window, a bad
+        // filter, or a dataset this site cannot read.
         const reason = await refusal_reason(stream)
-        const fallback = metrics ? 'The service refused the pinned-only download.' : 'The service refused the download.'
+        const fallback = st !== 422 ? `The download failed (HTTP ${st}).`
+            : metrics ? 'The service refused the pinned-only download.' : 'The service refused the download.'
         throw new DatasetError(reason ?? fallback, { status: st })
     }
-    if (st !== 200) throw new DatasetError(`The download failed (HTTP ${st}).`, { status: st })
     return { stream, headers }
 }
 
-/** The `error` text of a JSON refusal body, or null. */
+/** Why the service refused, from a JSON refusal body, or null. A
+ * refusal with a code (`{ error, message }`) carries its words in
+ * `message`; an older one has only the words, in `error`. */
 async function refusal_reason (stream) {
-    try { return JSON.parse(await new Response(stream).text())?.error ?? null }
+    try {
+        const body = JSON.parse(await new Response(stream).text())
+        return body?.message ?? body?.error ?? null
+    }
     catch { return null }
 }
 

@@ -40,3 +40,10 @@ dependencies:
     version: 2.0.6
     repository: https://helm.open-metadata.org/
     condition: openmetadata-dependencies.enabled
+  # SMB CSI driver for openmetadataSmb. Installed whenever
+  # openmetadataSmb.enabled is true, unless csi-driver-smb.enabled is set
+  # false because the cluster already has the driver.
+  - name: csi-driver-smb
+    version: 1.20.4
+    repository: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+    condition: csi-driver-smb.enabled,openmetadataSmb.enabled

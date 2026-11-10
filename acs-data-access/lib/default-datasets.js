@@ -4,12 +4,15 @@
  * Copyright 2026 University of Sheffield
  */
 
+import pLimit from "p-limit";
 import * as rx from "rxjs";
 import { v5 as uuidv5 } from "uuid";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
+import * as rxu from "@amrc-factoryplus/rx-util";
 
 import { DataAccess as Constants } from "./constants.js";
+import { coalesce } from "./rx-util.js";
 
 /* Every device with an ISA-95 placement gets one UNS device dataset,
  * its default dataset, which Data Access makes and owns. The dataset's
@@ -107,6 +110,8 @@ export class DefaultDatasets {
    * UNS bucket cannot read a UNS device dataset, so it makes none.
    * @arg opts.placements An Observable of Maps device -> placement.
    * @arg opts.devices An Observable of Sets of device UUIDs.
+   * @arg opts.concurrency How many datasets to make at a time.
+   * @arg opts.clock A function that gives the time in milliseconds.
    */
   constructor(opts) {
     this.data = opts.data;
@@ -126,6 +131,31 @@ export class DefaultDatasets {
      * had this long to show it. */
     this.settle = opts.settle ?? 60*1000;
     this.made = new Map();
+
+    /* How many datasets are made at a time. */
+    this.concurrency = opts.concurrency ?? 4;
+    this.clock = opts.clock ?? (() => Date.now());
+
+    /* The newest inputs. A pass reads these, never an older list. */
+    this.latest = null;
+    this.latest_names = null;
+    /* The pass that is running, if one is: a Promise that resolves
+     * when it ends. */
+    this.draining = null;
+    this.renaming = null;
+    this.stopped = false;
+  }
+
+  /** The newest placements, devices and dataset map, and a timer so a
+   * failure is retried. Each value is kept in `latest` as it arrives. */
+  inputs() {
+    return rx.combineLatest({
+      placements: this.placements,
+      devices:    this.devices,
+      datasets:   this.data.datasets,
+      tick:       rx.timer(0, this.retry_interval),
+    }).pipe(
+      rx.tap(v => this.latest = v));
   }
 
   /** The datasets to make, as arrays of `{ device, dataset }`. Emits
@@ -134,12 +164,7 @@ export class DefaultDatasets {
    * placed device, which makes the datasets of a site that has just
    * upgraded. */
   jobs() {
-    return rx.combineLatest({
-      placements: this.placements,
-      devices:    this.devices,
-      datasets:   this.data.datasets,
-      tick:       rx.timer(0, this.retry_interval),
-    }).pipe(
+    return this.inputs().pipe(
       rx.debounceTime(this.debounce),
       rx.map(({ placements, devices, datasets }) =>
         missing_defaults(placements, devices, datasets)),
@@ -153,6 +178,7 @@ export class DefaultDatasets {
       defaults: this.data.default_devices,
       infos:    this.data.general_infos,
     }).pipe(
+      rx.tap(v => this.latest_names = v),
       rx.debounceTime(this.debounce),
       rx.map(({ defaults, infos }) => stale_names(defaults, infos)),
       rx.filter(stale => stale.length > 0));
@@ -164,13 +190,23 @@ export class DefaultDatasets {
       return this;
     }
 
+    this.stopped = false;
+
+    /* A list from `jobs` or `renames` only says there is work. The
+     * pass reads the newest inputs, and lists that arrive while it
+     * runs collapse into one further pass, so no stale list waits its
+     * turn. An input error is retried: it does not stop the maker. */
     this.subscription = this.jobs().pipe(
-      rx.concatMap(missing => this.make_all(missing)),
+      coalesce(() => this.drain()),
+      rxu.retryBackoff(5000,
+        e => this.log("Default device datasets failed, will retry: %s", e)),
     ).subscribe({
       error: e => this.log("Default device datasets stopped: %s", e),
     });
     this.subscription.add(this.renames().pipe(
-      rx.concatMap(stale => this.rename_all(stale)),
+      coalesce(() => this.rename_drain()),
+      rxu.retryBackoff(5000,
+        e => this.log("Default device dataset names failed, will retry: %s", e)),
     ).subscribe({
       error: e => this.log("Default device dataset names stopped: %s", e),
     }));
@@ -178,26 +214,81 @@ export class DefaultDatasets {
     return this;
   }
 
+  /** Stop making datasets. A dataset that is being made is finished;
+   * nothing else is started. */
   stop() {
+    this.stopped = true;
     this.subscription?.unsubscribe();
   }
 
-  /** Make each missing dataset, one at a time. Never throws: a
-   * dataset that fails is logged and tried again later. */
-  async make_all(missing, now = Date.now()) {
+  /** Make every dataset the newest inputs show as missing: one pass.
+   *
+   * At most one pass runs at a time. The guard is here, not only in
+   * `coalesce`, because an input error ends the subscription while
+   * its pass still runs, and the retried subscription would start a
+   * second pass beside it.
+   * @returns How many datasets the pass made. */
+  async drain() {
+    while (this.draining) await this.draining;
+    if (this.stopped || !this.latest) return 0;
+
+    const { placements, devices, datasets } = this.latest;
+    const pass = this.make_all(missing_defaults(placements, devices, datasets));
+    const ended = pass.then(() => {}, () => {});
+    this.draining = ended;
+    ended.then(() => { if (this.draining === ended) this.draining = null; });
+    return pass;
+  }
+
+  /** Set every name the newest inputs show as stale: one pass, with
+   * the same guard as `drain`.
+   * @returns How many names the pass set. */
+  async rename_drain() {
+    while (this.renaming) await this.renaming;
+    if (this.stopped || !this.latest_names) return 0;
+
+    const { defaults, infos } = this.latest_names;
+    const pass = this.rename_all(stale_names(defaults, infos));
+    const ended = pass.then(() => {}, () => {});
+    this.renaming = ended;
+    ended.then(() => { if (this.renaming === ended) this.renaming = null; });
+    return pass;
+  }
+
+  /** Make each missing dataset, a few at a time. Never throws: a
+   * dataset that fails is logged and tried again later.
+   *
+   * @param missing An array of `{ device, dataset }`.
+   * @param now The time to use for every dataset. Leave it out to read
+   * the clock as each dataset starts and as it is finished.
+   * @returns How many datasets were made. */
+  async make_all(missing, now) {
+    const started = this.clock();
+    const limit = pLimit(this.concurrency);
     let made = 0;
-    for (const { device, dataset } of missing) {
-      if (now - (this.made.get(dataset) ?? -Infinity) < this.settle) continue;
+
+    await Promise.all(missing.map(({ device, dataset }) => limit(async () => {
+      if (this.stopped) return;
+      const t = now ?? this.clock();
+      if (t - (this.made.get(dataset) ?? -Infinity) < this.settle) return;
+      /* The list can be older than the dataset map by the time this
+       * dataset's turn comes. */
+      if (this.latest?.datasets?.has(dataset)) return;
       try {
         await this.make(device, dataset);
-        this.made.set(dataset, now);
+        /* The time it was finished, so the settle time starts when
+         * the dataset map can first show it, however long the pass. */
+        this.made.set(dataset, now ?? this.clock());
         made++;
       }
       catch (e) {
         this.log("Can't make the default dataset of %s: %s", device, e);
       }
-    }
-    if (made) this.log("Made %d default device dataset(s)", made);
+    })));
+
+    if (made)
+      this.log("Made %d default device dataset(s) in %d ms",
+        made, this.clock() - started);
     return made;
   }
 

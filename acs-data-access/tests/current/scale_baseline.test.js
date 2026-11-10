@@ -107,18 +107,26 @@ describe("known defects", () => {
         expect(Object.keys(rec.state().children)).toHaveLength(20);
     });
 
-    /* D3. Flips in stage 2: exactly 40 create_object calls. */
-    test("D3: the maker creates 40 datasets more than 40 times when a pass outlasts the settle time", async () => {
+    /* D3. Flipped in stage 2. Before it, the maker queued every list
+     * of missing datasets and made each list in turn, so this site got
+     * more than 40 create_object calls. Now a pass reads the newest
+     * inputs and each dataset is created once. */
+    test("D3: the maker creates 40 datasets exactly 40 times when a pass outlasts the settle time", async () => {
         vi.useFakeTimers();
 
-        /* Each ConfigDB call takes longer than the 2 s debounce is
-         * quiet for, and a pass of 40 takes longer than the 60 s the
-         * maker waits before it makes a dataset again. */
+        /* A dataset takes 2.5 s to make, so the 2 s debounce gives a
+         * new list of missing datasets after each one, and a pass of
+         * 40 takes longer than the 60 s the maker waits before it
+         * makes a dataset again. One at a time, as the maker worked
+         * when this was captured, so the pass still takes 100 s.
+         * default_datasets_burst.test.js covers 4 at a time with
+         * slower calls. */
         const site = make_site({ latency: 500 });
         const built = build_site(site, { datasets: 0, devices: 40, placed: 40, seed: 13 });
         const data = new DataFlow({ debug, cdb: site.cdb, auth: site.auth });
         data.run();
-        const maker = new DefaultDatasets({ data, cdb: site.cdb, debug });
+        const maker = new DefaultDatasets({
+            data, cdb: site.cdb, debug, concurrency: 1 });
         cleanup.push(() => {
             maker.stop();
             data.stop?.();
@@ -135,7 +143,7 @@ describe("known defects", () => {
         for (const device of built.placed)
             expect(datasets.has(default_dataset_uuid(device))).toBe(true);
 
-        expect(site.counters.calls.get("create_object")).toBeGreaterThan(40);
+        expect(site.counters.calls.get("create_object")).toBe(40);
     });
 
     /* D4. Flips in stage 4: the one dataset is invalid and every

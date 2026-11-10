@@ -15,6 +15,7 @@ import { DatasetIndex } from './dataset-index.js';
 import {
   default_dataset_device, default_dataset_uuid, DEVICE_PERMS, READ_STRUCTURE,
 } from './default-datasets.js';
+import { PartsIndex } from './parts-index.js';
 import { same_set, set_changes, watch_each } from './rx-util.js';
 
 /* One field of each value of a change sequence, sent on only when the
@@ -99,7 +100,14 @@ export class DataFlow {
     this.functional_changes = this._build_functional_changes();
     this.functional_types = this.functional_changes.pipe(field("map"));
 
-    this.parts = this._build_parts();
+    /* What following the Dataset members has cost: `scanned` rises
+     * by the number of members each time ConfigDB sends the list. */
+    this.parts_stats = { scanned: 0 };
+    /* Nothing holds the parts open: they cost one ConfigDB WATCH for
+     * each dataset, so they are watched only while somebody reads
+     * them. */
+    this.parts_changes = this._build_parts_changes();
+    this.parts = this.parts_changes.pipe(field("map"));
   }
 
   /* Hold the dataset map, the names, the metadata and the functional
@@ -320,26 +328,68 @@ export class DataFlow {
    * ------------------------------------------------
    */
 
+  /* The parts of one dataset: its subclasses that are Dataset
+   * members, as a Set, or null while the dataset is not a Dataset
+   * member itself. This opens one ConfigDB WATCH, for the dataset's
+   * own subclasses, and none while it is not a member. */
+  dataset_parts(dataset_uuid) {
+    const members = this.cdb.watch_members(Constants.Class.Dataset);
+
+    return members.pipe(
+      rx.map(set => set.has(dataset_uuid)),
+      rx.distinctUntilChanged(),
+
+      rx.switchMap(is_member =>
+        is_member
+          ? rx.combineLatest([
+              this.cdb.watch_subclasses(dataset_uuid),
+              members,
+            ]).pipe(
+              rx.map(([subclass_uuids, set]) =>
+                subclass_uuids.filter(x => set.has(x)))
+            )
+          : rx.of(null)),
+
+      rx.distinctUntilChanged(imm_is)
+    );
+  }
+
+  /* dataset_parts in the shape of `parts_changes`, for a reader of
+   * one dataset: `{ map, changed, parents }`. `map` holds the one
+   * entry, or none while the dataset is not a Dataset member. */
+  dataset_parts_changes(dataset_uuid) {
+    return this.dataset_parts(dataset_uuid).pipe(
+      rx.map(parts => {
+        const parents = new Map();
+        if (parts == null)
+          return { map: IMap(), changed: new Set([dataset_uuid]), parents };
+
+        for (const part of parts)
+          parents.set(part, new Set([dataset_uuid]));
+        return {
+          map: IMap([[dataset_uuid, parts]]),
+          changed: new Set([dataset_uuid]),
+          parents,
+        };
+      })
+    );
+  }
+
   allowed_dataset_parts(
     dataset_uuid,
     principal,
     permission
   ) {
     return rx.combineLatest([
-      this.parts,
+      this.dataset_parts(dataset_uuid),
       this.watch_allowed(principal, permission)
     ]).pipe(
-      rx.map(([partsMap, ok]) => {
-        const parts =
-          partsMap.get(dataset_uuid);
-
+      rx.map(([parts, ok]) => {
         if (!parts)
           return [];
 
         return parts.filter(partId => ok(partId));
-      }),
-
-      rxu.shareLatest()
+      })
     );
   }
 
@@ -349,27 +399,25 @@ export class DataFlow {
    * ----------------------------------------------------
    */
 
-  _build_parts() {
-    return rxu.rx(
-      rx.combineLatest([
-        this.cdb.watch_members_subclasses(
-          Constants.Class.Dataset
+  /* The parts of every dataset, as `{ map, changed, parents }`. A
+   * dataset that joins the Dataset members costs one WATCH; the others
+   * are left alone. Nothing is emitted until every member's subclasses
+   * have answered. PartsIndex has the rules. */
+  _build_parts_changes() {
+    return rx.defer(() => {
+      const index = new PartsIndex();
+
+      return this.cdb.watch_members(
+        Constants.Class.Dataset
+      ).pipe(
+        watch_each(
+          member => this.cdb.watch_subclasses(member),
+          this.parts_stats
         ),
-
-        this.cdb.watch_members(
-          Constants.Class.Dataset
-        )
-      ]),
-
-      rx.map(([subclassesMap, datasetMembers]) =>
-        subclassesMap.map(
-          subclass_uuids =>
-            subclass_uuids.filter(
-              x => datasetMembers.has(x)
-            )
-        )
-      ),
-
+        rx.map(event => index.apply(event)),
+        rx.filter(change => change != null)
+      );
+    }).pipe(
       rxu.shareLatest()
     );
   }

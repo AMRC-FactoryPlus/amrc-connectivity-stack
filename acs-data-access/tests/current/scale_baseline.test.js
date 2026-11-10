@@ -291,11 +291,15 @@ describe("baselines", () => {
         expect(subscribers).toBe(60);
     });
 
-    /* B5. Flips in stage 5: exactly 1. */
-    test("B5: a cold GET /v1/metadata/:uuid opens one subclass watch per Dataset member", async () => {
-        const fx = fixture({ datasets: 60, seed: 25 });
+    /* B5. Flipped in stage 5. Before it, the parts of one dataset came
+     * from the parts of all of them, so this request opened one
+     * subclass watch per Dataset member: 58 on the site of 60. Now it
+     * opens the watch of the dataset asked for, on a site of any
+     * size. */
+    test.each([60, 1000])("B5: a cold GET /v1/metadata/:uuid on a site of %i opens exactly one subclass watch", async n => {
+        const fx = fixture({ datasets: n, seed: 25 });
         const members = fx.site.members(Class.Dataset).size;
-        expect(members).toBeGreaterThan(50);
+        expect(members).toBeGreaterThan(n - 10);
 
         const api = new APIv1({
             data: fx.data, debug, auth: fx.site.auth, cdb: fx.site.cdb,
@@ -304,13 +308,15 @@ describe("baselines", () => {
             status (code) { this.code = code; return this; },
             json (body) { this.body = body; return this; },
         };
+        /* A dataset with parts, so the answer needs the watch. */
+        const dataset = fx.built.named.part_parent;
         expect(fx.site.counters.watch.subclass.total()).toBe(0);
-        await api.metadata_uuid(
-            { auth: ROOT, params: { uuid: fx.built.kinds.sparkplug[0] } }, res);
+        await api.metadata_uuid({ auth: ROOT, params: { uuid: dataset } }, res);
 
         expect(res.code).toBe(200);
-        expect(fx.site.counters.watch.subclass.total()).toBe(members);
-        expect(fx.site.counters.opened.subclass.total()).toBe(members);
+        expect([...res.body.parts]).toEqual([fx.built.kinds.subset[0]]);
+        expect([...fx.site.counters.watch.subclass]).toEqual([[dataset, 1]]);
+        expect([...fx.site.counters.opened.subclass]).toEqual([[dataset, 1]]);
     });
 });
 

@@ -242,6 +242,38 @@ function expect_each_once (actual, list) {
     expect(new Set(actual)).toEqual(new Set(list));
 }
 
+describe("the timings these tests assume", () => {
+    /* The constants above are copies. Each test that compares a
+     * latency or a lag with one of them proves its premise only while
+     * the copy is what the maker uses. */
+    test("are the maker's own defaults", () => {
+        const maker = new DefaultDatasets({
+            debug, data: {}, cdb: {}, placements: rx.NEVER, devices: rx.NEVER });
+
+        expect(maker.debounce).toBe(DEBOUNCE);
+        expect(maker.settle).toBe(SETTLE);
+        expect(maker.retry_interval).toBe(RETRY_INTERVAL);
+        expect(maker.concurrency).toBe(4);
+    });
+
+    /* The delay is written in run(), so it shows only in when the
+     * maker subscribes again. */
+    test("include the delay before a failed input is subscribed again", async () => {
+        const fx = rig(2, { site: { latency: 100 } });
+        const placements = restartable(placements_of(fx.built));
+        fx.maker.placements = placements.source;
+        cleanup.push(() => placements.close());
+
+        fx.maker.run();
+        await advance(SECOND);
+        placements.fail();
+        await advance(RETRY_DELAY - 100);
+        expect(placements.subscribes).toBe(1);
+        await advance(200);
+        expect(placements.subscribes).toBe(2);
+    });
+});
+
 describe("a burst of placed devices", () => {
     test("40 devices, slow calls and a pass longer than the settle time: 40 creates", async () => {
         /* Each call outlasts the debounce, so `jobs` gives a new list
@@ -508,6 +540,47 @@ describe("stop", () => {
         expect_all_made(fx);
     });
 
+    test("and at once run, in the middle of a pass: the old pass starts nothing more, and the new one waits for it", async () => {
+        const fx = rig(12, { site: { latency: 1000 } });
+
+        fx.maker.run();
+        /* The first four are on their second call. */
+        await advance(DEBOUNCE + 1500);
+        expect(fx.seen.in_flight).toBe(4);
+        const [old] = fx.seen.passes;
+        const started = old.list.slice(0, 4);
+
+        fx.maker.stop();
+        fx.maker.run();
+        /* The new run has asked for a pass. The old pass still has
+         * its four datasets in flight, and it runs alone. */
+        await advance(DEBOUNCE + 500);
+        expect(fx.seen.drains).toHaveLength(2);
+        expect(fx.seen.passes).toHaveLength(1);
+        expect(fx.seen.in_flight).toBe(4);
+
+        await advance(10 * MINUTE);
+        await fx.site.settle();
+
+        /* The old pass made the four it had in flight and no other,
+         * although the maker was running again while eight of its
+         * list still waited. */
+        expect(old.result).toBe(4);
+        expect(fx.log.creates().slice(0, 4)).toEqual(started.map(m => m.dataset));
+        /* The new pass started when the old one had ended, and made
+         * the rest from the inputs as they were then. */
+        const [, next] = fx.seen.passes;
+        expect(next.start).toBeGreaterThanOrEqual(old.end);
+        expect(next.items).toBe(8);
+        expect(next.result).toBe(8);
+        expect(fx.seen.most_running).toBe(1);
+        expect(fx.seen.most_in_flight).toBe(4);
+
+        expect_each_once(fx.log.creates(), fx.missing.map(m => m.dataset));
+        expect(fx.site.counters.calls.get("create_object")).toBe(12);
+        expect_all_made(fx);
+    });
+
     test("before the first list: nothing is made", async () => {
         const fx = rig(5);
 
@@ -674,6 +747,46 @@ describe("a dataset map that trails the writes", () => {
     });
 });
 
+describe("a dataset map that changes during a pass", () => {
+    /* The pass reads the dataset map as it is when each dataset's
+     * turn comes. The debounce only delays the lists that ask for a
+     * pass: it must not delay what a running pass can see. */
+    test("less than the debounce before a dataset's turn: the pass still skips it", async () => {
+        const datasets = new rx.BehaviorSubject(IMap());
+        const fx = rig(3, {
+            site: { latency: 1000 },
+            maker: { concurrency: 1 },
+            data: {
+                datasets,
+                default_devices: rx.NEVER,
+                general_infos: rx.NEVER,
+            },
+        });
+        cleanup.push(() => datasets.complete());
+
+        fx.maker.run();
+        /* The first dataset is on its last call. */
+        await advance(DEBOUNCE + 4500);
+        const [pass] = fx.seen.passes;
+        const [first, second, third] = pass.list;
+        expect(fx.seen.makes).toBe(1);
+        expect(fx.seen.in_flight).toBe(1);
+
+        /* Somebody else makes the second, and the map shows it half a
+         * second before its turn. */
+        const before_turn = 500;
+        expect(before_turn).toBeLessThan(fx.maker.debounce);
+        datasets.next(IMap([[second.dataset, {
+            structure: App.UNSDevice, config: { source: second.device } }]]));
+        await advance(before_turn + 6 * SECOND);
+        await fx.site.settle();
+
+        expect(pass.result).toBe(2);
+        expect(fx.log.creates()).toEqual([first.dataset, third.dataset]);
+        expect(fx.log.objects().has(second.dataset)).toBe(false);
+    });
+});
+
 /* A ConfigDB that answers at once and records its writes. */
 function instant_cdb (hooks = {}) {
     const calls = { create: [], put: [] };
@@ -745,6 +858,23 @@ describe("the settle time", () => {
          * pass started more than 60 s ago. */
         expect(time - start).toBeGreaterThan(SETTLE);
         expect(await m.make_all(missing)).toBe(0);
+        expect(calls.create).toEqual([DEF_A, DEF_B]);
+    });
+
+    test("is measured when a dataset's turn comes, not when the pass starts", async () => {
+        const start = 1_000_000;
+        let time = start;
+        /* The first dataset takes 2 s to make. */
+        const { cdb, calls } = instant_cdb({
+            create: obj => { if (obj == DEF_A) time += 2 * SECOND; } });
+        const m = unit_maker({ cdb, clock: () => time, concurrency: 1 });
+        /* The second was made 59 s before the pass starts: too new
+         * to make again then, and old enough when its turn comes. */
+        m.made.set(DEF_B, start - 59 * SECOND);
+
+        expect(await m.make_all([
+            { device: DEV_A, dataset: DEF_A }, { device: DEV_B, dataset: DEF_B },
+        ])).toBe(2);
         expect(calls.create).toEqual([DEF_A, DEF_B]);
     });
 
@@ -836,6 +966,33 @@ describe("the newest inputs", () => {
             `start ${DEF_A}`, `end ${DEF_A}`,
             `start ${DEF_A}`, `end ${DEF_A}`,
         ]);
+    });
+
+    test("a pass that waits its turn when the maker is stopped is never started", async () => {
+        const gates = [];
+        const { cdb, calls } = instant_cdb({
+            create: () => new Promise(resolve => gates.push(resolve)) });
+        const m = unit_maker({ cdb, settle: 0 });
+        m.latest = {
+            placements: new Map([[DEV_A, { node: NODE }]]),
+            devices: new Set([DEV_A]),
+            datasets: IMap(),
+        };
+        const passes = vi.spyOn(m, "make_all");
+        const turn = () => new Promise(r => setImmediate(r));
+
+        const both = Promise.all([m.drain(), m.drain()]);
+        await turn();
+        expect(passes).toHaveBeenCalledTimes(1);
+        expect(gates).toHaveLength(1);
+
+        m.stop();
+        gates.shift()();
+        /* The dataset in flight was finished. The second pass was not
+         * started: it read nothing and listed nothing. */
+        expect(await both).toEqual([1, 0]);
+        expect(passes).toHaveBeenCalledTimes(1);
+        expect(calls.create).toEqual([DEF_A]);
     });
 
     test("a pass skips a dataset the map shows by the time its turn comes", async () => {
@@ -952,6 +1109,55 @@ describe("default dataset names under a burst", () => {
         expect(fx.seen.rename_drains[1].start).toBeLessThan(first.end);
         /* The names were set once: the second pass found them right. */
         expect([first.result, second.result]).toEqual([3, 0]);
+        expect(fx.log.of("put_config")).toHaveLength(3);
+        expect_names(fx.site, "First");
+    });
+
+    test("stop in the middle of a pass: the name being set is finished, and no call follows for the rest", async () => {
+        /* A name takes a read and a write of 3 s each. */
+        const fx = rename_rig(3000);
+
+        fx.maker.run();
+        /* The read of the first name is in flight. */
+        await advance(DEBOUNCE + SECOND);
+        expect(fx.seen.renaming).toBe(1);
+        expect(fx.log.calls).toHaveLength(1);
+        const [first] = fx.seen.rename_passes[0].list;
+
+        fx.maker.stop();
+        await advance(10 * MINUTE);
+        await fx.site.settle();
+
+        /* The one name was read and written. Nothing was asked about
+         * the other two. */
+        expect(fx.log.calls.map(c => [c.method, c.args[1]])).toEqual([
+            ["get_config", first.dataset], ["put_config", first.dataset]]);
+        expect(fx.site.app(Info).get(first.dataset)).toEqual({ name: first.name });
+        expect(fx.seen.rename_passes).toHaveLength(1);
+        expect(fx.seen.rename_passes[0].result).toBe(1);
+        expect(fx.seen.renaming).toBe(0);
+    });
+
+    test("stop and at once run, in the middle of a pass: the old pass sets no further name, and the new one waits for it", async () => {
+        const fx = rename_rig(3000);
+
+        fx.maker.run();
+        await advance(DEBOUNCE + SECOND);
+        expect(fx.seen.renaming).toBe(1);
+        const [old] = fx.seen.rename_passes;
+
+        fx.maker.stop();
+        fx.maker.run();
+        await advance(5 * MINUTE);
+        await fx.site.settle();
+
+        /* The old pass finished the name it was setting and stopped,
+         * although the maker was running again. */
+        expect(old.result).toBe(1);
+        const [, next] = fx.seen.rename_passes;
+        expect(next.start).toBeGreaterThanOrEqual(old.end);
+        expect(fx.seen.most_renaming).toBe(1);
+        /* Each name was written once. */
         expect(fx.log.of("put_config")).toHaveLength(3);
         expect_names(fx.site, "First");
     });

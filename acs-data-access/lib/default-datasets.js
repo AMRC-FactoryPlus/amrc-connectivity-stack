@@ -156,6 +156,11 @@ export class DefaultDatasets {
     this.draining = null;
     this.renaming = null;
     this.stopped = false;
+    /* How many times the maker has been stopped. A pass ends at the
+     * next stop, whatever happens after it: run() straight after
+     * stop() starts a new pass from the newest inputs, and the old
+     * pass must not take up its list again beside it. */
+    this.stops = 0;
   }
 
   /** The newest placements, devices and dataset map, and a timer so a
@@ -226,10 +231,13 @@ export class DefaultDatasets {
     return this;
   }
 
-  /** Stop making datasets. A dataset that is being made is finished;
-   * nothing else is started. */
+  /** Stop making datasets and setting names. A dataset that is being
+   * made is finished, and so is a name that is being set; nothing
+   * else is started. A pass that was running does not start again
+   * when run() is called: the new run makes its own. */
   stop() {
     this.stopped = true;
+    this.stops++;
     this.subscription?.unsubscribe();
   }
 
@@ -276,11 +284,12 @@ export class DefaultDatasets {
    * @returns How many datasets were made. */
   async make_all(missing, now) {
     const started = this.clock();
+    const stops = this.stops;
     const limit = pLimit(this.concurrency);
     let made = 0;
 
     await Promise.all(missing.map(({ device, dataset }) => limit(async () => {
-      if (this.stopped) return;
+      if (this.stopped || this.stops != stops) return;
       const t = now ?? this.clock();
       if (t - (this.made.get(dataset) ?? -Infinity) < this.settle) return;
       /* The list can be older than the dataset map by the time this
@@ -305,10 +314,14 @@ export class DefaultDatasets {
   }
 
   /** Set each stale name. Never throws. Each write keeps the other
-   * fields of the dataset's General information. */
+   * fields of the dataset's General information. A stop ends the pass:
+   * the name that is being set is finished, and no ConfigDB call is
+   * made for the rest of the list. */
   async rename_all(stale) {
+    const stops = this.stops;
     let renamed = 0;
     for (const { dataset, name } of stale) {
+      if (this.stopped || this.stops != stops) break;
       try {
         const info = await this.cdb.get_config(UUIDs.App.Info, dataset) ?? {};
         if (info.name === name) continue;

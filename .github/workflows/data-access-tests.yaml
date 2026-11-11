@@ -1,0 +1,46 @@
+name: Data Access tests
+
+# Data Access keeps a live index of every dataset and sends changes to
+# open sessions. Its tests replay recorded histories through the real
+# handlers, so a change that alters what a client sees fails here.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'acs-data-access/**'
+      - 'lib/js-*/**'
+      - '.github/workflows/data-access-tests.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # The same major version as the JS base image the service runs on.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # The npm shipped with Node 22 crashes on file: dependencies.
+      # Pin to the same npm as the JS base image.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      # The GSSAPI module is native and needs the Kerberos headers.
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install dependencies
+        working-directory: acs-data-access
+        run: npm install --save=false --install-links
+
+      - name: Run the tests
+        working-directory: acs-data-access
+        run: npm test

@@ -494,6 +494,10 @@ describe("DataFlow", () => {
             watch_members: () => rx.of(ISet([SUBSET_APP])),
             search_app: app => rx.of(app == SUBSET_APP
                 ? IMap([[SUBSET, config]]) : IMap()),
+            search_app_changes: app => rx.of({
+                map: app == SUBSET_APP ? IMap([[SUBSET, config]]) : IMap(),
+                child: null, previous: null,
+            }),
         };
         const data = new DataFlow({
             debug: { bound: () => () => {} }, cdb, auth: {},

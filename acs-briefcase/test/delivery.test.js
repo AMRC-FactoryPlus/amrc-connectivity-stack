@@ -12,6 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 
+import yazl from "yazl";
+
 import {
     Delivery, blob_names, open_container, release_notice, withdraw_notice,
 } from "../lib/delivery.js";
@@ -153,6 +155,41 @@ test("a withdrawal sends only its notice", async () => {
     assert.deepEqual(blobs.map(b => b.name), [NAMES.withdraw]);
     assert.deepEqual(JSON.parse(blobs[0].body),
         withdraw_notice(DATASET, { ...X, withdrawn }, SOURCE));
+});
+
+/* A zip holding the given files, as a Buffer. */
+async function make_zip (files) {
+    const zip = new yazl.ZipFile();
+    for (const [name, content] of Object.entries(files))
+        zip.addBuffer(Buffer.from(content), name);
+    zip.end();
+    const chunks = [];
+    for await (const c of zip.outputStream) chunks.push(c);
+    return Buffer.concat(chunks);
+}
+
+/* A briefcase record for a zip. */
+const record_of = zip => ({ ...X, size: zip.length,
+    sha256: crypto.createHash("sha256").update(zip).digest("hex") });
+
+test("reads a briefcase's tier from the policy in its zip", async () => {
+    const zip = await make_zip({
+        "briefcase-x/bagit.txt":                    "BagIt-Version: 1.0\n",
+        "briefcase-x/data/metadata/policy.json":    '{"tier":"open"}',
+        "briefcase-x/data/policy.json":             '{"tier":"enclave-only"}',
+        "briefcase-x/data/telemetry/csv/a.csv":     "timestamp\n",
+    });
+    const { delivery, blobs, work_dir } = await make_delivery({ zip });
+    assert.equal(await delivery.tier(record_of(zip)), "enclave-only");
+    assert.deepEqual(blobs, []);
+    assert.deepEqual(await fsp.readdir(work_dir), []);
+});
+
+test("refuses a zip with no tier in its policy", async () => {
+    const zip = await make_zip({ "briefcase-x/bagit.txt": "BagIt-Version: 1.0\n" });
+    const { delivery, work_dir } = await make_delivery({ zip });
+    await assert.rejects(delivery.tier(record_of(zip)), /has no tier/);
+    assert.deepEqual(await fsp.readdir(work_dir), []);
 });
 
 test("a container URL with a SAS token needs nothing else", async () => {

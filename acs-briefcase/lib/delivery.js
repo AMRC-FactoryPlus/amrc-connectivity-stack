@@ -9,6 +9,8 @@ import fsp              from "node:fs/promises";
 import path             from "node:path";
 import { pipeline }     from "node:stream/promises";
 
+import yauzl            from "yauzl";
+
 import { sha256_file }  from "./bag.js";
 import { defined }      from "./util.js";
 
@@ -57,6 +59,37 @@ export function withdraw_notice (dataset, briefcase, source) {
         withdrawn:  briefcase.withdrawn,
         source:     defined(source ?? {}),
     };
+}
+
+/** Read one file from a zip.
+ *
+ * @param file The zip file.
+ * @param wanted A function that picks the entry by its name.
+ * @returns The file's content as a Buffer, or null if no entry is
+ * picked.
+ */
+export function read_zip_entry (file, wanted) {
+    return new Promise((resolve, reject) => {
+        yauzl.open(file, { lazyEntries: true }, (err, zip) => {
+            if (err) return reject(err);
+            zip.on("error", reject);
+            zip.on("end", () => resolve(null));
+            zip.on("entry", entry => {
+                if (!wanted(entry.fileName)) return zip.readEntry();
+                zip.openReadStream(entry, (err, stream) => {
+                    if (err) return reject(err);
+                    const chunks = [];
+                    stream.on("error", reject);
+                    stream.on("data", c => chunks.push(c));
+                    stream.on("end", () => {
+                        zip.close();
+                        resolve(Buffer.concat(chunks));
+                    });
+                });
+            });
+            zip.readEntry();
+        });
+    });
 }
 
 /** Open the ingest container.
@@ -129,6 +162,31 @@ export class Delivery {
         if (sha256 !== briefcase.sha256)
             throw new Error(`File ${briefcase.file} has checksum ${sha256}, `
                 + `not ${briefcase.sha256}`);
+    }
+
+    /** The access tier a briefcase was released under, read from the
+     * release policy inside its zip. A briefcase built before the tier
+     * was recorded has it nowhere else: the dataset's policy may have
+     * changed since.
+     *
+     * @param briefcase The briefcase, from the Briefcase release entry.
+     */
+    async tier (briefcase) {
+        const file = path.join(this.work_dir, `${briefcase.uuid}.tier.zip`);
+        try {
+            await this.fetch_zip(briefcase, file);
+            /* The bag sits under one top-level directory. */
+            const json = await read_zip_entry(file,
+                name => /^[^/]+\/data\/policy\.json$/.test(name));
+            const tier = json && JSON.parse(json).tier;
+            if (!tier)
+                throw new Error(`Briefcase ${briefcase.uuid} has no tier `
+                    + `in its release policy`);
+            return tier;
+        }
+        finally {
+            await fsp.rm(file, { force: true });
+        }
     }
 
     /** Deliver a briefcase: its zip, then its release notice. The

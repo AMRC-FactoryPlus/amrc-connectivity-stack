@@ -78,3 +78,17 @@ test("withdrawing with nothing live writes nothing", async () => {
     assert.equal(await store.withdraw(DATASET, "2026-10-30T09:00:00Z"), null);
     assert.deepEqual(puts, []);
 });
+
+test("adds fields to one briefcase in the record", async () => {
+    const { store, puts } = make_store({ briefcases: [{ ...X, withdrawn: "t" }, Y] });
+    await store.mark(DATASET, Y.uuid, { pushed: "p" });
+    assert.deepEqual(puts, [{ obj: DATASET, json: {
+        briefcases: [{ ...X, withdrawn: "t" }, { ...Y, pushed: "p" }] } }]);
+});
+
+test("refuses to mark a briefcase that is not in the record", async () => {
+    const { store, puts } = make_store({ briefcases: [X] });
+    await assert.rejects(store.mark(DATASET, Y.uuid, { pushed: "p" }),
+        /no record of briefcase/);
+    assert.deepEqual(puts, []);
+});

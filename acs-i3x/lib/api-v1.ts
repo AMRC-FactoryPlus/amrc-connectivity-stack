@@ -9,15 +9,17 @@ import { createHash } from "node:crypto";
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 
-import { I3X_SPEC_VERSION, Version } from "./constants.js";
+import { I3X_SPEC_VERSION } from "./constants.js";
+import { GIT_VERSION } from "./git-version.js";
 import { i3xEnvelope, i3xErrorHandler } from "./middleware/envelope.js";
+import { responseDetail } from "./mapping.js";
 import { Slicer } from "./slicer.js";
 import type { ObjectTree, Visible } from "./object-tree.js";
 import type { Grants } from "./access.js";
 import type { ValueCache, LazyValue } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
-import type { I3xVqt } from "./types/i3x.js";
+import type { I3xObject, I3xVqt } from "./types/i3x.js";
 import validator from 'validator';
 
 /** What APIv1 needs from Access. */
@@ -74,6 +76,44 @@ function badRequest(message: string): Error & { status: number } {
     const err = new Error(message) as Error & { status: number };
     err.status = 400;
     return err;
+}
+
+/**
+ * The ACS release this service was built from, for `serverVersion` in
+ * /info. The image build stamps the revision as "<release> (<commit>)",
+ * for example "v6.22.0 (3f2a9c1)"; a build outside the release
+ * pipeline says "dev".
+ */
+export function releaseOf(revision: string): string {
+    return revision.replace(/\s*\([^()]*\)\s*$/, "").trim() || "dev";
+}
+
+/** A failed item of a bulk response, keyed as the endpoint keys it. */
+function failedItem(key: "elementId" | "subscriptionId", id: string, status: number, detail: string) {
+    return { success: false, [key]: id, responseDetail: responseDetail(status, detail) };
+}
+
+/**
+ * The `elementIds` (or `subscriptionIds`) of a bulk request. A body
+ * without the list, or with anything but strings in it, is malformed.
+ */
+function idsOf(req: Request, field: "elementIds" | "subscriptionIds" = "elementIds"): string[] {
+    const ids = req.body?.[field];
+    if (!Array.isArray(ids) || ids.some(id => typeof id !== "string"))
+        throw badRequest(`${field} must be an array of strings`);
+    return ids;
+}
+
+/** The value of an object that exists and has no data: i3X answers
+ * with a null value of quality GoodNoData, not with an error. */
+function noData(obj: I3xObject) {
+    return {
+        elementId: obj.elementId,
+        isComposition: obj.isComposition,
+        value: null,
+        quality: "GoodNoData",
+        timestamp: new Date().toISOString(),
+    };
 }
 
 /**
@@ -289,7 +329,7 @@ const HISTORY_LOOKAHEAD = 2;
 async function* historyBulkJson(
     history: History,
     ids: string[],
-    shown: boolean[],
+    shown: Array<I3xObject | undefined>,
     startTime: string,
     endTime: string,
     signal: AbortSignal,
@@ -315,17 +355,17 @@ async function* historyBulkJson(
             for (let j = i; j <= i + HISTORY_LOOKAHEAD; j++) start(j);
             if (i) yield ",";
             const id = ids[i];
-            if (!shown[i]) {
+            const obj = shown[i];
+            if (!obj) {
                 allSuccess = false;
-                yield JSON.stringify({ success: false, elementId: id,
-                    error: { code: 404, message: `Object ${id} not found` } });
+                yield JSON.stringify(failedItem("elementId", id, 404, `Element not found: ${id}`));
                 continue;
             }
             /* Left in `pending` until it is done, so the finally below
              * closes it, and frees its InfluxDB slot, if we stop early. */
             const { rows, first } = pending[i]!;
             const head = `{"success":true,"elementId":${JSON.stringify(id)},`
-                + `"result":{"elementId":${JSON.stringify(id)},"values":[`;
+                + `"result":{"isComposition":${obj.isComposition},"values":[`;
             let started = false;
             try {
                 for (let step = await first; !step.done; step = await rows.next()) {
@@ -340,8 +380,7 @@ async function* historyBulkJson(
                 if (started || signal.aborted) throw err;
                 pending[i] = undefined;
                 allSuccess = false;
-                yield JSON.stringify({ success: false, elementId: id,
-                    error: { code: err.status ?? 500, message: err.message } });
+                yield JSON.stringify(failedItem("elementId", id, err.status ?? 500, err.message));
                 continue;
             }
             pending[i] = undefined;
@@ -419,6 +458,16 @@ export class APIv1 {
     }
 
     /**
+     * An object as i3X sends it: a root has no parent (the tree keeps
+     * "/" there), and the metadata is added when the client asks.
+     */
+    private wire(obj: I3xObject, includeMetadata: boolean, visible?: Visible) {
+        const out = obj.parentId === "/" ? { ...obj, parentId: null } : obj;
+        if (!includeMetadata) return out;
+        return { ...out, metadata: this.objectTree.objectMetadata(obj, visible) };
+    }
+
+    /**
      * Applies the server-imposed `maxDepthCap` to a client's requested
      * depth. Returns the effective depth to use and whether the
      * request was clamped (caller should return HTTP 206 if so).
@@ -457,30 +506,24 @@ export class APIv1 {
 
         /* ---- Explore: Object Types ---- */
         api.get("/objecttypes", this.get_object_types.bind(this));
-        api.get("/objecttypes/:elementId", this.get_object_type.bind(this));
         api.post("/objecttypes/query", this.query_object_types.bind(this));
 
         /* ---- Explore: Relationship Types ---- */
         api.get("/relationshiptypes", this.get_relationship_types.bind(this));
-        api.get("/relationshiptypes/:elementId", this.get_relationship_type.bind(this));
         api.post("/relationshiptypes/query", this.query_relationship_types.bind(this));
 
         /* ---- Explore: Objects ---- */
         api.get("/objects", asyncHandler(this.get_objects.bind(this)));
 
-        /* Value and history sub-routes must be declared before the
-         * /:elementId catch-all to avoid path conflicts. */
+        /* i3X 1.0 reads objects, values, history and relationships in
+         * bulk only: there are no routes for a single object. */
         api.post("/objects/list", this.list_objects.bind(this));
         api.post("/objects/value", asyncHandler(this.value_objects.bind(this)));
         api.post("/objects/history", asyncHandler(this.history_objects.bind(this)));
         api.post("/objects/related", asyncHandler(this.related_objects.bind(this)));
 
-        api.get("/objects/:elementId/value", asyncHandler(this.get_object_value.bind(this)));
-        api.get("/objects/:elementId/history", asyncHandler(this.get_object_history.bind(this)));
-        api.get("/objects/:elementId/related", asyncHandler(this.get_object_related.bind(this)));
-        api.get("/objects/:elementId", this.get_object.bind(this));
-
         /* ---- Subscriptions ---- */
+        api.use("/subscriptions", this.check_client_id.bind(this));
         api.post("/subscriptions/list", this.list_subscriptions.bind(this));
         api.post("/subscriptions/delete", this.delete_subscriptions.bind(this));
         api.post("/subscriptions/register", this.register_subscriptions.bind(this));
@@ -488,6 +531,11 @@ export class APIv1 {
         api.post("/subscriptions/stream", asyncHandler(this.stream_subscription.bind(this)));
         api.post("/subscriptions/sync", this.sync_subscription.bind(this));
         api.post("/subscriptions", this.create_subscription.bind(this));
+
+        /* Anything else under /v1 is not an i3X endpoint: answer in
+         * the i3X error shape, not with Express's HTML page. */
+        api.use((req: Request, _res: Response, next: NextFunction) =>
+            next(notFound(`No such endpoint: ${req.method} ${req.path}`)));
 
         /* ---- Error handler (must be last) ---- */
         api.use(i3xErrorHandler);
@@ -502,6 +550,17 @@ export class APIv1 {
             err.status = 503;
             return next(err);
         }
+        next();
+    }
+
+    /**
+     * Middleware for the subscription routes: i3X scopes a subscription
+     * to the client's `clientId`, so a request without one is malformed.
+     **/
+    check_client_id(req: Request, _res: Response, next: NextFunction): void {
+        const clientId = req.body?.clientId;
+        if (typeof clientId !== "string" || clientId === "")
+            return next(badRequest("clientId is required"));
         next();
     }
 
@@ -528,7 +587,7 @@ export class APIv1 {
         res.json({
             specVersion: I3X_SPEC_VERSION,
             serverName: "AMRC Connectivity Stack",
-            serverVersion: Version,
+            serverVersion: releaseOf(GIT_VERSION),
             capabilities: {
                 query,
                 update: { current: false, history: false },
@@ -553,15 +612,6 @@ export class APIv1 {
     }
 
     /**
-     * GET /objecttypes/:elementId — returns one object type, or 404 if unknown.
-     **/
-    get_object_type(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getObjectType(req.params.elementId);
-        if (!result) return next(notFound(`Object type ${req.params.elementId} not found`));
-        res.json(result);
-    }
-
-    /**
      * POST /objecttypes/query — bulk lookup of object types by id list.
      * Returns a per-id success/error envelope; missing ids are reported
      * as failures rather than aborting the batch. Uses the
@@ -569,13 +619,12 @@ export class APIv1 {
      * envelope middleware (the response is already a complete envelope).
      */
     query_object_types(req: Request, res: Response): void {
-        const { elementIds } = req.body;
-        const results = (elementIds as string[]).map(id => {
+        const results = idsOf(req).map(id => {
             const item = this.objectTree.getObjectType(id);
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
-            return { success: false, elementId: id, error: { code: 404, message: `Object type ${id} not found` } };
+            return failedItem("elementId", id, 404, `Object type not found: ${id}`);
         });
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -590,27 +639,17 @@ export class APIv1 {
     }
 
     /**
-     * GET /relationshiptypes/:elementId — returns one relationship type, or 404 if unknown.
-     **/
-    get_relationship_type(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getRelationshipType(req.params.elementId);
-        if (!result) return next(notFound(`Relationship type ${req.params.elementId} not found`));
-        res.json(result);
-    }
-
-    /**
      * POST /relationshiptypes/query — bulk lookup of relationship types
      * by id list, mirroring `query_object_types`: per-id success/error
      * envelope with the same `_originalJson` escape hatch.
      */
     query_relationship_types(req: Request, res: Response): void {
-        const { elementIds } = req.body;
-        const results = (elementIds as string[]).map(id => {
+        const results = idsOf(req).map(id => {
             const item = this.objectTree.getRelationshipType(id);
             if (item) {
                 return { success: true, elementId: id, result: item };
             }
-            return { success: false, elementId: id, error: { code: 404, message: `Relationship type ${id} not found` } };
+            return failedItem("elementId", id, 404, `Relationship type not found: ${id}`);
         });
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -645,7 +684,13 @@ export class APIv1 {
             }
         }
 
-        const objects = this.objectTree.iterateObjects(opts, 1000, visibleTo(res));
+        const visible = visibleTo(res);
+        const tree = this.objectTree;
+        const wire = this.wire.bind(this);
+        const objects = (function* () {
+            for (const o of tree.iterateObjects(opts, 1000, visible))
+                yield wire(o, opts.includeMetadata, visible);
+        })();
         await streamJsonArray(res, '{"success":true,"result":[', objects, "]}");
     }
 
@@ -655,14 +700,14 @@ export class APIv1 {
      * failures rather than aborting the batch.
      */
     list_objects(req: Request, res: Response): void {
-        const { elementIds, includeMetadata } = req.body;
+        const includeMetadata = req.body.includeMetadata === true;
         const visible = visibleTo(res);
-        const results = (elementIds as string[]).map(id => {
+        const results = idsOf(req).map(id => {
             const item = this.objectTree.getObject(id, visible);
             if (item) {
-                return { success: true, elementId: id, result: item };
+                return { success: true, elementId: id, result: this.wire(item, includeMetadata, visible) };
             }
-            return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+            return failedItem("elementId", id, 404, `Element not found: ${id}`);
         });
         const allSuccess = results.every(r => r.success);
         ((res as any)._originalJson || res.json.bind(res))({ success: allSuccess, results });
@@ -681,15 +726,15 @@ export class APIv1 {
      */
     async value_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
         const started = Date.now();
-        const { elementIds, maxDepth } = req.body;
-        const ids = elementIds as string[];
+        const ids = idsOf(req);
+        const { maxDepth } = req.body;
         if (maxDepth != null && !(Number.isInteger(maxDepth) && maxDepth >= 0)) {
             return next(badRequest("maxDepth must be a non-negative integer"));
         }
         const { effective, clamped } = this.clampDepth(maxDepth ?? 1);
         const visible = visibleTo(res);
         /* A hidden object answers as one that does not exist. */
-        const shown = ids.map(id => !visible || !!this.objectTree.getObject(id, visible));
+        const shown = ids.map(id => this.objectTree.getObject(id, visible));
 
         // Try UNS cache first (real-time), fall back to InfluxDB last().
         // A cached composition's components are read as they are sent.
@@ -702,9 +747,10 @@ export class APIv1 {
             : new Map();
 
         let influxHits = 0;
+        let empty = 0;
         const results = ids.map((id, i) => {
-            if (!shown[i])
-                return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
+            const obj = shown[i];
+            if (!obj) return failedItem("elementId", id, 404, `Element not found: ${id}`);
             const hit = cached[i];
             if (hit) {
                 return { success: true, elementId: id, hit };
@@ -714,15 +760,18 @@ export class APIv1 {
                 influxHits++;
                 return { success: true, elementId: id, result: item };
             }
-            return { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
+            /* The object exists and nothing has a value for it. */
+            empty++;
+            return { success: true, elementId: id, result: noData(obj) };
         });
-        this.log("POST /objects/value: %d ids, %d UNS cache hits, %d InfluxDB hits, %d no data, %dms",
-            ids.length, cached.filter(Boolean).length, influxHits,
+        this.log("POST /objects/value: %d ids, %d UNS cache hits, %d InfluxDB hits, %d no data, %d not found, %dms",
+            ids.length, cached.filter(Boolean).length, influxHits, empty,
             results.length - results.filter(r => r.success).length,
             Date.now() - started);
 
         if (clamped) res.status(206);
         const allSuccess = results.every(r => r.success);
+        const maxDepthCap = this.maxDepthCap;
         await streamText(res, (function* () {
             yield `{"success":${allSuccess},"results":[`;
             let first = true;
@@ -731,13 +780,20 @@ export class APIv1 {
                 first = false;
                 if ("hit" in r && r.hit) {
                     yield `{"success":true,"elementId":${JSON.stringify(r.elementId)},"result":`;
-                    yield* lazyValueJson(r.hit);
+                    yield* lazyValueJson(r.hit as LazyValue);
                     yield "}";
                 } else {
                     yield JSON.stringify(r);
                 }
             }
-            yield "]}";
+            yield "]";
+            /* A partial response says what was left out. */
+            if (clamped) {
+                yield ',"responseDetail":' + JSON.stringify(responseDetail(206,
+                    `Compositions were read to the server's depth limit of ${maxDepthCap}. `
+                    + "Read the compositions below that by their own elementIds."));
+            }
+            yield "}";
         })());
     }
 
@@ -753,17 +809,18 @@ export class APIv1 {
      * is checked before anything is sent.
      */
     async history_objects(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const { elementIds, startTime, endTime } = req.body;
+        const { startTime, endTime } = req.body;
         if (!startTime || !endTime) {
             return next(badRequest("startTime and endTime are required"));
         }
-        if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
+        if (typeof startTime !== "string" || typeof endTime !== "string"
+                || !validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
             return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
         }
-        const ids = elementIds as string[];
+        const ids = idsOf(req);
         const visible = visibleTo(res);
         /* A hidden object answers as one that does not exist. */
-        const shown = ids.map(id => !visible || !!this.objectTree.getObject(id, visible));
+        const shown = ids.map(id => this.objectTree.getObject(id, visible));
         await streamText(res,
             historyBulkJson(this.history, ids, shown, startTime, endTime, closeSignal(res)),
             { lateFailure: "end" });
@@ -771,12 +828,18 @@ export class APIv1 {
 
     /**
      * POST /objects/related — bulk related-object lookup, optionally
-     * filtered by `relationshiptype`. Per-id success/error envelope:
-     * missing ids are reported as failures.
+     * filtered by `relationshipType`. Each result is the object's
+     * edges, as `{ sourceRelationship, object }`: the relationship type
+     * that leads from the queried object to `object`. Per-id
+     * success/error envelope: missing ids are reported as failures.
      */
     async related_objects(req: Request, res: Response): Promise<void> {
-        const { elementIds, relationshiptype } = req.body;
-        const ids = elementIds as string[];
+        const ids = idsOf(req);
+        const relationshipType = req.body.relationshipType ?? undefined;
+        if (relationshipType !== undefined && typeof relationshipType !== "string")
+            throw badRequest("relationshipType must be a string");
+        const includeMetadata = req.body.includeMetadata === true;
+        const wire = this.wire.bind(this);
         /* Existence first, for the envelope's success flag; the related
          * objects themselves are read as they are sent. */
         const visible = visibleTo(res);
@@ -789,123 +852,22 @@ export class APIv1 {
                 const id = ids[i];
                 if (i) yield ",";
                 if (!found[i]) {
-                    yield JSON.stringify({ success: false, elementId: id,
-                        error: { code: 404, message: `Object ${id} not found` } });
+                    yield JSON.stringify(failedItem("elementId", id, 404, `Element not found: ${id}`));
                     continue;
                 }
                 yield `{"success":true,"elementId":${JSON.stringify(id)},"result":[`;
                 let first = true;
-                for (const o of tree.iterateRelated(id, relationshiptype, 1000, visible)) {
-                    yield (first ? "" : ",") + JSON.stringify(o);
+                for (const e of tree.iterateEdges(id, relationshipType, 1000, visible)) {
+                    yield (first ? "" : ",") + JSON.stringify({
+                        sourceRelationship: e.sourceRelationship,
+                        object: wire(e.object, includeMetadata, visible),
+                    });
                     first = false;
                 }
                 yield "]}";
             }
             yield "]}";
         })());
-    }
-
-    /**
-     * GET /objects/:elementId/value — single-id current value. Same
-     * cache-then-InfluxDB strategy as `value_objects` (UNS cache,
-     * then `history.getCompositionValue`/`getCurrentValue`); 404 if
-     * neither source has a value. The `maxDepth` query parameter works
-     * as it does for `value_objects`, including the 206 when clamped.
-     */
-    async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const id = req.params.elementId;
-        const visible = visibleTo(res);
-        const obj = this.objectTree.getObject(id, visible);
-        if (visible && !obj) return next(notFound(`No value for ${id}`));
-        /* Digits only: Number() would take "" as 0 (the whole
-         * subtree), and " 1", "0x10" or "1e1" as other depths. */
-        const raw = req.query.maxDepth;
-        if (raw !== undefined && !(typeof raw === "string" && /^\d+$/.test(raw))) {
-            return next(badRequest("maxDepth must be a non-negative integer"));
-        }
-        const { effective, clamped } = this.clampDepth(raw === undefined ? 1 : Number(raw));
-        if (clamped) res.status(206);
-        // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = await this.valueCache.getValueLazy(id, effective, visible);
-        if (cached) {
-            this.log("GET /objects/%s/value: UNS cache hit", id);
-            if (!cached.components) {
-                res.json(cached.head);
-                return;
-            }
-            // A composition high in the hierarchy can have millions of
-            // components: send them as they are read.
-            await streamText(res, (function* () {
-                yield '{"success":true,"result":';
-                yield* lazyValueJson(cached);
-                yield "}";
-            })());
-            return;
-        }
-        const result = obj?.isComposition
-            ? await this.history.getCompositionValue(id, effective, visible)
-            : await this.history.getCurrentValue(id);
-        this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
-            id, result ? "hit" : "no data");
-        if (!result) return next(notFound(`No value for ${id}`));
-        res.json(result);
-    }
-
-    /**
-     * GET /objects/:elementId/history — requires `startTime`/`endTime` query params (400 otherwise).
-     * The values are streamed, as for POST /objects/history.
-     **/
-    async get_object_history(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const { startTime, endTime } = req.query as { startTime?: string; endTime?: string };
-        if (!startTime || !endTime) {
-            return next(badRequest("startTime and endTime query parameters are required"));
-        }
-        if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
-            return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
-        }
-        const id = req.params.elementId;
-        const visible = visibleTo(res);
-        if (visible && !this.objectTree.getObject(id, visible))
-            return next(notFound(`Object ${id} not found`));
-        /* Sent as InfluxDB returns it, as for POST /objects/history. A
-         * query that fails before STREAM_CHUNK bytes have gathered
-         * still gets an error response. */
-        const rows = this.history.streamHistory(id, startTime, endTime, { signal: closeSignal(res) });
-        await streamText(res, (async function* () {
-            yield `{"success":true,"result":{"elementId":${JSON.stringify(id)},"values":[`;
-            let first = true;
-            for await (const batch of rows) {
-                let out = "";
-                for (const v of batch) {
-                    out += (first ? "" : ",") + JSON.stringify(v);
-                    first = false;
-                }
-                yield out;
-            }
-            yield "]}}";
-        })(), { lateFailure: "end" });
-    }
-
-    /**
-     * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
-     **/
-    async get_object_related(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const visible = visibleTo(res);
-        const obj = this.objectTree.getObject(req.params.elementId, visible);
-        if (!obj) return next(notFound(`Object ${req.params.elementId} not found`));
-        const rt = req.query.relationshiptype as string | undefined;
-        // An ISA-95 level can have tens of thousands of children.
-        await streamJsonArray(res, '{"success":true,"result":[',
-            this.objectTree.iterateRelated(req.params.elementId, rt, 1000, visible), "]}");
-    }
-
-    /**
-     * GET /objects/:elementId — returns one object, or 404 if unknown.
-     **/
-    get_object(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getObject(req.params.elementId, visibleTo(res));
-        if (!result) return next(notFound(`Object ${req.params.elementId} not found`));
-        res.json(result);
     }
 
     /**
@@ -918,17 +880,13 @@ export class APIv1 {
      */
     list_subscriptions(req: Request, res: Response): void {
         const owner = subscription_owner(req);
-        const { subscriptionIds } = req.body;
-        const results = (subscriptionIds as string[]).map(id => {
+        const { clientId } = req.body;
+        const results = idsOf(req, "subscriptionIds").map(id => {
             try {
-                const sub = this.subscriptions.getOne(owner, id);
+                const sub = this.subscriptions.getOne(owner, clientId, id);
                 return { success: true, subscriptionId: id, result: sub };
             } catch (err: any) {
-                return {
-                    success: false,
-                    subscriptionId: id,
-                    error: { code: err.status ?? 500, message: err.message },
-                };
+                return failedItem("subscriptionId", id, err.status ?? 500, err.message);
             }
         });
         const allSuccess = results.every(r => r.success);
@@ -943,17 +901,13 @@ export class APIv1 {
      */
     delete_subscriptions(req: Request, res: Response): void {
         const owner = subscription_owner(req);
-        const { subscriptionIds } = req.body;
-        const results = (subscriptionIds as string[]).map(id => {
+        const { clientId } = req.body;
+        const results = idsOf(req, "subscriptionIds").map(id => {
             try {
-                this.subscriptions.deleteOne(owner, id);
+                this.subscriptions.deleteOne(owner, clientId, id);
                 return { success: true, subscriptionId: id, result: null };
             } catch (err: any) {
-                return {
-                    success: false,
-                    subscriptionId: id,
-                    error: { code: err.status ?? 500, message: err.message },
-                };
+                return failedItem("subscriptionId", id, err.status ?? 500, err.message);
             }
         });
         const allSuccess = results.every(r => r.success);
@@ -969,21 +923,19 @@ export class APIv1 {
      */
     register_subscriptions(req: Request, res: Response): void {
         const owner = subscription_owner(req);
-        const { subscriptionId, elementIds, maxDepth } = req.body;
+        const { clientId, subscriptionId, maxDepth } = req.body;
+        if (maxDepth != null && !(Number.isInteger(maxDepth) && maxDepth >= 0))
+            throw badRequest("maxDepth must be a non-negative integer");
         const visible = visibleTo(res);
-        const results = (elementIds as string[]).map(id => {
+        const results = idsOf(req).map(id => {
             if (!this.objectTree.getObject(id, visible)) {
-                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+                return failedItem("elementId", id, 404, `Element not found: ${id}`);
             }
             try {
-                this.subscriptions.registerOne(owner, subscriptionId, id, maxDepth);
+                this.subscriptions.registerOne(owner, clientId, subscriptionId, id, maxDepth ?? undefined);
                 return { success: true, elementId: id, result: null };
             } catch (err: any) {
-                return {
-                    success: false,
-                    elementId: id,
-                    error: { code: err.status ?? 500, message: err.message },
-                };
+                return failedItem("elementId", id, err.status ?? 500, err.message);
             }
         });
         const allSuccess = results.every(r => r.success);
@@ -999,21 +951,17 @@ export class APIv1 {
      */
     unregister_subscriptions(req: Request, res: Response): void {
         const owner = subscription_owner(req);
-        const { subscriptionId, elementIds } = req.body;
+        const { clientId, subscriptionId } = req.body;
         const visible = visibleTo(res);
-        const results = (elementIds as string[]).map(id => {
+        const results = idsOf(req).map(id => {
             if (!this.objectTree.getObject(id, visible)) {
-                return { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } };
+                return failedItem("elementId", id, 404, `Element not found: ${id}`);
             }
             try {
-                this.subscriptions.unregisterOne(owner, subscriptionId, id);
+                this.subscriptions.unregisterOne(owner, clientId, subscriptionId, id);
                 return { success: true, elementId: id, result: null };
             } catch (err: any) {
-                return {
-                    success: false,
-                    elementId: id,
-                    error: { code: err.status ?? 500, message: err.message },
-                };
+                return failedItem("elementId", id, err.status ?? 500, err.message);
             }
         });
         const allSuccess = results.every(r => r.success);
@@ -1027,30 +975,32 @@ export class APIv1 {
      * do NOT call `res.json` here.
      */
     async stream_subscription(req: Request, res: Response, _next: NextFunction): Promise<void> {
-        const { subscriptionId } = req.body;
-        this.subscriptions.stream(subscription_owner(req), subscriptionId, res);
+        const { clientId, subscriptionId } = req.body;
+        this.subscriptions.stream(subscription_owner(req), clientId, subscriptionId, res);
     }
 
     /**
-     * POST /subscriptions/sync — acknowledges updates up to
-     * `lastSequenceNumber` and returns the rest of the queue. If the
+     * POST /subscriptions/sync — acknowledges the batches up to
+     * `lastSequenceNumber` and returns every batch still waiting, the
+     * changes since the previous sync as a new one:
+     * `[{ sequenceNumber, updates: [...] }]`. If the
      * queue overflowed since the previous sync, the response is HTTP
      * 206 with a `responseDetail` describing the loss; the client can
      * size the gap from the sequence numbers. Refused with 409 while
      * a stream is open.
      **/
     sync_subscription(req: Request, res: Response): void {
-        const { subscriptionId, lastSequenceNumber } = req.body;
-        const { updates, dropped } = this.subscriptions.sync(
-            subscription_owner(req), subscriptionId, lastSequenceNumber);
+        const { clientId, subscriptionId, lastSequenceNumber } = req.body;
+        const { batches, dropped } = this.subscriptions.sync(
+            subscription_owner(req), clientId, subscriptionId, lastSequenceNumber);
         if (!dropped) {
-            res.json(updates);
+            res.json(batches);
             return;
         }
         res.status(206);
         ((res as any)._originalJson || res.json.bind(res))({
             success: true,
-            result: updates,
+            result: batches,
             responseDetail: {
                 title: "Updates dropped due to queue overflow",
                 status: 206,
@@ -1062,9 +1012,9 @@ export class APIv1 {
 
     /**
      * POST /subscriptions — creates a new subscription owned by the
-     * authenticated principal. The client-supplied `clientId` is
-     * stored and echoed back because it is part of the i3X wire shape,
-     * but ownership is the principal, not the clientId.
+     * authenticated principal and scoped to the client-supplied
+     * `clientId`: later requests must come from the same principal and
+     * give the same clientId.
      **/
     create_subscription(req: Request, res: Response): void {
         const { clientId, displayName } = req.body;

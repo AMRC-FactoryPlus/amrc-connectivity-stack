@@ -113,6 +113,13 @@ export default defineConfig({
     }),
     stripMonacoInlineScript(),
   ],
+  server: {
+    proxy: {
+      // The i3X Explorer has its own dev server (npm run
+      // dev:i3x-explorer); the Explorer page frames it from here.
+      '/i3x-explorer/': { target: 'http://localhost:5174', ws: true },
+    },
+  },
   resolve: {
     alias: {
       '@': src(''),

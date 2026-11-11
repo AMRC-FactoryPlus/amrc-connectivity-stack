@@ -50,6 +50,8 @@ const data = new DataFlow({
   debug,
   cdb: fplus.ConfigDB,
   auth: fplus.Auth,
+  // How long a write waits for the index to show it before it answers.
+  write_wait_ms: env.WRITE_WAIT_MS,
 });
 
 const influxReader = new InfluxReader({

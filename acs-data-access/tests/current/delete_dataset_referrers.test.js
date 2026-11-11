@@ -59,7 +59,11 @@ function make_api(datasets, raw_configs) {
   };
 
   const api = new APIv1({
-    data: { datasets: rx.of(IMap(datasets)) },
+    data: {
+      datasets: rx.of(IMap(datasets)),
+      /* No index to wait for. */
+      caught_up: async () => true,
+    },
     auth: { async check_acl() { return true; } },
     cdb,
     debug: { bound: () => () => {} },

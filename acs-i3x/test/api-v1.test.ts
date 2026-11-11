@@ -1,10 +1,10 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import express from "express";
 import request from "supertest";
-import { APIv1 } from "../lib/api-v1.js";
+import { APIv1, releaseOf } from "../lib/api-v1.js";
 import { lazyFromValue } from "../lib/value-cache.js";
 import type { SyncResult } from "../lib/subscriptions.js";
-import { I3X_SPEC_VERSION, Version } from "../lib/constants.js";
+import { I3X_SPEC_VERSION } from "../lib/constants.js";
 import type {
     I3xNamespace,
     I3xObjectType,
@@ -36,6 +36,14 @@ function mockObjectTree() {
         /* The related routes stream from iterateRelated; this one reads
          * whatever getRelated is set up to return. */
         iterateRelated: jest.fn(function* (this: any, id: string, rt?: string) { yield* this.getRelated(id, rt); }),
+        /* The related routes stream edges from iterateEdges; here every
+         * object getRelated returns is a component. */
+        iterateEdges: jest.fn(function* (this: any, id: string, rt?: string) {
+            for (const object of this.getRelated(id, rt)) yield { sourceRelationship: "HasComponent", object };
+        }),
+        objectMetadata: jest.fn((obj: I3xObject) => ({
+            typeNamespaceUri: NS_URI, sourceTypeId: obj.typeElementId, relationships: {},
+        })),
         getChildElementIds: jest.fn<(id: string) => string[]>().mockReturnValue([]),
         addCompositionFromUns: jest.fn(),
     };
@@ -180,9 +188,16 @@ const sampleRelType: I3xRelationshipType = {
     elementId: "rel-1",
     displayName: "Has Parent",
     namespaceUri: NS_URI,
-    relationshipId: "i3x:rel:has-parent",
-    reverseOf: "i3x:rel:has-children",
+    relationshipId: "HasParent",
+    reverseOf: "HasChildren",
 };
+
+/** A getObject for a tree holding just these leaf objects. */
+const known = (...ids: string[]) => (id: string) =>
+    ids.includes(id) ? { ...sampleObject2, elementId: id } : undefined;
+
+/** An object as the API sends it: a root has no parent. */
+const wire = (o: I3xObject) => (o.parentId === "/" ? { ...o, parentId: null } : o);
 
 const sampleVqt: I3xVqt = {
     value: 42,
@@ -212,7 +227,9 @@ describe("APIv1", () => {
             expect(res.body.result).toEqual({
                 specVersion: I3X_SPEC_VERSION,
                 serverName: "AMRC Connectivity Stack",
-                serverVersion: Version,
+                /* The ACS release the build was stamped with; "dev"
+                 * outside the release pipeline. */
+                serverVersion: "dev",
                 capabilities: {
                     query: { history: true },
                     update: { current: false, history: false },
@@ -307,27 +324,6 @@ describe("APIv1", () => {
         });
     });
 
-    describe("GET /objecttypes/:elementId", () => {
-        it("returns single object type", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObjectType.mockReturnValue(sampleType);
-
-            const res = await request(app).get("/objecttypes/type-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleType);
-        });
-
-        it("returns 404 for missing type", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objecttypes/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /objecttypes/query", () => {
         it("returns bulk response preserving order", async () => {
             const { app, objectTree } = createApp();
@@ -368,27 +364,6 @@ describe("APIv1", () => {
         });
     });
 
-    describe("GET /relationshiptypes/:elementId", () => {
-        it("returns single relationship type", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getRelationshipType.mockReturnValue(sampleRelType);
-
-            const res = await request(app).get("/relationshiptypes/rel-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleRelType);
-        });
-
-        it("returns 404 for missing", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/relationshiptypes/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /relationshiptypes/query", () => {
         it("returns bulk response", async () => {
             const { app, objectTree } = createApp();
@@ -420,7 +395,19 @@ describe("APIv1", () => {
             const res = await request(app).get("/objects");
 
             expect(res.status).toBe(200);
-            expect(res.body.result).toEqual([sampleObject]);
+            expect(res.body.result).toEqual([wire(sampleObject)]);
+            expect(res.body.result[0].parentId).toBeNull();
+        });
+
+        it("adds the metadata when includeMetadata=true", async () => {
+            const { app, objectTree } = createApp();
+            objectTree.getObjects.mockReturnValue([sampleObject2]);
+
+            const res = await request(app).get("/objects").query({ includeMetadata: "true" });
+
+            expect(res.body.result).toEqual([{ ...sampleObject2, metadata: {
+                typeNamespaceUri: NS_URI, sourceTypeId: "type-1", relationships: {},
+            } }]);
         });
 
         it("supports root=true filter", async () => {
@@ -457,27 +444,6 @@ describe("APIv1", () => {
         });
     });
 
-    describe("GET /objects/:elementId", () => {
-        it("returns single object", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject);
-
-            const res = await request(app).get("/objects/obj-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleObject);
-        });
-
-        it("returns 404 for missing object", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /objects/list", () => {
         it("returns bulk preserving order", async () => {
             const { app, objectTree } = createApp();
@@ -504,43 +470,6 @@ describe("APIv1", () => {
         });
     });
 
-    describe("GET /objects/:elementId/related", () => {
-        it("returns related objects", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject);
-            objectTree.getRelated.mockReturnValue([sampleObject2]);
-
-            const res = await request(app).get("/objects/obj-1/related");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual([sampleObject2]);
-        });
-
-        it("passes relationshiptype query param", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject);
-            objectTree.getRelated.mockReturnValue([]);
-
-            await request(app)
-                .get("/objects/obj-1/related")
-                .query({ relationshiptype: "i3x:rel:has-children" });
-
-            expect(objectTree.getRelated).toHaveBeenCalledWith(
-                "obj-1",
-                "i3x:rel:has-children",
-            );
-        });
-
-        it("returns 404 if object not found", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/nonexistent/related");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /objects/related", () => {
         it("returns bulk related objects", async () => {
             const { app, objectTree } = createApp();
@@ -560,56 +489,45 @@ describe("APIv1", () => {
             expect(results).toHaveLength(2);
             expect(results[0].elementId).toBe("obj-1");
             expect(results[0].success).toBe(true);
-            expect(results[0].result).toEqual([sampleObject2]);
+            expect(results[0].result).toEqual([{ sourceRelationship: "HasComponent", object: sampleObject2 }]);
             expect(results[1].elementId).toBe("missing");
             expect(results[1].success).toBe(false);
+            expect(results[1].responseDetail)
+                .toEqual({ title: "Not Found", status: 404, detail: "Element not found: missing" });
+        });
+
+        it("filters by relationshipType and adds metadata when asked", async () => {
+            const { app, objectTree } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject);
+            objectTree.getRelated.mockReturnValue([sampleObject2]);
+
+            const res = await request(app)
+                .post("/objects/related")
+                .send({ elementIds: ["obj-1"], relationshipType: "HasComponent", includeMetadata: true });
+
+            expect(objectTree.getRelated).toHaveBeenCalledWith("obj-1", "HasComponent");
+            expect(res.body.results[0].result[0].object.metadata.sourceTypeId).toBe("type-1");
+        });
+
+        it("refuses a body without elementIds with a 400", async () => {
+            const { app } = createApp();
+
+            const res = await request(app).post("/objects/related").send({});
+
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({ success: false, responseDetail: {
+                title: "Bad Request", status: 400, detail: "elementIds must be an array of strings",
+            } });
         });
     });
 
     /* ---- Values ---- */
 
-    describe("GET /objects/:elementId/value", () => {
-        it("returns VQT value for a non-composition object", async () => {
-            const { app, history, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject2); // isComposition: false
-            history.getCurrentValue.mockResolvedValue(sampleValueResponse);
-
-            const res = await request(app).get("/objects/obj-2/value");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleValueResponse);
-        });
-
-        it("returns VQT value for a composition object", async () => {
-            const { app, history, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject); // isComposition: true
-            const compositionResponse: I3xValueResponse = {
-                ...sampleValueResponse,
-                isComposition: true,
-            };
-            history.getCompositionValue.mockResolvedValue(compositionResponse);
-
-            const res = await request(app).get("/objects/obj-1/value");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(compositionResponse);
-        });
-
-        it("returns 404 for missing value", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/obj-1/value");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /objects/value", () => {
         it("returns bulk VQTs", async () => {
             const { app, history, objectTree } = createApp();
             const resp1: I3xValueResponse = { ...sampleValueResponse, elementId: "obj-1" };
-            // obj-1 is not a composition in this context (getObject returns undefined by default)
+            objectTree.getObject.mockImplementation(known("obj-1"));
             history.getCurrentValue
                 .mockImplementation(async (id: string) => {
                     if (id === "obj-1") return resp1;
@@ -654,6 +572,10 @@ describe("APIv1", () => {
             expect(res.status).toBe(206);
             expect(history.getCompositionValue).toHaveBeenCalledWith("obj-1", 2);
             expect(res.body.success).toBe(true);
+            /* A partial response says what was left out. */
+            expect(res.body.responseDetail).toEqual({
+                title: "Partial Content", status: 206, detail: expect.stringContaining("depth limit of 2"),
+            });
         });
 
         it("returns 200 when no maxDepthCap is configured even for deep requests", async () => {
@@ -670,7 +592,8 @@ describe("APIv1", () => {
         });
 
         it("reads all cache misses from InfluxDB in one batch, in request order", async () => {
-            const { app, history, valueCache } = createApp();
+            const { app, history, valueCache, objectTree } = createApp();
+            objectTree.getObject.mockImplementation(known("miss-1", "hit", "none", "miss-2"));
             const cached: I3xValueResponse = { ...sampleValueResponse, elementId: "hit", value: "from-uns" };
             valueCache.getValue.mockImplementation((id: string) => id === "hit" ? cached : null);
             history.getCurrentValue.mockImplementation(async (id: string) =>
@@ -680,25 +603,33 @@ describe("APIv1", () => {
 
             const res = await request(app)
                 .post("/objects/value")
-                .send({ elementIds: ["miss-1", "hit", "none", "miss-2", "miss-1"], maxDepth: 2 });
+                .send({ elementIds: ["miss-1", "hit", "none", "gone", "miss-2", "miss-1"], maxDepth: 2 });
 
             expect(res.status).toBe(200);
             expect(history.getValues).toHaveBeenCalledTimes(1);
             expect(history.getValues).toHaveBeenCalledWith(["miss-1", "none", "miss-2"], 2, undefined);
             expect(res.body.success).toBe(false);
-            expect(res.body.results.map((r: any) => [r.elementId, r.success, r.result?.value ?? r.error?.code]))
+            expect(res.body.results.map((r: any) => [r.elementId, r.success, r.success ? r.result.value : r.responseDetail.status]))
                 .toEqual([
                     ["miss-1", true, "influx-miss-1"],
                     ["hit", true, "from-uns"],
-                    ["none", false, 404],
+                    ["none", true, null],
+                    ["gone", false, 404],
                     ["miss-2", true, "influx-miss-2"],
                     ["miss-1", true, "influx-miss-1"],
                 ]);
-            expect(res.body.results[2].error.message).toBe("No value for none");
+            /* An object with no data is not an error: its value is null
+             * and its quality says why. */
+            expect(res.body.results[2].result).toEqual({
+                elementId: "none", isComposition: false, value: null,
+                quality: "GoodNoData", timestamp: expect.stringMatching(/^\d{4}-.*Z$/),
+            });
+            expect(res.body.results[3].responseDetail.detail).toBe("Element not found: gone");
         });
 
         it("serves a UNS cache hit even when InfluxDB has a value, and does not query for it", async () => {
-            const { app, history, valueCache } = createApp();
+            const { app, history, valueCache, objectTree } = createApp();
+            objectTree.getObject.mockImplementation(known("obj-1"));
             const cached: I3xValueResponse = { ...sampleValueResponse, elementId: "obj-1", value: "newer-uns" };
             valueCache.getValue.mockReturnValue(cached);
             history.getCurrentValue.mockResolvedValue({ ...sampleValueResponse, value: "older-influx" });
@@ -710,29 +641,31 @@ describe("APIv1", () => {
         });
 
         it("fails the request when the InfluxDB read fails, as before", async () => {
-            const { app, history } = createApp();
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockImplementation(known("obj-1"));
             history.getValues.mockRejectedValue(new Error("Request timed out"));
 
             const res = await request(app).post("/objects/value").send({ elementIds: ["obj-1"] });
 
             expect(res.status).toBe(500);
-            expect(res.body.error.message).toBe("Request timed out");
+            expect(res.body.responseDetail.detail).toBe("Request timed out");
         });
 
         it("logs one summary line, counting repeated ids once per occurrence", async () => {
             const log = jest.fn();
-            const { app, history, valueCache } = createApp({ debug: { bound: () => log } });
+            const { app, history, valueCache, objectTree } = createApp({ debug: { bound: () => log } });
+            objectTree.getObject.mockImplementation(known("hit", "miss", "none"));
             valueCache.getValue.mockImplementation((id: string) =>
                 id === "hit" ? { ...sampleValueResponse, elementId: "hit" } : null);
             history.getCurrentValue.mockImplementation(async (id: string) =>
                 id === "miss" ? { ...sampleValueResponse, elementId: id } : null);
 
             await request(app).post("/objects/value")
-                .send({ elementIds: ["hit", "miss", "miss", "none", "none", "hit"] });
+                .send({ elementIds: ["hit", "miss", "miss", "none", "none", "hit", "gone"] });
 
             expect(log).toHaveBeenCalledTimes(1);
-            // 6 ids: 2 UNS cache hits, 2 InfluxDB hits, 2 with no data.
-            expect(log.mock.calls[0].slice(1, 5)).toEqual([6, 2, 2, 2]);
+            // 7 ids: 2 UNS cache hits, 2 InfluxDB hits, 2 with no data, 1 not found.
+            expect(log.mock.calls[0].slice(1, 6)).toEqual([7, 2, 2, 2, 1]);
         });
 
         it("does not write per-element logs to stdout", async () => {
@@ -743,8 +676,6 @@ describe("APIv1", () => {
             const spy = jest.spyOn(console, "log").mockImplementation(() => {});
             try {
                 await request(app).post("/objects/value").send({ elementIds: ["hit", "a", "b"] });
-                await request(app).get("/objects/a/value");
-                await request(app).get("/objects/hit/value");
                 expect(spy).not.toHaveBeenCalled();
             } finally {
                 spy.mockRestore();
@@ -754,102 +685,42 @@ describe("APIv1", () => {
 
     /* ---- History ---- */
 
-    describe("GET /objects/:elementId/history", () => {
-        it("returns history array", async () => {
-            const { app, history } = createApp();
-            history.queryHistory.mockResolvedValue([sampleVqt]);
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00Z" });
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual({
-                elementId: "obj-1",
-                values: [sampleVqt],
-            });
-        });
-
-        it("returns 400 for missing params", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/obj-1/history");
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-        });
-
-        it("returns 400 if only startTime provided", async () => {
-            const { app } = createApp();
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z" });
-
-            expect(res.status).toBe(400);
-        });
-
-        it("returns 400 for a non-RFC3339 startTime", async () => {
-            const { app, history } = createApp();
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "-30d)", endTime: "2026-04-01T00:00:00Z" });
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-            expect(history.queryHistory).not.toHaveBeenCalled();
-        });
-
-        it("returns 400 for a non-RFC3339 endTime", async () => {
-            const { app, history } = createApp();
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "now()" });
-
-            expect(res.status).toBe(400);
-            expect(history.queryHistory).not.toHaveBeenCalled();
-        });
-
-        it("accepts valid RFC 3339 bounds and passes them through", async () => {
-            const { app, history } = createApp();
-            history.queryHistory.mockResolvedValue([sampleVqt]);
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00+01:00" });
-
-            expect(res.status).toBe(200);
-            expect(history.queryHistory).toHaveBeenCalledWith(
-                "obj-1",
-                "2026-01-01T00:00:00Z",
-                "2026-04-01T00:00:00+01:00",
-            );
+    describe("releaseOf", () => {
+        it("takes the ACS release from the revision the image build stamps", () => {
+            expect(releaseOf("v6.22.0 (3f2a9c1e5b7d4e8a9c217d4e5f6a8b90aabbccdd)")).toBe("v6.22.0");
+            expect(releaseOf("v6.22.0-rc.1 (3f2a9c1)")).toBe("v6.22.0-rc.1");
+            expect(releaseOf("v6.22.0")).toBe("v6.22.0");
+            expect(releaseOf("dev")).toBe("dev");
+            expect(releaseOf(" (3f2a9c1)")).toBe("dev");
+            expect(releaseOf("")).toBe("dev");
         });
     });
 
     describe("POST /objects/history", () => {
         it("returns bulk history", async () => {
-            const { app, history } = createApp();
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockImplementation(known("obj-1", "obj-2"));
             history.queryHistory.mockResolvedValue([sampleVqt]);
 
             const res = await request(app)
                 .post("/objects/history")
                 .send({
-                    elementIds: ["obj-1", "obj-2"],
+                    elementIds: ["obj-1", "obj-2", "gone"],
                     startTime: "2026-01-01T00:00:00Z",
                     endTime: "2026-04-01T00:00:00Z",
                 });
 
             expect(res.status).toBe(200);
             const results = res.body.results;
-            expect(results).toHaveLength(2);
+            expect(results).toHaveLength(3);
             expect(results[0].elementId).toBe("obj-1");
             expect(results[0].success).toBe(true);
-            expect(results[0].result.values).toEqual([sampleVqt]);
+            expect(results[0].result).toEqual({ isComposition: false, values: [sampleVqt] });
             expect(results[1].elementId).toBe("obj-2");
             expect(results[1].success).toBe(true);
+            expect(results[2]).toEqual({ success: false, elementId: "gone", responseDetail: {
+                title: "Not Found", status: 404, detail: "Element not found: gone",
+            } });
         });
 
         it("returns 400 if startTime or endTime missing", async () => {
@@ -860,6 +731,54 @@ describe("APIv1", () => {
                 .send({ elementIds: ["obj-1"] });
 
             expect(res.status).toBe(400);
+        });
+
+        it("returns 400 for bounds that are not RFC 3339, before any query", async () => {
+            const { app, history } = createApp();
+
+            for (const [startTime, endTime] of [
+                ["-30d)", "2026-04-01T00:00:00Z"],
+                ["2026-01-01T00:00:00Z", "now()"],
+                [1767225600, "2026-04-01T00:00:00Z"],
+            ]) {
+                const res = await request(app)
+                    .post("/objects/history")
+                    .send({ elementIds: ["obj-1"], startTime, endTime });
+                expect(res.status).toBe(400);
+                expect(res.body.success).toBe(false);
+            }
+            expect(history.queryHistory).not.toHaveBeenCalled();
+        });
+
+        it("accepts valid RFC 3339 bounds and passes them through", async () => {
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockImplementation(known("obj-1"));
+            history.queryHistory.mockResolvedValue([sampleVqt]);
+
+            const res = await request(app)
+                .post("/objects/history")
+                .send({ elementIds: ["obj-1"], startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00+01:00" });
+
+            expect(res.status).toBe(200);
+            expect(history.queryHistory).toHaveBeenCalledWith(
+                "obj-1",
+                "2026-01-01T00:00:00Z",
+                "2026-04-01T00:00:00+01:00",
+            );
+        });
+
+        it("has no routes for a single object: i3X 1.0 reads in bulk only", async () => {
+            const { app, objectTree } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject);
+
+            for (const path of ["/objects/obj-1", "/objects/obj-1/value", "/objects/obj-1/history",
+                "/objects/obj-1/related", "/objecttypes/type-1", "/relationshiptypes/rel-1"]) {
+                const res = await request(app).get(path);
+                expect([path, res.status]).toEqual([path, 404]);
+                expect(res.body).toEqual({ success: false, responseDetail: {
+                    title: "Not Found", status: 404, detail: `No such endpoint: GET ${path}`,
+                } });
+            }
         });
     });
 
@@ -886,7 +805,7 @@ describe("APIv1", () => {
     describe("POST /subscriptions/list", () => {
         it("returns bulk envelope with monitoredObjects per subscription", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.getOne.mockImplementation((_owner: string, id: string) => ({
+            subscriptions.getOne.mockImplementation((_owner: string, _clientId: string, id: string) => ({
                 clientId: "c1",
                 subscriptionId: id,
                 displayName: `Sub ${id}`,
@@ -898,8 +817,8 @@ describe("APIv1", () => {
                 .send({ clientId: "c1", subscriptionIds: ["sub-1", "sub-2"] });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1");
-            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-2");
+            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1");
+            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-2");
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -929,7 +848,7 @@ describe("APIv1", () => {
 
         it("reports missing subscriptions as 404 without aborting the batch", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.getOne.mockImplementation((_owner: string, id: string) => {
+            subscriptions.getOne.mockImplementation((_owner: string, _clientId: string, id: string) => {
                 if (id === "missing") {
                     const err: any = new Error(`Subscription ${id} not found`);
                     err.status = 404;
@@ -963,7 +882,7 @@ describe("APIv1", () => {
                 {
                     success: false,
                     subscriptionId: "missing",
-                    error: { code: 404, message: "Subscription missing not found" },
+                    responseDetail: { title: "Not Found", status: 404, detail: "Subscription missing not found" },
                 },
             ]);
         });
@@ -973,7 +892,7 @@ describe("APIv1", () => {
          * be used to discover which subscription ids are live. */
         it("reports another principal's subscriptions as 404, not 403", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.getOne.mockImplementation((_owner: string, _id: string) => {
+            subscriptions.getOne.mockImplementation((_owner: string, _clientId: string, _id: string) => {
                 const err: any = new Error("Subscription sub-1 not found");
                 err.status = 404;
                 throw err;
@@ -990,15 +909,15 @@ describe("APIv1", () => {
                     {
                         success: false,
                         subscriptionId: "sub-1",
-                        error: { code: 404, message: "Subscription sub-1 not found" },
+                        responseDetail: { title: "Not Found", status: 404, detail: "Subscription sub-1 not found" },
                     },
                 ],
             });
         });
 
-        /* The clientId in the body is echoed but never trusted: it does
-         * not decide which subscriptions the caller can reach. */
-        it("ignores the clientId in the body when resolving ownership", async () => {
+        /* The clientId in the body scopes the lookup, as i3X requires,
+         * but it never stands in for the authenticated principal. */
+        it("looks up by the authenticated principal and the body's clientId", async () => {
             const { app, subscriptions } = createApp();
             subscriptions.getOne.mockReturnValue({
                 clientId: "someone-else",
@@ -1010,8 +929,7 @@ describe("APIv1", () => {
                 .post("/subscriptions/list")
                 .send({ clientId: "someone-else", subscriptionIds: ["sub-1"] });
 
-            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1");
-            expect(subscriptions.getOne).not.toHaveBeenCalledWith("someone-else", "sub-1");
+            expect(subscriptions.getOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "someone-else", "sub-1");
         });
     });
 
@@ -1034,8 +952,8 @@ describe("APIv1", () => {
                 });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.registerOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-1", 2);
-            expect(subscriptions.registerOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-2", 2);
+            expect(subscriptions.registerOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1", "obj-1", 2);
+            expect(subscriptions.registerOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1", "obj-2", 2);
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -1068,7 +986,7 @@ describe("APIv1", () => {
                 {
                     success: false,
                     elementId: "missing",
-                    error: { code: 404, message: "Object missing not found" },
+                    responseDetail: { title: "Not Found", status: 404, detail: "Element not found: missing" },
                 },
                 { success: true, elementId: "obj-2", result: null },
             ]);
@@ -1101,7 +1019,7 @@ describe("APIv1", () => {
                     {
                         success: false,
                         elementId: "obj-1",
-                        error: { code: 404, message: "Subscription sub-1 not found" },
+                        responseDetail: { title: "Not Found", status: 404, detail: "Subscription sub-1 not found" },
                     },
                 ],
             });
@@ -1126,8 +1044,8 @@ describe("APIv1", () => {
                 });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.unregisterOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-1");
-            expect(subscriptions.unregisterOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1", "obj-2");
+            expect(subscriptions.unregisterOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1", "obj-1");
+            expect(subscriptions.unregisterOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1", "obj-2");
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -1160,7 +1078,7 @@ describe("APIv1", () => {
                 {
                     success: false,
                     elementId: "missing",
-                    error: { code: 404, message: "Object missing not found" },
+                    responseDetail: { title: "Not Found", status: 404, detail: "Element not found: missing" },
                 },
                 { success: true, elementId: "obj-2", result: null },
             ]);
@@ -1193,7 +1111,7 @@ describe("APIv1", () => {
                     {
                         success: false,
                         elementId: "obj-1",
-                        error: { code: 404, message: "Subscription sub-1 not found" },
+                        responseDetail: { title: "Not Found", status: 404, detail: "Subscription sub-1 not found" },
                     },
                 ],
             });
@@ -1201,14 +1119,13 @@ describe("APIv1", () => {
     });
 
     describe("POST /subscriptions/sync", () => {
-        it("returns queued items", async () => {
+        it("returns the waiting batches", async () => {
             const { app, subscriptions } = createApp();
-            const syncItem: I3xSyncItem = {
+            const syncItem = {
                 sequenceNumber: 1,
-                elementId: "obj-1",
-                ...sampleVqt,
+                updates: [{ elementId: "obj-1", ...sampleVqt }],
             };
-            subscriptions.sync.mockReturnValue({ updates: [syncItem], dropped: 0 });
+            subscriptions.sync.mockReturnValue({ batches: [syncItem], dropped: 0 });
 
             const res = await request(app)
                 .post("/subscriptions/sync")
@@ -1220,16 +1137,31 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(res.body.result).toEqual([syncItem]);
+            expect(subscriptions.sync).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1", 0);
+        });
+
+        it("refuses a request without a clientId with a 400", async () => {
+            const { app, subscriptions } = createApp();
+
+            for (const path of ["", "/list", "/delete", "/register", "/unregister", "/sync", "/stream"]) {
+                const res = await request(app).post(`/subscriptions${path}`)
+                    .send({ subscriptionId: "sub-1", subscriptionIds: ["sub-1"], elementIds: ["obj-1"] });
+                expect([path, res.status]).toEqual([path, 400]);
+                expect(res.body).toEqual({ success: false, responseDetail: {
+                    title: "Bad Request", status: 400, detail: "clientId is required",
+                } });
+            }
+            expect(subscriptions.create).not.toHaveBeenCalled();
+            expect(subscriptions.sync).not.toHaveBeenCalled();
         });
 
         it("returns 206 with responseDetail when updates were dropped", async () => {
             const { app, subscriptions } = createApp();
-            const syncItem: I3xSyncItem = {
+            const syncItem = {
                 sequenceNumber: 151,
-                elementId: "obj-1",
-                ...sampleVqt,
+                updates: [{ elementId: "obj-1", ...sampleVqt }],
             };
-            subscriptions.sync.mockReturnValue({ updates: [syncItem], dropped: 50 });
+            subscriptions.sync.mockReturnValue({ batches: [syncItem], dropped: 50 });
 
             const res = await request(app)
                 .post("/subscriptions/sync")
@@ -1259,7 +1191,7 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(409);
             expect(res.body.success).toBe(false);
-            expect(res.body.error.code).toBe(409);
+            expect(res.body.responseDetail.status).toBe(409);
         });
 
         it("returns 404 envelope when subscription is unknown", async () => {
@@ -1277,7 +1209,7 @@ describe("APIv1", () => {
             expect(res.status).toBe(404);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 404, message: "Subscription sub-1 not found" },
+                responseDetail: { title: "Not Found", status: 404, detail: "Subscription sub-1 not found" },
             });
         });
 
@@ -1296,7 +1228,7 @@ describe("APIv1", () => {
             expect(res.status).toBe(403);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 403, message: "Subscription sub-1 does not belong to client c1" },
+                responseDetail: { title: "Forbidden", status: 403, detail: "Subscription sub-1 does not belong to client c1" },
             });
         });
     });
@@ -1310,8 +1242,8 @@ describe("APIv1", () => {
                 .send({ clientId: "c1", subscriptionIds: ["sub-1", "sub-2"] });
 
             expect(res.status).toBe(200);
-            expect(subscriptions.deleteOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-1");
-            expect(subscriptions.deleteOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "sub-2");
+            expect(subscriptions.deleteOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-1");
+            expect(subscriptions.deleteOne).toHaveBeenCalledWith(TEST_PRINCIPAL, "c1", "sub-2");
             expect(res.body).toEqual({
                 success: true,
                 results: [
@@ -1323,7 +1255,7 @@ describe("APIv1", () => {
 
         it("reports per-id errors with code from err.status", async () => {
             const { app, subscriptions } = createApp();
-            subscriptions.deleteOne.mockImplementation((_clientId: string, id: string) => {
+            subscriptions.deleteOne.mockImplementation((_owner: string, _clientId: string, id: string) => {
                 if (id === "missing") {
                     const err: any = new Error("Subscription missing not found");
                     err.status = 404;
@@ -1342,7 +1274,7 @@ describe("APIv1", () => {
                 {
                     success: false,
                     subscriptionId: "missing",
-                    error: { code: 404, message: "Subscription missing not found" },
+                    responseDetail: { title: "Not Found", status: 404, detail: "Subscription missing not found" },
                 },
             ]);
         });
@@ -1381,7 +1313,7 @@ describe("APIv1", () => {
             expect(res.status).toBe(404);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 404, message: "Subscription sub-1 not found" },
+                responseDetail: { title: "Not Found", status: 404, detail: "Subscription sub-1 not found" },
             });
         });
 
@@ -1400,7 +1332,7 @@ describe("APIv1", () => {
             expect(res.status).toBe(403);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 403, message: "Subscription sub-1 does not belong to client c1" },
+                responseDetail: { title: "Forbidden", status: 403, detail: "Subscription sub-1 does not belong to client c1" },
             });
         });
     });
@@ -1419,7 +1351,7 @@ describe("APIv1", () => {
             expect(res.status).toBe(500);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 500, message: "Boom" },
+                responseDetail: { title: "Internal Server Error", status: 500, detail: "Boom" },
             });
         });
 

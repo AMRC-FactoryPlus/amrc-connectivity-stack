@@ -12,6 +12,99 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Upgrading: i3X implements version 1.0 of the specification
+
+The i3X service now reports `specVersion: "1.0"` and answers in the 1.0
+shapes, so i3X Explorer and other 1.0 clients can connect. The earlier
+shapes are gone: a client written against the old API needs the
+changes below. The Manager UI is updated in the same release.
+
+- **Errors are `responseDetail`, not `error`.** A failed request, and a
+  failed item of a bulk response, carries
+  `responseDetail: { title, status, detail }` where it carried
+  `error: { code, message }`.
+- **Relationship types have the specification's names**: `HasParent`,
+  `HasChildren`, `HasComponent` and `ComponentOf`, where they were
+  `i3x:rel:has-parent` and so on. A level of the ISA-95 hierarchy
+  `HasChildren`. A device, and each branch inside it, `HasComponent`,
+  so ask for `HasComponent` to list what is under a device.
+- **`/objects/related` returns edges.** Each entry is
+  `{ sourceRelationship, object }`, where it was the object alone. The
+  filter is `relationshipType`, where it was `relationshiptype`.
+- **`/subscriptions/sync` returns batches**:
+  `[{ sequenceNumber, updates: [...] }]`, where it was a flat list of
+  updates that each had a `sequenceNumber`. The changes since the last
+  sync become one batch. A batch is sent again on every sync until
+  `lastSequenceNumber` acknowledges it.
+- **Subscriptions are scoped to their `clientId`.** Every subscription
+  request needs the `clientId` the subscription was created with: a
+  request with none gets a 400, and one with another `clientId` gets a
+  404. The subscription still belongs to the authenticated principal
+  as well.
+- **An object with no data is not an error.** `/objects/value` answers
+  it with `value: null` and `quality: "GoodNoData"`, where it answered
+  404 with "No value". A 404 now only means the object does not exist,
+  or you may not see it. A composition's own value has quality
+  `GoodNoData` too, where it had `Good`.
+- **An ISA-95 level has no value.** A level (an Enterprise, a Site, an
+  Area and so on) now has `isComposition: false`, and reading its value
+  gives `null` with `GoodNoData`, where it gave every metric of every
+  device below it. i3X reads through `HasComponent` only, never through
+  `HasChildren`. To read the devices under a level, list them with
+  `/objects/related` (`relationshipType: "HasChildren"`) and read them
+  by their own ids, which can go in one bulk request. A device, and
+  each branch inside it, is still a composition.
+- **History results are `{ isComposition, values }`**, where they were
+  `{ elementId, values }`.
+- **A root object has `parentId: null`**, where it had `"/"`.
+- **Every object's type is listed.** `/objecttypes` now includes the
+  types the service makes up: `isa95-level`, `unknown`, and scalar
+  types for leaf metrics (`metric-number`, `metric-boolean`,
+  `metric-string`, `metric`). Every leaf metric has one of these as its
+  `typeElementId`, from its Sparkplug type, where it had `unknown` or
+  the UUID of the Factory+ Metric schema. That schema describes how a
+  metric is configured, not its value, and i3X requires a value to
+  conform to its type.
+- **`includeMetadata` works**, on `GET /objects`, `/objects/list` and
+  `/objects/related`. It adds each object's type namespace and the ids
+  it is related to.
+- A bulk request with no `elementIds` gets a 400, where it got a 500.
+- **`serverVersion` in `/info` is the ACS release**, such as `v6.22.0`,
+  where it was always `0.1.0`. The service's `/ping` also reports the
+  real revision now, where it reported `dev`: the image build stamped
+  the revision into a file the build did not use.
+
+- **The single-object routes are gone.** i3X 1.0 reads in bulk only,
+  so the service no longer has `GET /objects/{id}`,
+  `GET /objects/{id}/value`, `GET /objects/{id}/history`,
+  `GET /objects/{id}/related`, `GET /objecttypes/{id}` or
+  `GET /relationshiptypes/{id}`. Send the one id to the bulk form
+  (`POST /objects/list`, `/objects/value`, `/objects/history`,
+  `/objects/related`, `/objecttypes/query`, `/relationshiptypes/query`)
+  and take the first item of `results`. Any other path under `/v1`
+  answers 404 in the i3X error shape.
+
+The service rebuilds its database from ConfigDB the first time the new
+version starts, because the stored object types change. It answers 503
+until that is done, as it does on a first start. That takes seconds on
+a small installation.
+
+- **Branches that exist only on the UNS come back when their devices
+  next publish them.** The rebuild keeps what ConfigDB describes. A
+  branch i3X learned from UNS messages alone, such as a device's
+  `Device_Information`, is listed again once the device publishes it,
+  which devices do when the MQTT broker restarts during the upgrade.
+
+### Services no longer wait for ever on a stalled ConfigDB connection
+
+A service that opened its ConfigDB change feed while the old ConfigDB
+pod was shutting down could wait on that connection for ever, because
+the shared service client had no timeout on connecting or signing in.
+Testing this release, i3X was left answering 503 after an upgrade until
+its pod was restarted. Connecting and signing in now give up after 20
+seconds, and the connection is retried as it is after any other
+failure. Every JavaScript service built on the shared client gets this.
+
 ### Upgrading: every device has an ISA-95 placement
 
 A device's ISA-95 position is now its **placement**: one node of the

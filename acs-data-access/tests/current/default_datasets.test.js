@@ -251,6 +251,8 @@ describe("default dataset names", () => {
     const m = maker({
       cdb: fake_cdb().cdb,
       data: {
+        /* No index to wait for. */
+        caught_up: async () => true,
         default_devices: rx.of(defaults),
         general_infos: rx.of(IMap({ [DEV_A]: { name: "Lathe" } })),
       },
@@ -296,6 +298,8 @@ function make_api(grants) {
   });
   const api = new APIv1({
     data: {
+      /* No index to wait for. */
+      caught_up: async () => true,
       datasets: rx.of(DATASETS),
       allowed_all_datasets: () => rx.of(DATASETS),
     },

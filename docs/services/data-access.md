@@ -326,6 +326,9 @@ A body of the wrong shape returns `422`. The service needs `WriteConfig`
 on `Dataset metadata` (plural) and `General Information`, and
 `WriteMembers` on `Functional dataset group` (plural).
 
+A read that follows one of these writes returns the new value. See
+[Reads after writes](#reads-after-writes).
+
 ### `GET v1/metadata/:uuid`
 
 Requires `Read dataset` on `:uuid`. Returns `404` if the dataset does
@@ -348,10 +351,11 @@ membership is transitive over subclasses, a dataset classified into a
 subclass of a functional class (e.g. a hypothetical `MES work order` ⊂
 `MES dataset`) is reported as a member of both.
 
-The service holds `function` and `metadata` in memory and updates them
-from ConfigDB notifications. A read sent straight after a write to a
-dataset's metadata or to its functional class can therefore return the
-previous value, until the notification arrives.
+The service holds `name`, `function` and `metadata` in memory and
+updates them from ConfigDB notifications. A write made through this
+service waits for that update before it answers, so a read sent
+straight after it returns the new value. See
+[Reads after writes](#reads-after-writes).
 
 ### `GET v1/metadata/:uuid/contents`
 
@@ -963,6 +967,45 @@ links where the dataset is the superclass (a union's members) and the
 links where it is the subclass (a session's link to its source). It then
 deletes the ConfigDB object. Returns the deleted UUID as a JSON string,
 or an empty string if the dataset didn't exist.
+
+### Reads after writes
+
+The read routes answer from an index the service holds in memory: the
+dataset map, the names, the metadata and the functional classes. The
+service updates the index from ConfigDB notifications, which arrive a
+few milliseconds after a write.
+
+Every route that writes waits until the index holds what it wrote, and
+only then answers. A client that reads straight after a write therefore
+gets the new value, with no need to wait or to retry. This covers:
+
+Write | Read that returns the new value
+---|---
+`PUT v1/metadata/:uuid/name` | `name` in `GET v1/metadata/:uuid`
+`PUT v1/metadata/:uuid/tags`, `labels`, `run` and `PATCH .../run` | `metadata` in `GET v1/metadata/:uuid`
+`PUT v1/metadata/:uuid/kind` | `function` in `GET v1/metadata/:uuid`
+`POST v1/structure` | The new dataset in `GET v1/structure/:uuid` and the lists
+`PUT v1/structure/:uuid` | The new config in `GET v1/structure/:uuid`, and `from` and `to` in `GET v1/metadata/:uuid`
+`GET v1/delete/:uuid` | `404` from the single-dataset reads, and the dataset gone from the lists
+
+The wait changes no status code and no response body. It has a time
+limit of 2 seconds (`WRITE_WAIT_MS`, in milliseconds). If the
+notification of a write has not arrived by then, the service logs
+`A write to ... did not show after 2000 ms` and answers with the
+write's normal status, because ConfigDB has accepted the write. A read
+can then return the previous value until the notification arrives.
+
+Two things are outside the wait, because they do not come from the
+index:
+
+* A write made straight to ConfigDB, not through this service. A read
+  returns it once its notification arrives.
+* Permissions. A principal's right to a new dataset comes from the Auth
+  service, in its own time, and this wait does not cover it.
+* `parts`. Each read asks ConfigDB for the dataset's subclasses.
+
+`WRITE_WAIT_MS` is an environment variable of the service. The chart
+has no value for it.
 
 ## Permissions
 

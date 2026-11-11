@@ -7,10 +7,15 @@
  * not queued: streaming is at-most-once, so there is nothing to keep.
  * While no stream is attached, changes are queued for /sync (or for the
  * next stream to open), up to `maxQueue` items, oldest dropped first.
+ *
+ * /sync hands the queue out in batches, as i3X 1.0 defines it. The
+ * changes since the previous /sync become one batch with the next
+ * sequence number, and a batch is sent again on every /sync until the
+ * client acknowledges its number.
  */
 
 import { randomUUID } from "crypto";
-import type { I3xVqt, I3xSubscription, I3xSyncItem } from "./types/i3x.js";
+import type { I3xVqt, I3xSubscription, I3xSyncBatch, I3xSyncItem } from "./types/i3x.js";
 import type { Viewer } from "./access.js";
 
 interface ValueCacheLike {
@@ -34,7 +39,7 @@ interface SubscriptionManagerOpts {
 }
 
 export interface SyncResult {
-    updates: I3xSyncItem[];
+    batches: I3xSyncBatch[];
     /* Updates dropped from the queue since the previous /sync. */
     dropped: number;
 }
@@ -44,13 +49,19 @@ interface Subscription {
      * subscription. This is what ownership is checked against; it is
      * never supplied by the client and is never sent on the wire. */
     owner: string;
-    /* The client's own handle for itself. Part of the i3X wire shape,
-     * so we store and echo it, but it protects nothing. */
+    /* The client's own handle for itself, which i3X scopes the
+     * subscription to: a request must give the clientId the
+     * subscription was created with. It is a second check, never a
+     * substitute for `owner`. */
     clientId: string;
     subscriptionId: string;
     displayName: string;
     registeredElements: Map<string, number>; // elementId -> maxDepth
-    queue: I3xSyncItem[];
+    /** Batches a /sync has returned and the client has not yet
+     * acknowledged, oldest first. */
+    batches: I3xSyncBatch[];
+    /** Changes since the last /sync, oldest first: the next batch. */
+    staged: I3xSyncItem[];
     /** Updates dropped from the front of a full queue since the last
      * /sync reported them or a stream opened. */
     dropped: number;
@@ -91,7 +102,8 @@ export class SubscriptionManager {
             subscriptionId,
             displayName: displayName ?? "",
             registeredElements: new Map(),
-            queue: [],
+            batches: [],
+            staged: [],
             dropped: 0,
             nextSequenceNumber: 1,
             activeStream: null,
@@ -109,11 +121,11 @@ export class SubscriptionManager {
         };
     }
 
-    list(owner: string, subscriptionIds: string[]): I3xSubscription[] {
+    list(owner: string, clientId: string, subscriptionIds: string[]): I3xSubscription[] {
         const results: I3xSubscription[] = [];
         for (const id of subscriptionIds) {
             const sub = this.subscriptions.get(id);
-            if (sub && owner && sub.owner === owner) {
+            if (sub && owner && sub.owner === owner && sub.clientId === clientId) {
                 results.push({
                     clientId: sub.clientId,
                     subscriptionId: sub.subscriptionId,
@@ -126,12 +138,12 @@ export class SubscriptionManager {
 
     /** Updates dropped from a subscription's full queue since the
      * last /sync or stream open. */
-    droppedCount(owner: string, subscriptionId: string): number {
-        return this.getAndVerify(owner, subscriptionId).dropped;
+    droppedCount(owner: string, clientId: string, subscriptionId: string): number {
+        return this.getAndVerify(owner, clientId, subscriptionId).dropped;
     }
 
-    getOne(owner: string, subscriptionId: string): I3xSubscription {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    getOne(owner: string, clientId: string, subscriptionId: string): I3xSubscription {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         const monitoredObjects = [...sub.registeredElements.entries()]
             .map(([elementId, maxDepth]) => ({ elementId, maxDepth }));
@@ -146,8 +158,8 @@ export class SubscriptionManager {
         };
     }
 
-    deleteOne(owner: string, subscriptionId: string): void {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    deleteOne(owner: string, clientId: string, subscriptionId: string): void {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         clearTimeout(sub.ttlTimer);
         sub.viewer.stop();
@@ -158,8 +170,8 @@ export class SubscriptionManager {
         this.subscriptions.delete(subscriptionId);
     }
 
-    register(owner: string, subscriptionId: string, elementIds: string[], maxDepth: number = 1): void {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    register(owner: string, clientId: string, subscriptionId: string, elementIds: string[], maxDepth: number = 1): void {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         for (const elementId of elementIds) {
             sub.registeredElements.set(elementId, maxDepth);
@@ -169,15 +181,17 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
-    registerOne(owner: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    /* Registering an object a second time succeeds and changes
+     * nothing but its depth. */
+    registerOne(owner: string, clientId: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
         sub.registeredElements.set(elementId, maxDepth);
         this.log("register: sub=%s element=%s maxDepth=%d", subscriptionId.slice(0, 8), elementId, maxDepth);
         this.resetTtl(sub);
     }
 
-    unregister(owner: string, subscriptionId: string, elementIds: string[]): void {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    unregister(owner: string, clientId: string, subscriptionId: string, elementIds: string[]): void {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         for (const elementId of elementIds) {
             sub.registeredElements.delete(elementId);
@@ -186,19 +200,22 @@ export class SubscriptionManager {
         this.resetTtl(sub);
     }
 
-    unregisterOne(owner: string, subscriptionId: string, elementId: string): void {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    unregisterOne(owner: string, clientId: string, subscriptionId: string, elementId: string): void {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
         sub.registeredElements.delete(elementId);
         this.resetTtl(sub);
     }
 
-    /* `lastSequenceNumber` acknowledges every update at or below it;
-     * -1 acknowledges the whole queue. Anything else that is not a
-     * non-negative integer is ignored and clears nothing, as the spec
-     * requires. Sync is refused while a stream is open: the stream owns
-     * delivery and the queue is empty. */
-    sync(owner: string, subscriptionId: string, lastSequenceNumber?: number): SyncResult {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    /* `lastSequenceNumber` acknowledges every batch at or below it;
+     * -1 acknowledges every batch sent so far. Anything else that is
+     * not a non-negative integer is ignored and clears nothing, as the
+     * spec requires. The changes since the previous sync then become a
+     * new batch, and every batch not yet acknowledged is returned, so
+     * a client that lost a response gets its batch again. Sync is
+     * refused while a stream is open: the stream owns delivery and the
+     * queue is empty. */
+    sync(owner: string, clientId: string, subscriptionId: string, lastSequenceNumber?: number): SyncResult {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         if (sub.activeStream) {
             const err: any = new Error(
@@ -208,25 +225,35 @@ export class SubscriptionManager {
         }
 
         if (lastSequenceNumber === -1) {
-            sub.queue = [];
+            sub.batches = [];
         } else if (Number.isInteger(lastSequenceNumber) && lastSequenceNumber! >= 0) {
-            sub.queue = sub.queue.filter(item => item.sequenceNumber > lastSequenceNumber!);
+            sub.batches = sub.batches.filter(b => b.sequenceNumber > lastSequenceNumber!);
         }
 
         const dropped = sub.dropped;
         sub.dropped = 0;
 
+        if (sub.staged.length > 0) {
+            sub.batches.push({ sequenceNumber: sub.nextSequenceNumber++, updates: sub.staged });
+            sub.staged = [];
+        }
+
         this.resetTtl(sub);
         /* Access may have been revoked since these were queued. */
-        return { updates: sub.queue.filter(item => sub.viewer.visible(item.elementId)), dropped };
+        const batches: I3xSyncBatch[] = [];
+        for (const b of sub.batches) {
+            const updates = b.updates.filter(item => sub.viewer.visible(item.elementId));
+            if (updates.length > 0) batches.push({ sequenceNumber: b.sequenceNumber, updates });
+        }
+        return { batches, dropped };
     }
 
     /* Only one stream per subscription: a new stream closes the
      * existing one cleanly and takes over. The queue built up while no
      * stream was attached is sent on the new stream and then released;
      * from here until the stream closes, nothing is queued. */
-    stream(owner: string, subscriptionId: string, res: any): void {
-        const sub = this.getAndVerify(owner, subscriptionId);
+    stream(owner: string, clientId: string, subscriptionId: string, res: any): void {
+        const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         if (sub.activeStream) {
             this.log("replacing existing stream: sub=%s", subscriptionId.slice(0, 8));
@@ -234,7 +261,8 @@ export class SubscriptionManager {
             sub.activeStream = null;
         }
 
-        this.log("stream opened: sub=%s registered=%d queued=%d dropped=%d", subscriptionId.slice(0, 8), sub.registeredElements.size, sub.queue.length, sub.dropped);
+        const queued = [...sub.batches.flatMap(b => b.updates), ...sub.staged];
+        this.log("stream opened: sub=%s registered=%d queued=%d dropped=%d", subscriptionId.slice(0, 8), sub.registeredElements.size, queued.length, sub.dropped);
 
         // Set SSE headers
         res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -245,13 +273,14 @@ export class SubscriptionManager {
         sub.activeStream = res;
 
         // Flush any queued items
-        if (sub.queue.length > 0) {
-            this.log("flushing %d queued items", sub.queue.length);
+        if (queued.length > 0) {
+            this.log("flushing %d queued items", queued.length);
         }
-        for (const item of sub.queue) {
+        for (const item of queued) {
             if (sub.viewer.visible(item.elementId)) this.writeSseEvent(res, item);
         }
-        sub.queue = [];
+        sub.batches = [];
+        sub.staged = [];
         sub.dropped = 0;
 
         // Handle close
@@ -297,27 +326,37 @@ export class SubscriptionManager {
                 continue;
             }
 
-            /* Only queued updates get a sequence number; streamed
-             * updates are never acknowledged, so need none. */
-            const item: I3xSyncItem = {
-                sequenceNumber: sub.nextSequenceNumber++,
-                elementId,
-                ...vqt,
-            };
             /* The queue is kept until the client syncs past it, so a
              * client that never does would grow it without limit. */
-            if (sub.queue.length >= this.maxQueue) {
-                sub.queue.splice(0, sub.queue.length - this.maxQueue + 1);
-                sub.dropped++;
-            }
-            sub.queue.push(item);
+            if (this.queued(sub) >= this.maxQueue) this.dropOldest(sub);
+            sub.staged.push({ elementId, ...vqt });
         }
     }
 
-    private writeSseEvent(res: any, item: I3xVqt & { elementId: string; sequenceNumber?: number }): void {
-        // SSE events use the same VQT shape as the spec — no sequenceNumber
-        const { sequenceNumber, ...vqt } = item;
-        const data = `data: ${JSON.stringify([vqt])}\n\n`;
+    /** Updates held for /sync: sent and not acknowledged, or not yet
+     * sent. */
+    private queued(sub: Subscription): number {
+        let n = sub.staged.length;
+        for (const b of sub.batches) n += b.updates.length;
+        return n;
+    }
+
+    /** Drop the oldest queued update, which is in the oldest batch not
+     * yet acknowledged if there is one. */
+    private dropOldest(sub: Subscription): void {
+        const oldest = sub.batches[0];
+        if (oldest) {
+            oldest.updates.shift();
+            if (oldest.updates.length === 0) sub.batches.shift();
+        } else {
+            sub.staged.shift();
+        }
+        sub.dropped++;
+    }
+
+    private writeSseEvent(res: any, item: I3xSyncItem): void {
+        // SSE events are the update itself: there is nothing to acknowledge.
+        const data = `data: ${JSON.stringify([item])}\n\n`;
         const ok = res.write(data);
         // Ensure the chunk is flushed to the client immediately
         if (typeof res.flush === "function") res.flush();
@@ -327,10 +366,12 @@ export class SubscriptionManager {
         }
     }
 
-    /* Ownership is checked against the authenticated principal, not
-     * against the client-supplied clientId. A subscription owned by
-     * someone else reports 404, identically to one that does not
-     * exist, so that the pair cannot be used to probe which
+    /* Ownership is checked against the authenticated principal. The
+     * clientId the subscription was created with must match as well,
+     * as i3X requires, but it is supplied by the client and guards
+     * nothing by itself. A subscription owned by someone else, or
+     * asked for with another clientId, reports 404, identically to one
+     * that does not exist, so that neither can be used to probe which
      * subscription ids are live. acs-directory does the same thing for
      * alerts, deliberately, for the same reason.
      *
@@ -338,9 +379,9 @@ export class SubscriptionManager {
      * That should be impossible — every subscription route sits behind
      * FplusHttpAuth — but it fails closed here rather than matching a
      * subscription stored with a falsy owner. */
-    private getAndVerify(owner: string, subscriptionId: string): Subscription {
+    private getAndVerify(owner: string, clientId: string, subscriptionId: string): Subscription {
         const sub = this.subscriptions.get(subscriptionId);
-        if (!sub || !owner || sub.owner !== owner) {
+        if (!sub || !owner || sub.owner !== owner || sub.clientId !== clientId) {
             const err: any = new Error(`Subscription ${subscriptionId} not found`);
             err.status = 404;
             throw err;
@@ -370,7 +411,8 @@ export class SubscriptionManager {
 
         clearTimeout(sub.ttlTimer);
         sub.viewer.stop();
-        sub.queue.length = 0;
+        sub.batches = [];
+        sub.staged = [];
         this.subscriptions.delete(subscriptionId);
     }
 }

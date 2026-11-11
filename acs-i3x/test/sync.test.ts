@@ -25,8 +25,7 @@ import { ValueCache } from "../lib/value-cache.js";
 import {
     DEVICE_INFORMATION_APP_UUID as DI,
     INFO_APP_UUID as INFO,
-    SCHEMA_APP_UUID as SCHEMA,
-} from "../lib/constants.js";
+    SCHEMA_APP_UUID as SCHEMA,, ObjType } from "../lib/constants.js";
 // @ts-ignore - plain ESM benchmark fixture
 import { device, deviceUuid } from "../bench/dataset.mjs";
 
@@ -385,7 +384,8 @@ describe("ConfigSync", () => {
         cdb.setMembers([]);
         await settle(sync);
         expect(tree.objectCount()).toBe(0);
-        expect(tree.getObjectTypes()).toEqual([]);
+        /* Only the types the service makes up are left. */
+        expect(tree.getObjectTypes().map(t => t.elementId)).toEqual(Object.values(ObjType));
     });
 
     it("a reconnect with no changes fetches nothing; with one change, one config", async () => {

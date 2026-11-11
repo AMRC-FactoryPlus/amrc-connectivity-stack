@@ -58,7 +58,7 @@ describe('devices_from_tree', () => {
   it('skips failed lookups and lists a device once', () => {
     const related = [
       ...RELATED,
-      { success: false, elementId: 'gone', error: { code: 404 } },
+      { success: false, elementId: 'gone', responseDetail: { status: 404 } },
       { success: true, elementId: 'south', result: [{ elementId: DEV3, displayName: 'Chiller' }] },
     ]
     expect(devices_from_tree(LEVELS, related).map(d => d.uuid)).toEqual([DEV1, DEV2, DEV3])

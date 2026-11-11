@@ -450,9 +450,9 @@ describe("InfluxDB write-back", () => {
             value: 7.5, quality: "Good", timestamp: "2026-10-05T11:00:00Z",
         });
 
-        // The single-value route reads the same store.
-        const one = await request(app).get(`/v1/objects/${s.leaf("Status")}/value`);
-        expect(one.body.result.value).toBe("ok");
+        // A second read of one leaf comes from the same store.
+        const one = await request(app).post("/v1/objects/value").send({ elementIds: [s.leaf("Status")] });
+        expect(one.body.results[0].result.value).toBe("ok");
         expect(s.queries).toHaveLength(1);
     });
 
@@ -590,8 +590,8 @@ describe("InfluxDB write-back", () => {
         // Reading one leaf keeps it.
         await request(app).post("/v1/objects/value").send({ elementIds: [s.leaf("Speed")] });
         // The device then still gets every leaf, from InfluxDB.
-        const r = await request(app).get(`/v1/objects/${DEV}/value`);
-        expect(Object.keys(r.body.result.components).sort())
+        const r = await request(app).post("/v1/objects/value").send({ elementIds: [DEV] });
+        expect(Object.keys(r.body.results[0].result.components).sort())
             .toEqual([s.leaf("Speed"), s.leaf("Status")].sort());
         expect(s.queries).toHaveLength(2);
     });

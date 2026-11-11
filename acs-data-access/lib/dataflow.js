@@ -62,11 +62,33 @@ function grant_changes (before, now) {
   return changed;
 }
 
+/* How long a write waits for the held maps to show it, in ms. ConfigDB
+ * sends the notification of a write within a few milliseconds, so this
+ * is reached only when a notification is lost or very late. */
+const WRITE_WAIT_MS = 2000;
+
+/* Only a positive whole number of milliseconds is a limit. */
+function wait_limit (opt) {
+  const ms = Number(opt);
+  return Number.isSafeInteger(ms) && ms > 0 ? ms : WRITE_WAIT_MS;
+}
+
 export class DataFlow {
   constructor(opts) {
     this.log = opts.debug.bound("data");
     this.cdb = opts.cdb;
     this.auth = opts.auth;
+
+    /* See caught_up. */
+    this.write_wait_ms = wait_limit(opts.write_wait_ms);
+    /* The maps the sources hold now, by source name: `names`,
+     * `metadata`, `functions` and `definitions`. A source has an entry
+     * only while something is subscribed to it. */
+    this.held = new Map();
+    /* The writes waiting for a held map to show them. Each key is
+     * `source uuid slot`, and its value is the waits on that key,
+     * oldest first. Empty unless a write is waiting. */
+    this.waits = new Map();
 
     /* The DatasetIndex the dataset map comes from, once something has
      * subscribed. Its `stats` count the datasets worked out. */
@@ -95,7 +117,7 @@ export class DataFlow {
     this.general_infos = this.info_changes.pipe(field("map"));
 
     this.metadata_changes = this._build_app_changes(
-      Constants.App.DatasetMetadata
+      Constants.App.DatasetMetadata, "metadata"
     );
     this.metadata = this.metadata_changes.pipe(field("map"));
 
@@ -136,6 +158,111 @@ export class DataFlow {
   stop() {
     for (const sub of this.running ?? []) sub.unsubscribe();
     this.running = null;
+
+    /* Nothing will bring the held maps up to date now. */
+    for (const [key, list] of [...this.waits])
+      this._end_waits(key, list, list.length, false);
+  }
+
+  /*
+   * ---------------------------------------------------
+   * Waiting for a write to show
+   * ---------------------------------------------------
+   */
+
+  /* Resolves once a held map shows a write that has just succeeded, so
+   * a read that follows the write returns the new value. The routes
+   * read the maps run() holds, and those trail a ConfigDB write by the
+   * time its notification takes to arrive.
+   *
+   * `source` names the map: `names` (General information, by object),
+   * `metadata` (object -> application -> config), `functions` (dataset
+   * -> its functional groups) or `definitions` (dataset -> structure
+   * application -> config, which the dataset map is worked out from in
+   * the same step). `seen(entry)` is given the map's entry for `uuid`,
+   * or undefined if it has none, and returns true when the entry holds
+   * what was written. It must compare content: the held value is never
+   * the object the caller wrote.
+   *
+   * `slot` names the thing written when one entry holds several, such
+   * as the application of a metadata write. Writes to the same source,
+   * uuid and slot replace each other. When the map shows a later one of
+   * them, the earlier ones resolve too: the map can pass over a value
+   * that was replaced before its notification arrived.
+   *
+   * This opens no subscription. The sources call _held_changed with
+   * each map they emit, and a wait is one entry in `waits` until it
+   * resolves. Resolves to true when the write shows, at once if it
+   * already does. Resolves to false after `write_wait_ms`, with a log
+   * line, so a lost notification cannot hold a request open. It never
+   * rejects. While run() is not holding the maps a read asks ConfigDB,
+   * so there is nothing to wait for and this resolves to true. */
+  caught_up(source, uuid, seen, slot = "") {
+    if (!this.running) return Promise.resolve(true);
+
+    const key = `${source} ${uuid} ${slot}`;
+    const list = this.waits.get(key) ?? [];
+
+    const map = this.held.get(source);
+    if (map && seen(map.get(uuid))) {
+      this._end_waits(key, list, list.length, true);
+      return Promise.resolve(true);
+    }
+
+    return new Promise(resolve => {
+      const wait = { source, uuid, seen, resolve, timer: null };
+      wait.timer = setTimeout(() => {
+        this.log("A write to %s of %s did not show after %d ms: "
+          + "its notification is late or lost", source, uuid,
+          this.write_wait_ms);
+        list.splice(list.indexOf(wait), 1);
+        if (list.length == 0) this.waits.delete(key);
+        resolve(false);
+      }, this.write_wait_ms);
+
+      list.push(wait);
+      this.waits.set(key, list);
+    });
+  }
+
+  /* Resolve the first `count` waits of a key's list and take them off
+   * it. A key with no wait left is dropped. */
+  _end_waits(key, list, count, shown) {
+    for (const wait of list.splice(0, count)) {
+      clearTimeout(wait.timer);
+      wait.resolve(shown);
+    }
+    if (list.length == 0) this.waits.delete(key);
+  }
+
+  /* A source holds a new map. `changed` is the Set of keys that
+   * differ, or null when any key can. With no write waiting this is
+   * one Map write and one size check. */
+  _held_changed(source, map, changed) {
+    this.held.set(source, map);
+    if (this.waits.size == 0) return;
+
+    for (const [key, list] of [...this.waits]) {
+      const { uuid } = list[0];
+      if (list[0].source != source) continue;
+      if (changed && !changed.has(uuid)) continue;
+
+      const entry = map.get(uuid);
+      /* The latest write the map shows ends every write before it. */
+      const shown = list.findLastIndex(wait => wait.seen(entry));
+      this._end_waits(key, list, shown + 1, true);
+    }
+  }
+
+  /* Tells the waiting writes about each `{ map, changed }` a source
+   * emits. This goes before the source is shared. A wait it resolves
+   * continues in a later microtask, and by then the shared sequence
+   * has the same value for a reader. */
+  _holds(source) {
+    return seq => seq.pipe(
+      rx.tap(({ map, changed }) => this._held_changed(source, map, changed)),
+      rx.finalize(() => this.held.delete(source)),
+    );
   }
 
   /*
@@ -485,7 +612,8 @@ export class DataFlow {
           return { map, changed };
         }),
 
-        rx.filter(change => change != null)
+        rx.filter(change => change != null),
+        this._holds("functions")
       );
     }).pipe(
       rxu.shareLatest()
@@ -521,9 +649,11 @@ export class DataFlow {
     });
   }
 
-  /* _app_changes, shared between its subscribers. */
-  _build_app_changes(app_klass) {
+  /* _app_changes, shared between its subscribers. `source` is the
+   * name caught_up knows the map by. */
+  _build_app_changes(app_klass, source) {
     return this._app_changes(app_klass).pipe(
+      this._holds(source),
       rxu.shareLatest()
     );
   }
@@ -542,7 +672,8 @@ export class DataFlow {
         UUIDs.App.Info
       ).pipe(
         rx.map(change => infos.apply(change)),
-        rx.filter(change => change != null)
+        rx.filter(change => change != null),
+        this._holds("names")
       );
     }).pipe(
       rxu.shareLatest()
@@ -568,10 +699,19 @@ export class DataFlow {
        * entries, and it is shared itself. A second share below it
        * would keep the ConfigDB searches open for a second time-out
        * after this one has let go of them. */
+      /* A waiting write is checked against the structure entries,
+       * after the index has taken them in. The dataset map cannot be
+       * used for this: it emits nothing when a dataset was invalid
+       * before a write and is still invalid after it. */
       return this._app_changes(
         Constants.App.DatasetDefinition
       ).pipe(
-        rx.map(({ map, changed }) => index.apply(map, changed)),
+        rx.map(({ map, changed }) => {
+          const change = index.apply(map, changed);
+          this._held_changed("definitions", map, changed);
+          return change;
+        }),
+        rx.finalize(() => this.held.delete("definitions")),
         rx.filter(change => change != null)
       );
     }).pipe(

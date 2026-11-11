@@ -1,86 +1,52 @@
 <!--
-  - Copyright (c) University of Sheffield AMRC 2026.
+  - ACS Admin
+  - The Explorer page: the i3X Explorer, framed, using this console's session
+  - Copyright 2026 University of Sheffield
   -->
 
+<!-- The Explorer is ace-technologies-inc/i3X-Explorer, vendored in
+     i3x-explorer/ (see its FORK.md) and served at /i3x-explorer/. It is
+     React, so it runs in a same-origin iframe: its styles and the
+     console's cannot reach each other. The host object put on window
+     here gives it the i3X service URL and this session's token, so it
+     never asks for a server or a sign-in, and tells the page what is
+     selected, for the console's own actions above the frame. -->
 <script setup>
-import { onMounted } from 'vue'
-import { useExplorerStore } from '@store/useExplorerStore.js'
-import { useMonitorStore } from '@store/useMonitorStore.js'
-import ExplorerTreeNode from './ExplorerTreeNode.vue'
-import NodeDetail from './NodeDetail.vue'
-import ExplorerAccess from './ExplorerAccess.vue'
-import CurrentValue from './CurrentValue.vue'
-import RelationshipGraph from './RelationshipGraph.vue'
-import HistoryPanel from './HistoryPanel.vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { HOST_KEY, classify_selection, mk_host } from '@/lib/i3x-explorer-host.js'
+import ExplorerActions from './ExplorerActions.vue'
 
-const store = useExplorerStore()
-const monitor = useMonitorStore()
+const router = useRouter()
+const store = useServiceClientStore()
+const selection = ref(null)
 
-onMounted(() => {
-  store.loadRoots()
+window[HOST_KEY] = mk_host({
+  client: serviceClientReady().then(() => store.client),
+  theme: () => document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+  open_window: () => window.open(router.resolve('/explorer').href, '_blank', 'noopener'),
+  selected: s => { selection.value = s },
 })
+onBeforeUnmount(() => { delete window[HOST_KEY] })
 
-function handleSubscribe () {
-  if (store.selectedNode) {
-    monitor.subscribe(store.selectedId, store.selectedNode.displayName)
-  }
-}
+const selected = computed(() => classify_selection(selection.value))
 </script>
 
 <template>
-  <div class="flex h-full min-h-0">
-    <!-- Left panel: Tree -->
-    <div class="w-72 border-r border-border flex flex-col overflow-hidden shrink-0">
-      <div class="p-3 border-b">
-        <input
-          v-model="store.filter"
-          type="text"
-          placeholder="Filter hierarchy..."
-          class="w-full px-3 py-1.5 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-slate-400"
-        />
-      </div>
-      <div class="flex-1 overflow-y-auto p-2">
-        <div v-if="store.loadingRoots" class="text-sm text-slate-500 p-2">Loading...</div>
-        <div v-else-if="store.rootIds.length === 0" class="text-sm text-slate-500 p-2">No objects found</div>
-        <div v-else>
-          <ExplorerTreeNode
-            v-for="id in store.rootIds"
-            :key="id"
-            :element-id="id"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Main panel -->
-    <div class="flex-1 flex flex-col overflow-y-auto p-4 gap-4">
-      <div v-if="!store.selectedId" class="flex items-center justify-center h-full text-slate-400 text-sm">
-        Select a node from the hierarchy to view details
-      </div>
-      <div v-else class="space-y-4">
-        <RelationshipGraph
-          :element-id="store.selectedId"
-          :display-name="store.selectedNode?.displayName"
-          @navigate="store.selectNode"
-        />
-        <CurrentValue
-          :element-id="store.selectedId"
-          :is-composition="store.selectedNode?.isComposition ?? false"
-        />
-        <HistoryPanel
-          :element-id="store.selectedId"
-          :is-composition="store.selectedNode?.isComposition ?? false"
-        />
-      </div>
-    </div>
-
-    <!-- Right sidebar -->
-    <div v-if="store.selectedId" class="w-96 border-l border-border hidden xl:block overflow-y-auto shrink-0">
-      <NodeDetail
-        :node="store.selectedNode"
-        @subscribe="handleSubscribe"
-      />
-      <ExplorerAccess/>
-    </div>
+  <!-- Fill the space under the header: main pads 1rem below, and 1rem
+       above from lg up. -->
+  <div class="flex flex-col gap-3 h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] px-4 pt-4 lg:p-0">
+    <!-- A line is kept for the actions either way, so selecting an
+         object does not move the Explorer down. -->
+    <ExplorerActions v-if="selected" :selection="selected"/>
+    <p v-else class="flex items-center min-h-9 text-sm text-gray-500">
+      Select an object to monitor it, or a device or ISA-95 level to manage its i3X access.
+    </p>
+    <iframe
+      src="/i3x-explorer/index.html"
+      title="i3X Explorer"
+      class="flex-1 min-h-0 w-full rounded-md border bg-white dark:bg-slate-900"/>
   </div>
 </template>

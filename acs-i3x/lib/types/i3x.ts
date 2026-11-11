@@ -2,7 +2,7 @@
  * i3X type definitions
  *
  * These types define the complete i3X data model, request/response shapes,
- * and server info as specified in the i3X specification (main branch).
+ * and server info as specified in the i3X 1.0 specification.
  */
 
 /* Response envelopes */
@@ -12,9 +12,17 @@ export interface I3xSuccess<T> {
     result: T;
 }
 
+/** Why a request, or one item of a bulk request, failed, or why a
+ * successful response is partial (RFC 9457 problem details). */
+export interface I3xResponseDetail {
+    title: string;
+    status: number;
+    detail: string;
+}
+
 export interface I3xError {
     success: false;
-    error: { code: number; message: string };
+    responseDetail: I3xResponseDetail;
 }
 
 export type I3xResponse<T> = I3xSuccess<T> | I3xError;
@@ -28,7 +36,7 @@ export interface I3xBulkItemSuccess<T> {
 export interface I3xBulkItemError {
     success: false;
     elementId: string;
-    error: { code: number; message: string };
+    responseDetail: I3xResponseDetail;
 }
 
 export type I3xBulkItem<T> = I3xBulkItemSuccess<T> | I3xBulkItemError;
@@ -47,7 +55,7 @@ export interface I3xSubscriptionBulkItemSuccess<T> {
 export interface I3xSubscriptionBulkItemError {
     success: false;
     subscriptionId: string;
-    error: { code: number; message: string };
+    responseDetail: I3xResponseDetail;
 }
 
 export type I3xSubscriptionBulkItem<T> =
@@ -83,13 +91,24 @@ export interface I3xObject {
     isExtended: boolean;
 }
 
+export interface I3xObjectMetadata {
+    description?: string;
+    typeNamespaceUri: string;
+    sourceTypeId: string;
+    /* The ids at the other end of the object's edges, by relationship
+     * type. */
+    relationships?: Record<string, string | string[]>;
+}
+
 export interface I3xObjectWithMetadata extends I3xObject {
-    metadata: {
-        description?: string;
-        typeNamespaceUri: string;
-        sourceTypeId: string;
-        relationships?: Record<string, string | string[]>;
-    };
+    metadata: I3xObjectMetadata;
+}
+
+/** One edge from an object: the relationship type that leads from it to
+ * `object`. */
+export interface I3xRelated {
+    sourceRelationship: string;
+    object: I3xObject;
 }
 
 export interface I3xRelationshipType {
@@ -115,7 +134,7 @@ export interface I3xValueResponse extends I3xVqt {
 }
 
 export interface I3xHistoryItem {
-    elementId: string;
+    isComposition: boolean;
     values: I3xVqt[];
 }
 
@@ -176,8 +195,14 @@ export interface I3xSyncRequest {
 }
 
 export interface I3xSyncItem extends I3xVqt {
-    sequenceNumber: number;
     elementId: string;
+}
+
+/** The updates a /sync call found waiting, under the number the client
+ * acknowledges them by. */
+export interface I3xSyncBatch {
+    sequenceNumber: number;
+    updates: I3xSyncItem[];
 }
 
 /* Server info */

@@ -128,6 +128,19 @@ export function useI3xClient () {
       return get(c(), 'v1/objects', query)
     },
 
+    // Every object type: the ConfigDB schemas, and the types i3X makes
+    // up for levels and for data points.
+    getObjectTypes () {
+      return get(c(), 'v1/objecttypes')
+    },
+
+    // One object with its metadata: its type's namespace and the ids
+    // it is related to, by relationship.
+    async getObjectMetadata (elementId) {
+      const { results } = await bulk(c(), 'v1/objects/list', { elementIds: [elementId], includeMetadata: true })
+      return results[0]?.success ? results[0].result?.metadata ?? null : null
+    },
+
     getObject (elementId) {
       return get(c(), `v1/objects/${encodeURIComponent(elementId)}`)
     },

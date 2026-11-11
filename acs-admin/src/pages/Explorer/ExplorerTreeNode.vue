@@ -18,6 +18,8 @@ const node = computed(() => entry.value?.node)
 const isSelected = computed(() => store.selectedId === props.elementId)
 const isExpanded = computed(() => entry.value?.expanded ?? false)
 const isLoading = computed(() => store.loadingChildren.has(props.elementId))
+// A level, an object or a kind of data point, from the object's type.
+const type = computed(() => store.typeOf(node.value))
 const hasChildren = computed(() => {
   if (entry.value?.loaded) return entry.value.childIds.length > 0
   return node.value?.isComposition ?? false
@@ -58,10 +60,7 @@ function handleToggle (e) {
       </button>
       <span v-else class="w-4 shrink-0"></span>
 
-      <i
-        class="fa-solid text-[10px] shrink-0"
-        :class="node?.isComposition ? 'fa-folder text-amber-500' : 'fa-circle text-slate-400'"
-      ></i>
+      <i class="fa-solid fa-fw text-[10px] shrink-0" :class="type.icon" :title="type.label"></i>
 
       <span class="truncate">{{ node?.displayName ?? elementId }}</span>
 

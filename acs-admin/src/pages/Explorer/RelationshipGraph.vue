@@ -7,6 +7,7 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick, shallowRef } from 'vu
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useI3xClient } from '@composables/useI3xClient.js'
+import { graph_elements, next_layer } from '@/lib/explorer/model.js'
 
 const props = defineProps({
   elementId: { type: String, required: true },
@@ -29,57 +30,21 @@ async function loadGraph () {
   try {
     const cytoscape = (await import('cytoscape')).default
 
-    const nodesMap = new Map()
-    const edges = []
-
-    nodesMap.set(props.elementId, { data: { id: props.elementId, label: props.displayName || props.elementId, type: 'selected' } })
-
-    let currentLayerIds = [props.elementId]
-
-    for (let d = 0; d < depth.value; d++) {
-      if (currentLayerIds.length === 0) break
-
-      const nextLayerIds = []
-      const results = await Promise.all(
-        currentLayerIds.map(id => i3x.getRelated(id).then(related => ({ id, related })).catch(() => ({ id, related: [] })))
-      )
-
-      for (const { id, related } of results) {
-        for (const rel of related) {
-          if (!nodesMap.has(rel.elementId)) {
-            const entry = nodesMap.get(id)
-            const relType = rel.parentId === id ? 'child'
-              : entry?.data && id === rel.elementId ? 'self'
-              : rel.elementId === nodesMap.get(id)?.data?.parentId ? 'parent'
-              : 'related'
-
-            nodesMap.set(rel.elementId, {
-              data: {
-                id: rel.elementId,
-                label: rel.displayName || rel.elementId,
-                type: relType,
-                parentId: rel.parentId,
-              }
-            })
-            nextLayerIds.push(rel.elementId)
-          }
-
-          const edgeId = `${id}-${rel.elementId}`
-          const reverseEdgeId = `${rel.elementId}-${id}`
-          if (!edges.find(e => e.data.id === edgeId || e.data.id === reverseEdgeId)) {
-            edges.push({
-              data: {
-                id: edgeId,
-                source: id,
-                target: rel.elementId,
-              }
-            })
-          }
-        }
-      }
-
-      currentLayerIds = nextLayerIds
+    // One request per step out from the selected object. i3X names
+    // the relationship on every edge, so the graph does not guess it.
+    const selected = props.elementId
+    const layers = []
+    const seen = new Set([selected])
+    let ids = [selected]
+    for (let d = 0; d < depth.value && ids.length; d++) {
+      const layer = await i3x.getRelatedBulk(ids).catch(() => [])
+      layers.push(layer)
+      ids = next_layer(layer, seen)
     }
+    // The selection changed while this was read.
+    if (selected !== props.elementId) return
+    const { nodes, edges } = graph_elements(
+      { elementId: selected, displayName: props.displayName }, layers)
 
     if (cy.value) {
       cy.value.destroy()
@@ -93,7 +58,7 @@ async function loadGraph () {
     cy.value = cytoscape({
       container: containerRef.value,
       elements: {
-        nodes: Array.from(nodesMap.values()),
+        nodes,
         edges,
       },
       style: [
@@ -142,11 +107,27 @@ async function loadGraph () {
           },
         },
         {
+          selector: 'node[type="component"]',
+          style: {
+            'border-color': '#8b5cf6',
+            'border-width': 3,
+          },
+        },
+        {
           selector: 'edge',
           style: {
             'width': 2,
             'line-color': '#cbd5e1',
             'curve-style': 'bezier',
+            'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#cbd5e1',
+            'label': 'data(label)',
+            'font-size': '9px',
+            'color': '#64748b',
+            'text-rotation': 'autorotate',
+            'text-background-color': '#fff',
+            'text-background-opacity': 1,
+            'text-background-padding': '2px',
           },
         },
       ],
@@ -235,7 +216,9 @@ onBeforeUnmount(() => {
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> Selected</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-amber-500 bg-slate-100 inline-block"></span> Parent</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-green-500 bg-slate-100 inline-block"></span> Child</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-violet-500 bg-slate-100 inline-block"></span> Component</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-slate-400 bg-slate-100 inline-block"></span> Related</span>
+        <span class="ml-auto">Each line is labelled with the i3X relationship, in the arrow's direction</span>
       </div>
     </CardContent>
   </Card>

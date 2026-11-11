@@ -46,6 +46,14 @@ changes below. The Manager UI is updated in the same release.
   404 with "No value". A 404 now only means the object does not exist,
   or you may not see it. A composition's own value has quality
   `GoodNoData` too, where it had `Good`.
+- **An ISA-95 level has no value.** A level (an Enterprise, a Site, an
+  Area and so on) now has `isComposition: false`, and reading its value
+  gives `null` with `GoodNoData`, where it gave every metric of every
+  device below it. i3X reads through `HasComponent` only, never through
+  `HasChildren`. To read the devices under a level, list them with
+  `/objects/related` (`relationshipType: "HasChildren"`) and read them
+  by their own ids, which can go in one bulk request. A device, and
+  each branch inside it, is still a composition.
 - **History results are `{ isComposition, values }`**, where they were
   `{ elementId, values }`.
 - **A root object has `parentId: null`**, where it had `"/"`.

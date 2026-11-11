@@ -4,9 +4,11 @@
 
 /*
  * Cached values of compositions. With maxDepth 0 a composition's cached
- * value is every UNS value in its whole subtree. High in the ISA-95
- * hierarchy that is millions of components, so they are read with one
- * ordered query and streamed to the client, never built in memory.
+ * value is every UNS value in its whole subtree. A device can have
+ * tens of thousands of metrics, so they are read with one ordered query
+ * and streamed to the client, never built in memory. (A level of the
+ * ISA-95 hierarchy is not a composition: in i3X a value read never
+ * follows HasChildren.)
  * Other depths stop the walk where the InfluxDB read stops. These tests check the order and
  * the bytes against the recursive walk the cache used to do, and that
  * a slow client holds the read back.
@@ -29,12 +31,14 @@ import { I3xStore } from "../lib/store.js";
 import { History } from "../lib/history.js";
 import { RelType } from "../lib/constants.js";
 // @ts-ignore - plain ESM benchmark fixture
-import { pipelineSnapshot } from "../bench/dataset.mjs";
+import { pipelineSnapshot, deviceUuid } from "../bench/dataset.mjs";
 import { allowAll } from "./helpers/allow-all.js";
 
-function stack(devices: number, store = new I3xStore()) {
+/* `wide` gives every device that many extra metrics of its own, for a
+ * composition with tens of thousands of components. */
+function stack(devices: number, store = new I3xStore(), wide = 0) {
     const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
-    tree.refreshFromSnapshot(pipelineSnapshot(devices));
+    tree.refreshFromSnapshot(pipelineSnapshot(devices, wide));
     tree.setReady();
     const valueCache = new ValueCache({ objectTree: tree, store, staleThreshold: 60_000 });
     return { store, tree, valueCache };
@@ -57,6 +61,9 @@ function fill(s: ReturnType<typeof stack>, pad = 0) {
 
 /* What the cache returns: the recursive walk over the tree, over every
  * stored value (the compositions are complete). */
+/* The first device: the composition these tests read. */
+const DEVICE: string = deviceUuid(0);
+
 function oldValue(s: ReturnType<typeof stack>, id: string) {
     const components = (s.valueCache as any).collectChildValues(id, 0, 1, true) as Record<string, any> | null;
     if (!components) return null;
@@ -88,7 +95,11 @@ describe("composition values from the cache", () => {
         const s = stack(40);
         fill(s);
         const compositions = s.tree.getObjects().filter(o => o.isComposition);
-        expect(compositions.length).toBeGreaterThan(200);
+        expect(compositions.length).toBeGreaterThan(150);
+        /* A level organises devices; it is not a composition of them. */
+        const level = s.tree.getObjects({ root: true })[0];
+        expect(level.isComposition).toBe(false);
+        expect(s.valueCache.getValue(level.elementId)).toBeNull();
         let checked = 0;
         for (const o of compositions) {
             const want = oldValue(s, o.elementId);
@@ -98,7 +109,7 @@ describe("composition values from the cache", () => {
         }
         expect(checked).toBeGreaterThan(100);
         // Leaves are unchanged, InfluxDB rows included.
-        const leaf = s.tree.getObjects().find(o => !o.isComposition)!;
+        const leaf = s.tree.getObjects().find(o => !o.isComposition && o.typeElementId !== "isa95-level")!;
         expect(s.valueCache.getValue(leaf.elementId)!.isComposition).toBe(false);
     });
 
@@ -106,9 +117,9 @@ describe("composition values from the cache", () => {
         const s = stack(40);
         fill(s);
         const a = app(s);
-        const root = s.tree.getObjects({ root: true })[0].elementId;
-        const device = s.tree.getChildElementIds(s.tree.getChildElementIds(root)[0])[0];
-        const leaf = s.tree.getObjects().find(o => !o.isComposition)!.elementId;
+        const root = DEVICE;
+        const device: string = deviceUuid(1);
+        const leaf = s.tree.getObjects().find(o => !o.isComposition && o.typeElementId !== "isa95-level")!.elementId;
 
         const one = await request(a).post("/v1/objects/value").send({ elementIds: [root], maxDepth: 0 });
         expect(one.text).toBe(JSON.stringify({ success: true,
@@ -131,9 +142,9 @@ describe("composition values from the cache", () => {
         const store = new I3xStore({ path: join(dir, "i3x.db") });
         const server = http.createServer();
         try {
-            const s = stack(1500, store);
+            const s = stack(2, store, 20_000);
             fill(s, 200);
-            const root = s.tree.getObjects({ root: true })[0].elementId;
+            const root = DEVICE;
             const want = JSON.stringify({ success: true,
                 results: [{ success: true, elementId: root, result: oldValue(s, root) }] });
             const total = Object.keys(oldValue(s, root)!.components).length;
@@ -198,7 +209,7 @@ describe("composition values to a depth", () => {
         const s = stack(40);
         fill(s);
         const a = app(s);
-        const root = s.tree.getObjects({ root: true })[0].elementId;
+        const root = DEVICE;
         const all = leaves(s, root, 0).length;
         let last = 0;
         for (const depth of [1, 2, 3, 4, 0]) {
@@ -229,7 +240,7 @@ describe("composition values to a depth", () => {
     it("refuse a body maxDepth that is not a non-negative integer", async () => {
         const s = stack(4);
         fill(s);
-        const root = s.tree.getObjects({ root: true })[0].elementId;
+        const root = DEVICE;
         for (const bad of [-1, 1.5, "1", "", "deep", "0x10", true, [1], {}]) {
             const r = await request(app(s)).post("/v1/objects/value")
                 .send({ elementIds: [root], maxDepth: bad });
@@ -278,12 +289,12 @@ describe("long reads and the event loop", () => {
         const dir = mkdtempSync(join(tmpdir(), "i3x-stall-"));
         const store = new I3xStore({ path: join(dir, "i3x.db") });
         try {
-            const s = stack(3000, store);
+            const s = stack(2, store, 60_000);
             fill(s, 40);
             // Commit the setup now, so the reads below do not pay for it.
             store.commit();
             const a = app(s);
-            const root = s.tree.getObjects({ root: true })[0].elementId;
+            const root = DEVICE;
             const total = Object.keys(oldValue(s, root)!.components).length;
             expect(total).toBeGreaterThan(50_000);
 
@@ -313,7 +324,7 @@ describe("long reads and the event loop", () => {
             }
             expect(Buffer.concat(chunks).toString()).toBe(JSON.stringify({ success: true,
                 results: [{ success: true, elementId: root, result: oldValue(s, root) }] }));
-            console.log(`longest stall at 3,000 devices: composition value ${valueStall.toFixed(0)} ms, `
+            console.log(`longest stall at 120,000 components: composition value ${valueStall.toFixed(0)} ms, `
                 + `GET /objects ${objectsStall.toFixed(0)} ms, related ${relatedStall.toFixed(0)} ms`);
             // Each step is a few small queries and pauses every 20 ms;
             // allow for a slow, busy test machine.
@@ -330,7 +341,7 @@ describe("long reads and the event loop", () => {
 describe("paged tree reads", () => {
     it("iterateDescendantLeafIds and iterateRelated give exactly the old lists", () => {
         const s = stack(60);
-        const leaf = s.tree.getObjects().find(o => !o.isComposition && o.parentId !== "/")!;
+        const leaf = s.tree.getObjects().find(o => !o.isComposition && o.typeElementId !== "isa95-level" && o.parentId !== "/")!;
         for (const o of s.tree.getObjects().filter(o => o.isComposition)) {
             for (const depth of [0, 1, 2, 3])
                 expect([...s.tree.iterateDescendantLeafIds(o.elementId, depth)].filter(x => x !== null))
@@ -343,7 +354,7 @@ describe("paged tree reads", () => {
     });
 
     it("expanding a whole fleet to leaves for InfluxDB does not stall the event loop", async () => {
-        const s = stack(3000);
+        const s = stack(2, undefined, 60_000);
         s.store.commit();
         const history = new History({ influxUrl: "http://influx.invalid", influxToken: "", influxOrg: "o",
             influxBucket: "b", objectTree: s.tree, valueCache: s.valueCache });
@@ -351,7 +362,7 @@ describe("paged tree reads", () => {
         (history as any).queryApi = { collectRows: async () => [] };
         const getMetricMeta = s.tree.getMetricMeta.bind(s.tree);
         jest.spyOn(s.tree, "getMetricMeta").mockImplementation((id: string) => { leaves++; return getMetricMeta(id); });
-        const root = s.tree.getObjects({ root: true })[0].elementId;
+        const root = DEVICE;
 
         let last = performance.now(), worst = 0;
         const t = setInterval(() => { const now = performance.now(); worst = Math.max(worst, now - last); last = now; }, 2);

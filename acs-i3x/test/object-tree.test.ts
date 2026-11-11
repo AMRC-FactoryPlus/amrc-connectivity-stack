@@ -482,7 +482,7 @@ describe("ObjectTree", () => {
             const { tree, dev1, instanceUuid } = await treeWithDevice();
             // Find a leaf node (no children)
             const allObjects = tree.getObjects();
-            const leaf = allObjects.find(o => !o.isComposition);
+            const leaf = allObjects.find(o => !o.isComposition && o.typeElementId !== "isa95-level");
             if (leaf) {
                 expect(tree.getChildElementIds(leaf.elementId)).toEqual([]);
             }

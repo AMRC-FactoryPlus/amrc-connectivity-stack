@@ -490,6 +490,12 @@ bulk items are keyed by `subscriptionId` in place of `elementId`.
 - **`/objects/related`** returns edges, `{ sourceRelationship, object }`,
   where `sourceRelationship` is the type that leads from the queried
   object to `object`. `relationshipType` filters on it.
+- **A level of the ISA-95 hierarchy is not a composition.** It
+  organises the devices and levels under it, which are its children and
+  not parts of its value. `isComposition` is true only for a device and
+  the branches inside it. Reading a level's value gives `null` with
+  `GoodNoData`, and `maxDepth` never follows `HasChildren`: read the
+  devices by their own ids.
 - **A root object** has `parentId: null`.
 - **`includeMetadata`** adds `metadata.typeNamespaceUri`,
   `metadata.sourceTypeId` and `metadata.relationships` (the ids at the

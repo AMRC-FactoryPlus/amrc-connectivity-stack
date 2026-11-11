@@ -320,7 +320,7 @@ describe("the API, scoped to the caller", () => {
         s.store.prepare(`
             insert into last_value (element_id, anchor, device_uuid, value_json, timestamp, quality, source)
             select element_id, parent_id, device_uuid, '1', '2026-11-03T00:00:00Z', 'Good', 'uns'
-            from object where is_composition = 0
+            from object where is_composition = 0 and type_element_id != 'isa95-level'
         `).run();
     }
 
@@ -368,15 +368,22 @@ describe("the API, scoped to the caller", () => {
             .toEqual([[RelType.HasChildren, "North"]]);
     });
 
-    it("leaves hidden devices out of a level's composition value", async () => {
+    it("gives a level no value of its own, and hides a hidden device's values", async () => {
         const s = setup({ "alice@REALM": [grant("dev-a")] });
         fill(s);
         const { a } = app(s, "alice@REALM");
         const top = levelId(s, "AMRC");
-        const many = await request(a).post("/v1/objects/value").send({ elementIds: [top, "dev-b-temp"], maxDepth: 0 });
-        expect(Object.keys(many.body.results[0].result.components).sort()).toEqual(["dev-a-pos", "dev-a-temp"]);
-        expect(many.body.results[1]).toEqual({ success: false, elementId: "dev-b-temp",
-            responseDetail: { title: "Not Found", status: 404, detail: "Element not found: dev-b-temp" } });
+        const many = await request(a).post("/v1/objects/value")
+            .send({ elementIds: [top, "dev-a", "dev-b", "dev-b-temp"], maxDepth: 0 });
+        /* A level organises devices: reading it does not read them. */
+        expect(many.body.results[0].result).toMatchObject(
+            { isComposition: false, value: null, quality: "GoodNoData" });
+        expect(many.body.results[0].result).not.toHaveProperty("components");
+        expect(Object.keys(many.body.results[1].result.components).sort()).toEqual(["dev-a-pos", "dev-a-temp"]);
+        for (const i of [2, 3]) {
+            expect(many.body.results[i].success).toBe(false);
+            expect(many.body.results[i].responseDetail.status).toBe(404);
+        }
     });
 
     it("refuses to subscribe to a hidden object, and stops delivering on revocation", async () => {

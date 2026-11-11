@@ -85,7 +85,7 @@ describe("i3X 1.0: address space", () => {
         expect(types.get(ObjType.StringMetric).schema).toEqual({ type: "string" });
 
         const objects = await get("/objects");
-        const leaves = objects.filter((o: any) => !o.isComposition);
+        const leaves = objects.filter((o: any) => !o.isComposition && o.typeElementId !== "isa95-level");
         const used = new Set(leaves.map((o: any) => o.typeElementId));
         expect(used.has(ObjType.Unknown)).toBe(false);
         expect(used.has(ObjType.NumberMetric)).toBe(true);
@@ -176,7 +176,7 @@ describe("i3X 1.0: address space", () => {
 describe("i3X 1.0: values", () => {
     it("answers an object with no data with a null GoodNoData value, and an unknown id with 404", async () => {
         const objects: any[] = await get("/objects");
-        const leaf = objects.find(o => !o.isComposition);
+        const leaf = objects.find(o => !o.isComposition && o.typeElementId !== "isa95-level");
         const res = await post("/objects/value", { elementIds: [leaf.elementId, "no-such-id"] });
         expect(res.success).toBe(false);
         expect(res.results[0]).toMatchObject({ success: true, elementId: leaf.elementId,
@@ -188,7 +188,7 @@ describe("i3X 1.0: values", () => {
 
     it("answers history with the result shape of 1.0", async () => {
         const objects: any[] = await get("/objects");
-        const leaf = objects.find(o => !o.isComposition);
+        const leaf = objects.find(o => !o.isComposition && o.typeElementId !== "isa95-level");
         const res = await post("/objects/history", {
             elementIds: [leaf.elementId, "no-such-id"],
             startTime: "2026-11-01T00:00:00Z", endTime: "2026-11-02T00:00:00Z",
@@ -204,7 +204,7 @@ describe("i3X 1.0: subscriptions", () => {
         { value, quality: "Good", timestamp: "2026-11-03T00:00:00Z" });
 
     it("scopes a subscription to its clientId and syncs in batches", async () => {
-        const leaf = (await get("/objects")).find((o: any) => !o.isComposition).elementId;
+        const leaf = (await get("/objects")).find((o: any) => !o.isComposition && o.typeElementId !== "isa95-level").elementId;
         const made = await post("/subscriptions", { clientId: "c-1", displayName: "mine" });
         expect(made.result).toEqual({ clientId: "c-1", subscriptionId: expect.any(String), displayName: "mine" });
         const subscriptionId = made.result.subscriptionId;

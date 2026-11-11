@@ -275,7 +275,7 @@ describe("GET /v1/objects ETag", () => {
         const t = tree(5);
         const rev = t.revision();
         const vc = new ValueCache({ objectTree: t, staleThreshold: 60_000 });
-        const leaf = t.getObjects().find(o => !o.isComposition)!;
+        const leaf = t.getObjects().find(o => !o.isComposition && o.typeElementId !== "isa95-level")!;
         (vc as any).set?.(leaf.elementId, { value: 1, quality: "Good", timestamp: new Date().toISOString() });
         expect(t.revision()).toBe(rev);
     });

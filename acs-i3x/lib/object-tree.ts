@@ -1084,7 +1084,11 @@ export class ObjectTree {
                     segment,
                     ObjType.Isa95Level,
                     parentId,
-                    true,           // isComposition
+                    /* A level organises the objects under it: they are
+                     * its children, not parts of its value. In i3X
+                     * only an object with components is a composition,
+                     * and a value read never follows HasChildren. */
+                    false,
                 );
                 this.putObject(obj, "config", null);
                 this.placementRev++;

@@ -35,8 +35,9 @@ function isCorrupt(err: unknown): boolean {
  * uns_device records each device's UNS topic segment.
  * 5: a device's ISA-95 position comes from its placement, and
  * sync_device records the position each device was placed at.
- * 6: a leaf metric with no schema takes its object type from its
- * Sparkplug type (i3X 1.0), where it was "unknown". */
+ * 6: i3X 1.0. A leaf metric with no schema takes its object type from
+ * its Sparkplug type, where it was "unknown", and an ISA-95 level is
+ * no longer a composition. */
 export const SCHEMA_VERSION = 6;
 
 const TABLES = `

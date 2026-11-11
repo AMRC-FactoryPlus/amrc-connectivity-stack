@@ -3,7 +3,7 @@
   -->
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useExplorerStore } from '@store/useExplorerStore.js'
 import { useMonitorStore } from '@store/useMonitorStore.js'
 import ExplorerTreeNode from './ExplorerTreeNode.vue'
@@ -15,6 +15,10 @@ import HistoryPanel from './HistoryPanel.vue'
 
 const store = useExplorerStore()
 const monitor = useMonitorStore()
+
+// An ISA-95 level organises the objects under it. In i3X it has no
+// value or history of its own: those belong to devices and metrics.
+const isLevel = computed(() => !!store.selectedNode && store.typeOf(store.selectedNode).kind === 'level')
 
 onMounted(() => {
   store.loadRoots()
@@ -63,14 +67,21 @@ function handleSubscribe () {
           :display-name="store.selectedNode?.displayName"
           @navigate="store.selectNode"
         />
-        <CurrentValue
-          :element-id="store.selectedId"
-          :is-composition="store.selectedNode?.isComposition ?? false"
-        />
-        <HistoryPanel
-          :element-id="store.selectedId"
-          :is-composition="store.selectedNode?.isComposition ?? false"
-        />
+        <div v-if="isLevel" class="rounded-lg border bg-card p-4 text-sm text-slate-500">
+          <span class="font-medium text-slate-700">{{ store.selectedNode?.displayName }}</span>
+          is a level of the ISA-95 hierarchy. It groups the devices and levels under it and has no
+          value or history of its own. Select a device or a metric to see values.
+        </div>
+        <template v-else>
+          <CurrentValue
+            :element-id="store.selectedId"
+            :is-composition="store.selectedNode?.isComposition ?? false"
+          />
+          <HistoryPanel
+            :element-id="store.selectedId"
+            :is-composition="store.selectedNode?.isComposition ?? false"
+          />
+        </template>
       </div>
     </div>
 

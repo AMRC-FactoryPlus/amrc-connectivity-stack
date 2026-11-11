@@ -20,9 +20,12 @@ const isExpanded = computed(() => entry.value?.expanded ?? false)
 const isLoading = computed(() => store.loadingChildren.has(props.elementId))
 // A level, an object or a kind of data point, from the object's type.
 const type = computed(() => store.typeOf(node.value))
+// Until its children are read, expect them under a composition (its
+// components) and under an ISA-95 level (its children). A level is not
+// a composition in i3X.
 const hasChildren = computed(() => {
   if (entry.value?.loaded) return entry.value.childIds.length > 0
-  return node.value?.isComposition ?? false
+  return (node.value?.isComposition ?? false) || type.value.kind === 'level'
 })
 
 const isVisible = computed(() => {

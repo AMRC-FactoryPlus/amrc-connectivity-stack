@@ -10,6 +10,7 @@ import { useExplorerStore } from '../stores/explorer'
 import { useSubscriptionsStore } from '../stores/subscriptions'
 import { catalogAvailable, ensureAllObjectsLoaded, loadHierarchicalRoots } from './catalog'
 import { clearServerQueries } from '../data/queryClient'
+import { hostAuthProvider } from '../acs/host' // ACS
 
 /**
  * The connect/disconnect flows, extracted from the Toolbar so the connection
@@ -152,6 +153,9 @@ function oauthScope(credentials: Credentials & { type: 'oauth' }, serverUrl: str
 
 async function authProviderFor(credentials: Credentials | null, serverUrl: string): Promise<AuthProvider | undefined> {
   useConnectionStore.getState().setAccountName(null)
+  // ACS: framed by the Manager UI, send its token for the i3X service.
+  const hosted = hostAuthProvider()
+  if (hosted) return hosted
   if (credentials?.type !== 'oauth') return undefined
   const settings = oauthSettingsFor(credentials, serverUrl)
   if (!settings) {

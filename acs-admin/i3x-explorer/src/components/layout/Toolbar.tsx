@@ -13,10 +13,13 @@ import { AboutDialog } from './AboutDialog'
 import { SearchIcon, CheckIcon, RedirectIcon, BlockedIcon, CameraIcon, NewWindowIcon } from '../common/icons'
 import { Spinner } from '../common/Spinner'
 import iconPng from '/icon.png'
+import { acsHost } from '../../acs/host' // ACS
 
 type Theme = 'light' | 'dark'
 
 function getInitialTheme(): Theme {
+  // ACS: framed by the Manager UI, start in its theme.
+  if (acsHost) return acsHost.theme()
   const saved = localStorage.getItem('i3x-theme')
   if (saved === 'light' || saved === 'dark') return saved
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -223,13 +226,14 @@ export function Toolbar() {
       </button>
 
       <div className="flex-1 flex items-center gap-2 min-w-0">
-        <button
+        {/* ACS: the Manager UI chooses the server and signs in; the status bar shows the URL. */}
+        {!acsHost && <button
           onClick={() => setShowConnectionDialog(true)}
           title={serverUrl ? `${serverUrl}: click to change server settings` : 'Configure the server connection'}
           className="px-3 py-1.5 text-xs font-mono bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none truncate min-w-0 max-w-[10rem] sm:max-w-sm lg:max-w-2xl"
         >
           {serverUrl || 'Click to configure'}
-        </button>
+        </button>}
 
         {!isConnected ? (
           <>
@@ -251,7 +255,7 @@ export function Toolbar() {
               </button>
             )}
           </>
-        ) : (
+        ) : !acsHost && (
           <button
             onClick={handleDisconnect}
             title="Disconnect from the server and stop its subscriptions"
@@ -285,6 +289,7 @@ export function Toolbar() {
         <button
           onClick={() => {
             if (window.electronAPI) window.electronAPI.openNewWindow()
+            else if (acsHost) acsHost.openNewWindow() // ACS
             else window.open(window.location.href, '_blank')
           }}
           title="Open a new window (Ctrl+N / ⌘N)"

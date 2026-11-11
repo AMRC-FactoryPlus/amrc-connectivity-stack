@@ -5,6 +5,9 @@ import './styles/index.css'
 import { normalizeServerUrl, useConnectionStore } from './stores/connection'
 import { applyServerFromQuery } from './services/serverFromQuery'
 import { loadRuntimeConfig } from './config/runtimeConfig'
+// ACS: framed by the Manager UI, connect to its i3X service with its session.
+import { configureForHost, startHosted } from './acs/host'
+import { performConnect } from './services/connection'
 
 async function init() {
   // Runtime config lets operators override defaults without rebuilding. The server
@@ -23,12 +26,15 @@ async function init() {
   // A `?server=` deep-link overrides both the config.json default and any
   // persisted value, so apply it last (it waits for store hydration itself).
   applyServerFromQuery()
+  await configureForHost() // ACS
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   )
+
+  startHosted(performConnect) // ACS
 }
 
 init()

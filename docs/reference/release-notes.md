@@ -66,6 +66,10 @@ changes below. The Manager UI is updated in the same release.
   `/objects/related`. It adds each object's type namespace and the ids
   it is related to.
 - A bulk request with no `elementIds` gets a 400, where it got a 500.
+- **`serverVersion` in `/info` is the ACS release**, such as `v6.22.0`,
+  where it was always `0.1.0`. The service's `/ping` also reports the
+  real revision now, where it reported `dev`: the image build stamped
+  the revision into a file the build did not use.
 
 - **The single-object routes are gone.** i3X 1.0 reads in bulk only,
   so the service no longer has `GET /objects/{id}`,

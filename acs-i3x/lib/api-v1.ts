@@ -9,7 +9,8 @@ import { createHash } from "node:crypto";
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
 
-import { I3X_SPEC_VERSION, Version } from "./constants.js";
+import { I3X_SPEC_VERSION } from "./constants.js";
+import { GIT_VERSION } from "./git-version.js";
 import { i3xEnvelope, i3xErrorHandler } from "./middleware/envelope.js";
 import { responseDetail } from "./mapping.js";
 import { Slicer } from "./slicer.js";
@@ -75,6 +76,16 @@ function badRequest(message: string): Error & { status: number } {
     const err = new Error(message) as Error & { status: number };
     err.status = 400;
     return err;
+}
+
+/**
+ * The ACS release this service was built from, for `serverVersion` in
+ * /info. The image build stamps the revision as "<release> (<commit>)",
+ * for example "v6.22.0 (3f2a9c1)"; a build outside the release
+ * pipeline says "dev".
+ */
+export function releaseOf(revision: string): string {
+    return revision.replace(/\s*\([^()]*\)\s*$/, "").trim() || "dev";
 }
 
 /** A failed item of a bulk response, keyed as the endpoint keys it. */
@@ -576,7 +587,7 @@ export class APIv1 {
         res.json({
             specVersion: I3X_SPEC_VERSION,
             serverName: "AMRC Connectivity Stack",
-            serverVersion: Version,
+            serverVersion: releaseOf(GIT_VERSION),
             capabilities: {
                 query,
                 update: { current: false, history: false },

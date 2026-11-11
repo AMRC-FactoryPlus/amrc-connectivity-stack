@@ -27,7 +27,9 @@ RUN <<'SHELL'
     touch /home/node/.npmrc
     npm install --save=false --install-links
 
-    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.js
+    # The source is TypeScript: a .js file here is not compiled, and the
+    # service would report the "dev" of the checked-in file.
+    echo "export const GIT_VERSION=\"$revision\";" > ./lib/git-version.ts
 
     npm run clean
     echo tsc -v

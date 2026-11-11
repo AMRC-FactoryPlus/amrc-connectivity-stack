@@ -13,10 +13,11 @@
 import { jest, describe, it, expect, beforeAll } from "@jest/globals";
 import express from "express";
 import request from "supertest";
-import { APIv1 } from "../lib/api-v1.js";
+import { APIv1, releaseOf } from "../lib/api-v1.js";
 import { lazyFromValue } from "../lib/value-cache.js";
 import type { SyncResult } from "../lib/subscriptions.js";
-import { I3X_SPEC_VERSION, Version, RelType } from "../lib/constants.js";
+import { I3X_SPEC_VERSION, RelType } from "../lib/constants.js";
+import { GIT_VERSION } from "../lib/git-version.js";
 import type {
     I3xNamespace,
     I3xObjectType,
@@ -429,7 +430,7 @@ describe("E2E Compliance Tests", () => {
             const res = await request(app).get("/v1/info");
 
             expect(res.body.result.specVersion).toBe(I3X_SPEC_VERSION);
-            expect(res.body.result.serverVersion).toBe(Version);
+            expect(res.body.result.serverVersion).toBe(releaseOf(GIT_VERSION));
         });
     });
 

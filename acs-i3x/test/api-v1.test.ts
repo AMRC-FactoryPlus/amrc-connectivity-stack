@@ -1,10 +1,10 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import express from "express";
 import request from "supertest";
-import { APIv1 } from "../lib/api-v1.js";
+import { APIv1, releaseOf } from "../lib/api-v1.js";
 import { lazyFromValue } from "../lib/value-cache.js";
 import type { SyncResult } from "../lib/subscriptions.js";
-import { I3X_SPEC_VERSION, Version } from "../lib/constants.js";
+import { I3X_SPEC_VERSION } from "../lib/constants.js";
 import type {
     I3xNamespace,
     I3xObjectType,
@@ -227,7 +227,9 @@ describe("APIv1", () => {
             expect(res.body.result).toEqual({
                 specVersion: I3X_SPEC_VERSION,
                 serverName: "AMRC Connectivity Stack",
-                serverVersion: Version,
+                /* The ACS release the build was stamped with; "dev"
+                 * outside the release pipeline. */
+                serverVersion: "dev",
                 capabilities: {
                     query: { history: true },
                     update: { current: false, history: false },
@@ -682,6 +684,17 @@ describe("APIv1", () => {
     });
 
     /* ---- History ---- */
+
+    describe("releaseOf", () => {
+        it("takes the ACS release from the revision the image build stamps", () => {
+            expect(releaseOf("v6.22.0 (3f2a9c1e5b7d4e8a9c217d4e5f6a8b90aabbccdd)")).toBe("v6.22.0");
+            expect(releaseOf("v6.22.0-rc.1 (3f2a9c1)")).toBe("v6.22.0-rc.1");
+            expect(releaseOf("v6.22.0")).toBe("v6.22.0");
+            expect(releaseOf("dev")).toBe("dev");
+            expect(releaseOf(" (3f2a9c1)")).toBe("dev");
+            expect(releaseOf("")).toBe("dev");
+        });
+    });
 
     describe("POST /objects/history", () => {
         it("returns bulk history", async () => {

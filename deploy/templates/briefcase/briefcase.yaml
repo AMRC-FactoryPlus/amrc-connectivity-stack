@@ -59,6 +59,34 @@ spec:
               value: {{ .Values.acs.organisation | quote }}
             - name: SOURCE_URL
               value: {{ .Values.acs.secure | ternary "https" "http" }}://{{ .Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
+            {{- if .Values.briefcase.delivery.enabled }}
+            # The sharing platform's ingest container. A URL with a SAS
+            # token is the whole credential, so it is kept in a Secret.
+            # Without one, the other keys name a service principal.
+            - name: DELIVERY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.briefcase.delivery.secretName | required "values.briefcase.delivery.secretName is required!" }}
+                  key: url
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.briefcase.delivery.secretName }}
+                  key: tenant-id
+                  optional: true
+            - name: AZURE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.briefcase.delivery.secretName }}
+                  key: client-id
+                  optional: true
+            - name: AZURE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.briefcase.delivery.secretName }}
+                  key: client-secret
+                  optional: true
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

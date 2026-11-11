@@ -12,7 +12,7 @@ import * as rx          from "rxjs";
 
 import { App, Class }   from "./constants.js";
 import { live_briefcase } from "./store.js";
-import { defined }      from "./util.js";
+import { defined, watch_members } from "./util.js";
 
 /** Compare what is Published with what has been released.
  *
@@ -66,7 +66,10 @@ export class Exporter {
      * Briefcase release entries can be read. */
     plans () {
         return rx.combineLatest([
-            this.cdb.watch_members(Class.Published),
+            watch_members({
+                cdb: this.cdb, klass: Class.Published,
+                log: this.log, delay: this.retry,
+            }),
             this.cdb.search_app(App.BriefcaseRelease),
         ]).pipe(
             rx.map(([published, releases]) => plan(published, releases)),

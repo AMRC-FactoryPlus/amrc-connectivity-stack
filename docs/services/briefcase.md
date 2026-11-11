@@ -54,6 +54,12 @@ briefcase is recorded, its UUID is never used again. The exporter
 re-reads a dataset's entry before each build, and remembers work it has
 done until ConfigDB reports it, so it does not build a dataset twice.
 
+If ConfigDB refuses to list the members of `Published`, for example
+while a grant is missing, the exporter logs it and asks again after
+`RETRY_INTERVAL`. Until then it keeps the last membership it read, so a
+refusal never looks like an empty `Published` class, which would
+withdraw every briefcase.
+
 The chart runs one replica with the `Recreate` strategy, so two
 exporters never run at once.
 

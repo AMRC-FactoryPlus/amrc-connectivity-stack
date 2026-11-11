@@ -102,7 +102,7 @@ describe("composition values from the cache", () => {
         expect(s.valueCache.getValue(leaf.elementId)!.isComposition).toBe(false);
     });
 
-    it("are sent byte for byte as before, by both value routes", async () => {
+    it("are sent byte for byte as built in memory, by the value route", async () => {
         const s = stack(40);
         fill(s);
         const a = app(s);
@@ -110,8 +110,9 @@ describe("composition values from the cache", () => {
         const device = s.tree.getChildElementIds(s.tree.getChildElementIds(root)[0])[0];
         const leaf = s.tree.getObjects().find(o => !o.isComposition)!.elementId;
 
-        const one = await request(a).get(`/v1/objects/${root}/value?maxDepth=0`);
-        expect(one.text).toBe(JSON.stringify({ success: true, result: oldValue(s, root) }));
+        const one = await request(a).post("/v1/objects/value").send({ elementIds: [root], maxDepth: 0 });
+        expect(one.text).toBe(JSON.stringify({ success: true,
+            results: [{ success: true, elementId: root, result: oldValue(s, root) }] }));
         expect(one.headers["content-type"]).toBe("application/json; charset=utf-8");
 
         const ids = [root, leaf, "no-such-id", device, root];
@@ -133,7 +134,8 @@ describe("composition values from the cache", () => {
             const s = stack(1500, store);
             fill(s, 200);
             const root = s.tree.getObjects({ root: true })[0].elementId;
-            const want = JSON.stringify({ success: true, result: oldValue(s, root) });
+            const want = JSON.stringify({ success: true,
+                results: [{ success: true, elementId: root, result: oldValue(s, root) }] });
             const total = Object.keys(oldValue(s, root)!.components).length;
 
             /* Count the component rows each snapshot reader reads. The
@@ -160,7 +162,9 @@ describe("composition values from the cache", () => {
             await new Promise(r => server.once("listening", r));
             const port = (server.address() as AddressInfo).port;
             const res = await new Promise<http.IncomingMessage>(r =>
-                http.get({ port, path: `/v1/objects/${root}/value?maxDepth=0` }, r));
+                http.request({ port, method: "POST", path: "/v1/objects/value",
+                    headers: { "Content-Type": "application/json" } }, r)
+                    .end(JSON.stringify({ elementIds: [root], maxDepth: 0 })));
             res.pause();
             await new Promise(r => setTimeout(r, 300));
             expect(reads).toHaveLength(2);
@@ -208,7 +212,7 @@ describe("composition values to a depth", () => {
         expect(last).toBe(all);
     });
 
-    it("default to the direct leaves for GET, as for POST", async () => {
+    it("default to the direct leaves", async () => {
         const s = stack(40);
         fill(s);
         const a = app(s);
@@ -216,29 +220,17 @@ describe("composition values to a depth", () => {
         const id = s.tree.getObjects().find(o => o.isComposition
             && leaves(s, o.elementId, 1).length > 0
             && leaves(s, o.elementId, 0).length > leaves(s, o.elementId, 1).length)!.elementId;
-        const one = await request(a).get(`/v1/objects/${id}/value`);
-        expect(Object.keys(one.body.result.components).sort()).toEqual(leaves(s, id, 1));
         const many = await request(a).post("/v1/objects/value").send({ elementIds: [id] });
-        expect(many.body.results[0].result).toEqual(one.body.result);
-    });
-
-    it("refuse a maxDepth that is not a non-negative integer", async () => {
-        const s = stack(4);
-        fill(s);
-        const root = s.tree.getObjects({ root: true })[0].elementId;
-        for (const bad of ["-1", "1.5", "deep", "", "%201", "0x10", "1e1"]) {
-            const r = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=${bad}`);
-            expect(r.status).toBe(400);
-        }
-        const twice = await request(app(s)).get(`/v1/objects/${root}/value?maxDepth=1&maxDepth=2`);
-        expect(twice.status).toBe(400);
+        expect(Object.keys(many.body.results[0].result.components).sort()).toEqual(leaves(s, id, 1));
+        const one = await request(a).post("/v1/objects/value").send({ elementIds: [id], maxDepth: 1 });
+        expect(one.body.results[0].result).toEqual(many.body.results[0].result);
     });
 
     it("refuse a body maxDepth that is not a non-negative integer", async () => {
         const s = stack(4);
         fill(s);
         const root = s.tree.getObjects({ root: true })[0].elementId;
-        for (const bad of [-1, 1.5, "1", "", true]) {
+        for (const bad of [-1, 1.5, "1", "", "deep", "0x10", true, [1], {}]) {
             const r = await request(app(s)).post("/v1/objects/value")
                 .send({ elementIds: [root], maxDepth: bad });
             expect(r.status).toBe(400);
@@ -253,13 +245,13 @@ describe("composition values to a depth", () => {
         const id = s.tree.getObjects().find(o => o.isComposition
             && leaves(s, o.elementId, 2).length > 0
             && leaves(s, o.elementId, 0).length > leaves(s, o.elementId, 2).length)!.elementId;
-        const one = await request(a).get(`/v1/objects/${id}/value?maxDepth=0`);
-        expect(one.status).toBe(206);
-        expect(Object.keys(one.body.result.components).sort()).toEqual(leaves(s, id, 2));
         const many = await request(a).post("/v1/objects/value").send({ elementIds: [id], maxDepth: 0 });
         expect(many.status).toBe(206);
-        const within = await request(a).get(`/v1/objects/${id}/value?maxDepth=2`);
+        expect(Object.keys(many.body.results[0].result.components).sort()).toEqual(leaves(s, id, 2));
+        expect(many.body.responseDetail.status).toBe(206);
+        const within = await request(a).post("/v1/objects/value").send({ elementIds: [id], maxDepth: 2 });
         expect(within.status).toBe(200);
+        expect(within.body).not.toHaveProperty("responseDetail");
     });
 });
 
@@ -300,23 +292,27 @@ describe("long reads and the event loop", () => {
             const server = http.createServer(a).listen(0);
             await new Promise(r => server.once("listening", r));
             const port = (server.address() as AddressInfo).port;
-            const get = (path: string) => new Promise<Buffer[]>((resolve, reject) => {
-                http.get({ port, path }, res => {
+            const call = (path: string, body?: object) => new Promise<Buffer[]>((resolve, reject) => {
+                http.request({ port, path, method: body ? "POST" : "GET",
+                    headers: { "Content-Type": "application/json" } }, res => {
                     const chunks: Buffer[] = [];
                     res.on("data", c => chunks.push(c));
                     res.on("end", () => resolve(chunks));
-                }).on("error", reject);
+                }).on("error", reject).end(body ? JSON.stringify(body) : undefined);
             });
             let chunks: Buffer[] = [];
             let valueStall = 0, objectsStall = 0, relatedStall = 0;
             try {
-                valueStall = await longestStall(async () => { chunks = await get(`/v1/objects/${root}/value?maxDepth=0`); });
-                objectsStall = await longestStall(() => get("/v1/objects"));
-                relatedStall = await longestStall(() => get(`/v1/objects/${root}/related`));
+                valueStall = await longestStall(async () => {
+                    chunks = await call("/v1/objects/value", { elementIds: [root], maxDepth: 0 });
+                });
+                objectsStall = await longestStall(() => call("/v1/objects"));
+                relatedStall = await longestStall(() => call("/v1/objects/related", { elementIds: [root] }));
             } finally {
                 server.close();
             }
-            expect(Buffer.concat(chunks).toString()).toBe(JSON.stringify({ success: true, result: oldValue(s, root) }));
+            expect(Buffer.concat(chunks).toString()).toBe(JSON.stringify({ success: true,
+                results: [{ success: true, elementId: root, result: oldValue(s, root) }] }));
             console.log(`longest stall at 3,000 devices: composition value ${valueStall.toFixed(0)} ms, `
                 + `GET /objects ${objectsStall.toFixed(0)} ms, related ${relatedStall.toFixed(0)} ms`);
             // Each step is a few small queries and pauses every 20 ms;

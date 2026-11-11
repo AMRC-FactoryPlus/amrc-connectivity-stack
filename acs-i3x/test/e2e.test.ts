@@ -498,28 +498,6 @@ describe("E2E Compliance Tests", () => {
         });
     });
 
-    describe("GET /v1/objecttypes/:elementId", () => {
-        it("returns single type with all fields", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objecttypes/type-cnc");
-
-            expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(res.body.result).toEqual(typeCnc);
-        });
-
-        it("returns 404 error envelope for nonexistent type", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objecttypes/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-            expect(res.body.responseDetail).toHaveProperty("detail");
-            expect(typeof res.body.responseDetail.detail).toBe("string");
-            expect(res.body.responseDetail.status).toBe(404);
-        });
-    });
-
     describe("POST /v1/objecttypes/query", () => {
         it("returns bulk response preserving input order and size", async () => {
             const { app } = createE2eApp();
@@ -598,26 +576,6 @@ describe("E2E Compliance Tests", () => {
         });
     });
 
-    describe("GET /v1/objects/:elementId", () => {
-        it("returns single object with all fields", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/obj-cnc-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(res.body.result).toEqual({ ...objCnc1, parentId: null });
-        });
-
-        it("returns 404 for nonexistent object", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-            expect(res.body.responseDetail).toHaveProperty("detail");
-        });
-    });
-
     describe("POST /v1/objects/list", () => {
         it("returns bulk response preserving order", async () => {
             const { app } = createE2eApp();
@@ -662,25 +620,6 @@ describe("E2E Compliance Tests", () => {
         });
     });
 
-    describe("GET /v1/relationshiptypes/:elementId", () => {
-        it("returns single relationship type", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/relationshiptypes/rel-has-parent");
-
-            expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(res.body.result).toEqual(relHasParent);
-        });
-
-        it("returns 404 for nonexistent", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/relationshiptypes/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /v1/relationshiptypes/query", () => {
         it("returns bulk response matching input size", async () => {
             const { app } = createE2eApp();
@@ -701,44 +640,6 @@ describe("E2E Compliance Tests", () => {
     });
 
     /* ---- Explore: Related Objects ---- */
-
-    describe("GET /v1/objects/:elementId/related", () => {
-        it("returns related objects", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/obj-cnc-1/related");
-
-            expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(Array.isArray(res.body.result)).toBe(true);
-            expect(res.body.result).toEqual([
-                { sourceRelationship: RelType.HasComponent, object: objRobot },
-            ]);
-        });
-
-        it("filters by relationshipType query param", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app)
-                .get("/v1/objects/obj-cnc-1/related")
-                .query({ relationshipType: RelType.HasComponent });
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toHaveLength(1);
-            expect(res.body.result[0].object.elementId).toBe("obj-robot-1");
-
-            const none = await request(app)
-                .get("/v1/objects/obj-cnc-1/related")
-                .query({ relationshipType: RelType.HasChildren });
-            expect(none.body.result).toEqual([]);
-        });
-
-        it("returns 404 for nonexistent object", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/nonexistent/related");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
 
     describe("POST /v1/objects/related", () => {
         it("returns bulk related objects", async () => {
@@ -763,45 +664,6 @@ describe("E2E Compliance Tests", () => {
     });
 
     /* ---- Query: Current Values ---- */
-
-    describe("GET /v1/objects/:elementId/value", () => {
-        it("returns VQT in envelope with all required fields", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/obj-cnc-1/value");
-
-            expect(res.status).toBe(200);
-            expect(res.headers["content-type"]).toMatch(/application\/json/);
-            expect(res.body.success).toBe(true);
-
-            const vqt = res.body.result;
-            expect(vqt).toHaveProperty("elementId", "obj-cnc-1");
-            expect(vqt).toHaveProperty("isComposition");
-            expect(vqt).toHaveProperty("value");
-            expect(vqt).toHaveProperty("quality");
-            expect(vqt).toHaveProperty("timestamp");
-            expect(typeof vqt.isComposition).toBe("boolean");
-            expect(typeof vqt.quality).toBe("string");
-            expect(typeof vqt.timestamp).toBe("string");
-        });
-
-        it("returns a null GoodNoData value for an object with no value", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/obj-cnc-2/value");
-
-            expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-            expect(res.body.result).toMatchObject({ value: null, quality: "GoodNoData" });
-            expect(typeof res.body.result.isComposition).toBe("boolean");
-            expect(res.body.result.timestamp).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/);
-        });
-
-        it("returns 404 for nonexistent object", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/nonexistent/value");
-
-            expect(res.status).toBe(404);
-        });
-    });
 
     describe("POST /v1/objects/value", () => {
         it("returns bulk VQT response", async () => {
@@ -858,62 +720,6 @@ describe("E2E Compliance Tests", () => {
     });
 
     /* ---- Query: History ---- */
-
-    describe("GET /v1/objects/:elementId/history", () => {
-        it("returns history array in envelope", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app)
-                .get("/v1/objects/obj-cnc-1/history")
-                .query({
-                    startTime: "2026-01-01T00:00:00Z",
-                    endTime: "2026-01-02T00:00:00Z",
-                });
-
-            expect(res.status).toBe(200);
-            expect(res.headers["content-type"]).toMatch(/application\/json/);
-            expect(res.body.success).toBe(true);
-
-            const result = res.body.result;
-            expect(result).toHaveProperty("isComposition", true);
-            expect(Array.isArray(result.values)).toBe(true);
-            expect(result.values).toHaveLength(3);
-
-            for (const vqt of result.values) {
-                expect(vqt).toHaveProperty("value");
-                expect(vqt).toHaveProperty("quality");
-                expect(vqt).toHaveProperty("timestamp");
-            }
-        });
-
-        it("returns 400 when startTime and endTime are missing", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app).get("/v1/objects/obj-cnc-1/history");
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-            expect(res.body.responseDetail).toHaveProperty("detail");
-        });
-
-        it("returns 400 when only startTime is provided", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app)
-                .get("/v1/objects/obj-cnc-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z" });
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-        });
-
-        it("returns 400 when only endTime is provided", async () => {
-            const { app } = createE2eApp();
-            const res = await request(app)
-                .get("/v1/objects/obj-cnc-1/history")
-                .query({ endTime: "2026-01-02T00:00:00Z" });
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-        });
-    });
 
     describe("POST /v1/objects/history", () => {
         it("returns bulk history response", async () => {
@@ -1227,15 +1033,10 @@ describe("E2E Compliance Tests", () => {
                 request(app).get("/v1/info"),
                 request(app).get("/v1/namespaces"),
                 request(app).get("/v1/objecttypes"),
-                request(app).get("/v1/objecttypes/type-cnc"),
                 request(app).get("/v1/objects"),
-                request(app).get("/v1/objects/obj-cnc-1"),
                 request(app).get("/v1/relationshiptypes"),
-                request(app).get("/v1/relationshiptypes/rel-has-parent"),
-                request(app).get("/v1/objects/obj-cnc-1/value"),
-                request(app).get("/v1/objects/obj-cnc-1/related"),
-                request(app).get("/v1/objects/obj-cnc-1/history")
-                    .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-01-02T00:00:00Z" }),
+                request(app).post("/v1/subscriptions").send({ clientId: "c1" }),
+                request(app).post("/v1/subscriptions/sync").send({ clientId: "c1", subscriptionId: "sub-1" }),
             ]);
 
             for (const res of responses) {
@@ -1248,12 +1049,15 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
 
             const responses = await Promise.all([
-                request(app).get("/v1/objecttypes/nonexistent"),
-                request(app).get("/v1/objects/nonexistent"),
-                request(app).get("/v1/relationshiptypes/nonexistent"),
-                request(app).get("/v1/objects/nonexistent/value"),
-                request(app).get("/v1/objects/nonexistent/related"),
-                request(app).get("/v1/objects/obj-cnc-1/history"),
+                /* Not i3X endpoints: 1.0 has no single-object routes. */
+                request(app).get("/v1/objecttypes/type-cnc"),
+                request(app).get("/v1/objects/obj-cnc-1"),
+                request(app).get("/v1/objects/obj-cnc-1/value"),
+                /* Malformed requests. */
+                request(app).post("/v1/objects/list").send({}),
+                request(app).post("/v1/objects/value").send({ elementIds: ["obj-cnc-1"], maxDepth: -1 }),
+                request(app).post("/v1/objects/history").send({ elementIds: ["obj-cnc-1"] }),
+                request(app).post("/v1/subscriptions").send({}),
             ]);
 
             for (const res of responses) {
@@ -1311,13 +1115,11 @@ describe("E2E Compliance Tests", () => {
             const responses = await Promise.all([
                 request(app).get("/v1/namespaces"),
                 request(app).get("/v1/objecttypes"),
-                request(app).get("/v1/objecttypes/type-cnc"),
                 request(app).get("/v1/objects"),
-                request(app).get("/v1/objects/obj-cnc-1"),
-                request(app).get("/v1/objects/obj-cnc-1/value"),
-                request(app).get("/v1/objects/obj-cnc-1/related"),
-                request(app).get("/v1/objects/obj-cnc-1/history")
-                    .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-01-02T00:00:00Z" }),
+                request(app).post("/v1/objects/value").send({ elementIds: ["obj-cnc-1"] }),
+                request(app).post("/v1/objects/related").send({ elementIds: ["obj-cnc-1"] }),
+                request(app).post("/v1/objects/history").send({ elementIds: ["obj-cnc-1"],
+                    startTime: "2026-01-01T00:00:00Z", endTime: "2026-01-02T00:00:00Z" }),
                 request(app).get("/v1/relationshiptypes"),
                 request(app).post("/v1/subscriptions").send({ clientId: "c1" }),
                 request(app).post("/v1/objects/list").send({ elementIds: [] }),
@@ -1351,10 +1153,9 @@ describe("E2E Compliance Tests", () => {
                 request(app).get("/v1/namespaces"),
                 request(app).get("/v1/objecttypes"),
                 request(app).get("/v1/objects"),
-                request(app).get("/v1/objects/obj-cnc-1"),
-                request(app).get("/v1/objects/obj-cnc-1/value"),
-                request(app).get("/v1/objects/obj-cnc-1/history")
-                    .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-01-02T00:00:00Z" }),
+                request(app).post("/v1/objects/history").send({ elementIds: ["obj-cnc-1"],
+                    startTime: "2026-01-01T00:00:00Z", endTime: "2026-01-02T00:00:00Z" }),
+                request(app).post("/v1/objects/related").send({ elementIds: ["obj-cnc-1"] }),
                 request(app).get("/v1/relationshiptypes"),
                 request(app).post("/v1/objecttypes/query")
                     .send({ elementIds: ["type-cnc"] }),
@@ -1375,9 +1176,9 @@ describe("E2E Compliance Tests", () => {
             const { app } = createE2eApp();
 
             const responses = await Promise.all([
-                request(app).get("/v1/objecttypes/nonexistent"),
-                request(app).get("/v1/objects/nonexistent"),
-                request(app).get("/v1/objects/obj-cnc-1/history"),
+                request(app).get("/v1/objects/obj-cnc-1"),
+                request(app).post("/v1/objects/list").send({}),
+                request(app).post("/v1/objects/history").send({ elementIds: ["obj-cnc-1"] }),
             ]);
 
             for (const res of responses) {
@@ -1389,55 +1190,44 @@ describe("E2E Compliance Tests", () => {
     /* ---- Cross-endpoint consistency ---- */
 
     describe("Cross-endpoint consistency", () => {
-        it("object from /objects/:id matches same object in /objects list", async () => {
+        it("an object from /objects/list matches the same object in GET /objects", async () => {
             const { app } = createE2eApp();
 
-            const singleRes = await request(app).get("/v1/objects/obj-cnc-1");
             const listRes = await request(app).get("/v1/objects");
-
-            const fromList = listRes.body.result.find(
-                (o: any) => o.elementId === "obj-cnc-1",
-            );
-            expect(singleRes.body.result).toEqual(fromList);
-        });
-
-        it("object type from /objecttypes/:id matches same in /objecttypes list", async () => {
-            const { app } = createE2eApp();
-
-            const singleRes = await request(app).get("/v1/objecttypes/type-cnc");
-            const listRes = await request(app).get("/v1/objecttypes");
-
-            const fromList = listRes.body.result.find(
-                (t: any) => t.elementId === "type-cnc",
-            );
-            expect(singleRes.body.result).toEqual(fromList);
-        });
-
-        it("bulk object list returns same data as individual gets", async () => {
-            const { app } = createE2eApp();
-
             const bulkRes = await request(app)
                 .post("/v1/objects/list")
                 .send({ elementIds: ["obj-cnc-1", "obj-robot-1"] });
 
-            const single1 = await request(app).get("/v1/objects/obj-cnc-1");
-            const single2 = await request(app).get("/v1/objects/obj-robot-1");
-
-            const bulkResults = bulkRes.body.results;
-            expect(bulkResults[0].result).toEqual(single1.body.result);
-            expect(bulkResults[1].result).toEqual(single2.body.result);
+            const fromList = (id: string) => listRes.body.result.find((o: any) => o.elementId === id);
+            expect(bulkRes.body.results[0].result).toEqual(fromList("obj-cnc-1"));
+            expect(bulkRes.body.results[1].result).toEqual(fromList("obj-robot-1"));
         });
 
-        it("value from /objects/:id/value matches bulk value response", async () => {
+        it("an object type from /objecttypes/query matches the same in GET /objecttypes", async () => {
             const { app } = createE2eApp();
 
-            const singleRes = await request(app).get("/v1/objects/obj-cnc-1/value");
+            const listRes = await request(app).get("/v1/objecttypes");
             const bulkRes = await request(app)
-                .post("/v1/objects/value")
+                .post("/v1/objecttypes/query")
+                .send({ elementIds: ["type-cnc"] });
+
+            const fromList = listRes.body.result.find(
+                (t: any) => t.elementId === "type-cnc",
+            );
+            expect(bulkRes.body.results[0].result).toEqual(fromList);
+        });
+
+        it("the object in a related edge matches the same object in GET /objects", async () => {
+            const { app } = createE2eApp();
+
+            const listRes = await request(app).get("/v1/objects");
+            const related = await request(app)
+                .post("/v1/objects/related")
                 .send({ elementIds: ["obj-cnc-1"] });
 
-            const bulkItem = bulkRes.body.results[0];
-            expect(bulkItem.result).toEqual(singleRes.body.result);
+            const edge = related.body.results[0].result[0];
+            expect(edge.object).toEqual(
+                listRes.body.result.find((o: any) => o.elementId === edge.object.elementId));
         });
     });
 });

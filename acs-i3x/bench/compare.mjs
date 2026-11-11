@@ -80,14 +80,15 @@ for (let i = 0; i < comps.length; i += 200) {
     const ids = comps.slice(i, i + 200);
     requests.push(["POST", "/v1/objects/value", { elementIds: [...ids, "no-such-id", ids[0]], maxDepth: 0 }]);
 }
-/* Single-id GETs for a spread of devices, sub-objects and leaves. */
+/* Single-id reads for a spread of devices, sub-objects and leaves.
+ * i3X 1.0 has no single-object routes, so these are bulk reads of one. */
+const single = (id) => requests.push(["POST", "/v1/objects/value", { elementIds: [id] }]);
 for (let i = 0; i < n; i += 37) {
-    requests.push(["GET", `/v1/objects/${devs[i]}/value`]);
-    const d = device(i);
-    requests.push(["GET", `/v1/objects/${d.originMap.Status.Instance_UUID}/value`]);
+    single(devs[i]);
+    single(device(i).originMap.Status.Instance_UUID);
 }
-for (let i = 0; i < leaves.length; i += 97) requests.push(["GET", `/v1/objects/${leaves[i]}/value`]);
-requests.push(["GET", "/v1/objects/no-such-id/value"]);
+for (let i = 0; i < leaves.length; i += 97) single(leaves[i]);
+single("no-such-id");
 
 let same = 0, differ = 0, bytes = 0, ok = 0, notOk = 0, retried = 0, oldFailed = 0;
 for (const [method, path, body] of requests) {

@@ -267,12 +267,12 @@ describe("after a restart", () => {
         expect(r.valueCache.size()).toBe(0);
 
         const n = w.influx.queries.length;
-        const res = await request(r.app).get(`/v1/objects/${w.leaf("Speed")}/value`);
-        expect(res.body.result.value).toBe(5);
+        const res = await request(r.app).post("/v1/objects/value").send({ elementIds: [w.leaf("Speed")] });
+        expect(res.body.results[0].result.value).toBe(5);
         expect(w.influx.queries.length).toBe(n + 1);
         /* As after a clear, the value read is kept and served next. */
-        const again = await request(r.app).get(`/v1/objects/${w.leaf("Speed")}/value`);
-        expect(again.body.result.value).toBe(5);
+        const again = await request(r.app).post("/v1/objects/value").send({ elementIds: [w.leaf("Speed")] });
+        expect(again.body.results[0].result.value).toBe(5);
         expect(w.influx.queries.length).toBe(n + 1);
         /* A stored value the read did not replace stays hidden. */
         expect(r.valueCache.getValue(w.leaf("Status"))).toBeNull();
@@ -513,8 +513,8 @@ describe("review fixes", () => {
         const connectedAt = Date.now();
         r.mqtt.connect();
         /* A read during the margin gets the old point and is trusted. */
-        const res = await request(r.app).get(`/v1/objects/${w.leaf("Speed")}/value`);
-        expect(res.body.result.value).toBe(1);
+        const res = await request(r.app).post("/v1/objects/value").send({ elementIds: [w.leaf("Speed")] });
+        expect(res.body.results[0].result.value).toBe(1);
         /* The historian then writes a point from just before connect. */
         w.influx.series.set(w.leaf("Speed"), { _value: 9, _time: iso(connectedAt - 50) });
         await caughtUp(r.valueCache);
@@ -693,15 +693,15 @@ describe("review fixes", () => {
         r.mqtt.connect();
         const reads = () => w.influx.queries.filter(q => !isCatchUp(q)).length;
         const n = reads();
-        const during = await request(r.app).get(`/v1/objects/${DEV}/value`);
+        const during = await request(r.app).post("/v1/objects/value").send({ elementIds: [DEV] });
         expect(reads()).toBe(n + 1);
-        expect(during.body.result.isComposition).toBe(true);
+        expect(during.body.results[0].result.isComposition).toBe(true);
         await caughtUp(r.valueCache);
         await sleep(100);
         const m = reads();
-        const after = await request(r.app).get(`/v1/objects/${DEV}/value`);
+        const after = await request(r.app).post("/v1/objects/value").send({ elementIds: [DEV] });
         expect(reads()).toBe(m);
-        expect(after.body.result.components[w.leaf("Speed")].value).toBe(1);
+        expect(after.body.results[0].result.components[w.leaf("Speed")].value).toBe(1);
     });
 });
 

@@ -322,27 +322,6 @@ describe("APIv1", () => {
         });
     });
 
-    describe("GET /objecttypes/:elementId", () => {
-        it("returns single object type", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObjectType.mockReturnValue(sampleType);
-
-            const res = await request(app).get("/objecttypes/type-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleType);
-        });
-
-        it("returns 404 for missing type", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objecttypes/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /objecttypes/query", () => {
         it("returns bulk response preserving order", async () => {
             const { app, objectTree } = createApp();
@@ -380,27 +359,6 @@ describe("APIv1", () => {
 
             expect(res.status).toBe(200);
             expect(res.body.result).toEqual([sampleRelType]);
-        });
-    });
-
-    describe("GET /relationshiptypes/:elementId", () => {
-        it("returns single relationship type", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getRelationshipType.mockReturnValue(sampleRelType);
-
-            const res = await request(app).get("/relationshiptypes/rel-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleRelType);
-        });
-
-        it("returns 404 for missing", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/relationshiptypes/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
         });
     });
 
@@ -484,27 +442,6 @@ describe("APIv1", () => {
         });
     });
 
-    describe("GET /objects/:elementId", () => {
-        it("returns single object", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject);
-
-            const res = await request(app).get("/objects/obj-1");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(wire(sampleObject));
-        });
-
-        it("returns 404 for missing object", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/nonexistent");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
-
     describe("POST /objects/list", () => {
         it("returns bulk preserving order", async () => {
             const { app, objectTree } = createApp();
@@ -528,43 +465,6 @@ describe("APIv1", () => {
             expect(results[1].success).toBe(true);
             expect(results[2].elementId).toBe("missing");
             expect(results[2].success).toBe(false);
-        });
-    });
-
-    describe("GET /objects/:elementId/related", () => {
-        it("returns related objects", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject);
-            objectTree.getRelated.mockReturnValue([sampleObject2]);
-
-            const res = await request(app).get("/objects/obj-1/related");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual([{ sourceRelationship: "HasComponent", object: sampleObject2 }]);
-        });
-
-        it("passes relationshipType query param", async () => {
-            const { app, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject);
-            objectTree.getRelated.mockReturnValue([]);
-
-            await request(app)
-                .get("/objects/obj-1/related")
-                .query({ relationshipType: "HasChildren" });
-
-            expect(objectTree.getRelated).toHaveBeenCalledWith(
-                "obj-1",
-                "HasChildren",
-            );
-        });
-
-        it("returns 404 if object not found", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/nonexistent/related");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
         });
     });
 
@@ -620,43 +520,6 @@ describe("APIv1", () => {
     });
 
     /* ---- Values ---- */
-
-    describe("GET /objects/:elementId/value", () => {
-        it("returns VQT value for a non-composition object", async () => {
-            const { app, history, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject2); // isComposition: false
-            history.getCurrentValue.mockResolvedValue(sampleValueResponse);
-
-            const res = await request(app).get("/objects/obj-2/value");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(sampleValueResponse);
-        });
-
-        it("returns VQT value for a composition object", async () => {
-            const { app, history, objectTree } = createApp();
-            objectTree.getObject.mockReturnValue(sampleObject); // isComposition: true
-            const compositionResponse: I3xValueResponse = {
-                ...sampleValueResponse,
-                isComposition: true,
-            };
-            history.getCompositionValue.mockResolvedValue(compositionResponse);
-
-            const res = await request(app).get("/objects/obj-1/value");
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual(compositionResponse);
-        });
-
-        it("returns 404 for missing value", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/obj-1/value");
-
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-        });
-    });
 
     describe("POST /objects/value", () => {
         it("returns bulk VQTs", async () => {
@@ -811,8 +674,6 @@ describe("APIv1", () => {
             const spy = jest.spyOn(console, "log").mockImplementation(() => {});
             try {
                 await request(app).post("/objects/value").send({ elementIds: ["hit", "a", "b"] });
-                await request(app).get("/objects/a/value");
-                await request(app).get("/objects/hit/value");
                 expect(spy).not.toHaveBeenCalled();
             } finally {
                 spy.mockRestore();
@@ -821,83 +682,6 @@ describe("APIv1", () => {
     });
 
     /* ---- History ---- */
-
-    describe("GET /objects/:elementId/history", () => {
-        it("returns history array", async () => {
-            const { app, history, objectTree } = createApp();
-            objectTree.getObject.mockImplementation(known("obj-1"));
-            history.queryHistory.mockResolvedValue([sampleVqt]);
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00Z" });
-
-            expect(res.status).toBe(200);
-            expect(res.body.result).toEqual({
-                isComposition: false,
-                values: [sampleVqt],
-            });
-        });
-
-        it("returns 400 for missing params", async () => {
-            const { app } = createApp();
-
-            const res = await request(app).get("/objects/obj-1/history");
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-        });
-
-        it("returns 400 if only startTime provided", async () => {
-            const { app } = createApp();
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z" });
-
-            expect(res.status).toBe(400);
-        });
-
-        it("returns 400 for a non-RFC3339 startTime", async () => {
-            const { app, history } = createApp();
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "-30d)", endTime: "2026-04-01T00:00:00Z" });
-
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-            expect(history.queryHistory).not.toHaveBeenCalled();
-        });
-
-        it("returns 400 for a non-RFC3339 endTime", async () => {
-            const { app, history } = createApp();
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "now()" });
-
-            expect(res.status).toBe(400);
-            expect(history.queryHistory).not.toHaveBeenCalled();
-        });
-
-        it("accepts valid RFC 3339 bounds and passes them through", async () => {
-            const { app, history, objectTree } = createApp();
-            objectTree.getObject.mockImplementation(known("obj-1"));
-            history.queryHistory.mockResolvedValue([sampleVqt]);
-
-            const res = await request(app)
-                .get("/objects/obj-1/history")
-                .query({ startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00+01:00" });
-
-            expect(res.status).toBe(200);
-            expect(history.queryHistory).toHaveBeenCalledWith(
-                "obj-1",
-                "2026-01-01T00:00:00Z",
-                "2026-04-01T00:00:00+01:00",
-            );
-        });
-    });
 
     describe("POST /objects/history", () => {
         it("returns bulk history", async () => {
@@ -934,6 +718,54 @@ describe("APIv1", () => {
                 .send({ elementIds: ["obj-1"] });
 
             expect(res.status).toBe(400);
+        });
+
+        it("returns 400 for bounds that are not RFC 3339, before any query", async () => {
+            const { app, history } = createApp();
+
+            for (const [startTime, endTime] of [
+                ["-30d)", "2026-04-01T00:00:00Z"],
+                ["2026-01-01T00:00:00Z", "now()"],
+                [1767225600, "2026-04-01T00:00:00Z"],
+            ]) {
+                const res = await request(app)
+                    .post("/objects/history")
+                    .send({ elementIds: ["obj-1"], startTime, endTime });
+                expect(res.status).toBe(400);
+                expect(res.body.success).toBe(false);
+            }
+            expect(history.queryHistory).not.toHaveBeenCalled();
+        });
+
+        it("accepts valid RFC 3339 bounds and passes them through", async () => {
+            const { app, history, objectTree } = createApp();
+            objectTree.getObject.mockImplementation(known("obj-1"));
+            history.queryHistory.mockResolvedValue([sampleVqt]);
+
+            const res = await request(app)
+                .post("/objects/history")
+                .send({ elementIds: ["obj-1"], startTime: "2026-01-01T00:00:00Z", endTime: "2026-04-01T00:00:00+01:00" });
+
+            expect(res.status).toBe(200);
+            expect(history.queryHistory).toHaveBeenCalledWith(
+                "obj-1",
+                "2026-01-01T00:00:00Z",
+                "2026-04-01T00:00:00+01:00",
+            );
+        });
+
+        it("has no routes for a single object: i3X 1.0 reads in bulk only", async () => {
+            const { app, objectTree } = createApp();
+            objectTree.getObject.mockReturnValue(sampleObject);
+
+            for (const path of ["/objects/obj-1", "/objects/obj-1/value", "/objects/obj-1/history",
+                "/objects/obj-1/related", "/objecttypes/type-1", "/relationshiptypes/rel-1"]) {
+                const res = await request(app).get(path);
+                expect([path, res.status]).toEqual([path, 404]);
+                expect(res.body).toEqual({ success: false, responseDetail: {
+                    title: "Not Found", status: 404, detail: `No such endpoint: GET ${path}`,
+                } });
+            }
         });
     });
 

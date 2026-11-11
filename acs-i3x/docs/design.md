@@ -408,12 +408,11 @@ Pure translation helpers, quality derivation and the i3X type definitions.
 
 ## Endpoint Mapping
 
-The service implements i3X 1.0 (`specVersion: "1.0"` in `/info`). All
-mounted under `/v1/`. The single-object and single-type `GET` routes
-(`/objects/:elementId` and below, `/objecttypes/:elementId`,
-`/relationshiptypes/:elementId`) are not in i3X 1.0, which has only the
-bulk forms. They stay for the clients that use them and answer in the
-1.0 shapes.
+The service implements i3X 1.0 (`specVersion: "1.0"` in `/info`), and
+serves exactly the endpoints 1.0 defines, all mounted under `/v1/`.
+i3X 1.0 reads objects, types, values, history and relationships in bulk
+only, so there are no routes for a single object or type. Any other
+path under `/v1/` answers 404 in the i3X error shape.
 
 ### Server Info (no auth)
 | Method | Path | Source |
@@ -425,23 +424,17 @@ bulk forms. They stay for the clients that use them and answer in the
 |--------|------|--------|
 | GET | `/namespaces` | Object tree |
 | GET | `/objecttypes` | Object tree (ConfigDB classes + schemas) |
-| GET | `/objecttypes/:elementId` | Object tree |
 | POST | `/objecttypes/query` | Object tree bulk |
 | GET | `/relationshiptypes` | Object tree |
-| GET | `/relationshiptypes/:elementId` | Object tree |
 | POST | `/relationshiptypes/query` | Object tree bulk |
 | GET | `/objects` | Object tree, streamed in chunks |
-| GET | `/objects/:elementId` | Object tree |
 | POST | `/objects/list` | Object tree bulk |
-| GET | `/objects/:elementId/related` | Object tree relationships |
-| POST | `/objects/related` | Object tree bulk |
+| POST | `/objects/related` | Object tree relationships, bulk |
 
 ### Query (REQUIRED)
 | Method | Path | Source |
 |--------|------|--------|
-| GET | `/objects/:elementId/value` | Value cache |
 | POST | `/objects/value` | Value cache bulk |
-| GET | `/objects/:elementId/history` | InfluxDB |
 | POST | `/objects/history` | InfluxDB bulk |
 
 ### Subscribe (REQUIRED + SSE)

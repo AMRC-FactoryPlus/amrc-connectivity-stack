@@ -59,9 +59,15 @@ changes below. The Manager UI is updated in the same release.
   it is related to.
 - A bulk request with no `elementIds` gets a 400, where it got a 500.
 
-The single-object `GET` routes (`/objects/{id}`, `/objects/{id}/value`
-and the like) are not part of i3X 1.0, which has only the bulk `POST`
-forms. They still work, and answer in the new shapes.
+- **The single-object routes are gone.** i3X 1.0 reads in bulk only,
+  so the service no longer has `GET /objects/{id}`,
+  `GET /objects/{id}/value`, `GET /objects/{id}/history`,
+  `GET /objects/{id}/related`, `GET /objecttypes/{id}` or
+  `GET /relationshiptypes/{id}`. Send the one id to the bulk form
+  (`POST /objects/list`, `/objects/value`, `/objects/history`,
+  `/objects/related`, `/objecttypes/query`, `/relationshiptypes/query`)
+  and take the first item of `results`. Any other path under `/v1`
+  answers 404 in the i3X error shape.
 
 The service rebuilds its database from ConfigDB the first time the new
 version starts, because the stored object types change. It answers 503

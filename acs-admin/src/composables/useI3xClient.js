@@ -42,6 +42,18 @@ async function bulk (client, url, body) {
   return { status: res.status, results: res.body.results ?? [] }
 }
 
+// i3X 1.0 reads objects, values, history and relationships in bulk
+// only. For a call about one object, send the one id and take its
+// result; a failed item throws, as a failed request does.
+async function one (client, url, body) {
+  const { status, results } = await bulk(client, url, body)
+  const item = results[0]
+  if (!item?.success) {
+    throw new Error(item?.responseDetail?.detail || 'i3X request failed')
+  }
+  return { status, result: item.result }
+}
+
 /**
  * Sort the per-id results of a subscription register into the ids that
  * registered, the ids i3X does not show this principal (404: no access,
@@ -142,15 +154,15 @@ export function useI3xClient () {
     },
 
     getObject (elementId) {
-      return get(c(), `v1/objects/${encodeURIComponent(elementId)}`)
+      return one(c(), 'v1/objects/list', { elementIds: [elementId] }).then(r => r.result)
     },
 
     // The objects related to one object, each with the
     // `sourceRelationship` that leads to it from `elementId`.
     getRelated (elementId, relationshipType) {
-      const query = relationshipType ? { relationshipType } : undefined
-      return get(c(), `v1/objects/${encodeURIComponent(elementId)}/related`, query)
-        .then(objects_of)
+      const body = { elementIds: [elementId] }
+      if (relationshipType) body.relationshipType = relationshipType
+      return one(c(), 'v1/objects/related', body).then(r => objects_of(r.result))
     },
 
     // As getRelated for many objects: the per-id results, each
@@ -176,7 +188,7 @@ export function useI3xClient () {
     // An object with no data answers with a null value of quality
     // GoodNoData, not with an error.
     getValue (elementId) {
-      return get(c(), `v1/objects/${encodeURIComponent(elementId)}/value`)
+      return one(c(), 'v1/objects/value', { elementIds: [elementId] }).then(r => r.result)
     },
 
     // `partial` is set when the server's maxDepthCap cut maxDepth short
@@ -189,8 +201,8 @@ export function useI3xClient () {
     },
 
     getHistory (elementId, startTime, endTime) {
-      return get(c(), `v1/objects/${encodeURIComponent(elementId)}/history`,
-        { startTime, endTime })
+      return one(c(), 'v1/objects/history', { elementIds: [elementId], startTime, endTime })
+        .then(r => r.result)
     },
 
     getHistoryBulk (params) {

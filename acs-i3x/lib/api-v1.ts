@@ -495,32 +495,21 @@ export class APIv1 {
 
         /* ---- Explore: Object Types ---- */
         api.get("/objecttypes", this.get_object_types.bind(this));
-        api.get("/objecttypes/:elementId", this.get_object_type.bind(this));
         api.post("/objecttypes/query", this.query_object_types.bind(this));
 
         /* ---- Explore: Relationship Types ---- */
         api.get("/relationshiptypes", this.get_relationship_types.bind(this));
-        api.get("/relationshiptypes/:elementId", this.get_relationship_type.bind(this));
         api.post("/relationshiptypes/query", this.query_relationship_types.bind(this));
 
         /* ---- Explore: Objects ---- */
         api.get("/objects", asyncHandler(this.get_objects.bind(this)));
 
-        /* Value and history sub-routes must be declared before the
-         * /:elementId catch-all to avoid path conflicts. */
+        /* i3X 1.0 reads objects, values, history and relationships in
+         * bulk only: there are no routes for a single object. */
         api.post("/objects/list", this.list_objects.bind(this));
         api.post("/objects/value", asyncHandler(this.value_objects.bind(this)));
         api.post("/objects/history", asyncHandler(this.history_objects.bind(this)));
         api.post("/objects/related", asyncHandler(this.related_objects.bind(this)));
-
-        /* The single-object routes below, and the two single-type routes
-         * above, are not part of i3X 1.0, which has only the bulk
-         * forms. They stay for the clients that use them, and answer in
-         * the 1.0 shapes. */
-        api.get("/objects/:elementId/value", asyncHandler(this.get_object_value.bind(this)));
-        api.get("/objects/:elementId/history", asyncHandler(this.get_object_history.bind(this)));
-        api.get("/objects/:elementId/related", asyncHandler(this.get_object_related.bind(this)));
-        api.get("/objects/:elementId", this.get_object.bind(this));
 
         /* ---- Subscriptions ---- */
         api.use("/subscriptions", this.check_client_id.bind(this));
@@ -531,6 +520,11 @@ export class APIv1 {
         api.post("/subscriptions/stream", asyncHandler(this.stream_subscription.bind(this)));
         api.post("/subscriptions/sync", this.sync_subscription.bind(this));
         api.post("/subscriptions", this.create_subscription.bind(this));
+
+        /* Anything else under /v1 is not an i3X endpoint: answer in
+         * the i3X error shape, not with Express's HTML page. */
+        api.use((req: Request, _res: Response, next: NextFunction) =>
+            next(notFound(`No such endpoint: ${req.method} ${req.path}`)));
 
         /* ---- Error handler (must be last) ---- */
         api.use(i3xErrorHandler);
@@ -607,15 +601,6 @@ export class APIv1 {
     }
 
     /**
-     * GET /objecttypes/:elementId — returns one object type, or 404 if unknown.
-     **/
-    get_object_type(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getObjectType(req.params.elementId);
-        if (!result) return next(notFound(`Object type not found: ${req.params.elementId}`));
-        res.json(result);
-    }
-
-    /**
      * POST /objecttypes/query — bulk lookup of object types by id list.
      * Returns a per-id success/error envelope; missing ids are reported
      * as failures rather than aborting the batch. Uses the
@@ -640,15 +625,6 @@ export class APIv1 {
     get_relationship_types(req: Request, res: Response): void {
         const ns = req.query.namespaceUri as string | undefined;
         res.json(this.objectTree.getRelationshipTypes(ns));
-    }
-
-    /**
-     * GET /relationshiptypes/:elementId — returns one relationship type, or 404 if unknown.
-     **/
-    get_relationship_type(req: Request, res: Response, next: NextFunction): void {
-        const result = this.objectTree.getRelationshipType(req.params.elementId);
-        if (!result) return next(notFound(`Relationship type not found: ${req.params.elementId}`));
-        res.json(result);
     }
 
     /**
@@ -881,113 +857,6 @@ export class APIv1 {
             }
             yield "]}";
         })());
-    }
-
-    /**
-     * GET /objects/:elementId/value — single-id current value. Same
-     * cache-then-InfluxDB strategy as `value_objects` (UNS cache,
-     * then `history.getCompositionValue`/`getCurrentValue`); 404 if
-     * neither source has a value. The `maxDepth` query parameter works
-     * as it does for `value_objects`, including the 206 when clamped.
-     */
-    async get_object_value(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const id = req.params.elementId;
-        const visible = visibleTo(res);
-        const obj = this.objectTree.getObject(id, visible);
-        if (!obj) return next(notFound(`Element not found: ${id}`));
-        /* Digits only: Number() would take "" as 0 (the whole
-         * subtree), and " 1", "0x10" or "1e1" as other depths. */
-        const raw = req.query.maxDepth;
-        if (raw !== undefined && !(typeof raw === "string" && /^\d+$/.test(raw))) {
-            return next(badRequest("maxDepth must be a non-negative integer"));
-        }
-        const { effective, clamped } = this.clampDepth(raw === undefined ? 1 : Number(raw));
-        if (clamped) res.status(206);
-        // Try UNS cache first (real-time), fall back to InfluxDB last()
-        const cached = await this.valueCache.getValueLazy(id, effective, visible);
-        if (cached) {
-            this.log("GET /objects/%s/value: UNS cache hit", id);
-            if (!cached.components) {
-                res.json(cached.head);
-                return;
-            }
-            // A composition high in the hierarchy can have millions of
-            // components: send them as they are read.
-            await streamText(res, (function* () {
-                yield '{"success":true,"result":';
-                yield* lazyValueJson(cached);
-                yield "}";
-            })());
-            return;
-        }
-        const result = obj.isComposition
-            ? await this.history.getCompositionValue(id, effective, visible)
-            : await this.history.getCurrentValue(id);
-        this.log("GET /objects/%s/value: UNS cache miss, InfluxDB %s",
-            id, result ? "hit" : "no data");
-        res.json(result ?? noData(obj));
-    }
-
-    /**
-     * GET /objects/:elementId/history — requires `startTime`/`endTime` query params (400 otherwise).
-     * The values are streamed, as for POST /objects/history.
-     **/
-    async get_object_history(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const { startTime, endTime } = req.query as { startTime?: string; endTime?: string };
-        if (!startTime || !endTime) {
-            return next(badRequest("startTime and endTime query parameters are required"));
-        }
-        if(!validator.isRFC3339(startTime) || !validator.isRFC3339(endTime)) {
-            return next(badRequest("startTime and endTime must be an RFC 3339 timestamp"));
-        }
-        const id = req.params.elementId;
-        const visible = visibleTo(res);
-        const obj = this.objectTree.getObject(id, visible);
-        if (!obj) return next(notFound(`Element not found: ${id}`));
-        /* Sent as InfluxDB returns it, as for POST /objects/history. A
-         * query that fails before STREAM_CHUNK bytes have gathered
-         * still gets an error response. */
-        const rows = this.history.streamHistory(id, startTime, endTime, { signal: closeSignal(res) });
-        await streamText(res, (async function* () {
-            yield `{"success":true,"result":{"isComposition":${obj.isComposition},"values":[`;
-            let first = true;
-            for await (const batch of rows) {
-                let out = "";
-                for (const v of batch) {
-                    out += (first ? "" : ",") + JSON.stringify(v);
-                    first = false;
-                }
-                yield out;
-            }
-            yield "]}}";
-        })(), { lateFailure: "end" });
-    }
-
-    /**
-     * GET /objects/:elementId/related — related objects, optionally filtered by `relationshiptype`. 404 if the source object is unknown.
-     **/
-    async get_object_related(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const visible = visibleTo(res);
-        const obj = this.objectTree.getObject(req.params.elementId, visible);
-        if (!obj) return next(notFound(`Element not found: ${req.params.elementId}`));
-        const rt = req.query.relationshipType as string | undefined;
-        const tree = this.objectTree;
-        const wire = this.wire.bind(this);
-        // An ISA-95 level can have tens of thousands of children.
-        await streamJsonArray(res, '{"success":true,"result":[', (function* () {
-            for (const e of tree.iterateEdges(obj.elementId, rt, 1000, visible))
-                yield { sourceRelationship: e.sourceRelationship, object: wire(e.object, false, visible) };
-        })(), "]}");
-    }
-
-    /**
-     * GET /objects/:elementId — returns one object, or 404 if unknown.
-     **/
-    get_object(req: Request, res: Response, next: NextFunction): void {
-        const visible = visibleTo(res);
-        const result = this.objectTree.getObject(req.params.elementId, visible);
-        if (!result) return next(notFound(`Element not found: ${req.params.elementId}`));
-        res.json(this.wire(result, req.query.includeMetadata === "true", visible));
     }
 
     /**

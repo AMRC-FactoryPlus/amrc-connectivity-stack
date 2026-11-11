@@ -285,28 +285,30 @@ describe("POST /v1/objects/history, streamed", () => {
     });
 });
 
-describe("GET /v1/objects/:elementId/history, streamed", () => {
-    it("sends the same body as before", async () => {
+describe("POST /v1/objects/history for one element, streamed", () => {
+    it("sends a long history whole", async () => {
         const data = rows(30_000);
         const res = await request(app(makeHistory(csvTransport(() => data, { chunkSize: 8192 }))))
-            .get("/v1/objects/temp/history").query({ startTime: START, endTime: END });
+            .post("/v1/objects/history").send({ elementIds: ["temp"], startTime: START, endTime: END });
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ success: true, result: { isComposition: false, values: vqts(data) } });
+        expect(res.body).toEqual({ success: true, results: [
+            { success: true, elementId: "temp", result: { isComposition: false, values: vqts(data) } },
+        ] });
     });
 
-    it("answers 404 for a hidden element and an error response for an early failure", async () => {
+    it("answers a per-item 404 for a hidden element and a per-item error for an early failure", async () => {
         const h = makeHistory(csvTransport(() => {
             throw new HttpError(400, "Bad Request", "{\"message\":\"bad query\"}");
         }));
-        const hidden = await request(app(h)).get("/v1/objects/secret/history")
-            .query({ startTime: START, endTime: END });
-        expect(hidden.status).toBe(404);
-        expect(hidden.body.success).toBe(false);
-
-        const failed = await request(app(h)).get("/v1/objects/temp/history")
-            .query({ startTime: START, endTime: END });
-        expect(failed.status).toBe(500);
-        expect(failed.body).toEqual({ success: false, responseDetail: { title: "Internal Server Error", status: 500, detail: expect.stringContaining("bad query") } });
+        const res = await request(app(h)).post("/v1/objects/history")
+            .send({ elementIds: ["secret", "temp"], startTime: START, endTime: END });
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ success: false, results: [
+            { success: false, elementId: "secret",
+                responseDetail: { title: "Not Found", status: 404, detail: "Element not found: secret" } },
+            { success: false, elementId: "temp",
+                responseDetail: { title: "Internal Server Error", status: 500, detail: expect.stringContaining("bad query") } },
+        ] });
         expect(SEMAPHORE(h).running).toBe(0);
     });
 });

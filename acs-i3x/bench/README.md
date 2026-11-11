@@ -150,5 +150,6 @@ node bench/history.mjs --influx http://127.0.0.1:58087 \
   --build before=/tmp/i3x-before/acs-i3x/dist --build after=./dist --runs 3
 ```
 
-Add `--gzip 0` to ask for an uncompressed response, or `--get` to use
-`GET /v1/objects/:elementId/history` instead.
+Add `--gzip 0` to ask for an uncompressed response. `--get` uses
+`GET /v1/objects/:elementId/history` instead, which only builds from
+before i3X 1.0 have: 1.0 reads history in bulk only.

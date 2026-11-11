@@ -1341,7 +1341,7 @@ export class ValueCache {
                 elementId,
                 isComposition: true,
                 value: null,
-                quality: "Good",
+                quality: "GoodNoData",
                 timestamp: latest,
             },
             components: () => this.walkComponents(elementId, all, trust, maxDepth, visible),
@@ -1442,7 +1442,7 @@ export class ValueCache {
                 if (step[1].timestamp > latest) latest = step[1].timestamp;
             }
             if (Object.keys(components).length === 0) return null;
-            return { elementId, isComposition: true, value: null, quality: "Good", timestamp: latest, components };
+            return { elementId, isComposition: true, value: null, quality: "GoodNoData", timestamp: latest, components };
         }
 
         this.flush();
@@ -1479,7 +1479,7 @@ export class ValueCache {
                 elementId,
                 isComposition: true,
                 value: null,
-                quality: "Good",
+                quality: "GoodNoData",
                 timestamp: latestTs,
                 components,
             };

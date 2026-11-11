@@ -13,6 +13,7 @@ import type {
     I3xRelationshipType,
     I3xSuccess,
     I3xError,
+    I3xResponseDetail,
     I3xBulkItem,
     I3xBulkResponse,
 } from "./types/i3x.js";
@@ -76,8 +77,25 @@ export function wrapResponse<T>(result: T): I3xSuccess<T> {
     return { success: true, result };
 }
 
+const STATUS_TITLES: Record<number, string> = {
+    206: "Partial Content",
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    409: "Conflict",
+    500: "Internal Server Error",
+    501: "Not Implemented",
+    503: "Service Unavailable",
+};
+
+/** The i3X problem details for an HTTP status and an explanation. */
+export function responseDetail(status: number, detail: string): I3xResponseDetail {
+    return { title: STATUS_TITLES[status] ?? "Error", status, detail };
+}
+
 export function wrapError(message: string, code: number): I3xError {
-    return { success: false, error: { code, message } };
+    return { success: false, responseDetail: responseDetail(code, message) };
 }
 
 export function wrapBulkResponse<T>(items: I3xBulkItem<T>[]): I3xBulkResponse<T> {

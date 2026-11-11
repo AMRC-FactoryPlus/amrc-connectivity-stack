@@ -404,7 +404,7 @@ describe("ObjectTree", () => {
             expect(childrenOfSub1).toContain(sub2);
         });
 
-        it("getRelated(id, HasChildren) returns children", async () => {
+        it("getRelated(id, HasComponent) returns a device's components", async () => {
             const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
@@ -414,12 +414,14 @@ describe("ObjectTree", () => {
                 ["Axes"],
             );
 
-            const children = tree.getRelated(dev1, RelType.HasChildren);
+            /* A device's children are parts of its value, not children. */
+            expect(tree.getRelated(dev1, RelType.HasChildren)).toEqual([]);
+            const children = tree.getRelated(dev1, RelType.HasComponent);
             const childIds = children.map(c => c.elementId);
             expect(childIds).toContain(sub1);
         });
 
-        it("getRelated(childId, HasParent) returns parent", async () => {
+        it("getRelated(childId, ComponentOf) returns the device", async () => {
             const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
@@ -429,7 +431,8 @@ describe("ObjectTree", () => {
                 ["Axes"],
             );
 
-            const parents = tree.getRelated(sub1, RelType.HasParent);
+            expect(tree.getRelated(sub1, RelType.HasParent)).toEqual([]);
+            const parents = tree.getRelated(sub1, RelType.ComponentOf);
             expect(parents).toHaveLength(1);
             expect(parents[0].elementId).toBe(dev1);
         });

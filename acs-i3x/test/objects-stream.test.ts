@@ -49,9 +49,13 @@ function bareApp(objectTree: ObjectTree) {
     return app;
 }
 
-/** What the old route sent: res.json of the whole array. */
-const oldBody = (t: ObjectTree, opts?: any) =>
-    JSON.stringify({ success: true, result: t.getObjects(opts) });
+/** What res.json of the whole array would send: every object as i3X
+ * has it, where a root has no parent, with its metadata if asked. */
+const oldBody = (t: ObjectTree, opts?: any, includeMetadata = false) =>
+    JSON.stringify({ success: true, result: t.getObjects(opts).map(o => {
+        const out = o.parentId === "/" ? { ...o, parentId: null } : o;
+        return includeMetadata ? { ...out, metadata: t.objectMetadata(o) } : out;
+    }) });
 
 describe("GET /v1/objects", () => {
     const t = tree(300);
@@ -70,7 +74,7 @@ describe("GET /v1/objects", () => {
             const res = await request(app).get(`/v1/objects${query}`);
             expect(res.status).toBe(200);
             expect(res.headers["content-type"]).toBe("application/json; charset=utf-8");
-            expect(res.text).toBe(oldBody(t, opts));
+            expect(res.text).toBe(oldBody(t, opts, query.includes("includeMetadata")));
         }
         // Big enough to take many chunks.
         expect(oldBody(t).length).toBeGreaterThan(1_000_000);

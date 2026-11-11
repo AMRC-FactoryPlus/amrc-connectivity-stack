@@ -34,8 +34,10 @@ function isCorrupt(err: unknown): boolean {
 /* 4: devices without ISA-95 hierarchy are left out of the tree, and
  * uns_device records each device's UNS topic segment.
  * 5: a device's ISA-95 position comes from its placement, and
- * sync_device records the position each device was placed at. */
-export const SCHEMA_VERSION = 5;
+ * sync_device records the position each device was placed at.
+ * 6: a leaf metric with no schema takes its object type from its
+ * Sparkplug type (i3X 1.0), where it was "unknown". */
+export const SCHEMA_VERSION = 6;
 
 const TABLES = `
     -- The object tree. seq gives Map insertion order: an upsert keeps

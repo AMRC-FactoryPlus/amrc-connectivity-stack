@@ -414,7 +414,7 @@ export class History {
                 elementId: id,
                 isComposition: true,
                 value: null,
-                quality: "Good",
+                quality: "GoodNoData",
                 timestamp: latestTimestamp,
                 components,
             });

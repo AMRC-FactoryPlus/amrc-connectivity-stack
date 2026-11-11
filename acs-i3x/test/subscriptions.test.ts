@@ -1,6 +1,7 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { SubscriptionManager } from "../lib/subscriptions.js";
 import type { I3xVqt, I3xSyncItem } from "../lib/types/i3x.js";
+import type { SyncResult } from "../lib/subscriptions.js";
 import { allowAll } from "./helpers/allow-all.js";
 
 /* ---- Mock helpers ---- */
@@ -34,6 +35,12 @@ function makeVqt(value: unknown = 42, timestamp?: string): I3xVqt {
         quality: "Good",
         timestamp: timestamp ?? "2026-04-01T12:00:00Z",
     };
+}
+
+/** The updates of a sync result, oldest first, whatever batches they
+ * came in. */
+function flat(r: SyncResult): I3xSyncItem[] {
+    return r.batches.flatMap(b => b.updates);
 }
 
 function closeHandler(res: any): () => void {
@@ -101,7 +108,7 @@ describe("SubscriptionManager", () => {
             const sub1 = mgr.create("client-1", "client-1", "Sub A");
             const sub2 = mgr.create("client-1", "client-1", "Sub B");
 
-            const result = mgr.list("client-1", [sub1.subscriptionId, sub2.subscriptionId]);
+            const result = mgr.list("client-1", "client-1", [sub1.subscriptionId, sub2.subscriptionId]);
 
             expect(result).toHaveLength(2);
             expect(result.map(s => s.subscriptionId).sort()).toEqual(
@@ -112,7 +119,7 @@ describe("SubscriptionManager", () => {
         it("returns empty for unknown subscriptionId", () => {
             mgr.create("client-1", "client-1");
 
-            const result = mgr.list("client-1", ["nonexistent-id"]);
+            const result = mgr.list("client-1", "client-1", ["nonexistent-id"]);
 
             expect(result).toHaveLength(0);
         });
@@ -120,7 +127,7 @@ describe("SubscriptionManager", () => {
         it("filters out subscriptions belonging to different clientId", () => {
             const sub = mgr.create("client-1", "client-1");
 
-            const result = mgr.list("client-2", [sub.subscriptionId]);
+            const result = mgr.list("client-2", "client-2", [sub.subscriptionId]);
 
             expect(result).toHaveLength(0);
         });
@@ -132,7 +139,7 @@ describe("SubscriptionManager", () => {
         it("returns subscription with empty monitoredObjects initially", () => {
             const sub = mgr.create("client-1", "client-1", "Sub A");
 
-            const result = mgr.getOne("client-1", sub.subscriptionId);
+            const result = mgr.getOne("client-1", "client-1", sub.subscriptionId);
 
             expect(result).toEqual({
                 clientId: "client-1",
@@ -144,9 +151,9 @@ describe("SubscriptionManager", () => {
 
         it("includes registered elements with their maxDepth", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"], 3);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1", "elem-2"], 3);
 
-            const result = mgr.getOne("client-1", sub.subscriptionId);
+            const result = mgr.getOne("client-1", "client-1", sub.subscriptionId);
 
             expect(result.monitoredObjects).toEqual(
                 expect.arrayContaining([
@@ -159,10 +166,10 @@ describe("SubscriptionManager", () => {
 
         it("reflects different maxDepth per element when registered separately", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.registerOne("client-1", sub.subscriptionId, "elem-1", 1);
-            mgr.registerOne("client-1", sub.subscriptionId, "elem-2", 5);
+            mgr.registerOne("client-1", "client-1", sub.subscriptionId, "elem-1", 1);
+            mgr.registerOne("client-1", "client-1", sub.subscriptionId, "elem-2", 5);
 
-            const result = mgr.getOne("client-1", sub.subscriptionId);
+            const result = mgr.getOne("client-1", "client-1", sub.subscriptionId);
 
             expect(result.monitoredObjects).toEqual(
                 expect.arrayContaining([
@@ -174,7 +181,7 @@ describe("SubscriptionManager", () => {
 
         it("throws 404 for unknown subscriptionId", () => {
             try {
-                mgr.getOne("client-1", "does-not-exist");
+                mgr.getOne("client-1", "client-1", "does-not-exist");
                 fail("expected getOne to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -184,7 +191,7 @@ describe("SubscriptionManager", () => {
         it("throws 404 for a different owner", () => {
             const sub = mgr.create("client-1", "client-1");
             try {
-                mgr.getOne("client-2", sub.subscriptionId);
+                mgr.getOne("client-2", "client-2", sub.subscriptionId);
                 fail("expected getOne to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -197,15 +204,15 @@ describe("SubscriptionManager", () => {
     describe("deleteOne", () => {
         it("removes subscription", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.deleteOne("client-1", sub.subscriptionId);
+            mgr.deleteOne("client-1", "client-1", sub.subscriptionId);
 
-            const result = mgr.list("client-1", [sub.subscriptionId]);
+            const result = mgr.list("client-1", "client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(0);
         });
 
         it("throws 404 for unknown subscription", () => {
             try {
-                mgr.deleteOne("client-1", "nonexistent-id");
+                mgr.deleteOne("client-1", "client-1", "nonexistent-id");
                 throw new Error("expected throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -216,14 +223,14 @@ describe("SubscriptionManager", () => {
         it("throws 404 when subscription belongs to a different owner", () => {
             const sub = mgr.create("client-1", "client-1");
             try {
-                mgr.deleteOne("client-2", sub.subscriptionId);
+                mgr.deleteOne("client-2", "client-2", sub.subscriptionId);
                 throw new Error("expected throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
             }
 
             /* Subscription is untouched */
-            const result = mgr.list("client-1", [sub.subscriptionId]);
+            const result = mgr.list("client-1", "client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(1);
         });
     });
@@ -233,7 +240,7 @@ describe("SubscriptionManager", () => {
     describe("register", () => {
         it("adds elementIds to subscription", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
 
             // After registering, value changes for elem-1 should be captured
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
@@ -242,7 +249,7 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-1");
         });
@@ -251,8 +258,8 @@ describe("SubscriptionManager", () => {
             const sub = mgr.create("client-1", "client-1");
 
             expect(() => {
-                mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
-                mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+                mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
+                mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             }).not.toThrow();
         });
 
@@ -260,7 +267,7 @@ describe("SubscriptionManager", () => {
             const sub = mgr.create("client-1", "client-1");
 
             try {
-                mgr.register("client-2", sub.subscriptionId, ["elem-1"]);
+                mgr.register("client-2", "client-2", sub.subscriptionId, ["elem-1"]);
                 fail("expected register to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -269,7 +276,7 @@ describe("SubscriptionManager", () => {
 
         it("throws 404 for unknown subscriptionId", () => {
             try {
-                mgr.register("client-1", "does-not-exist", ["elem-1"]);
+                mgr.register("client-1", "client-1", "does-not-exist", ["elem-1"]);
                 fail("expected register to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -282,7 +289,7 @@ describe("SubscriptionManager", () => {
     describe("registerOne", () => {
         it("adds a single elementId to subscription", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.registerOne("client-1", sub.subscriptionId, "elem-1");
+            mgr.registerOne("client-1", "client-1", sub.subscriptionId, "elem-1");
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -290,14 +297,14 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-1");
         });
 
         it("throws 404 for unknown subscriptionId", () => {
             try {
-                mgr.registerOne("client-1", "does-not-exist", "elem-1");
+                mgr.registerOne("client-1", "client-1", "does-not-exist", "elem-1");
                 fail("expected registerOne to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -307,7 +314,7 @@ describe("SubscriptionManager", () => {
         it("throws 404 for a different owner", () => {
             const sub = mgr.create("client-1", "client-1");
             try {
-                mgr.registerOne("client-2", sub.subscriptionId, "elem-1");
+                mgr.registerOne("client-2", "client-2", sub.subscriptionId, "elem-1");
                 fail("expected registerOne to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -320,8 +327,8 @@ describe("SubscriptionManager", () => {
     describe("unregister", () => {
         it("removes elementIds from subscription", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
-            mgr.unregister("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
+            mgr.unregister("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -329,14 +336,14 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(0);
         });
 
         it("still receives changes for remaining registered elements", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
-            mgr.unregister("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
+            mgr.unregister("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -344,14 +351,14 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-2", makeVqt(200));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(1);
             expect(items[0].elementId).toBe("elem-2");
         });
 
         it("throws 404 for unknown subscriptionId", () => {
             try {
-                mgr.unregister("client-1", "does-not-exist", ["elem-1"]);
+                mgr.unregister("client-1", "client-1", "does-not-exist", ["elem-1"]);
                 fail("expected unregister to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -361,7 +368,7 @@ describe("SubscriptionManager", () => {
         it("throws 404 for a different owner", () => {
             const sub = mgr.create("client-1", "client-1");
             try {
-                mgr.unregister("client-2", sub.subscriptionId, ["elem-1"]);
+                mgr.unregister("client-2", "client-2", sub.subscriptionId, ["elem-1"]);
                 fail("expected unregister to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -374,8 +381,8 @@ describe("SubscriptionManager", () => {
     describe("unregisterOne", () => {
         it("removes a single elementId from subscription", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
-            mgr.unregisterOne("client-1", sub.subscriptionId, "elem-1");
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1", "elem-2"]);
+            mgr.unregisterOne("client-1", "client-1", sub.subscriptionId, "elem-1");
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -383,13 +390,13 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(0);
         });
 
         it("throws 404 for unknown subscriptionId", () => {
             try {
-                mgr.unregisterOne("client-1", "does-not-exist", "elem-1");
+                mgr.unregisterOne("client-1", "client-1", "does-not-exist", "elem-1");
                 fail("expected unregisterOne to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -399,7 +406,7 @@ describe("SubscriptionManager", () => {
         it("throws 404 for a different owner", () => {
             const sub = mgr.create("client-1", "client-1");
             try {
-                mgr.unregisterOne("client-2", sub.subscriptionId, "elem-1");
+                mgr.unregisterOne("client-2", "client-2", sub.subscriptionId, "elem-1");
                 fail("expected unregisterOne to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -410,9 +417,9 @@ describe("SubscriptionManager", () => {
     /* ---- onValueChange ---- */
 
     describe("onValueChange", () => {
-        it("queues item with correct sequenceNumber", () => {
+        it("queues the changes for the next sync, as one batch", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -421,17 +428,21 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100, "2026-04-01T12:00:00Z"));
             listener("elem-1", makeVqt(200, "2026-04-01T12:00:01Z"));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
-            expect(items).toHaveLength(2);
-            expect(items[0].sequenceNumber).toBe(1);
-            expect(items[1].sequenceNumber).toBe(2);
+            const { batches } = mgr.sync("client-1", "client-1", sub.subscriptionId);
+            expect(batches).toEqual([{
+                sequenceNumber: 1,
+                updates: [
+                    { elementId: "elem-1", ...makeVqt(100, "2026-04-01T12:00:00Z") },
+                    { elementId: "elem-1", ...makeVqt(200, "2026-04-01T12:00:01Z") },
+                ],
+            }]);
         });
 
         it("only queues for subscriptions that have the elementId registered", () => {
             const sub1 = mgr.create("client-1", "client-1");
             const sub2 = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub1.subscriptionId, ["elem-1"]);
-            mgr.register("client-1", sub2.subscriptionId, ["elem-2"]);
+            mgr.register("client-1", "client-1", sub1.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub2.subscriptionId, ["elem-2"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -439,8 +450,8 @@ describe("SubscriptionManager", () => {
             ) => void;
             listener("elem-1", makeVqt(100));
 
-            const items1 = mgr.sync("client-1", sub1.subscriptionId).updates;
-            const items2 = mgr.sync("client-1", sub2.subscriptionId).updates;
+            const items1 = flat(mgr.sync("client-1", "client-1", sub1.subscriptionId));
+            const items2 = flat(mgr.sync("client-1", "client-1", sub2.subscriptionId));
             expect(items1).toHaveLength(1);
             expect(items2).toHaveLength(0);
         });
@@ -458,26 +469,25 @@ describe("SubscriptionManager", () => {
             mgr.destroy();
             mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: 3 });
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             for (let i = 1; i <= 5; i++) listen()("elem-1", makeVqt(i));
 
-            expect(mgr.droppedCount("client-1", sub.subscriptionId)).toBe(2);
+            expect(mgr.droppedCount("client-1", "client-1", sub.subscriptionId)).toBe(2);
 
-            const { updates, dropped } = mgr.sync("client-1", sub.subscriptionId);
-            expect(updates.map(i => i.sequenceNumber)).toEqual([3, 4, 5]);
-            expect(updates.map(i => i.value)).toEqual([3, 4, 5]);
-            expect(dropped).toBe(2);
+            const result = mgr.sync("client-1", "client-1", sub.subscriptionId);
+            expect(flat(result).map(i => i.value)).toEqual([3, 4, 5]);
+            expect(result.dropped).toBe(2);
             /* The sync reported the drops, so they are not counted again. */
-            expect(mgr.droppedCount("client-1", sub.subscriptionId)).toBe(0);
+            expect(mgr.droppedCount("client-1", "client-1", sub.subscriptionId)).toBe(0);
         });
 
         it("still streams every update when the queue is full", () => {
             mgr.destroy();
             mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: 2 });
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
             for (let i = 1; i <= 5; i++) listen()("elem-1", makeVqt(i));
             expect(res.write).toHaveBeenCalledTimes(5);
         });
@@ -486,15 +496,15 @@ describe("SubscriptionManager", () => {
             const log = jest.spyOn(console, "log").mockImplementation(() => {});
             try {
                 const queued = mgr.create("client-1", "client-1");
-                mgr.register("client-1", queued.subscriptionId, ["elem-1"]);
+                mgr.register("client-1", "client-1", queued.subscriptionId, ["elem-1"]);
                 const streamed = mgr.create("client-1", "client-1");
-                mgr.register("client-1", streamed.subscriptionId, ["elem-1"]);
+                mgr.register("client-1", "client-1", streamed.subscriptionId, ["elem-1"]);
                 const res = mockSseRes();
-                mgr.stream("client-1", streamed.subscriptionId, res);
+                mgr.stream("client-1", "client-1", streamed.subscriptionId, res);
                 log.mockClear();
                 for (let i = 1; i <= 20; i++) listen()("elem-1", makeVqt(i));
                 expect(log).not.toHaveBeenCalled();
-                expect(mgr.sync("client-1", queued.subscriptionId).updates.at(-1)?.value).toBe(20);
+                expect(flat(mgr.sync("client-1", "client-1", queued.subscriptionId)).at(-1)?.value).toBe(20);
             } finally {
                 log.mockRestore();
             }
@@ -506,7 +516,7 @@ describe("SubscriptionManager", () => {
     describe("sync", () => {
         it("returns all queued items without lastSequenceNumber", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -515,56 +525,80 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100));
             listener("elem-1", makeVqt(200));
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(2);
         });
 
-        it("removes acknowledged items when lastSequenceNumber provided", () => {
+        it("removes acknowledged batches when lastSequenceNumber provided", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
             ) => void;
             listener("elem-1", makeVqt(100));
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
             listener("elem-1", makeVqt(200));
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
             listener("elem-1", makeVqt(300));
 
-            const items = mgr.sync("client-1", sub.subscriptionId, 2).updates;
-            expect(items).toHaveLength(1);
-            expect(items[0].sequenceNumber).toBe(3);
-            expect(items[0].value).toBe(300);
+            const { batches } = mgr.sync("client-1", "client-1", sub.subscriptionId, 2);
+            expect(batches.map(b => b.sequenceNumber)).toEqual([3]);
+            expect(batches[0].updates.map(u => u.value)).toEqual([300]);
+        });
+
+        it("sends a batch again until it is acknowledged", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+            expect(mgr.sync("client-1", "client-1", sub.subscriptionId).batches
+                .map(b => b.sequenceNumber)).toEqual([1]);
+
+            /* The client lost that response and asks again, with no
+             * acknowledgement: batch 1 comes back, then the new one. */
+            listener("elem-1", makeVqt(200));
+            const again = mgr.sync("client-1", "client-1", sub.subscriptionId).batches;
+            expect(again.map(b => b.sequenceNumber)).toEqual([1, 2]);
+            expect(again.map(b => b.updates.map(u => u.value))).toEqual([[100], [200]]);
+
+            /* With nothing new, an unacknowledged sync makes no batch. */
+            expect(mgr.sync("client-1", "client-1", sub.subscriptionId).batches
+                .map(b => b.sequenceNumber)).toEqual([1, 2]);
+            expect(mgr.sync("client-1", "client-1", sub.subscriptionId, 2).batches).toEqual([]);
         });
 
         it("returns empty array on empty queue", () => {
             const sub = mgr.create("client-1", "client-1");
 
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items).toHaveLength(0);
         });
 
         it("sequence numbers are monotonically increasing", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
             ) => void;
-            for (let i = 0; i < 10; i++) {
+            const seen: number[] = [];
+            for (let i = 0; i < 4; i++) {
                 listener("elem-1", makeVqt(i));
+                const { batches } = mgr.sync("client-1", "client-1", sub.subscriptionId, seen.at(-1));
+                seen.push(...batches.map(b => b.sequenceNumber));
             }
-
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
-            for (let i = 1; i < items.length; i++) {
-                expect(items[i].sequenceNumber).toBeGreaterThan(items[i - 1].sequenceNumber);
-            }
+            expect(seen).toEqual([1, 2, 3, 4]);
         });
 
         it("clears the whole queue when lastSequenceNumber is -1", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
@@ -572,17 +606,36 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100));
             listener("elem-1", makeVqt(200));
 
-            expect(mgr.sync("client-1", sub.subscriptionId, -1).updates).toEqual([]);
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
+            expect(flat(mgr.sync("client-1", "client-1", sub.subscriptionId, -1))).toEqual([]);
 
             listener("elem-1", makeVqt(300));
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
-            expect(items).toHaveLength(1);
-            expect(items[0].sequenceNumber).toBe(3);
+            const { batches } = mgr.sync("client-1", "client-1", sub.subscriptionId);
+            expect(batches.map(b => b.sequenceNumber)).toEqual([2]);
+            expect(batches[0].updates.map(u => u.value)).toEqual([300]);
+        });
+
+        it("clears every batch sent so far when lastSequenceNumber is -1", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(100));
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
+            listener("elem-1", makeVqt(200));
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
+
+            /* Batches 1 and 2 go; the change since then is batch 3. */
+            listener("elem-1", makeVqt(300));
+            const { batches } = mgr.sync("client-1", "client-1", sub.subscriptionId, -1);
+            expect(batches.map(b => b.sequenceNumber)).toEqual([3]);
         });
 
         it("clears nothing when lastSequenceNumber is invalid", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
@@ -590,16 +643,16 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100));
 
             for (const bad of ["1", 1.5, -2, null] as any[]) {
-                expect(mgr.sync("client-1", sub.subscriptionId, bad).updates).toHaveLength(1);
+                expect(flat(mgr.sync("client-1", "client-1", sub.subscriptionId, bad))).toHaveLength(1);
             }
         });
 
         it("refuses with 409 while a stream is open", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.stream("client-1", sub.subscriptionId, mockSseRes());
+            mgr.stream("client-1", "client-1", sub.subscriptionId, mockSseRes());
 
             try {
-                mgr.sync("client-1", sub.subscriptionId);
+                mgr.sync("client-1", "client-1", sub.subscriptionId);
                 fail("expected sync to throw");
             } catch (err: any) {
                 expect(err.status).toBe(409);
@@ -609,15 +662,15 @@ describe("SubscriptionManager", () => {
         it("allows sync again once the stream has closed", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
             closeHandler(res)();
 
-            expect(mgr.sync("client-1", sub.subscriptionId).updates).toEqual([]);
+            expect(flat(mgr.sync("client-1", "client-1", sub.subscriptionId))).toEqual([]);
         });
 
         it("drops the oldest updates beyond the queue limit", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
@@ -626,16 +679,35 @@ describe("SubscriptionManager", () => {
                 listener("elem-1", makeVqt(i));
             }
 
-            const { updates, dropped } = mgr.sync("client-1", sub.subscriptionId);
-            expect(dropped).toBe(3);
-            expect(updates).toHaveLength(MAX_QUEUE);
-            expect(updates[0].sequenceNumber).toBe(4);
-            expect(updates[MAX_QUEUE - 1].sequenceNumber).toBe(MAX_QUEUE + 3);
+            const result = mgr.sync("client-1", "client-1", sub.subscriptionId);
+            expect(result.dropped).toBe(3);
+            expect(flat(result).map(u => u.value))
+                .toEqual([4, 5, 6, 7, 8].slice(0, MAX_QUEUE));
+        });
+
+        it("drops from the oldest unacknowledged batch first", () => {
+            const sub = mgr.create("client-1", "client-1");
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
+            const listener = valueCache.onValueChange.mock.calls[0][0] as (
+                elementId: string,
+                vqt: I3xVqt,
+            ) => void;
+            listener("elem-1", makeVqt(1));
+            listener("elem-1", makeVqt(2));
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
+            /* Batch 1 is never acknowledged; the queue fills behind it. */
+            for (let i = 3; i <= MAX_QUEUE + 2; i++) listener("elem-1", makeVqt(i));
+
+            const result = mgr.sync("client-1", "client-1", sub.subscriptionId);
+            expect(result.dropped).toBe(2);
+            /* Batch 1 lost both its updates, so it is gone. */
+            expect(result.batches.map(b => b.sequenceNumber)).toEqual([2]);
+            expect(flat(result)).toHaveLength(MAX_QUEUE);
         });
 
         it("reports dropped updates only once", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
@@ -644,15 +716,15 @@ describe("SubscriptionManager", () => {
                 listener("elem-1", makeVqt(i));
             }
 
-            expect(mgr.sync("client-1", sub.subscriptionId).dropped).toBe(1);
-            expect(mgr.sync("client-1", sub.subscriptionId).dropped).toBe(0);
+            expect(mgr.sync("client-1", "client-1", sub.subscriptionId).dropped).toBe(1);
+            expect(mgr.sync("client-1", "client-1", sub.subscriptionId).dropped).toBe(0);
         });
 
         it("throws 404 for a different owner", () => {
             const sub = mgr.create("client-1", "client-1");
 
             try {
-                mgr.sync("client-2", sub.subscriptionId);
+                mgr.sync("client-2", "client-2", sub.subscriptionId);
                 fail("expected sync to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -661,7 +733,7 @@ describe("SubscriptionManager", () => {
 
         it("throws 404 for unknown subscriptionId", () => {
             try {
-                mgr.sync("client-1", "does-not-exist");
+                mgr.sync("client-1", "client-1", "does-not-exist");
                 fail("expected sync to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -676,7 +748,7 @@ describe("SubscriptionManager", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
 
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "text/event-stream; charset=utf-8");
             expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-cache");
@@ -686,7 +758,7 @@ describe("SubscriptionManager", () => {
 
         it("flushes queued items immediately", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -696,7 +768,7 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(200));
 
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             // Should have written the queued items
             expect(res.write).toHaveBeenCalled();
@@ -708,7 +780,7 @@ describe("SubscriptionManager", () => {
 
         it("releases the queue once it has been sent on the stream", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
@@ -716,59 +788,58 @@ describe("SubscriptionManager", () => {
             listener("elem-1", makeVqt(100));
 
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
             expect(sseUpdates(res).map(u => u.value)).toEqual([100]);
             closeHandler(res)();
 
-            expect(mgr.sync("client-1", sub.subscriptionId).updates).toEqual([]);
+            expect(flat(mgr.sync("client-1", "client-1", sub.subscriptionId))).toEqual([]);
         });
 
         it("does not queue updates while a stream is open", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
             ) => void;
 
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
             listener("elem-1", makeVqt(100));
             listener("elem-1", makeVqt(200));
             closeHandler(res)();
             listener("elem-1", makeVqt(300));
 
             expect(sseUpdates(res).map(u => u.value)).toEqual([100, 200]);
-            const items = mgr.sync("client-1", sub.subscriptionId).updates;
+            const items = flat(mgr.sync("client-1", "client-1", sub.subscriptionId));
             expect(items.map(i => i.value)).toEqual([300]);
-            expect(items[0].sequenceNumber).toBe(1);
         });
 
         it("does not resend updates an earlier stream delivered", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
                 vqt: I3xVqt,
             ) => void;
 
             const res1 = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res1);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res1);
             listener("elem-1", makeVqt(100));
             closeHandler(res1)();
             listener("elem-1", makeVqt(200));
 
             const res2 = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res2);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res2);
             expect(sseUpdates(res2).map(u => u.value)).toEqual([200]);
         });
 
         it("sends new items as they arrive", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -785,12 +856,12 @@ describe("SubscriptionManager", () => {
 
         it("closes the existing stream when a second one opens", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const res1 = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res1);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res1);
 
             const res2 = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res2);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res2);
             expect(res1.end).toHaveBeenCalled();
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
@@ -804,11 +875,11 @@ describe("SubscriptionManager", () => {
 
         it("keeps the new stream when the replaced one reports close", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const res1 = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res1);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res1);
             const res2 = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res2);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res2);
 
             closeHandler(res1)();
 
@@ -823,7 +894,7 @@ describe("SubscriptionManager", () => {
         it("clears activeStream on res close", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             // Simulate res close by calling the 'close' handler
             const closeCall = res.on.mock.calls.find(
@@ -836,16 +907,16 @@ describe("SubscriptionManager", () => {
             // Should be able to open a new stream now
             const res2 = mockSseRes();
             expect(() =>
-                mgr.stream("client-1", sub.subscriptionId, res2),
+                mgr.stream("client-1", "client-1", sub.subscriptionId, res2),
             ).not.toThrow();
         });
 
         it("uses correct SSE format for each item", () => {
             const sub = mgr.create("client-1", "client-1");
-            mgr.register("client-1", sub.subscriptionId, ["elem-1"]);
+            mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
 
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as (
                 elementId: string,
@@ -864,7 +935,7 @@ describe("SubscriptionManager", () => {
         it("throws 404 for unknown subscriptionId", () => {
             const res = mockSseRes();
             try {
-                mgr.stream("client-1", "does-not-exist", res);
+                mgr.stream("client-1", "client-1", "does-not-exist", res);
                 fail("expected stream to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -875,7 +946,7 @@ describe("SubscriptionManager", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
             try {
-                mgr.stream("client-2", sub.subscriptionId, res);
+                mgr.stream("client-2", "client-2", sub.subscriptionId, res);
                 fail("expected stream to throw");
             } catch (err: any) {
                 expect(err.status).toBe(404);
@@ -891,7 +962,7 @@ describe("SubscriptionManager", () => {
 
             jest.advanceTimersByTime(TTL + 1);
 
-            const result = mgr.list("client-1", [sub.subscriptionId]);
+            const result = mgr.list("client-1", "client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(0);
         });
 
@@ -902,13 +973,13 @@ describe("SubscriptionManager", () => {
             jest.advanceTimersByTime(TTL - 1000);
 
             // Access the subscription via sync (resets TTL)
-            mgr.sync("client-1", sub.subscriptionId);
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
 
             // Advance another TTL - 1000 ms (total elapsed since reset < TTL)
             jest.advanceTimersByTime(TTL - 1000);
 
             // Should still exist
-            const result = mgr.list("client-1", [sub.subscriptionId]);
+            const result = mgr.list("client-1", "client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(1);
         });
 
@@ -919,46 +990,46 @@ describe("SubscriptionManager", () => {
             jest.advanceTimersByTime(TTL - 1000);
 
             // Access resets timer
-            mgr.sync("client-1", sub.subscriptionId);
+            mgr.sync("client-1", "client-1", sub.subscriptionId);
 
             // Now advance full TTL + 1 from the reset point
             jest.advanceTimersByTime(TTL + 1);
 
-            const result = mgr.list("client-1", [sub.subscriptionId]);
+            const result = mgr.list("client-1", "client-1", [sub.subscriptionId]);
             expect(result).toHaveLength(0);
         });
 
         it("does not expire while a stream is open", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             jest.advanceTimersByTime(TTL * 5);
 
             expect(res.end).not.toHaveBeenCalled();
-            expect(mgr.list("client-1", [sub.subscriptionId])).toHaveLength(1);
+            expect(mgr.list("client-1", "client-1", [sub.subscriptionId])).toHaveLength(1);
         });
 
         it("expires a TTL after the stream closes", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
             jest.advanceTimersByTime(TTL * 2);
 
             closeHandler(res)();
             jest.advanceTimersByTime(TTL - 1000);
-            expect(mgr.list("client-1", [sub.subscriptionId])).toHaveLength(1);
+            expect(mgr.list("client-1", "client-1", [sub.subscriptionId])).toHaveLength(1);
 
             jest.advanceTimersByTime(1001);
-            expect(mgr.list("client-1", [sub.subscriptionId])).toHaveLength(0);
+            expect(mgr.list("client-1", "client-1", [sub.subscriptionId])).toHaveLength(0);
         });
 
         it("does not revive a deleted subscription when its stream closes", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
-            mgr.deleteOne("client-1", sub.subscriptionId);
+            mgr.deleteOne("client-1", "client-1", sub.subscriptionId);
             closeHandler(res)();
 
             expect(jest.getTimerCount()).toBe(0);
@@ -974,8 +1045,8 @@ describe("SubscriptionManager", () => {
 
             mgr.destroy();
 
-            const result1 = mgr.list("client-1", [sub1.subscriptionId]);
-            const result2 = mgr.list("client-2", [sub2.subscriptionId]);
+            const result1 = mgr.list("client-1", "client-1", [sub1.subscriptionId]);
+            const result2 = mgr.list("client-2", "client-2", [sub2.subscriptionId]);
             expect(result1).toHaveLength(0);
             expect(result2).toHaveLength(0);
         });
@@ -989,7 +1060,7 @@ describe("SubscriptionManager", () => {
         it("closes active streams on destroy", () => {
             const sub = mgr.create("client-1", "client-1");
             const res = mockSseRes();
-            mgr.stream("client-1", sub.subscriptionId, res);
+            mgr.stream("client-1", "client-1", sub.subscriptionId, res);
 
             mgr.destroy();
 
@@ -1021,33 +1092,33 @@ describe("SubscriptionManager", () => {
             const sub = mgr.create(OWNER, CLIENT_ID);
 
             /* Mallory knows the subscriptionId and the clientId. */
-            expect_not_found(() => mgr.getOne(ATTACKER, sub.subscriptionId), "getOne");
-            expect_not_found(() => mgr.sync(ATTACKER, sub.subscriptionId), "sync");
+            expect_not_found(() => mgr.getOne(ATTACKER, CLIENT_ID, sub.subscriptionId), "getOne");
+            expect_not_found(() => mgr.sync(ATTACKER, CLIENT_ID, sub.subscriptionId), "sync");
             expect_not_found(
-                () => mgr.stream(ATTACKER, sub.subscriptionId, mockSseRes()), "stream");
+                () => mgr.stream(ATTACKER, CLIENT_ID, sub.subscriptionId, mockSseRes()), "stream");
             expect_not_found(
-                () => mgr.register(ATTACKER, sub.subscriptionId, ["elem-1"]), "register");
+                () => mgr.register(ATTACKER, CLIENT_ID, sub.subscriptionId, ["elem-1"]), "register");
             expect_not_found(
-                () => mgr.registerOne(ATTACKER, sub.subscriptionId, "elem-1"), "registerOne");
+                () => mgr.registerOne(ATTACKER, CLIENT_ID, sub.subscriptionId, "elem-1"), "registerOne");
             expect_not_found(
-                () => mgr.unregister(ATTACKER, sub.subscriptionId, ["elem-1"]), "unregister");
+                () => mgr.unregister(ATTACKER, CLIENT_ID, sub.subscriptionId, ["elem-1"]), "unregister");
             expect_not_found(
-                () => mgr.unregisterOne(ATTACKER, sub.subscriptionId, "elem-1"), "unregisterOne");
-            expect_not_found(() => mgr.deleteOne(ATTACKER, sub.subscriptionId), "deleteOne");
+                () => mgr.unregisterOne(ATTACKER, CLIENT_ID, sub.subscriptionId, "elem-1"), "unregisterOne");
+            expect_not_found(() => mgr.deleteOne(ATTACKER, CLIENT_ID, sub.subscriptionId), "deleteOne");
 
             /* Nothing was destroyed along the way. */
-            expect(mgr.list(OWNER, [sub.subscriptionId])).toHaveLength(1);
+            expect(mgr.list(OWNER, CLIENT_ID, [sub.subscriptionId])).toHaveLength(1);
         });
 
         it("reports a foreign subscription identically to an unknown one", () => {
             const sub = mgr.create(OWNER, CLIENT_ID);
 
             const foreign = (() => {
-                try { mgr.getOne(ATTACKER, sub.subscriptionId); return null; }
+                try { mgr.getOne(ATTACKER, CLIENT_ID, sub.subscriptionId); return null; }
                 catch (err: any) { return err; }
             })();
             const unknown = (() => {
-                try { mgr.getOne(ATTACKER, "9d1e0e4e-0000-0000-0000-000000000000"); return null; }
+                try { mgr.getOne(ATTACKER, CLIENT_ID, "9d1e0e4e-0000-0000-0000-000000000000"); return null; }
                 catch (err: any) { return err; }
             })();
 
@@ -1063,11 +1134,11 @@ describe("SubscriptionManager", () => {
         it("never reports 403 from any subscription operation", () => {
             const sub = mgr.create(OWNER, CLIENT_ID);
             const calls: Array<() => unknown> = [
-                () => mgr.getOne(ATTACKER, sub.subscriptionId),
-                () => mgr.sync(ATTACKER, sub.subscriptionId),
-                () => mgr.deleteOne(ATTACKER, sub.subscriptionId),
-                () => mgr.getOne("", sub.subscriptionId),
-                () => mgr.getOne(undefined as any, sub.subscriptionId),
+                () => mgr.getOne(ATTACKER, CLIENT_ID, sub.subscriptionId),
+                () => mgr.sync(ATTACKER, CLIENT_ID, sub.subscriptionId),
+                () => mgr.deleteOne(ATTACKER, CLIENT_ID, sub.subscriptionId),
+                () => mgr.getOne("", CLIENT_ID, sub.subscriptionId),
+                () => mgr.getOne(undefined as any, CLIENT_ID, sub.subscriptionId),
             ];
             for (const call of calls) {
                 try {
@@ -1083,10 +1154,28 @@ describe("SubscriptionManager", () => {
             const a = mgr.create("alice@REALM", CLIENT_ID);
             const b = mgr.create("bob@REALM", CLIENT_ID);
 
-            expect(mgr.list("alice@REALM", [a.subscriptionId, b.subscriptionId]))
+            expect(mgr.list("alice@REALM", CLIENT_ID, [a.subscriptionId, b.subscriptionId]))
                 .toEqual([expect.objectContaining({ subscriptionId: a.subscriptionId })]);
-            expect(mgr.list("bob@REALM", [a.subscriptionId, b.subscriptionId]))
+            expect(mgr.list("bob@REALM", CLIENT_ID, [a.subscriptionId, b.subscriptionId]))
                 .toEqual([expect.objectContaining({ subscriptionId: b.subscriptionId })]);
+        });
+
+        it("treats a subscription asked for with another clientId as not found", () => {
+            const sub = mgr.create(OWNER, CLIENT_ID);
+
+            expect_not_found(() => mgr.getOne(OWNER, "other-client", sub.subscriptionId), "getOne");
+            expect_not_found(() => mgr.sync(OWNER, "other-client", sub.subscriptionId), "sync");
+            expect_not_found(
+                () => mgr.stream(OWNER, "other-client", sub.subscriptionId, mockSseRes()), "stream");
+            expect_not_found(
+                () => mgr.registerOne(OWNER, "other-client", sub.subscriptionId, "elem-1"), "registerOne");
+            expect_not_found(
+                () => mgr.unregisterOne(OWNER, "other-client", sub.subscriptionId, "elem-1"), "unregisterOne");
+            expect_not_found(() => mgr.deleteOne(OWNER, "other-client", sub.subscriptionId), "deleteOne");
+            expect(mgr.list(OWNER, "other-client", [sub.subscriptionId])).toHaveLength(0);
+
+            /* Nothing was destroyed along the way. */
+            expect(mgr.list(OWNER, CLIENT_ID, [sub.subscriptionId])).toHaveLength(1);
         });
 
         it("lets one principal use two different clientIds", () => {
@@ -1094,33 +1183,33 @@ describe("SubscriptionManager", () => {
             const tab1 = mgr.create(OWNER, "tab-1");
             const tab2 = mgr.create(OWNER, "tab-2");
 
-            expect(mgr.getOne(OWNER, tab1.subscriptionId).clientId).toBe("tab-1");
-            expect(mgr.getOne(OWNER, tab2.subscriptionId).clientId).toBe("tab-2");
+            expect(mgr.getOne(OWNER, "tab-1", tab1.subscriptionId).clientId).toBe("tab-1");
+            expect(mgr.getOne(OWNER, "tab-2", tab2.subscriptionId).clientId).toBe("tab-2");
         });
 
         it("survives the full lifecycle for a single principal", () => {
             const sub = mgr.create(OWNER, CLIENT_ID, "Lifecycle");
             expect(sub.clientId).toBe(CLIENT_ID);
 
-            mgr.register(OWNER, sub.subscriptionId, ["elem-1"], 2);
-            expect(mgr.getOne(OWNER, sub.subscriptionId).monitoredObjects)
+            mgr.register(OWNER, CLIENT_ID, sub.subscriptionId, ["elem-1"], 2);
+            expect(mgr.getOne(OWNER, CLIENT_ID, sub.subscriptionId).monitoredObjects)
                 .toEqual([{ elementId: "elem-1", maxDepth: 2 }]);
 
             const listener = valueCache.onValueChange.mock.calls[0][0] as
                 (elementId: string, vqt: I3xVqt) => void;
             listener("elem-1", makeVqt(7));
 
-            const items = mgr.sync(OWNER, sub.subscriptionId).updates;
+            const items = flat(mgr.sync(OWNER, CLIENT_ID, sub.subscriptionId));
             expect(items).toHaveLength(1);
             expect(items[0].value).toBe(7);
 
             const res = mockSseRes();
-            mgr.stream(OWNER, sub.subscriptionId, res);
+            mgr.stream(OWNER, CLIENT_ID, sub.subscriptionId, res);
             listener("elem-1", makeVqt(8));
             expect(res.write).toHaveBeenCalled();
 
-            mgr.deleteOne(OWNER, sub.subscriptionId);
-            expect(mgr.list(OWNER, [sub.subscriptionId])).toHaveLength(0);
+            mgr.deleteOne(OWNER, CLIENT_ID, sub.subscriptionId);
+            expect(mgr.list(OWNER, CLIENT_ID, [sub.subscriptionId])).toHaveLength(0);
         });
     });
 

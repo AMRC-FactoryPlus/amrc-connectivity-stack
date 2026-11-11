@@ -62,7 +62,7 @@ function oldValue(s: ReturnType<typeof stack>, id: string) {
     if (!components) return null;
     const ts = Object.values(components).reduce(
         (best: string, c: any) => (c.timestamp > best ? c.timestamp : best), "");
-    return { elementId: id, isComposition: true, value: null, quality: "Good", timestamp: ts, components };
+    return { elementId: id, isComposition: true, value: null, quality: "GoodNoData", timestamp: ts, components };
 }
 
 function app(s: ReturnType<typeof stack>, maxDepthCap = 0) {
@@ -120,7 +120,7 @@ describe("composition values from the cache", () => {
             const v = id === leaf ? s.valueCache.getValue(leaf) : id === "no-such-id" ? null : oldValue(s, id);
             return v
                 ? { success: true, elementId: id, result: v }
-                : { success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } };
+                : { success: false, elementId: id, responseDetail: { title: "Not Found", status: 404, detail: `Element not found: ${id}` } };
         });
         expect(many.text).toBe(JSON.stringify({ success: false, results }));
     });

@@ -408,7 +408,12 @@ Pure translation helpers, quality derivation and the i3X type definitions.
 
 ## Endpoint Mapping
 
-All mounted under `/v1/`:
+The service implements i3X 1.0 (`specVersion: "1.0"` in `/info`). All
+mounted under `/v1/`. The single-object and single-type `GET` routes
+(`/objects/:elementId` and below, `/objecttypes/:elementId`,
+`/relationshiptypes/:elementId`) are not in i3X 1.0, which has only the
+bulk forms. They stay for the clients that use them and answer in the
+1.0 shapes.
 
 ### Server Info (no auth)
 | Method | Path | Source |
@@ -431,7 +436,7 @@ All mounted under `/v1/`:
 | GET | `/objects/:elementId/related` | Object tree relationships |
 | POST | `/objects/related` | Object tree bulk |
 
-### Query (REQUIRED for value, OPTIONAL for history — we implement both)
+### Query (REQUIRED)
 | Method | Path | Source |
 |--------|------|--------|
 | GET | `/objects/:elementId/value` | Value cache |
@@ -461,20 +466,60 @@ Express middleware wraps all responses in the i3X envelope:
 // Success (write/void)
 { "success": true, "result": null }
 
-// Error
-{ "success": false, "error": { "message": "..." } }
+// Error (RFC 9457 problem details)
+{ "success": false, "responseDetail": { "title": "Not Found", "status": 404, "detail": "..." } }
 
 // Bulk (partial failure)
 {
   "success": false,
   "results": [
     { "success": true, "elementId": "...", "result": { ... } },
-    { "success": false, "elementId": "...", "error": { "message": "..." } }
+    { "success": false, "elementId": "...",
+      "responseDetail": { "title": "Not Found", "status": 404, "detail": "..." } }
   ]
 }
+
+// Partial (HTTP 206: depth limit reached, or sync updates dropped)
+{ "success": true, "result": <data>, "responseDetail": { "title": "...", "status": 206, "detail": "..." } }
 ```
 
-Bulk responses preserve request array order and size.
+Bulk responses preserve request array order and size. Subscription
+bulk items are keyed by `subscriptionId` in place of `elementId`.
+
+## Address space rules (i3X 1.0)
+
+- **Relationship types** are `HasParent`, `HasChildren`, `HasComponent`
+  and `ComponentOf`. A level of the ISA-95 hierarchy `HasChildren`, and
+  what sits under it `HasParent`. A device, and each branch inside it,
+  `HasComponent`, and what sits under it is a `ComponentOf` it. The
+  tree stores only parents, so `/objects/related` makes the edges from
+  them, and every edge has its reverse.
+- **`/objects/related`** returns edges, `{ sourceRelationship, object }`,
+  where `sourceRelationship` is the type that leads from the queried
+  object to `object`. `relationshipType` filters on it.
+- **A root object** has `parentId: null`.
+- **`includeMetadata`** adds `metadata.typeNamespaceUri`,
+  `metadata.sourceTypeId` and `metadata.relationships` (the ids at the
+  other end of the object's edges, by relationship type).
+- **Every `typeElementId` names a listed type.** The ConfigDB schemas
+  are the types of devices and of branches that have a schema. The
+  service adds `isa95-level`, `unknown`, and the leaf types
+  `metric-number`, `metric-boolean`, `metric-string` and `metric`,
+  whose schemas are scalar. A leaf metric with no schema of its own
+  takes its type from its Sparkplug type.
+- **An object with no data** answers `/objects/value` with
+  `value: null` and `quality: "GoodNoData"`. Only an id that is not in
+  the tree, or that the caller may not see, is a 404. A composition's
+  own value is `null` with `GoodNoData`; its data is in `components`.
+- **History** results are `{ isComposition, values }`. A composition
+  has no history of its own, and `maxDepth` is not applied to history.
+- **Subscriptions** are scoped to the `clientId` they were created
+  with, as well as to the authenticated principal. A request without a
+  `clientId` is a 400, and one with another `clientId` is a 404.
+- **`/subscriptions/sync`** returns batches,
+  `[{ sequenceNumber, updates: [...] }]`. The changes since the last
+  sync become one batch, and a batch is sent again on every sync until
+  the client acknowledges its number with `lastSequenceNumber`.
 
 Gzip compression via `compression` middleware when client sends `Accept-Encoding: gzip`.
 

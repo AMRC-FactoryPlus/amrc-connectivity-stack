@@ -165,20 +165,20 @@ const historyCnc1: I3xVqt[] = [
     { value: 1200, quality: "Good", timestamp: "2026-01-01T12:00:00Z" },
 ];
 
-/* Relationships: obj-cnc-1 has child obj-robot-1 */
+/* Relationships: obj-robot-1 is a component of obj-cnc-1 */
 const relationships = new Map<string, Map<string | undefined, I3xObject[]>>([
     [
         "obj-cnc-1",
         new Map<string | undefined, I3xObject[]>([
             [undefined, [objRobot]],
-            [RelType.HasChildren, [objRobot]],
+            [RelType.HasComponent, [objRobot]],
         ]),
     ],
     [
         "obj-robot-1",
         new Map<string | undefined, I3xObject[]>([
             [undefined, [objCnc1]],
-            [RelType.HasParent, [objCnc1]],
+            [RelType.ComponentOf, [objCnc1]],
         ]),
     ],
 ]);
@@ -245,6 +245,17 @@ function createPreloadedMocks() {
          * whatever getRelated returns. */
         iterateRelated: jest.fn(function* (this: any, id: string, rt?: string) { yield* this.getRelated(id, rt); }),
 
+        /* The related routes stream edges from iterateEdges. */
+        iterateEdges: jest.fn(function* (this: any, id: string, rt?: string) {
+            const sourceRelationship = id === "obj-cnc-1" ? RelType.HasComponent : RelType.ComponentOf;
+            if (rt !== undefined && rt !== sourceRelationship) return;
+            for (const object of this.getRelated(id, rt)) yield { sourceRelationship, object };
+        }),
+
+        objectMetadata: jest.fn((obj: I3xObject) => ({
+            typeNamespaceUri: NS_URI, sourceTypeId: obj.typeElementId, relationships: {},
+        })),
+
         getChildElementIds: jest.fn<(id: string) => string[]>()
             .mockReturnValue([]),
 
@@ -296,16 +307,16 @@ function createPreloadedMocks() {
                 subscriptionId: "sub-generated-1",
                 displayName: displayName ?? "Default",
             })),
-        list: jest.fn<(owner: string, ids: string[]) => I3xSubscription[]>()
-            .mockImplementation((_owner: string, ids: string[]) =>
+        list: jest.fn<(owner: string, clientId: string, ids: string[]) => I3xSubscription[]>()
+            .mockImplementation((_owner: string, _clientId: string, ids: string[]) =>
                 ids.map(id => ({
                     clientId: TEST_CLIENT_ID,
                     subscriptionId: id,
                     displayName: "Sub " + id,
                 })),
             ),
-        getOne: jest.fn<(owner: string, id: string) => I3xSubscription>()
-            .mockImplementation((_owner: string, id: string) => {
+        getOne: jest.fn<(owner: string, clientId: string, id: string) => I3xSubscription>()
+            .mockImplementation((_owner: string, _clientId: string, id: string) => {
                 if (id === "does-not-exist") {
                     const err: any = new Error(`Subscription ${id} not found`);
                     err.status = 404;
@@ -320,24 +331,24 @@ function createPreloadedMocks() {
                     ],
                 };
             }),
-        deleteOne: jest.fn<(owner: string, id: string) => void>()
-            .mockImplementation((_owner: string, id: string) => {
+        deleteOne: jest.fn<(owner: string, clientId: string, id: string) => void>()
+            .mockImplementation((_owner: string, _clientId: string, id: string) => {
                 if (id === "does-not-exist") {
                     const err: any = new Error(`Subscription ${id} not found`);
                     err.status = 404;
                     throw err;
                 }
             }),
-        register: jest.fn<(owner: string, subId: string, ids: string[], maxDepth?: number) => void>(),
-        registerOne: jest.fn<(owner: string, subId: string, id: string, maxDepth?: number) => void>(),
-        unregister: jest.fn<(owner: string, subId: string, ids: string[]) => void>(),
-        unregisterOne: jest.fn<(owner: string, subId: string, id: string) => void>(),
-        stream: jest.fn<(owner: string, subId: string, res: any) => void>(),
-        sync: jest.fn<(owner: string, subId: string, lastSeq?: number) => SyncResult>()
+        register: jest.fn<(owner: string, clientId: string, subId: string, ids: string[], maxDepth?: number) => void>(),
+        registerOne: jest.fn<(owner: string, clientId: string, subId: string, id: string, maxDepth?: number) => void>(),
+        unregister: jest.fn<(owner: string, clientId: string, subId: string, ids: string[]) => void>(),
+        unregisterOne: jest.fn<(owner: string, clientId: string, subId: string, id: string) => void>(),
+        stream: jest.fn<(owner: string, clientId: string, subId: string, res: any) => void>(),
+        sync: jest.fn<(owner: string, clientId: string, subId: string, lastSeq?: number) => SyncResult>()
             .mockReturnValue({
-                updates: [
-                    { sequenceNumber: 1, elementId: "obj-cnc-1", ...vqtCnc1 },
-                    { sequenceNumber: 2, elementId: "obj-robot-1", ...vqtRobot },
+                batches: [
+                    { sequenceNumber: 1, updates: [{ elementId: "obj-cnc-1", ...vqtCnc1 }] },
+                    { sequenceNumber: 2, updates: [{ elementId: "obj-robot-1", ...vqtRobot }] },
                 ],
                 dropped: 0,
             }),
@@ -503,9 +514,9 @@ describe("E2E Compliance Tests", () => {
 
             expect(res.status).toBe(404);
             expect(res.body.success).toBe(false);
-            expect(res.body.error).toHaveProperty("message");
-            expect(typeof res.body.error.message).toBe("string");
-            expect(res.body.error.code).toBe(404);
+            expect(res.body.responseDetail).toHaveProperty("detail");
+            expect(typeof res.body.responseDetail.detail).toBe("string");
+            expect(res.body.responseDetail.status).toBe(404);
         });
     });
 
@@ -529,7 +540,7 @@ describe("E2E Compliance Tests", () => {
             expect(results[1].success).toBe(true);
             expect(results[2].elementId).toBe("nonexistent");
             expect(results[2].success).toBe(false);
-            expect(results[2].error).toHaveProperty("message");
+            expect(results[2].responseDetail).toHaveProperty("detail");
         });
     });
 
@@ -568,8 +579,9 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(200);
             const objects = res.body.result;
             expect(objects).toHaveLength(2);
+            /* A root has no parent. */
             for (const o of objects) {
-                expect(o.parentId).toBe("/");
+                expect(o.parentId).toBeNull();
             }
         });
 
@@ -593,7 +605,7 @@ describe("E2E Compliance Tests", () => {
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
-            expect(res.body.result).toEqual(objCnc1);
+            expect(res.body.result).toEqual({ ...objCnc1, parentId: null });
         });
 
         it("returns 404 for nonexistent object", async () => {
@@ -602,7 +614,7 @@ describe("E2E Compliance Tests", () => {
 
             expect(res.status).toBe(404);
             expect(res.body.success).toBe(false);
-            expect(res.body.error).toHaveProperty("message");
+            expect(res.body.responseDetail).toHaveProperty("detail");
         });
     });
 
@@ -698,19 +710,25 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
             expect(Array.isArray(res.body.result)).toBe(true);
-            expect(res.body.result).toHaveLength(1);
-            expect(res.body.result[0].elementId).toBe("obj-robot-1");
+            expect(res.body.result).toEqual([
+                { sourceRelationship: RelType.HasComponent, object: objRobot },
+            ]);
         });
 
-        it("filters by relationshiptype query param", async () => {
+        it("filters by relationshipType query param", async () => {
             const { app } = createE2eApp();
             const res = await request(app)
                 .get("/v1/objects/obj-cnc-1/related")
-                .query({ relationshiptype: RelType.HasChildren });
+                .query({ relationshipType: RelType.HasComponent });
 
             expect(res.status).toBe(200);
             expect(res.body.result).toHaveLength(1);
-            expect(res.body.result[0].elementId).toBe("obj-robot-1");
+            expect(res.body.result[0].object.elementId).toBe("obj-robot-1");
+
+            const none = await request(app)
+                .get("/v1/objects/obj-cnc-1/related")
+                .query({ relationshipType: RelType.HasChildren });
+            expect(none.body.result).toEqual([]);
         });
 
         it("returns 404 for nonexistent object", async () => {
@@ -766,13 +784,15 @@ describe("E2E Compliance Tests", () => {
             expect(typeof vqt.timestamp).toBe("string");
         });
 
-        it("returns 404 for object with no value", async () => {
+        it("returns a null GoodNoData value for an object with no value", async () => {
             const { app } = createE2eApp();
             const res = await request(app).get("/v1/objects/obj-cnc-2/value");
 
-            expect(res.status).toBe(404);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toHaveProperty("message");
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(res.body.result).toMatchObject({ value: null, quality: "GoodNoData" });
+            expect(typeof res.body.result.isComposition).toBe("boolean");
+            expect(res.body.result.timestamp).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z$/);
         });
 
         it("returns 404 for nonexistent object", async () => {
@@ -854,7 +874,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.body.success).toBe(true);
 
             const result = res.body.result;
-            expect(result).toHaveProperty("elementId", "obj-cnc-1");
+            expect(result).toHaveProperty("isComposition", true);
             expect(Array.isArray(result.values)).toBe(true);
             expect(result.values).toHaveLength(3);
 
@@ -871,7 +891,7 @@ describe("E2E Compliance Tests", () => {
 
             expect(res.status).toBe(400);
             expect(res.body.success).toBe(false);
-            expect(res.body.error).toHaveProperty("message");
+            expect(res.body.responseDetail).toHaveProperty("detail");
         });
 
         it("returns 400 when only startTime is provided", async () => {
@@ -991,7 +1011,7 @@ describe("E2E Compliance Tests", () => {
                 {
                     success: false,
                     elementId: "missing",
-                    error: { code: 404, message: "Object missing not found" },
+                    responseDetail: { title: "Not Found", status: 404, detail: "Element not found: missing" },
                 },
                 { success: true, elementId: "obj-robot-1", result: null },
             ]);
@@ -1036,7 +1056,7 @@ describe("E2E Compliance Tests", () => {
                 {
                     success: false,
                     elementId: "missing",
-                    error: { code: 404, message: "Object missing not found" },
+                    responseDetail: { title: "Not Found", status: 404, detail: "Element not found: missing" },
                 },
                 { success: true, elementId: "obj-robot-1", result: null },
             ]);
@@ -1044,7 +1064,7 @@ describe("E2E Compliance Tests", () => {
     });
 
     describe("POST /v1/subscriptions/sync", () => {
-        it("returns items array in envelope", async () => {
+        it("returns the batches in envelope", async () => {
             const { app } = createE2eApp();
             const res = await request(app)
                 .post("/v1/subscriptions/sync")
@@ -1057,17 +1077,20 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
-            const items = res.body.result;
-            expect(Array.isArray(items)).toBe(true);
-            expect(items).toHaveLength(2);
+            const batches = res.body.result;
+            expect(Array.isArray(batches)).toBe(true);
+            expect(batches).toHaveLength(2);
 
-            for (const item of items) {
-                expect(item).toHaveProperty("sequenceNumber");
-                expect(item).toHaveProperty("elementId");
-                expect(item).toHaveProperty("value");
-                expect(item).toHaveProperty("quality");
-                expect(item).toHaveProperty("timestamp");
-                expect(typeof item.sequenceNumber).toBe("number");
+            for (const batch of batches) {
+                expect(typeof batch.sequenceNumber).toBe("number");
+                expect(Array.isArray(batch.updates)).toBe(true);
+                for (const item of batch.updates) {
+                    expect(item).not.toHaveProperty("sequenceNumber");
+                    expect(item).toHaveProperty("elementId");
+                    expect(item).toHaveProperty("value");
+                    expect(item).toHaveProperty("quality");
+                    expect(item).toHaveProperty("timestamp");
+                }
             }
         });
 
@@ -1086,7 +1109,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(404);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 404, message: "Subscription does-not-exist not found" },
+                responseDetail: { title: "Not Found", status: 404, detail: "Subscription does-not-exist not found" },
             });
         });
     });
@@ -1107,7 +1130,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.status).toBe(404);
             expect(res.body).toEqual({
                 success: false,
-                error: { code: 404, message: "Subscription does-not-exist not found" },
+                responseDetail: { title: "Not Found", status: 404, detail: "Subscription does-not-exist not found" },
             });
         });
     });
@@ -1152,7 +1175,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.body.results[1]).toEqual({
                 success: false,
                 subscriptionId: "does-not-exist",
-                error: { code: 404, message: "Subscription does-not-exist not found" },
+                responseDetail: { title: "Not Found", status: 404, detail: "Subscription does-not-exist not found" },
             });
         });
     });
@@ -1190,7 +1213,7 @@ describe("E2E Compliance Tests", () => {
             expect(res.body.results).toHaveLength(1);
             expect(res.body.results[0].success).toBe(false);
             expect(res.body.results[0].subscriptionId).toBe("does-not-exist");
-            expect(res.body.results[0].error.code).toBe(404);
+            expect(res.body.results[0].responseDetail.status).toBe(404);
         });
     });
 
@@ -1221,7 +1244,7 @@ describe("E2E Compliance Tests", () => {
             }
         });
 
-        it("every error response has { success: false, error: { code, message } }", async () => {
+        it("every error response has { success: false, responseDetail: { title, status, detail } }", async () => {
             const { app } = createE2eApp();
 
             const responses = await Promise.all([
@@ -1235,10 +1258,11 @@ describe("E2E Compliance Tests", () => {
 
             for (const res of responses) {
                 expect(res.body).toHaveProperty("success", false);
-                expect(res.body).toHaveProperty("error");
-                expect(res.body.error).toHaveProperty("message");
-                expect(typeof res.body.error.message).toBe("string");
-                expect(res.body.error.code).toBe(res.status);
+                expect(res.body).not.toHaveProperty("error");
+                expect(typeof res.body.responseDetail.title).toBe("string");
+                expect(res.body.responseDetail).toHaveProperty("detail");
+                expect(typeof res.body.responseDetail.detail).toBe("string");
+                expect(res.body.responseDetail.status).toBe(res.status);
             }
         });
 
@@ -1302,7 +1326,7 @@ describe("E2E Compliance Tests", () => {
             for (const res of responses) {
                 expect(res.status).toBe(503);
                 expect(res.body.success).toBe(false);
-                expect(res.body.error).toHaveProperty("message");
+                expect(res.body.responseDetail).toHaveProperty("detail");
             }
         });
 

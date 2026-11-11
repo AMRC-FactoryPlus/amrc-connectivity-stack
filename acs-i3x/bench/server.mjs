@@ -106,7 +106,13 @@ const qa = history.queryApi;
 const collect = qa.collectRows.bind(qa);
 qa.collectRows = (...args) => { queries++; return collect(...args); };
 
-const subscriptions = new SubscriptionManager({ valueCache, ttl: 300000 });
+/* Every caller sees everything: access control is not under test. */
+const access = {
+    grants: async () => ({ all: true, targets: new Set() }),
+    visible: () => undefined,
+    track: () => ({ visible: () => true, stop: () => {} }),
+};
+const subscriptions = new SubscriptionManager({ valueCache, viewers: access, ttl: 300000 });
 
 const eld = monitorEventLoopDelay({ resolution: 10 });
 eld.enable();
@@ -134,7 +140,7 @@ app.get("/bench/leaves", (req, res) => {
 /* Same body parsing as WebAPI (service-api: 100kb limit). */
 app.use(express.json({ limit: "100kb", strict: false }));
 app.use((req, _res, next) => { req.auth = "bench@REALM"; next(); });
-routes({ objectTree, valueCache, history, subscriptions })(app);
+routes({ objectTree, access, valueCache, history, subscriptions })(app);
 
 app.listen(Number(a.port), () => {
     console.error(`bench server on :${a.port} dist=${dist} devices=${n} warm=${warmCount} objects=${objectTree.getObjects().length}`);

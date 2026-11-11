@@ -340,7 +340,7 @@ describe("the API, scoped to the caller", () => {
         const hidden = await request(a).get("/v1/objects/dev-b");
         const missing = await request(a).get("/v1/objects/no-such");
         expect(hidden.status).toBe(404);
-        expect(hidden.body.error.message).toBe("Object dev-b not found");
+        expect(hidden.body.responseDetail.detail).toBe("Element not found: dev-b");
         expect(missing.status).toBe(404);
 
         for (const path of ["value", "related"])
@@ -363,8 +363,9 @@ describe("the API, scoped to the caller", () => {
         const s = setup({ "alice@REALM": [grant("dev-a")] });
         const site = levelId(s, "AMRC", "Factory 2050");
         const res = await request(app(s, "alice@REALM").a)
-            .get(`/v1/objects/${site}/related`).query({ relationshiptype: RelType.HasChildren });
-        expect(res.body.result.map((o: any) => o.displayName)).toEqual(["North"]);
+            .get(`/v1/objects/${site}/related`).query({ relationshipType: RelType.HasChildren });
+        expect(res.body.result.map((e: any) => [e.sourceRelationship, e.object.displayName]))
+            .toEqual([[RelType.HasChildren, "North"]]);
     });
 
     it("leaves hidden devices out of a level's composition value", async () => {
@@ -378,7 +379,7 @@ describe("the API, scoped to the caller", () => {
         const many = await request(a).post("/v1/objects/value").send({ elementIds: [top, "dev-b-temp"], maxDepth: 0 });
         expect(Object.keys(many.body.results[0].result.components).sort()).toEqual(["dev-a-pos", "dev-a-temp"]);
         expect(many.body.results[1]).toEqual({ success: false, elementId: "dev-b-temp",
-            error: { code: 404, message: "No value for dev-b-temp" } });
+            responseDetail: { title: "Not Found", status: 404, detail: "Element not found: dev-b-temp" } });
     });
 
     it("refuses to subscribe to a hidden object, and stops delivering on revocation", async () => {
@@ -386,7 +387,7 @@ describe("the API, scoped to the caller", () => {
         const { a, subscriptions } = app(s, "alice@REALM");
         const sub = (await request(a).post("/v1/subscriptions").send({ clientId: "c" })).body.result;
         const reg = await request(a).post("/v1/subscriptions/register").send({
-            subscriptionId: sub.subscriptionId, elementIds: ["dev-a-temp", "dev-b-temp", "dev-c-temp"],
+            clientId: "c", subscriptionId: sub.subscriptionId, elementIds: ["dev-a-temp", "dev-b-temp", "dev-c-temp"],
         });
         expect(reg.body.results.map((r: any) => r.success)).toEqual([true, true, false]);
 
@@ -396,8 +397,9 @@ describe("the API, scoped to the caller", () => {
         s.auth.set("alice@REALM", [grant("dev-b")]);
         push("dev-a-temp");
         push("dev-b-temp");
-        const sync = await request(a).post("/v1/subscriptions/sync").send({ subscriptionId: sub.subscriptionId });
-        expect(sync.body.result.map((u: any) => u.elementId)).toEqual(["dev-b-temp"]);
+        const sync = await request(a).post("/v1/subscriptions/sync").send({ clientId: "c", subscriptionId: sub.subscriptionId });
+        expect(sync.body.result.map((b: any) => b.updates.map((u: any) => u.elementId)))
+            .toEqual([["dev-b-temp"]]);
         subscriptions.destroy();
     });
 

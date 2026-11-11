@@ -71,7 +71,11 @@ export function make_api ({ allowed = true, buckets = { sparkplug: "default", un
     const calls = { acl: [], members: [], placements: [], created: [], put: [] };
 
     const api = new APIv1({
-        data: { datasets: rx.of(IMap(DATASETS)) },
+        data: {
+            datasets: rx.of(IMap(DATASETS)),
+            /* No index to wait for. */
+            caught_up: async () => true,
+        },
         auth: {
             root_principal: "root@EXAMPLE.ORG",
             async check_acl (principal, perm, target) {

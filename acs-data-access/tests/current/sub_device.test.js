@@ -214,7 +214,11 @@ function make_api ({ datasets = {}, origin_map = ORIGIN_MAP, allowed = true } = 
     const PLACEMENT = Constants.External.ISA95Placement;
 
     const api = new APIv1({
-        data: { datasets: rx.of(IMap(datasets)) },
+        data: {
+            datasets: rx.of(IMap(datasets)),
+            /* No index to wait for. */
+            caught_up: async () => true,
+        },
         auth: {
             async check_acl (principal, perm, target) {
                 acl_checks.push([perm, target]);

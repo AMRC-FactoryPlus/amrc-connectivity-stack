@@ -10,6 +10,8 @@
   "license": "MIT",
   "dependencies": {
     "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+    "@azure/identity": "^4.14.1",
+    "@azure/storage-blob": "^12.34.0",
     "csv-parse": "^7.0.3",
     "hyparquet-writer": "0.18.0",
     "immutable": "^5.1.4",

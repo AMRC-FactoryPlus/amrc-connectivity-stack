@@ -14,7 +14,7 @@ async function fetch_body (client, opts) {
   if (!res.ok) {
     let body = null
     try { body = await res.json() } catch { /* not JSON */ }
-    throw new Error(body?.error?.message || `i3X request failed: ${res.status}`)
+    throw new Error(body?.responseDetail?.detail || `i3X request failed: ${res.status}`)
   }
   return { status: res.status, body: await res.json() }
 }
@@ -22,13 +22,14 @@ async function fetch_body (client, opts) {
 async function request (client, opts) {
   const { body } = await fetch_body(client, opts)
   if (body.success === false) {
-    throw new Error(body.error?.message || 'i3X request failed')
+    throw new Error(body.responseDetail?.detail || 'i3X request failed')
   }
   return body.result
 }
 
-// Bulk endpoints answer with one { success, elementId, result | error }
-// per id, and `success: false` at the top when any id failed. Return the
+// Bulk endpoints answer with one { success, elementId, result |
+// responseDetail } per id, and `success: false` at the top when any id
+// failed. `responseDetail` is { title, status, detail }. Return the
 // per-id results, with the HTTP status, and leave the caller to handle
 // the failures.
 async function bulk (client, url, body) {
@@ -47,7 +48,7 @@ async function bulk (client, url, body) {
  * or not served) and the ids that failed for another reason. An id with
  * no result counts as failed.
  *
- * @param results  [{ success, elementId, error: { code } }]
+ * @param results  [{ success, elementId, responseDetail: { status } }]
  * @param ids      the ids that were sent, if known
  * @returns { ok, missing, failed }, each an array of ids
  */
@@ -58,11 +59,34 @@ export function register_outcome (results, ids = null) {
     if (r?.elementId == null || seen.has(r.elementId)) continue
     seen.add(r.elementId)
     if (r.success) ok.push(r.elementId)
-    else if (r.error?.code === 404) missing.push(r.elementId)
+    else if (r.responseDetail?.status === 404) missing.push(r.elementId)
     else failed.push(r.elementId)
   }
   for (const id of ids ?? []) if (!seen.has(id)) failed.push(id)
   return { ok, missing, failed }
+}
+
+// The i3X relationship types. A level of the ISA-95 hierarchy
+// HasChildren; a device, and each branch inside it, HasComponent.
+export const REL = {
+  HasParent: 'HasParent',
+  HasChildren: 'HasChildren',
+  HasComponent: 'HasComponent',
+  ComponentOf: 'ComponentOf',
+}
+
+// i3X answers a related lookup with edges: { sourceRelationship,
+// object }. The pages work with the objects, so hand those back, each
+// with the relationship that leads to it.
+export function objects_of (edges) {
+  return (edges ?? []).map(e => ({ ...e.object, sourceRelationship: e.sourceRelationship }))
+}
+
+// The objects directly under another in the tree, whichever of the two
+// downward relationships leads to them.
+export function children_of (objects) {
+  return objects.filter(o =>
+    o.sourceRelationship === REL.HasChildren || o.sourceRelationship === REL.HasComponent)
 }
 
 function get (client, url, query) {
@@ -108,17 +132,36 @@ export function useI3xClient () {
       return get(c(), `v1/objects/${encodeURIComponent(elementId)}`)
     },
 
+    // The objects related to one object, each with the
+    // `sourceRelationship` that leads to it from `elementId`.
     getRelated (elementId, relationshipType) {
-      const query = relationshipType ? { relationshiptype: relationshipType } : undefined
+      const query = relationshipType ? { relationshipType } : undefined
       return get(c(), `v1/objects/${encodeURIComponent(elementId)}/related`, query)
+        .then(objects_of)
     },
 
+    // As getRelated for many objects: the per-id results, each
+    // `result` an array of objects.
     getRelatedBulk (elementIds, relationshipType) {
       const body = { elementIds }
-      if (relationshipType) body.relationshiptype = relationshipType
-      return bulk(c(), 'v1/objects/related', body).then(r => r.results)
+      if (relationshipType) body.relationshipType = relationshipType
+      return bulk(c(), 'v1/objects/related', body).then(r =>
+        r.results.map(item => item.success ? { ...item, result: objects_of(item.result) } : item))
     },
 
+    // The objects directly under one object in the tree.
+    getChildren (elementId) {
+      return this.getRelated(elementId).then(children_of)
+    },
+
+    // As getChildren for many objects, as per-id results.
+    getChildrenBulk (elementIds) {
+      return this.getRelatedBulk(elementIds).then(results =>
+        results.map(item => item.success ? { ...item, result: children_of(item.result) } : item))
+    },
+
+    // An object with no data answers with a null value of quality
+    // GoodNoData, not with an error.
     getValue (elementId) {
       return get(c(), `v1/objects/${encodeURIComponent(elementId)}/value`)
     },

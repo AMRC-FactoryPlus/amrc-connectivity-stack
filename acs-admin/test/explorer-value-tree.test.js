@@ -6,7 +6,7 @@
  * The Explorer's current value of a composition, as a tree.
  *
  * i3X answers with a flat map of leaf IDs, so the tree and the names
- * come from has-children. A leaf inside a nested composition must keep
+ * come from the objects under each composition. A leaf inside a nested composition must keep
  * its value: dropping those is the bug this tree replaces.
  */
 
@@ -52,8 +52,8 @@ function fake_i3x ({ cap = 0 } = {}) {
       calls.info++
       return { capabilities: { query: cap ? { history: true, maxDepthCap: cap } : { history: true } } }
     },
-    async getRelatedBulk (ids, rel) {
-      calls.related.push({ ids, rel })
+    async getChildrenBulk (ids) {
+      calls.related.push({ ids })
       return ids.map(id => ({ success: true, elementId: id, result: children(id) }))
     },
     async getValueBulk (ids, requested) {
@@ -125,7 +125,9 @@ describe('composition value tree', () => {
     const i3x = fake_i3x()
     i3x.getValueBulk = async ids => ({
       results: ids.map(id =>
-        ({ success: false, elementId: id, error: { code: 404, message: `No value for ${id}` } })),
+        ({ success: true, elementId: id, result: {
+          elementId: id, isComposition: true, value: null, quality: 'GoodNoData', timestamp: '2026-10-05T11:16:01Z',
+        } })),
       partial: false,
     })
     const t = top()
@@ -141,7 +143,6 @@ describe('composition value tree', () => {
     expect(i3x.calls.related.map(c => c.ids)).toEqual([
       ['light'], ['location', 'cyber'], ['network'],
     ])
-    expect(i3x.calls.related.every(c => c.rel === 'i3x:rel:has-children')).toBe(true)
   })
 
   it('leaves compositions below the depth to be read on expand', async () => {
@@ -167,17 +168,17 @@ describe('composition value tree', () => {
 
   it('leaves a composition whose children failed to read to be read again', async () => {
     const i3x = fake_i3x()
-    const related = i3x.getRelatedBulk
+    const related = i3x.getChildrenBulk
     let fail = true
-    i3x.getRelatedBulk = async (ids, rel) => (await related(ids, rel))
+    i3x.getChildrenBulk = async ids => (await related(ids))
       .map(r => fail && r.elementId === 'location'
-        ? { success: false, elementId: r.elementId, error: { code: 404, message: 'Object location not found' } }
+        ? { success: false, elementId: r.elementId, responseDetail: { title: 'Not Found', status: 404, detail: 'Element not found: location' } }
         : r)
     const t = top()
     await load_subtree(i3x, t)
     const location = t.children[2]
     expect(location.children).toBe(null)
-    expect(location.error).toBe('Object location not found')
+    expect(location.error).toBe('Element not found: location')
     expect(names(t.children[3])).toEqual(['Network', 'Firmware'])
 
     fail = false
@@ -202,7 +203,7 @@ describe('composition value tree', () => {
 
   it('drops the failure of an expand that settles after the selection changed', async () => {
     const i3x = fake_i3x()
-    i3x.getRelatedBulk = async () => { throw new Error('i3X request failed: 503') }
+    i3x.getChildrenBulk = async () => { throw new Error('i3X request failed: 503') }
     const node = mk_node({ elementId: 'network', isComposition: true })
 
     let current = true

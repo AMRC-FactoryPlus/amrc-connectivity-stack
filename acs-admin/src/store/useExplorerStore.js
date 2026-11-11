@@ -55,7 +55,7 @@ export const useExplorerStore = defineStore('explorer', {
       this.loadingChildren.add(elementId)
       try {
         const i3x = useI3xClient()
-        const children = await i3x.getRelated(elementId, 'i3x:rel:has-children')
+        const children = await i3x.getChildren(elementId)
         const childIds = []
         for (const child of children) {
           childIds.push(child.elementId)

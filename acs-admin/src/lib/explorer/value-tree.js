@@ -5,7 +5,8 @@
 /**
  * The current values of a composition, as a tree. i3X answers a
  * composition's value with a flat map of leaf element IDs; the tree
- * comes from the has-children relationship, which also gives the names.
+ * comes from the objects under each composition, which also gives the
+ * names.
  */
 
 // How many levels below a composition are read in one go. Deeper
@@ -14,8 +15,6 @@ export const LOAD_DEPTH = 3
 // Stop reading further levels once this many rows are loaded, so a
 // composition high in the hierarchy does not flood the browser.
 export const MAX_ROWS = 500
-
-const HAS_CHILDREN = 'i3x:rel:has-children'
 
 /**
  * A row of the tree. `children` is null until that level is read, or
@@ -48,13 +47,13 @@ export async function load_subtree (i3x, top, { depth = LOAD_DEPTH, max_rows = M
   let rows = 0
   for (let level = 0; level < depth && frontier.length; level++) {
     const byId = new Map(frontier.map(n => [n.elementId, n]))
-    const related = await i3x.getRelatedBulk([...byId.keys()], HAS_CHILDREN)
+    const related = await i3x.getChildrenBulk([...byId.keys()])
     const next = []
     for (const r of related) {
       const parent = byId.get(r.elementId)
       if (!parent) continue
       if (!r.success) {
-        parent.error = r.error?.message ?? 'Failed to load'
+        parent.error = r.responseDetail?.detail ?? 'Failed to load'
         continue
       }
       parent.children = r.result.map(mk_node)

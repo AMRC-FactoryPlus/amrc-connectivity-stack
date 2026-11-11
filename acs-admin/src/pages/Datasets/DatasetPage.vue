@@ -85,7 +85,7 @@
       </div>
 
       <div class="-mb-px flex gap-1 overflow-x-auto" role="tablist">
-        <button v-for="t in TABS" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id"
+        <button v-for="t in tabs" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id"
                 :class="['inline-flex h-9 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors',
                          tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900']"
                 @click="setTab(t.id)">
@@ -201,7 +201,7 @@ import CorrectTimesDialog from '@/components/Datasets/page/CorrectTimesDialog.vu
 import VoidDialog from '@/components/Datasets/page/VoidDialog.vue'
 import EnergyCarbon from '@/components/Datasets/addons/EnergyCarbon.vue'
 import { useEnergyCarbon } from '@/components/Datasets/addons/useEnergyCarbon.js'
-import { TABS, tab_of, equipment_of, equipment_change, labels_for } from '@/components/Datasets/page/page-logic.js'
+import { tabs_for, tab_of, equipment_of, equipment_change, labels_for } from '@/components/Datasets/page/page-logic.js'
 
 const ds = useDatasetsStore()
 const sc = useServiceClientStore()
@@ -212,7 +212,9 @@ onMounted(() => ds.start())
 onUnmounted(() => ds.stop())
 
 const uuid = computed(() => route.params.uuid)
-const tab = computed(() => tab_of(route.params.tab))
+// The chart sets BRIEFCASE_EXPORTER only when it runs the exporter.
+const tabs = tabs_for({ briefcases: import.meta.env.BRIEFCASE_EXPORTER === 'true' })
+const tab = computed(() => tab_of(route.params.tab, tabs))
 function setTab (t) {
   router.replace(t === 'overview' ? `/datasets/${uuid.value}` : `/datasets/${uuid.value}/${t}`)
 }

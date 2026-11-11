@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 import { STRUCTURE, DA } from '../src/lib/datasets/constants.js'
 import { merge_datasets, structure_tree } from '../src/lib/datasets/model.js'
 import {
-    tab_of, equipment_of, included_list, equipment_change, group_items,
+    tabs_for, tab_of, equipment_of, included_list, equipment_change, group_items,
     labels_for, metric_total, filter_metrics, tree_rows, structure_type,
     live_badge, contents_devices,
 } from '../src/components/Datasets/page/page-logic.js'
@@ -52,6 +52,18 @@ describe('page logic', () => {
         expect(tab_of('add-ons')).toBe('add-ons')
         expect(tab_of('history')).toBe('overview')
         expect(tab_of(undefined)).toBe('overview')
+    })
+
+    it('shows Release only where the briefcase exporter runs', () => {
+        const ids = briefcases => tabs_for({ briefcases }).map(t => t.id)
+        expect(ids(true)).toContain('release')
+        expect(ids(false)).not.toContain('release')
+        expect(ids(false)).toEqual(ids(true).filter(id => id !== 'release'))
+    })
+
+    it('opens the overview for a hidden tab', () => {
+        expect(tab_of('release', tabs_for({ briefcases: true }))).toBe('release')
+        expect(tab_of('release', tabs_for({ briefcases: false }))).toBe('overview')
     })
 
     it('finds the equipment of a run', () => {

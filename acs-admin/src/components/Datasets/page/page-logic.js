@@ -23,9 +23,18 @@ export const TABS = [
 
 export const VOID_REASONS = ['Started late', 'Stopped late', 'Test', 'Wrong equipment', 'Other']
 
-/** The tab from the URL, or overview for anything unknown. */
-export function tab_of (param) {
-    return TABS.some(t => t.id === param) ? param : 'overview'
+/**
+ * The tabs a dataset page shows. Release only shows when the briefcase
+ * exporter runs on this site: without it, a released dataset never
+ * gets a briefcase.
+ */
+export function tabs_for ({ briefcases }) {
+    return briefcases ? TABS : TABS.filter(t => t.id !== 'release')
+}
+
+/** The tab from the URL, or overview for anything unknown or hidden. */
+export function tab_of (param, tabs = TABS) {
+    return tabs.some(t => t.id === param) ? param : 'overview'
 }
 
 /**

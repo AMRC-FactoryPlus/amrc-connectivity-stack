@@ -33,7 +33,9 @@ correct a released dataset, withdraw it and publish it again.
 
 The Admin UI's **Release** tab on the dataset page does all of this: it
 edits the release policy, releases and withdraws the dataset (asking why
-when it withdraws), and lists every briefcase with a download.
+when it withdraws), and lists every briefcase with a download. The tab
+shows only when the chart runs the exporter, because without it a
+released dataset never gets a briefcase.
 
 ## How the exporter works
 
@@ -206,7 +208,7 @@ subclass of `Principal`, so the releaser role is one.
 
 Value | Default | Content
 ---|---|---
-`briefcase.enabled` | `false` | Run the exporter
+`briefcase.enabled` | `false` | Run the exporter, and show the Admin UI's Release tab
 `briefcase.image.repository` | `acs-briefcase` | The image to run
 `briefcase.verbosity` | `ALL,!service,!token` | Debug log tags (`VERBOSE`)
 `briefcase.retryInterval` | `300` | Seconds before a failed build is tried again (`RETRY_INTERVAL`)
@@ -215,7 +217,9 @@ The chart also sets `DIRECTORY_URL`, `WORK_DIR` (an `emptyDir` at
 `/work`, where each briefcase is built and zipped), and
 `SOURCE_ORGANISATION` and `SOURCE_URL`, from `acs.organisation` and
 `acs.baseUrl`, which each briefcase records as the instance it came
-from.
+from. On the Admin UI it sets `BRIEFCASE_EXPORTER=true`, which shows
+the Release tab, and a pod annotation, so that turning the exporter on
+or off restarts the Admin UI to pick the setting up.
 
 ## Testing
 

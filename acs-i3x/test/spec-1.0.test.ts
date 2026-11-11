@@ -91,6 +91,11 @@ describe("i3X 1.0: address space", () => {
         expect(used.has(ObjType.NumberMetric)).toBe(true);
         expect(used.has(ObjType.StringMetric)).toBe(true);
 
+        /* Every leaf is a data point with a scalar (or open) type, never
+         * a ConfigDB schema: its value must conform to its type. */
+        const scalar = new Set<string>([ObjType.NumberMetric, ObjType.BooleanMetric, ObjType.StringMetric, ObjType.Metric]);
+        for (const o of leaves) expect(scalar.has(o.typeElementId)).toBe(true);
+
         /* The synthetic types answer the bulk lookup and the filter. */
         const q = await post("/objecttypes/query", { elementIds: [ObjType.NumberMetric, "no-such-type"] });
         expect(q.results.map((r: any) => r.success)).toEqual([true, false]);

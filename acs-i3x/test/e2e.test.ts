@@ -1049,17 +1049,18 @@ describe("E2E Compliance Tests", () => {
         it("every error response has { success: false, responseDetail: { title, status, detail } }", async () => {
             const { app } = createE2eApp();
 
-            const responses = await Promise.all([
+            /* One at a time: each request starts a server of its own. */
+            const responses = [
                 /* Not i3X endpoints: 1.0 has no single-object routes. */
-                request(app).get("/v1/objecttypes/type-cnc"),
-                request(app).get("/v1/objects/obj-cnc-1"),
-                request(app).get("/v1/objects/obj-cnc-1/value"),
+                await request(app).get("/v1/objecttypes/type-cnc"),
+                await request(app).get("/v1/objects/obj-cnc-1"),
+                await request(app).get("/v1/objects/obj-cnc-1/value"),
                 /* Malformed requests. */
-                request(app).post("/v1/objects/list").send({}),
-                request(app).post("/v1/objects/value").send({ elementIds: ["obj-cnc-1"], maxDepth: -1 }),
-                request(app).post("/v1/objects/history").send({ elementIds: ["obj-cnc-1"] }),
-                request(app).post("/v1/subscriptions").send({}),
-            ]);
+                await request(app).post("/v1/objects/list").send({}),
+                await request(app).post("/v1/objects/value").send({ elementIds: ["obj-cnc-1"], maxDepth: -1 }),
+                await request(app).post("/v1/objects/history").send({ elementIds: ["obj-cnc-1"] }),
+                await request(app).post("/v1/subscriptions").send({}),
+            ];
 
             for (const res of responses) {
                 expect(res.body).toHaveProperty("success", false);

@@ -504,8 +504,10 @@ bulk items are keyed by `subscriptionId` in place of `elementId`.
   are the types of devices and of branches that have a schema. The
   service adds `isa95-level`, `unknown`, and the leaf types
   `metric-number`, `metric-boolean`, `metric-string` and `metric`,
-  whose schemas are scalar. A leaf metric with no schema of its own
-  takes its type from its Sparkplug type.
+  whose schemas are scalar. Every leaf metric takes its type from
+  its Sparkplug type, not from its `Schema_UUID`: that names the
+  Factory+ Metric schema, which describes the metric's configuration,
+  and i3X requires a value to conform to its type's schema.
 - **An object with no data** answers `/objects/value` with
   `value: null` and `quality: "GoodNoData"`. Only an id that is not in
   the tree, or that the caller may not see, is a 404. A composition's

@@ -35,10 +35,11 @@ function isCorrupt(err: unknown): boolean {
  * uns_device records each device's UNS topic segment.
  * 5: a device's ISA-95 position comes from its placement, and
  * sync_device records the position each device was placed at.
- * 6: i3X 1.0. A leaf metric with no schema takes its object type from
- * its Sparkplug type, where it was "unknown", and an ISA-95 level is
- * no longer a composition. */
-export const SCHEMA_VERSION = 6;
+ * 6, 7: i3X 1.0. A leaf metric takes its object type from its Sparkplug
+ * type, where it was "unknown" or the Factory+ Metric schema, and an
+ * ISA-95 level is no longer a composition. (6 was a test build that
+ * kept a metric's Schema_UUID.) */
+export const SCHEMA_VERSION = 7;
 
 const TABLES = `
     -- The object tree. seq gives Map insertion order: an upsert keeps

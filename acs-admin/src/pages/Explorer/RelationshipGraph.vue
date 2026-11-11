@@ -218,7 +218,9 @@ onBeforeUnmount(() => {
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-green-500 bg-slate-100 inline-block"></span> Child</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-violet-500 bg-slate-100 inline-block"></span> Component</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-slate-400 bg-slate-100 inline-block"></span> Related</span>
-        <span class="ml-auto">Each line is labelled with the i3X relationship, in the arrow's direction</span>
+      </div>
+      <div class="px-4 pb-2 text-xs text-slate-400">
+        Each line is labelled with the i3X relationship, read in the arrow's direction.
       </div>
     </CardContent>
   </Card>

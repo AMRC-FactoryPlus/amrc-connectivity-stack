@@ -5,7 +5,7 @@
 import { jest } from "@jest/globals";
 import { ObjectTree } from "../lib/object-tree.js";
 import { TestObjectTree } from "./helpers/isa95.js";
-import { RelType } from "../lib/constants.js";
+import { ObjType, RelType } from "../lib/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 import { loadFromMock } from "./helpers/load-from-mock.js";
 
@@ -382,6 +382,42 @@ describe("ObjectTree", () => {
             const countAfter = tree.getObjects().length;
 
             expect(countAfter).toBe(countBefore);
+        });
+
+        it("types a leaf by its Sparkplug type, not by the Metric schema it names", async () => {
+            const { tree, dev1 } = await treeWithDevice();
+            const METRIC_SCHEMA = "b16275f1-e443-4c41-a482-fcbdfbd20769";
+
+            /* From UNS: the last schema in the path is the leaf's, and
+             * is the Factory+ Metric schema for every metric. */
+            const speed = tree.addCompositionFromUns(
+                [dev1, "axes-uuid"], ["top-schema", "axes-schema", METRIC_SCHEMA], ["Axes", "Speed"],
+                undefined, { type: "DoubleLE" })!;
+            expect(tree.getObject("axes-uuid")!.typeElementId).toBe("axes-schema");
+            expect(tree.getObject(speed)!.typeElementId).toBe(ObjType.NumberMetric);
+            const on = tree.addCompositionFromUns(
+                [dev1], ["top-schema", METRIC_SCHEMA], ["Running"], undefined, { type: "Boolean" })!;
+            expect(tree.getObject(on)!.typeElementId).toBe(ObjType.BooleanMetric);
+            const when = tree.addCompositionFromUns(
+                [dev1], ["top-schema", METRIC_SCHEMA], ["Seen"], undefined, { type: "DateTime" })!;
+            expect(tree.getObject(when)!.typeElementId).toBe(ObjType.Metric);
+
+            /* From config: the origin map gives the metric the same
+             * Schema_UUID. */
+            tree.addDevice("dev-typed", {
+                schema: "top-schema",
+                originMap: {
+                    Schema_UUID: "top-schema",
+                    Instance_UUID: "dev-typed",
+                    Serial: { Schema_UUID: METRIC_SCHEMA, Instance_UUID: "serial-uuid", Sparkplug_Type: "String" },
+                    Count: { Schema_UUID: METRIC_SCHEMA, Instance_UUID: "count-uuid", Sparkplug_Type: "UInt32" },
+                },
+            }, { name: "Typed" }, ["AMRC"]);
+            expect(tree.getObject("serial-uuid")!.typeElementId).toBe(ObjType.StringMetric);
+            expect(tree.getObject("count-uuid")!.typeElementId).toBe(ObjType.NumberMetric);
+            /* Every type an object names is listed, with a scalar schema
+             * for the data points. */
+            expect(tree.getObjectType(ObjType.NumberMetric)!.schema).toEqual({ type: "number" });
         });
 
         it("after adding composition: getChildElementIds(parentId) returns child IDs", async () => {

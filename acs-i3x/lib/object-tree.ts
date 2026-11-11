@@ -173,9 +173,12 @@ function sparkplugTypeToSuffix(spType: string): string {
 }
 
 /**
- * The object type of a leaf metric with no schema of its own, from its
- * Sparkplug type. i3X wants a leaf's type to have a scalar schema, so a
- * client can tell a data point from a branch and check the value.
+ * The object type of a leaf metric, from its Sparkplug type. In i3X an
+ * object's value must conform to its type's schema, and a data point's
+ * type has a scalar schema, so a client can tell a data point from a
+ * branch and check the value. A metric's Schema_UUID does not serve:
+ * it names the Factory+ Metric schema, which describes how the metric
+ * is configured (its Sparkplug type, address and so on), not its value.
  */
 function leafTypeFor(spType: string | undefined): string {
     const t = (spType ?? "").replace(/(LE|BE)$/, "");
@@ -1196,13 +1199,14 @@ export class ObjectTree {
                 // Last segment is a leaf metric (has a value), rest are composition
                 const isLeaf = i === metricSegments.length - 1;
 
-                // Schema: use schemaUuidPath[i+1] if available. Without
-                // one a leaf takes its type from the metric's Sparkplug
-                // type, and a branch is of unknown type.
+                // A leaf takes its type from the metric's Sparkplug
+                // type (see leafTypeFor). A branch uses
+                // schemaUuidPath[i+1] if available, and is otherwise of
+                // unknown type.
                 const schemaIdx = i + 1;
-                const typeElementId = schemaIdx < schemaUuidPath.length
-                    ? schemaUuidPath[schemaIdx]
-                    : isLeaf ? leafTypeFor(uns?.type) : ObjType.Unknown;
+                const typeElementId = isLeaf ? leafTypeFor(uns?.type)
+                    : schemaIdx < schemaUuidPath.length ? schemaUuidPath[schemaIdx]
+                    : ObjType.Unknown;
 
                 if (!existing && !this.hasObject(elementId)) {
                     const obj = toI3xObject(
@@ -1318,11 +1322,11 @@ export class ObjectTree {
             const elementId = entry.Instance_UUID
                 ?? uuidv5(`${parentId}:${key}`, I3X_UUID_NAMESPACE);
 
-            // Use Schema_UUID as typeElementId if available. Without one
-            // a leaf takes its type from its Sparkplug type, and a
-            // branch is of unknown type.
-            const typeElementId = entry.Schema_UUID
-                ?? (isLeaf ? leafTypeFor(entry.Sparkplug_Type) : ObjType.Unknown);
+            // A leaf takes its type from its Sparkplug type (see
+            // leafTypeFor). A branch uses its Schema_UUID if it has
+            // one, and is otherwise of unknown type.
+            const typeElementId = isLeaf ? leafTypeFor(entry.Sparkplug_Type)
+                : entry.Schema_UUID ?? ObjType.Unknown;
 
             // Build the metric path for InfluxDB queries
             const currentPath = pathPrefix ? `${pathPrefix}/${key}` : key;

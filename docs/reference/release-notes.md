@@ -60,8 +60,11 @@ changes below. The Manager UI is updated in the same release.
 - **Every object's type is listed.** `/objecttypes` now includes the
   types the service makes up: `isa95-level`, `unknown`, and scalar
   types for leaf metrics (`metric-number`, `metric-boolean`,
-  `metric-string`, `metric`). A leaf metric with no schema of its own
-  has one of these as its `typeElementId`, where it had `unknown`.
+  `metric-string`, `metric`). Every leaf metric has one of these as its
+  `typeElementId`, from its Sparkplug type, where it had `unknown` or
+  the UUID of the Factory+ Metric schema. That schema describes how a
+  metric is configured, not its value, and i3X requires a value to
+  conform to its type.
 - **`includeMetadata` works**, on `GET /objects`, `/objects/list` and
   `/objects/related`. It adds each object's type namespace and the ids
   it is related to.

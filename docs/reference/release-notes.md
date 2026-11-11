@@ -94,11 +94,16 @@ a small installation.
   branch i3X learned from UNS messages alone, such as a device's
   `Device_Information`, is listed again once the device publishes it,
   which devices do when the MQTT broker restarts during the upgrade.
-- **If i3X still answers 503 several minutes after the upgrade, restart
-  its pod** (`kubectl rollout restart deploy/i3x`). Its connection to
-  ConfigDB can stall if it opens while the old ConfigDB pod is shutting
-  down, and it does not yet retry. This is not new in this release, and
-  a fix to the shared client is in progress.
+
+### Services no longer wait for ever on a stalled ConfigDB connection
+
+A service that opened its ConfigDB change feed while the old ConfigDB
+pod was shutting down could wait on that connection for ever, because
+the shared service client had no timeout on connecting or signing in.
+Testing this release, i3X was left answering 503 after an upgrade until
+its pod was restarted. Connecting and signing in now give up after 20
+seconds, and the connection is retried as it is after any other
+failure. Every JavaScript service built on the shared client gets this.
 
 ### Upgrading: every device has an ISA-95 placement
 

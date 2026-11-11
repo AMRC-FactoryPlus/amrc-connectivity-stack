@@ -8,6 +8,7 @@ import { Map as IMap, Seq as ISeq, merge } from "immutable";
 import * as rx from "rxjs";
 
 import { UUIDs } from "@amrc-factoryplus/rx-client";
+import { json_equal } from "@amrc-factoryplus/service-api";
 import { ServiceError } from "@amrc-factoryplus/service-client";
 import { DataAccess as Constants } from "./constants.js";
 import {
@@ -423,6 +424,10 @@ export class APIv1 {
 
     await this.cdb.delete_object(dataset_uuid);
 
+    /* So a read that follows no longer finds the dataset. */
+    await this.data.caught_up("definitions", dataset_uuid,
+      defs => defs == null);
+
     return res.status(200).json(dataset_uuid);
   }
 
@@ -646,6 +651,8 @@ export class APIv1 {
     const current = await this.cdb.get_config(UUIDs.App.Info, uuid) ?? {};
     if (current.name !== name.trim())
       await this.cdb.put_config(UUIDs.App.Info, uuid, { ...current, name: name.trim() });
+    await this.data.caught_up("names", uuid,
+      info => info?.name === name.trim());
 
     return res.status(204).end();
   }
@@ -659,7 +666,7 @@ export class APIv1 {
       return fail(this.log, 422, `Tags must be a list of strings`);
 
     const uuid = await this._check_metadata_edit(req);
-    await this._put_or_remove(Constants.Metadata.Tags, uuid,
+    await this._write_metadata(Constants.Metadata.Tags, uuid,
       tags.length ? { tags } : null);
 
     return res.status(204).end();
@@ -676,7 +683,7 @@ export class APIv1 {
       return fail(this.log, 422, `Labels must be an object of strings`);
 
     const uuid = await this._check_metadata_edit(req);
-    await this._put_or_remove(Constants.Metadata.EquipmentLabels, uuid,
+    await this._write_metadata(Constants.Metadata.EquipmentLabels, uuid,
       Object.keys(labels).length ? { labels } : null);
 
     return res.status(204).end();
@@ -702,6 +709,12 @@ export class APIv1 {
     if (kind && !await this.cdb.class_has_direct_member(kind, uuid))
       await this.cdb.class_add_member(kind, uuid);
 
+    /* `function` lists every functional group of the dataset. Only
+     * the kinds are checked: the dataset must be in the one written
+     * and in no other. */
+    await this.data.caught_up("functions", uuid, groups =>
+      kinds.every(klass => (groups?.includes(klass) ?? false) == (klass == kind)));
+
     return res.status(204).end();
   }
 
@@ -713,7 +726,7 @@ export class APIv1 {
       return fail(this.log, 422, `Run details must be an object`);
 
     const uuid = await this._check_metadata_edit(req);
-    await this.cdb.put_config(Constants.Metadata.RunMetadata, uuid, req.body);
+    await this._write_metadata(Constants.Metadata.RunMetadata, uuid, req.body);
 
     return res.status(204).end();
   }
@@ -729,11 +742,41 @@ export class APIv1 {
     const uuid = await this._check_metadata_edit(req);
     await this.cdb.patch_config(Constants.Metadata.RunMetadata, uuid, "merge", req.body);
 
+    /* Only ConfigDB knows what the patch left, so ask it. */
+    const run = await this.cdb.get_config(Constants.Metadata.RunMetadata, uuid);
+    await this._metadata_caught_up(Constants.Metadata.RunMetadata, uuid, run);
+
     return res.status(204).end();
   }
 
   _is_object(v) {
     return v != null && typeof v == "object" && !Array.isArray(v);
+  }
+
+  /** Writes a metadata entry, or removes it when `config` is null,
+   * and waits until a read returns it. */
+  async _write_metadata(app, uuid, config) {
+    await this._put_or_remove(app, uuid, config);
+    await this._metadata_caught_up(app, uuid, config);
+  }
+
+  /** Waits until the metadata map shows `config` as a dataset's entry
+   * for one application, or no entry when `config` is null or
+   * undefined. See DataFlow.caught_up: this gives up after its time
+   * limit and never fails, so the write answers as it always has. */
+  _metadata_caught_up(app, uuid, config) {
+    return this.data.caught_up("metadata", uuid,
+      apps => config == null
+        ? !apps?.has(app)
+        : json_equal(apps?.get(app), config),
+      app);
+  }
+
+  /** Waits until the dataset map is worked out from `config` as a
+   * dataset's entry for one structure. See DataFlow.caught_up. */
+  _structure_caught_up(structure, uuid, config) {
+    return this.data.caught_up("definitions", uuid,
+      defs => json_equal(defs?.get(structure), config));
   }
 
   /** Writes a config entry, or removes it when `config` is null. */
@@ -1401,6 +1444,7 @@ export class APIv1 {
       null,
       owner
     );
+    await this._structure_caught_up(structure, dataset_uuid, checked.config);
 
     return res.status(200).json(dataset_uuid);
   }
@@ -1513,6 +1557,7 @@ export class APIv1 {
     if(!objectUuid){
       return fail(this.log, 500, `Failed to update dataset ${dataset_uuid}`);
     }
+    await this._structure_caught_up(structure, dataset_uuid, stored_config);
  
     return res.status(200).json(objectUuid);
   }

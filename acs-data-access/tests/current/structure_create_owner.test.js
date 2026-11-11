@@ -58,6 +58,8 @@ function make_api({ resolve = async () => OWNER, create_error, denied = [] } = {
   const datasets = { [SOURCE]: { structure: Constants.App.SparkplugSrc, config: {} } };
   const api = new APIv1({
     data: {
+      /* No index to wait for. */
+      caught_up: async () => true,
       datasets: rx.of(IMap(datasets)),
       allowed_all_datasets: () => rx.of(IMap(datasets)),
     },

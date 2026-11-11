@@ -65,6 +65,8 @@ function make_api(datasets, denied = [], delete_errors = {}) {
 
   const api = new APIv1({
     data: {
+      /* No index to wait for. */
+      caught_up: async () => true,
       datasets: rx.of(IMap(datasets)),
       allowed_all_datasets: () => rx.of(IMap(datasets)),
     },

@@ -225,6 +225,75 @@ existing kinds, **Sparkplug source** and **Sub-device**, read the
   service client's `create_dataset` passes Data Access's JSON refusal
   through as the error's `body`.
 
+### Upgrading: the historians and the UNS ingester run as acs-ingest
+
+The Sparkplug historian, the UNS ingester and the UNS historian are
+now one service, acs-ingest, written in Elixir. It runs each of them
+as a part of one pod, and its `acs-ingest` Deployment replaces the
+`historian-sparkplug`, `uns-ingester-sparkplug` and `historian-uns`
+Deployments. Each part still logs in as its own principal, with the
+keytab it had before, and has its own MQTT connection. The parts write
+the same InfluxDB series and publish the same UNS messages as the
+services they replace, apart from the changes below, so history
+carries on across the upgrade.
+
+- **The enable flags and the other settings are unchanged.**
+  `historians.sparkplug.enabled`, `unsIngesters.sparkplug.enabled` and
+  `historians.uns.enabled` turn the parts on and off, and the pod runs
+  while any of them is on. `batchSize`, `flushInterval`,
+  `stallTimeout` and `connectTimeout` keep their places and defaults.
+- **The log level and image are set under `ingest`.** The `logLevel`,
+  `image` and `verbosity` settings under `historians.sparkplug`,
+  `historians.uns` and `unsIngesters.sparkplug` are no longer read.
+  One log level covers all three parts:
+
+  ```yaml
+  ingest:
+    logLevel: info
+  ```
+- **If you upgrade with `helm upgrade --reuse-values`, use
+  `--reset-then-reuse-values` instead**, as for the ISA-95 placement
+  above. The old values have no `ingest` section, and the upgrade
+  fails. Flux is not affected.
+- **Sites that mirror ACS images need the `acs-ingest` image.** The
+  `historian-sparkplug`, `uns-ingester-sparkplug` and `historian-uns`
+  images are no longer used.
+- **The log lines are new.** Searches or alerts that match the JS
+  services' messages need updating.
+- **An InfluxDB outage no longer restarts the historians or loses
+  their data.** Failed writes are kept and retried, up to 100,000
+  points for each historian. Beyond that the oldest are dropped, with
+  an error in the log. Before, a failed write ended the service and
+  lost the points it held. A batch that InfluxDB rejects as bad is
+  dropped, with an error in the log.
+- **A stall or a lost connection restarts one part, not the pod.**
+  When `stallTimeout` or `connectTimeout` fires (see "Historians and
+  the UNS ingester restart when they stop receiving data" below), that
+  part restarts its MQTT client with fresh Kerberos credentials, and
+  the other parts carry on. If two restarts in a row don't help,
+  acs-ingest exits, and Kubernetes restarts the pod, with all three
+  parts.
+- **There is no `k5start` container.** acs-ingest logs in to Kerberos
+  itself, and retries until the KDC answers, so the pod has no
+  `wait-for-kdc` init container either.
+- **Values the JS services wrote wrongly, or crashed on, are now
+  written exactly or skipped with a warning.** The warning names the
+  device and metric, or the UNS topic. In particular:
+  * 64-bit integers are written exactly. The JS rounded them beyond
+    2^53, and wrote a negative Int64 as a large unsigned number.
+  * A DATA value whose datatype differs from its birth's, such as 1.5
+    for an Int32 metric, is skipped. The JS wrote it.
+  * An integer out of range for its datatype is skipped.
+  * Templates, DataSets and arrays aren't written. The device's birth
+    lists them in the log once.
+  * The UNS ingester publishes DATA that names its metric instead of
+    giving an alias. The JS published nothing for it.
+  * The UNS historian writes Bytes and File values as text, where the
+    JS wrote `[object Object]`. It skips a value of the wrong JSON
+    type, a timestamp it can't read or InfluxDB can't store, and a
+    message without the user properties it needs. The JS converted
+    the value, or crashed.
+
 ### i3X no longer serves MCP
 
 The `/mcp` endpoint and its search index are gone, and so is the

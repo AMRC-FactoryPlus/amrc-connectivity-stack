@@ -100,7 +100,7 @@ spec:
               value: http://acs-influxdb2.{{ .Release.Namespace }}.svc.cluster.local
             - name: INFLUX_ORG
               value: default
-            # The UNS historian's bucket. templates/historians/uns.yaml
+            # The UNS historian's bucket. templates/ingest/acs-ingest.yaml
             # creates it under this fixed name.
             - name: INFLUX_BUCKET
               value: uns

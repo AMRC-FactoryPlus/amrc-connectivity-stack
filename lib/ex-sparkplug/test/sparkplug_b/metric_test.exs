@@ -72,11 +72,77 @@ defmodule SparkplugB.MetricTest do
                  value: {:long_value, 9_223_372_036_854_775_807}
                })
     end
+
+    test "decode from sign extension to 32 or 64 bits in either field" do
+      for {datatype, raw, value} <- [
+            {1, {:long_value, 4_294_967_168}, -128},
+            {1, {:long_value, 18_446_744_073_709_551_488}, -128},
+            {2, {:long_value, 4_294_934_528}, -32_768},
+            {3, {:long_value, 18_446_744_071_562_067_968}, -2_147_483_648},
+            {3, {:int_value, 2_147_483_648}, -2_147_483_648}
+          ] do
+        assert %Metric{value: ^value} =
+                 decode_metric(%Proto.Metric{datatype: datatype, value: raw})
+      end
+    end
+
+    test "out of range for their type stay raw" do
+      for {datatype, raw} <- [
+            # Too big for the type's width.
+            {1, {:int_value, 300}},
+            {2, {:int_value, 65_536}},
+            {3, {:long_value, 4_294_967_296}},
+            # One below the type's minimum, sign-extended.
+            {1, {:int_value, 4_294_967_167}},
+            {1, {:long_value, 18_446_744_073_709_551_487}},
+            {2, {:long_value, 4_294_934_527}},
+            {3, {:long_value, 18_446_744_071_562_067_967}},
+            # Neither the type's width nor sign extension.
+            {1, {:long_value, 9_223_372_036_854_775_808}}
+          ] do
+        assert %Metric{value: ^raw} = decode_metric(%Proto.Metric{datatype: datatype, value: raw})
+      end
+    end
   end
 
-  test "unsigned integers are accepted from either integer field" do
-    assert %Metric{value: 7} = decode_metric(%Proto.Metric{datatype: 7, value: {:int_value, 7}})
-    assert %Metric{value: 7} = decode_metric(%Proto.Metric{datatype: 7, value: {:long_value, 7}})
+  describe "unsigned integers" do
+    test "are accepted from either integer field" do
+      assert %Metric{value: 7} = decode_metric(%Proto.Metric{datatype: 7, value: {:int_value, 7}})
+
+      assert %Metric{value: 7} =
+               decode_metric(%Proto.Metric{datatype: 7, value: {:long_value, 7}})
+    end
+
+    test "decode up to their type's maximum" do
+      for {datatype, value} <- [
+            {5, 255},
+            {6, 65_535},
+            {7, 4_294_967_295},
+            {8, 18_446_744_073_709_551_615}
+          ] do
+        assert %Metric{value: ^value} =
+                 decode_metric(%Proto.Metric{datatype: datatype, value: {:long_value, value}})
+      end
+    end
+
+    test "out of range for their type stay raw" do
+      for {datatype, raw} <- [
+            {5, {:int_value, 256}},
+            {6, {:int_value, 65_536}},
+            {7, {:long_value, 4_294_967_296}}
+          ] do
+        assert %Metric{value: ^raw} = decode_metric(%Proto.Metric{datatype: datatype, value: raw})
+      end
+    end
+  end
+
+  test "with_datatype/2 checks the range too" do
+    metric = decode_metric(%Proto.Metric{alias: 1, value: {:int_value, 300}})
+
+    assert %Metric{datatype: :int8, value: {:int_value, 300}} =
+             Metric.with_datatype(metric, :int8)
+
+    assert %Metric{datatype: :int16, value: 300} = Metric.with_datatype(metric, :int16)
   end
 
   test "a value in the wrong field for its datatype stays raw" do

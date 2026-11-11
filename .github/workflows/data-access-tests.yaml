@@ -28,6 +28,11 @@ jobs:
         with:
           node-version: '22.x'
 
+      # The npm shipped with Node 22 crashes on file: dependencies.
+      # Pin to the same npm as the JS base image.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
       # The GSSAPI module is native and needs the Kerberos headers.
       - name: Install Kerberos headers
         run: sudo apt-get update && sudo apt-get install -y libkrb5-dev

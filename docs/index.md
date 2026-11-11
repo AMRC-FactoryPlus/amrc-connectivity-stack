@@ -32,6 +32,7 @@
 - Reference
   - [Release Notes](./reference/release-notes.md)
 - Services
+   - [Briefcase Exporter](./services/briefcase.md)
    - [File Service](./services/file-service.md)
    - [Git Server](./services/git-server.md)
    - [ISA-95 Placement](./services/isa95-placement.md)

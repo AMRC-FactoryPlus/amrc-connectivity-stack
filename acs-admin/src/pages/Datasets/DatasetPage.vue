@@ -85,7 +85,7 @@
       </div>
 
       <div class="-mb-px flex gap-1 overflow-x-auto" role="tablist">
-        <button v-for="t in TABS" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id"
+        <button v-for="t in tabs" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id"
                 :class="['inline-flex h-9 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors',
                          tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900']"
                 @click="setTab(t.id)">
@@ -134,6 +134,7 @@
                    :grafana="grafana" :downloading="downloading" @tab="setTab" @download="download"/>
       <DataTab v-else-if="tab === 'data'" :key="`data-${rec.uuid}`" :record="rec" :resolved="resolved" :downloading="downloading" @download="download"/>
       <UseTab v-else-if="tab === 'use'" :record="rec" :grafana="grafana" :downloading="downloading" @download="download"/>
+      <ReleaseTab v-else-if="tab === 'release'" :key="`release-${rec.uuid}`" :record="rec"/>
       <template v-else-if="tab === 'add-ons'">
         <EnergyCarbon :record="rec" :ec="ec"/>
         <p class="text-xs text-slate-500">
@@ -194,12 +195,13 @@ import DeleteDatasetDialog from '@/components/Datasets/DeleteDatasetDialog.vue'
 import OverviewTab from '@/components/Datasets/page/OverviewTab.vue'
 import DataTab from '@/components/Datasets/page/DataTab.vue'
 import UseTab from '@/components/Datasets/page/UseTab.vue'
+import ReleaseTab from '@/components/Datasets/page/ReleaseTab.vue'
 import StructureTab from '@/components/Datasets/page/StructureTab.vue'
 import CorrectTimesDialog from '@/components/Datasets/page/CorrectTimesDialog.vue'
 import VoidDialog from '@/components/Datasets/page/VoidDialog.vue'
 import EnergyCarbon from '@/components/Datasets/addons/EnergyCarbon.vue'
 import { useEnergyCarbon } from '@/components/Datasets/addons/useEnergyCarbon.js'
-import { TABS, tab_of, equipment_of, equipment_change, labels_for } from '@/components/Datasets/page/page-logic.js'
+import { tabs_for, tab_of, equipment_of, equipment_change, labels_for } from '@/components/Datasets/page/page-logic.js'
 
 const ds = useDatasetsStore()
 const sc = useServiceClientStore()
@@ -210,7 +212,9 @@ onMounted(() => ds.start())
 onUnmounted(() => ds.stop())
 
 const uuid = computed(() => route.params.uuid)
-const tab = computed(() => tab_of(route.params.tab))
+// The chart sets BRIEFCASE_EXPORTER only when it runs the exporter.
+const tabs = tabs_for({ briefcases: import.meta.env.BRIEFCASE_EXPORTER === 'true' })
+const tab = computed(() => tab_of(route.params.tab, tabs))
 function setTab (t) {
   router.replace(t === 'overview' ? `/datasets/${uuid.value}` : `/datasets/${uuid.value}/${t}`)
 }

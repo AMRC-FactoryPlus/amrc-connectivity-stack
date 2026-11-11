@@ -48,7 +48,7 @@ The following endpoints are exposed for the **ACS-Files** service:
 - If authorised, the file is retrieved from storage by the `uuid` and returned to the requester as a **binary data stream** for download.
 
 #### `PUT /v1/file/:uuid`
-- Checks whether the requesting principal has **Upload** permission for the `Files Configuration` Application.
+- Checks whether the requesting principal has **Upload** permission. The check is against the wildcard target, so a grant of Upload must use the wildcard; a grant targeting the `Files Configuration` Application is not enough.
 - Checks if a **File Object** exists with the given uuid. 
 - If valid:
   - The file contents is written to a temporary file in the Kubernetes volume.

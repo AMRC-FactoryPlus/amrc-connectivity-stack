@@ -2,18 +2,24 @@ import { PassThrough } from "stream";
 import { once } from "events";
 import pLimit from "p-limit";
 
-import { csv_escape, csv_device_path, strip_metric_suffix } from "./utils.js";
+import {
+    csv_escape, csv_device_path, metric_type, strip_metric_suffix,
+} from "./utils.js";
 import { build_flux_queries } from "./flux.js";
 import { DataAccess as Constants } from "./constants.js";
 
-/* `path` comes last so that clients reading the columns by position
- * still work. */
 /* The UUID columns come from tags both historians write on every
  * point: the device, the instance that owns the metric's folder, and
  * that instance's schema. A metric directly on the device has no
  * bottom-level tags (Influx stores no empty tags), so its instance
  * and schema are the device's own. New columns go at the end. */
-const CSV_HEADER = "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid";
+const CSV_HEADER = "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid,type";
+
+/* The value as Influx wrote it. The client parses long and unsignedLong
+ * into JS numbers, which lose precision above 2^53. */
+function raw_value(row) {
+    return row.values[row.tableMeta.column("_value").index];
+}
 
 /** Whether an error is InfluxDB saying a bucket does not exist. */
 export function is_missing_bucket(err) {
@@ -51,8 +57,9 @@ export class InfluxReader {
     }
 
     /** Combines the resolved device sources of a dataset into a single CSV
-     * stream with columns device, metric, timestamp, value, unit, path - see the
-     * @returns doc on APIv1#dataset_data.
+     * stream with columns device, metric, timestamp, value, unit, path,
+     * device_uuid, instance_uuid, schema_uuid, type - see the @returns
+     * doc on APIv1#dataset_data.
      */
     exportDevices(deviceSources, meta = {}) {
         const csvStream = new PassThrough({
@@ -140,12 +147,13 @@ export class InfluxReader {
                 csv_escape(device),
                 csv_escape(strip_metric_suffix(o._measurement)),
                 csv_escape(o._time),
-                csv_escape(o._value),
+                csv_escape(raw_value(row)),
                 csv_escape(o.unit),
                 csv_escape(path),
                 csv_escape(o.topLevelInstance),
                 csv_escape(o.bottomLevelInstance || o.topLevelInstance),
                 csv_escape(o.bottomLevelSchema || o.topLevelSchema),
+                csv_escape(metric_type(o._measurement)),
             ].join(",");
 
             await this.#write(writable, line + "\n");

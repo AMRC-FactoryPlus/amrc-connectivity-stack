@@ -86,7 +86,19 @@ changes below. The Manager UI is updated in the same release.
 
 The service rebuilds its database from ConfigDB the first time the new
 version starts, because the stored object types change. It answers 503
-until that is done, as it does on a first start.
+until that is done, as it does on a first start. That takes seconds on
+a small installation.
+
+- **Branches that exist only on the UNS come back when their devices
+  next publish them.** The rebuild keeps what ConfigDB describes. A
+  branch i3X learned from UNS messages alone, such as a device's
+  `Device_Information`, is listed again once the device publishes it,
+  which devices do when the MQTT broker restarts during the upgrade.
+- **If i3X still answers 503 several minutes after the upgrade, restart
+  its pod** (`kubectl rollout restart deploy/i3x`). Its connection to
+  ConfigDB can stall if it opens while the old ConfigDB pod is shutting
+  down, and it does not yet retry. This is not new in this release, and
+  a fix to the shared client is in progress.
 
 ### Upgrading: every device has an ISA-95 placement
 

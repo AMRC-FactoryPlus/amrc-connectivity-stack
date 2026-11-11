@@ -53,6 +53,17 @@ export function strip_metric_suffix(value) {
     return String(value).replace(/:[iudbs]$/, "");
 }
 
+const SUFFIX_TYPES = {
+    i: "int", u: "uint", d: "double", b: "boolean", s: "string",
+};
+
+// The value type a measurement's suffix stands for, as named in the CSV
+// export's type column. Null for a measurement with no suffix.
+export function metric_type(value) {
+    const m = /:([iudbs])$/.exec(value ?? "");
+    return m ? SUFFIX_TYPES[m[1]] : null;
+}
+
 /** The full Sparkplug metric name of an Influx row.
  *
  * The historians split a metric `a/b/c` into the `path` tag `a/b` and

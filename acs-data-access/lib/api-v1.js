@@ -848,10 +848,13 @@ export class APIv1 {
               * device - Device this data point comes from
               * metric - metric name (don't include Influx :x suffix)
               * timestamp - ISO string
-              * value - actual data value
+              * value - actual data value, exactly as Influx stores it
               * unit - Engineering unit (if available)
               * path - full Sparkplug metric name (`Folder/Sub/Name`, or
                 just the name at the device root); a valid metrics selector
+              * device_uuid, instance_uuid, schema_uuid - the device, the
+                instance that owns the metric's folder, and its schema
+              * type - double, int, uint, boolean or string
     * Don't return valid response if dataset is invalid
    */
   async dataset_data(req, res) {

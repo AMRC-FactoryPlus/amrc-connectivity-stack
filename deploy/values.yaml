@@ -305,6 +305,18 @@ dataAccess:
     # `timeoutMs`.
     queryTimeoutMs: 90000
 
+briefcase:
+  # -- Run the briefcase exporter, which builds a briefcase of each
+  # Published dataset for sharing outside Factory+. The Admin UI shows
+  # the dataset page's Release tab only when this is set.
+  enabled: false
+  image:
+    repository: acs-briefcase
+  verbosity: "ALL,!service,!token"
+  # -- (RETRY_INTERVAL) Seconds to wait before building a briefcase
+  # again after a build fails.
+  retryInterval: 300
+
 openid:
   # -- Whether or not to deploy the Keycloak OIDC server
   enabled: true

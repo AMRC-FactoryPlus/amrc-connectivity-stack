@@ -10,6 +10,9 @@ data:
   .env: |
     SCHEME={{ .Values.acs.secure | ternary "https" "http" }}
     BASEURL={{ .Values.acs.baseUrl }}
+    {{- if .Values.briefcase.enabled }}
+    BRIEFCASE_EXPORTER=true
+    {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -28,6 +31,12 @@ spec:
       labels:
         component: admin
         factory-plus.service: admin
+      {{- if .Values.briefcase.enabled }}
+      # The console reads its .env only when it starts, so turning the
+      # briefcase exporter on or off has to restart it.
+      annotations:
+        factoryplus.app.amrc.co.uk/briefcase-exporter: "true"
+      {{- end }}
     spec:
       {{- with .Values.acs.imagePullSecrets }}
       imagePullSecrets:

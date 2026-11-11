@@ -154,7 +154,7 @@ describeInflux("History bulk path against real InfluxDB", () => {
         if (bucketId) await fetch(`${URL}/api/v2/buckets/${bucketId}`, { method: "DELETE", headers });
     });
 
-    const leaves = () => tree.getObjects().filter((o) => !o.isComposition).map((o) => o.elementId);
+    const leaves = () => tree.getObjects().filter((o) => !o.isComposition && o.typeElementId !== "isa95-level").map((o) => o.elementId);
     const comps = () => tree.getObjects().filter((o) => o.isComposition).map((o) => o.elementId);
 
     it("covers the edge cases the fleet is meant to contain", async () => {

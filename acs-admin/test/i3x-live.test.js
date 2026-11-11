@@ -16,8 +16,8 @@ describe('register_outcome', () => {
   it('sorts ids into registered, not found and failed', () => {
     const out = register_outcome([
       { success: true, elementId: 'a', result: null },
-      { success: false, elementId: 'b', error: { code: 404, message: 'Object b not found' } },
-      { success: false, elementId: 'c', error: { code: 500, message: 'boom' } },
+      { success: false, elementId: 'b', responseDetail: { status: 404, detail: 'Element not found: b' } },
+      { success: false, elementId: 'c', responseDetail: { status: 500, detail: 'boom' } },
     ])
     expect(out).toEqual({ ok: ['a'], missing: ['b'], failed: ['c'] })
   })
@@ -30,7 +30,7 @@ describe('register_outcome', () => {
   it('takes the first result for an id and skips results with no id', () => {
     const out = register_outcome([
       { success: true, elementId: 'a' },
-      { success: false, elementId: 'a', error: { code: 404 } },
+      { success: false, elementId: 'a', responseDetail: { status: 404 } },
       { success: true },
     ])
     expect(out).toEqual({ ok: ['a'], missing: [], failed: [] })
@@ -61,7 +61,7 @@ function fake_i3x ({ visible = [], fail = false } = {}) {
       calls.register.push([...ids])
       return ids.map(id => shown.has(id)
         ? { success: true, elementId: id, result: null }
-        : { success: false, elementId: id, error: { code: 404, message: `Object ${id} not found` } })
+        : { success: false, elementId: id, responseDetail: { title: "Not Found", status: 404, detail: `Element not found: ${id}` } })
     },
     async unregisterEach (clientId, sub, ids) {
       calls.unregister.push([...ids])

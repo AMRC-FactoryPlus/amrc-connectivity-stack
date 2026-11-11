@@ -7,6 +7,7 @@
  */
 
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, truncateSync, statSync } from "node:fs";
+import { ObjType } from "../lib/constants.js";
 import { tmpdir } from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
@@ -522,7 +523,8 @@ describe("ObjectTree rows", () => {
         t.addObjectType("schema-other", { title: "B" }, null);
         t.updateObjectType("schema-top", { title: "A2" }, { name: "Top" });
         expect(t.getObjects().map(o => o.elementId)).toEqual(before);
-        expect(t.getObjectTypes().map(o => o.elementId)).toEqual(["schema-top", "schema-other"]);
+        expect(t.getObjectTypes().map(o => o.elementId))
+            .toEqual(["schema-top", "schema-other", ...Object.values(ObjType)]);
     });
 
     it("returns object types with the schema exactly as stored", () => {

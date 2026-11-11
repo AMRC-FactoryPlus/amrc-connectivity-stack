@@ -5,7 +5,7 @@
 import { jest } from "@jest/globals";
 import { ObjectTree } from "../lib/object-tree.js";
 import { TestObjectTree } from "./helpers/isa95.js";
-import { RelType } from "../lib/constants.js";
+import { ObjType, RelType } from "../lib/constants.js";
 import { createMockFplus } from "./helpers/mock-services.js";
 import { loadFromMock } from "./helpers/load-from-mock.js";
 
@@ -384,6 +384,42 @@ describe("ObjectTree", () => {
             expect(countAfter).toBe(countBefore);
         });
 
+        it("types a leaf by its Sparkplug type, not by the Metric schema it names", async () => {
+            const { tree, dev1 } = await treeWithDevice();
+            const METRIC_SCHEMA = "b16275f1-e443-4c41-a482-fcbdfbd20769";
+
+            /* From UNS: the last schema in the path is the leaf's, and
+             * is the Factory+ Metric schema for every metric. */
+            const speed = tree.addCompositionFromUns(
+                [dev1, "axes-uuid"], ["top-schema", "axes-schema", METRIC_SCHEMA], ["Axes", "Speed"],
+                undefined, { type: "DoubleLE" })!;
+            expect(tree.getObject("axes-uuid")!.typeElementId).toBe("axes-schema");
+            expect(tree.getObject(speed)!.typeElementId).toBe(ObjType.NumberMetric);
+            const on = tree.addCompositionFromUns(
+                [dev1], ["top-schema", METRIC_SCHEMA], ["Running"], undefined, { type: "Boolean" })!;
+            expect(tree.getObject(on)!.typeElementId).toBe(ObjType.BooleanMetric);
+            const when = tree.addCompositionFromUns(
+                [dev1], ["top-schema", METRIC_SCHEMA], ["Seen"], undefined, { type: "DateTime" })!;
+            expect(tree.getObject(when)!.typeElementId).toBe(ObjType.Metric);
+
+            /* From config: the origin map gives the metric the same
+             * Schema_UUID. */
+            tree.addDevice("dev-typed", {
+                schema: "top-schema",
+                originMap: {
+                    Schema_UUID: "top-schema",
+                    Instance_UUID: "dev-typed",
+                    Serial: { Schema_UUID: METRIC_SCHEMA, Instance_UUID: "serial-uuid", Sparkplug_Type: "String" },
+                    Count: { Schema_UUID: METRIC_SCHEMA, Instance_UUID: "count-uuid", Sparkplug_Type: "UInt32" },
+                },
+            }, { name: "Typed" }, ["AMRC"]);
+            expect(tree.getObject("serial-uuid")!.typeElementId).toBe(ObjType.StringMetric);
+            expect(tree.getObject("count-uuid")!.typeElementId).toBe(ObjType.NumberMetric);
+            /* Every type an object names is listed, with a scalar schema
+             * for the data points. */
+            expect(tree.getObjectType(ObjType.NumberMetric)!.schema).toEqual({ type: "number" });
+        });
+
         it("after adding composition: getChildElementIds(parentId) returns child IDs", async () => {
             const { tree, dev1 } = await treeWithDevice();
 
@@ -404,7 +440,7 @@ describe("ObjectTree", () => {
             expect(childrenOfSub1).toContain(sub2);
         });
 
-        it("getRelated(id, HasChildren) returns children", async () => {
+        it("getRelated(id, HasComponent) returns a device's components", async () => {
             const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
@@ -414,12 +450,14 @@ describe("ObjectTree", () => {
                 ["Axes"],
             );
 
-            const children = tree.getRelated(dev1, RelType.HasChildren);
+            /* A device's children are parts of its value, not children. */
+            expect(tree.getRelated(dev1, RelType.HasChildren)).toEqual([]);
+            const children = tree.getRelated(dev1, RelType.HasComponent);
             const childIds = children.map(c => c.elementId);
             expect(childIds).toContain(sub1);
         });
 
-        it("getRelated(childId, HasParent) returns parent", async () => {
+        it("getRelated(childId, ComponentOf) returns the device", async () => {
             const { tree, dev1 } = await treeWithDevice();
 
             const sub1 = "sub-1-uuid";
@@ -429,7 +467,8 @@ describe("ObjectTree", () => {
                 ["Axes"],
             );
 
-            const parents = tree.getRelated(sub1, RelType.HasParent);
+            expect(tree.getRelated(sub1, RelType.HasParent)).toEqual([]);
+            const parents = tree.getRelated(sub1, RelType.ComponentOf);
             expect(parents).toHaveLength(1);
             expect(parents[0].elementId).toBe(dev1);
         });
@@ -479,7 +518,7 @@ describe("ObjectTree", () => {
             const { tree, dev1, instanceUuid } = await treeWithDevice();
             // Find a leaf node (no children)
             const allObjects = tree.getObjects();
-            const leaf = allObjects.find(o => !o.isComposition);
+            const leaf = allObjects.find(o => !o.isComposition && o.typeElementId !== "isa95-level");
             if (leaf) {
                 expect(tree.getChildElementIds(leaf.elementId)).toEqual([]);
             }

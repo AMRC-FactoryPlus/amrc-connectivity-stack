@@ -184,7 +184,7 @@ describe("wrapError", () => {
         const resp = wrapError("something went wrong", 500);
         expect(resp).toEqual({
             success: false,
-            error: { code: 500, message: "something went wrong" },
+            responseDetail: { title: "Internal Server Error", status: 500, detail: "something went wrong" },
         });
     });
 
@@ -192,7 +192,7 @@ describe("wrapError", () => {
         const resp = wrapError("", 400);
         expect(resp).toEqual({
             success: false,
-            error: { code: 400, message: "" },
+            responseDetail: { title: "Bad Request", status: 400, detail: "" },
         });
     });
 });
@@ -210,7 +210,7 @@ describe("wrapBulkResponse", () => {
     it("returns success false when one item failed", () => {
         const items: I3xBulkItem<string>[] = [
             { success: true, elementId: "a", result: "ok" },
-            { success: false, elementId: "b", error: { code: 404, message: "not found" } },
+            { success: false, elementId: "b", responseDetail: { title: "Not Found", status: 404, detail: "not found" } },
         ];
         const resp = wrapBulkResponse(items);
         expect(resp.success).toBe(false);
@@ -219,8 +219,8 @@ describe("wrapBulkResponse", () => {
 
     it("returns success false when all items failed", () => {
         const items: I3xBulkItem<string>[] = [
-            { success: false, elementId: "a", error: { code: 500, message: "err1" } },
-            { success: false, elementId: "b", error: { code: 500, message: "err2" } },
+            { success: false, elementId: "a", responseDetail: { title: "Internal Server Error", status: 500, detail: "err1" } },
+            { success: false, elementId: "b", responseDetail: { title: "Internal Server Error", status: 500, detail: "err2" } },
         ];
         const resp = wrapBulkResponse(items);
         expect(resp.success).toBe(false);

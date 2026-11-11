@@ -4,10 +4,14 @@
 
 import { defineStore } from 'pinia'
 import { useI3xClient } from '@composables/useI3xClient.js'
+import { describe_type } from '@/lib/explorer/model.js'
 
 export const useExplorerStore = defineStore('explorer', {
   state: () => ({
     nodes: new Map(),
+    // The i3X object types, by elementId. Loaded once; until then an
+    // object shows by its type id.
+    types: new Map(),
     rootIds: [],
     selectedId: null,
     loadingRoots: false,
@@ -20,14 +24,30 @@ export const useExplorerStore = defineStore('explorer', {
       if (!state.selectedId) return null
       return state.nodes.get(state.selectedId)?.node ?? null
     },
+    // node => its type as the page shows it (see describe_type).
+    typeOf (state) {
+      return node => describe_type(node, state.types)
+    },
   },
 
   actions: {
+    async loadTypes () {
+      try {
+        const types = await useI3xClient().getObjectTypes()
+        this.types = new Map(types.map(t => [t.elementId, t]))
+      }
+      catch (err) {
+        // The page works without them: objects show by their type id.
+        console.warn('Explorer: the i3X object types are not available', err)
+      }
+    },
+
     async loadRoots () {
       if (this.loadingRoots) return
       this.loadingRoots = true
       try {
         const i3x = useI3xClient()
+        this.loadTypes()
         const roots = await i3x.getObjects({ root: true })
         this.rootIds = []
         for (const obj of roots) {
@@ -55,7 +75,7 @@ export const useExplorerStore = defineStore('explorer', {
       this.loadingChildren.add(elementId)
       try {
         const i3x = useI3xClient()
-        const children = await i3x.getRelated(elementId, 'i3x:rel:has-children')
+        const children = await i3x.getChildren(elementId)
         const childIds = []
         for (const child of children) {
           childIds.push(child.elementId)

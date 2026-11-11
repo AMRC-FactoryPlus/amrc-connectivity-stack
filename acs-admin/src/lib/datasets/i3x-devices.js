@@ -11,7 +11,7 @@
 // The i3X type of an ISA-95 level object.
 export const ISA95_LEVEL_TYPE = 'isa95-level'
 // The relationship from a level to what sits directly under it.
-export const HAS_CHILDREN = 'i3x:rel:has-children'
+export const HAS_CHILDREN = 'HasChildren'
 
 // The heading for devices with no ISA-95 path.
 export const NO_PATH = 'Not in the ISA-95 hierarchy'
@@ -21,7 +21,7 @@ export const NO_PATH = 'Not in the ISA-95 hierarchy'
  *
  * @param levels   i3X objects of type isa95-level:
  *                 [{ elementId, displayName, parentId }]
- * @param related  the per-level results of a has-children lookup:
+ * @param related  the per-level results of a HasChildren lookup:
  *                 [{ success, elementId, result: [object] }]
  * @returns [{ uuid, name, path, parent }], sorted by path then name.
  *   A child that is not a level is a device: its elementId is the

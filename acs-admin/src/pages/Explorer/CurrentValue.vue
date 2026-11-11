@@ -116,7 +116,7 @@ function formatValue (val) {
       <div v-if="error" class="text-sm text-red-500">{{ error }}</div>
       <div v-else-if="loading && !leafValue && !root" class="text-sm text-slate-400">Loading...</div>
 
-      <div v-else-if="leafValue && !leafValue.isComposition" class="flex items-center gap-3">
+      <div v-else-if="leafValue && !leafValue.isComposition && leafValue.value != null" class="flex items-center gap-3">
         <span class="text-2xl font-semibold font-mono">{{ formatValue(leafValue.value) }}</span>
         <QualityBadge :quality="leafValue.quality" />
         <span class="text-xs text-slate-400 ml-auto">{{ formatTimestamp(leafValue.timestamp) }}</span>

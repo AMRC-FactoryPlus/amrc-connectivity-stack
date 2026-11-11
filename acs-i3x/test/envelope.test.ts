@@ -87,7 +87,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { code: 404, message: "Not Found" },
+            responseDetail: { title: "Not Found", status: 404, detail: "Not Found" },
         });
     });
 
@@ -102,7 +102,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { code: 403, message: "Forbidden" },
+            responseDetail: { title: "Forbidden", status: 403, detail: "Forbidden" },
         });
     });
 
@@ -116,7 +116,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { code: 500, message: "something broke" },
+            responseDetail: { title: "Internal Server Error", status: 500, detail: "something broke" },
         });
     });
 
@@ -130,7 +130,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { code: 500, message: "Internal server error" },
+            responseDetail: { title: "Internal Server Error", status: 500, detail: "Internal server error" },
         });
     });
 
@@ -146,7 +146,7 @@ describe("i3xErrorHandler", () => {
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
             success: false,
-            error: { code: 400, message: "Bad Request" },
+            responseDetail: { title: "Bad Request", status: 400, detail: "Bad Request" },
         });
     });
 
@@ -169,7 +169,7 @@ describe("i3xErrorHandler", () => {
         const lastCall = originalJson.mock.calls[originalJson.mock.calls.length - 1][0];
         expect(lastCall).toEqual({
             success: false,
-            error: { code: 404, message: "Not Found" },
+            responseDetail: { title: "Not Found", status: 404, detail: "Not Found" },
         });
     });
 });

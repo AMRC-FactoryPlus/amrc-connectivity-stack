@@ -1,15 +1,35 @@
 export const Version = "0.1.0";
-export const I3X_SPEC_VERSION = "0.1.0";
+/* The i3X specification this service implements. The spec versions as
+ * MAJOR.MINOR, and clients refuse a server that reports another major. */
+export const I3X_SPEC_VERSION = "1.0";
 
 export const HIERARCHY_SCHEMA_UUID = "84ac3397-f3a2-440a-99e5-5bb9f6a75091";
 export const DEVICE_INFO_SCHEMA_UUID = "2dd093e9-1450-44c5-be8c-c0d78e48219b";
 
-// Built-in i3X relationship type IDs (synthetic, internal to this service)
+// The i3X relationship types, with the elementIds the specification
+// gives them. An object under an ISA-95 level HasParent that level; an
+// object under a composition (a device or a branch of one) is a
+// ComponentOf it.
 export const RelType = {
-    HasParent:     "i3x:rel:has-parent",
-    HasChildren:   "i3x:rel:has-children",
-    HasComponent:  "i3x:rel:has-component",
-    ComponentOf:   "i3x:rel:component-of",
+    HasParent:     "HasParent",
+    HasChildren:   "HasChildren",
+    HasComponent:  "HasComponent",
+    ComponentOf:   "ComponentOf",
+};
+
+// Object types this service makes up; every other type is a ConfigDB
+// schema, with the schema's UUID as its elementId.
+export const ObjType = {
+    /* A level of the ISA-95 hierarchy above the devices. */
+    Isa95Level:    "isa95-level",
+    /* An object whose type is not known. */
+    Unknown:       "unknown",
+    /* Leaf metrics with no schema of their own, by the JSON type of
+     * their value. Metric is for Sparkplug types with no one JSON type. */
+    NumberMetric:  "metric-number",
+    BooleanMetric: "metric-boolean",
+    StringMetric:  "metric-string",
+    Metric:        "metric",
 };
 
 // ConfigDB UUIDs consumed by the object tree loader and notify subscriptions.

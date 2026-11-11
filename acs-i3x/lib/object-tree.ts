@@ -22,10 +22,13 @@ import type {
     I3xNamespace,
     I3xObjectType,
     I3xObject,
+    I3xObjectMetadata,
+    I3xRelated,
     I3xRelationshipType,
 } from "./types/i3x.js";
 
 import {
+    ObjType,
     RelType,
 } from "./constants.js";
 import { I3xStore } from "./store.js";
@@ -168,6 +171,42 @@ function sparkplugTypeToSuffix(spType: string): string {
         default: return "s";
     }
 }
+
+/**
+ * The object type of a leaf metric, from its Sparkplug type. In i3X an
+ * object's value must conform to its type's schema, and a data point's
+ * type has a scalar schema, so a client can tell a data point from a
+ * branch and check the value. A metric's Schema_UUID does not serve:
+ * it names the Factory+ Metric schema, which describes how the metric
+ * is configured (its Sparkplug type, address and so on), not its value.
+ */
+function leafTypeFor(spType: string | undefined): string {
+    const t = (spType ?? "").replace(/(LE|BE)$/, "");
+    switch (t) {
+        case "Float": case "Double":
+        case "Int8": case "Int16": case "Int32": case "Int64":
+        case "UInt8": case "UInt16": case "UInt32": case "UInt64":
+            return ObjType.NumberMetric;
+        case "Boolean":
+            return ObjType.BooleanMetric;
+        case "String": case "Text": case "UUID":
+            return ObjType.StringMetric;
+        default:
+            return ObjType.Metric;
+    }
+}
+
+/* The object types this service makes up, in the order they are
+ * listed, after the ConfigDB schemas. */
+const SYNTHETIC_TYPES: Array<[string, string, object]> = [
+    [ObjType.Isa95Level,    "ISA-95 level",     { type: "object" }],
+    [ObjType.Unknown,       "Unknown type",     { type: "object" }],
+    [ObjType.NumberMetric,  "Number metric",    { type: "number" }],
+    [ObjType.BooleanMetric, "Boolean metric",   { type: "boolean" }],
+    [ObjType.StringMetric,  "String metric",    { type: "string" }],
+    /* A metric whose Sparkplug type has no single JSON type. */
+    [ObjType.Metric,        "Metric",           {}],
+];
 
 /* The ids in the subtree rooted at ?1, the root included. UNION, not
  * UNION ALL, so a parent cycle cannot recurse for ever. */
@@ -683,14 +722,24 @@ export class ObjectTree {
     getObjectTypes(namespaceUri?: string): I3xObjectType[] {
         // Every type is in this tree's namespace.
         if (namespaceUri !== undefined && namespaceUri !== this.namespaceUri) return [];
-        return (this.store.prepare("select element_id, display_name, schema_json from object_type order by seq")
+        const types = (this.store.prepare("select element_id, display_name, schema_json from object_type order by seq")
             .all() as any[]).map(r => this.toObjectType(r));
+        /* i3X requires every typeElementId to name a listed type. */
+        const listed = new Set(types.map(t => t.elementId));
+        for (const [id] of SYNTHETIC_TYPES)
+            if (!listed.has(id)) types.push(this.syntheticType(id)!);
+        return types;
     }
 
     getObjectType(elementId: string): I3xObjectType | undefined {
         const r = this.store.prepare("select element_id, display_name, schema_json from object_type where element_id = ?")
             .get(elementId);
-        return r ? this.toObjectType(r) : undefined;
+        return r ? this.toObjectType(r) : this.syntheticType(elementId);
+    }
+
+    private syntheticType(elementId: string): I3xObjectType | undefined {
+        const t = SYNTHETIC_TYPES.find(([id]) => id === elementId);
+        return t && toI3xObjectType(t[0], t[1], this.namespaceUri, t[0], t[2]);
     }
 
     private toObjectType(r: any): I3xObjectType {
@@ -793,22 +842,73 @@ export class ObjectTree {
      */
     *iterateRelated(elementId: string, relationshipType?: string, pageSize: number = 1000,
             visible?: Visible): Generator<I3xObject> {
+        for (const edge of this.iterateEdges(elementId, relationshipType, pageSize, visible))
+            yield edge.object;
+    }
+
+    /**
+     * The edges from an object: the one to its parent, then one to each
+     * child, each with the relationship type that leads from this
+     * object to the other. The tree only stores parents, so the edges
+     * are made from them, and every edge has its reverse.
+     *
+     * The levels of the ISA-95 hierarchy organise the objects below
+     * them (HasChildren, and HasParent back). Everything from a device
+     * down is part of the device's value (HasComponent, and ComponentOf
+     * back).
+     */
+    *iterateEdges(elementId: string, relationshipType?: string, pageSize: number = 1000,
+            visible?: Visible): Generator<I3xRelated> {
         const obj = this.getObject(elementId, visible);
         if (!obj) return;
+        const { up, down } = this.edgeTypes(obj);
 
-        if (relationshipType === undefined || relationshipType === RelType.HasParent) {
-            if (obj.parentId !== null && obj.parentId !== "/") {
-                const parent = this.getObject(obj.parentId, visible);
-                if (parent) yield parent;
-            }
+        if (up !== undefined && (relationshipType === undefined || relationshipType === up)) {
+            const parent = this.getObject(obj.parentId!, visible);
+            if (parent) yield { sourceRelationship: up, object: parent };
         }
 
-        if (relationshipType === undefined || relationshipType === RelType.HasChildren) {
+        if (relationshipType === undefined || relationshipType === down) {
             const sql = `select seq, ${OBJECT_COLS} from object
                 where seq > ? and parent_id = ? order by seq limit ?`;
             for (const r of this.snapshotPages(sql, [elementId], pageSize))
-                if (shown(r, visible)) yield toObject(r);
+                if (shown(r, visible)) yield { sourceRelationship: down, object: toObject(r) };
         }
+    }
+
+    /** The relationship types from an object to its parent (none for a
+     * root) and to its children. */
+    private edgeTypes(obj: I3xObject): { up: string | undefined; down: string } {
+        const down = obj.typeElementId === ObjType.Isa95Level
+            ? RelType.HasChildren : RelType.HasComponent;
+        if (obj.parentId === null || obj.parentId === "/") return { up: undefined, down };
+        const parentType = (this.store.prepare("select type_element_id t from object where element_id = ?")
+            .get(obj.parentId) as { t: string } | undefined)?.t;
+        const up = parentType === undefined || parentType === ObjType.Isa95Level
+            ? RelType.HasParent : RelType.ComponentOf;
+        return { up, down };
+    }
+
+    /**
+     * The metadata i3X returns with an object when a client asks for
+     * it: where the type comes from, and the ids at the other end of
+     * the object's edges (see iterateEdges). Objects the caller cannot
+     * see are left out.
+     */
+    objectMetadata(obj: I3xObject, visible?: Visible): I3xObjectMetadata {
+        const { up, down } = this.edgeTypes(obj);
+        const relationships: Record<string, string | string[]> = {};
+        if (up !== undefined && this.getObject(obj.parentId!, visible))
+            relationships[up] = obj.parentId!;
+        const children = (this.store.prepare(
+            "select element_id, device_uuid from object where parent_id = ? order by seq",
+        ).all(obj.elementId) as any[]).filter(r => shown(r, visible)).map(r => r.element_id as string);
+        if (children.length) relationships[down] = children;
+        return {
+            typeNamespaceUri: this.namespaceUri,
+            sourceTypeId: obj.typeElementId,
+            relationships,
+        };
     }
 
     getRelated(elementId: string, relationshipType?: string, visible?: Visible): I3xObject[] {
@@ -985,9 +1085,13 @@ export class ObjectTree {
                 const obj = toI3xObject(
                     elementId,
                     segment,
-                    "isa95-level",  // synthetic type for ISA-95 nodes
+                    ObjType.Isa95Level,
                     parentId,
-                    true,           // isComposition
+                    /* A level organises the objects under it: they are
+                     * its children, not parts of its value. In i3X
+                     * only an object with components is a composition,
+                     * and a value read never follows HasChildren. */
+                    false,
                 );
                 this.putObject(obj, "config", null);
                 this.placementRev++;
@@ -1092,14 +1196,17 @@ export class ObjectTree {
                         ? instanceUuidPath[instanceIdx]
                         : uuidv5(`${parentId}:${segment}`, I3X_UUID_NAMESPACE));
 
-                // Schema: use schemaUuidPath[i+1] if available, else "unknown"
-                const schemaIdx = i + 1;
-                const typeElementId = schemaIdx < schemaUuidPath.length
-                    ? schemaUuidPath[schemaIdx]
-                    : "unknown";
-
                 // Last segment is a leaf metric (has a value), rest are composition
                 const isLeaf = i === metricSegments.length - 1;
+
+                // A leaf takes its type from the metric's Sparkplug
+                // type (see leafTypeFor). A branch uses
+                // schemaUuidPath[i+1] if available, and is otherwise of
+                // unknown type.
+                const schemaIdx = i + 1;
+                const typeElementId = isLeaf ? leafTypeFor(uns?.type)
+                    : schemaIdx < schemaUuidPath.length ? schemaUuidPath[schemaIdx]
+                    : ObjType.Unknown;
 
                 if (!existing && !this.hasObject(elementId)) {
                     const obj = toI3xObject(
@@ -1215,8 +1322,11 @@ export class ObjectTree {
             const elementId = entry.Instance_UUID
                 ?? uuidv5(`${parentId}:${key}`, I3X_UUID_NAMESPACE);
 
-            // Use Schema_UUID as typeElementId if available
-            const typeElementId = entry.Schema_UUID ?? "unknown";
+            // A leaf takes its type from its Sparkplug type (see
+            // leafTypeFor). A branch uses its Schema_UUID if it has
+            // one, and is otherwise of unknown type.
+            const typeElementId = isLeaf ? leafTypeFor(entry.Sparkplug_Type)
+                : entry.Schema_UUID ?? ObjType.Unknown;
 
             // Build the metric path for InfluxDB queries
             const currentPath = pathPrefix ? `${pathPrefix}/${key}` : key;

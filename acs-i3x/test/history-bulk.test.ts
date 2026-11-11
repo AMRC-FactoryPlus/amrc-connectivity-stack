@@ -325,7 +325,7 @@ describe("History bulk current values", () => {
             expect(collectRows).toHaveBeenCalledTimes(1);
             expect(out.get("a-temp")?.value).toBe(20);
             expect(out.get("dev-B")).toEqual({
-                elementId: "dev-B", isComposition: true, value: null, quality: "Good", timestamp: T2,
+                elementId: "dev-B", isComposition: true, value: null, quality: "GoodNoData", timestamp: T2,
                 components: { "b-temp": { value: 30, quality: "Good", timestamp: T2 } },
             });
         });

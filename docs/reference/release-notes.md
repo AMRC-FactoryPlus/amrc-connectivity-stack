@@ -419,6 +419,18 @@ longer depend on GitHub Pages. If the browser still does not take a
 download, the admin UI gives up after 30 seconds and says so instead of
 spinning.
 
+### Dataset time windows include the start and exclude the end
+
+The Data Access reference now says that every time window is `[from,
+to)`: a reading timestamped exactly at `from` is in the window, and a
+reading timestamped exactly at `to` is not. This covers session limits,
+the `from` and `to` of downloads and series requests, and series
+buckets. The reference and the Admin UI's dataset builder used to say
+both ends were inclusive, which was wrong. Data Access has always
+worked this way, because InfluxDB's `range()` treats its stop time the
+same way, so nothing changes for clients. Sessions that meet end to
+end never share a reading.
+
 ### List every dataset's name in one request
 
 `GET v1/metadata` on Data Access takes a new `include` parameter. With

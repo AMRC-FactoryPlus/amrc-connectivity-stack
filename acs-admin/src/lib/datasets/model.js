@@ -271,7 +271,11 @@ export function to_iso (t) {
     return d.toISOString()
 }
 
-/** Check a window before it goes to the service, which accepts a bad one. */
+/**
+ * Check a window before it goes to the service, which accepts a bad one.
+ * Data Access reads a window as [from, to): it includes a reading at
+ * `from` and excludes a reading at `to`.
+ */
 export function validate_window (from, to) {
     if (from == null || to == null || from === '' || to === '') return 'Choose a start and an end.'
     const f = new Date(from).getTime(), t = new Date(to).getTime()

@@ -47,6 +47,8 @@ export class SessionLimitsHandler extends BaseStructureHandler {
     return ok; 
   }
 
+  /* A session covers [from, to): a reading at `from` is in it and a
+   * reading at `to` is not, as Flux's range() treats start and stop. */
   async resolve({ config, inherited_range, visited }) {
     const session_range = {
       from: config.from ?? null,

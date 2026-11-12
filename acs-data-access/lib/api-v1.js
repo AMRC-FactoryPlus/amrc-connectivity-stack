@@ -74,6 +74,69 @@ export function bound_sources(resolved, window) {
   return { sources };
 }
 
+/* The fields GET /metadata?include= can add to each dataset. Each is
+ * the key of the same name in the answer of GET /metadata/:uuid. The
+ * kind the Admin UI sets is one of the classes in `function`. `parts`
+ * is left out: following a dataset's parts costs a ConfigDB WATCH for
+ * each dataset, so a list of every dataset cannot give it cheaply. */
+export const METADATA_FIELDS = ["name", "from", "to", "function", "metadata"];
+
+/** The metadata of one dataset, with the keys GET /metadata/:uuid
+ * answers except `parts`, in the same order. A key whose value is
+ * undefined is left out of the JSON.
+ * @param maps The held maps, as APIv1#metadata_maps returns them. */
+export function metadata_entry(uuid, dataset, maps) {
+  const info = maps.infos.get(uuid);
+  return {
+    uuid,
+    name: info?.name ? info.name : "UNKNOWN",
+    from: dataset.from ? dataset.from : undefined,
+    to: dataset.to ? dataset.to : undefined,
+    function: maps.functional.get(uuid),
+    metadata: maps.metadata.get(uuid),
+  };
+}
+
+/** Parses the `include` query parameter of GET /metadata.
+ *
+ * It is a comma-separated list of METADATA_FIELDS, and may be given
+ * more than once. `uuid` is accepted and changes nothing, since every
+ * entry has it. An empty list asks for entries of `uuid` alone.
+ *
+ * @returns null when the parameter is absent, or a Set of fields.
+ * Throws a 422 Refusal for anything else. */
+export function parse_include(log, value) {
+  if (value === undefined) return null;
+
+  const values = Array.isArray(value) ? value : [value];
+  if (values.some(v => typeof v != "string"))
+    refuse(log, 422, "invalid_include",
+      "include must be a comma-separated list of field names.",
+      { fields: METADATA_FIELDS });
+
+  const asked = values.flatMap(v => v.split(","))
+    .map(f => f.trim())
+    .filter(f => f != "" && f != "uuid");
+
+  const unknown = [...new Set(asked.filter(f => !METADATA_FIELDS.includes(f)))];
+  if (unknown.length)
+    refuse(log, 422, "invalid_include",
+      `Unknown include field${unknown.length > 1 ? "s" : ""} `
+      + `${unknown.join(", ")}. The fields are ${METADATA_FIELDS.join(", ")}.`
+      + (unknown.includes("parts")
+        ? " A dataset's parts come only from GET /metadata/:uuid." : ""),
+      { unknown, fields: METADATA_FIELDS });
+
+  return new Set(asked);
+}
+
+/** Keeps `uuid` and the included fields of a metadata entry, in the
+ * entry's own key order. */
+function pick_fields(entry, include) {
+  return Object.fromEntries(Object.entries(entry)
+    .filter(([key]) => key == "uuid" || include.has(key)));
+}
+
 export class APIv1 {
   constructor(opts) {
     this.data = opts.data;
@@ -114,7 +177,7 @@ export class APIv1 {
     let api = express.Router();
 
     api.route("/metadata")
-      .get(this.metadata_list.bind(this));
+      .get(this.refusable(this.metadata_list));
 
     api.route("/metadata/:uuid")
       .get(this.metadata_uuid.bind(this));
@@ -434,13 +497,44 @@ export class APIv1 {
   /** GET. Returns a list of Dataset UUIDs that the client has READ_DATASET access to.
    * The dataset can be optionally restricted by from and to dates (this is not implemented yet).
    * Dates must be in the format ISO date-time string in UTC 2025-11-13T09:33:18.000Z
-   * @param from {date} (optional, inclusive) query param
-   * @param to {date} (optional, inclusive) query param
+   * @param from {date} (optional, start-inclusive) query param
+   * @param to {date} (optional, end-exclusive) query param
+   * @param include {string} (optional) query param: a comma-separated
+   *   list of METADATA_FIELDS. With it the list holds an object per
+   *   dataset instead of a UUID: `uuid` and each field asked for, as
+   *   GET /metadata/:uuid gives them. An unknown field is a 422.
    * Don't return invalid datasets
   */
   async metadata_list(req, res) {
-    const uuids = await rx.firstValueFrom(this.data.allowed_valid_dataset_uuids(req.auth, Constants.Perm.ReadDataset));
-    return res.status(200).json(uuids);
+    const include = parse_include(this.log, req.query?.include);
+    if (!include) {
+      const uuids = await rx.firstValueFrom(this.data.allowed_valid_dataset_uuids(req.auth, Constants.Perm.ReadDataset));
+      return res.status(200).json(uuids);
+    }
+
+    /* The same maps GET /metadata/:uuid reads, so each entry is what
+     * that route would answer for the dataset. They are held in memory
+     * (DataFlow.run), so this costs no call per dataset. */
+    const [datasets, maps] = await Promise.all([
+      rx.firstValueFrom(this.data.allowed_valid_datasets(req.auth, Constants.Perm.ReadDataset)),
+      this.metadata_maps(),
+    ]);
+
+    const list = datasets.entrySeq()
+      .map(([uuid, dataset]) =>
+        pick_fields(metadata_entry(uuid, dataset, maps), include))
+      .toArray();
+    return res.status(200).json(list);
+  }
+
+  /** The held maps a metadata answer is built from. */
+  async metadata_maps() {
+    const [infos, functional, metadata] = await Promise.all([
+      rx.firstValueFrom(this.data.general_infos),
+      rx.firstValueFrom(this.data.functional_types),
+      rx.firstValueFrom(this.data.metadata),
+    ]);
+    return { infos, functional, metadata };
   }
 
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
@@ -466,17 +560,9 @@ export class APIv1 {
     if (!ok) return fail(this.log, 403, `You don't have READ permissions for ${dataset_uuid}`);
 
 
-    const [
-      datasets,
-      infos,
-      all_f_types,
-      all_metadata,
-      parts
-    ] = await Promise.all([
+    const [datasets, maps, parts] = await Promise.all([
       rx.firstValueFrom(this.data.allowed_valid_datasets(req.auth, Constants.Perm.ReadDataset)),
-      rx.firstValueFrom(this.data.general_infos),
-      rx.firstValueFrom(this.data.functional_types),
-      rx.firstValueFrom(this.data.metadata),
+      this.metadata_maps(),
       rx.firstValueFrom(
         this.data.allowed_dataset_parts(dataset_uuid, req.auth, Constants.Perm.ReadDataset)
       )
@@ -484,18 +570,8 @@ export class APIv1 {
 
     const dataset = datasets.get(dataset_uuid);
     if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} is not found or invalid.`);
-  
-    const info = infos.get(dataset_uuid);
 
-    const meta = {
-      uuid: dataset_uuid,
-      name: info?.name ? info.name : "UNKNOWN",
-      from: dataset.from ? dataset.from : undefined,
-      to: dataset.to ? dataset.to : undefined,
-      function: all_f_types.get(dataset_uuid),
-      metadata: all_metadata.get(dataset_uuid),
-      parts
-    }
+    const meta = { ...metadata_entry(dataset_uuid, dataset, maps), parts };
     return res.status(200).json(meta);
   }
 
@@ -819,6 +895,8 @@ export class APIv1 {
     });
   }
 
+  /** Intersects two `[from, to)` windows: the later start and the
+   * earlier stop. The result is still start-inclusive and end-exclusive. */
   intersectRanges(parent, child){
     const from = maxDate(parent.from, child.from);
     const to = minDate(parent.to, child.to);

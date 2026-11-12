@@ -172,11 +172,33 @@ including another session or union. Both `from` and `to` are required
 by the current validation (`session-limits-handler.js`); an open-ended
 session — where one bound is omitted — is described in the design but
 is not accepted by the current implementation, which rejects a request
-missing either field with `422`. Bounds are inclusive. Datetimes must
-match `2025-11-13T09:33:18.000Z` exactly (millisecond precision, `Z`
-suffix) — `lib/validate.js`'s `valid_datetime` rejects anything else,
+missing either field with `422`. The session covers `[from, to)`: it
+includes a reading timestamped exactly at `from` and leaves out a
+reading timestamped exactly at `to` (see [Time windows](#time-windows)).
+Datetimes must match `2025-11-13T09:33:18.000Z` exactly (millisecond
+precision, `Z` suffix) — `lib/validate.js`'s `valid_datetime` rejects anything else,
 including dates that don't round-trip through `Date.parse`/`toISOString`
 (e.g. 30 February).
+
+### Time windows
+
+Every time window in Data Access is start-inclusive and end-exclusive,
+written `[from, to)`. A reading timestamped exactly at `from` is in the
+window, and a reading timestamped exactly at `to` is not. This applies
+to `Session limits`, to the `from` and `to` of a `POST v1/data/:uuid` or
+`POST v1/series` request, to the `windows` and `pending` ranges in a
+series answer, and to each series bucket.
+
+Two windows that meet, where one stops at the time the next starts,
+never both hold the same reading. So a run split into back-to-back
+sessions downloads each reading once. This is how the InfluxDB Flux
+`range()` function treats its `start` and `stop`, and Data Access passes
+`from` and `to` to it unchanged.
+
+When windows nest, for example a session of a session, or a request
+window over a session dataset, Data Access takes the later of the two
+starts and the earlier of the two stops. The result is still
+`[from, to)`.
 
 ### Structurally invalid datasets
 
@@ -298,6 +320,68 @@ includes the default dataset of every device the caller holds
 and `to` query parameters described in the original design are not
 implemented** — the endpoint always returns the full allowed list.
 
+#### `include`: metadata for every dataset in one request
+
+`GET v1/metadata?include=<fields>` returns an object for each dataset
+in place of its UUID. Each object has `uuid` and the fields you ask
+for, with the values `GET v1/metadata/:uuid` gives for them. A client
+that needs the names of hundreds of datasets can then ask once, rather
+than once per dataset.
+
+`include` is a comma-separated list of these fields, the keys of the
+[`GET v1/metadata/:uuid`](#get-v1metadatauuid) answer:
+
+Field | Meaning
+---|---
+`name` | The dataset's name, `"UNKNOWN"` if it has none
+`from` / `to` | The dataset's time window. Each is omitted where the dataset is unbounded
+`function` | The functional classes the dataset belongs to. The kind the Admin UI sets (`MES equipment`, `Run`, `MES operation` or `MES product`) is one of these
+`metadata` | Config entries keyed by Application UUID, for every application in `Dataset metadata`
+
+`parts` is not available here. Finding a dataset's parts costs a
+ConfigDB watch for each dataset, so it comes only from
+`GET v1/metadata/:uuid`. You may repeat the parameter
+(`include=name&include=from`), and `uuid` is accepted and changes
+nothing. An empty `include=` returns objects with `uuid` alone.
+
+The list holds the same datasets as the plain list, checked in the same
+way, so it never shows a dataset that `GET v1/metadata/:uuid` would
+refuse. The service builds it from the maps it holds in memory, so the
+cost does not grow with a call per dataset.
+
+Request:
+
+```http
+GET /v1/metadata?include=name,from,to
+```
+
+Response:
+
+```json
+[
+  { "uuid": "5eed0000-0000-4000-8000-000000000001", "name": "Press 3" },
+  {
+    "uuid": "5eed0000-0000-4000-8000-000000000002",
+    "name": "Press 3, first shift",
+    "from": "2026-01-01T06:00:00.000Z",
+    "to": "2026-01-01T14:00:00.000Z"
+  }
+]
+```
+
+A field the service does not know returns `422`:
+
+```json
+{
+  "error": "invalid_include",
+  "message": "Unknown include field colour. The fields are name, from, to, function, metadata.",
+  "unknown": ["colour"],
+  "fields": ["name", "from", "to", "function", "metadata"]
+}
+```
+
+Without `include` the answer is the array of UUIDs, as before.
+
 ### Metadata writes: `v1/metadata/:uuid/<field>`
 
 These routes write a dataset's metadata with the service's own rights.
@@ -338,7 +422,7 @@ Property | Type | Meaning
 ---|---|---
 `uuid` | UUID | Dataset UUID
 `name` | string | From the dataset's `General Information` config; `"UNKNOWN"` if absent
-`from` / `to` | date | Bounds inherited from the `Session limits` in the dataset's structure, recursively; omitted where unbounded
+`from` / `to` | date | Bounds inherited from the `Session limits` in the dataset's structure, recursively, as a `[from, to)` window; omitted where unbounded
 `function` | array | Functional classes the dataset belongs to
 `metadata` | object | Config entries keyed by Application UUID, for every application in `Dataset metadata`
 `parts` | array | Direct subclasses of this dataset that are themselves Datasets and that the caller has `Read dataset` on
@@ -475,7 +559,9 @@ end, so clients that read the columns by position keep working.
 
 The body can carry a time window, **`from`** and **`to`**, as ISO 8601
 date-times (for example `2026-11-03T09:00:00Z`). They narrow each
-source's resolved range and never widen it. The download needs a start
+source's resolved range and never widen it. The download includes
+readings at `from` and leaves out readings at `to`, as for every
+[time window](#time-windows). The download needs a start
 and an end for every source:
 
 * A dataset bounded by a `Session limits` structure downloads with no
@@ -563,7 +649,7 @@ Field | Rule
 ---|---
 `devices` / `dataset` | Give exactly one. `devices` is a list of device UUIDs (the Sparkplug `topLevelInstance` tag). `dataset` is one dataset UUID.
 `store` | Which bucket a device request reads: `sparkplug` (the `default` bucket, the default) or `uns`. Only with `devices`: a dataset's sources say where they are stored. The Admin UI sends `uns`, as new device datasets read the UNS.
-`from`, `to` | ISO 8601 date-times, `from` before `to`. Required. `to` may be in the future.
+`from`, `to` | ISO 8601 date-times, `from` before `to`. Required. `to` may be in the future. The window is `[from, to)`: a reading at `from` counts and a reading at `to` does not (see [Time windows](#time-windows)).
 `every` | Bucket size. One of `10s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `6h`, `1d`, `1w`. Optional.
 `points` | Target number of buckets, 1 to 2000, default 300. Used only when `every` is absent: the server picks the smallest step that gives at most `points` buckets.
 `count` | `true` to return per-device point counts. Birth metadata (`Schema_UUID` and `Instance_UUID`) does not count.
@@ -603,7 +689,9 @@ days the clocks change.
 }
 ```
 
-* Bucket times are epoch milliseconds of the bucket start.
+* Bucket times are epoch milliseconds of the bucket start. A bucket
+  holds the readings from its start up to, but not including, the start
+  of the next bucket.
 * Arrays are sparse. A bucket with no data is absent.
 * `points` rows are `[start, mean, n]`. `n` is the number of raw points
   in the bucket. A client can fold a live value `v` into the newest
@@ -612,7 +700,8 @@ days the clocks change.
   requested, and is `null` when the device has no data in the lookback.
 * `windows` is present only for a dataset request. It lists the disjoint
   time ranges, within the request window, in which the device belongs to
-  the dataset. Counts and means cover only these ranges.
+  the dataset. Each is a `[from, to)` pair of ISO date-times. Counts and
+  means cover only these ranges.
 * For a dataset request, `last` is the newest data inside the device's
   dataset windows, within the lookback. It is not limited to the
   request window, so a device that is still in the dataset reports its
@@ -627,7 +716,7 @@ days the clocks change.
   Means and `last` always come from raw data.
 * `pending` is present only when part of the window has no counts yet,
   because the backfill has not reached it and it is too long to count
-  from raw data. It lists those ranges as `[from, to]` ISO pairs. A
+  from raw data. It lists those ranges as `[from, to)` ISO pairs. A
   client can show "still building history" for them and ask again
   later.
 * `denied` lists requested devices the caller may not read.

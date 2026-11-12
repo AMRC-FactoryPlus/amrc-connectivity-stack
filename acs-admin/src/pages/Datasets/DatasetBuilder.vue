@@ -203,7 +203,7 @@
             <div v-else-if="isoWindow" class="text-sm">
               <div class="font-medium">{{ fmt_window(form.from, form.to) }}</div>
               <div class="break-all font-mono text-xs text-slate-500">
-                Stored as {{ isoWindow.from }} to {{ isoWindow.to }} (UTC, both inclusive)
+                Stored as {{ isoWindow.from }} to {{ isoWindow.to }} (UTC, includes the start, excludes the end)
               </div>
               <div v-if="form.to > now" class="mt-1 text-xs text-slate-600">
                 <i class="fa-solid fa-clock mr-1 text-slate-400"></i>The end is in the future. The dataset fills in as data arrives.

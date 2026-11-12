@@ -314,8 +314,20 @@ briefcase:
     repository: acs-briefcase
   verbosity: "ALL,!service,!token"
   # -- (RETRY_INTERVAL) Seconds to wait before building a briefcase
-  # again after a build fails.
+  # again after a build or a delivery fails.
   retryInterval: 300
+  delivery:
+    # -- Deliver each briefcase to a sharing platform outside Factory+,
+    # by writing it to the platform's ingest container over the Azure
+    # Blob Storage API. Briefcases at the `enclave-only` tier are not
+    # delivered. The exporter's pod needs outbound HTTPS to the
+    # container.
+    enabled: false
+    # -- A Secret in the release namespace, made by hand. Its `url` key
+    # is the ingest container's URL. Either the URL carries a SAS token
+    # that can create and write blobs, or the keys `tenant-id`,
+    # `client-id` and `client-secret` name a service principal that can.
+    secretName: briefcase-delivery
 
 openid:
   # -- Whether or not to deploy the Keycloak OIDC server

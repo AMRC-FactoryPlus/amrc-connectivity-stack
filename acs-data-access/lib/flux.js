@@ -145,7 +145,9 @@ export function subset_predicate(metrics, store) {
  *
  * @param {object} opts
  * @param {string} opts.bucket Influx bucket name.
- * @param {object} opts.source `{ device_uuid, store, from, to }`. A
+ * @param {object} opts.source `{ device_uuid, store, from, to }`, read
+ *   as `[from, to)`: Flux's range() includes `start` and excludes
+ *   `stop`, and `from` and `to` go to it unchanged. A
  *   `uns` source tests the UNS form of `path`; the bucket's other tags
  *   and the measurement names are the same in both stores.
  * @param {object} [opts.filter] `{ metrics }` or `{ measurement }`.

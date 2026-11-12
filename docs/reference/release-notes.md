@@ -419,6 +419,32 @@ longer depend on GitHub Pages. If the browser still does not take a
 download, the admin UI gives up after 30 seconds and says so instead of
 spinning.
 
+### Dataset time windows include the start and exclude the end
+
+The Data Access reference now says that every time window is `[from,
+to)`: a reading timestamped exactly at `from` is in the window, and a
+reading timestamped exactly at `to` is not. This covers session limits,
+the `from` and `to` of downloads and series requests, and series
+buckets. The reference and the Admin UI's dataset builder used to say
+both ends were inclusive, which was wrong. Data Access has always
+worked this way, because InfluxDB's `range()` treats its stop time the
+same way, so nothing changes for clients. Sessions that meet end to
+end never share a reading. The dataset builder's Today and Yesterday
+windows now end at the next midnight, where they ended one millisecond
+before it, so they cover the whole day and adjacent days meet exactly.
+
+### List every dataset's name in one request
+
+`GET v1/metadata` on Data Access takes a new `include` parameter. With
+`include=name,from,to` it returns each dataset the caller may read as
+an object holding its UUID, name and time window, where it returned
+the UUIDs alone. The fields are `name`, `from`, `to`, `function` and
+`metadata`, with the same values as `GET v1/metadata/:uuid`. A client
+listing hundreds of datasets by name can now ask once, where before it
+sent one request per dataset, and that many requests at once could
+fail or slow the service. Without `include` the answer is unchanged. An
+unknown field gets a `422` that names it.
+
 ### Read access to a dataset shows what is in it
 
 Data Access has a new route, `GET v1/metadata/:uuid/contents`. It lists

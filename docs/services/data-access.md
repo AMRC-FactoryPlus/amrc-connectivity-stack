@@ -298,6 +298,68 @@ includes the default dataset of every device the caller holds
 and `to` query parameters described in the original design are not
 implemented** — the endpoint always returns the full allowed list.
 
+#### `include`: metadata for every dataset in one request
+
+`GET v1/metadata?include=<fields>` returns an object for each dataset
+in place of its UUID. Each object has `uuid` and the fields you ask
+for, with the values `GET v1/metadata/:uuid` gives for them. A client
+that needs the names of hundreds of datasets can then ask once, rather
+than once per dataset.
+
+`include` is a comma-separated list of these fields, the keys of the
+[`GET v1/metadata/:uuid`](#get-v1metadatauuid) answer:
+
+Field | Meaning
+---|---
+`name` | The dataset's name, `"UNKNOWN"` if it has none
+`from` / `to` | The dataset's time window. Each is omitted where the dataset is unbounded
+`function` | The functional classes the dataset belongs to. The kind the Admin UI sets (`MES equipment`, `Run`, `MES operation` or `MES product`) is one of these
+`metadata` | Config entries keyed by Application UUID, for every application in `Dataset metadata`
+
+`parts` is not available here. Finding a dataset's parts costs a
+ConfigDB watch for each dataset, so it comes only from
+`GET v1/metadata/:uuid`. You may repeat the parameter
+(`include=name&include=from`), and `uuid` is accepted and changes
+nothing. An empty `include=` returns objects with `uuid` alone.
+
+The list holds the same datasets as the plain list, checked in the same
+way, so it never shows a dataset that `GET v1/metadata/:uuid` would
+refuse. The service builds it from the maps it holds in memory, so the
+cost does not grow with a call per dataset.
+
+Request:
+
+```http
+GET /v1/metadata?include=name,from,to
+```
+
+Response:
+
+```json
+[
+  { "uuid": "5eed0000-0000-4000-8000-000000000001", "name": "Press 3" },
+  {
+    "uuid": "5eed0000-0000-4000-8000-000000000002",
+    "name": "Press 3, first shift",
+    "from": "2026-01-01T06:00:00.000Z",
+    "to": "2026-01-01T14:00:00.000Z"
+  }
+]
+```
+
+A field the service does not know returns `422`:
+
+```json
+{
+  "error": "invalid_include",
+  "message": "Unknown include field colour. The fields are name, from, to, function, metadata.",
+  "unknown": ["colour"],
+  "fields": ["name", "from", "to", "function", "metadata"]
+}
+```
+
+Without `include` the answer is the array of UUIDs, as before.
+
 ### Metadata writes: `v1/metadata/:uuid/<field>`
 
 These routes write a dataset's metadata with the service's own rights.

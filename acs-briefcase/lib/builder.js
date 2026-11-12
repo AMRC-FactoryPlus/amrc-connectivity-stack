@@ -82,7 +82,7 @@ export class Builder {
      * @param opts.briefcase The new briefcase's UUID.
      * @param opts.replaces The UUID of the withdrawn briefcase this one
      * replaces, if there is one.
-     * @returns `{ dataset, briefcase, built, file, size, sha256 }`,
+     * @returns `{ dataset, briefcase, built, tier, file, size, sha256 }`,
      * where `file` is the zip in the work directory.
      */
     async build (dataset, { briefcase, replaces }) {
@@ -214,6 +214,7 @@ export class Builder {
             return {
                 dataset, briefcase, file,
                 built:  built.toISOString(),
+                tier:   policy.tier,
                 ...zip,
             };
         }

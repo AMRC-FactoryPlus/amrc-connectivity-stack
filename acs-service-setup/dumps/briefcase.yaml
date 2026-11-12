@@ -115,6 +115,26 @@ configs:
                   Published class. Absent while the briefcase is live.
                 type: string
                 format: date-time
+              tier:
+                description: >
+                  The access tier in the release policy the briefcase
+                  was built with. Briefcases built before this was
+                  recorded gain it when they are first delivered.
+                enum: [open, registered, approved-project, enclave-only]
+              pushed:
+                description: >
+                  When the briefcase was delivered to the sharing
+                  platform: the time its release notice was accepted.
+                  Absent if it has not been delivered.
+                type: string
+                format: date-time
+              withdrawal_pushed:
+                description: >
+                  When the sharing platform was told of the withdrawal:
+                  the time its withdrawal notice was accepted. Only a
+                  briefcase that was delivered has one.
+                type: string
+                format: date-time
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
@@ -144,6 +164,9 @@ grants:
     # The Files service checks Upload against the wildcard target, not
     # the Files Configuration app.
     !u Files.Perm.Upload: null
+    # Read each zip back to deliver it to the sharing platform.
+    !u Files.Perm.Download:
+      !u Briefcase.FileType.Briefcase: true
 
   # What a person needs to release datasets and pass the briefcases on.
   # Administrators grant this role to people by hand. Neither Data

@@ -37,6 +37,19 @@ export class Store {
         await this.cdb.put_config(App.BriefcaseRelease, dataset, { briefcases });
     }
 
+    /** Add fields to a briefcase in the dataset's record.
+     * @param uuid The briefcase's UUID.
+     * @param fields The fields to set. */
+    async mark (dataset, uuid, fields) {
+        const entry = await this.release(dataset);
+        const briefcase = entry?.briefcases?.find(b => b.uuid === uuid);
+        if (!briefcase)
+            throw new Error(`${dataset} has no record of briefcase ${uuid}`);
+
+        Object.assign(briefcase, fields);
+        await this.cdb.put_config(App.BriefcaseRelease, dataset, entry);
+    }
+
     /** Mark the dataset's live briefcase as withdrawn.
      * @param at The time of the withdrawal, as an ISO 8601 string.
      * @returns The UUID of the briefcase withdrawn, or null if none

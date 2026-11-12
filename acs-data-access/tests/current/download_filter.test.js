@@ -98,6 +98,15 @@ describe("build_flux_query", () => {
     expect(q).toContain(`r.topLevelInstance ==\n                    "${DEVICE}"`);
   });
 
+  /* Windows are [from, to): Flux's range() includes start and excludes
+   * stop, so `to` must reach it with no adjustment. */
+  test("the range starts at from and stops at to, unchanged", () => {
+    const q = build_flux_query({
+      bucket: "b", source: { ...source, from: FROM, to: TO } });
+    expect(q).toContain(`start: time(v: "${FROM}")`);
+    expect(q).toContain(`stop: time(v: "${TO}")`);
+  });
+
   test("a name selector matches every datatype suffix at any path", () => {
     const q = build_flux_query({
       bucket: "b", source, filter: { metrics: ["Temperature"] } });

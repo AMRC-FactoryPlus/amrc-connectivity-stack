@@ -17,7 +17,7 @@ import {
     merge_datasets, resolve_devices, included_in, device_dataset_for,
     default_dataset_uuid, is_default_dataset,
     overlapping_devices, dataset_status, structure_tree,
-    to_iso, validate_window, fmt_duration, fmt_elapsed, fmt_window,
+    to_iso, validate_window, quick_window, fmt_duration, fmt_elapsed, fmt_window,
     london_local_to_ms, ms_to_london_local, london_offset_min,
     track_range, ticks, historised_metrics, normalise_tags, matches,
 } from '../src/lib/datasets/model.js'
@@ -193,6 +193,22 @@ describe('time', () => {
         expect(validate_window('2026-10-07T10:00:00.000Z', '2026-10-07T10:00:00.000Z')).toMatch(/before/)
         expect(validate_window('', '2026-10-07T10:00:00.000Z')).toMatch(/start and an end/)
         expect(validate_window('2026-10-07T09:00:00.000Z', '2026-10-07T10:00:00.000Z')).toBe(null)
+    })
+
+    it('ends Today and Yesterday at London midnight, so the days meet', () => {
+        const iso = w => ({ from: to_iso(w.from), to: to_iso(w.to) })
+        // BST: London midnight is 23:00 UTC the day before.
+        const now = Date.parse('2026-10-07T12:00:00Z')
+        expect(iso(quick_window('today', now)))
+            .toEqual({ from: '2026-10-06T23:00:00.000Z', to: '2026-10-07T23:00:00.000Z' })
+        expect(iso(quick_window('yesterday', now)))
+            .toEqual({ from: '2026-10-05T23:00:00.000Z', to: '2026-10-06T23:00:00.000Z' })
+        // The clocks go back on 25 Oct 2026, so that day is 25 hours long.
+        const fall = Date.parse('2026-10-25T12:00:00Z')
+        expect(iso(quick_window('today', fall)))
+            .toEqual({ from: '2026-10-24T23:00:00.000Z', to: '2026-10-26T00:00:00.000Z' })
+        expect(quick_window('yesterday', Date.parse('2026-10-26T12:00:00Z')).to)
+            .toBe(quick_window('today', fall).to)
     })
 
     it('converts London wall-clock time in summer and winter', () => {

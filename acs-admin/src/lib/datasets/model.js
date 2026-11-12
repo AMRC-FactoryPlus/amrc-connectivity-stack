@@ -271,7 +271,11 @@ export function to_iso (t) {
     return d.toISOString()
 }
 
-/** Check a window before it goes to the service, which accepts a bad one. */
+/**
+ * Check a window before it goes to the service, which accepts a bad one.
+ * Data Access reads a window as [from, to): it includes a reading at
+ * `from` and excludes a reading at `to`.
+ */
 export function validate_window (from, to) {
     if (from == null || to == null || from === '' || to === '') return 'Choose a start and an end.'
     const f = new Date(from).getTime(), t = new Date(to).getTime()
@@ -395,14 +399,18 @@ export function snap (ms, step = 5 * 60 * 1000) {
     return Math.round(ms / step) * step
 }
 
-/** Quick windows for the builder. Each returns { from, to } in ms. */
+/**
+ * Quick windows for the builder. Each returns { from, to } in ms. A
+ * window is [from, to), so a day ends at the next London midnight and
+ * adjacent days meet exactly.
+ */
 export function quick_window (id, now = Date.now()) {
     const today = london_start_of_day(now)
     switch (id) {
-        case 'today':     return { from: today, to: london_local_to_ms(`${london_date_key(today + 36 * 3600e3)}T00:00`) - 1 }
+        case 'today':     return { from: today, to: london_local_to_ms(`${london_date_key(today + 36 * 3600e3)}T00:00`) }
         case 'yesterday': {
             const y = london_start_of_day(today - 12 * 3600e3)
-            return { from: y, to: today - 1 }
+            return { from: y, to: today }
         }
         case 'last24':    return { from: now - 24 * 3600e3, to: now }
         case 'last7':     return { from: now - 7 * 24 * 3600e3, to: now }

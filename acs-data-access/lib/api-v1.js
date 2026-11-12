@@ -497,8 +497,8 @@ export class APIv1 {
   /** GET. Returns a list of Dataset UUIDs that the client has READ_DATASET access to.
    * The dataset can be optionally restricted by from and to dates (this is not implemented yet).
    * Dates must be in the format ISO date-time string in UTC 2025-11-13T09:33:18.000Z
-   * @param from {date} (optional, inclusive) query param
-   * @param to {date} (optional, inclusive) query param
+   * @param from {date} (optional, start-inclusive) query param
+   * @param to {date} (optional, end-exclusive) query param
    * @param include {string} (optional) query param: a comma-separated
    *   list of METADATA_FIELDS. With it the list holds an object per
    *   dataset instead of a UUID: `uuid` and each field asked for, as
@@ -895,6 +895,8 @@ export class APIv1 {
     });
   }
 
+  /** Intersects two `[from, to)` windows: the later start and the
+   * earlier stop. The result is still start-inclusive and end-exclusive. */
   intersectRanges(parent, child){
     const from = maxDate(parent.from, child.from);
     const to = minDate(parent.to, child.to);

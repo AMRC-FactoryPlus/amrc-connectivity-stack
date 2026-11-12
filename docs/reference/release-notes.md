@@ -429,7 +429,9 @@ buckets. The reference and the Admin UI's dataset builder used to say
 both ends were inclusive, which was wrong. Data Access has always
 worked this way, because InfluxDB's `range()` treats its stop time the
 same way, so nothing changes for clients. Sessions that meet end to
-end never share a reading.
+end never share a reading. The dataset builder's Today and Yesterday
+windows now end at the next midnight, where they ended one millisecond
+before it, so they cover the whole day and adjacent days meet exactly.
 
 ### List every dataset's name in one request
 

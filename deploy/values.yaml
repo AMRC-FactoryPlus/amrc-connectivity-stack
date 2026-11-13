@@ -1128,9 +1128,20 @@ openmetadataStorage:
 # acs-openmetadata/README.md.
 openmetadataSmb:
   enabled: false
-  # -- Secret (created by hand) holding the SMB login, with keys
-  # username, password and optionally domain.
+  # -- Secret holding the SMB login, with keys username, password and
+  # optionally domain. Created from sealedCredentials if set, otherwise
+  # by hand.
   credentialsSecret: openmetadata-smb-creds
+  # -- The SMB login sealed with kubeseal --raw for credentialsSecret's
+  # name and the release namespace, as keys username, password and
+  # optionally domain. Encrypted, so safe to commit. Needs the
+  # sealed-secrets controller on the cluster.
+  sealedCredentials:
+    username: AgBZQiJiK+howm5Q4D7Pj5pTq5MT1whKGW8RqRtAC9o1yFf7HZcJG33/0fWaWMkPXrOBTtxqzIzQjHRix/9JqZ9viaVV+F+WKsuNsLtBRFE/ycSk0yJx7b+y4PoLFCqwSFOwrpxdxG3jW2etHcfmacl7XtIqNjI0tXj2VC8ryt0raXfsI0cEAi+f/+zt+U67y8Le7fXfkyC7D/WvEb70sRs8NnE+dbA6OONc7k3sUEma6GPsFNHr5AaMCS/XjmPGTshTVXpaG86B/TJIIMVftcv0pami2B6uAxpTtSIVCoUEfC+xcnE0+hnTByknZUphQHbnC6De9hE8Q5txZYjDwjxE5LwiC+uDkz9AEL+YjqaSJ7a8Gg8OrzQM1tP05QDPpYrJzPC3ZODRCwXbcnovDKYSTINqWlCDFZxi8LasZ0PuMDI+si3hl4hPh2cVtZZmbsQubb081BOvBf83dnLJ72HVsi8c0ZCt5OZ/Lv02Ci/PO2lhqwIyK+35h7EWHkaQgl6IYwV6pQdckT3Xj7oKss7obElvLPbN3JwUvBVKF5U0KA3j78mZudle9keP7QxHI6o0AnjThiqeOlg0QRMVgFR7lZcYM9vS82hubyqxHq5dgBBANRaut0wc5q8ppi8bcz7m70IMLVrl1nTY/Jov/EXGhlL2OEkztlYzUGHoz0Tb8daKBElTMw/FH8rjY2tmplbcr2QIExntfq2aVbAO83xl
+    
+    password: AgAZJs/dtzpNjVOLmuREKuoEs6VuAhR0771aaOyGvfMmS4VNmx8Vt/9NLGwU3D+bycUo3/vsalmoLGdLId2CX2NIU6E/RJG1qo/enfYD4IF74Rl2AVEnpOy2PnKpVvh6Z5P9Pd3W9zgmOlTmBZj+qxrtDLcljc4IscIoIwnyirxsR5zfFNZUmrsgS3yzaRpVvXCUR8u5otHgvCiTE/0vjs7xFjf1m272owFywZt/JUFB5CiemhteU7P/AU63i38iZWuREQhSQpx8+cJdr24ClXzOa7BGJr6OXmKkbTmz7Ay4fG7ZDMnDPg5FfAfmAA4XmWyTv0w7T67pdpdfbBNXHhy5Dz0v4WiOZm62RkShOgAb0AXevUjmdD++Ro8WAvBQF0RfH3uzE7MHu/llFnbW5bMO9mFgLoxqqFlc2bj883/BgXh2o0OqBdx/VDnga2QwTJKuPIGdcJefbNo9E/0lAhYy4PdsDSNE29T7/i+5xnxrfs611P8qgWnRq/yIjJ6fkP2+WqSKa3LsLaREIgdSUB2JuZOpcS5b7KES1tFqRZKbbPxykFOrzYwnBbWpiwcE/DVQ93yBrtJhQFTVVjNfBfAGR3EX+qa9S2L1wrY/OUdwHtvhc76pR3tLgJQ9xsOoUMOI6noKoVJWdQITOZjvdb1A7CKULQl56YYDW9A+n7pLB3Pyj2Y/RvXdgeGhT6XgmICPvZEbCR2zhkf5l+mDuVDtjmNY6JABMKaU
+    
+    domain: AgCrCBJi/NQTH4IxypqrFfiRb8FXfx6foCHpENXsoka53jbjm1rs89R5KY7RJ2oXVkgX6631t+1NazQdACCSPnesF5vLkMpq5BlhuIJo0p1ZcJpscFcfwtMzoMm/7HKTS6+Orq/SzTLNxK82D5Uzb2E1u9yVz/EEH+hCXMWZGQMpRE5CWZ3ZFD0NEB4oOpW7lJ8R+LgUaTmwAoGmJA8cUuxWSngEIj1oDtWkDQFbGc/lupuoroNS+b0ErTLGVfNv7ffZ5PdddOB1fvWqkS2xfGDhCgyfEiWNE1A/CrH8My1AMba9BPmsrRuNYLwH9hXrw3PBsYn4r6YrZIcLkF+gQZPBZj4RoSYm55U8Tvf5fqKeZd+Kyhd9wNZeV3BqKy5yQytXNEysWimcSvJit2LP9Nqe0ll40bJw7dWVp6E8luL8d6sitAEsNi1yUTo31dT9mXlVTsb39SRPnTgK/+j6ddmMwl64mVXEzSNCxVOCe4AhBNpuN76Z68SYKTT76phGcZ5wV4mf3G2jJHh0d5Pa/qkFEVCsZGfPe42H8KYLuBF+bpakCMxU8R4iYsU5vJolz8mV0gMyD/Ehka6vIwNgG84GOY2HVUjNPAdFChF3egkSYmJhgx8rN4g0QrV6W+C2T0ZplWURPHDXwmgfAh6+Ts0T4l3I6NW4I2DGKp1xgvgORk7KOmNPtDcZflD8y2p8Pg3RjCQ=
   # -- Shares to mount. name becomes the directory under /shares;
   # source is the UNC path with forward slashes, on the file server
   # itself rather than through a DFS namespace.

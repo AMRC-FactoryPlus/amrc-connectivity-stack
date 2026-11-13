@@ -17,5 +17,8 @@ dependencies:
 - name: openmetadata-dependencies
   repository: https://helm.open-metadata.org/
   version: 2.0.6
-digest: sha256:47e1bfee2d4897c12ac2f42c63fa0228538389f2621bf446c9271fcced3f4ae1
-generated: "2026-10-21T14:10:22.728585922Z"
+- name: csi-driver-smb
+  repository: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+  version: 1.20.4
+digest: sha256:948c575e474cde763fc137b795458842c481e8dcd9b263846fc2ab37595f9cea
+generated: "2026-11-10T11:31:23.561141705Z"

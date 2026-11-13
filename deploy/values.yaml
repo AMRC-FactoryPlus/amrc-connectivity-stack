@@ -1120,6 +1120,54 @@ openmetadataStorage:
   dagsSize: 1Gi
   logsSize: 10Gi
 
+# SMB shares to catalogue in OpenMetadata, which has no SMB connector.
+# Each share is mounted read-only via csi-driver-smb (the csi-driver-smb
+# subchart, installed with this) and served over SFTP at
+# openmetadata-sftp:22 under /shares/<name>. Add an SFTP Drive service
+# in OpenMetadata pointing there. Requires openmetadata.enabled. See
+# acs-openmetadata/README.md.
+openmetadataSmb:
+  enabled: false
+  # -- Secret holding the SMB login, with keys username, password and
+  # optionally domain. Created from sealedCredentials if set, otherwise
+  # by hand.
+  credentialsSecret: openmetadata-smb-creds
+  # -- The SMB login sealed with kubeseal --raw for credentialsSecret's
+  # name and the release namespace, as keys username, password and
+  # optionally domain. Encrypted, so safe to commit. Needs the
+  # sealed-secrets controller on the cluster. Set this in your own
+  # values file, as it's specific to the cluster that sealed it:
+  #   sealedCredentials:
+  #     username: AgB...
+  #     password: AgA...
+  #     domain: AgC...
+  sealedCredentials: {}
+  # -- Shares to mount. name becomes the directory under /shares;
+  # source is the UNC path with forward slashes, on the file server
+  # itself rather than through a DFS namespace.
+  shares: []
+  mountOptions:
+    - ro
+    - dir_mode=0555
+    - file_mode=0444
+    - uid=1000
+    - gid=1000
+  sftp:
+    image:
+      registry: docker.io
+      repository: linuxserver/openssh-server
+      tag: 10.3_p1-r2-ls242
+
+# The SMB CSI driver used by openmetadataSmb. It's installed whenever
+# openmetadataSmb.enabled is true. Its CSIDriver and ClusterRoles are
+# cluster-wide, so only one release per cluster can install it: set
+# enabled: false here if the cluster already has csi-driver-smb (from
+# another ACS release or installed separately).
+csi-driver-smb:
+  # enabled: false
+  windows:
+    enabled: false
+
 openmetadata-dependencies:
   enabled: false
 

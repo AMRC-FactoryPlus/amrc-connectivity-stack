@@ -39,6 +39,11 @@ spec:
     - ReadOnlyMany
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
+  # Reserve this PV for our PVC. volumeName on the PVC alone binds only
+  # one way; without this any other unclassed PVC could claim it.
+  claimRef:
+    namespace: {{ $.Release.Namespace }}
+    name: openmetadata-smb-{{ .name }}
   mountOptions:
     {{- toYaml $smb.mountOptions | nindent 4 }}
   csi:

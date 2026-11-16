@@ -1,4 +1,5 @@
 flask
+flask-cors
 gssapi
 krb5
 

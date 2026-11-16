@@ -33,6 +33,13 @@ class FplusHttpAuth:
         app.add_url_rule("/token", "token", self.token, methods=["POST"])
 
     def auth (self):
+        # The browser's CORS preflight never carries an Authorization
+        # header, by design - flask-cors only adds headers to the
+        # response, it doesn't intercept the request before this hook
+        # runs, so this has to let OPTIONS through explicitly.
+        if request.method == "OPTIONS":
+            return
+
         auth = request.headers.get("Authorization")
         if not auth:
             log.info("Auth failed: no HTTP auth provided")

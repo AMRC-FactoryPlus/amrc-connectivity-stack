@@ -28,7 +28,10 @@
         </TabsList>
         <div v-if="p.loading || ps.loading || g.loading || grants.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
-      <LinkUserDialog v-if="activeTab==='principals'"/>
+      <div v-if="activeTab==='principals'" class="flex gap-2">
+        <CreateUserDialog/>
+        <LinkUserDialog/>
+      </div>
     </div>
     <TabsContent value="principals">
       <PrincipalList @rowClick="e => objectClicked(e.original)"/>
@@ -55,6 +58,7 @@ import PermissionList from '@pages/AccessControl/Permissions/PermissionList.vue'
 import { usePermissionStore } from '@store/usePermissionStore.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
+import CreateUserDialog from '@pages/AccessControl/CreateUserDialog.vue'
 import {useGrantStore} from "@store/useGrantStore.js";
 import {useRoute, useRouter} from "vue-router";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
@@ -76,6 +80,7 @@ export default {
 
   components: {
     LinkUserDialog,
+    CreateUserDialog,
     PermissionList,
     Sheet,
     Tabs,

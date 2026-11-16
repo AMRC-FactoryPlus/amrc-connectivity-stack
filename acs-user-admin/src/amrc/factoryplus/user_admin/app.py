@@ -9,6 +9,8 @@ from    flask                           import Flask
 
 from    amrc.factoryplus.service_client import ServiceClient
 
+from    .lib.auth                       import FplusHttpAuth
+
 log = logging.getLogger(__name__)
 
 def create_app (env=None):
@@ -17,6 +19,8 @@ def create_app (env=None):
 
     app = Flask(__name__)
     app.fplus = ServiceClient(env=env)
+
+    FplusHttpAuth().setup(app)
 
     return app
 

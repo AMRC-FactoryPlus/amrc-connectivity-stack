@@ -41,25 +41,6 @@
             :v="v$.password"
         />
       </div>
-      <div class="flex flex-col gap-1">
-        <label class="text-sm font-medium">Groups</label>
-        <ObjectSelector
-            v-model="groups"
-            :store-data="g.data"
-            title="Select Groups"
-            subtitle="Select the groups this user should start in"
-            column1-header="Name"
-            column1-main-key="name"
-            column1-sub-key="uuid"
-            column2-header="Class"
-            column2-main-key="class.name"
-            column2-sub-key="class.uuid"
-        >
-          <Button variant="outline">
-            {{ groups.length ? `${groups.length} selected` : 'Select Groups' }}
-          </Button>
-        </ObjectSelector>
-      </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <Button :disabled="v$.$invalid || submitting" @click="formSubmit">
           <div class="flex items-center justify-center gap-2">
@@ -82,8 +63,6 @@ import { required } from '@vuelidate/validators'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { toast } from 'vue-sonner'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
-import { useGroupStore } from '@store/useGroupStore.js'
-import { defineAsyncComponent } from 'vue'
 
 export default {
 
@@ -92,7 +71,6 @@ export default {
       v$: useVuelidate(),
       s: useServiceClientStore(),
       p: usePrincipalStore(),
-      g: useGroupStore(),
     }
   },
 
@@ -107,7 +85,6 @@ export default {
     DialogTrigger,
     VisuallyHidden,
     Input,
-    ObjectSelector: defineAsyncComponent(() => import('@components/ObjectSelector/ObjectSelector.vue')),
   },
 
   methods: {
@@ -121,7 +98,6 @@ export default {
       this.name = null
       this.principal = null
       this.password = null
-      this.groups = []
     },
 
     async formSubmit () {
@@ -134,7 +110,6 @@ export default {
           name: this.name,
           principal: this.principal,
           password: this.password,
-          groups: this.groups.map(group => group.uuid),
         })
         toast.success(`${this.name} has been created`)
         this.dialogOpen = false
@@ -161,7 +136,6 @@ export default {
       name: null,
       principal: null,
       password: null,
-      groups: [],
     }
   },
 

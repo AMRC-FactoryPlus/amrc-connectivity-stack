@@ -698,6 +698,11 @@ clusterManager:
     repository: acs-cluster-manager
   verbosity: "ALL,!service,!token"
 
+userAdmin:
+  # -- Whether or not to enable the User Admin component. Image and
+  # resources are set when its Deployment is added.
+  enabled: true
+
 i3x:
   # -- Whether or not to enable the i3X service
   enabled: true

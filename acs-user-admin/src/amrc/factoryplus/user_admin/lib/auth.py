@@ -27,6 +27,7 @@ class FplusHttpAuth:
         self.tokens = {}
 
     def setup (self, app):
+        self.fplus = app.fplus
         app.before_request(self.auth)
         app.after_request(self.add_negotiate_header)
         app.add_url_rule("/token", "token", self.token, methods=["POST"])
@@ -66,7 +67,15 @@ class FplusHttpAuth:
             g.www_authenticate = \
                 "Negotiate " + base64.b64encode(srv_tok).decode()
 
-        return str(ctx.initiator_name)
+        principal = str(ctx.initiator_name)
+        # check_acl always takes a Factory+ principal UUID (the only
+        # caller is this service's own routes), not a raw Kerberos UPN,
+        # so resolve it here rather than pushing that decision onto
+        # every caller of g.auth.
+        uuid = self.fplus.auth.find_principal("kerberos", principal)
+        if uuid is None:
+            raise ValueError(f"No Factory+ identity for {principal}")
+        return uuid
 
     def auth_bearer (self, token):
         client = self.tokens.get(token)

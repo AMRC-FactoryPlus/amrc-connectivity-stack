@@ -10,6 +10,7 @@ from    flask                           import Flask
 from    amrc.factoryplus.service_client import ServiceClient
 
 from    .lib.auth                       import FplusHttpAuth
+from    .lib.routes                     import bp
 
 log = logging.getLogger(__name__)
 
@@ -19,8 +20,10 @@ def create_app (env=None):
 
     app = Flask(__name__)
     app.fplus = ServiceClient(env=env)
+    app.config["KADMIN_CCNAME"] = env.get("KADMIN_CCNAME")
 
     FplusHttpAuth().setup(app)
+    app.register_blueprint(bp)
 
     return app
 

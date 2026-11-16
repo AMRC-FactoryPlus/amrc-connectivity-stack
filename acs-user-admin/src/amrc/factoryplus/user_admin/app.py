@@ -22,7 +22,8 @@ def create_app (env=None):
     app.fplus = ServiceClient(env=env)
     app.config["KADMIN_CCNAME"] = env.get("KADMIN_CCNAME")
 
-    FplusHttpAuth().setup(app)
+    app.auth = FplusHttpAuth()
+    app.auth.setup(app)
     app.register_blueprint(bp)
 
     return app

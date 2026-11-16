@@ -8,11 +8,14 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "flask (>=3.1.0,<4.0.0)",
+    "krb5",
+    "kadmin",
     "amrc.factoryplus.service_client",
 ]
 
 [tool.poetry.dependencies]
 "amrc.factoryplus.service_client" = { path = "../lib/py-service-client", develop = true }
+kadmin = { path = "../lib/py-python-kadmv", develop = true }
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

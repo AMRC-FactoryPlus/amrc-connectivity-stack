@@ -43,8 +43,13 @@ objects:
 service: !u UUIDs.Service.Authentication
 version: 2
 grants:
-  !u ACS.Group.Administrator:
-    !u UserAdmin.Perm.ManageUsers: null
+  # ManageUsers is granted to ACS.Group.Administrator in dumps/admin.yaml,
+  # not here. Auth's dump loader is fully authoritative per-principal -
+  # it deletes every existing grant for a principal that isn't
+  # re-declared in the same dump (acs-auth/lib/queries.js's
+  # dump_load_aces) - so a second, separate grants document for the
+  # same principal would wipe out everything admin.yaml granted it (or
+  # vice versa, depending on load order) on every service-setup run.
 
   # The permissions acs-user-admin's own routes.js needs to create a
   # HumanUser object, name it, add it to the groups the caller picked,

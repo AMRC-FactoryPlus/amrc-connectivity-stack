@@ -25,6 +25,9 @@ def create_user ():
         return jsonify(error="Forbidden"), 403
 
     body = request.get_json()
+    if not isinstance(body, dict):
+        return jsonify(error="Body must be a JSON object"), 400
+
     missing = [k for k in ("name", "principal", "password") if k not in body]
     if missing:
         return jsonify(error=f"Missing fields: {', '.join(missing)}"), 400

@@ -189,6 +189,12 @@ data:
     admin           x
     op1krbkeys/*    x     */*1
     op1krbkeys/*    x     */*1/*
+    {{- if .Values.userAdmin.enabled }}
+    # Add principal and change password only - not op1krbkeys's full x
+    # (all), so a compromise of this credential can't delete or modify
+    # existing principals, only create new ones and set their passwords.
+    op1useradmin    ac
+    {{- end }}
     {{- range .Values.identity.kadminUsers }}
     {{ .principal }} {{ .permission }} {{ .restrictions }}
     {{- end }}

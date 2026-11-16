@@ -12,6 +12,17 @@ objects:
         name: "User administration"
         iri: service/UserAdmin
 
+  # The PermGroup itself must be registered as a class (a member of
+  # ServicePerms) before ManageUsers can be declared a member of it
+  # below - mirrors how Auth/CmdEsc/ConfigDB/MQTT's PermGroups are
+  # registered in dumps/auth.yaml:54-74.
+  !u Auth.Class.ServicePerms:
+    !u ACS.PermGroup.UserAdmin:
+      name: "User admin permission"
+      iri: user-admin/perm/All
+      subclassOf:
+        - !u UUIDs.Class.Permission
+
   !u ACS.PermGroup.UserAdmin:
     !u UserAdmin.Perm.ManageUsers: { name: "Create and manage human users" }
 

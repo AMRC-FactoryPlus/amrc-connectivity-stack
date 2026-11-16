@@ -59,6 +59,10 @@ grants:
   # Clusters.Perm.Secrets, ...), since this service never touches
   # those.
   !u UserAdmin.Requirement.ServiceAccount:
+    # find_principal (the pre-flight duplicate check in routes.py, and
+    # resolving an inbound caller's own Kerberos identity in lib/auth.py)
+    # requires this - it's only ever grantable on Wildcard.
+    !u Auth.Perm.ReadKerberos: null
     !u Auth.Perm.ManageKerberos: null
     !u ConfigDB.Perm.CreateObject:
       !u Auth.Class.PrincipalType: true

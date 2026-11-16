@@ -59,6 +59,13 @@ grants:
   # Clusters.Perm.Secrets, ...), since this service never touches
   # those.
   !u UserAdmin.Requirement.ServiceAccount:
+    # check_acl's own HTTP call (GET v2/acl/:principal) requires the
+    # caller - us - to hold ReadACL, scoped to our own permission
+    # group, or the Auth service itself 403s it (acs-auth/lib/
+    # api_v2.js's _get_acl). Mirrors sv1configdb/sv1directory/etc.'s own
+    # grants in this same file.
+    !u Auth.Perm.ReadACL:
+      !u ACS.PermGroup.UserAdmin: true
     # find_principal (the pre-flight duplicate check in routes.py, and
     # resolving an inbound caller's own Kerberos identity in lib/auth.py)
     # requires this - it's only ever grantable on Wildcard.

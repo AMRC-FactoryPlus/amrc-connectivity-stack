@@ -1,0 +1,28 @@
+[project]
+name = "amrc.factoryplus.user_admin"
+version = "0.1.0"
+description = "Factory+ user administration service: creates human-user principals direct-to-KDC."
+authors = [{ name = "AMRC", email = "info@amrc.co.uk" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "flask (>=3.1.0,<4.0.0)",
+    "amrc.factoryplus.service_client",
+]
+
+[tool.poetry.dependencies]
+"amrc.factoryplus.service_client" = { path = "../lib/py-service-client", develop = true }
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+    { include = "amrc", from = "src" }
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+pytest-mock = "^3.14.0"

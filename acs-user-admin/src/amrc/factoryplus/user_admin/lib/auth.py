@@ -8,6 +8,7 @@ import  secrets
 import  time
 
 import  gssapi
+import  krb5
 from    flask    import g, jsonify, request
 
 log = logging.getLogger(__name__)
@@ -16,11 +17,11 @@ SESSION_LENGTH = 3 * 3600
 DATE_FUZZ = 60
 
 class FplusHttpAuth:
-    """Inbound HTTP auth for acs-user-admin. Accepts Negotiate (SPNEGO)
-    against our Kerberos keytab, and issues opaque Bearer tokens from
-    POST /token which are accepted on subsequent calls. Modeled on
-    lib/js-service-api/lib/auth.js's FplusHttpAuth, trimmed to the two
-    schemes this service needs - no Basic, no Keycloak JWT."""
+    """Inbound HTTP auth for acs-user-admin. Accepts Basic and Negotiate
+    (SPNEGO) against our Kerberos keytab, and issues opaque Bearer
+    tokens from POST /token which are accepted on subsequent calls.
+    Modeled on lib/js-service-api/lib/auth.js's FplusHttpAuth, trimmed
+    to the three schemes this service needs - no Keycloak JWT."""
 
     def __init__ (self, session_length=SESSION_LENGTH):
         self.session_length = session_length
@@ -28,6 +29,7 @@ class FplusHttpAuth:
 
     def setup (self, app):
         self.fplus = app.fplus
+        self.realm = app.config["REALM"]
         app.before_request(self.auth)
         app.after_request(self.add_negotiate_header)
         app.add_url_rule("/token", "token", self.token, methods=["POST"])
@@ -48,7 +50,9 @@ class FplusHttpAuth:
         scheme, _, creds = auth.partition(" ")
 
         try:
-            if scheme == "Negotiate":
+            if scheme == "Basic":
+                client = self.auth_basic(creds)
+            elif scheme == "Negotiate":
                 client = self.auth_gssapi(creds)
             elif scheme == "Bearer":
                 client = self.auth_bearer(creds)
@@ -60,6 +64,23 @@ class FplusHttpAuth:
 
         log.info(f"Auth succeeded for [{client}]")
         g.auth = client
+
+    def auth_basic (self, creds):
+        user, _, password = base64.b64decode(creds).decode().partition(":")
+        client = user if "@" in user else f"{user}@{self.realm}"
+
+        # Verifies the password against the KDC directly - equivalent
+        # to a kinit, the same check GSS.verifyCredentials does in the
+        # JS auth.js this is modeled on.
+        ctx = krb5.init_context()
+        princ = krb5.parse_name_flags(ctx, client.encode())
+        opts = krb5.get_init_creds_opt_alloc(ctx)
+        krb5.get_init_creds_password(ctx, princ, opts, password=password.encode())
+
+        uuid = self.fplus.auth.find_principal("kerberos", client)
+        if uuid is None:
+            raise ValueError(f"No Factory+ identity for {client}")
+        return uuid
 
     def auth_gssapi (self, creds):
         cli_tok = base64.b64decode(creds)
@@ -108,4 +129,4 @@ class FplusHttpAuth:
         return response
 
     def _unauthorized (self):
-        return "", 401, {"WWW-Authenticate": "Negotiate"}
+        return "", 401, {"WWW-Authenticate": 'Basic realm="Factory+"'}

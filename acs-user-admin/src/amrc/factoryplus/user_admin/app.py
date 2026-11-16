@@ -22,6 +22,7 @@ def create_app (env=None):
     app = Flask(__name__)
     app.fplus = ServiceClient(env=env)
     app.config["KADMIN_CCNAME"] = env.get("KADMIN_CCNAME")
+    app.config["REALM"] = env.get("REALM")
 
     # The Admin UI calls this service cross-origin from its own
     # subdomain, same as every JS service via lib/js-service-api's

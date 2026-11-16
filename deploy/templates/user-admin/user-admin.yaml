@@ -60,6 +60,10 @@ spec:
             # reads its acceptor keytab from this standard env var.
             - name: KRB5_KTNAME
               value: /keytabs/server
+            # Inbound Basic auth needs the realm to qualify a bare
+            # username (e.g. "admin") into a full principal.
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
           volumeMounts:

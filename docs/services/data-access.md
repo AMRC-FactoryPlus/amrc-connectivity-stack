@@ -538,9 +538,9 @@ Column | Content
 `value` | The data value, exactly as Influx returns it, so 64-bit integers keep every digit
 `unit` | The engineering unit, if the metric has one
 `path` | The full Sparkplug metric name, for example `Axes/X/Position/Actual`; for a metric at the top level of the device, its name
-`device_uuid` | The UUID of the device the point came from
-`instance_uuid` | The UUID of the instance that owns the metric's folder; for a metric at the top level of the device, the device's UUID
-`schema_uuid` | The UUID of that instance's schema
+`device_uuid` | The UUID of the device the point came from. This is the device's top-level `Instance_UUID`
+`instance_uuid` | The `Instance_UUID` of the nearest object around the metric that has one; for a metric with no such object between it and the device, the device's UUID. The same value as `instance` in `GET v1/metadata/:uuid/contents`
+`schema_uuid` | The `Schema_UUID` of the nearest object around the metric that has one, or the device's schema
 `type` | The datatype the historian stored: `double`, `int`, `uint`, `boolean` or `string`
 
 The columns are the same whichever bucket a row comes from. A row from
@@ -549,6 +549,12 @@ the first segment of the row's `path` tag, the Sparkplug device ID, and
 `path` from the rest. So a `UNS device` download and a `Sparkplug
 source` download of the same device have identical `device`, `metric`,
 `path` and `unit` columns.
+
+The historians do not tag every point with its nearest instance: a
+metric one object inside the device has no `bottomLevelInstance` tag.
+Data Access fills `instance_uuid` and `schema_uuid` from the
+`usesInstances` and `usesSchemas` tags in that case, so the columns are
+right for data that is already stored.
 
 Two metrics with the same name under different folders have the same
 `metric` value but different `path` values. You can send a `path`

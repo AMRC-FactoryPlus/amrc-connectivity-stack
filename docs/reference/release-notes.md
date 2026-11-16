@@ -95,6 +95,23 @@ a small installation.
   `Device_Information`, is listed again once the device publishes it,
   which devices do when the MQTT broker restarts during the upgrade.
 
+### Dataset downloads give the right instance for every metric
+
+The `instance_uuid` column of a dataset download named the device for
+any metric that sits exactly one object inside it, such as
+`Circuits/TP_100/Current` where `TP_100` has an `Instance_UUID`. It
+now names that object, as `GET v1/metadata/:uuid/contents` already
+did. `schema_uuid` is corrected in the same way. This affected many
+metrics of a download from the UNS bucket, and the metrics of a
+top-level folder in a download from the `default` bucket.
+
+The fix is in how Data Access reads the stored data, so downloads of
+old data are corrected too. Nothing is rewritten in InfluxDB, and
+there is nothing to do when you upgrade. A client that matched rows on
+`instance_uuid` and saw no readings for these metrics will now see
+them. A client that relied on the device's UUID in that column for
+these metrics should use `device_uuid`.
+
 ### Services no longer wait for ever on a stalled ConfigDB connection
 
 A service that opened its ConfigDB change feed while the old ConfigDB

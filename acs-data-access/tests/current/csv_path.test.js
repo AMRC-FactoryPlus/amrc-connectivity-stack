@@ -147,6 +147,41 @@ describe("CSV path column", () => {
         expect(line.split(",").slice(6, 9)).toEqual([DEVICE, DEVICE, "5c5c5c5c-0000-4000-8000-000000000002"]);
     });
 
+    test("a metric one instance deep takes that instance, though the historian wrote no bottom tag", async () => {
+        const INST = "a1a1a1a1-0000-4000-8000-000000000009";
+        const SCHEMA = "5c5c5c5c-0000-4000-8000-000000000009";
+        const TOP_SCHEMA = "5c5c5c5c-0000-4000-8000-000000000002";
+        const { reader } = make_reader([[
+            row("Current_AC_Average:d", "Circuits/TP_100", {
+                topLevelInstance: DEVICE, usesInstances: `${DEVICE}:${INST}`,
+                topLevelSchema: TOP_SCHEMA, usesSchemas: `${TOP_SCHEMA}:${SCHEMA}`,
+            }),
+        ]]);
+        const [, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
+        expect(line.split(",").slice(6, 9)).toEqual([DEVICE, INST, SCHEMA]);
+    });
+
+    test("an empty chain, or one of several entries with no bottom tag, falls back to the device", async () => {
+        const { reader } = make_reader([[
+            row("Speed:d", "", { topLevelInstance: DEVICE, usesInstances: `${DEVICE}:` }),
+            row("Odd:d", "A/B", { topLevelInstance: DEVICE, usesInstances: `${DEVICE}:i-1:i-2` }),
+        ]]);
+        const [, a, b] = await export_csv(reader, [{ device_uuid: DEVICE }]);
+        expect(a.split(",")[7]).toBe(DEVICE);
+        expect(b.split(",")[7]).toBe(DEVICE);
+    });
+
+    test("a bottom tag wins over the chain", async () => {
+        const { reader } = make_reader([[
+            row("Frequency:d", "A/B/C", {
+                topLevelInstance: DEVICE, bottomLevelInstance: "i-3",
+                usesInstances: `${DEVICE}:i-1:i-2:i-3`,
+            }),
+        ]]);
+        const [, line] = await export_csv(reader, [{ device_uuid: DEVICE }]);
+        expect(line.split(",")[7]).toBe("i-3");
+    });
+
     test("escapes a path with a comma or a quote", async () => {
         const { reader } = make_reader([[
             row("Temp:d", 'Zone,1/Sensor "A"'),

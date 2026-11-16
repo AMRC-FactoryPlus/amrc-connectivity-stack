@@ -587,6 +587,15 @@ export const I3X = {
  * direct-to-KDC. ManageUsers must match the value minted in
  * acs-user-admin/src/amrc/factoryplus/user_admin/lib/uuids.py. */
 export const UserAdmin = {
+    Requirement: {
+        /* The ServiceRole group op1useradmin's account.groups (see
+         * deploy/templates/user-admin/krbkeys.yaml) places it in, so
+         * its ConfigDB/Auth permissions can be granted to this group
+         * rather than to a UUID that doesn't exist until deploy time.
+         * Modeled on Clusters.Requirement.ServiceAccount. */
+        ServiceAccount: "a42402a6-83be-411b-aa9b-bff95ac6c50b",
+    },
+    Perm: {
         ManageUsers:    "d4a080f8-eca7-4063-b22a-a6f14a4721eb",
     },
 };

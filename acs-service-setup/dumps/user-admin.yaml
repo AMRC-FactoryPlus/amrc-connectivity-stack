@@ -14,9 +14,43 @@ objects:
 
   !u ACS.PermGroup.UserAdmin:
     !u UserAdmin.Perm.ManageUsers: { name: "Create and manage human users" }
+
+  # op1useradmin's account is created dynamically by krb-keys-operator
+  # (deploy/templates/user-admin/krbkeys.yaml, account.class:
+  # CentralService) rather than being a fixed UUID, so its own
+  # ConfigDB/Auth permissions - below - are granted to this ServiceRole
+  # group instead of to the account itself. account.groups on that
+  # KerberosKey places the account in this group at creation time.
+  # Modeled on Clusters.Requirement.ServiceAccount in dumps/clusters.yaml.
+  !u Auth.Class.ServiceRole:
+    !u UserAdmin.Requirement.ServiceAccount:
+      name: "User admin service account"
+      iri: service/UserAdminServiceAccount
+      subclassOf:
+        - !u Auth.Class.CentralService
 ---
 service: !u UUIDs.Service.Authentication
 version: 2
 grants:
   !u ACS.Group.Administrator:
     !u UserAdmin.Perm.ManageUsers: null
+
+  # The permissions acs-user-admin's own routes.js needs to create a
+  # HumanUser object, name it, add it to the groups the caller picked,
+  # and link its Kerberos identity - see
+  # acs-user-admin/.../lib/routes.py. Scoped to exactly that, not
+  # op1krbkeys's broader permission set (ManageACL, ManageGroup,
+  # Clusters.Perm.Secrets, ...), since this service never touches
+  # those.
+  !u UserAdmin.Requirement.ServiceAccount:
+    !u Auth.Perm.ManageKerberos: null
+    !u ConfigDB.Perm.CreateObject:
+      !u Auth.Class.PrincipalType: true
+    !u ConfigDB.Perm.CreateSpecificObject:
+      !u Auth.Class.PrincipalType: true
+    !u ConfigDB.Perm.WriteConfig:
+      !u UUIDs.App.Info: false
+    !u ConfigDB.Perm.WriteMemberships:
+      !u UUIDs.Special.Mine: true
+    !u ConfigDB.Perm.WriteMembers:
+      !u Auth.Class.Role: true

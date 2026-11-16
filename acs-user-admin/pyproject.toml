@@ -9,6 +9,7 @@ requires-python = ">=3.11"
 dependencies = [
     "flask (>=3.1.0,<4.0.0)",
     "flask-cors (>=5.0.0,<7.0.0)",
+    "gunicorn (>=23.0.0,<28.0.0)",
     "krb5",
     "kadmin",
     "gssapi (>=1.8.0,<2.0.0)",

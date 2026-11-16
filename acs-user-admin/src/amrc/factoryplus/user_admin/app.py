@@ -45,4 +45,6 @@ def create_app (env=None):
     return app
 
 if __name__ == "__main__":
-    create_app().run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    # Local dev only - gunicorn (see the Dockerfile/Deployment) is the
+    # real entrypoint, invoking create_app() directly.
+    create_app().run(host="0.0.0.0", port=8080)

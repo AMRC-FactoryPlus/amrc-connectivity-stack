@@ -37,14 +37,17 @@ spec:
       containers:
         - name: user-admin
 {{ include "amrc-connectivity-stack.image" (list . .Values.userAdmin) | indent 10 }}
-          command: ["python3", "-m", "amrc.factoryplus.user_admin.app"]
+          # A single worker: Bearer tokens live in FplusHttpAuth's
+          # in-memory dict (lib/auth.py), not a shared store, so a
+          # second worker process wouldn't recognise tokens minted by
+          # the first. Threads, not more workers, give it concurrency.
+          command: ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1",
+              "--threads", "4", "amrc.factoryplus.user_admin.app:create_app()"]
           {{- with .Values.userAdmin.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
-            - name: PORT
-              value: "8080"
             - name: KRB5_CONFIG
               value: /config/krb5-conf/krb5.conf
             # Outbound Factory+ calls (ConfigDB/Auth, as op1useradmin)

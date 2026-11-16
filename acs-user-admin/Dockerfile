@@ -29,4 +29,9 @@ COPY src src
 USER useradmin
 ENV PATH=/usr/local/python/bin:/usr/local/bin:/usr/bin:/bin
 ENV PYTHONPATH=/home/useradmin/src:/usr/local/python
-CMD ["python3", "-m", "amrc.factoryplus.user_admin.app"]
+# A single worker: Bearer tokens live in FplusHttpAuth's in-memory
+# dict (lib/auth.py), not a shared store, so a second worker process
+# wouldn't recognise tokens minted by the first. Threads, not more
+# workers, is how this gets concurrency.
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", \
+    "amrc.factoryplus.user_admin.app:create_app()"]

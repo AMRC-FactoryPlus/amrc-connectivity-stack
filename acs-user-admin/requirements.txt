@@ -1,6 +1,7 @@
 flask
 flask-cors
 gssapi
+gunicorn
 krb5
 
 # Local patched version

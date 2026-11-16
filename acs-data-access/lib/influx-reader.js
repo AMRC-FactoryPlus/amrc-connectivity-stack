@@ -3,16 +3,18 @@ import { once } from "events";
 import pLimit from "p-limit";
 
 import {
-    csv_escape, csv_device_path, metric_type, strip_metric_suffix,
+    csv_escape, csv_device_path, metric_type, nearest_uuid,
+    strip_metric_suffix,
 } from "./utils.js";
 import { build_flux_queries } from "./flux.js";
 import { DataAccess as Constants } from "./constants.js";
 
 /* The UUID columns come from tags both historians write on every
- * point: the device, the instance that owns the metric's folder, and
- * that instance's schema. A metric directly on the device has no
- * bottom-level tags (Influx stores no empty tags), so its instance
- * and schema are the device's own. New columns go at the end. */
+ * point: the device, the instance nearest the metric, and that
+ * instance's schema. A metric directly on the device has no instance
+ * of its own, so its instance and schema are the device's. The
+ * historians leave the bottom-level tags off some metrics that do have
+ * one: see nearest_uuid. New columns go at the end. */
 const CSV_HEADER = "device,metric,timestamp,value,unit,path,device_uuid,instance_uuid,schema_uuid,type";
 
 /* The value as Influx wrote it. The client parses long and unsignedLong
@@ -151,8 +153,10 @@ export class InfluxReader {
                 csv_escape(o.unit),
                 csv_escape(path),
                 csv_escape(o.topLevelInstance),
-                csv_escape(o.bottomLevelInstance || o.topLevelInstance),
-                csv_escape(o.bottomLevelSchema || o.topLevelSchema),
+                csv_escape(nearest_uuid(
+                    o.bottomLevelInstance, o.usesInstances, o.topLevelInstance)),
+                csv_escape(nearest_uuid(
+                    o.bottomLevelSchema, o.usesSchemas, o.topLevelSchema)),
                 csv_escape(metric_type(o._measurement)),
             ].join(",");
 

@@ -81,6 +81,31 @@ export function metric_path(path, measurement) {
     return `${path}/${name}`;
 }
 
+/** The UUID nearest a metric: its own object's, or the device's.
+ *
+ * The historians tag each point with the top-level UUID, the bottom
+ * one, and the chain of every one above the metric as
+ * `top:first:second`. Both leave the bottom tag off a metric whose
+ * chain has one entry: the UNS historian wants two entries, and the
+ * Sparkplug historian wants a `/` in the object's path. The chain is
+ * always written, so a chain of one entry gives the UUID the bottom
+ * tag should have held. A metric directly on the device has an empty
+ * chain, and its nearest UUID is the device's.
+ *
+ * @param {string} [bottom] The `bottomLevelInstance` or
+ *   `bottomLevelSchema` tag.
+ * @param {string} [uses] The `usesInstances` or `usesSchemas` tag.
+ * @param {string} [top] The `topLevelInstance` or `topLevelSchema` tag.
+ * @returns {string|undefined}
+ */
+export function nearest_uuid(bottom, uses, top) {
+    if (bottom) return bottom;
+    const chain = typeof uses == "string"
+        ? uses.split(":").slice(1).filter(u => u != "")
+        : [];
+    return chain.length == 1 ? chain[0] : top;
+}
+
 /** The `device` and `path` columns of a CSV row.
  *
  * A row from the `default` bucket has a `device` tag (the Sparkplug

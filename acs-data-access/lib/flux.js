@@ -215,8 +215,10 @@ export function build_flux_query({ bucket, source, filter = {}, subset }) {
                 "path",
                 "topLevelInstance",
                 "bottomLevelInstance",
+                "usesInstances",
                 "topLevelSchema",
-                "bottomLevelSchema"
+                "bottomLevelSchema",
+                "usesSchemas"
             ])
         `;
 }

@@ -87,6 +87,18 @@ export default {
     Input,
   },
 
+  watch: {
+    name (newName) {
+      const suggested = this.derivePrincipal(newName)
+      // Only overwrite the principal if it still matches our last
+      // suggestion - once the user edits it by hand, leave it alone.
+      if (this.principal === this.autoPrincipal) {
+        this.principal = suggested
+      }
+      this.autoPrincipal = suggested
+    },
+  },
+
   methods: {
     handleOpen (e) {
       this.dialogOpen = e
@@ -98,6 +110,20 @@ export default {
       this.name = null
       this.principal = null
       this.password = null
+      this.autoPrincipal = null
+    },
+
+    // "Jane Smith" -> "jsmith@REALM", matching the Kerberos Principal
+    // field's own placeholder convention.
+    derivePrincipal (name) {
+      const parts = (name || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+      if (!parts.length) return null
+
+      const username = parts.length === 1
+        ? parts[0]
+        : parts[0][0] + parts[parts.length - 1]
+      const realm = this.s.baseUrl ? this.s.baseUrl.toUpperCase() : 'REALM.EXAMPLE.COM'
+      return `${username}@${realm}`
     },
 
     async formSubmit () {
@@ -136,6 +162,7 @@ export default {
       name: null,
       principal: null,
       password: null,
+      autoPrincipal: null,
     }
   },
 

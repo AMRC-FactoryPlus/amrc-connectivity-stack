@@ -286,6 +286,6 @@ data:
 {{ end }}
 {{ if .Values.userAdmin.enabled }}
       - service: !u ACS.Service.UserAdmin
-        url: !acs "http://user-admin.${namespace}.svc.${k8sdomain}"
+        url: !acs "http${secure}://user-admin.${domain}"
 {{ end }}
 {{ end }}

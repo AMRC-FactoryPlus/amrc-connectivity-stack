@@ -28,18 +28,27 @@
       <div class="flex flex-col gap-1">
         <label class="text-sm font-medium">Kerberos Principal</label>
         <Input
-            placeholder="e.g. jsmith@MY-REALM.COM"
+            placeholder="e.g. jane.smith@MY-REALM.COM"
             v-model="v$.principal.$model"
             :v="v$.principal"
         />
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-sm font-medium">Password</label>
-        <Input
-            type="password"
-            v-model="v$.password.$model"
-            :v="v$.password"
-        />
+        <div class="flex gap-2">
+          <Input
+              class="flex-1"
+              type="password"
+              v-model="v$.password.$model"
+              :v="v$.password"
+          />
+          <Button type="button" variant="outline" title="Generate a password" @click="generatePassword">
+            <i class="fa-solid fa-dice"></i>
+          </Button>
+        </div>
+        <Copyable v-if="password" :text="password" class="text-xs text-gray-500">
+          Generated: <span class="font-mono">{{ password }}</span> (click to copy)
+        </Copyable>
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <Button :disabled="v$.$invalid || submitting" @click="formSubmit">
@@ -58,6 +67,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@components/ui/button'
 import { VisuallyHidden } from 'reka-ui'
 import { Input } from '@/components/ui/input'
+import Copyable from '@components/Copyable.vue'
 import useVuelidate from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
@@ -85,6 +95,7 @@ export default {
     DialogTrigger,
     VisuallyHidden,
     Input,
+    Copyable,
   },
 
   watch: {
@@ -113,15 +124,21 @@ export default {
       this.autoPrincipal = null
     },
 
-    // "Jane Smith" -> "jsmith@REALM", matching the Kerberos Principal
-    // field's own placeholder convention.
+    generatePassword () {
+      // Excludes visually-ambiguous characters (0/O, 1/l/I) since this
+      // may need to be read aloud or transcribed by hand to the new user.
+      const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*'
+      const bytes = new Uint32Array(20)
+      crypto.getRandomValues(bytes)
+      this.password = Array.from(bytes, b => charset[b % charset.length]).join('')
+    },
+
+    // "Jane Smith" -> "jane.smith@REALM"
     derivePrincipal (name) {
       const parts = (name || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
       if (!parts.length) return null
 
-      const username = parts.length === 1
-        ? parts[0]
-        : parts[0][0] + parts[parts.length - 1]
+      const username = parts.join('.')
       const realm = this.s.baseUrl ? this.s.baseUrl.toUpperCase() : 'REALM.EXAMPLE.COM'
       return `${username}@${realm}`
     },

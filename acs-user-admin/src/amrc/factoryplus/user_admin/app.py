@@ -15,6 +15,12 @@ from    .lib.routes                     import bp
 
 log = logging.getLogger(__name__)
 
+# Without this, every log.info() in lib/auth.py and lib/routes.py is
+# silently dropped (the root logger defaults to WARNING), leaving only
+# werkzeug's bare access log line on an auth failure - no indication of
+# which scheme was tried or why it was rejected.
+logging.basicConfig(level=logging.INFO)
+
 def create_app (env=None):
     if env is None:
         env = os.environ

@@ -699,9 +699,17 @@ clusterManager:
   verbosity: "ALL,!service,!token"
 
 userAdmin:
-  # -- Whether or not to enable the User Admin component. Image and
-  # resources are set when its Deployment is added.
+  # -- Whether or not to enable the User Admin component
   enabled: true
+  image:
+    # -- The repository of the User Admin component
+    repository: acs-user-admin
+  # -- Resource requests and limits for the `user-admin` container. The
+  # default is empty, which leaves the pod BestEffort: first in line
+  # for the kernel OOM killer and for eviction under node memory
+  # pressure. Set a memory request to make it Burstable, and a memory
+  # limit to cap it.
+  resources: {}
 
 i3x:
   # -- Whether or not to enable the i3X service

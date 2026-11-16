@@ -1,0 +1,9 @@
+flask
+gssapi
+krb5
+
+# Local patched version
+/acs-lib/py-python-kadmv
+
+# Factory+ service client, extracted into a shared library
+/acs-lib/py-service-client

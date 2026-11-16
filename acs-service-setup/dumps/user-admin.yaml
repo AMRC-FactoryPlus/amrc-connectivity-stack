@@ -1,0 +1,22 @@
+# User Admin service: creates Factory+ human-user principals
+# direct-to-KDC, replacing the three manual, disconnected steps
+# (kadmin, ConfigDB object, ACL/group wiring) with a single "Create
+# User" action in acs-admin.
+#-REQUIRE: auth
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u UUIDs.Class.Service:
+    !u ACS.Service.UserAdmin:
+        name: "User administration"
+        iri: service/UserAdmin
+
+  !u ACS.PermGroup.UserAdmin:
+    !u UserAdmin.Perm.ManageUsers: { name: "Create and manage human users" }
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u ACS.Group.Administrator:
+    !u UserAdmin.Perm.ManageUsers: null

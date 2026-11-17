@@ -360,7 +360,9 @@ class Driver:
             return
 
         msg = topic_parts[2]
-        data = topic_parts[3] if len(topic_parts) > 3 else None
+        # For cmd the data part is a whole device address, which may
+        # contain "/", so take everything after the message type.
+        data = "/".join(topic_parts[3:]) if len(topic_parts) > 3 else None
 
         # If the message is a command, add a trailing slash to make sure that
         # we get the correct handler.

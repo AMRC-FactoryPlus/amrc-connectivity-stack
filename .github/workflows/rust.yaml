@@ -1,0 +1,83 @@
+name: Rust
+# Formatting, lint and tests for lib/rs-edge-driver and every Rust
+# split driver. Any directory with a Cargo.toml checked in is picked up
+# by the find job, so a new driver needs no change here. The images are
+# built by publish.yml, not here.
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      # Staging branches for epics, such as feature/split-drivers.
+      - 'feature/**'
+    paths:
+      - 'lib/rs-**'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/*.rs'
+      - '.github/workflows/rust.yaml'
+
+env:
+  # Keep this in step with rust_version in the driver Dockerfiles
+  # (lib/rs-edge-driver/driver-template/Dockerfile), so that CI checks
+  # the code with the compiler that builds the images. rustup and
+  # cargo read RUSTUP_TOOLCHAIN to pick the toolchain.
+  RUSTUP_TOOLCHAIN: '1.99'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  find:
+    runs-on: ubuntu-24.04
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find Rust projects
+        id: find
+        run: |
+          projects=$(git ls-files -- 'Cargo.toml' '*/Cargo.toml' \
+            | xargs -n1 dirname | sort -u | jq -R . | jq -sc .)
+          echo "Rust projects: $projects"
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: find
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.find.outputs.projects) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.project }}/target
+          key: ${{ runner.os }}-cargo-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.project }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.project)) }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.project }}-
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      # The tests are run from the project directory, which some of
+      # them rely on: rs-edge-driver checks its README's links relative
+      # to the repo.
+      - name: Test
+        run: cargo test --locked

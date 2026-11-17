@@ -92,9 +92,11 @@ export function device_options (c) {
 
 /* Translator.runDevices hands each connection "data" event to the
  * devices that own its addresses. With one device per connection that
- * is a single _handleData call, which this copies. */
+ * is a single _handleData call, which this copies, with the DataGroup a
+ * driver connection passes when it gathers several messages. */
 export function route (conn, device) {
-    conn.on("data", (obj, parseVals = true) => device._handleData(obj, parseVals));
+    conn.on("data", (obj, parseVals = true, group) =>
+        device._handleData(obj, parseVals, group));
 }
 
 /* A connection that does nothing; the benchmark emits its data events. */

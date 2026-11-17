@@ -103,7 +103,7 @@ describe("moving a site's REST connections with the chart's defaults", () => {
     const defaults = chart_defaults();
 
     test("the chart moves REST", () => {
-        assert.deepEqual(defaults, { REST: true });
+        assert.equal(defaults.REST, true);
     });
 
     test("the site's REST connections are the golden-output samples", () => {

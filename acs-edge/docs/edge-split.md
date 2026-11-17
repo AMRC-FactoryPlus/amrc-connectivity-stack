@@ -611,6 +611,52 @@ Numbers may also be sent as strings, which are parsed for the metric's
 type. A `null` value is ignored, so the metric keeps its last value.
 This is the format edge-sim already uses.
 
+## Gathering data
+
+Each data packet carries one address, but a built-in connection hands
+the Edge Agent all the values of an OPC UA notification or a poll
+together, and each device publishes one Sparkplug DDATA for them. So
+that a split driver doesn't multiply the Sparkplug traffic, the Edge
+Agent gathers the data packets that arrive together and hands them to
+the devices as one group. Each device publishes one DDATA for the
+values in the group that belong to it.
+
+* Packets that arrive in the same turn of the agent's event loop form a
+  group: in practice, whatever the agent reads from the driver's socket
+  in one go. The group is handed on at the end of that turn, so a
+  packet on its own is not held back.
+
+* `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment makes it wait
+  that many milliseconds after the first packet of a group instead,
+  up to 100. The default is 0. Every packet waits up to that long, a
+  lone one included.
+
+* A second packet for an address already in the group hands the group
+  on first, so every value is published, in the order the driver sent
+  them.
+
+* Any other packet from the driver, such as a status change or a write
+  result, and any write the agent sends, hands the group on first, so
+  the data is published before what followed it.
+
+* Each address in a group is read as if it had come alone: a metric
+  with no path still reads the whole payload, and a metric whose
+  payload has no timestamp is stamped with when its packet arrived.
+
+A driver SHOULD publish the values it gets together (one notification,
+the results of one poll) back to back, so that they reach the agent in
+as few socket reads as possible, and SHOULD set `TCP_NODELAY` on its
+connection to the agent. Without it, Nagle's algorithm holds the second
+and later packets of a burst until the agent acknowledges the first,
+which on Linux can take 40 ms, so they miss the first packet's group.
+The Rust driver library's MQTT client (rumqttc 0.24) can't set it yet.
+Nothing else in the protocol changes.
+
+With 100 values changing 10 times a second on one device through a
+split driver, the agent publishes 10 DDATA a second, as the built-in
+OPC UA connection does. With 1,000, a burst arrives in two or three
+socket reads, so it publishes 20 to 30 a second rather than 10,000.
+
 ## Edge Scout (address browsing)
 
 **Proposed, awaiting Alex.** Edge Scout, which lists a device's

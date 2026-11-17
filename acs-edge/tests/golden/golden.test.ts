@@ -62,7 +62,7 @@ const DRIVER_PROTOCOL = DRIVER ? process.env.GOLDEN_PROTOCOL ?? "REST" : "REST";
  * configs the move leaves. Each case is a connection the test moves:
  * [name, sample, entry before, entry after]. A sample is a directory
  * of the committed samples, or a path from acs-edge/tests. */
-const read_move = (test: string) => {
+const move_cases = (test: string) => {
     const dir = path.join(__dirname, "../../../acs-service-setup/test", test);
     const read = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
     const site = read("site.json");
@@ -79,8 +79,9 @@ const read_move = (test: string) => {
         });
     return { cases, secrets: site.secrets as { [k: string]: string } };
 };
-const REST_MOVE = read_move("rest-move");
-const MQTT_MOVE = read_move("mqtt-move");
+const REST_MOVE = move_cases("rest-move");
+const MQTT_MOVE = move_cases("mqtt-move");
+const UDP_MOVE = move_cases("udp-move");
 
 const sample_dir = (sample: string) => sample.includes("/")
     ? path.join(__dirname, "..", sample) : path.join(SAMPLES, sample);
@@ -126,6 +127,7 @@ describe("Golden-output harness", () => {
             PayloadFormatMap["REST"],
             PayloadFormatMap["MQTT"],
             PayloadFormatMap["OPC UA"],
+            PayloadFormatMap["UDP"],
         ]);
     });
 
@@ -261,6 +263,29 @@ describe("Golden-output harness", () => {
                 const expected = [mqtt_session(before.MQTTConnDetails, secrets)];
                 expect(r.a.credentials).toEqual(expected);
                 expect(r.b.credentials).toEqual(expected);
+            });
+        });
+
+    /* The same for acs-service-setup/test/udp-move.test.js: three UDP
+     * connections, one in each payload format, on three agents. Each
+     * runs with its port opened on the host in the real cluster; here
+     * the sender sends to the driver's port on localhost. */
+    if (DRIVER_PROTOCOL == "UDP") describe.each(UDP_MOVE.cases)(
+        "split driver after service-setup's move %s",
+        (name, sample, before, after) => {
+            it(`${DRIVER!.name} matches built-in UDP`, async () => {
+                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
+                const fixture = truncate(read_fixture(sample_dir(sample)), cap);
+                const r = await golden({ a: fixture }, {
+                    a: { entry: before },
+                    b: { entry: after, driver: DRIVER! },
+                });
+                show(`${name} after the move`, r);
+                expect(before.connType).toBe("UDP");
+                expect(after.connType).toBe("Driver");
+                expect(after.DriverDetails).toEqual(before.UDPConnDetails);
+                expect(r.comparison.values).toBeGreaterThan(0);
+                expect(explain(r)).toBe("");
             });
         });
 

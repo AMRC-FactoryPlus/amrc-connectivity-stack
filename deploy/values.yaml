@@ -440,6 +440,7 @@ serviceSetup:
     splitDrivers:
       REST: true
       MQTT: true
+      UDP: true
 
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.

@@ -5,15 +5,15 @@ into the Edge Agent itself. Others run as a split driver, which is a
 small container (a sidecar) in the Edge Agent's pod that talks to the
 device and passes what it reads to the Edge Agent over a broker inside
 the pod. Modbus, BACnet, ADS and the other drivers with their own image
-have always worked this way. The built-in REST, MQTT and OPC UA
+have always worked this way. The built-in REST, MQTT, OPC UA and UDP
 connections are moving to split drivers so that every protocol is
 deployed, versioned and fixed in the same way. The protocol between the
 Edge Agent and a split driver is described in
 [`acs-edge/docs/edge-split.md`](../../../acs-edge/docs/edge-split.md).
 
-REST and MQTT move first. Their split drivers are `edge-rest` and
-`edge-mqtt`. OPC UA keeps its built-in connection until its driver is
-ready.
+REST, MQTT and UDP move first. Their split drivers are `edge-rest`,
+`edge-mqtt` and `edge-udp`. OPC UA keeps its built-in connection until
+its driver is ready.
 
 ## The setting
 
@@ -26,6 +26,7 @@ serviceSetup:
     splitDrivers:
       REST: true      # the chart's default
       MQTT: true      # the chart's default
+      UDP: true       # the chart's default
       # OPCUA: not set, so it stays built in
       # dryRun: true  # log what would move and change nothing
 ```
@@ -75,6 +76,23 @@ data for that time. An MQTT connection with a fixed client id and clean
 session off has a persistent session on its broker, which the split
 driver takes over because it connects with the same client id.
 
+Built-in UDP connections move the same way, to an `edge-udp` sidecar
+each, with `UDPConnDetails` becoming `DriverDetails` and the port kept.
+Each sidecar also opens the connection's port on the edge host its Edge
+Agent runs on (a Kubernetes `hostPort`), and a host can open each port
+once. So before it moves a UDP connection, service-setup checks its
+port against every connection that already opens one, with the rule the
+Manager uses when you save a connection: two connections clash if they
+are in the same cluster and either their Edge Agents are pinned to the
+same host or either agent is not pinned. Where an agent runs comes from
+its Edge Agent Deployment. A connection that would clash is not moved:
+it stays on the built-in connection, keeps working as before, and the
+log has a line for it ending `Give one of them another port`. Every
+built-in UDP connection uses port 50205, because that was the only port
+the old form allowed, so on a site where two of them can land on one
+host, only the first moves. Give the one that moved another port in the
+Manager (and point its device at it) and the next run moves the other.
+
 Service-setup runs the move on every install and upgrade, and a second
 run finds nothing to change. A run that stopped half way through is
 finished by the next one.
@@ -82,10 +100,11 @@ finished by the next one.
 ### New connections
 
 After the upgrade, the connection form in the Manager offers one REST
-driver, called "REST", and one MQTT driver, called "MQTT", which are
-the split drivers. The built-in drivers are called "REST (built-in)"
-and "MQTT (built-in)" and are shown only on a connection that still
-uses one, for example on a site that has moved a protocol back.
+driver, called "REST", one MQTT driver, called "MQTT", and one UDP
+driver, called "UDP", which are the split drivers. The built-in drivers
+are called "REST (built-in)", "MQTT (built-in)" and "UDP (built-in)"
+and are shown only on a connection that still uses one, for example on
+a site that has moved a protocol back.
 
 ## Edge charts and every split driver move
 
@@ -262,28 +281,67 @@ driver for a poll every millisecond for each device, and an MQTT driver
 has nothing to poll. Without those polls the split Edge Agent used 6%,
 14% and 25% at the same rates, less than the built-in connection.
 
+## What changes for a UDP connection
+
+`edge-udp` hands the Edge Agent each datagram as it arrived, as the
+built-in connection did, and the Edge Agent reads it with the device's
+payload format (JSON, Buffer or Delimited String), so the data your
+devices publish doesn't change. Its full behaviour is in
+[`edge-udp/README.md`](../../../edge-udp/README.md). You may notice
+these differences:
+
+- **The port opens on the edge host.** A device outside the cluster can
+  now send to the host's address on the connection's port, which it
+  couldn't with the built-in connection. The port must be free on the
+  host, and the host's firewall must let UDP in on it.
+  [Connecting a UDP device](../../services/udp-devices.md) covers the
+  address to send to, the firewall and network policy rules, and
+  pinning.
+- **Pinning isn't checked by the move.** On a cluster with more than one
+  host, a device outside the cluster needs the Edge Agent pinned to one
+  host. The Manager asks for that when you save a UDP connection, but
+  the move does not, so pin the agent with **Move** on the node's page.
+- **The port can be changed.** The split driver's form takes any port
+  from 1 to 65535, where the built-in form only took 50205.
+- **Metric addresses stay empty.** Every datagram goes to the empty
+  address, as before, so a metric with an address never gets a value.
+  The form now labels the field "Address (leave empty)".
+- **Writes are refused.** A write to a UDP metric is answered as failed.
+  The built-in connection ignored it and never answered.
+- **Drops are counted.** The driver asks for a bigger receive buffer
+  and logs a warning every 10 seconds in which datagrams were lost,
+  saying where. Raising `net.core.rmem_max` on the host lets fast
+  devices use the bigger buffer.
+- **One more container per connection.** Each UDP connection runs in
+  its own `edge-udp` container in the Edge Agent's pod.
+
 ## Checking it worked
 
 1. In the service-setup Job's log, find the line that starts
-   `Split drivers:`. It gives how many connections moved and how many
-   failed, and the lines above it name each connection.
-2. In the Manager, open a REST or MQTT connection. Its driver is
-   "REST" or "MQTT".
+   `Split drivers:`. It gives how many connections moved, how many
+   were held back and how many failed, and the lines above it name each
+   connection and say why it was held back.
+2. In the Manager, open a REST, MQTT or UDP connection. Its driver is
+   "REST", "MQTT" or "UDP".
 3. On the edge cluster, the Edge Agent's pod has a `driver-<name>`
-   container for each REST and MQTT connection, and each is running.
+   container for each REST, MQTT and UDP connection, and each is
+   running.
 4. The connection's devices are publishing data again a few minutes
    after the upgrade.
 
 ## Moving back
 
-Set `REST: false` or `MQTT: false` under
+Set `REST: false`, `MQTT: false` or `UDP: false` under
 `serviceSetup.config.splitDrivers` in your values and upgrade.
 Service-setup moves every connection of that protocol back to the
 built-in connection, removes its sidecar, and leaves each connection's
 config, and its Edge Agent's deployment, exactly as they were before
 the move. A connection created in the Manager after the move uses the
 split driver, and the next upgrade with the protocol set to `false`
-moves it to the built-in connection too.
+moves it to the built-in connection too. `UDP: false` also closes the
+UDP ports on the edge hosts. A UDP connection that was given a port
+other than 50205 after the move keeps it, and the built-in connection
+listens on it inside the pod.
 
 ## Adding a protocol's migration
 
@@ -299,7 +357,9 @@ to its split driver. Follow what REST and MQTT did:
 2. **The switch.** Add the protocol to `SplitDrivers` in
    `acs-service-setup/lib/split-drivers.js` if it isn't there, with its
    payload format map, and set it to `true` under
-   `serviceSetup.config.splitDrivers` in `deploy/values.yaml`. Point the
+   `serviceSetup.config.splitDrivers` in `deploy/values.yaml`. A
+   split DriverDef with `hostPorts` gets the host port check without
+   anything to add. Point the
    release note at "Edge charts and every split driver move" above
    rather than explaining it again, because it applies to every
    protocol, and say the move needs a major release.

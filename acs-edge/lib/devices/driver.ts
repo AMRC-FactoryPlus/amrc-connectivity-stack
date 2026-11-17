@@ -4,11 +4,11 @@
 
 import crypto from "crypto";
 
-import {Metrics, serialisationType, sparkplugMetric, writeValToBuffer, writeValToJSON} from "../helpers/typeHandler.js";
+import {Metrics, now_ns, serialisationType, sparkplugMetric, writeValToBuffer, writeValToJSON} from "../helpers/typeHandler.js";
 import {log} from "../helpers/log.js";
 
 import {DriverBroker} from "../driverBroker.js";
-import {DeviceConnection} from "../device.js";
+import {DataGroup, DeviceConnection} from "../device.js";
 
 /* Whether an address can go in a cmd or write topic. MQTT forbids the
  * wildcards and NUL in a topic name. */
@@ -39,6 +39,21 @@ function write_timeout () {
     return ms > 0 ? ms : WRITE_TIMEOUT;
 }
 
+/* How long, in milliseconds, the agent may hold a driver's data to
+ * gather values that arrive together, so that each device publishes
+ * one DDATA for them rather than one per value. 0 holds nothing past
+ * the current turn of the event loop: whatever the agent reads from
+ * the driver's socket in one go is handled together, straight after.
+ * DRIVER_DATA_WAIT_MS overrides it, up to MAX_DATA_WAIT. See
+ * "Gathering data" in docs/edge-split.md. */
+const DATA_WAIT = 0;
+const MAX_DATA_WAIT = 100;
+
+function data_wait () {
+    const ms = Number.parseFloat(process.env.DRIVER_DATA_WAIT_MS ?? "");
+    return ms >= 0 ? Math.min(ms, MAX_DATA_WAIT) : DATA_WAIT;
+}
+
 export class DriverConnection extends DeviceConnection {
     id:         string
     conf:       any
@@ -54,6 +69,15 @@ export class DriverConnection extends DeviceConnection {
     #writeBase  = crypto.randomBytes(4).toString("hex")
     #writeSeq   = 0
     #writeTimeout = write_timeout()
+    /* Data messages not yet handed to the devices, by address, and when
+     * each arrived. Null-prototype objects, because an address can be
+     * any string, "__proto__" included. */
+    #data:      { [addr: string]: Buffer } = Object.create(null)
+    #received:  DataGroup["received"] = Object.create(null)
+    #dataCount  = 0
+    #dataTimer: NodeJS.Immediate | NodeJS.Timeout | null = null
+    #dataWait   = data_wait()
+    #onMessage  = this.#message.bind(this)
 
     constructor(type: string, details: any, name: string, broker: DriverBroker) {
         // Call constructor of parent class
@@ -70,7 +94,7 @@ export class DriverConnection extends DeviceConnection {
 
     open() {
         log(`Opening Driver ${this.id}`);
-        this.broker.on("message", this.#message.bind(this));
+        this.broker.on("message", this.#onMessage);
         this.broker.publish({
             id:         this.id,
             msg:        "active",
@@ -82,6 +106,9 @@ export class DriverConnection extends DeviceConnection {
 
     close () {
         this.#cancel_addrs();
+        /* The devices have stopped by now (Translator.stop), so data
+         * still waiting has nowhere to go. */
+        this.#drop_data();
         /* The device is stopping, so nothing is waiting for these. */
         for (const w of this.#pending.values())
             clearTimeout(w.timer);
@@ -91,7 +118,7 @@ export class DriverConnection extends DeviceConnection {
             msg:        "active",
             payload:    Buffer.from("OFFLINE"),
         });
-        this.broker.off("message", this.#message.bind(this));
+        this.broker.off("message", this.#onMessage);
         this.emit("close");
     }
 
@@ -116,6 +143,10 @@ export class DriverConnection extends DeviceConnection {
 
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat: serialisationType, delimiter?: string) {
         this.#flush_addrs();
+        /* A write can report its value straight away. Data that arrived
+         * before it must be reported first, as it was when each message
+         * was handled on arrival. */
+        this.#flush_data();
 
         /* A driver that subscribed to write/# answers each write, so
          * report each value only when its answer says it was written.
@@ -292,6 +323,11 @@ export class DriverConnection extends DeviceConnection {
         if (id != this.id) return;
 
         //log(util.format("DRIVER message: %s %s", id, msg));
+        /* Anything else the driver says comes after the data it sent
+         * before, so hand that data on first. A status change can close
+         * the devices, and a write result reports a value. */
+        if (msg != "data") this.#flush_data();
+
         switch (msg) {
         case "status":  return this.#msg_status(payload.toString());
         case "data":    return this.#msg_data(data, payload);
@@ -390,13 +426,56 @@ export class DriverConnection extends DeviceConnection {
         });
     }
 
+    /* Each data message carries one address. Messages that arrive
+     * together are gathered and handed to the devices as one data
+     * event, so each device publishes one DDATA for them, as the
+     * built-in connections do for a notification or a poll. The
+     * group goes at the end of this turn of the event loop, or after
+     * DRIVER_DATA_WAIT_MS if that is set. A second message for an
+     * address already in the group sends the group first, so every
+     * value is still published, in the order it came. */
     #msg_data (data: string, payload: Buffer) {
         const addr = this.addrs.get(data);
         //log(`Driver [${this.id}]: data ${data} ${addr}`);
         /* The empty string is an address: the UDP connection delivers
          * every datagram to it. */
-        if (addr !== undefined)
-            this.emit("data", { [addr]: payload });
+        if (addr === undefined) return;
+
+        if (addr in this.#data) this.#flush_data();
+        this.#data[addr] = payload;
+        this.#received[addr] = { ms: Date.now(), ns: now_ns() };
+        this.#dataCount++;
+
+        if (this.#dataTimer) return;
+        const flush = () => {
+            this.#dataTimer = null;
+            this.#flush_data();
+        };
+        this.#dataTimer = this.#dataWait > 0
+            ? setTimeout(flush, this.#dataWait)
+            : setImmediate(flush);
+    }
+
+    /* Hand the gathered data to the devices now. */
+    #flush_data () {
+        if (this.#dataCount == 0) return;
+        const obj = this.#data;
+        const group: DataGroup = { received: this.#received };
+        this.#drop_data();
+        this.emit("data", obj, true, group);
+    }
+
+    #drop_data () {
+        if (this.#dataTimer) {
+            if (this.#dataWait > 0)
+                clearTimeout(this.#dataTimer as NodeJS.Timeout);
+            else
+                clearImmediate(this.#dataTimer as NodeJS.Immediate);
+            this.#dataTimer = null;
+        }
+        this.#data = Object.create(null);
+        this.#received = Object.create(null);
+        this.#dataCount = 0;
     }
 
     /* A driver's answer to a write: empty if it was written, otherwise

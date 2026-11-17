@@ -1,0 +1,49 @@
+name: Service setup tests
+
+# Runs acs-service-setup's unit tests, which include the split driver
+# migration and the whole-site REST move with the chart's defaults
+# (test/rest-move.test.js reads deploy/values.yaml and dumps/edge.yaml).
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'acs-service-setup/**'
+      - 'lib/js-service-client/**'
+      - 'lib/js-rx-client/**'
+      - 'lib/js-rx-util/**'
+      - 'deploy/values.yaml'
+      - 'acs-edge/tests/fixtures/drivers/samples/rest-*/**'
+      - '.github/workflows/service-setup-tests.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      # The local libraries are file: dependencies, so each needs its
+      # own dependencies installed. The GSSAPI library is optional and
+      # not needed by the tests.
+      - name: Install dependencies
+        run: |
+          for dir in lib/js-rx-util lib/js-rx-client lib/js-service-client acs-service-setup; do
+            (cd "$dir" && npm install --save=false --omit=optional --no-audit --no-fund)
+          done
+
+      - name: Run the tests
+        working-directory: acs-service-setup
+        run: npm test

@@ -19,6 +19,8 @@ on:
       # service-setup's split driver payload format maps.
       - 'lib/js-edge-driver/**'
       - 'acs-service-setup/lib/split-drivers.js'
+      # The site the REST move test moves, which the harness replays.
+      - 'acs-service-setup/test/rest-move/**'
       - '.github/workflows/acs-edge-tests.yaml'
 
 jobs:

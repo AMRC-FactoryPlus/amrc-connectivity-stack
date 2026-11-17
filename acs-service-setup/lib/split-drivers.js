@@ -14,8 +14,10 @@
  *     OPCUA:  false    # move OPC UA connections back to the Edge Agent
  *     dryRun: true     # log what would change and write nothing
  *
- * A protocol that is not named is left alone, so by default nothing
- * moves. For each connection of a named protocol this rewrites:
+ * A protocol that is not named, or is null, is left alone. The chart
+ * sets `REST: true`, so REST connections move on upgrade unless a site
+ * sets it to `false` or `null`; MQTT and OPC UA don't move unless a
+ * site asks. For each connection of a named protocol this rewrites:
  *
  *  - its Edge Agent config entry: `connType`, the details key and,
  *    where the protocol needs it, the payload format;

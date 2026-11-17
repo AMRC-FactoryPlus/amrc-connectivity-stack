@@ -40,6 +40,10 @@ export interface FakeDevice {
 
     /* How many messages or responses the device has delivered. */
     delivered: number,
+
+    /* The distinct credentials the connection sent, where the device
+     * can see them (the HTTP stub's Authorization headers). */
+    credentials?: Set<string>,
 }
 
 export type DeviceFactory = (fixture: Fixture, opts: DeviceOpts) => FakeDevice;

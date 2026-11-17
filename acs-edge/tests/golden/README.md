@@ -19,6 +19,7 @@ On the committed samples this runs:
 | self-check | Each sample through the built-in connection twice. The two runs must match, which shows the harness itself is deterministic. |
 | negative check | One sample per protocol with one recorded value changed in the second run. The comparison must fail and name the metric. |
 | split driver | Each REST sample through the built-in REST connection and through the reference REST driver. They must match. |
+| split driver after service-setup's move | The REST connections of the site in `acs-service-setup/test/rest-move/site.json`, through the built-in connection as the site had them and through the driver as service-setup's move left them (`moved.json`). Both runs must match and send the same credentials. `acs-service-setup/test/rest-move.test.js` checks that the move gives exactly `moved.json`. |
 | in-process driver | One REST sample through a small in-process driver, to cover that path. |
 
 Each run prints the comparison and the CPU time it used.
@@ -70,7 +71,7 @@ From code, `driver.ts` has the two kinds of driver the harness accepts, both a `
 - `spawned(name, command, args)` runs a command with the driver environment added. This is how real drivers run.
 - `in_process(name, start)` calls `start(env)` in the test process and expects back something with `stop()`.
 
-Pass one as `{ b: { driver } }` to `golden()` in `harness.ts`.
+Pass one as `{ b: { driver } }` to `golden()` in `harness.ts`. A run can also take `entry`, a connection entry to run in place of the fixture's (one that is already `Driver` is run as it is), and `secrets`, the values the agent fills `__FPSI__` placeholders from.
 
 ## How a run works
 

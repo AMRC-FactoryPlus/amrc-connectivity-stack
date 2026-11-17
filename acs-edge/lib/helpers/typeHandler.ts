@@ -814,11 +814,17 @@ export function writeValuesToPayload(metrics: sparkplugMetric[], payloadFormat: 
         case serialisationType.fixedBuffer:
             payload = Buffer.alloc(0);
             metrics.forEach((metric) => {
-                if (payload.length) {
-                    payload = Buffer.concat([payload, writeValToBuffer(metric)]);
-                } else {
-                    payload = writeValToBuffer(metric);
+                /* Skip a value that can't be written rather than
+                 * sending bytes that don't mean anything. */
+                let bytes: Buffer;
+                try {
+                    bytes = writeValToBuffer(metric);
                 }
+                catch (err) {
+                    log(`Can't write ${metric.name}: ${(err as Error).message}`);
+                    return;
+                }
+                payload = Buffer.concat([payload, bytes]);
             })
             if (payload && payload.length) {
                 return payload;
@@ -935,73 +941,173 @@ export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrde
     }
 }
 
-export function writeValToBuffer(metric: sparkplugMetric): Buffer {
-    // Writes out a variable of the specified metric.type type to output buffer buf
-    // Datetime, string, and buffer are not implemented...yet
-    let buf = Buffer.allocUnsafe(8);
-    let len = 0;
-    const endianness = metric.properties?.endianness?.value as byteOrder ?? byteOrder.bigEndian
-
-    try {
-        switch (metric.type) {
-            case sparkplugDataType.boolean:
-                len = buf.writeUInt8(metric.value ? 1 : 0);
-                break;
-            case sparkplugDataType.int8:
-                len = buf.writeInt8(metric.value as number);
-                break;
-
-            case sparkplugDataType.int16:
-                if (endianness === byteOrder.bigEndian) len = buf.writeInt16BE(metric.value as number); else len = buf.writeInt16LE(metric.value as number);
-                break;
-
-            case sparkplugDataType.int32:
-                if (endianness === byteOrder.bigEndian) len = buf.writeInt32BE(metric.value as number); else len = buf.writeInt32LE(metric.value as number);
-                break;
-
-            case sparkplugDataType.int64:
-                if (endianness === byteOrder.bigEndian) len = buf.writeBigInt64BE(metric.value as bigint); else len = buf.writeBigInt64LE(metric.value as bigint);
-                break;
-
-            case sparkplugDataType.uInt8:
-                len = buf.writeUInt8(metric.value as number);
-                break;
-
-            case sparkplugDataType.uInt16:
-                if (endianness === byteOrder.bigEndian) len = buf.writeUInt16BE(metric.value as number); else len = buf.writeUInt16LE(metric.value as number);
-                break;
-            case sparkplugDataType.uInt32:
-                if (endianness === byteOrder.bigEndian) len = buf.writeUInt32BE(metric.value as number); else len = buf.writeUInt32LE(metric.value as number);
-                break;
-
-            case sparkplugDataType.uInt64:
-                if (endianness === byteOrder.bigEndian) len = buf.writeBigUInt64BE(metric.value as bigint); else len = buf.writeBigUInt64LE(metric.value as bigint);
-                break;
-
-            case sparkplugDataType.float:
-                if (endianness === byteOrder.bigEndian) len = buf.writeFloatBE(metric.value as number); else len = buf.writeFloatLE(metric.value as number);
-                break;
-
-            case sparkplugDataType.double:
-                if (endianness === byteOrder.bigEndian) len = buf.writeDoubleBE(metric.value as number); else len = buf.writeDoubleLE(metric.value as number);
-                break;
-
-            case sparkplugDataType.string:
-            case sparkplugDataType.text:
-            case sparkplugDataType.uuid:
-                /* Variable length: written as UTF-8, not into the
-                 * fixed 8-byte buffer. */
-                return Buffer.from(String(metric.value ?? ""), "utf8");
-
-            default:
-                throw new Error(`Type ${metric.type} not supported for buffer parsing`);
-        }
-
-        return buf.slice(0, len);
-    } catch (err) {
-        console.log(err);
-        return buf.slice(0);
+/* Convert a value written to a 64-bit integer metric to a BigInt.
+ * A DCMD value arrives as a Long, which the device turns into a JS
+ * number, so precision above 2^53 is already lost by the time it gets
+ * here. Throws if the value isn't an integer in range. */
+export function toBigInt64(value: unknown, signed: boolean): bigint {
+    let big: bigint;
+    if (typeof value == "bigint")
+        big = value;
+    else if (Long.isLong(value))
+        big = BigInt((value as Long).toString());
+    else if (typeof value == "number") {
+        if (!Number.isFinite(value))
+            throw new Error(`Can't write ${value} as a 64-bit integer`);
+        big = BigInt(Math.trunc(value));
     }
+    else if (typeof value == "string" && /^\s*-?\d+\s*$/.test(value))
+        big = BigInt(value.trim());
+    else
+        throw new Error(`Can't write ${String(value)} as a 64-bit integer`);
+
+    const fits = signed ? BigInt.asIntN(64, big) : BigInt.asUintN(64, big);
+    if (fits != big)
+        throw new Error(`${big} is out of range for ${signed ? "Int64" : "UInt64"}`);
+    return big;
+}
+
+/* Write a metric's value as raw bytes for its Sparkplug type. This is
+ * the payload of a cmd to a split driver and of a Buffer-format write.
+ * Throws if the type isn't supported or the value doesn't fit it. */
+export function writeValToBuffer(metric: sparkplugMetric): Buffer {
+    const buf = Buffer.alloc(8);
+    const endianness = metric.properties?.endianness?.value as byteOrder ?? byteOrder.bigEndian;
+    const be = endianness === byteOrder.bigEndian;
+    let len: number;
+
+    switch (metric.type) {
+        case sparkplugDataType.boolean:
+            len = buf.writeUInt8(metric.value ? 1 : 0);
+            break;
+        case sparkplugDataType.int8:
+            len = buf.writeInt8(metric.value as number);
+            break;
+        case sparkplugDataType.int16:
+            len = be ? buf.writeInt16BE(metric.value as number) : buf.writeInt16LE(metric.value as number);
+            break;
+        case sparkplugDataType.int32:
+            len = be ? buf.writeInt32BE(metric.value as number) : buf.writeInt32LE(metric.value as number);
+            break;
+        case sparkplugDataType.int64: {
+            const v = toBigInt64(metric.value, true);
+            len = be ? buf.writeBigInt64BE(v) : buf.writeBigInt64LE(v);
+            break;
+        }
+        case sparkplugDataType.uInt8:
+            len = buf.writeUInt8(metric.value as number);
+            break;
+        case sparkplugDataType.uInt16:
+            len = be ? buf.writeUInt16BE(metric.value as number) : buf.writeUInt16LE(metric.value as number);
+            break;
+        case sparkplugDataType.uInt32:
+            len = be ? buf.writeUInt32BE(metric.value as number) : buf.writeUInt32LE(metric.value as number);
+            break;
+        case sparkplugDataType.uInt64: {
+            const v = toBigInt64(metric.value, false);
+            len = be ? buf.writeBigUInt64BE(v) : buf.writeBigUInt64LE(v);
+            break;
+        }
+        case sparkplugDataType.float:
+            len = be ? buf.writeFloatBE(metric.value as number) : buf.writeFloatLE(metric.value as number);
+            break;
+        case sparkplugDataType.double:
+            len = be ? buf.writeDoubleBE(metric.value as number) : buf.writeDoubleLE(metric.value as number);
+            break;
+        case sparkplugDataType.string:
+        case sparkplugDataType.text:
+        case sparkplugDataType.uuid:
+            /* Variable length: written as UTF-8, not into the
+             * fixed 8-byte buffer. */
+            return Buffer.from(String(metric.value ?? ""), "utf8");
+        default:
+            throw new Error(`Type ${metric.type} not supported for buffer writes`);
+    }
+
+    return buf.subarray(0, len);
+}
+
+/* The Sparkplug types a typed write can carry. */
+export const TYPED_WRITE_TYPES: ReadonlySet<string> = new Set([
+    sparkplugDataType.boolean,
+    sparkplugDataType.int8, sparkplugDataType.int16,
+    sparkplugDataType.int32, sparkplugDataType.int64,
+    sparkplugDataType.uInt8, sparkplugDataType.uInt16,
+    sparkplugDataType.uInt32, sparkplugDataType.uInt64,
+    sparkplugDataType.float, sparkplugDataType.double,
+    sparkplugDataType.string, sparkplugDataType.text,
+    sparkplugDataType.uuid, sparkplugDataType.dateTime,
+]);
+
+const INT_RANGES: Record<string, [number, number]> = {
+    [sparkplugDataType.int8]:   [-0x80, 0x7f],
+    [sparkplugDataType.int16]:  [-0x8000, 0x7fff],
+    [sparkplugDataType.int32]:  [-0x80000000, 0x7fffffff],
+    [sparkplugDataType.uInt8]:  [0, 0xff],
+    [sparkplugDataType.uInt16]: [0, 0xffff],
+    [sparkplugDataType.uInt32]: [0, 0xffffffff],
+};
+
+/* Write a metric's value as the JSON payload of a typed write to a
+ * split driver: {"type": <Sparkplug type>, "value": <value>}. Int64
+ * and UInt64 values are decimal strings, so a driver gets every digit.
+ * Float and Double NaN and infinities are the strings "NaN",
+ * "Infinity" and "-Infinity", which JSON can't hold as numbers.
+ * DateTime is milliseconds since the epoch. See docs/edge-split.md.
+ * Throws if the type isn't supported or the value doesn't fit it. */
+export function writeValToJSON(metric: sparkplugMetric): Buffer {
+    const { type } = metric;
+    const value = metric.value as any;
+    let out: boolean | number | string;
+
+    switch (type) {
+        case sparkplugDataType.boolean:
+            out = typeof value == "string"
+                ? value.trim().toLowerCase() == "true"
+                : Boolean(value);
+            break;
+        case sparkplugDataType.int8:
+        case sparkplugDataType.int16:
+        case sparkplugDataType.int32:
+        case sparkplugDataType.uInt8:
+        case sparkplugDataType.uInt16:
+        case sparkplugDataType.uInt32: {
+            const n = Math.trunc(Long.isLong(value) ? value.toNumber() : Number(value));
+            const [min, max] = INT_RANGES[type];
+            if (!Number.isFinite(n) || n < min || n > max)
+                throw new Error(`${String(value)} is out of range for ${type}`);
+            out = n;
+            break;
+        }
+        case sparkplugDataType.int64:
+        case sparkplugDataType.uInt64:
+            out = toBigInt64(value, type == sparkplugDataType.int64).toString();
+            break;
+        case sparkplugDataType.float:
+        case sparkplugDataType.double: {
+            const n = Number(value);
+            out = Number.isFinite(n) ? n : String(n);
+            break;
+        }
+        case sparkplugDataType.string:
+        case sparkplugDataType.text:
+        case sparkplugDataType.uuid:
+            out = String(value ?? "");
+            break;
+        case sparkplugDataType.dateTime: {
+            const n = value instanceof Date ? value.getTime()
+                : Long.isLong(value) ? value.toNumber()
+                : Number(value);
+            if (!Number.isFinite(n))
+                throw new Error(`${String(value)} is not a valid DateTime`);
+            out = Math.trunc(n);
+            break;
+        }
+        default:
+            throw new Error(`Type ${type} not supported for typed writes`);
+    }
+
+    return Buffer.from(JSON.stringify({ type, value: out }));
 }
 
 /**

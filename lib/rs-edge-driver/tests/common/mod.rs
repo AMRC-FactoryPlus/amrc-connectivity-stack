@@ -53,6 +53,8 @@ pub struct Stats {
     pub pings: AtomicUsize,
     /// Connections dropped because the keep-alive ran out.
     pub expired: AtomicUsize,
+    /// Every topic filter the driver has subscribed to, in order.
+    pub subscriptions: Mutex<Vec<String>>,
 }
 
 impl Stats {
@@ -64,6 +66,9 @@ impl Stats {
     }
     pub fn expired(&self) -> usize {
         self.expired.load(Ordering::SeqCst)
+    }
+    pub fn subscriptions(&self) -> Vec<String> {
+        self.subscriptions.lock().unwrap().clone()
     }
 }
 
@@ -273,6 +278,8 @@ async fn serve(
                                 .unwrap();
                         }
                         Packet::Subscribe(s) => {
+                            stats.subscriptions.lock().unwrap()
+                                .extend(s.filters.iter().map(|f| f.path.clone()));
                             let codes = s
                                 .filters
                                 .iter()

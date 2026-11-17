@@ -125,12 +125,31 @@ The driver reports its status to the Edge Agent on
   `DriverHandle::error()`, which sets `ERR` and reconnects.
 - No data is published unless the status is `UP`.
 
-The driver calls `connect`, `subscribe`, `cmd` and `close` on its own
+The driver calls `connect`, `subscribe`, `cmd`, `write` and `close` on its own
 tasks, so a slow or unreachable device never holds up the MQTT
 connection to the Edge Agent and its keep-alive pings.
 
 When the Edge Agent sends `active OFFLINE`, the driver closes the
 handler and forgets its configuration until the agent sends `ONLINE`.
+
+## Writes
+
+The Edge Agent sends each write in two forms, and a handler takes one
+of them:
+
+- By default the driver subscribes to `cmd/#` and calls
+  `Handler::cmd` with the address and the value as raw bytes, as it
+  always has.
+- A handler that sets `const TYPED_WRITES: bool = true` gets typed
+  writes instead. The driver subscribes to `write/#` and calls
+  `Handler::write` with the parsed address and a `WriteValue`, which
+  carries the Sparkplug type and the value (`WriteValue::Int16(-2)`,
+  `WriteValue::Double(0.5)` and so on). Return `WriteError::ReadOnly`,
+  `BadValue` or `Failed` if the write fails, and the driver reports it
+  to the Edge Agent as `RO`, `CMD` or `ERR`. This needs an Edge Agent
+  from November 2026 or later.
+
+See "Typed writes" in `acs-edge/docs/edge-split.md` for the protocol.
 
 ## Polling in parallel
 

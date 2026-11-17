@@ -11,8 +11,9 @@ import Aedes from "aedes";
 
 const prefix = "fpEdge1";
 /* The data part is a data topic for data, err, req and rsp, but a
- * whole device address for cmd, which may contain any character MQTT
- * allows in a topic, including "/". The ACLs keep drivers to \w+. */
+ * whole device address for cmd and write, which may contain any
+ * character MQTT allows in a topic, including "/". The ACLs keep
+ * drivers to \w+. */
 const topicrx = new RegExp(`^${prefix}/([\\w-]+)/(\\w+)(?:/(.+))?$`);
 
 function log (f, ...a) {
@@ -153,7 +154,7 @@ export class DriverBroker extends EventEmitter {
             publish: new RegExp(
                 `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+|req/\\w+)$`),
             subscribe: new RegExp(
-                `^${prefix}/${id}/(?:active|conf|addr|cmd/#|poll|rsp/\\w+)$`),
+                `^${prefix}/${id}/(?:active|conf|addr|cmd/#|write/#|poll|rsp/\\w+)$`),
         });
 
         callback(null, true);

@@ -3,8 +3,9 @@
  */
 
 import {
-  DEFAULT_PAYLOAD_FORMAT, UUIDs, driver_values, is_isa95_tag,
+  DEFAULT_PAYLOAD_FORMAT, UUIDs, driver_id, driver_values, is_isa95_tag,
   isa95_vocabulary, merge_isa95_tags, render_isa95, set_connection_type,
+  set_driver_ids,
 } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@/store/useDeviceStore'
 import { useConnectionStore } from '@/store/useConnectionStore'
@@ -233,6 +234,34 @@ function processOriginMapObject(obj, path, tags) {
 }
 
 /**
+ * The `values.drivers` of an Edge Agent Deployment: one entry for each
+ * split driver connection, keyed by its driver id, which is what the
+ * chart names the sidecar, its MQTT username and its password after.
+ *
+ * @param {Array} deviceConnections - The connections of the Edge Agent config, with their driver ids set
+ * @param {Array} connections - The connection store entries
+ * @returns {Object} - The driver map
+ */
+export function deploymentDrivers (deviceConnections, connections) {
+  const driverMap = {}
+  for (const deviceConn of deviceConnections) {
+    // The s-s migration will have given every deviceConnection a uuid
+    const connection = connections.find(conn => conn.uuid === deviceConn.uuid)
+    if (!connection) {
+      console.debug('No matching connection found for device connection:', deviceConn.name)
+      continue
+    }
+
+    // Split drivers get a sidecar; internal drivers get nothing
+    const values = driver_values(connection.configuration, connection.configuration?.driver)
+    if (!values) continue
+
+    driverMap[driver_id(deviceConn)] = values
+  }
+  return driverMap
+}
+
+/**
  * Updates the Edge Agent Deployment configuration for a node to include external drivers
  *
  * @param {string} nodeUuid - UUID of the node
@@ -272,37 +301,8 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
       deployment.values.drivers = {}
     }
 
-    // Create a map of connection names to driver image references
-    const driverMap = {}
-
     console.debug('Updating edge agent deployment for node:', nodeUuid)
-    console.debug('Connections:', connectionStore.data)
-    console.debug('Device connections:', deviceConnections)
-
-    // Process each device connection to find external drivers
-    for (const deviceConn of deviceConnections) {
-      // Find the corresponding connection in the connection store
-      console.debug('Looking for connection matching device connection:', deviceConn.name, 'with uuid:', deviceConn.uuid)
-
-      // The s-s migration will have given every deviceConnection a uuid
-      const connection = connectionStore.data.find(conn => conn.uuid === deviceConn.uuid)
-      if (!connection) {
-        console.debug('No matching connection found for device connection:', deviceConn.name);
-        continue;
-      }
-      console.debug('Found matching connection:', connection.name)
-
-      // Split drivers get a sidecar; internal drivers get nothing
-      const values = driver_values(connection.configuration, connection.configuration?.driver)
-      if (!values) {
-        console.debug('Driver image not found in connection store');
-        console.debug('Connection', connection);
-        continue;
-      }
-      console.debug('Found driver image from driver store', values.image);
-
-      driverMap[deviceConn.name] = values
-    }
+    const driverMap = deploymentDrivers(deviceConnections, connectionStore.data)
 
     /* XXX bmz: Here we need a source for EA-level values. */
 
@@ -569,6 +569,10 @@ async function buildEdgeAgentConfig({
         return conn.devices && conn.devices.length > 0
       })
     }
+
+    /* A split driver whose connection name can't be its id (it has a
+     * dot, say) gets a driverId, the same one every time. */
+    set_driver_ids(config.deviceConnections)
 
     // Log the final config before saving
     console.debug('Final edge agent config to be saved:', JSON.stringify(config, null, 2))

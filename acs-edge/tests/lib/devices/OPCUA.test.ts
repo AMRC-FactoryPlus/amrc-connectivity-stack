@@ -231,6 +231,17 @@ describe("startSubscription()", () => {
 
         expect(data).toHaveBeenCalledWith({ "ns=1;s=B": 7 }, false);
     });
+
+    /* The server answers an empty monitor request with BadNothingToDo,
+     * which node-opcua throws unhandled and which killed the agent. */
+    it("makes no subscription for a device with no addresses", async () => {
+        const { conn, session } = setup();
+        await conn.open();
+        for (const metrics of [[], [metric("c")]])
+            await conn.startSubscription(new Metrics(metrics as any),
+                "Defined by Protocol", "", 500, "dev", () => {});
+        expect(session.createSubscription2).not.toHaveBeenCalled();
+    });
 });
 
 describe("close()", () => {

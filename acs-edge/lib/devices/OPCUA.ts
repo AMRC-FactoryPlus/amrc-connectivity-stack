@@ -365,6 +365,14 @@ export class OPCUAConnection extends DeviceConnection {
         deviceId: string,
         subscriptionStartCallback: Function) {
         this.#subscriptionOptions.requestedPublishingInterval = interval;
+        /* A device with no addresses has nothing to monitor. Asking the
+         * server to monitor an empty list gets BadNothingToDo, which
+         * node-opcua throws where nothing catches it, and the Edge
+         * Agent dies. */
+        if (!metrics.addresses.some(addr => addr !== 'undefined')) {
+            log(`No addresses to monitor for ${deviceId} on ${this._type}`);
+            return;
+        }
         if (this.#session) {
             this.#session.createSubscription2(this.#subscriptionOptions, (err, subscription) => {
                 if (typeof subscription !== "undefined") {

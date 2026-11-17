@@ -119,6 +119,30 @@ pub fn to_json(v: &Variant) -> Option<Value> {
     })
 }
 
+/// A value with `offset` added back to every DateTime in it.
+///
+/// With `ignore_clock_skew` async-opcua takes the server's clock offset
+/// off every DateTime it decodes, values included. The offset is only
+/// meant for the protocol's own timestamps, so this undoes it for
+/// values.
+pub fn undo_clock_offset(v: Variant, offset: chrono::TimeDelta) -> Variant {
+    if offset.is_zero() {
+        return v;
+    }
+    match v {
+        Variant::DateTime(d) => Variant::DateTime(Box::new(*d + offset)),
+        Variant::Array(mut a) => {
+            a.values = std::mem::take(&mut a.values)
+                .into_iter()
+                .map(|v| undo_clock_offset(v, offset))
+                .collect();
+            Variant::Array(a)
+        }
+        Variant::Variant(inner) => Variant::Variant(Box::new(undo_clock_offset(*inner, offset))),
+        v => v,
+    }
+}
+
 /// The data packet for a value received at `received_ms`. The
 /// timestamp is when the driver received the value, not the server's
 /// timestamp, because the built-in connection's values were stamped
@@ -278,6 +302,33 @@ mod tests {
         )
         .unwrap();
         assert_eq!(j(Variant::Array(Box::new(a))), Some(json!([1.5, 2.5])));
+    }
+
+    #[test]
+    fn clock_offset_is_undone_for_dates_only() {
+        let t = DateTime::from(
+            opcua::types::DateTimeUtc::from_timestamp_millis(1_763_380_800_123).unwrap(),
+        );
+        let hour = chrono::TimeDelta::hours(1);
+        // As async-opcua decodes it from a server an hour fast.
+        let shifted = Variant::DateTime(Box::new(t - hour));
+        match undo_clock_offset(shifted, hour) {
+            Variant::DateTime(d) => assert_eq!(date_ms(&d), 1_763_380_800_123),
+            v => panic!("{v:?}"),
+        }
+        let a = Array::new(
+            VariantScalarTypeId::DateTime,
+            vec![Variant::DateTime(Box::new(t - hour))],
+        )
+        .unwrap();
+        assert_eq!(
+            j(undo_clock_offset(Variant::Array(Box::new(a)), hour)),
+            Some(json!([1_763_380_800_123i64]))
+        );
+        assert_eq!(
+            undo_clock_offset(Variant::Double(1.5), hour),
+            Variant::Double(1.5)
+        );
     }
 
     #[test]

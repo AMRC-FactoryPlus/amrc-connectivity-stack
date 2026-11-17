@@ -1217,6 +1217,10 @@ configs:
       presentation: *opcua_presentation
       image:
         repository: edge-opcua
+      # Its client certificate lives here, for as long as the pod, as
+      # the built-in's did, so a server that trusts it keeps trusting
+      # it across container restarts.
+      stateDir: /var/lib/edge-driver
       schema: *opcua_schema
     # It has replaced the built-in: it is offered as "UDP", and the
     # chart moves UDP connections to it by default.

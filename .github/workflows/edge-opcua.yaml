@@ -79,6 +79,6 @@ jobs:
         env:
           EDGE_OPCUA_SERVER_TESTS: '1'
         run: |
-          cargo test --locked --test opcua -- --nocapture 2>&1 | tee opcua.log
+          cargo test --locked --test opcua --test clock -- --nocapture 2>&1 | tee opcua.log
           ! grep -q "skipped: set EDGE_OPCUA_SERVER_TESTS" opcua.log
           grep -q "test result: ok. [1-9]" opcua.log

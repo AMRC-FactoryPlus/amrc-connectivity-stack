@@ -144,6 +144,8 @@ const CASES = [
         name: "OPCUA", conn: C.opcua, entry_name: "OPC",
         key: "OPCUAConnDetails", details: OPCUA_DETAILS, image: "edge-opcua",
         format: ["Defined by Protocol", "JSON"],
+        /* From the DriverDef: where its client certificate lives. */
+        values: { stateDir: "/var/lib/edge-driver" },
     },
     {
         name: "MQTT", conn: C.mqtt, entry_name: "Broker",
@@ -240,7 +242,7 @@ describe("migrate_split_drivers", () => {
             assert.equal(e.name, c.entry_name);
 
             assert.deepEqual(drivers(cdb)[c.entry_name],
-                { ...(c.deployment ?? {}), image: { repository: c.image } });
+                { ...(c.deployment ?? {}), image: { repository: c.image }, ...(c.values ?? {}) });
             /* Other connections are untouched. */
             assert.deepEqual(drivers(cdb).PLC, { image: { repository: "edge-modbus" } });
 

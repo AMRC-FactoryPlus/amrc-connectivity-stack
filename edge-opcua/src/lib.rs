@@ -13,12 +13,16 @@
 //! - [`addr`] parses node ids;
 //! - [`value`] turns OPC UA values into data packets and typed writes
 //!   into OPC UA values;
+//! - [`subs`] makes the subscriptions and retries what the server
+//!   refused;
 //! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait.
 
 pub mod addr;
 pub mod config;
 pub mod handler;
+pub mod subs;
 pub mod value;
 
 pub use addr::Addr;
 pub use handler::OpcuaHandler;
+pub use subs::dropped_total;

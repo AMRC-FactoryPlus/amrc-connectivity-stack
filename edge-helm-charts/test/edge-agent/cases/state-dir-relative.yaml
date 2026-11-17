@@ -1,0 +1,13 @@
+# A stateDir must be an absolute path.
+name: Agent-Five
+uuid: 55555555-5555-4555-8555-555555555555
+cluster: example-cluster
+directory_url: http://directory.example
+hostname: node-a
+drivers:
+  plc:
+    image:
+      repository: edge-opcua
+    stateDir: var/lib/edge-driver
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

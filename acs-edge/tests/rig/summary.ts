@@ -202,8 +202,12 @@ export function compare_summaries (a: Summary, b: Summary): Problem[] {
         if (x.ddata_per_s > 0) {
             const ratio = y.ddata_per_s / x.ddata_per_s;
             const rates = `${ratio.toFixed(2)}x (${x.ddata_per_s.toFixed(2)}/s to ${y.ddata_per_s.toFixed(2)}/s)`;
-            if (ratio > Limits.rate_fail)
+            /* Metrics that only now get values add messages of their
+             * own, so a rise then says nothing about grouping. */
+            if (ratio > Limits.rate_fail && !started.length)
                 p("FAIL", `DDATA rate ${rates}`);
+            else if (ratio > Limits.rate_fail)
+                p("WARN", `DDATA rate ${rates}, with ${started.length} metrics newly getting values`);
             else if (ratio > Limits.rate_warn)
                 p("WARN", `DDATA rate ${rates}`);
             else if (ratio < Limits.rate_down)

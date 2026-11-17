@@ -141,13 +141,18 @@ export async function load (rig: Rig, opts: LoadOpts, client?: any) {
             console.log("%s is already deployed; leaving its deployment alone", node.name);
         else {
             const pin = conns.some(c => c.protocol == "UDP") ? opts.hostname : undefined;
-            await w.do(`deploy ${node.name} on cluster ${cluster.uuid}${pin ? ` pinned to ${pin}` : ""}`, () =>
+            const limits = node.values?.limits;
+            const image = node.values?.image?.default?.tag;
+            await w.do(`deploy ${node.name} on cluster ${cluster.uuid}${pin ? ` pinned to ${pin}` : ""}`
+                + (limits ? `, requesting ${limits.cpu} CPU and ${limits.memory} memory` : "")
+                + (image ? `, with its image pinned to ${image}` : ""), () =>
                 cdb.put_config(App.EdgeAgentDeployment, nuuid, {
                     createdAt:  new Date().toISOString(),
                     name:       node.name,
                     cluster:    cluster.uuid,
                     chart,
                     ...(pin ? { hostname: pin } : {}),
+                    ...(node.values ? { values: node.values } : {}),
                 }));
         }
     }
@@ -237,4 +242,50 @@ export async function remove (rig: Rig, opts: { cluster?: string, dry: boolean }
     console.log("\n%d deletions %s", w.writes,
         w.dry ? "would be made (dry run: rerun with --yes)" : "made");
     return { deletions: w.writes };
+}
+
+/* The ACS-35 change for one connection, as a site makes it in the
+ * Manager: the connection's payload format becomes `JSON (Batched)`
+ * (in its ConnectionConfiguration, and in its Edge Agent config entry
+ * and every device there, because the agent copies the connection's
+ * format over its devices' anyway), and the image pin is removed from
+ * its Edge Agent's Deployment, in one go. */
+export async function batch (rig: Rig, opts: { connection: string, dry: boolean },
+    client?: any)
+{
+    const fplus = client ?? await service_client();
+    const cdb = fplus.ConfigDB;
+    const w = new Writer(opts.dry);
+    const FORMAT = "JSON (Batched)";
+
+    const c = rig.connections.find(c => c.id == opts.connection);
+    if (!c) throw new Error(`No connection ${opts.connection} in the rig`);
+    const cuuid = conn_uuid(rig, c), nuuid = node_uuid(rig, c.node);
+
+    const cconf = await cdb.get_config(App.ConnectionConfiguration, cuuid);
+    if (!cconf) throw new Error(`${c.name} is not loaded`);
+    await w.do(`set ${c.name}'s payload format to ${FORMAT} in its connection config`, () =>
+        cdb.put_config(App.ConnectionConfiguration, cuuid,
+            { ...cconf, source: { ...cconf.source, payloadFormat: FORMAT } }));
+
+    const agent = await cdb.get_config(App.EdgeAgentConfig, nuuid);
+    const entry = agent?.deviceConnections?.find((e: any) => e.uuid == cuuid);
+    if (!entry) throw new Error(`${c.node}'s Edge Agent config has no entry for ${c.name}`);
+    entry.payloadFormat = FORMAT;
+    for (const d of entry.devices ?? []) d.payloadFormat = FORMAT;
+    await w.do(`set ${c.name} and its ${entry.devices?.length ?? 0} devices to ${FORMAT} in ${c.node}'s Edge Agent config`,
+        () => cdb.put_config(App.EdgeAgentConfig, nuuid, agent));
+
+    const dep = await cdb.get_config(App.EdgeAgentDeployment, nuuid);
+    if (dep?.values?.image) {
+        const { image, ...values } = dep.values;
+        await w.do(`remove the image pin ${JSON.stringify(image)} from ${c.node}'s deployment`, () =>
+            cdb.put_config(App.EdgeAgentDeployment, nuuid, { ...dep, values }));
+    }
+    else
+        console.log("%s's deployment has no image pin", c.node);
+
+    console.log("\n%d writes %s", w.writes,
+        opts.dry ? "would be made (dry run: rerun with --yes)" : "made");
+    return { writes: w.writes };
 }

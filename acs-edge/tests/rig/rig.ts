@@ -66,6 +66,10 @@ export interface RigConnection {
     /* What the rig changed from the source because a mock can't do it,
      * e.g. TLS. Reported, never silently dropped. */
     changes:    string[],
+    /* MQTT topics whose payload is a JSON array of `{value, timestamp}`
+     * items instead of one object, as a source that batches its values
+     * sends. Only for connections made with `--batched`. */
+    array_topics?: string[],
     /* The source deviceConnections[] entry, unchanged. */
     connection: any,
 }
@@ -76,6 +80,10 @@ export interface RigNode {
     agent:      string,
     /* The `sparkplug` block of the source Edge Agent config. */
     sparkplug:  any,
+    /* Values for the node's EdgeAgentDeployment, merged over the Edge
+     * Agent chart's for this node only: its resource requests, and an
+     * image pin for a node made with `--batched`. */
+    values?:    any,
 }
 
 export interface Rig {

@@ -175,28 +175,29 @@ describe("the split DriverDefs", () => {
     });
 
     /* The new-connection form offers DriverDefs that aren't hidden, and
-     * picks them by name. REST's and UDP's split drivers have replaced
-     * the built-ins; MQTT's and OPC UA's images aren't published yet. */
-    test("offer REST's and UDP's split drivers by their names and hide the others", () => {
+     * picks them by name. REST's, MQTT's and UDP's split drivers have
+     * replaced the built-ins; OPC UA's image isn't published yet. */
+    test("offer the REST, MQTT and UDP split drivers by their plain names and hide the others", () => {
         const { REST, MQTT, OPCUA, UDP } = SplitDrivers;
-        for (const p of [REST, UDP]) {
+        for (const p of [REST, MQTT, UDP]) {
             assert.equal(DEFS[p.split].hidden, undefined);
             assert.equal(DEFS[p.internal].hidden, true);
         }
-        for (const p of [MQTT, OPCUA]) {
-            assert.equal(DEFS[p.split].hidden, true);
-            assert.equal(DEFS[p.internal].hidden, undefined);
-        }
+        assert.equal(DEFS[OPCUA.split].hidden, true);
+        assert.equal(DEFS[OPCUA.internal].hidden, undefined);
 
         const names = load_names();
         assert.equal(names[REST.split], "REST");
         assert.equal(names[REST.internal], "REST (built-in)");
+        assert.equal(names[MQTT.split], "MQTT");
+        assert.equal(names[MQTT.internal], "MQTT (built-in)");
         assert.equal(names[UDP.split], "UDP");
         assert.equal(names[UDP.internal], "UDP (built-in)");
         const offered = Object.entries(DEFS)
             .filter(([, d]) => !d.hidden)
             .map(([uuid]) => names[uuid]);
         assert.equal(offered.filter(n => /^REST\b/.test(n)).length, 1);
+        assert.equal(offered.filter(n => /^MQTT\b/.test(n)).length, 1);
         assert.equal(offered.filter(n => /^UDP\b/.test(n)).length, 1);
         assert.equal(new Set(offered).size, offered.length, "offered names are unique");
     });

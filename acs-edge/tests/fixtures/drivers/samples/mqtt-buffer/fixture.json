@@ -1,0 +1,40 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-mqtt-buffer",
+  "agent": "sample-agent",
+  "protocol": "MQTT",
+  "payloadFormat": "Buffer",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "buffer:big-endian",
+    "buffer:bit",
+    "buffer:little-endian",
+    "buffer:string",
+    "many-metrics-per-address",
+    "mqtt:protocol:mqtt",
+    "multi-device",
+    "payload:Buffer",
+    "protocol:MQTT",
+    "type:Boolean",
+    "type:Double",
+    "type:Float",
+    "type:Int16",
+    "type:String",
+    "type:UInt32",
+    "type:UInt8"
+  ],
+  "counts": {
+    "devices": 2,
+    "metrics": 9,
+    "read_metrics": 9,
+    "addresses": 2,
+    "events": 10,
+    "bytes": 220
+  },
+  "findings": []
+}

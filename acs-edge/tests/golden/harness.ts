@@ -134,7 +134,7 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
     const timeout = opts.timeout_ms
         ?? 30_000 + 3 * fixture.meta.duration_ms / speed;
 
-    const device = make_device(fixture, { speed });
+    const device = make_device(fixture, { speed, entry: opts.entry });
     const held = hold_console();
     const pwdir = fs.mkdtempSync(path.join(os.tmpdir(), "golden-"));
     const secrets = fs.mkdtempSync(path.join(os.tmpdir(), "golden-secrets-"));

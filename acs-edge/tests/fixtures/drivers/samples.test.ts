@@ -12,7 +12,8 @@ import { verify } from "./verify.js";
 
 const SAMPLES = path.join(__dirname, "samples");
 const KINDS = [
-    "opcua", "mqtt-json", "mqtt-delimited", "rest-json", "rest-xml",
+    "opcua", "mqtt-json", "mqtt-delimited", "mqtt-xml", "mqtt-buffer",
+    "rest-json", "rest-xml",
     "udp-buffer", "udp-delimited", "udp-json",
 ];
 

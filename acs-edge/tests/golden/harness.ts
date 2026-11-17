@@ -32,6 +32,8 @@ export interface RunOpts {
     /* Leave out for the built-in connection. With a driver, the
      * connection is switched to `Driver` and this driver serves it. */
     driver?:    DriverSpec,
+    /* The connection's name, if not the fixture's. */
+    connection_name?: string,
     /* Give up after this long. */
     timeout_ms?: number,
 }
@@ -135,6 +137,8 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
         await device.start();
         let entry = without_unread_paths(
             scale(device.connection(fixture.connection), speed));
+        if (opts.connection_name)
+            entry.name = opts.connection_name;
         if (opts.driver)
             entry = to_split(entry, fixture.meta.protocol);
         const config = { deviceConnections: [entry] };
@@ -158,11 +162,14 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
 
         if (opts.driver) {
             const password = crypto.randomBytes(16).toString("hex");
-            fs.writeFileSync(path.join(pwdir, entry.name), password);
+            /* The id the chart gives the sidecar: see driver_id in
+             * lib/js-service-client/lib/edge-connection.js. */
+            const id = entry.driverId ?? entry.name;
+            fs.writeFileSync(path.join(pwdir, id), password);
             const { port } = translator.broker.server!.address() as AddressInfo;
             driver = await opts.driver.start({
                 EDGE_MQTT:      `mqtt://127.0.0.1:${port}`,
-                EDGE_USERNAME:  entry.name,
+                EDGE_USERNAME:  id,
                 EDGE_PASSWORD:  password,
             });
         }

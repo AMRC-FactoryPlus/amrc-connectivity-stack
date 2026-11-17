@@ -55,19 +55,21 @@ export function without_unread_paths (entry: any): any {
 
 /* The connection entry as service-setup leaves it after moving the
  * connection to its split driver: `move_entry()` with a DriverDef that
- * is not internal, and the protocol's payload format map. */
+ * is not internal, and the protocol's payload format map, then
+ * `set_driver_ids()`, which gives it a `driverId` if its name can't be
+ * the driver's id. */
 export function to_split (entry: any, protocol: string): any {
     const map = PayloadFormatMap[protocol];
     if (!map) throw new Error(`No split driver move for protocol ${protocol}`);
 
     const script = `
-        import { move_entry, move_payload_format } from ${JSON.stringify(pathToFileURL(EDGE_CONNECTION).href)};
+        import { move_entry, move_payload_format, set_driver_ids } from ${JSON.stringify(pathToFileURL(EDGE_CONNECTION).href)};
         let input = "";
         for await (const chunk of process.stdin) input += chunk;
         const { entry, map } = JSON.parse(input);
         const driverdef = { name: "Golden-output split driver" };
-        const next = move_entry(entry, driverdef,
-            f => move_payload_format(f, map, true));
+        const [next] = set_driver_ids([move_entry(entry, driverdef,
+            f => move_payload_format(f, map, true))]);
         process.stdout.write(JSON.stringify(next));
     `;
     const out = execFileSync(process.execPath,

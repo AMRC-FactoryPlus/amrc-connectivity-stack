@@ -14,9 +14,10 @@ import type { Metric, Output } from "./capture.js";
  * and the two offsets may differ by at most the allowance. golden()
  * adds the agent's CPU per input message to this base (see there).
  * Everything else (names, types, values, properties, how many values
- * each metric gets and in what order) must match exactly. Override
- * with GOLDEN_TIME_ALLOWANCE_MS. */
-export const DEFAULT_TIME_ALLOWANCE_MS = 100;
+ * each metric gets and in what order) must match exactly. CI runners
+ * are slower and busier, so CI gets more. Override with
+ * GOLDEN_TIME_ALLOWANCE_MS. */
+export const DEFAULT_TIME_ALLOWANCE_MS = process.env.CI ? 250 : 100;
 
 /* Birth timestamps say when the agent sent the birth, which depends on
  * how long a driver takes to start and not on the data, so they are

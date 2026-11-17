@@ -5,6 +5,7 @@
  */
 
 import crypto from "crypto";
+import type { AddressInfo } from "net";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -15,15 +16,17 @@ import { Translator } from "../../lib/translator.js";
 import type { Fixture } from "../fixtures/drivers/fixture.js";
 import { CaptureClient, decode, fake_fplus, Output } from "./capture.js";
 import { compare, Comparison, DEFAULT_TIME_ALLOWANCE_MS, report } from "./compare.js";
-import { free_port, sleep } from "./devices/device.js";
+import { sleep } from "./devices/device.js";
 import { make_device } from "./devices/index.js";
 import type { DriverSpec, RunningDriver } from "./driver.js";
 import { to_split } from "./migrate.js";
 
 /* The poll or publish interval a run uses in real time, unless
  * GOLDEN_INTERVAL_MS says otherwise. Fixture time is sped up so that
- * the fixture's interval takes this long. */
-export const DEFAULT_INTERVAL_MS = 200;
+ * the fixture's interval takes this long. CI runners are slower and
+ * run other suites alongside, so CI (which sets CI=true) uses a
+ * slower rate. */
+export const DEFAULT_INTERVAL_MS = process.env.CI ? 400 : 200;
 
 export interface RunOpts {
     /* Leave out for the built-in connection. With a driver, the
@@ -135,9 +138,10 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
             entry = to_split(entry, fixture.meta.protocol);
         const config = { deviceConnections: [entry] };
 
-        const port = await free_port();
+        /* Port 0: the broker takes whatever port is free, and the
+         * driver is told the port it got. */
         const env = {
-            EDGE_MQTT:      `mqtt://127.0.0.1:${port}`,
+            EDGE_MQTT:      "mqtt://127.0.0.1:0",
             EDGE_PASSWORDS: pwdir,
         };
         const client = new CaptureClient();
@@ -154,8 +158,9 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
         if (opts.driver) {
             const password = crypto.randomBytes(16).toString("hex");
             fs.writeFileSync(path.join(pwdir, entry.name), password);
+            const { port } = translator.broker.server!.address() as AddressInfo;
             driver = await opts.driver.start({
-                EDGE_MQTT:      env.EDGE_MQTT,
+                EDGE_MQTT:      `mqtt://127.0.0.1:${port}`,
                 EDGE_USERNAME:  entry.name,
                 EDGE_PASSWORD:  password,
             });

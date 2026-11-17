@@ -65,7 +65,25 @@ export class OpcuaDevice implements FakeDevice {
         this.pki = fs.mkdtempSync(path.join(os.tmpdir(), "golden-opcua-"));
     }
 
+    /* node-opcua needs a port number before it listens, so take a free
+     * one and try again if something else took it first. */
     async start () {
+        for (let i = 1; ; i++) {
+            try {
+                await this.listen();
+                break;
+            }
+            catch (e: any) {
+                await this.server?.shutdown(0).catch(() => {});
+                this.server = undefined;
+                this.vars.clear();
+                if (i >= 3 || !/EADDRINUSE/.test(String(e?.message ?? e))) throw e;
+            }
+        }
+        this.#replay = this.replay();
+    }
+
+    async listen () {
         this.port = await free_port();
         const certs = new OPCUACertificateManager({
             rootFolder: path.join(this.pki, "server"),
@@ -100,7 +118,6 @@ export class OpcuaDevice implements FakeDevice {
         }
 
         await server.start();
-        this.#replay = this.replay();
     }
 
     connection (conn: any) {

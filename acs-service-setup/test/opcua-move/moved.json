@@ -399,12 +399,14 @@
           "cell-opcua-cccccccc": {
             "image": {
               "repository": "edge-opcua"
-            }
+            },
+            "stateDir": "/var/lib/edge-driver"
           },
           "Furnace": {
             "image": {
               "repository": "edge-opcua"
-            }
+            },
+            "stateDir": "/var/lib/edge-driver"
           }
         }
       }

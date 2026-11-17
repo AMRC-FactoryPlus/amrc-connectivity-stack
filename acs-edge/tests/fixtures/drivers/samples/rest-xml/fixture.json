@@ -1,0 +1,37 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-rest-xml",
+  "agent": "sample-agent",
+  "protocol": "REST",
+  "payloadFormat": "XML",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "many-metrics-per-address",
+    "payload:XML",
+    "protocol:REST",
+    "rest:auth:None",
+    "type:DateTime",
+    "type:Double",
+    "type:Float",
+    "type:String",
+    "type:UInt16",
+    "type:UInt32",
+    "type:UInt64",
+    "xpath:descendant",
+    "xpath:text"
+  ],
+  "counts": {
+    "devices": 1,
+    "metrics": 12,
+    "read_metrics": 12,
+    "addresses": 1,
+    "events": 5,
+    "bytes": 4746
+  },
+  "findings": []
+}

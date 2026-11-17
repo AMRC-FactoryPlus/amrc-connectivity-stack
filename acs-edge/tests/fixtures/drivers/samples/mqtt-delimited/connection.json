@@ -1,0 +1,77 @@
+{
+  "name": "sample-mqtt-delimited",
+  "uuid": "00000000-0000-4000-8000-000000000002",
+  "connType": "MQTT",
+  "payloadFormat": "Delimited String",
+  "devices": [
+    {
+      "deviceId": "Device_1",
+      "deviceType": "00000000-0000-4000-8000-000000000001",
+      "pubInterval": 0,
+      "payloadFormat": "Delimited String",
+      "templates": [],
+      "tags": [
+        {
+          "Name": "Metric_01",
+          "type": "Boolean",
+          "method": "GET",
+          "address": "sample/topic_01",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_02",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "sample/topic_02",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_03",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "sample/topic_03",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_04",
+          "type": "Int8",
+          "method": "GET",
+          "address": "sample/topic_04",
+          "value": null,
+          "recordToDB": true
+        }
+      ]
+    },
+    {
+      "deviceId": "Device_2",
+      "deviceType": "00000000-0000-4000-8000-000000000001",
+      "pubInterval": 0,
+      "payloadFormat": "Delimited String",
+      "templates": [],
+      "tags": [
+        {
+          "Name": "Metric_05",
+          "type": "Int8",
+          "method": "GET",
+          "address": "sample/topic_04",
+          "value": null,
+          "recordToDB": true
+        }
+      ]
+    }
+  ],
+  "MQTTConnDetails": {
+    "host": "mqtt.example",
+    "port": 1883,
+    "useSSL": false,
+    "protocol": "mqtt",
+    "clientId": "sample-client",
+    "username": "",
+    "password": "REDACTED",
+    "keepAlive": 60,
+    "cleanSession": true
+  }
+}

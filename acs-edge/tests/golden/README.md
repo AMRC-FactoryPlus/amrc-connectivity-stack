@@ -19,7 +19,7 @@ On the committed samples this runs:
 | self-check | Each sample through the built-in connection twice. The two runs must match, which shows the harness itself is deterministic. |
 | negative check | One sample per protocol with one recorded value changed in the second run. The comparison must fail and name the metric. |
 | split driver | Each REST sample through the built-in REST connection and through the reference REST driver. They must match. |
-| split driver after service-setup's move | The REST connections of the site in `acs-service-setup/test/rest-move/site.json`, through the built-in connection as the site had them and through the driver as service-setup's move left them (`moved.json`). Both runs must match and send the same credentials. `acs-service-setup/test/rest-move.test.js` checks that the move gives exactly `moved.json`. |
+| split driver after service-setup's move | The REST connections of the site in `acs-service-setup/test/rest-move/site.json`, through the built-in connection as the site had them and through the driver as service-setup's move left them (`moved.json`). Both runs must match and send the same credentials. `acs-service-setup/test/rest-move.test.js` checks that the move gives exactly `moved.json`. The UDP connections of `acs-service-setup/test/udp-move/site.json` run the same way with `GOLDEN_PROTOCOL=UDP`, one per payload format, checked by `udp-move.test.js`. |
 | in-process driver | One REST sample through a small in-process driver, to cover that path. |
 
 Each run prints the comparison and the CPU time it used.

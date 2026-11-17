@@ -1,0 +1,555 @@
+{
+  "samples": {
+    "cccccccc-0000-4000-8000-000000000001": "udp-json",
+    "cccccccc-0000-4000-8000-000000000002": "udp-buffer",
+    "cccccccc-0000-4000-8000-000000000003": "udp-delimited"
+  },
+  "configs": {
+    "fa8b429c-de3e-11ef-87fd-6382f0eac944": {
+      "cccccccc-0000-4000-8000-000000000001": {
+        "driver": "f76120f0-de4d-11ef-baeb-4b617561ae1d",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+        "config": {
+          "port": 50205
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "JSON"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-1"
+        }
+      },
+      "cccccccc-0000-4000-8000-000000000002": {
+        "driver": "f76120f0-de4d-11ef-baeb-4b617561ae1d",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
+        "config": {
+          "port": 50205
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "Buffer"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-2"
+        }
+      },
+      "cccccccc-0000-4000-8000-000000000003": {
+        "driver": "f76120f0-de4d-11ef-baeb-4b617561ae1d",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000d",
+        "config": {
+          "port": 50205
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "Delimited String"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-4"
+        }
+      },
+      "cccccccc-0000-4000-8000-000000000004": {
+        "driver": "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+        "config": {
+          "host": "plc.local",
+          "port": 502,
+          "protocol": "tcp"
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "Buffer"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-1"
+        },
+        "pollInt": 1000
+      },
+      "cccccccc-0000-4000-8000-000000000005": {
+        "driver": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000c",
+        "config": {
+          "host": "broker.local",
+          "port": 1883,
+          "protocol": "mqtt",
+          "clientId": "",
+          "cleanSession": true,
+          "keepAlive": 60,
+          "useSSL": false
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "JSON"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-3"
+        }
+      }
+    },
+    "aac6f843-cfee-4683-b121-6943bfdf9173": {
+      "aaaaaaaa-0000-4000-8000-00000000000a": {
+        "sparkplug": {
+          "asyncPubMode": true
+        },
+        "deviceConnections": [
+          {
+            "name": "RobotArm",
+            "uuid": "cccccccc-0000-4000-8000-000000000001",
+            "connType": "UDP",
+            "payloadFormat": "JSON",
+            "devices": [
+              {
+                "deviceId": "Arm_Pose",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "JSON",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_01",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.position.x",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_02",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.position.y",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_03",
+                    "type": "FloatLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.joints[0]",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_04",
+                    "type": "FloatLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.joints[1]",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_05",
+                    "type": "Int32",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.cycle",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_06",
+                    "type": "Boolean",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.moving",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_07",
+                    "type": "String",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.mode",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              },
+              {
+                "deviceId": "Arm_Tool",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "JSON",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_08",
+                    "type": "Int32",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.cycle",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_09",
+                    "type": "UInt16",
+                    "method": "GET",
+                    "address": "",
+                    "path": "$.tool",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              }
+            ],
+            "UDPConnDetails": {
+              "port": 50205
+            }
+          },
+          {
+            "name": "PLC-1",
+            "uuid": "cccccccc-0000-4000-8000-000000000004",
+            "connType": "Driver",
+            "payloadFormat": "Buffer",
+            "pollInt": 1000,
+            "devices": [
+              {
+                "deviceId": "Press",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Buffer",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Value",
+                    "type": "UInt16BE",
+                    "method": "GET",
+                    "address": "1,40001,1",
+                    "path": "",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              }
+            ],
+            "DriverDetails": {
+              "host": "plc.local",
+              "port": 502,
+              "protocol": "tcp"
+            }
+          }
+        ]
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000b": {
+        "sparkplug": {
+          "asyncPubMode": true
+        },
+        "deviceConnections": [
+          {
+            "name": "cell2.robot",
+            "uuid": "cccccccc-0000-4000-8000-000000000002",
+            "connType": "UDP",
+            "payloadFormat": "Buffer",
+            "devices": [
+              {
+                "deviceId": "Cell2_Robot",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "Buffer",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_01",
+                    "type": "UInt32BE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "0",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_02",
+                    "type": "FloatLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "4",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_03",
+                    "type": "DoubleBE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "8",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_04",
+                    "type": "Int16LE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "16",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_05",
+                    "type": "Boolean",
+                    "method": "GET",
+                    "address": "",
+                    "path": "18:0",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_06",
+                    "type": "Boolean",
+                    "method": "GET",
+                    "address": "",
+                    "path": "18:3",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_07",
+                    "type": "UInt8",
+                    "method": "GET",
+                    "address": "",
+                    "path": "19",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_08",
+                    "type": "String",
+                    "method": "GET",
+                    "address": "",
+                    "path": "20",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              },
+              {
+                "deviceId": "Cell2_Gripper",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "Buffer",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_09",
+                    "type": "UInt32BE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "0",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              }
+            ],
+            "UDPConnDetails": {
+              "port": 50205
+            }
+          }
+        ]
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000d": {
+        "sparkplug": {
+          "asyncPubMode": true
+        },
+        "deviceConnections": [
+          {
+            "name": "Gauges",
+            "uuid": "cccccccc-0000-4000-8000-000000000003",
+            "connType": "UDP",
+            "payloadFormat": "Delimited String",
+            "delimiter": ",",
+            "devices": [
+              {
+                "deviceId": "Gauge_Bank",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "Delimited String",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_01",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "0",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_02",
+                    "type": "FloatLE",
+                    "method": "GET",
+                    "address": "",
+                    "path": "1",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_03",
+                    "type": "Int16",
+                    "method": "GET",
+                    "address": "",
+                    "path": "2",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_04",
+                    "type": "Boolean",
+                    "method": "GET",
+                    "address": "",
+                    "path": "3",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_05",
+                    "type": "String",
+                    "method": "GET",
+                    "address": "",
+                    "path": "4",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ],
+                "delimiter": ","
+              },
+              {
+                "deviceId": "Gauge_Spare",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "Delimited String",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_06",
+                    "type": "Int16",
+                    "method": "GET",
+                    "address": "",
+                    "path": "2",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ],
+                "delimiter": ","
+              }
+            ],
+            "UDPConnDetails": {
+              "port": 50205
+            }
+          }
+        ]
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000c": {
+        "sparkplug": {
+          "asyncPubMode": true
+        },
+        "deviceConnections": [
+          {
+            "name": "LineBroker",
+            "uuid": "cccccccc-0000-4000-8000-000000000005",
+            "connType": "MQTT",
+            "payloadFormat": "JSON",
+            "devices": [
+              {
+                "deviceId": "Line_Status",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pubInterval": 0,
+                "payloadFormat": "JSON",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Value",
+                    "type": "UInt16BE",
+                    "method": "GET",
+                    "address": "line/status",
+                    "path": "",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              }
+            ],
+            "MQTTConnDetails": {
+              "host": "broker.local",
+              "port": 1883,
+              "protocol": "mqtt",
+              "clientId": "",
+              "cleanSession": true,
+              "keepAlive": 60,
+              "useSSL": false
+            }
+          }
+        ]
+      }
+    },
+    "f2b9417a-ef7f-421f-b387-bb8183a48cdb": {
+      "aaaaaaaa-0000-4000-8000-00000000000a": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-1",
+        "chart": "dddddddd-0000-4000-8000-000000000001",
+        "name": "robot-agent",
+        "values": {
+          "name": "robot-agent",
+          "uuid": "aaaaaaaa-0000-4000-8000-00000000000a",
+          "drivers": {
+            "PLC-1": {
+              "image": {
+                "repository": "edge-modbus"
+              }
+            }
+          }
+        }
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000b": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-2",
+        "chart": "dddddddd-0000-4000-8000-000000000001",
+        "name": "cell-agent",
+        "values": {
+          "name": "cell-agent",
+          "uuid": "aaaaaaaa-0000-4000-8000-00000000000b",
+          "drivers": {}
+        }
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000d": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-4",
+        "chart": "dddddddd-0000-4000-8000-000000000001",
+        "name": "gauge-agent",
+        "values": {
+          "name": "gauge-agent",
+          "uuid": "aaaaaaaa-0000-4000-8000-00000000000d",
+          "drivers": {}
+        }
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000c": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-3",
+        "chart": "dddddddd-0000-4000-8000-000000000001",
+        "name": "line-agent",
+        "values": {
+          "name": "line-agent",
+          "uuid": "aaaaaaaa-0000-4000-8000-00000000000c"
+        }
+      }
+    }
+  }
+}

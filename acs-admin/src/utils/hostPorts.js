@@ -14,9 +14,10 @@
  *  - in a cluster with more than one host, the Edge Agent must be
  *    pinned to a host, or the device cannot know where to send.
  *
- * These checks are in the Manager only. Service-setup and the chart do
- * not apply them, so a connection that already breaks them, or one a
- * migration moves to a split driver, still deploys.
+ * These checks are in the Manager only, so a connection that already
+ * breaks them still deploys. Service-setup's split driver move
+ * (acs-service-setup/lib/split-drivers.js) checks ports the same way
+ * before it moves a connection, but not pinning.
  */
 
 import { driver_ports, port_clashes } from '@amrc-factoryplus/service-client'

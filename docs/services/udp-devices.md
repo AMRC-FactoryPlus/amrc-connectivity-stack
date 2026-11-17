@@ -7,9 +7,12 @@ device must send, what the network must allow, and how to set up the
 edge host for high rates.
 
 It applies to connections that use the UDP split driver (`edge-udp`,
-named "UDP (split driver)" in the Manager's driver list). The older built-in UDP
-connection runs inside the Edge Agent container and cannot be reached
-from outside the cluster.
+named "UDP" in the Manager's driver list). From ACS version 7 an upgrade
+moves every connection on the older built-in UDP driver, now named
+"UDP (built-in)", to the split driver (see
+[Split Drivers](../architecture/edge-management/split-drivers.md)). The
+built-in connection runs inside the Edge Agent container and cannot be
+reached from outside the cluster.
 
 ## Where the device sends
 
@@ -52,11 +55,13 @@ its Edge Agent:
 - A cluster that reports no hosts yet (not set up, or its edge-sync is
   not running) might have only one, so the Manager allows the save.
 
-These checks are in the Manager only. A connection saved before they
-existed, or moved to the UDP split driver by a service-setup migration,
-still deploys as it is, even on an Edge Agent that is not pinned, so
-check those by hand: pin the Edge Agent with **Move** if its cluster
-has more than one host.
+A connection saved before these checks existed still deploys as it
+is, even on an Edge Agent that is not pinned. The upgrade that moves
+built-in UDP connections to the split driver checks ports the same way
+and leaves a connection on the built-in driver when another connection
+on its host already has the port, but it does not check pinning. So
+check these connections by hand: pin the Edge Agent with **Move** if
+its cluster has more than one host.
 
 Use a port that nothing else on the host uses. The host passes every
 datagram for the port to the driver, so a program on the host listening

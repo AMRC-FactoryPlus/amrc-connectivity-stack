@@ -11,7 +11,10 @@ name: Split driver golden output
 # it replaces (GOLDEN_PROTOCOL) to the matrix below. A driver whose
 # tests need system packages (edge-mqtt needs mosquitto) also lists
 # them in `packages`, and `test_env` turns those tests on: rust.yaml
-# runs the same tests without the packages, where they skip.
+# runs the same tests without the packages, where they skip. edge-opcua's
+# integration tests need a node-opcua server from acs-edge's
+# node_modules, which this job installs after the driver tests, so they
+# run in edge-opcua.yaml instead.
 
 on:
   pull_request:
@@ -21,6 +24,7 @@ on:
       - 'feature/**'
     paths:
       - 'edge-mqtt/**'
+      - 'edge-opcua/**'
       - 'edge-rest/**'
       - 'edge-udp/**'
       - 'lib/rs-edge-driver/**'
@@ -51,6 +55,8 @@ jobs:
             protocol: MQTT
             packages: mosquitto
             test_env: EDGE_MQTT_MOSQUITTO=1
+          - driver: edge-opcua
+            protocol: OPC UA
           - driver: edge-rest
             protocol: REST
           - driver: edge-udp

@@ -19,7 +19,7 @@ import { compare, Comparison, DEFAULT_TIME_ALLOWANCE_MS, report } from "./compar
 import { sleep } from "./devices/device.js";
 import { make_device } from "./devices/index.js";
 import type { DriverSpec, RunningDriver } from "./driver.js";
-import { to_split } from "./migrate.js";
+import { to_split, without_unread_paths } from "./migrate.js";
 
 /* The poll or publish interval a run uses in real time, unless
  * GOLDEN_INTERVAL_MS says otherwise. Fixture time is sped up so that
@@ -147,7 +147,8 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
 
     try {
         await device.start();
-        let entry = scale(device.connection(opts.entry ?? fixture.connection), speed);
+        let entry = without_unread_paths(
+            scale(device.connection(opts.entry ?? fixture.connection), speed));
         if (opts.connection_name)
             entry.name = opts.connection_name;
         if (opts.driver && entry.connType != "Driver")

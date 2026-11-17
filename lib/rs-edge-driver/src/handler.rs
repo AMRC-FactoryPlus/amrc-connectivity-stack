@@ -185,6 +185,27 @@ pub trait Handler: Send + Sized {
         true
     }
 
+    /// **Async mode, optional**: as [`subscribe`](Handler::subscribe),
+    /// with the edge agent's address groups as well.
+    ///
+    /// The edge agent puts each device's addresses in a group with the
+    /// device's poll interval. A handler that subscribes at a rate,
+    /// such as OPC UA with its sampling and publishing intervals, can
+    /// override this to use them. `addrs` is every address in the map,
+    /// exactly as `subscribe` gets it. An address can be in more than
+    /// one group, and an address in no group is still in `addrs`.
+    ///
+    /// The default calls [`subscribe`](Handler::subscribe) with
+    /// `addrs`, so a handler that overrides only `subscribe` works as
+    /// before.
+    async fn subscribe_groups(
+        &mut self,
+        addrs: &[Self::Addr],
+        _groups: &[AddrGroup<Self::Addr>],
+    ) -> bool {
+        self.subscribe(addrs).await
+    }
+
     /// Handle a command sent from the edge agent.
     ///
     /// Commands arrive on `fpEdge1/{id}/cmd/{name}` and are
@@ -233,6 +254,31 @@ pub trait Handler: Send + Sized {
     /// The default returns `None`, which keeps the locked `poll`.
     fn poller(&self) -> Option<Arc<dyn Poller<Self::Addr>>> {
         None
+    }
+}
+
+/// One group from the edge agent's address configuration: the
+/// addresses of one device and how often the edge agent wants them.
+/// See [`Handler::subscribe_groups`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddrGroup<A> {
+    /// The group's name, which is the device's name.
+    pub name: String,
+    /// The poll interval, zero if the edge agent gave none.
+    pub poll: std::time::Duration,
+    /// The group's addresses that are in the current address map.
+    pub addrs: Vec<A>,
+}
+
+impl<A> AddrGroup<A> {
+    /// A group, for a handler's own tests.
+    pub fn new(name: impl Into<String>, poll: std::time::Duration, addrs: Vec<A>) -> Self {
+        Self {
+            name: name.into(),
+            poll,
+            addrs,
+        }
     }
 }
 

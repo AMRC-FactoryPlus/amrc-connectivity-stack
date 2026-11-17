@@ -23,6 +23,10 @@ export const PayloadFormatMap: { [protocol: string]: { [f: string]: string } } =
     "REST":     {},
     "MQTT":     {},
     "OPC UA":   { "Defined by Protocol": "JSON" },
+    /* edge-udp passes datagrams through as bytes, as the built-in
+     * connection does, so no format changes. service-setup has no
+     * UDP move yet (ACS-38). */
+    "UDP":      {},
 };
 
 /* The connection entry as service-setup leaves it after moving the

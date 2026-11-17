@@ -9,15 +9,15 @@ import {
     FORMAT, VERSION, Finding, Fixture, FixtureEvent, OpcuaValue,
 } from "./fixture.js";
 import { ConnectionMetrics, ReadMetric, connection_metrics, finding } from "./metrics.js";
-import { DelimitedDoc, JsonDoc, PayloadDoc, XmlDoc } from "./payloads.js";
+import { BufferDoc, DelimitedDoc, JsonDoc, PayloadDoc, XmlDoc } from "./payloads.js";
 import { Signal, hash, supported_type } from "./signals.js";
 
 export interface SynthOpts {
     agent: string,
     seed: number,
     duration_ms: number,
-    /* MQTT publish interval per topic. REST and OPC UA use the
-     * connection's poll interval. */
+    /* MQTT publish interval per topic, and the interval between UDP
+     * datagrams. REST and OPC UA use the connection's poll interval. */
     mqtt_interval_ms: number,
 }
 
@@ -64,9 +64,9 @@ export function synthesise (connection: any, opts: SynthOpts)
         interval = poll_interval(connection);
         opcua_events(usable, opts, interval, events, expected, findings);
     }
-    else if (protocol == "MQTT" || protocol == "REST") {
-        interval = protocol == "MQTT"
-            ? opts.mqtt_interval_ms : poll_interval(connection);
+    else if (protocol == "MQTT" || protocol == "REST" || protocol == "UDP") {
+        interval = protocol == "REST"
+            ? poll_interval(connection) : opts.mqtt_interval_ms;
         payload_events(protocol, cm, usable, opts, interval,
             events, expected, findings);
     }
@@ -100,7 +100,9 @@ export function synthesise (connection: any, opts: SynthOpts)
 }
 
 /* MQTT and REST: one payload per address per interval, holding every
- * metric configured on that address. */
+ * metric configured on that address. UDP: one datagram per interval,
+ * for the empty address, which is the only one the connection
+ * delivers to. */
 function payload_events (
     protocol: string, cm: ConnectionMetrics,
     usable: { m: ReadMetric, i: number }[], opts: SynthOpts,
@@ -118,6 +120,12 @@ function payload_events (
     const pending: { t: number, ev: FixtureEvent, vals: Map<number, any> }[] = [];
 
     for (const [addr, ms] of by_addr) {
+        if (protocol == "UDP" && addr != "") {
+            for (const u of ms) findings.push(finding(u.m,
+                "UDP delivers every datagram to the empty address, so a "
+                + "metric with any other address never gets a value"));
+            continue;
+        }
         const doc = new_doc(cm.payloadFormat, cm.delimiter);
         if (typeof doc == "string") {
             for (const u of ms) findings.push(finding(u.m, doc));
@@ -133,7 +141,7 @@ function payload_events (
         for (const u of ms) {
             const prev = by_path.get(u.m.path);
             if (prev) { shared.push({ u, s: prev }); continue; }
-            const slot = doc.place(u.m.path);
+            const slot = doc.place(u.m.path, u.m);
             if (typeof slot == "string") {
                 findings.push(finding(u.m, slot));
                 continue;
@@ -165,6 +173,9 @@ function payload_events (
             const body = doc.render(values, types);
             const ev: FixtureEvent = protocol == "MQTT"
                 ? { t, type: "mqtt", topic: addr, payload: body }
+                : protocol == "UDP"
+                ? { t, type: "udp", payload: body,
+                    ...((doc as PayloadDoc).binary ? { encoding: "base64" as const } : {}) }
                 : {
                     t, type: "http", path: addr, status: 200,
                     content_type: doc.content_type, body,
@@ -197,6 +208,7 @@ function new_doc (format: string, delimiter: string): PayloadDoc | string {
         case "JSON": return new JsonDoc();
         case "XML": return new XmlDoc();
         case "Delimited String": return new DelimitedDoc(delimiter);
+        case "Buffer": return new BufferDoc();
         default: return `payload format "${format}" is not synthesised`;
     }
 }
@@ -276,6 +288,12 @@ function features (connection: any, cm: ConnectionMetrics): string[] {
         }
         if (cm.payloadFormat == "Delimited String")
             f.add(p ? "delimited:field" : "delimited:whole-payload");
+        if (cm.payloadFormat == "Buffer") {
+            if (m.type == "Boolean") f.add("buffer:bit");
+            else if (m.type == "String") f.add("buffer:string");
+            else if (m.metric.properties?.endianness?.value != null)
+                f.add(`buffer:${Number(m.metric.properties.endianness.value) == 4321 ? "big" : "little"}-endian`);
+        }
     }
     if ([...per_addr.values()].some(n => n > 1))
         f.add("many-metrics-per-address");

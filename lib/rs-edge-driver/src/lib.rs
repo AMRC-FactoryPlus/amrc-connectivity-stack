@@ -59,7 +59,7 @@ mod logging;
 mod redact;
 mod status;
 
-pub use config::{DEFAULT_MAX_PACKET_SIZE, DriverConfig};
+pub use config::{DEFAULT_MAX_PACKET_SIZE, DriverConfig, DriverOptions};
 pub use driver::{Driver, DriverHandle};
 pub use error::{ConnectError, Error, HandlerError};
 pub use handler::{Handler, Poller};

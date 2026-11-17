@@ -54,9 +54,20 @@ strip = true
 
 `serde_json` is needed because `Handler::create` receives the
 connection's configuration as a `serde_json::Value`. Write the
-handler as the library's README describes, and use
-[`examples/test_driver.rs`](../../lib/rs-edge-driver/examples/test_driver.rs)
-as a starting point for a polled driver.
+handler as the library's README describes.
+
+[`edge-test-rs`](../../edge-test-rs/README.md) is the reference
+driver: copy its layout rather than the library's
+`examples/test_driver.rs`, which is a smaller sketch and does not
+match the JS test driver. In `edge-test-rs`, `main.rs` only sets up
+logging and runs the driver, and the rest sits in a `src/lib.rs` crate
+with one module for address parsing (with unit tests), one for the
+device and one for the `Handler`. A `lib.rs` is what lets the files in
+`tests/` reach the handler. Its `tests/driver.rs` runs the whole
+driver against the fake Edge Agent in
+`lib/rs-edge-driver/tests/common/`, loaded with a `#[path]` module,
+which needs `rumqttc` and tokio's `full` features as
+dev-dependencies.
 
 Commit `Cargo.lock`. The Dockerfile and CI both build with `--locked`,
 so a missing or stale lock file fails the build rather than picking

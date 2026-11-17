@@ -72,8 +72,9 @@ it logs in. The rig changes only:
   README in `acs-edge/tests/fixtures/drivers/` explains this.
 - TLS, as above.
 - Whether a real OPC UA server trusts the split driver's new client
-  certificate. The mocks trust every certificate. Check this on each
-  real server when its connection moves (ACS-27).
+  certificate. The mocks trust every certificate. The built-in already
+  presented a new certificate from every new pod, so this is expected
+  to work (see ACS-27, PR 911).
 - MQTT brokers shared between connections. Each rig connection has a
   broker of its own.
 
@@ -729,7 +730,7 @@ test, collected on 2026-11-17.
 - an Edge Agent whose Deployment sets `values.image.default` must
   have that removed before the upgrade, or its sidecar can't pull.
 
-**OPC UA (ACS-26 PR 905 merged, ACS-27 card, no PR yet):**
+**OPC UA (ACS-26 PR 905 merged, ACS-27 PR 911):**
 
 - each security policy: the rig has None, Basic256, Basic256Sha256 and
   Aes128_Sha256, with and without a login;
@@ -738,11 +739,21 @@ test, collected on 2026-11-17.
   after the move (step 8);
 - multi-device connections: after the move every device gets values,
   where the built-in connection gave them only to the last device;
+- paths stay gone after the Manager saves a moved device (its
+  DriverDef has `metricPaths: false`), and are gone from DBIRTH;
+- a DateTime metric shows a date, where the built-in published 0;
+- an OPC UA mock stopped mid-run marks its devices offline, and they
+  rebirth when it starts again;
 - DDATA rate after the move (ACS-45): the comparison warns above 1.5
-  times the built-in rate and fails above 3 times or below half;
+  times the built-in rate and fails above 3 times or below half. The
+  golden harness measured about 2 times (2.1 DDATA/s against 1.0 for
+  113 metrics at 1 s), so expect the warning, not a failure;
+- `OPCUA: false` moves every connection back and data carries on;
 - whether each real server trusts the driver's certificate. The mocks
-  can't show this: check it on each real server when its connection
-  moves.
+  can't show this. The built-in connection already presented a new
+  self-signed certificate from every new pod (it is kept in an
+  `emptyDir`), so a server that kept working across Edge Agent
+  restarts should accept the driver's.
 
 **UDP (ACS-38 PR 907 and ACS-43 PR 904, both merged):**
 

@@ -36,17 +36,16 @@ export const PayloadFormatMap: { [protocol: string]: { [f: string]: string } } =
  * So a move away from "Defined by Protocol" has to drop the paths, and
  * then the path is gone from the metric's properties in DBIRTH too.
  *
- * service-setup's move (ACS-21) does not do this yet, and the Admin UI
- * copies each metric's `Path` from the device's origin map into the
- * Edge Agent config. Moving OPC UA connections (ACS-27) must clear
- * those, or metrics with a path stop updating.
- *
- * The harness drops these paths for both runs, so that it compares what
- * the driver sends and not what the move leaves behind. The built-in
- * run's DDATA is unchanged by it, because the built-in never read
- * them. */
+ * service-setup's move drops them (the OPC UA split DriverDef has
+ * `metricPaths: false`), and so does `to_split` below. The harness
+ * also drops them from the built-in run, so that both runs' DBIRTHs
+ * have the same properties. The built-in run's DDATA is unchanged by
+ * it, because the built-in never read them. A run of an entry
+ * service-setup already moved keeps whatever paths it has, so a path
+ * the move missed shows as a metric that never updates. */
 export function without_unread_paths (entry: any): any {
     const next = JSON.parse(JSON.stringify(entry));
+    if (next.connType == "Driver") return next;
     for (const device of next.devices ?? []) {
         const format = device.payloadFormat ?? next.payloadFormat;
         if (format != "Defined by Protocol") continue;
@@ -56,9 +55,15 @@ export function without_unread_paths (entry: any): any {
     return next;
 }
 
+/* What of each protocol's split DriverDef the move reads, beyond not
+ * being internal: see acs-service-setup/dumps/edge.yaml. */
+const DriverDefs: { [protocol: string]: any } = {
+    "OPC UA":   { metricPaths: false },
+};
+
 /* The connection entry as service-setup leaves it after moving the
- * connection to its split driver: `move_entry()` with a DriverDef that
- * is not internal, and the protocol's payload format map, then
+ * connection to its split driver: `move_entry()` with the split
+ * DriverDef and the protocol's payload format map, then
  * `set_driver_ids()`, which gives it a `driverId` if its name can't be
  * the driver's id. */
 export function to_split (entry: any, protocol: string): any {
@@ -69,14 +74,15 @@ export function to_split (entry: any, protocol: string): any {
         import { move_entry, move_payload_format, set_driver_ids } from ${JSON.stringify(pathToFileURL(EDGE_CONNECTION).href)};
         let input = "";
         for await (const chunk of process.stdin) input += chunk;
-        const { entry, map } = JSON.parse(input);
-        const driverdef = { name: "Golden-output split driver" };
+        const { entry, map, def } = JSON.parse(input);
+        const driverdef = { name: "Golden-output split driver", ...def };
         const [next] = set_driver_ids([move_entry(entry, driverdef,
             f => move_payload_format(f, map, true))]);
         process.stdout.write(JSON.stringify(next));
     `;
     const out = execFileSync(process.execPath,
         ["--input-type=module", "-e", script],
-        { input: JSON.stringify({ entry, map }), encoding: "utf8" });
+        { input: JSON.stringify({ entry, map, def: DriverDefs[protocol] ?? {} }),
+            encoding: "utf8" });
     return JSON.parse(out);
 }

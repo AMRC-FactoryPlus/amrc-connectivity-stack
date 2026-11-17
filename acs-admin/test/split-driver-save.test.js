@@ -17,7 +17,7 @@ import {
 } from '@amrc-factoryplus/service-client'
 
 import {
-  applyConnection, deploymentDrivers, devicePayloadFormat,
+  applyConnection, applyMetricPaths, deploymentDrivers, devicePayloadFormat,
 } from '../src/utils/edgeAgentConfigUpdater.js'
 
 /* The DriverDefs, as acs-service-setup/dumps/edge.yaml has them. The
@@ -26,7 +26,7 @@ const PROTOCOLS = [
   {
     name: 'OPC UA',
     internal: { uuid: 'opcua', def: { internal: { connType: 'OPC UA', details: 'OPCUAConnDetails' } } },
-    split: { uuid: 'opcua-split', def: { image: { repository: 'edge-opcua' } } },
+    split: { uuid: 'opcua-split', def: { image: { repository: 'edge-opcua' }, metricPaths: false } },
     payloadFormat: { 'Defined by Protocol': 'JSON' },
     format: 'Defined by Protocol',
     config: { endpoint: 'opc.tcp://server:4840', securityMode: 'None', securityPolicy: 'None', useCredentials: false },
@@ -116,6 +116,37 @@ describe.each(PROTOCOLS)('saving a moved $name connection', p => {
     expect(adminEntry(backEntry, back, p.internal)).toEqual(backEntry)
     expect({ ...adminEntry(null, back, p.internal), pollInt: backEntry.pollInt })
       .toEqual(backEntry)
+  })
+})
+
+/* The built-in OPC UA connection never read a metric's path, and the
+ * split driver's values would be read through it, so a path from the
+ * origin map (a unit, say) must not reach the agent config. */
+describe('applyMetricPaths', () => {
+  const opcua = PROTOCOLS[0]
+  const tag = (Name, path) => ({ Name, type: 'Double', address: `ns=2;s=${Name}`,
+    ...(path === undefined ? {} : { path }) })
+  const built = () => ({
+    devices: [
+      { deviceId: 'a', tags: [tag('x', 'mm'), tag('y', 'null'), tag('z')] },
+      { deviceId: 'b', tags: [tag('w', '$.value')] },
+    ],
+  })
+  const conn = driver => ({ configuration: { driver: driver.def } })
+
+  it('leaves paths out on the OPC UA split driver, as the move does', () => {
+    const entry = applyMetricPaths(built(), conn(opcua.split))
+    expect(entry.devices.map(d => d.tags)).toEqual([[tag('x'), tag('y'), tag('z')], [tag('w')]])
+
+    /* The same tags as service-setup's move gives. */
+    const moved = move_entry({ connType: 'OPC UA', ...built() }, opcua.split.def, f => f)
+    expect(moved.devices).toEqual(entry.devices)
+  })
+
+  it('keeps paths on any other driver', () => {
+    for (const driver of PROTOCOLS.flatMap(p => [p.internal, p.split]))
+      if (driver != opcua.split)
+        expect(applyMetricPaths(built(), conn(driver))).toEqual(built())
   })
 })
 

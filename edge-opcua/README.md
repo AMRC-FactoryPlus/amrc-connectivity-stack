@@ -5,10 +5,13 @@ An Edge Agent split driver for OPC UA servers, written in Rust on
 [async-opcua](https://github.com/freeopcua/async-opcua) client. It
 replaces the Edge Agent's built-in OPC UA connection
 (`acs-edge/lib/devices/OPCUA.ts`) and takes the same connection
-details, so moving a connection to it only moves them from
-`OPCUAConnDetails` to `DriverDetails`. Moving connections is not part
-of this driver: service-setup does it per protocol (see
-`acs-service-setup/lib/split-drivers.js`).
+details. Service-setup moves every built-in OPC UA connection to it on
+upgrade (`acs-service-setup/lib/split-drivers.js`): the details move
+from `OPCUAConnDetails` to `DriverDetails`, the payload format changes
+from "Defined by Protocol" to JSON, and metric paths are removed,
+because this driver's values leave nothing for a path to select (its
+DriverDef has `metricPaths: false`). See
+[Split Drivers](../docs/architecture/edge-management/split-drivers.md).
 
 [Adding a Rust Driver](../docs/development/rust-drivers.md) covers the
 build, CI and publishing steps.
@@ -94,14 +97,20 @@ of range) `CMD`, anything else `ERR`.
   while the session is down, so the agent marks the devices offline
   and sends a new DBIRTH when it is back. The built-in kept them
   online with stale values.
+- **DateTime values.** Sent as milliseconds, which the agent publishes
+  as the date. The built-in passed node-opcua's `Date`, which the agent
+  published as 0.
 - **Values JSON can't hold.** NaN is dropped by the agent (the metric
   keeps its last value). Int64 and UInt64 are sent with every digit and
   the agent reads them exactly up to 2^53; the built-in passed
   node-opcua's `[high, low]` pair. See `src/value.rs`.
-- **More, smaller DDATA messages.** The driver protocol carries one
-  address per data message, so the agent publishes a DDATA per changed
-  address where the built-in published one per notification. The
-  values and timestamps are the same.
+- **A few more DDATA messages.** The driver protocol carries one
+  address per data message. The agent gathers the values that arrive
+  together into one DDATA per device, but a notification's later
+  values sometimes arrive after the agent has sent its first group and
+  go out in a second DDATA: between one and two per notification
+  (measured 1.5 to 2.1 times the built-in's rate for 113 values), where
+  the built-in sent one. The values and timestamps are the same.
 
 ## The async-opcua version
 

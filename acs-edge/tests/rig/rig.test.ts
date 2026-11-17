@@ -529,10 +529,13 @@ describe("summaries", () => {
         /* Hierarchy added where there was none, and lost where there
          * was one. */
         const h = "Device_Information/ISA95_Hierarchy/Enterprise";
+        const u = "Device_Information/Instance_UUID";
         y.metrics[h] = { type: "String", values: 0, distinct: 0 };
+        y.metrics[u] = { type: "UUID", values: 0, distinct: 0 };
         ps = compare_summaries(before, after);
         expect(ps.map(p => p.level)).toEqual(["EXPECTED"]);
         expect(ps[0].what).toContain(Expected.isa95);
+        delete y.metrics[u];
         x.metrics[h] = y.metrics[h];
         delete y.metrics[h];
         expect(compare_summaries(before, after).map(p => p.level)).toEqual(["FAIL"]);

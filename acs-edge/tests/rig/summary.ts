@@ -237,7 +237,8 @@ export interface Problem {
  *  - a UDP device publishing, because before the upgrade nothing
  *    outside the cluster could reach the built-in UDP connection;
  *  - ISA-95 hierarchy metrics added to a device that had none, which
- *    the placement step puts at the organisation. */
+ *    the placement step puts at the organisation, with the
+ *    Device_Information UUIDs if it had no Device_Information. */
 export const Expected = {
     starved:    "now publishing: the built-in connection gave it no values",
     datetime:   "DateTime metrics now get values",
@@ -246,6 +247,9 @@ export const Expected = {
 };
 
 const ISA95 = /^Device_Information\/ISA95_Hierarchy\//;
+/* A device with no Device_Information object gains its UUID tags with
+ * the hierarchy. */
+const DEVINFO = /^Device_Information\/(Schema_UUID|Instance_UUID)$/;
 
 const list = (names: string[]) =>
     names.slice(0, 10).join(", ") + (names.length > 10 ? ` and ${names.length - 10} more` : "");
@@ -292,7 +296,9 @@ export function compare_summaries (a: Summary, b: Summary): Problem[] {
             const lost = xm.filter(n => !(n in y.metrics));
             const added = ym.filter(n => !(n in x.metrics));
             const had_isa95 = xm.some(n => ISA95.test(n));
-            const isa95 = had_isa95 ? [] : added.filter(n => ISA95.test(n));
+            const had_info = xm.some(n => n.startsWith("Device_Information/"));
+            const isa95 = had_isa95 ? [] : added.filter(n => ISA95.test(n)
+                || (!had_info && DEVINFO.test(n)));
             const other = added.filter(n => !isa95.includes(n));
             if (lost.length) p("FAIL", `metrics missing in ${b.label}: ${list(lost)}`);
             if (other.length) p("FAIL", `metrics only in ${b.label}: ${list(other)}`);

@@ -225,3 +225,111 @@ async fn cmd_handler_is_unchanged() {
         vec![("plant/line1/speed".to_owned(), Bytes::from_static(bytes))]
     );
 }
+
+fn results(events: &[FromDriver]) -> Vec<(String, String)> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            FromDriver::Other { topic, payload } if topic.contains("/result/") => Some((
+                topic.clone(),
+                std::string::String::from_utf8_lossy(payload).into_owned(),
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A write with an id is one the agent is waiting for, so the driver
+/// answers it on `result/{id}`, empty if it was written, and reports
+/// nothing on `err`. The handler doesn't change.
+#[tokio::test]
+async fn writes_with_an_id_are_answered_on_result() {
+    let mut agent = FakeAgent::start("Conn").await;
+    let _driver = spawn_driver::<TypedHandler>(agent.config());
+    let seen = Arc::new(Seen::default());
+
+    agent
+        .handshake(
+            register(seen.clone()),
+            &[("1", "ro"), ("2", "fails"), ("3", "ok")],
+        )
+        .await;
+    agent.wait_status("UP", secs(5)).await;
+
+    let w = |id: &str| format!(r#"{{"type":"Int16","value":1,"id":"{id}"}}"#);
+    agent.send("write/ok", w("ab12_1"));
+    agent.send("write/ro", w("ab12_2"));
+    agent.send("write/fails", w("ab12_3"));
+    agent.send("write/missing", w("ab12_4"));
+    agent.send(
+        "write/ok",
+        r#"{"type":"Int16","value":70000,"id":"ab12_5"}"#,
+    );
+    agent.send("write/ok", w("ab12_6"));
+
+    let events = agent.drain(ms(500)).await;
+    assert_eq!(errors(&events), vec![]);
+    let mut got = results(&events);
+    got.sort();
+    assert_eq!(
+        got,
+        vec![
+            ("fpEdge1/Conn/result/ab12_1".into(), "".into()),
+            (
+                "fpEdge1/Conn/result/ab12_2".into(),
+                "RO\nBadNotWritable".into()
+            ),
+            (
+                "fpEdge1/Conn/result/ab12_3".into(),
+                "ERR\ndevice said no".into()
+            ),
+            (
+                "fpEdge1/Conn/result/ab12_4".into(),
+                "CMD\naddress not in the address map".into()
+            ),
+            (
+                "fpEdge1/Conn/result/ab12_5".into(),
+                "CMD\nbad Int16 value 70000".into()
+            ),
+            ("fpEdge1/Conn/result/ab12_6".into(), "".into()),
+        ]
+    );
+    // Successes come back in the order the handler wrote them.
+    let ok: Vec<_> = results(&events)
+        .into_iter()
+        .filter(|(_, p)| p.is_empty())
+        .map(|(t, _)| t)
+        .collect();
+    assert_eq!(
+        ok,
+        vec!["fpEdge1/Conn/result/ab12_1", "fpEdge1/Conn/result/ab12_6"]
+    );
+    assert_eq!(seen.writes.lock().unwrap().len(), 2);
+}
+
+/// Without an id, or with one that can't be a topic level, the agent
+/// isn't waiting: nothing on success, `err` on failure, as before.
+#[tokio::test]
+async fn writes_without_an_id_are_not_answered() {
+    let mut agent = FakeAgent::start("Conn").await;
+    let _driver = spawn_driver::<TypedHandler>(agent.config());
+    let seen = Arc::new(Seen::default());
+
+    agent
+        .handshake(register(seen.clone()), &[("1", "ro"), ("3", "ok")])
+        .await;
+    agent.wait_status("UP", secs(5)).await;
+
+    agent.send("write/ok", r#"{"type":"Int16","value":1}"#);
+    agent.send("write/ok", r#"{"type":"Int16","value":1,"id":"x/#"}"#);
+    agent.send("write/ok", r#"{"type":"Int16","value":1,"id":7}"#);
+    agent.send("write/ro", r#"{"type":"Int16","value":1,"id":""}"#);
+
+    let events = agent.drain(ms(500)).await;
+    assert_eq!(results(&events), vec![]);
+    assert_eq!(
+        errors(&events),
+        vec![("fpEdge1/Conn/err/1".into(), "RO\nBadNotWritable".into())]
+    );
+    assert_eq!(seen.writes.lock().unwrap().len(), 3);
+}

@@ -14,7 +14,7 @@ import { DriverBroker } from "../../lib/driverBroker.js";
 import { Translator } from "../../lib/translator.js";
 
 import type { Fixture } from "../fixtures/drivers/fixture.js";
-import { CaptureClient, decode, fake_fplus, Output } from "./capture.js";
+import { CaptureClient, decode, fake_fplus, Metric, Output } from "./capture.js";
 import { compare, Comparison, DEFAULT_TIME_ALLOWANCE_MS, report } from "./compare.js";
 import { sleep } from "./devices/device.js";
 import { make_device } from "./devices/index.js";
@@ -42,8 +42,23 @@ export interface RunOpts {
     /* Secrets for the agent to fill `__FPSI__` placeholders from, as
      * the chart mounts them, keyed by placeholder. */
     secrets?:   { [placeholder: string]: string },
+    /* Keep the connection's security and credentials, where the fake
+     * device can check them (see DeviceOpts). */
+    secure?:    boolean,
+    /* Sparkplug commands to send the agent, each at its fixture time
+     * after the device first delivers input. */
+    commands?:  Command[],
     /* Give up after this long. */
     timeout_ms?: number,
+}
+
+/* A DCMD setting one metric of one device. */
+export interface Command {
+    t:          number,
+    device:     string,
+    metric:     string,
+    type:       string,
+    value:      any,
 }
 
 /* CPU time in microseconds, split at the moment the fake device first
@@ -76,6 +91,8 @@ export interface RunResult {
     log:        string,
     /* The credentials the device saw, sorted. */
     credentials: string[],
+    /* The values written to the device, in order. */
+    writes:     string[],
     timed_out:  boolean,
 }
 
@@ -134,7 +151,7 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
     const timeout = opts.timeout_ms
         ?? 30_000 + 3 * fixture.meta.duration_ms / speed;
 
-    const device = make_device(fixture, { speed });
+    const device = make_device(fixture, { speed, secure: opts.secure });
     const held = hold_console();
     const pwdir = fs.mkdtempSync(path.join(os.tmpdir(), "golden-"));
     const secrets = fs.mkdtempSync(path.join(os.tmpdir(), "golden-secrets-"));
@@ -200,6 +217,19 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
             return { agent: process.cpuUsage(), driver: await driver?.cpu_us() };
         })();
 
+        /* Commands go to the agent as its Sparkplug client would hand
+         * them over. */
+        const commands = (async () => {
+            await first;
+            for (const c of [...opts.commands ?? []].sort((x, y) => x.t - y.t)) {
+                const wait = device.t0! + c.t / speed - Date.now();
+                if (wait > 0) await sleep(wait);
+                if (done) return;
+                client.emit("dcmd", c.device,
+                    { metrics: [{ name: c.metric, type: c.type, value: c.value }] });
+            }
+        })();
+
         let timer: NodeJS.Timeout | undefined;
         await Promise.race([
             device.finished(),
@@ -212,6 +242,7 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
         done = true;
 
         const at_t0 = await first;
+        await commands;
         const cpu_end = process.cpuUsage();
         const driver_end = await driver?.cpu_us();
         const end = Date.now();
@@ -237,6 +268,7 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
             cpu,
             wall_ms, log: "", timed_out,
             credentials: [...device.credentials ?? []].sort(),
+            writes: [...device.writes ?? []],
             busy: device.t0 ? cpu.agent_us / 1000 / Math.max(1, end - device.t0) : 0,
         };
         return result;
@@ -301,10 +333,15 @@ export function cpu_line (r: RunResult) {
 export async function golden (fixtures: { a: Fixture, b?: Fixture },
     opts: { a?: RunOpts, b?: RunOpts, allowance_ms?: number } = {},
 ): Promise<GoldenResult> {
-    const base_ms = opts.allowance_ms
-        ?? (Number(process.env.GOLDEN_TIME_ALLOWANCE_MS) || DEFAULT_TIME_ALLOWANCE_MS);
     const a = await run_agent(fixtures.a, opts.a);
     const b = await run_agent(fixtures.b ?? fixtures.a, opts.b);
+    return compare_runs(a, b, opts.allowance_ms);
+}
+
+/* Compare two runs already made: `a` is the reference. */
+export function compare_runs (a: RunResult, b: RunResult, allowance?: number): GoldenResult {
+    const base_ms = allowance
+        ?? (Number(process.env.GOLDEN_TIME_ALLOWANCE_MS) || DEFAULT_TIME_ALLOWANCE_MS);
     if (a.label == b.label) b.label += " (2)";
 
     /* The agent stamps each metric as it works through a message, so
@@ -337,4 +374,38 @@ export async function golden (fixtures: { a: Fixture, b?: Fixture },
         `CPU: ${cpu_line(b)}`,
     ].join("\n");
     return { a, b, comparison, summary };
+}
+
+/* Several runs, one per device, as if they were one run: the reference
+ * for a connection whose built-in run is wrong with several devices
+ * (the built-in OPC UA connection). Each run's device has its own
+ * messages, so they don't overlap. Timestamps are moved so that each
+ * run's first input is at the first run's, and the node's own messages
+ * are the first run's. */
+export function merge_runs (runs: RunResult[], label: string): RunResult {
+    const [first] = runs;
+    const births = new Map(first.output.births);
+    const data = new Map(first.output.data);
+    const counts = new Map(first.output.counts);
+    for (const r of runs.slice(1)) {
+        const shift = BigInt(r.t0 - first.t0) * 1_000_000n;
+        const moved = (ms: Metric[]) => ms.map(m => ({ ...m, ts_ns: m.ts_ns - shift }));
+        for (const [k, v] of r.output.births)
+            if (k != "NBIRTH") births.set(k, v.map(moved));
+        for (const [k, v] of r.output.data) data.set(k, moved(v));
+        for (const [k, v] of r.output.counts)
+            if (k.includes(" ")) counts.set(k, v);
+    }
+    const sum = (f: (r: RunResult) => number) => runs.reduce((n, r) => n + f(r), 0);
+    return {
+        ...first,
+        label,
+        output:     { births, data, counts },
+        delivered:  sum(r => r.delivered),
+        ddata:      sum(r => r.ddata),
+        log:        runs.map(r => r.log).join("\n"),
+        credentials: [...new Set(runs.flatMap(r => r.credentials))].sort(),
+        writes:     runs.flatMap(r => r.writes),
+        timed_out:  runs.some(r => r.timed_out),
+    };
 }

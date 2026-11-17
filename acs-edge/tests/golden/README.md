@@ -71,7 +71,7 @@ From code, `driver.ts` has the two kinds of driver the harness accepts, both a `
 - `spawned(name, command, args)` runs a command with the driver environment added. This is how real drivers run.
 - `in_process(name, start)` calls `start(env)` in the test process and expects back something with `stop()`.
 
-Pass one as `{ b: { driver } }` to `golden()` in `harness.ts`. A run can also take `entry`, a connection entry to run in place of the fixture's (one that is already `Driver` is run as it is), and `secrets`, the values the agent fills `__FPSI__` placeholders from.
+Pass one as `{ b: { driver } }` to `golden()` in `harness.ts`. A run can also take `entry`, a connection entry to run in place of the fixture's (one that is already `Driver` is run as it is), and `secrets`, the values the agent fills `__FPSI__` placeholders from. `secure` keeps the connection's security and credentials where the fake device can check them (OPC UA), and `commands` sends the agent DCMDs at fixture times. `run_agent()` makes one run, and `compare_runs()` compares two made separately; `merge_runs()` joins runs of one device each into one reference, for a built-in connection that is wrong with several devices.
 
 ## How a run works
 
@@ -90,7 +90,7 @@ The fake devices:
 |---|---|
 | REST | An HTTP stub. The n-th GET of a path gets the response that was current at fixture time n × interval, so both runs see the same sequence of responses however their poll timing differs. |
 | MQTT | An Aedes broker. Once every topic has a subscriber it publishes the recorded messages in order, at their scaled times. |
-| OPC UA | A node-opcua server with one variable per node. Security is off on both runs, because no fixture can run a certificate handshake. The connection samples four times per value change, so no change is missed or seen twice. |
+| OPC UA | A node-opcua server with one variable per node. Security is off on both runs unless the run is `secure`: then the server offers every mode and the policies real connections use, trusts any client certificate, accepts any user, and records each login in `credentials`. Values the connection writes are recorded in `writes`. The connection samples four times per value change, so no change is missed or seen twice. |
 | UDP | A sender that waits for the connection to bind its port, then sends each datagram to `127.0.0.1` at its scaled time. |
 
 To add a kind, write a class implementing `FakeDevice` in `devices/device.ts` and add it to `Kinds` in `devices/index.ts`.

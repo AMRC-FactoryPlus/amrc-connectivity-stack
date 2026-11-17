@@ -12,6 +12,9 @@ import type { Fixture } from "../../fixtures/drivers/fixture.js";
 export interface DeviceOpts {
     /* Fixture time runs this many times faster than real time. */
     speed:  number,
+    /* Keep the connection's security settings and credentials, where
+     * the device can check them, instead of turning security off. */
+    secure?: boolean,
 }
 
 /* A fake device replays a fixture's device input to whichever
@@ -42,8 +45,13 @@ export interface FakeDevice {
     delivered: number,
 
     /* The distinct credentials the connection sent, where the device
-     * can see them (the HTTP stub's Authorization headers). */
+     * can see them (the HTTP stub's Authorization headers, the OPC UA
+     * server's logins when secure). */
     credentials?: Set<string>,
+
+    /* Values written to the device by the connection, in order, where
+     * the device can see them. */
+    writes?: string[],
 }
 
 export type DeviceFactory = (fixture: Fixture, opts: DeviceOpts) => FakeDevice;

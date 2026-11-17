@@ -1,0 +1,161 @@
+{
+  "name": "sample-opcua-types",
+  "uuid": "00000000-0000-4000-8000-000000000003",
+  "connType": "OPC UA",
+  "payloadFormat": "Defined by Protocol",
+  "pollInt": 1000,
+  "devices": [
+    {
+      "deviceId": "Device_1",
+      "deviceType": "00000000-0000-4000-8000-000000000001",
+      "pollInt": 1000,
+      "pubInterval": 0,
+      "payloadFormat": "Defined by Protocol",
+      "templates": [],
+      "tags": [
+        {
+          "Name": "Types/FloatLE",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_01",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/FloatBE",
+          "type": "FloatBE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_02",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/DoubleLE",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_03",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/DoubleBE",
+          "type": "DoubleBE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_04",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/Boolean",
+          "type": "Boolean",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_05",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Types/String",
+          "type": "String",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_06",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Types/Int16LE",
+          "type": "Int16LE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_07",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/Int16BE",
+          "type": "Int16BE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_08",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/UInt16LE",
+          "type": "UInt16LE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_09",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/UInt16BE",
+          "type": "UInt16BE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_10",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/UInt8",
+          "type": "UInt8",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_11",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/UInt32LE",
+          "type": "UInt32LE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_12",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/UInt32BE",
+          "type": "UInt32BE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_13",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        },
+        {
+          "Name": "Types/Int32BE",
+          "type": "Int32BE",
+          "method": "GET",
+          "address": "ns=2;s=Types/Node_14",
+          "value": null,
+          "recordToDB": true,
+          "engLow": 0,
+          "engHigh": 1000
+        }
+      ]
+    }
+  ],
+  "OPCUAConnDetails": {
+    "endpoint": "opc.tcp://opcua.example:4840",
+    "securityMode": "None",
+    "securityPolicy": "None",
+    "useCredentials": false
+  }
+}

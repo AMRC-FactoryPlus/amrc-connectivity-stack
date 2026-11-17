@@ -160,24 +160,27 @@ const CASES = [
 
 describe("the split DriverDefs", () => {
     test("share the internal driver's form, so connection details keep their fields", () => {
-        for (const p of Object.values(SplitDrivers)) {
+        for (const [name, p] of Object.entries(SplitDrivers)) {
             const [internal, split] = [DEFS[p.internal], DEFS[p.split]];
             assert.ok(internal.internal, "the internal DriverDef is internal");
             assert.ok(split.image?.repository, "the split DriverDef has an image");
             assert.equal(split.internal, undefined);
+            assert.equal(split.polled, internal.polled);
+            /* UDP's split driver has its own form (udp-move.test.js
+             * checks it takes every built-in config). */
+            if (name == "UDP") continue;
             assert.deepEqual(split.schema, internal.schema);
             assert.deepEqual(split.presentation, internal.presentation);
-            assert.equal(split.polled, internal.polled);
         }
     });
 
     /* The new-connection form offers DriverDefs that aren't hidden, and
-     * picks them by name. REST's and OPC UA's split drivers have
+     * picks them by name. REST's, OPC UA's and UDP's split drivers have
      * replaced the built-ins; MQTT's image isn't published yet. */
-    test("offer REST's and OPC UA's split drivers by their names and hide the others", () => {
-        const { REST, MQTT, OPCUA } = SplitDrivers;
+    test("offer REST's, OPC UA's and UDP's split drivers by their names and hide the others", () => {
+        const { REST, MQTT, OPCUA, UDP } = SplitDrivers;
         const names = load_names();
-        for (const [p, name] of [[REST, "REST"], [OPCUA, "OPC-UA"]]) {
+        for (const [p, name] of [[REST, "REST"], [OPCUA, "OPC-UA"], [UDP, "UDP"]]) {
             assert.equal(DEFS[p.split].hidden, undefined);
             assert.equal(DEFS[p.internal].hidden, true);
             assert.equal(names[p.split], name);
@@ -191,6 +194,7 @@ describe("the split DriverDefs", () => {
             .map(([uuid]) => names[uuid]);
         assert.equal(offered.filter(n => /^REST\b/.test(n)).length, 1);
         assert.equal(offered.filter(n => /^OPC-UA\b/.test(n)).length, 1);
+        assert.equal(offered.filter(n => /^UDP\b/.test(n)).length, 1);
         assert.equal(new Set(offered).size, offered.length, "offered names are unique");
     });
 

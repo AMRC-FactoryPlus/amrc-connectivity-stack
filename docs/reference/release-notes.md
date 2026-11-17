@@ -12,7 +12,7 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
-### Before you upgrade: version 7 moves REST and OPC UA connections out of the Edge Agent
+### Before you upgrade: version 7 moves REST, OPC UA and UDP connections out of the Edge Agent
 
 The release with this change is a major release, ACS version 7. Read
 this section before upgrading a production installation, because a
@@ -27,17 +27,17 @@ into the Edge Agent or with a separate small program, a split driver,
 that runs in its own container beside it. In version 7, every Edge
 Agent connection that uses the built-in REST connection moves to a new
 REST split driver, `edge-rest`, by itself on upgrade, and every one that
-uses the built-in OPC UA connection moves to `edge-opcua`. Each
-connection keeps its details, devices and addresses, including OPC UA
-security settings and credentials. REST devices publish the same data.
-OPC UA devices publish the same data too, with the exceptions under
-"What a site with OPC UA connections must know" below. Each Edge Agent
-with a REST or OPC UA connection restarts once or twice in the minutes
-after the upgrade, as the new container is added, so those devices
-have no data for that time. New REST and OPC UA connections in the
-Manager use the split drivers, under the names "REST" and "OPC-UA".
-MQTT and UDP connections stay built in for now and will move the same
-way in later releases.
+uses the built-in OPC UA or UDP connection moves to `edge-opcua` or
+`edge-udp`. Each connection keeps its details, devices and addresses,
+including OPC UA security settings and credentials. REST and UDP
+devices publish the same data. OPC UA devices publish the same data
+too, with the exceptions under "What a site with OPC UA connections
+must know" below. Each Edge Agent with a REST, OPC UA or UDP connection
+restarts once or twice in the minutes after the upgrade, as the new
+container is added, so those devices have no data for that time. New
+REST, OPC UA and UDP connections in the Manager use the split drivers,
+under the names "REST", "OPC-UA" and "UDP". MQTT connections stay
+built in for now and will move the same way in a later release.
 
 **Why some sites must act.** Edge clusters get their software from the
 edge Helm charts in the `shared/helm` git repository on the central
@@ -45,10 +45,10 @@ cluster. Each upgrade writes the new charts to the `acs` branch, but
 edge clusters deploy from `main`, and the upgrade only moves `main` if
 nobody has committed to it. On a site that has committed its own
 changes to `main`, the edge clusters keep running the older release,
-which has no `edge-rest` or `edge-opcua`. The connections move anyway,
-because the move happens on the central cluster, so on those edge
-clusters the new containers can't start and the moved devices get no
-data.
+which has no `edge-rest`, `edge-opcua` or `edge-udp`. The connections
+move anyway, because the move happens on the central cluster, so on
+those edge clusters the new containers can't start and the moved
+devices get no data.
 
 **Upgrade procedure.**
 
@@ -64,10 +64,11 @@ data.
      minutes, and the moved devices' data resumes.
    - Or, to upgrade now and merge later, set
      `serviceSetup.config.splitDrivers.REST: null` and
-     `serviceSetup.config.splitDrivers.OPCUA: null` in your values for
-     this upgrade. Your REST and OPC UA connections stay built in. Set
-     them back to `true` (or remove them) on a later upgrade, once you
-     have merged.
+     `serviceSetup.config.splitDrivers.OPCUA: null` and
+     `serviceSetup.config.splitDrivers.UDP: null` in your values for
+     this upgrade. Your REST, OPC UA and UDP connections stay built in.
+     Set them back to `true` (or remove them) on a later upgrade, once
+     you have merged.
 3. **Check every edge cluster is syncing** from the central cluster
    before you upgrade. An edge cluster that can't fetch from the central
    git server keeps its old software, and its moved devices have no
@@ -78,8 +79,8 @@ data.
    if your site needs step 2.
 5. **Check it worked.** Find the line starting `Split drivers:` in the
    `service-setup` container's log, which says how many connections
-   moved and how many failed. Each Edge Agent pod with REST or OPC UA
-   connections has a running `driver-<name>` container for each, and
+   moved and how many failed. Each Edge Agent pod with REST, OPC UA or
+   UDP connections has a running `driver-<name>` container for each, and
    their devices are publishing again a few minutes after the upgrade.
 
 **If the moved devices have no data after the upgrade**, and their Edge
@@ -127,12 +128,36 @@ historian queries that read those devices. Other changes you may see:
   new Edge Agent pod, because the built-in connection made one each
   time, and it accepts the split driver's in the same way.
 
+**What a site with a UDP device must know.** A moved UDP connection's
+port now opens on the edge host its Edge Agent runs on, so a device on
+the plant network can send to that host's address, which it could not
+do with the built-in connection. That also means the port must be free
+on the host and allowed through the host's firewall. Every built-in UDP
+connection uses port 50205, because that was the only port the old form
+allowed, and a host can open each port once. So when two UDP
+connections could land on the same host (two Edge Agents pinned to one
+host, or an Edge Agent that is not pinned in a cluster with several
+hosts), only the first moves, and the other stays on the built-in
+connection and keeps working as before. The `service-setup` log names
+it in a line ending `Give one of them another port`. Give the
+connection that moved another port in the Manager, and point its device
+at the new port, and the next upgrade moves the one that stayed. (The
+built-in form only offers 50205, so the one that stayed can't be given
+another port.) The upgrade does not check
+that an Edge Agent with a UDP connection is pinned to a host, so on a
+cluster with more than one host, pin it with **Move** on the node's
+page before you point a device outside the cluster at it. See
+[Connecting a UDP device](../services/udp-devices.md) for the address
+to send to, the firewall rules and the host's receive buffer.
+
 **To move back** at any time, set
-`serviceSetup.config.splitDrivers.REST: false` (or `OPCUA: false`) and
-upgrade again. Every REST connection's config returns to exactly what
-it was. OPC UA connections return to the built-in connection with their
-details and "Defined by Protocol", and the Manager puts their metric
-paths back the next time it saves the device.
+`serviceSetup.config.splitDrivers.REST: false` (or `OPCUA: false`, or
+`UDP: false`) and upgrade again. Every REST and UDP connection's config
+returns to exactly what it was, and a moved UDP connection's port is
+closed on the host again. OPC UA connections return to the built-in
+connection with their details and "Defined by Protocol", and the
+Manager puts their metric paths back the next time it saves the
+device.
 
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.

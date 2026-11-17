@@ -21,6 +21,7 @@ on:
       - 'acs-service-setup/lib/split-drivers.js'
       # The sites the move tests move, which the harness reads.
       - 'acs-service-setup/test/rest-move/**'
+      - 'acs-service-setup/test/udp-move/**'
       - 'acs-service-setup/test/opcua-move/**'
       - '.github/workflows/acs-edge-tests.yaml'
 

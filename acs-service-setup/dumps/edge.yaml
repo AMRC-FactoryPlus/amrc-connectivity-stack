@@ -55,7 +55,7 @@ objects:
     !u ACS.Driver.REST:             { name: "REST (built-in)" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA (built-in)" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
-    !u ACS.Driver.UDP:              { name: "UDP" }
+    !u ACS.Driver.UDP:              { name: "UDP (built-in)" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
     !u ACS.Driver.Test:             { name: "Test" }
@@ -68,7 +68,7 @@ objects:
     !u ACS.Driver.RESTSplit:        { name: "REST" }
     !u ACS.Driver.MQTTSplit:        { name: "MQTT (split driver)" }
     !u ACS.Driver.OPCUASplit:       { name: "OPC-UA" }
-    !u ACS.Driver.UDPSplit:         { name: "UDP (split driver)" }
+    !u ACS.Driver.UDPSplit:         { name: "UDP" }
 
 configs:
   # Driver Definition Configuration
@@ -334,7 +334,12 @@ configs:
           - protocol
         title: MQTT Server Details
         type: object
+    # The built-in UDP driver. New UDP connections use the split driver
+    # (ACS.Driver.UDPSplit), so this one is hidden from the
+    # new-connection form, but a connection a site has moved back to it
+    # still shows it.
     !u ACS.Driver.UDP:
+      hidden: true
       polled: false
       presentation:
         address:
@@ -1211,12 +1216,12 @@ configs:
       image:
         repository: edge-opcua
       schema: *opcua_schema
-    # Not moved by lib/split-drivers.js yet: that is ACS-38.
+    # It has replaced the built-in: it is offered as "UDP", and the
+    # chart moves UDP connections to it by default.
     # The address field can't be hidden (the Admin UI only hides the
     # path), and every datagram goes to the empty address, so the form
     # says to leave it empty.
     !u ACS.Driver.UDPSplit:
-      hidden: true
       polled: false
       presentation:
         address:

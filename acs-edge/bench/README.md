@@ -137,3 +137,25 @@ ignores. To keep runs steady:
 | `build.mjs` | Compiles the agent code the benchmark imports, using `tsconfig.json`. |
 | `tsconfig.json` | Lists the agent files to compile and where the output goes. |
 | `baseline.json` | The run recorded when the benchmark was added. |
+
+## DDATA rate (`bench:rate`)
+
+`npm run bench:rate` answers a different question: with many values
+changing at a fixed rate on one device, how many DDATA messages a second
+does the agent publish, and how much CPU does it use?
+
+```sh
+npm run bench:rate -- --values 100,1000 --hz 10 --seconds 10
+```
+
+One device has one metric per value, each on its own address with no
+path. In `built-in` mode every change is one `data` event holding all
+the values, as the built-in OPC UA connection emits a notification. In
+`split` mode a stub driver (`rate-stub.mjs`, in a child process)
+publishes one `{"value", "timestamp"}` message per value, back to back,
+as edge-opcua does. The CPU figure is the agent's process only, as a
+share of one core. Split runs also report how each burst reached the
+agent: over how many synchronous runs and event-loop turns, and how many
+milliseconds from its first message to its last. Results go to
+`bench/results-rate.json`. CPU varies by a few points between runs, so
+run it three times and compare medians.

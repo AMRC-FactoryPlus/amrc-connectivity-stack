@@ -328,6 +328,35 @@ export function cpu_line (r: RunResult) {
     return parts.join("; ");
 }
 
+/* DDATA messages per device in each run, as a line of text. How
+ * values are grouped into messages is not compared, but a split driver
+ * that made the agent send many more messages than the built-in
+ * connection would load the central broker and everything subscribed,
+ * so the report shows the counts side by side. */
+export function ddata_counts (a: RunResult, b: RunResult) {
+    const per = (r: RunResult) => new Map([...r.output.counts]
+        .filter(([k]) => k.startsWith("DDATA "))
+        .map(([k, n]) => [k.slice(6), n]));
+    const x = per(a), y = per(b);
+    const devs = [...new Set([...x.keys(), ...y.keys()])].sort();
+    return devs.map(d => ({ device: d, a: x.get(d) ?? 0, b: y.get(d) ?? 0 }));
+}
+
+/* One difference for each device `b` sent more DDATA messages for
+ * than `a` did. */
+export function ddata_excess (a: RunResult, b: RunResult) {
+    return ddata_counts(a, b).filter(r => r.b > r.a)
+        .map(r => `DDATA ${r.device}: ${r.b} message(s) from ${b.label}, `
+            + `more than the ${r.a} from ${a.label}`);
+}
+
+export function ddata_line (a: RunResult, b: RunResult) {
+    const rows = ddata_counts(a, b);
+    if (!rows.length) return `DDATA per device: none`;
+    return `DDATA per device (${a.label} / ${b.label}): `
+        + rows.map(r => `${r.device} ${r.a} / ${r.b}`).join(", ");
+}
+
 /* Run a fixture twice and compare: `a` is the reference, `b` the run
  * under test. Each defaults to the built-in connection. */
 export async function golden (fixtures: { a: Fixture, b?: Fixture },
@@ -352,6 +381,21 @@ export function compare_runs (a: RunResult, b: RunResult, allowance?: number): G
     const per_msg = (r: RunResult) => r.delivered ? r.cpu.agent_us / r.delivered / 1000 : 0;
     const allowance_ms = Math.round(base_ms + Math.max(per_msg(a), per_msg(b)));
     const comparison = compare(a, b, { allowance_ms });
+    /* A split driver may make the agent send fewer DDATA messages than
+     * the built-in connection, because the agent gathers the values a
+     * driver sends together, but it should not send more: more loads
+     * the central broker and every subscriber. The Rust drivers can't
+     * meet that yet. Their MQTT client doesn't set TCP_NODELAY, so the
+     * second and later values of a burst reach the agent about 40 ms
+     * after the first (Nagle's algorithm waiting for a delayed ACK),
+     * too late to join its group, and an OPC UA notification can come
+     * out as two DDATA. So more is a warning, and a failure only with
+     * GOLDEN_STRICT_DDATA set. */
+    const more = opts.b?.driver && !opts.a?.driver ? ddata_excess(a, b) : [];
+    if (more.length && process.env.GOLDEN_STRICT_DDATA) {
+        comparison.ok = false;
+        comparison.diffs.push(...more);
+    }
     for (const r of [a, b])
         if (r.timed_out) {
             comparison.ok = false;
@@ -372,6 +416,8 @@ export function compare_runs (a: RunResult, b: RunResult, allowance?: number): G
         `Timing allowance: ${allowance_ms} ms (${base_ms} ms plus the agent's CPU per input message)`,
         `CPU: ${cpu_line(a)}`,
         `CPU: ${cpu_line(b)}`,
+        ddata_line(a, b),
+        ...(more.length && comparison.ok ? [`Warning: ${more.join("; ")}`] : []),
     ].join("\n");
     return { a, b, comparison, summary };
 }

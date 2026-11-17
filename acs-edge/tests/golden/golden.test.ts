@@ -76,6 +76,7 @@ const move_cases = (test: string) => {
     return { cases, secrets: site.secrets as { [k: string]: string } };
 };
 const REST_MOVE = move_cases("rest-move");
+const UDP_MOVE = move_cases("udp-move");
 const OPCUA_MOVE = move_cases("opcua-move");
 
 function show (name: string, r: GoldenResult) {
@@ -107,6 +108,7 @@ describe("Golden-output harness", () => {
             PayloadFormatMap["REST"],
             PayloadFormatMap["MQTT"],
             PayloadFormatMap["OPC UA"],
+            PayloadFormatMap["UDP"],
         ]);
     });
 
@@ -215,6 +217,29 @@ describe("Golden-output harness", () => {
                     : [];
                 expect(r.a.credentials).toEqual(expected);
                 expect(r.b.credentials).toEqual(expected);
+            });
+        });
+
+    /* The same for acs-service-setup/test/udp-move.test.js: three UDP
+     * connections, one in each payload format, on three agents. Each
+     * runs with its port opened on the host in the real cluster; here
+     * the sender sends to the driver's port on localhost. */
+    if (DRIVER_PROTOCOL == "UDP") describe.each(UDP_MOVE.cases)(
+        "split driver after service-setup's move %s",
+        (name, sample, before, after) => {
+            it(`${DRIVER!.name} matches built-in UDP`, async () => {
+                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
+                const fixture = truncate(read_fixture(path.join(SAMPLES, sample)), cap);
+                const r = await golden({ a: fixture }, {
+                    a: { entry: before },
+                    b: { entry: after, driver: DRIVER! },
+                });
+                show(`${name} after the move`, r);
+                expect(before.connType).toBe("UDP");
+                expect(after.connType).toBe("Driver");
+                expect(after.DriverDetails).toEqual(before.UDPConnDetails);
+                expect(r.comparison.values).toBeGreaterThan(0);
+                expect(explain(r)).toBe("");
             });
         });
 

@@ -8,7 +8,10 @@ name: Split driver golden output
 # they behave as the connections they replace.
 #
 # To add a driver, add its directory and the protocol of the fixtures
-# it replaces (GOLDEN_PROTOCOL) to the matrix below.
+# it replaces (GOLDEN_PROTOCOL) to the matrix below. A driver whose
+# tests need system packages (edge-mqtt needs mosquitto) also lists
+# them in `packages`, and `test_env` turns those tests on: rust.yaml
+# runs the same tests without the packages, where they skip.
 
 on:
   pull_request:
@@ -17,7 +20,9 @@ on:
       - main
       - 'feature/**'
     paths:
+      - 'edge-mqtt/**'
       - 'edge-rest/**'
+      - 'edge-udp/**'
       - 'lib/rs-edge-driver/**'
       - 'acs-edge/lib/**'
       - 'acs-edge/tests/golden/**'
@@ -42,8 +47,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - driver: edge-mqtt
+            protocol: MQTT
+            packages: mosquitto
+            test_env: EDGE_MQTT_MOSQUITTO=1
           - driver: edge-rest
             protocol: REST
+          - driver: edge-udp
+            protocol: UDP
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,6 +72,15 @@ jobs:
           key: ${{ runner.os }}-golden-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.driver }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.driver)) }}
           restore-keys: |
             ${{ runner.os }}-golden-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.driver }}-
+
+      - name: Install the driver's test packages
+        if: matrix.packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Driver tests with their packages
+        if: matrix.test_env
+        working-directory: ${{ matrix.driver }}
+        run: env ${{ matrix.test_env }} cargo test --locked
 
       - name: Build the driver
         working-directory: ${{ matrix.driver }}

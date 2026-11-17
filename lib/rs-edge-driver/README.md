@@ -109,6 +109,25 @@ kept outside this repository, is a real async-mode driver: it
 subscribes to a southbound MQTT broker and pushes data via
 `DriverHandle::publish` as it arrives.
 
+### A device that sends faster than the Edge Agent can take
+
+`DriverHandle::publish` queues without limit. That suits a device that
+sends at the rate it was asked for, but a device that pushes data on its
+own, such as a UDP sender, can outrun the Edge Agent, and the queue then
+grows until the container runs out of memory. Such a driver should call
+`DriverHandle::try_publish` instead. It returns `false`, and drops the
+data, while more than `DriverOptions::publish_queue_bytes` (16 MiB by
+default, each message counting its payload plus
+`PUBLISH_QUEUE_OVERHEAD`) is waiting to go to the agent. Count and log
+what it refuses, so the loss is visible. Data from both calls goes out
+in the order it was accepted. [`edge-udp`](../../edge-udp) does this.
+
+When the device side can hold data back, as an MQTT broker does for a
+slow subscriber, call `DriverHandle::publish_wait` instead. It meets the
+same limit by waiting rather than dropping: the handler stops reading
+from its device until the agent has taken enough, and nothing is lost
+in the driver. [`edge-mqtt`](../../edge-mqtt) does this.
+
 ## Connection status
 
 The driver reports its status to the Edge Agent on

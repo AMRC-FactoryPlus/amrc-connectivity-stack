@@ -6,7 +6,7 @@
 
 import { parseValueFromPayload } from "../../lib/helpers/typeHandler.js";
 import {
-    Fixture, FixtureEvent, HttpEvent, MqttEvent, event_address, event_payload,
+    Fixture, FixtureEvent, PayloadEvent, event_address, event_payload,
 } from "../fixtures/drivers/fixture.js";
 import { connection_metrics } from "../fixtures/drivers/metrics.js";
 
@@ -19,12 +19,34 @@ export interface Tampered {
     event:      number,
 }
 
-function body (ev: MqttEvent | HttpEvent) {
-    return ev.type == "mqtt" ? ev.payload : ev.body;
+function body (ev: PayloadEvent) {
+    return ev.type == "http" ? ev.body : ev.payload;
 }
 
-function with_body (ev: MqttEvent | HttpEvent, text: string): FixtureEvent {
-    return ev.type == "mqtt" ? { ...ev, payload: text } : { ...ev, body: text };
+function with_body (ev: PayloadEvent, text: string): FixtureEvent {
+    return ev.type == "http" ? { ...ev, body: text } : { ...ev, payload: text };
+}
+
+/* The payload's text with one number changed, or for a binary payload
+ * its bytes with one byte changed, in each way that might reach a
+ * metric. */
+function* variants (ev: PayloadEvent): Generator<PayloadEvent> {
+    const text = body(ev);
+    if (ev.type != "http" && ev.encoding == "base64") {
+        const bytes = Buffer.from(text, "base64");
+        for (let i = 0; i < bytes.length; i++) {
+            const changed = Buffer.from(bytes);
+            changed[i] = (changed[i] + 7) & 0xff;
+            yield with_body(ev, changed.toString("base64")) as PayloadEvent;
+        }
+        return;
+    }
+    for (const match of text.matchAll(/-?\d+(?:\.\d+)?/g)) {
+        const at = match.index!;
+        const next = String(Number(match[0]) + 7);
+        yield with_body(ev,
+            text.slice(0, at) + next + text.slice(at + match[0].length)) as PayloadEvent;
+    }
 }
 
 /* A copy of the fixture with one number in one event changed, and the
@@ -53,21 +75,14 @@ export function tamper (fixture: Fixture): Tampered {
             continue;
         }
 
-        if (ev.type != "mqtt" && ev.type != "http") continue;
-        if (ev.type == "mqtt" && ev.encoding == "base64") continue;
         const addr = event_address(ev);
         const readers = cm.read.filter(r => r.address == addr);
-        const text = body(ev);
-        const parse = (e: MqttEvent | HttpEvent) => readers.map(r =>
+        const parse = (e: PayloadEvent) => readers.map(r =>
             parseValueFromPayload(event_payload(e), r.metric,
                 fixture.meta.payloadFormat, fixture.meta.delimiter));
         const before = parse(ev);
 
-        for (const match of text.matchAll(/-?\d+(?:\.\d+)?/g)) {
-            const at = match.index!;
-            const next = String(Number(match[0]) + 7);
-            const changed_text = text.slice(0, at) + next + text.slice(at + match[0].length);
-            const changed_ev = with_body(ev, changed_text) as MqttEvent | HttpEvent;
+        for (const changed_ev of variants(ev)) {
             const after = parse(changed_ev);
             const i = after.findIndex((v, j) => v !== before[j]
                 && v != null && !Number.isNaN(v));

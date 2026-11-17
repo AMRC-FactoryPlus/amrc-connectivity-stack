@@ -4,6 +4,7 @@
  * Copyright 2026 University of Sheffield
  */
 
+import { CaptureClient, decode } from "./capture.js";
 import type { Metric, Output } from "./capture.js";
 import { compare, Run } from "./compare.js";
 
@@ -60,5 +61,36 @@ describe("compare", () => {
         expect(c.diffs).toEqual([
             `DBIRTH Dev metric "M": type Float in a, Double in b`,
         ]);
+    });
+});
+
+describe("decode", () => {
+    const client = () => {
+        const c = new CaptureClient();
+        const birth = (value: number) => ({
+            timestamp: Date.now(),
+            metrics: [{ name: "M", type: "Float", value }],
+        });
+        return { c, birth };
+    };
+
+    it("leaves out a DBIRTH that repeats the one before it", () => {
+        const { c, birth } = client();
+        c.publishDeviceBirth("Dev", birth(1));
+        c.publishDeviceBirth("Dev", birth(1));
+        const out = decode(c.messages);
+        expect(out.births.get("DBIRTH Dev")).toHaveLength(1);
+        expect(out.repeated?.get("DBIRTH Dev")).toBe(1);
+    });
+
+    it("keeps a DBIRTH with different metrics or with data before it", () => {
+        const { c, birth } = client();
+        c.publishDeviceBirth("Dev", birth(1));
+        c.publishDeviceBirth("Dev", birth(2));
+        c.publishDeviceData("Dev", { timestamp: Date.now(), metrics: [{ name: "M", type: "Float", value: 3 }] });
+        c.publishDeviceBirth("Dev", birth(2));
+        const out = decode(c.messages);
+        expect(out.births.get("DBIRTH Dev")).toHaveLength(3);
+        expect(out.repeated?.get("DBIRTH Dev")).toBeUndefined();
     });
 });

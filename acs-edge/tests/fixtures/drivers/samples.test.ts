@@ -13,6 +13,7 @@ import { verify } from "./verify.js";
 const SAMPLES = path.join(__dirname, "samples");
 const KINDS = [
     "opcua", "mqtt-json", "mqtt-delimited", "rest-json", "rest-xml",
+    "udp-buffer", "udp-delimited", "udp-json",
 ];
 
 const dirs = fs.readdirSync(SAMPLES).sort();
@@ -45,7 +46,7 @@ describe("Driver fixture samples", () => {
             for (const ev of fixture.events) {
                 const [addr, body] = ev.type == "opcua"
                     ? ["", JSON.stringify(ev.values)]
-                    : [event_address(ev), ev.type == "mqtt" ? ev.payload : ev.body];
+                    : [event_address(ev), ev.type == "http" ? ev.body : ev.payload];
                 if (!seen.has(addr)) seen.set(addr, new Set());
                 seen.get(addr)!.add(body);
             }

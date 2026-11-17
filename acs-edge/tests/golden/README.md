@@ -2,7 +2,7 @@
 
 This harness proves that a split driver makes the Edge Agent publish exactly the same Sparkplug output as the built-in connection it replaces. It takes a driver fixture (see `../fixtures/drivers/README.md`), replays the fixture's device input from a fake device, runs the real Edge Agent code against it twice, and compares what the agent publishes.
 
-Every split driver that replaces a built-in connection (REST, MQTT, OPC UA) must pass it before it is rolled out.
+Every split driver that replaces a built-in connection (REST, MQTT, OPC UA, UDP) must pass it before it is rolled out.
 
 ## Running it
 
@@ -52,6 +52,18 @@ A split driver is given the agent's broker address and its credentials in its en
 GOLDEN_DRIVER=../edge-rest/target/release/driver GOLDEN_PROTOCOL=REST npx jest tests/golden -t "split driver"
 ```
 
+A Rust driver built with Docker is a Linux binary, so run the harness in a Linux container too, with the repository mounted and `node_modules` kept in volumes so the host's are not touched. For `edge-udp`, from the repository root:
+
+```sh
+docker run --rm -v "$PWD":/w -w /w/edge-udp rust:1.99 cargo build --release --locked
+docker run --rm -v "$PWD":/w -v acs-edge-nm:/w/acs-edge/node_modules \
+    -v jsed-nm:/w/lib/js-edge-driver/node_modules node:22-trixie bash -c '
+    cd /w/lib/js-edge-driver && npm ci && cd /w/acs-edge &&
+    npm install --save=false --install-links &&
+    GOLDEN_DRIVER=/w/edge-udp/target/release/driver GOLDEN_PROTOCOL=UDP \
+        npx jest tests/golden -t "split driver"'
+```
+
 `GOLDEN_DRIVER` is split on spaces into a command and arguments. Run the binary directly, not through a shell or `npx`, because the harness reads the CPU time of the process it spawned.
 
 From code, `driver.ts` has the two kinds of driver the harness accepts, both a `DriverSpec`:
@@ -79,7 +91,7 @@ The fake devices:
 | REST | An HTTP stub. The n-th GET of a path gets the response that was current at fixture time n × interval, so both runs see the same sequence of responses however their poll timing differs. |
 | MQTT | An Aedes broker. Once every topic has a subscriber it publishes the recorded messages in order, at their scaled times. |
 | OPC UA | A node-opcua server with one variable per node. Security is off on both runs, because no fixture can run a certificate handshake. The connection samples four times per value change, so no change is missed or seen twice. |
-| UDP | A sender that waits for the connection to bind its port, then sends each datagram. The fixture format has no UDP events yet, so only its unit test uses it. |
+| UDP | A sender that waits for the connection to bind its port, then sends each datagram to `127.0.0.1` at its scaled time. |
 
 To add a kind, write a class implementing `FakeDevice` in `devices/device.ts` and add it to `Kinds` in `devices/index.ts`.
 
@@ -88,6 +100,7 @@ To add a kind, write a class implementing `FakeDevice` in `devices/device.ts` an
 `compare.ts` compares the second run with the first:
 
 - **NBIRTH and each device's DBIRTH**: the same metrics by name, with the same types, values and properties, sent the same number of times.
+  In both runs alike, a DBIRTH that straight away repeats the same device's DBIRTH, with the same metrics, is left out before counting, because it tells a consumer nothing new. The built-in MQTT connection sends one such repeat per device at startup: the agent's `DeviceConnection.open()` emits `open` at once, and the MQTT client emits it again when it connects. A split driver only reports `UP` once it is connected, so it sends one.
 - **DDATA**: for each device and metric, the same sequence of values, with the same types and properties. How values are grouped into DDATA messages is not compared, because it depends on which response arrives first.
 - **DDEATH**: the same number per device. A death mid-run means the device went away.
 

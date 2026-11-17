@@ -43,7 +43,20 @@ export interface OpcuaEvent {
     values: { [node_id: string]: OpcuaValue },
 }
 
-export type FixtureEvent = MqttEvent | HttpEvent | OpcuaEvent;
+/* One datagram sent to the connection's port at time t. The built-in
+ * UDP connection hands the agent every datagram under the address ""
+ * (the empty string), so the event has no address. */
+export interface UdpEvent {
+    t: number,
+    type: "udp",
+    payload: string,
+    encoding?: "utf8" | "base64",
+}
+
+export type FixtureEvent = MqttEvent | HttpEvent | OpcuaEvent | UdpEvent;
+
+/* The events that carry one payload for one address. */
+export type PayloadEvent = MqttEvent | HttpEvent | UdpEvent;
 
 /* A metric the fixture cannot drive, and why. */
 export interface Finding {
@@ -107,10 +120,10 @@ export function write_fixture (dir: string, fixture: Fixture) {
 }
 
 /* The payload as the built-in connection hands it to the Edge Agent's
- * parser: a Buffer for MQTT, and for REST what axios gives, which is a
- * parsed object for a JSON response and a string otherwise. */
-export function event_payload (ev: MqttEvent | HttpEvent): any {
-    if (ev.type == "mqtt")
+ * parser: a Buffer for MQTT and UDP, and for REST what axios gives,
+ * which is a parsed object for a JSON response and a string otherwise. */
+export function event_payload (ev: PayloadEvent): any {
+    if (ev.type == "mqtt" || ev.type == "udp")
         return Buffer.from(ev.payload, ev.encoding == "base64" ? "base64" : "utf8");
     if (/json/.test(ev.content_type)) {
         try { return JSON.parse(ev.body); }
@@ -120,6 +133,7 @@ export function event_payload (ev: MqttEvent | HttpEvent): any {
 }
 
 /* The Edge Agent address an event is for. */
-export function event_address (ev: MqttEvent | HttpEvent): string {
+export function event_address (ev: PayloadEvent): string {
+    if (ev.type == "udp") return "";
     return ev.type == "mqtt" ? ev.topic : ev.path;
 }

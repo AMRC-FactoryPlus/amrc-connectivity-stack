@@ -60,7 +60,10 @@ mod redact;
 mod status;
 mod write;
 
-pub use config::{DEFAULT_MAX_PACKET_SIZE, DriverConfig, DriverOptions};
+pub use config::{
+    DEFAULT_MAX_PACKET_SIZE, DEFAULT_PUBLISH_QUEUE_BYTES, DriverConfig, DriverOptions,
+    PUBLISH_QUEUE_OVERHEAD,
+};
 pub use driver::{Driver, DriverHandle};
 pub use error::{ConnectError, Error, HandlerError, WriteError};
 pub use handler::{Handler, Poller};

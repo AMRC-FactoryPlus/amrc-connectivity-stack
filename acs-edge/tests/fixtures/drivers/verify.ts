@@ -9,7 +9,7 @@ import {
     parseValueFromPayload, sparkplugDataType,
 } from "../../../lib/helpers/typeHandler.js";
 import {
-    Finding, Fixture, HttpEvent, MqttEvent, event_address, event_payload,
+    Finding, Fixture, PayloadEvent, event_address, event_payload,
 } from "./fixture.js";
 import { ConnectionMetrics, ReadMetric, connection_metrics, finding, js_type } from "./metrics.js";
 
@@ -83,12 +83,12 @@ export function verify (fixture: Fixture, opts: VerifyOpts = {},
         const seen = new Map<string, number>();
         fixture.events.forEach((ev, n) => {
             if (ev.type == "opcua") return;
-            const addr = event_address(ev as MqttEvent | HttpEvent);
+            const addr = event_address(ev as PayloadEvent);
             const count = (seen.get(addr) ?? 0) + 1;
             seen.set(addr, count);
             if (count > max) return;
             checked++;
-            const payload = event_payload(ev as MqttEvent | HttpEvent);
+            const payload = event_payload(ev as PayloadEvent);
             for (const { m, i } of by_addr.get(addr) ?? []) {
                 let v = parseValueFromPayload(payload, m.metric,
                     fixture.meta.payloadFormat, fixture.meta.delimiter);

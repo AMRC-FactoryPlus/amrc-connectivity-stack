@@ -64,11 +64,14 @@ pub(crate) enum DriverEvent<A> {
         seq: u64,
         addrs: Option<Vec<(String, String, A)>>,
     },
-    /// A typed write failed, to report on `err/{topic}`.
-    WriteFailed {
+    /// A typed write has finished. It is answered on `result/{id}` if
+    /// the agent is waiting for it, and a failure is otherwise
+    /// reported on `err/{topic}`.
+    WriteDone {
         generation: u64,
         topic: String,
-        error: WriteError,
+        id: Option<String>,
+        result: Result<(), WriteError>,
     },
 }
 
@@ -139,11 +142,13 @@ enum Op<A> {
     },
     Subscribe(Vec<A>),
     Cmd(String, Bytes),
-    /// A typed write, with the data topic to report a failure on.
+    /// A typed write, with the data topic to report a failure on and
+    /// the id to answer, if the agent is waiting for an answer.
     Write {
         topic: String,
         addr: A,
         value: WriteValue,
+        id: Option<String>,
     },
 }
 
@@ -713,12 +718,19 @@ impl<H: Handler + 'static> Driver<H> {
                     }
                 }
                 Op::Cmd(name, payload) => h.cmd(&name, payload).await,
-                Op::Write { topic, addr, value } => {
-                    if let Err(error) = h.write(&addr, value).await {
-                        let _ = tx.send(DriverEvent::WriteFailed {
+                Op::Write {
+                    topic,
+                    addr,
+                    value,
+                    id,
+                } => {
+                    let result = h.write(&addr, value).await;
+                    if result.is_err() || id.is_some() {
+                        let _ = tx.send(DriverEvent::WriteDone {
                             generation,
                             topic,
-                            error,
+                            id,
+                            result,
                         });
                     }
                 }
@@ -860,8 +872,13 @@ impl<H: Handler + 'static> Driver<H> {
     /// Handle a typed `write` — queue it for the handler, or report it
     /// as `CMD` if it can't be used.
     fn on_write(&self, session: &Session<H>, addr: String, payload: &[u8]) {
+        let id = WriteValue::id_of(payload);
         let Some(topic) = self.addr_topics.get(&addr).cloned() else {
             tracing::warn!(addr, "write to an address not in the address map");
+            if let Some(id) = id {
+                let error = WriteError::BadValue("address not in the address map".into());
+                self.report_write_result(session, &id, Err(&error));
+            }
             return;
         };
         let Some(parsed) = self.addrs.get(&topic).cloned() else {
@@ -873,9 +890,16 @@ impl<H: Handler + 'static> Driver<H> {
                     topic,
                     addr: parsed,
                     value,
+                    id,
                 });
             }
-            Err(e) => self.report_write_error(session, &topic, &WriteError::BadValue(e)),
+            Err(e) => {
+                let error = WriteError::BadValue(e);
+                match id {
+                    Some(id) => self.report_write_result(session, &id, Err(&error)),
+                    None => self.report_write_error(session, &topic, &error),
+                }
+            }
         }
     }
 
@@ -886,6 +910,24 @@ impl<H: Handler + 'static> Driver<H> {
         let payload = format!("{}\n{}", error.code(), error.message());
         let _ = session.outbound.send((
             self.topic_with("err", topic),
+            QoS::AtLeastOnce,
+            Bytes::from(payload),
+        ));
+    }
+
+    /// Answer a write the agent is waiting for on `result/{id}`: empty
+    /// if it was written, otherwise the code, a newline and the
+    /// message.
+    fn report_write_result(&self, session: &Session<H>, id: &str, result: Result<(), &WriteError>) {
+        let payload = match result {
+            Ok(()) => String::new(),
+            Err(error) => {
+                tracing::warn!(id, %error, "write failed");
+                format!("{}\n{}", error.code(), error.message())
+            }
+        };
+        let _ = session.outbound.send((
+            self.topic_with("result", id),
             QoS::AtLeastOnce,
             Bytes::from(payload),
         ));
@@ -966,15 +1008,22 @@ impl<H: Handler + 'static> Driver<H> {
                     self.on_parsed(session, addrs);
                 }
             }
-            DriverEvent::WriteFailed {
+            DriverEvent::WriteDone {
                 generation,
                 topic,
-                error,
-            } => {
-                if generation == self.generation {
-                    self.report_write_error(session, &topic, &error);
+                id,
+                result,
+            } => match id {
+                // The agent is waiting for this answer, and the write
+                // has happened or not whatever has changed since.
+                Some(id) => self.report_write_result(session, &id, result.as_ref().map(|_| ())),
+                None if generation == self.generation => {
+                    if let Err(error) = result {
+                        self.report_write_error(session, &topic, &error);
+                    }
                 }
-            }
+                None => {}
+            },
         }
     }
 

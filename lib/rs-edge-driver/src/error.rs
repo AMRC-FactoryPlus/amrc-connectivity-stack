@@ -27,9 +27,10 @@ impl HandlerError {
 }
 
 /// Error returned by [`Handler::write`](crate::Handler::write) when a
-/// typed write fails. The driver reports it to the edge agent on
-/// `fpEdge1/{id}/err/{data topic}` as the error code, a newline and
-/// the message.
+/// typed write fails. The driver reports it to the edge agent as the
+/// error code, a newline and the message: on `fpEdge1/{id}/result/{write
+/// id}` if the agent is waiting for an answer, otherwise on
+/// `fpEdge1/{id}/err/{data topic}`.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum WriteError {
     /// The address can't be written. Reported as `RO`.

@@ -439,6 +439,7 @@ serviceSetup:
     # docs/architecture/edge-management/split-drivers.md.
     splitDrivers:
       REST: true
+      MQTT: true
       OPCUA: true
       UDP: true
 

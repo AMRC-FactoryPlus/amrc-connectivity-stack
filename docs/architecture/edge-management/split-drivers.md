@@ -11,9 +11,8 @@ deployed, versioned and fixed in the same way. The protocol between the
 Edge Agent and a split driver is described in
 [`acs-edge/docs/edge-split.md`](../../../acs-edge/docs/edge-split.md).
 
-REST, OPC UA and UDP are the first to move. Their split drivers are
-`edge-rest`, `edge-opcua` and `edge-udp`. MQTT keeps its built-in
-connection until its driver is ready.
+REST, MQTT, OPC UA and UDP move in version 7. Their split drivers are
+`edge-rest`, `edge-mqtt`, `edge-opcua` and `edge-udp`.
 
 ## The setting
 
@@ -25,9 +24,9 @@ serviceSetup:
   config:
     splitDrivers:
       REST: true      # the chart's default
+      MQTT: true      # the chart's default
       OPCUA: true     # the chart's default
       UDP: true       # the chart's default
-      # MQTT: not set, so it stays built in
       # dryRun: true  # log what would move and change nothing
 ```
 
@@ -41,21 +40,24 @@ Each protocol takes one of three values:
 
 Helm merges your values over the chart's, so you only need to set the
 protocol you want to change. To stop REST moving at all, set
-`REST: null`. With `dryRun: true`, service-setup logs each change it
+`REST: null`, and likewise for MQTT. With `dryRun: true`, service-setup logs each change it
 would make and writes nothing, which is a safe way to see what an
 upgrade will do before you make it.
 
 ## What an upgrade does
 
-For each built-in REST connection, service-setup:
+For each built-in REST or MQTT connection, service-setup:
 
-1. changes the connection's driver to the REST split driver;
+1. changes the connection's driver to the protocol's split driver;
 2. changes the connection's entry in its Edge Agent's config from
-   `connType: REST` with `RESTConnDetails` to `connType: Driver` with
-   `DriverDetails`, keeping every field (base URL, authentication,
-   devices, addresses, paths and payload formats) as it was;
-3. adds an `edge-rest` sidecar for the connection to the Edge Agent's
-   deployment.
+   `connType: REST` with `RESTConnDetails`, or `connType: MQTT` with
+   `MQTTConnDetails`, to `connType: Driver` with `DriverDetails`,
+   keeping every field as it was: for REST the base URL and
+   authentication, for MQTT the host, port, protocol, TLS, username,
+   password, client id, keep-alive and clean session, and for both the
+   devices, addresses, paths and payload formats;
+3. adds an `edge-rest` or `edge-mqtt` sidecar for the connection to the
+   Edge Agent's deployment.
 
 A connection whose name can't be used as a container or MQTT name (for
 example one with a dot, an underscore or a space in it, such as a name
@@ -67,9 +69,11 @@ The Edge Agent reloads its config as soon as service-setup writes it,
 and its pod restarts with the new sidecar once the edge cluster has
 applied the new deployment, which normally takes a few minutes. An
 upgrade already restarts every Edge Agent once for its new image, so
-expect an Edge Agent with REST connections to restart once or twice in
-the minutes after the upgrade, and its REST devices to have no data for
-that time.
+expect an Edge Agent with REST or MQTT connections to restart once or
+twice in the minutes after the upgrade, and those devices to have no
+data for that time. An MQTT connection with a fixed client id and clean
+session off has a persistent session on its broker, which the split
+driver takes over because it connects with the same client id.
 
 Built-in UDP connections move the same way, to an `edge-udp` sidecar
 each, with `UDPConnDetails` becoming `DriverDetails` and the port kept.
@@ -105,11 +109,12 @@ finished by the next one.
 ### New connections
 
 After the upgrade, the connection form in the Manager offers one REST
-driver, called "REST", which is the split driver. The built-in driver is
-called "REST (built-in)" and is shown only on a connection that still
-uses it, for example on a site that has moved REST back. OPC UA and UDP
-are the same: the split drivers are "OPC-UA" and "UDP", and the
-built-ins "OPC-UA (built-in)" and "UDP (built-in)".
+driver, called "REST", one MQTT driver, called "MQTT", one OPC UA
+driver, called "OPC-UA", and one UDP driver, called "UDP", which are
+the split drivers. The built-in drivers are called "REST (built-in)",
+"MQTT (built-in)", "OPC-UA (built-in)" and "UDP (built-in)" and are
+shown only on a connection that still uses one, for example on a site
+that has moved a protocol back.
 
 ## Edge charts and every split driver move
 
@@ -159,6 +164,15 @@ clusters run.
    example `REST: null`) for this upgrade. Its connections then stay
    built in, and you can set it back to `true` on a later upgrade, once
    you have merged.
+4. **Remove any image pin from your Edge Agents.** A sidecar's image is
+   its repository with the tag and registry from `image.default` in the
+   Edge Agent Deployment's values, so for an Edge Agent whose Deployment
+   sets its own tag or registry (under `image.default` or
+   `image.edgeAgent`) no split driver image exists. Service-setup
+   doesn't move that agent's connections: it counts them as held back
+   and logs a line for each that says `not moving to the split driver`
+   and names the setting. Remove the setting and the next upgrade moves
+   them.
 
 The service-setup Job's `edge-helm-charts` container logs a line
 starting `WARNING: branch main of shared/helm has commits of its own`
@@ -216,6 +230,68 @@ these differences:
   a body built from every metric on the address.
 - **One more container per connection.** Each REST connection runs in
   its own `edge-rest` container in the Edge Agent's pod.
+
+## What changes for an MQTT connection
+
+`edge-mqtt` subscribes to the same topics with the same connection
+details as the built-in connection and hands the Edge Agent each
+message's payload unchanged, so the Edge Agent reads it with the same
+payload format and metric paths, and the data your devices publish
+doesn't change. That holds for every payload format (JSON,
+JSON (Batched), XML, Delimited String and Buffer) and for wildcard
+topics. Its full behaviour is in
+[`edge-mqtt/README.md`](../../../edge-mqtt/README.md). You may notice
+these differences:
+
+- **A lost broker takes the devices offline.** While the driver can't
+  reach the broker, or the broker refuses its username or password, the
+  connection's devices are marked offline, and they come back when it
+  reconnects. The driver tries again every 10 seconds, as the built-in
+  connection did. The built-in connection left its devices online while
+  its broker was away, so their last values looked current.
+- **Writes publish the value as text.** A write to an MQTT metric
+  publishes the value alone (`21.5`, `true`) to the metric's topic. The
+  built-in connection built the message from the device's payload
+  format and the metric's path. If anything you run writes to MQTT
+  metrics, check it accepts the plain value.
+- **Very large messages are dropped.** A message larger than about
+  16 MB is dropped with a warning in the driver's log.
+- **Shared topics stay subscribed.** When a device is removed, a topic
+  another device on the connection still reads stays subscribed. The
+  built-in connection unsubscribed it, which stopped the other device's
+  data until the agent restarted.
+- **Certificates are checked as before.** Over TLS the broker's
+  certificate must be signed by a well-known certificate authority, as
+  with the built-in connection, so a broker with a self-signed
+  certificate is still refused.
+- **CPU moves between containers.** Each message now crosses the pod's
+  internal broker, and the driver container uses a little CPU of its
+  own. The Edge Agent uses less than it did with the built-in
+  connection, so the pod as a whole uses about the same or less. See
+  "CPU" below.
+- **One more container per connection.** Each MQTT connection runs in
+  its own `edge-mqtt` container in the Edge Agent's pod.
+
+### CPU
+
+The Edge Agent and `edge-mqtt` were measured against the built-in
+connection on a connection shaped like the busiest MQTT connection in
+use: 7 devices, 2,721 metrics and 112 topics of JSON, with messages
+from a separate broker at 123, 370 and 1,232 messages a second.
+
+| Messages a second | Edge Agent, built-in | Edge Agent, split | `edge-mqtt` |
+|---|---|---|---|
+| 123 | 9 to 10% of a core | 6% | 1% |
+| 370 | 20 to 22% | 14% | 1 to 2% |
+| 1,232 | 37 to 39% | 25% | 2% |
+
+`edge-mqtt` uses about 5 MB of memory, whatever the number of metrics.
+No message was lost or reordered. Before version 7 the Edge Agent ran
+each device's poll timer every millisecond when the connection had no
+poll interval, which is every MQTT connection, and with a split driver
+each tick sent the driver a poll it had nothing to do with. That more
+than doubled the Edge Agent's CPU at 123 messages a second (21 to 24%).
+A device with no poll interval now has no poll timer.
 
 ## What changes for a UDP connection
 
@@ -306,28 +382,29 @@ You may notice these differences:
 
 1. In the service-setup Job's log, find the line that starts
    `Split drivers:`. It gives how many connections moved, how many
-   were held back by a port clash and how many failed, and the lines
-   above it name each connection.
-2. In the Manager, open a REST, OPC UA or UDP connection. Its driver is
-   "REST", "OPC-UA" or "UDP".
+   were held back and how many failed, and the lines above it name each
+   connection and say why it was held back.
+2. In the Manager, open a moved connection. Its driver is "REST",
+   "MQTT", "OPC-UA" or "UDP".
 3. On the edge cluster, the Edge Agent's pod has a `driver-<name>`
-   container for each REST, OPC UA and UDP connection, and each is
+   container for each moved connection, and each is
    running.
 4. The connection's devices are publishing data again a few minutes
    after the upgrade.
 
 ## Moving back
 
-Set `REST: false` under `serviceSetup.config.splitDrivers` in your
-values and upgrade. Service-setup moves every REST connection back to
-the built-in connection, removes its sidecar, and leaves each
-connection's config exactly as it was before it moved. A REST
-connection created in the Manager after the move uses the split driver,
-and the next upgrade with `REST: false` moves it to the built-in
-connection too. `UDP: false` does the same for UDP connections and
-closes their ports on the edge hosts. A UDP connection that was given a
-port other than 50205 after the move keeps it, and the built-in
-connection listens on it inside the pod.
+Set `REST: false`, `MQTT: false` or `UDP: false` under
+`serviceSetup.config.splitDrivers` in your values and upgrade.
+Service-setup moves every connection of that protocol back to the
+built-in connection, removes its sidecar, and leaves each connection's
+config, and its Edge Agent's deployment, exactly as they were before
+the move. A connection created in the Manager after the move uses the
+split driver, and the next upgrade with the protocol set to `false`
+moves it to the built-in connection too. `UDP: false` also closes the
+UDP ports on the edge hosts. A UDP connection that was given a port
+other than 50205 after the move keeps it, and the built-in connection
+listens on it inside the pod.
 
 `OPCUA: false` moves OPC UA connections back in the same way, and their
 payload format back to "Defined by Protocol" (also on a connection that
@@ -338,8 +415,8 @@ device's origin map the next time it saves the device or connection.
 
 ## Adding a protocol's migration
 
-This is for developers moving another built-in protocol (MQTT, UDP, OPC
-UA) to its split driver. Follow what REST did:
+This is for developers moving another built-in protocol (UDP, OPC UA)
+to its split driver. Follow what REST and MQTT did:
 
 1. **DriverDefs.** In `acs-service-setup/dumps/edge.yaml`, the split
    DriverDef already exists and is hidden. Remove its `hidden`, name it

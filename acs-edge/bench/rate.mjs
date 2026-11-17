@@ -4,6 +4,7 @@
  * Copyright 2026 University of Sheffield
  *
  *   npm run bench:rate -- [--values 100,1000] [--hz 10] [--seconds 10]
+ *       [--stub <driver binary>]
  *
  * One device has one metric per value, each on its own address, the
  * way an OPC UA connection reads one node per metric. Every value
@@ -14,7 +15,9 @@
  *   subscription notification.
  * - split: a stub driver in a child process publishes one message per
  *   value, back to back, through the agent's driver broker, as
- *   edge-opcua does.
+ *   edge-opcua does. `--stub` runs a driver binary instead, such as
+ *   lib/rs-edge-driver's `rate_stub` example, which does the same over
+ *   the Rust driver library's link to the agent.
  *
  * For each it reports DDATA messages a second and the agent's CPU as a
  * share of one core. The stub's own CPU is not counted. For the split
@@ -23,7 +26,7 @@
  * long it took from its first message to its last.
  */
 
-import { fork } from "node:child_process";
+import { fork, spawn } from "node:child_process";
 import fs   from "node:fs";
 import net  from "node:net";
 import os   from "node:os";
@@ -43,6 +46,7 @@ const { values: args } = parseArgs({ options: {
     seconds:    { type: "string", default: "10" },
     warmup:     { type: "string", default: "3" },
     modes:      { type: "string", default: "built-in,split" },
+    stub:       { type: "string" },
 } });
 const HZ = Number(args.hz);
 const SECONDS = Number(args.seconds);
@@ -184,21 +188,43 @@ async function run_split (n) {
     const dev = make_device(node, conn, bench_case(n, true));
     conn.on("open", () => dev._deviceConnected());
 
-    const child = fork(path.join(here, "rate-stub.mjs"),
-        [url, id, password, String(n), String(HZ)],
-        { stdio: ["ignore", "inherit", "inherit", "ipc"] });
-    const ready = new Promise(r => child.once("message", r));
+    let child, ready;
+    if (args.stub) {
+        /* A driver binary starts sending as soon as it has its
+         * addresses, so it is ready when its first data arrives. */
+        child = spawn(args.stub, [], {
+            stdio: ["ignore", "inherit", "inherit"],
+            env: { ...process.env, EDGE_MQTT: url, EDGE_USERNAME: id,
+                EDGE_PASSWORD: password, RATE_HZ: String(HZ) },
+        });
+        ready = new Promise(r => {
+            const first = m => {
+                if (m.msg != "data") return;
+                broker.off("message", first);
+                r();
+            };
+            broker.on("message", first);
+        });
+    }
+    else {
+        child = fork(path.join(here, "rate-stub.mjs"),
+            [url, id, password, String(n), String(HZ)],
+            { stdio: ["ignore", "inherit", "inherit", "ipc"] });
+        ready = new Promise(r => child.once("message", r));
+    }
     conn.open();
     await ready;
     await sleep(150);
 
     const seen = arrivals(broker);
-    child.send({ start: true });
+    if (!args.stub) child.send({ start: true });
     const r = await window(mqtt);
     const a = seen();
 
-    child.send({ exit: true });
-    await new Promise(r => child.once("exit", r));
+    const exited = new Promise(r => child.once("exit", r));
+    if (args.stub) child.kill();
+    else child.send({ exit: true });
+    await exited;
     dev._stopMetricSubscription();
     conn.close();
     await broker.stop();

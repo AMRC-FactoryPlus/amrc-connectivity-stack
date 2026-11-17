@@ -1,0 +1,37 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-mqtt-batched",
+  "agent": "sample-agent",
+  "protocol": "MQTT",
+  "payloadFormat": "JSON (Batched)",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "batched:array-and-object",
+    "many-metrics-per-address",
+    "mqtt:protocol:mqtt",
+    "mqtt:wildcard",
+    "mqtt:overlapping-filters",
+    "multi-device",
+    "payload:JSON (Batched)",
+    "protocol:MQTT",
+    "type:Boolean",
+    "type:Double",
+    "type:Float",
+    "type:String",
+    "type:UInt32"
+  ],
+  "counts": {
+    "devices": 2,
+    "metrics": 9,
+    "read_metrics": 9,
+    "addresses": 9,
+    "events": 40,
+    "bytes": 3852
+  },
+  "findings": []
+}

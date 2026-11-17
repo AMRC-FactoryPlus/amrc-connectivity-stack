@@ -1,6 +1,6 @@
 /*
  * ACS service setup
- * A whole site's MQTT connections moved by the chart's defaults, and back
+ * A whole site's MQTT connections moved by the chart's defaults
  * Copyright 2026 University of Sheffield AMRC
  *
  * mqtt-move/site.json is a site before an upgrade:
@@ -70,13 +70,12 @@ const C = {
 };
 const MQTT = [C.json, C.delimited, C.batched, C.xml, C.buffer];
 
-/* serviceSetup.config.splitDrivers as the chart ships it, but with OPC
- * UA left where it is: the site's OPC UA connection stands for a
- * protocol this test doesn't move. opcua-move.test.js moves OPC UA. */
+/* serviceSetup.config.splitDrivers as the chart ships it. Every built-in
+ * connection moves, so the site's OPC UA connection does too. */
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));
-    return { ...values.serviceSetup.config.splitDrivers, OPCUA: null };
+    return values.serviceSetup.config.splitDrivers;
 }
 
 /* The DriverDefs as edge.yaml loads them on upgrade. */
@@ -122,8 +121,9 @@ const site_entry = conn => SITE.configs[App.EdgeAgentConfig][agent_of(conn)]
 describe("moving a site's MQTT connections with the chart's defaults", () => {
     const defaults = chart_defaults();
 
-    test("the chart moves MQTT", () => {
-        assert.equal(defaults.MQTT, true);
+    test("the chart holds no protocol back", () => {
+        for (const p of ["REST", "MQTT", "OPCUA", "UDP"])
+            assert.ok(!(p in defaults), `splitDrivers.${p} is set`);
     });
 
     test("the site's MQTT connections are the golden-output samples", () => {
@@ -143,10 +143,11 @@ describe("moving a site's MQTT connections with the chart's defaults", () => {
             ["JSON", "Delimited String", "JSON (Batched)", "XML", "Buffer"]);
     });
 
-    test("moves every built-in MQTT connection and nothing else", async () => {
+    test("moves every built-in MQTT connection", async () => {
         const cdb = site();
         const count = await run(cdb, defaults);
-        assert.equal(count.moved, 5);
+        /* The five MQTT connections and the oven's OPC UA one. */
+        assert.equal(count.moved, 6);
         assert.equal(count.failed, 0);
 
         for (const conn of MQTT) {
@@ -187,10 +188,11 @@ describe("moving a site's MQTT connections with the chart's defaults", () => {
         assert.equal(ids[C.delimited], undefined);
         assert.equal(ids[C.buffer], undefined);
 
-        /* The Modbus driver and the agent with no MQTT are untouched. */
+        /* The Modbus driver is untouched. The oven's OPC UA connection
+         * moves too, as every built-in connection does. */
         assert.deepEqual(entry(cdb, C.plc), site_entry(C.plc));
-        assert.ok(!cdb.writes.some(w => w.obj == OVEN || w.obj == C.oven || w.obj == C.plc),
-            "nothing about the agent with no MQTT, or the Modbus driver, is written");
+        assert.ok(!cdb.writes.some(w => w.obj == C.plc), "the Modbus driver is not written");
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.oven).driver, Driver.OPCUASplit);
 
         /* Each Deployment gets an edge-mqtt sidecar per connection,
          * keyed by its driver id, with no tag of its own. The cell
@@ -222,51 +224,30 @@ describe("moving a site's MQTT connections with the chart's defaults", () => {
         assert.equal(count.moved, 0);
     });
 
-    test("moving back leaves every config as it was, byte for byte", async () => {
+    test("false is refused and MQTT connections still move", async () => {
         const cdb = site();
-        await run(cdb, defaults);
-        /* A site sets MQTT to false in its own values; Helm merges that
-         * over the chart's. */
-        const back = { ...defaults, MQTT: false };
-        const count = await run(cdb, back);
-        assert.equal(count.moved, 5);
-        assert.equal(text(jsonb(state(cdb))), text(jsonb(SITE.configs)));
-
-        cdb.writes = [];
-        await run(cdb, back);
-        assert.deepEqual(cdb.writes, [], "a second run back writes nothing");
-    });
-
-    test("moving back keeps an empty drivers map the Manager wrote", async () => {
-        /* The cell agent's Deployment has no values.drivers, so the
-         * move adds it and moving back removes it. The Manager writes
-         * an empty map when it saves an agent with no split drivers,
-         * and that stays. */
-        const cdb = site();
-        const dep = cdb.get(Edge.App.Deployment, CELL);
-        dep.values.drivers = {};
-        cdb.set(Edge.App.Deployment, CELL, dep);
-        const before = text(state(cdb));
-
-        await run(cdb, defaults);
-        assert.equal(cdb.get(App.ConnectionConfiguration, C.xml).splitMigration.addedDrivers,
-            undefined);
-        await run(cdb, { ...defaults, MQTT: false });
-        assert.equal(text(state(cdb)), before);
-    });
-
-    test("moving again after moving back gives the same configs", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        await run(cdb, { ...defaults, MQTT: false });
-        await run(cdb, defaults);
+        const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: false });
+        assert.equal(count.moved, 6);
         assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+        assert.equal(lines.filter(l =>
+            l.startsWith("ERROR: serviceSetup.config.splitDrivers.MQTT is false.")).length, 1);
     });
 
-    test("null leaves MQTT connections where they are", async () => {
+    /* A site whose Edge Agents still run version 6 holds MQTT with null. */
+    test("null holds every MQTT connection where it is, and says how many", async () => {
         const cdb = site();
-        await run(cdb, { ...defaults, MQTT: null });
-        assert.equal(text(jsonb(state(cdb))), text(jsonb(SITE.configs)));
+        const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: null });
+        assert.equal(count.held, 5);
+        /* Only the oven's OPC UA connection moves. */
+        assert.equal(count.moved, 1);
+        for (const conn of MQTT)
+            assert.deepEqual(entry(cdb, conn), site_entry(conn));
+        assert.equal(lines.filter(l => l.startsWith(
+            "ERROR: serviceSetup.config.splitDrivers.MQTT is null, so 5 MQTT")).length, 1);
+
+        const again = await run_logged(cdb, defaults);
+        assert.equal(again.count.moved, 5);
+        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
     });
 });
 
@@ -301,7 +282,7 @@ describe("an Edge Agent whose Deployment pins its image", () => {
             pin(cdb, CELL, image);
             const { count, lines } = await run_logged(cdb, defaults);
             assert.equal(count.held, 2);
-            assert.equal(count.moved, 3);
+            assert.equal(count.moved, 4);
 
             for (const conn of CELL_MQTT) {
                 assert.equal(cdb.get(App.ConnectionConfiguration, conn).driver, Driver.MQTT);
@@ -311,7 +292,8 @@ describe("an Edge Agent whose Deployment pins its image", () => {
             const held = lines.filter(l => /not moving to the split driver/.test(l));
             assert.equal(held.length, 2, "one line per connection");
             assert.match(held[0], /Deployment sets image\./);
-            assert.match(held[0], /Remove that from the Deployment's values/);
+            assert.match(held[0], /keeps running the connection itself/);
+            assert.match(held[0], /Remove the setting from the Deployment's values/);
 
             /* Removing the pin lets the next run move them, and the
              * result is the same as moving without a pin. */
@@ -323,21 +305,11 @@ describe("an Edge Agent whose Deployment pins its image", () => {
         });
     }
 
-    test("a pinned Deployment still moves back", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        pin(cdb, CELL, { default: { tag: "batch.2" } });
-        const { count } = await run_logged(cdb, { ...defaults, MQTT: false });
-        assert.equal(count.moved, 5);
-        assert.equal(count.held, 0);
-        assert.equal(entry(cdb, C.xml).connType, "MQTT");
-    });
-
     test("a pin without a tag or registry doesn't hold anything back", async () => {
         const cdb = site();
         pin(cdb, CELL, { default: { pullPolicy: "Always" } });
         const { count } = await run_logged(cdb, defaults);
-        assert.equal(count.moved, 5);
+        assert.equal(count.moved, 6);
         assert.equal(count.held, 0);
     });
 });

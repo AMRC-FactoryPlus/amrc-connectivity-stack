@@ -77,7 +77,7 @@
         "keepAlive": 60,
         "cleanSession": true
       },
-      "driver": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+      "driver": "540ae6a1-16c5-43d2-be9e-0bf0a628641e",
       "source": {
         "payloadFormat": "JSON"
       },
@@ -87,7 +87,11 @@
       },
       "createdAt": "2026-01-01T00:00:00.000Z",
       "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
-      "deployment": {}
+      "deployment": {},
+      "splitMigration": {
+        "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        "payloadFormat": "JSON"
+      }
     }
   },
   "aac6f843-cfee-4683-b121-6943bfdf9173": {
@@ -441,9 +445,8 @@
               "payloadFormat": "JSON"
             }
           ],
-          "connType": "MQTT",
-          "payloadFormat": "JSON",
-          "MQTTConnDetails": {
+          "connType": "Driver",
+          "DriverDetails": {
             "host": "broker.local",
             "port": 8883,
             "useSSL": true,
@@ -453,7 +456,8 @@
             "username": "line",
             "keepAlive": 60,
             "cleanSession": true
-          }
+          },
+          "payloadFormat": "JSON"
         }
       ]
     }
@@ -491,7 +495,14 @@
       "chart": "dddddddd-0000-4000-8000-000000000001",
       "values": {
         "name": "line-agent",
-        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b"
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b",
+        "drivers": {
+          "LineBroker": {
+            "image": {
+              "repository": "edge-mqtt"
+            }
+          }
+        }
       },
       "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
       "hostname": "edge-2"

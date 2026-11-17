@@ -3,8 +3,8 @@ name: Split driver golden output
 # Builds each Rust split driver that replaces a built-in Edge Agent
 # connection and runs the golden-output harness (acs-edge/tests/golden)
 # against it: every committed sample for its protocol goes through the
-# built-in connection and through the driver, and the Sparkplug output
-# must match. rust.yaml lints and unit-tests the drivers; this proves
+# driver, and the Sparkplug output must match the built-in connection's,
+# recorded in acs-edge/tests/golden/recorded before ACS 7 removed it. rust.yaml lints and unit-tests the drivers; this proves
 # they behave as the connections they replace.
 #
 # To add a driver, add its directory and the protocol of the fixtures
@@ -125,7 +125,7 @@ jobs:
           GOLDEN_PROTOCOL: ${{ matrix.protocol }}
         run: |
           npx jest --ci tests/golden -t "split driver" 2>&1 | tee golden.log
-          grep -q "matches built-in" golden.log
+          grep -q "matches recorded built-in" golden.log
           # Every protocol also replays what service-setup's move leaves.
           case "$GOLDEN_PROTOCOL" in
             REST|MQTT|UDP|"OPC UA") grep -q "after the move" golden.log ;;

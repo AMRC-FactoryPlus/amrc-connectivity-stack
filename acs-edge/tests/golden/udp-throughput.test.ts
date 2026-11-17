@@ -1,12 +1,11 @@
 /*
  * ACS Edge Agent
- * UDP throughput: the built-in connection against a split driver
+ * UDP throughput through the UDP split driver
  * Copyright 2026 University of Sheffield
  */
 
-/* Sends numbered datagrams at fixed rates to the real Edge Agent, once
- * through the built-in UDP connection and once through a split driver,
- * and reports for each run how many datagrams reached the agent's
+/* Sends numbered datagrams at fixed rates to the real Edge Agent through
+ * the UDP split driver, and reports for each run how many datagrams reached the agent's
  * Sparkplug output, whether they stayed in order, and the CPU and
  * memory the agent and the driver used.
  *
@@ -23,7 +22,10 @@
  * The datagrams are made up: a sequence number and twelve doubles, as
  * a robot might send its joint positions, as a 100-byte Buffer, as
  * JSON, or as a Buffer padded to 1,400 bytes. Every value changes in
- * every datagram, so each datagram makes one DDATA of 13 metrics. */
+ * every datagram, so each datagram makes one DDATA of 13 metrics.
+ *
+ * Until ACS 7 it also ran each rate through the built-in UDP connection
+ * for comparison. That connection is gone. */
 
 import { ChildProcess, spawn } from "child_process";
 import crypto from "crypto";
@@ -366,12 +368,12 @@ function table (rs: Result[]): string {
 (ENABLED ? describe : describe.skip)("UDP throughput", () => {
     jest.setTimeout(3_600_000);
 
-    it("reports loss, order, CPU and memory for built-in and split", async () => {
+    it("reports loss, order, CPU and memory through the split driver", async () => {
         if (!DRIVER) throw new Error("Set GOLDEN_DRIVER to the edge-udp binary");
         const results: Result[] = [];
         for (const c of CASES)
             for (const rate of RATES)
-                for (const split of [false, true]) {
+                for (const split of [true]) {
                     const r = await run(c, rate, split);
                     results.push(r);
                     process.stdout.write(`${JSON.stringify(r)}\n`);
@@ -388,7 +390,7 @@ function table (rs: Result[]): string {
         if (process.env.UDP_THROUGHPUT_OUT)
             fs.writeFileSync(process.env.UDP_THROUGHPUT_OUT,
                 JSON.stringify(results, null, 2) + "\n");
-        /* Order must hold at every rate on both paths. Loss is
+        /* Order must hold at every rate. Loss is
          * reported, not asserted: it depends on the machine. */
         expect(results.filter(r => !r.in_order)).toEqual([]);
     });

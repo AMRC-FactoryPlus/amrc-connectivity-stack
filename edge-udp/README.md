@@ -109,8 +109,9 @@ docker run --rm -v "$PWD":/w -w /w/edge-udp rust:1.99 cargo test
 - `tests/driver.rs` runs the whole driver over MQTT and a real socket
   against the fake Edge Agent from `rs-edge-driver`'s tests.
 - The golden-output harness (`acs-edge/tests/golden`) runs the real
-  Edge Agent once with the built-in connection and once with this
-  driver, on the `udp-*` fixtures, and requires identical Sparkplug
-  output. Its README says how to run it with a Docker-built binary.
+  Edge Agent with this driver on the `udp-*` fixtures and requires the
+  Sparkplug output the built-in connection gave, from runs recorded
+  before ACS 7 removed it. Its README says how to run it with a Docker-built binary.
 - `acs-edge/tests/golden/udp-throughput.test.ts` sends datagrams at
-  fixed rates through both and reports loss, order, CPU and memory.
+  fixed rates through this driver and reports loss, order, CPU and
+  memory.

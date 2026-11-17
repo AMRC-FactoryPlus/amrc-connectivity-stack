@@ -109,7 +109,6 @@
       "deployment": {},
       "splitMigration": {
         "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
-        "addedDrivers": true,
         "payloadFormat": "XML"
       }
     },
@@ -138,7 +137,6 @@
       "deployment": {},
       "splitMigration": {
         "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
-        "addedDrivers": true,
         "payloadFormat": "Buffer"
       }
     },
@@ -168,9 +166,9 @@
         "securityPolicy": "None",
         "useCredentials": false
       },
-      "driver": "f32fed40-de4d-11ef-a011-1711bd498427",
+      "driver": "d4d50f58-8af7-4690-8eac-9817b991eecf",
       "source": {
-        "payloadFormat": "Defined by Protocol"
+        "payloadFormat": "JSON"
       },
       "pollInt": 1000,
       "topology": {
@@ -179,7 +177,11 @@
       },
       "createdAt": "2026-01-01T00:00:00.000Z",
       "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
-      "deployment": {}
+      "deployment": {},
+      "splitMigration": {
+        "from": "f32fed40-de4d-11ef-a011-1711bd498427",
+        "payloadFormat": "Defined by Protocol"
+      }
     }
   },
   "aac6f843-cfee-4683-b121-6943bfdf9173": {
@@ -600,18 +602,18 @@
               "templates": [],
               "deviceType": "00000000-0000-4000-8000-000000000001",
               "pubInterval": 0,
-              "payloadFormat": "Defined by Protocol"
+              "payloadFormat": "JSON"
             }
           ],
           "pollInt": 1000,
-          "connType": "OPC UA",
-          "payloadFormat": "Defined by Protocol",
-          "OPCUAConnDetails": {
+          "connType": "Driver",
+          "DriverDetails": {
             "endpoint": "opc.tcp://oven.local:4840",
             "securityMode": "None",
             "securityPolicy": "None",
             "useCredentials": false
-          }
+          },
+          "payloadFormat": "JSON"
         }
       ]
     },
@@ -907,7 +909,15 @@
       "chart": "dddddddd-0000-4000-8000-000000000001",
       "values": {
         "name": "oven-agent",
-        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b"
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b",
+        "drivers": {
+          "Oven": {
+            "image": {
+              "repository": "edge-opcua"
+            },
+            "stateDir": "/var/lib/edge-driver"
+          }
+        }
       },
       "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
       "hostname": "edge-2"

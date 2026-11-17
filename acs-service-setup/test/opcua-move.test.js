@@ -1,6 +1,6 @@
 /*
  * ACS service setup
- * A whole site's OPC UA connections moved by the chart's defaults, and back
+ * A whole site's OPC UA connections moved by the chart's defaults
  * Copyright 2026 University of Sheffield AMRC
  *
  * opcua-move/site.json is a site before an upgrade: one Edge Agent with
@@ -115,8 +115,9 @@ const bare = ({ path, ...tag }) => tag;
 describe("moving a site's OPC UA connections with the chart's defaults", () => {
     const defaults = chart_defaults();
 
-    test("the chart moves OPC UA", () => {
-        assert.equal(defaults.OPCUA, true);
+    test("the chart holds no protocol back", () => {
+        for (const p of ["REST", "MQTT", "OPCUA", "UDP"])
+            assert.ok(!(p in defaults), `splitDrivers.${p} is set`);
     });
 
     test("the site's OPC UA connections are the golden-output sample", () => {
@@ -223,46 +224,5 @@ describe("moving a site's OPC UA connections with the chart's defaults", () => {
         const count = await run(cdb, defaults);
         assert.deepEqual(cdb.writes, []);
         assert.equal(count.moved + count.repaired, 0);
-    });
-
-    /* Moving back restores the built-in connection, its details and
-     * "Defined by Protocol", and removes the sidecars. It does not put
-     * back the cleared paths, which the built-in never read, and it
-     * writes out the default format of a connection that had none. */
-    test("moving back leaves the site as it was, but for the paths", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        const back = { ...defaults, OPCUA: false };
-        const count = await run(cdb, back);
-        assert.equal(count.moved, 2);
-
-        const want = structuredClone(SITE.configs);
-        const agent = want[App.EdgeAgentConfig][AGENT];
-        for (const e of agent.deviceConnections.filter(e => OPCUA.includes(e.uuid)))
-            for (const t of tags(e)) delete t.path;
-        const furnace = agent.deviceConnections.find(e => e.uuid == C.furnace);
-        want[App.EdgeAgentConfig][AGENT].deviceConnections[1] = {
-            ...furnace, payloadFormat: "Defined by Protocol",
-        };
-        want[App.ConnectionConfiguration][C.furnace].source =
-            { payloadFormat: "Defined by Protocol" };
-        assert.deepEqual(state(cdb), want);
-        const restored = entry(cdb, AGENT, C.furnace);
-        assert.equal(restored.connType, "OPC UA");
-        assert.deepEqual(restored.OPCUAConnDetails, furnace.OPCUAConnDetails);
-
-        cdb.writes = [];
-        await run(cdb, back);
-        assert.deepEqual(cdb.writes, [], "a second run back writes nothing");
-    });
-
-    test("moving again after moving back gives the same configs", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        await run(cdb, { ...defaults, OPCUA: false });
-        await run(cdb, defaults);
-        /* Furnace's entry, which had no payload format, now has one, so
-         * its keys come in another order: compare the values. */
-        assert.deepEqual(state(cdb), read_json("moved.json"));
     });
 });

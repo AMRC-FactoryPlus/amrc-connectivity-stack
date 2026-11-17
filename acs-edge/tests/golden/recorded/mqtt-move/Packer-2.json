@@ -1,0 +1,412 @@
+{
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it",
+ "label": "built-in",
+ "fixture": "sample-mqtt-buffer",
+ "duration_ms": 5000,
+ "speed": 2.5,
+ "delivered": 10,
+ "ddata": 7,
+ "agent_us_per_input": 1452,
+ "credentials": [
+  "MQTT client packer-2, no credentials, keepalive 60, clean true, plain"
+ ],
+ "writes": [],
+ "births": {
+  "DBIRTH Device_1": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "null",
+     "t": -382.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -382.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -382.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -382.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_01",
+     "type": "UInt32",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"0\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_02",
+     "type": "Float",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"4\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_03",
+     "type": "Double",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"8\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_04",
+     "type": "Int16",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"16\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_05",
+     "type": "Boolean",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"18:0\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_06",
+     "type": "Boolean",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"18:3\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_07",
+     "type": "UInt8",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"19\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_08",
+     "type": "String",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"20\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "DBIRTH Device_2": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_09",
+     "type": "UInt32",
+     "value": "null",
+     "t": -380,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"sample/topic_02\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"0\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "NBIRTH": [
+   [
+    {
+     "name": "Schema_UUID",
+     "type": "UUID",
+     "value": "\"15360868-2f35-4b52-990b-49329fb246fe\"",
+     "t": -380
+    },
+    {
+     "name": "Instance_UUID",
+     "type": "UUID",
+     "value": "\"00000000-0000-4000-8000-00000000a6e7\"",
+     "t": -380
+    },
+    {
+     "name": "Config_Revision",
+     "type": "UUID",
+     "value": "\"\\\"golden-config\\\"\"",
+     "t": -380
+    },
+    {
+     "name": "Node Properties/Type",
+     "type": "String",
+     "value": "\"ACS Edge Agent\"",
+     "t": -380
+    },
+    {
+     "name": "Node Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380
+    },
+    {
+     "name": "Node Control/Reload Edge Agent Config",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380
+    },
+    {
+     "name": "Node Control/Payload Compression",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Instance_UUID",
+     "type": "UUID",
+     "value": "\"b09a2fed-eec9-52cf-b824-1a553f8113c8\"",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Type",
+     "type": "UUID",
+     "value": "\"c414c68b-5014-4e46-a0b4-d5f7f8df1d9f\"",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Invalid/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Invalid/Instance_UUID",
+     "type": "UUID",
+     "value": "\"59982376-d40f-582b-a4d0-1f5683014f7c\"",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Invalid/Type",
+     "type": "UUID",
+     "value": "\"99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6\"",
+     "t": -380
+    },
+    {
+     "name": "Alerts/Config_Invalid/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -380
+    }
+   ]
+  ]
+ },
+ "repeated": {
+  "DBIRTH Device_1": 1,
+  "DBIRTH Device_2": 1
+ },
+ "data": {
+  "Device_1/Metric_01": [
+   {
+    "name": "Metric_01",
+    "type": "UInt32",
+    "value": "605",
+    "t": 543.82
+   },
+   {
+    "name": "Metric_01",
+    "type": "UInt32",
+    "value": "606",
+    "t": 1541.65
+   },
+   {
+    "name": "Metric_01",
+    "type": "UInt32",
+    "value": "611",
+    "t": 3542.12
+   }
+  ],
+  "Device_1/Metric_02": [
+   {
+    "name": "Metric_02",
+    "type": "Float",
+    "value": "386.5137023925781",
+    "t": 543.86
+   },
+   {
+    "name": "Metric_02",
+    "type": "Float",
+    "value": "396.4755554199219",
+    "t": 1541.66
+   },
+   {
+    "name": "Metric_02",
+    "type": "Float",
+    "value": "405.00830078125",
+    "t": 2542.68
+   },
+   {
+    "name": "Metric_02",
+    "type": "Float",
+    "value": "412.90087890625",
+    "t": 3542.15
+   },
+   {
+    "name": "Metric_02",
+    "type": "Float",
+    "value": "419.18994140625",
+    "t": 4551.8
+   }
+  ],
+  "Device_1/Metric_03": [
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "239.4796638447761",
+    "t": 543.88
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "252.7248710102238",
+    "t": 1541.67
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "264.60152587812286",
+    "t": 2542.71
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "275.25214816506116",
+    "t": 3542.17
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "284.01694456898457",
+    "t": 4551.84
+   }
+  ],
+  "Device_1/Metric_04": [
+   {
+    "name": "Metric_04",
+    "type": "Int16",
+    "value": "672",
+    "t": 543.88
+   },
+   {
+    "name": "Metric_04",
+    "type": "Int16",
+    "value": "667",
+    "t": 1541.68
+   },
+   {
+    "name": "Metric_04",
+    "type": "Int16",
+    "value": "666",
+    "t": 2542.72
+   }
+  ],
+  "Device_1/Metric_05": [
+   {
+    "name": "Metric_05",
+    "type": "Boolean",
+    "value": "true",
+    "t": 543.92
+   }
+  ],
+  "Device_1/Metric_06": [
+   {
+    "name": "Metric_06",
+    "type": "Boolean",
+    "value": "false",
+    "t": 543.92
+   }
+  ],
+  "Device_1/Metric_07": [
+   {
+    "name": "Metric_07",
+    "type": "UInt8",
+    "value": "165",
+    "t": 543.89
+   },
+   {
+    "name": "Metric_07",
+    "type": "UInt8",
+    "value": "166",
+    "t": 1541.69
+   },
+   {
+    "name": "Metric_07",
+    "type": "UInt8",
+    "value": "169",
+    "t": 2542.74
+   }
+  ],
+  "Device_1/Metric_08": [
+   {
+    "name": "Metric_08",
+    "type": "String",
+    "value": "\"SETUP\"",
+    "t": 543.9
+   }
+  ],
+  "Device_2/Metric_09": [
+   {
+    "name": "Metric_09",
+    "type": "UInt32",
+    "value": "820",
+    "t": 167.71
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt32",
+    "value": "824",
+    "t": 2161.5
+   }
+  ]
+ },
+ "counts": {
+  "DBIRTH Device_1": 2,
+  "DBIRTH Device_2": 2,
+  "DDATA Device_1": 5,
+  "DDATA Device_2": 2,
+  "NBIRTH": 1
+ }
+}

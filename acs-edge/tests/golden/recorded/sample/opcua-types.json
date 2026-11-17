@@ -1,0 +1,532 @@
+{
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it",
+ "label": "built-in",
+ "fixture": "sample-opcua-types",
+ "duration_ms": 5000,
+ "speed": 2.5,
+ "delivered": 5,
+ "ddata": 5,
+ "agent_us_per_input": 9119,
+ "credentials": [],
+ "writes": [],
+ "births": {
+  "DBIRTH Device_1": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "100",
+     "t": -1282.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -1282.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1282.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1282.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Types/FloatLE",
+     "type": "Float",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/FloatBE",
+     "type": "Float",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_02\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/DoubleLE",
+     "type": "Double",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_03\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/DoubleBE",
+     "type": "Double",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_04\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/Boolean",
+     "type": "Boolean",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_05\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/String",
+     "type": "String",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_06\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/Int16LE",
+     "type": "Int16",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_07\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/Int16BE",
+     "type": "Int16",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_08\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/UInt16LE",
+     "type": "UInt16",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_09\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/UInt16BE",
+     "type": "UInt16",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_10\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/UInt8",
+     "type": "UInt8",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_11\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/UInt32LE",
+     "type": "UInt32",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_12\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/UInt32BE",
+     "type": "UInt32",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_13\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Types/Int32BE",
+     "type": "Int32",
+     "value": "null",
+     "t": -1190,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Types/Node_14\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":1000},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "NBIRTH": [
+   [
+    {
+     "name": "Schema_UUID",
+     "type": "UUID",
+     "value": "\"15360868-2f35-4b52-990b-49329fb246fe\"",
+     "t": -1280
+    },
+    {
+     "name": "Instance_UUID",
+     "type": "UUID",
+     "value": "\"00000000-0000-4000-8000-00000000a6e7\"",
+     "t": -1280
+    },
+    {
+     "name": "Config_Revision",
+     "type": "UUID",
+     "value": "\"\\\"golden-config\\\"\"",
+     "t": -1280
+    },
+    {
+     "name": "Node Properties/Type",
+     "type": "String",
+     "value": "\"ACS Edge Agent\"",
+     "t": -1280
+    },
+    {
+     "name": "Node Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1280
+    },
+    {
+     "name": "Node Control/Reload Edge Agent Config",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1280
+    },
+    {
+     "name": "Node Control/Payload Compression",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Instance_UUID",
+     "type": "UUID",
+     "value": "\"b09a2fed-eec9-52cf-b824-1a553f8113c8\"",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Type",
+     "type": "UUID",
+     "value": "\"c414c68b-5014-4e46-a0b4-d5f7f8df1d9f\"",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Invalid/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Invalid/Instance_UUID",
+     "type": "UUID",
+     "value": "\"59982376-d40f-582b-a4d0-1f5683014f7c\"",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Invalid/Type",
+     "type": "UUID",
+     "value": "\"99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6\"",
+     "t": -1280
+    },
+    {
+     "name": "Alerts/Config_Invalid/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1280
+    }
+   ]
+  ]
+ },
+ "repeated": {},
+ "data": {
+  "Device_1/Types/Boolean": [
+   {
+    "name": "Types/Boolean",
+    "type": "Boolean",
+    "value": "false",
+    "t": -767.53
+   }
+  ],
+  "Device_1/Types/DoubleBE": [
+   {
+    "name": "Types/DoubleBE",
+    "type": "Double",
+    "value": "679.8600688566582",
+    "t": -767.57
+   },
+   {
+    "name": "Types/DoubleBE",
+    "type": "Double",
+    "value": "692.5959948249737",
+    "t": 1249.81
+   },
+   {
+    "name": "Types/DoubleBE",
+    "type": "Double",
+    "value": "707.2841859513005",
+    "t": 2258.14
+   },
+   {
+    "name": "Types/DoubleBE",
+    "type": "Double",
+    "value": "718.5615405261859",
+    "t": 3267.43
+   },
+   {
+    "name": "Types/DoubleBE",
+    "type": "Double",
+    "value": "725.8267670325222",
+    "t": 4300.22
+   }
+  ],
+  "Device_1/Types/DoubleLE": [
+   {
+    "name": "Types/DoubleLE",
+    "type": "Double",
+    "value": "99.08968658610856",
+    "t": -767.58
+   },
+   {
+    "name": "Types/DoubleLE",
+    "type": "Double",
+    "value": "102.68239680500666",
+    "t": 1249.8
+   },
+   {
+    "name": "Types/DoubleLE",
+    "type": "Double",
+    "value": "104.60208938221368",
+    "t": 2258.13
+   },
+   {
+    "name": "Types/DoubleLE",
+    "type": "Double",
+    "value": "110.71792646174053",
+    "t": 3267.43
+   },
+   {
+    "name": "Types/DoubleLE",
+    "type": "Double",
+    "value": "113.03064384203759",
+    "t": 4300.2
+   }
+  ],
+  "Device_1/Types/FloatBE": [
+   {
+    "name": "Types/FloatBE",
+    "type": "Float",
+    "value": "180.5176239013672",
+    "t": -767.59
+   },
+   {
+    "name": "Types/FloatBE",
+    "type": "Float",
+    "value": "194.01683044433594",
+    "t": 1249.77
+   },
+   {
+    "name": "Types/FloatBE",
+    "type": "Float",
+    "value": "209.40182495117188",
+    "t": 2258.13
+   },
+   {
+    "name": "Types/FloatBE",
+    "type": "Float",
+    "value": "218.92848205566406",
+    "t": 3267.42
+   },
+   {
+    "name": "Types/FloatBE",
+    "type": "Float",
+    "value": "227.7229461669922",
+    "t": 4300.18
+   }
+  ],
+  "Device_1/Types/FloatLE": [
+   {
+    "name": "Types/FloatLE",
+    "type": "Float",
+    "value": "206.78932189941406",
+    "t": -767.62
+   },
+   {
+    "name": "Types/FloatLE",
+    "type": "Float",
+    "value": "229.65084838867188",
+    "t": 1249.72
+   },
+   {
+    "name": "Types/FloatLE",
+    "type": "Float",
+    "value": "245.53392028808594",
+    "t": 2258.08
+   },
+   {
+    "name": "Types/FloatLE",
+    "type": "Float",
+    "value": "263.7942199707031",
+    "t": 3267.41
+   },
+   {
+    "name": "Types/FloatLE",
+    "type": "Float",
+    "value": "281.1077880859375",
+    "t": 4300.15
+   }
+  ],
+  "Device_1/Types/Int16BE": [
+   {
+    "name": "Types/Int16BE",
+    "type": "Int16",
+    "value": "165",
+    "t": -767.42
+   },
+   {
+    "name": "Types/Int16BE",
+    "type": "Int16",
+    "value": "164",
+    "t": 1249.86
+   },
+   {
+    "name": "Types/Int16BE",
+    "type": "Int16",
+    "value": "160",
+    "t": 2258.15
+   }
+  ],
+  "Device_1/Types/Int16LE": [
+   {
+    "name": "Types/Int16LE",
+    "type": "Int16",
+    "value": "-41",
+    "t": -767.45
+   },
+   {
+    "name": "Types/Int16LE",
+    "type": "Int16",
+    "value": "-39",
+    "t": 1249.83
+   },
+   {
+    "name": "Types/Int16LE",
+    "type": "Int16",
+    "value": "-36",
+    "t": 2258.15
+   },
+   {
+    "name": "Types/Int16LE",
+    "type": "Int16",
+    "value": "-37",
+    "t": 4300.23
+   }
+  ],
+  "Device_1/Types/Int32BE": [
+   {
+    "name": "Types/Int32BE",
+    "type": "Int32",
+    "value": "-754",
+    "t": -767.3
+   }
+  ],
+  "Device_1/Types/String": [
+   {
+    "name": "Types/String",
+    "type": "String",
+    "value": "\"RUNNING\"",
+    "t": -767.48
+   }
+  ],
+  "Device_1/Types/UInt16BE": [
+   {
+    "name": "Types/UInt16BE",
+    "type": "UInt16",
+    "value": "864",
+    "t": -767.36
+   }
+  ],
+  "Device_1/Types/UInt16LE": [
+   {
+    "name": "Types/UInt16LE",
+    "type": "UInt16",
+    "value": "105",
+    "t": -767.38
+   },
+   {
+    "name": "Types/UInt16LE",
+    "type": "UInt16",
+    "value": "106",
+    "t": 1249.87
+   },
+   {
+    "name": "Types/UInt16LE",
+    "type": "UInt16",
+    "value": "105",
+    "t": 2258.16
+   }
+  ],
+  "Device_1/Types/UInt32BE": [
+   {
+    "name": "Types/UInt32BE",
+    "type": "UInt32",
+    "value": "782",
+    "t": -767.33
+   },
+   {
+    "name": "Types/UInt32BE",
+    "type": "UInt32",
+    "value": "787",
+    "t": 2258.29
+   },
+   {
+    "name": "Types/UInt32BE",
+    "type": "UInt32",
+    "value": "789",
+    "t": 4300.26
+   }
+  ],
+  "Device_1/Types/UInt32LE": [
+   {
+    "name": "Types/UInt32LE",
+    "type": "UInt32",
+    "value": "906",
+    "t": -767.33
+   },
+   {
+    "name": "Types/UInt32LE",
+    "type": "UInt32",
+    "value": "905",
+    "t": 1249.88
+   },
+   {
+    "name": "Types/UInt32LE",
+    "type": "UInt32",
+    "value": "909",
+    "t": 3267.46
+   },
+   {
+    "name": "Types/UInt32LE",
+    "type": "UInt32",
+    "value": "906",
+    "t": 4300.25
+   }
+  ],
+  "Device_1/Types/UInt8": [
+   {
+    "name": "Types/UInt8",
+    "type": "UInt8",
+    "value": "163",
+    "t": -767.34
+   },
+   {
+    "name": "Types/UInt8",
+    "type": "UInt8",
+    "value": "166",
+    "t": 3267.46
+   }
+  ]
+ },
+ "counts": {
+  "DBIRTH Device_1": 1,
+  "DDATA Device_1": 5,
+  "NBIRTH": 1
+ }
+}

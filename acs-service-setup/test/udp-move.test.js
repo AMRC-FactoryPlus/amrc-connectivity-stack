@@ -1,6 +1,6 @@
 /*
  * ACS service setup
- * A whole site's UDP connections moved by the chart's defaults, and back
+ * A whole site's UDP connections moved by the chart's defaults
  * Copyright 2026 University of Sheffield AMRC
  *
  * udp-move/site.json is a site before an upgrade: three Edge Agents
@@ -28,7 +28,7 @@ import util from "node:util";
 
 import yaml from "yaml";
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs, driver_id } from "@amrc-factoryplus/service-client";
 
 import { DumpLoader } from "../lib/dumps.js";
 import { MigrateSplitDrivers } from "../lib/split-drivers.js";
@@ -67,10 +67,7 @@ const UDP = [[C.json, A.arm], [C.buffer, A.cell], [C.delim, A.gauge]];
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));
-    /* UDP only: the site has an MQTT connection it expects to stay
-     * put, and mqtt-move.test.js moves MQTT. */
-    const { REST, UDP } = values.serviceSetup.config.splitDrivers;
-    return { REST, UDP };
+    return values.serviceSetup.config.splitDrivers;
 }
 
 /* The DriverDefs as edge.yaml loads them on upgrade. */
@@ -141,8 +138,9 @@ function fits (details, schema) {
 describe("moving a site's UDP connections with the chart's defaults", () => {
     const defaults = chart_defaults();
 
-    test("the chart moves UDP", () => {
-        assert.equal(defaults.UDP, true);
+    test("the chart holds no protocol back", () => {
+        for (const p of ["REST", "MQTT", "OPCUA", "UDP"])
+            assert.ok(!(p in defaults), `splitDrivers.${p} is set`);
     });
 
     test("the site's UDP connections are the golden-output samples", () => {
@@ -167,27 +165,27 @@ describe("moving a site's UDP connections with the chart's defaults", () => {
     });
 
     test("the split driver's form takes every built-in UDP connection's details", () => {
-        const internal = DEFS[Driver.UDP].schema;
         const split = DEFS[Driver.UDPSplit].schema;
-        /* The field names are the same, so the details move as they are. */
-        assert.deepEqual(Object.keys(split.properties), Object.keys(internal.properties));
-        /* Every port the built-in form allowed. */
-        for (const port of internal.properties.port.enum)
-            assert.equal(fits({ port }, split), undefined, `port ${port}`);
+        /* The built-in form had one field, port, and allowed only
+         * 50205. The field name is the same, so the details move as
+         * they are. */
+        assert.deepEqual(Object.keys(split.properties), ["port"]);
+        assert.equal(fits({ port: 50205 }, split), undefined, "port 50205");
         for (const [conn] of UDP) {
             const config = SITE.configs[App.ConnectionConfiguration][conn].config;
-            assert.equal(fits(config, internal), undefined);
             assert.equal(fits(config, split), undefined);
         }
         /* The split driver opens the port on the host. */
         assert.deepEqual(DEFS[Driver.UDPSplit].hostPorts, [{ protocol: "UDP", field: "port" }]);
     });
 
-    test("moves every built-in UDP connection and nothing else", async () => {
+    test("moves every built-in UDP connection", async () => {
         const cdb = site();
         const { count } = await run(cdb, defaults);
-        assert.equal(count.moved, 3);
+        /* The three UDP connections and the line agent's MQTT one. */
+        assert.equal(count.moved, 4);
         assert.equal(count.held, 0);
+        assert.equal(count.no_sidecar, 0);
         assert.equal(count.failed, 0);
 
         /* ConnectionConfigurations: the driver changes, and nothing
@@ -238,10 +236,11 @@ describe("moving a site's UDP connections with the chart's defaults", () => {
         assert.deepEqual(drivers(cdb, A.cell), { [cell.driverId]: sidecar });
         assert.deepEqual(drivers(cdb, A.gauge), { "Gauges": sidecar });
 
-        /* The Modbus driver and the agent with no UDP are untouched. */
+        /* The Modbus driver is untouched. The line agent's MQTT
+         * connection moves too, as every built-in connection does. */
         assert.deepEqual(entry(cdb, A.arm, C.plc), site_entry(A.arm, C.plc));
-        assert.ok(!cdb.writes.some(w => [A.line, C.plc, C.broker].includes(w.obj)),
-            "nothing about the line agent, its MQTT connection or the Modbus driver is written");
+        assert.ok(!cdb.writes.some(w => w.obj == C.plc), "the Modbus driver is not written");
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.broker).driver, Driver.MQTTSplit);
 
         if (process.env.UPDATE_UDP_MOVE)
             fs.writeFileSync(MOVED_FILE, text(state(cdb)));
@@ -257,41 +256,6 @@ describe("moving a site's UDP connections with the chart's defaults", () => {
         assert.deepEqual(cdb.writes, []);
         assert.equal(count.moved, 0);
     });
-
-    test("moving back leaves every config as it was, byte for byte", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        /* A site sets UDP to false in its own values; Helm merges that
-         * over the chart's. The sidecars, and so the host ports, go. */
-        const back = { ...defaults, UDP: false };
-        const { count } = await run(cdb, back);
-        assert.equal(count.moved, 3);
-        assert.equal(text(jsonb(state(cdb))), text(jsonb(SITE.configs)));
-
-        cdb.writes = [];
-        await run(cdb, back);
-        assert.deepEqual(cdb.writes, [], "a second run back writes nothing");
-    });
-
-    test("a Deployment with no drivers map gets none back", async () => {
-        /* One the Manager has not saved since it learned about split
-         * drivers. The move adds the map and moving back removes it. */
-        const cdb = site(configs => {
-            delete configs[Edge.App.Deployment][A.gauge].values.drivers;
-        });
-        const before = text(state(cdb));
-        await run(cdb, defaults);
-        await run(cdb, { ...defaults, UDP: false });
-        assert.equal(text(state(cdb)), before);
-    });
-
-    test("moving again after moving back gives the same configs", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        await run(cdb, { ...defaults, UDP: false });
-        await run(cdb, defaults);
-        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
-    });
 });
 
 /* Change where a connection's Edge Agent runs. The move reads it from
@@ -305,60 +269,91 @@ const place = (conn, agent, topology) => configs => {
     else delete dep.hostname;
 };
 const CLUSTER = "bbbbbbbb-0000-4000-8000-000000000001";
-const held_lines = lines => lines.filter(l => /not moving to the split driver/.test(l));
+const clash_lines = lines => lines.filter(l => /moved to the split driver without its container/.test(l));
 
+/* The built-in UDP connection only allowed port 50205, so two on one
+ * host both want it. Both move, because neither has anything else to
+ * run on. The one that gets the port first keeps it; the other moves
+ * without its sidecar, so its Edge Agent's pod can still start. */
 describe("moving UDP connections whose ports would clash on a host", () => {
     const defaults = chart_defaults();
+    const sidecar = (cdb, agent, conn) => drivers(cdb, agent)?.[driver_id(entry(cdb, agent, conn))];
 
-    test("two agents on one host: the first moves and the second stays built-in", async () => {
+    test("two agents on one host: both move, the second without its sidecar", async () => {
         const cdb = site(place(C.buffer, A.cell, { cluster: CLUSTER, hostname: "edge-1" }));
         const { count, lines } = await run(cdb, defaults);
-        assert.equal(count.moved, 2);
-        assert.equal(count.held, 1);
+        assert.equal(count.moved, 3);
+        assert.equal(count.no_sidecar, 1);
 
-        /* Nothing about the held connection is written, so it keeps
-         * running on the built-in driver. */
-        assert.ok(!cdb.writes.some(w => w.obj == C.buffer || w.obj == A.cell));
-        assert.equal(entry(cdb, A.cell, C.buffer).connType, "UDP");
-        assert.equal(cdb.get(App.ConnectionConfiguration, C.buffer).driver, Driver.UDP);
+        /* The connection is moved, so nothing is left on a built-in
+         * driver, but its Deployment has no sidecar for it. */
+        assert.equal(entry(cdb, A.cell, C.buffer).connType, "Driver");
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.buffer).driver, Driver.UDPSplit);
+        assert.equal(sidecar(cdb, A.cell, C.buffer), undefined);
+        /* The first keeps the port. */
+        assert.deepEqual(sidecar(cdb, A.arm, C.json).hostPorts, [{ protocol: "UDP", port: 50205 }]);
 
-        const held = held_lines(lines);
-        assert.equal(held.length, 1);
-        assert.equal(held[0], `Connection ${C.buffer}: not moving to the split driver, `
-            + `because connection ${C.json}, which can run on the same host, already `
-            + "opens UDP port 50205 there. Give one of them another port; the next "
-            + "service-setup run then moves it.");
+        const clash = clash_lines(lines);
+        assert.equal(clash.length, 1);
+        assert.equal(clash[0], `ERROR: Connection ${C.buffer}: moved to the split driver `
+            + `without its container, because connection ${C.json}, which can run on `
+            + "the same host, already opens UDP port 50205 there. Its devices get no "
+            + "data until it has another port: change the port in the Manager and "
+            + "save the connection.");
 
-        /* The next run holds it again and writes nothing. */
+        /* The next run says so again, writes nothing, and doesn't take
+         * the port from the first. */
         cdb.writes = [];
         const again = await run(cdb, defaults);
-        assert.equal(again.count.held, 1);
+        assert.equal(again.count.no_sidecar, 1);
+        assert.equal(clash_lines(again.lines).length, 1);
         assert.deepEqual(cdb.writes, []);
+        assert.ok(sidecar(cdb, A.arm, C.json));
     });
 
-    test("the held connection moves once the other has another port", async () => {
+    test("the second gets its sidecar once it has another port", async () => {
         const cdb = site(place(C.buffer, A.cell, { cluster: CLUSTER, hostname: "edge-1" }));
         await run(cdb, defaults);
 
-        /* Someone gives the moved connection another port in the
-         * Manager. */
-        const cc = cdb.get(App.ConnectionConfiguration, C.json);
+        /* Someone gives the second connection another port in the
+         * Manager. Saving it there adds the sidecar; a service-setup
+         * run before that does the same. */
+        const cc = cdb.get(App.ConnectionConfiguration, C.buffer);
         cc.config.port = 50300;
-        cdb.set(App.ConnectionConfiguration, C.json, cc);
+        cdb.set(App.ConnectionConfiguration, C.buffer, cc);
 
         const { count } = await run(cdb, defaults);
-        assert.equal(count.moved, 1);
-        assert.equal(count.held, 0);
-        assert.deepEqual(drivers(cdb, A.cell)[entry(cdb, A.cell, C.buffer).driverId].hostPorts,
+        assert.equal(count.no_sidecar, 0);
+        assert.equal(count.repaired, 1);
+        assert.deepEqual(sidecar(cdb, A.cell, C.buffer).hostPorts,
+            [{ protocol: "UDP", port: 50300 }]);
+        assert.deepEqual(sidecar(cdb, A.arm, C.json).hostPorts,
             [{ protocol: "UDP", port: 50205 }]);
+    });
+
+    test("two on one agent: the agent keeps the first sidecar only", async () => {
+        /* A second built-in UDP connection on the arm's agent. */
+        const C2 = "cccccccc-0000-4000-8000-0000000000aa";
+        const cdb = site(configs => {
+            const cc = structuredClone(configs[App.ConnectionConfiguration][C.json]);
+            configs[App.ConnectionConfiguration][C2] = cc;
+            const agent = configs[App.EdgeAgentConfig][A.arm];
+            const e = structuredClone(agent.deviceConnections.find(e => e.uuid == C.json));
+            agent.deviceConnections.push({ ...e, uuid: C2, name: "RobotArm2",
+                devices: e.devices.map(d => ({ ...d, deviceId: `${d.deviceId}_2` })) });
+        });
+        const { count } = await run(cdb, defaults);
+        assert.equal(count.no_sidecar, 1);
+        assert.deepEqual(Object.keys(drivers(cdb, A.arm)).sort(), ["PLC-1", "RobotArm"]);
+        assert.equal(entry(cdb, A.arm, C2).connType, "Driver");
     });
 
     test("an agent not pinned to a host clashes with every host in its cluster", async () => {
         const cdb = site(place(C.delim, A.gauge, { cluster: CLUSTER }));
         const { count, lines } = await run(cdb, defaults);
-        assert.equal(count.moved, 2);
-        assert.equal(count.held, 1);
-        assert.match(held_lines(lines)[0], new RegExp(`^Connection ${C.delim}: `));
+        assert.equal(count.moved, 3);
+        assert.equal(count.no_sidecar, 1);
+        assert.match(clash_lines(lines)[0], new RegExp(`^ERROR: Connection ${C.delim}: `));
     });
 
     test("an empty topology copy on the connection doesn't matter", async () => {
@@ -369,14 +364,14 @@ describe("moving UDP connections whose ports would clash on a host", () => {
                 configs[App.ConnectionConfiguration][conn].topology = {};
         });
         const { count } = await run(cdb, defaults);
-        assert.equal(count.moved, 3);
-        assert.equal(count.held, 0);
+        assert.equal(count.moved, 4);
+        assert.equal(count.no_sidecar, 0);
     });
 
     test("a Deployment on \"Floating\" is not pinned to a host", async () => {
         const cdb = site(place(C.delim, A.gauge, { cluster: CLUSTER, hostname: "Floating" }));
         const { count } = await run(cdb, defaults);
-        assert.equal(count.held, 1);
+        assert.equal(count.no_sidecar, 1);
     });
 
     test("agents on one host name in different clusters don't clash", async () => {
@@ -384,31 +379,15 @@ describe("moving UDP connections whose ports would clash on a host", () => {
             cluster: "bbbbbbbb-0000-4000-8000-000000000002", hostname: "edge-1",
         }));
         const { count } = await run(cdb, defaults);
-        assert.equal(count.moved, 3);
-        assert.equal(count.held, 0);
+        assert.equal(count.moved, 4);
+        assert.equal(count.no_sidecar, 0);
     });
 
-    test("a dry run holds back the same connections", async () => {
+    test("a dry run finds the same clash", async () => {
         const cdb = site(place(C.buffer, A.cell, { cluster: CLUSTER, hostname: "edge-1" }));
         const { count } = await run(cdb, { ...defaults, dryRun: true });
         assert.deepEqual(cdb.writes, []);
-        assert.equal(count.moved, 2);
-        assert.equal(count.held, 1);
-    });
-
-    test("moving back is never held", async () => {
-        /* Two moved connections already clash, say from hand edits;
-         * moving back must still take both back. */
-        const cdb = site(place(C.buffer, A.cell, { cluster: CLUSTER, hostname: "edge-1" }));
-        await run(cdb, defaults);
-        const cc = cdb.get(App.ConnectionConfiguration, C.buffer);
-        cdb.set(App.ConnectionConfiguration, C.buffer,
-            { ...cc, driver: Driver.UDPSplit, splitMigration: { from: Driver.UDP, payloadFormat: "Buffer" } });
-
-        const { count } = await run(cdb, { ...defaults, UDP: false });
         assert.equal(count.moved, 3);
-        assert.equal(count.held, 0);
-        for (const [conn] of UDP)
-            assert.equal(cdb.get(App.ConnectionConfiguration, conn).driver, Driver.UDP);
+        assert.equal(count.no_sidecar, 1);
     });
 });

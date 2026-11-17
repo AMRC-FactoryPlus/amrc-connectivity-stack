@@ -15,8 +15,8 @@ paragraph marked **Implementation** says what the code does. Drivers
 built outside this repository depend on that behaviour, so the
 Implementation notes are the contract for new drivers.
 
-One decision in this document is **proposed, awaiting Alex**. It is
-marked where it appears: [Edge Scout](#edge-scout-address-browsing).
+Split drivers have no address browsing: see [Edge
+Scout](#edge-scout-address-browsing).
 
 ### Summary for driver authors
 
@@ -659,10 +659,9 @@ socket reads, so it publishes 20 to 30 a second rather than 10,000.
 
 ## Edge Scout (address browsing)
 
-**Proposed, awaiting Alex.** Edge Scout, which lists a device's
-addresses for the Admin UI, is not supported for split drivers for now.
-The protocol has no browse message, and only the built-in OPC UA and
-MQTT connections implement browsing. No Scout code is removed while
-those built-in connections remain. If browsing is needed for a split
-driver later, it can be added as a new `req`/`rsp` kind without changing
-the rest of the protocol.
+Edge Scout, which listed a device's addresses for the Admin UI, is not
+supported for split drivers. Only the built-in OPC UA and MQTT
+connections implemented it, and ACS 7 removed them and Scout with them.
+The protocol has no browse message. If browsing is needed for a split
+driver later, it can be added as a new `req`/`rsp` kind without
+changing the rest of the protocol (ACS-32).

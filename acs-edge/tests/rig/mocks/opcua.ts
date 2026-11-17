@@ -9,14 +9,26 @@ import os from "os";
 import path from "path";
 
 import {
-    OPCUACertificateManager, OPCUAServer, resolveNodeId, UAVariable,
+    MessageSecurityMode, OPCUACertificateManager, OPCUAServer, resolveNodeId,
+    SecurityPolicy, UAVariable,
 } from "node-opcua";
 
-import { getOpcSecurityMode, getOpcSecurityPolicy } from "../../../lib/helpers/typeHandler.js";
 import type { Fixture, OpcuaEvent } from "../../fixtures/drivers/fixture.js";
 import { variant } from "../../golden/devices/opcua.js";
 import type { RigConnection } from "../rig.js";
 import { Looper, Mock, MockStatus, record_write } from "./mock.js";
+
+/* A connection's security mode and policy as node-opcua's, by the
+ * names the connection form uses. The built-in OPC UA connection had
+ * these, and went in ACS 7. */
+function security_mode (name: string): MessageSecurityMode {
+    return (MessageSecurityMode as any)[name] ?? MessageSecurityMode.Invalid;
+}
+
+function security_policy (name: string): SecurityPolicy {
+    if (name == "Aes128_Sha256") return SecurityPolicy.Aes128_Sha256_RsaOaep;
+    return (SecurityPolicy as any)[name] ?? SecurityPolicy.Invalid;
+}
 
 /* A node-opcua server with one writable variable per node the
  * connection reads, with the fixture's data types.
@@ -55,8 +67,8 @@ export class OpcuaMock implements Mock {
     async start () {
         if (this.server) return;
         const src = this.conn.connection.OPCUAConnDetails ?? {};
-        const mode = getOpcSecurityMode(src.securityMode ?? "None");
-        const policy = getOpcSecurityPolicy(src.securityPolicy ?? "None");
+        const mode = security_mode(src.securityMode ?? "None");
+        const policy = security_policy(src.securityPolicy ?? "None");
         const creds = !!src.useCredentials;
 
         const certs = new OPCUACertificateManager({

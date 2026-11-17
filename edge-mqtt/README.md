@@ -4,7 +4,7 @@ An Edge Agent split driver for devices that publish to an MQTT broker.
 It subscribes to each address as a topic on the device's broker and
 passes every message's payload to the Edge Agent unchanged, so the
 agent decodes it with the device's payload format and metric paths, as
-it does for the built-in MQTT connection (`acs-edge/lib/devices/MQTT.ts`).
+it did for the built-in MQTT connection, which ACS 7 removed.
 It takes the built-in's connection details field for field, so moving a
 connection to it only moves them.
 
@@ -94,8 +94,8 @@ on the PATH. Without them they are skipped with a note, unless
 ## Checking it against the built-in
 
 The golden-output harness in `acs-edge/tests/golden` runs the real Edge
-Agent once with the built-in connection and once with this driver, and
-requires the same Sparkplug output. From `acs-edge`, after
+Agent with this driver and requires the same Sparkplug output as the
+built-in connection gave, from runs recorded before ACS 7 removed it. From `acs-edge`, after
 `npm install --save=false --install-links` there and `npm ci` in
 `lib/js-edge-driver`, on Linux:
 

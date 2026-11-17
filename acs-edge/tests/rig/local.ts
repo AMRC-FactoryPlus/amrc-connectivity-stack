@@ -13,15 +13,17 @@
  * (`Translator`) per rig node they belong to, and a local MQTT broker
  * the agents publish their Sparkplug output to, then records that
  * output with `check record` for <n> seconds and writes the summary.
- * Run it once with the connections built in and once with --split,
- * and compare the two summaries with `check compare`, which is the
- * cluster test on one machine.
+ * Compare two summaries with `check compare`, which is the cluster
+ * test on one machine.
  *
- * With --split, each connection of a named protocol is moved to its
- * split driver as service-setup moves it (`move_entry` and the
- * protocol's payload format map) and the driver binary is started
- * against the agent's driver broker, as the Edge Agent chart starts a
- * sidecar. PROTO is OPCUA, MQTT, REST or UDP.
+ * Each connection is moved to its split driver as service-setup moves
+ * it (`move_entry` and the protocol's payload format map) and the
+ * driver binary from --split is started against the agent's driver
+ * broker, as the Edge Agent chart starts a sidecar. PROTO is OPCUA,
+ * MQTT, REST or UDP. Every chosen connection's protocol needs one: the
+ * Edge Agent has no built-in connections since ACS 7. For a run with
+ * the built-in connections, build the rig from a tree that still has
+ * them (see docs/development/split-driver-cluster-test.md).
  *
  * --outage stops one mock for a while during the recording, to check
  * the device goes offline and comes back.
@@ -225,6 +227,13 @@ async function main () {
         if (!Split[name]) throw new Error(`Unknown protocol ${name}`);
         split.set(Split[name].proto, bin);
     }
+    const unsplit = [...new Set(conns.map(c => c.protocol)
+        .filter(p => !split.has(p)))];
+    if (unsplit.length)
+        throw new Error(`No --split driver for ${unsplit.join(", ")}. The Edge `
+            + `Agent has no built-in connections since ACS 7, so every chosen `
+            + `connection needs its split driver. For a built-in run, build the `
+            + `rig from a tree that still has them.`);
 
     /* The rig only has the chosen connections and their nodes, so the
      * summary only covers them. */
@@ -302,10 +311,9 @@ async function main () {
     print_summary(summary);
     for (const m of mocks) console.log("Mock %s: %o", m.conn.id, m.status());
 
-    /* The built-in MQTT connection's unsubscribe rejects unhandled when
-     * two devices read one topic, and Translator.stop() doesn't wait
-     * for its devices (both noted in the golden harness). The
-     * recording is saved, so let shutdown errors pass. */
+    /* Translator.stop() doesn't wait for its devices (noted in the
+     * golden harness). The recording is saved, so let shutdown errors
+     * pass. */
     process.on("unhandledRejection", e => console.log("At shutdown: %s", e));
     process.on("uncaughtException", e => console.log("At shutdown: %s", e));
     for (const a of agents) {

@@ -187,6 +187,10 @@ export class SparkplugNode extends (
             ...builder.build_alert(
                 UUIDs.Alert.ConfigInvalid, "Config_Invalid",
                 this.#conf.alerts?.configInvalid ?? false),
+            /* Each connection the agent could not start. */
+            ...(this.#conf.alerts?.connections ?? []).flatMap(name =>
+                builder.build_alert(UUIDs.Alert.Connection,
+                    `Connection/${name}`, true)),
         ]);
 
         return this;

@@ -230,7 +230,8 @@ server starts, low server limits, a stalled agent, several devices on
 one connection, and a server clock an hour fast.
 
 The golden-output harness compares the Edge Agent's Sparkplug output
-with the built-in connection and with this driver:
+with this driver against the built-in connection's, from runs recorded
+before ACS 7 removed it:
 
 ```sh
 cargo build --release

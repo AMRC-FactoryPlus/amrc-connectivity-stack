@@ -120,13 +120,12 @@ of range) `CMD`, anything else `ERR`.
 ## Logging
 
 `VERBOSE` works as it does for every Rust driver (see
-[`lib/rs-edge-driver`](../lib/rs-edge-driver)), except that
-async-opcua's crates (`opcua_client`, `opcua_core` and the rest) stay
-at `info` unless `VERBOSE` names them, because at `debug` they log two
-or three lines for every Publish and one for every monitored item, and
-the edge-agent chart sets `VERBOSE=ALL` by default.
-`VERBOSE=ALL,opcua=debug` turns them on, and `RUST_LOG` overrides both
-as usual.
+[`lib/rs-edge-driver`](../lib/rs-edge-driver)): `VERBOSE=ALL`, the
+edge-agent chart's default, turns on `debug` for this driver and the
+library but not for async-opcua, which at `debug` logs two or three
+lines for every Publish and one for every monitored item.
+`VERBOSE=ALL,opcua=debug` turns async-opcua's on too, and `RUST_LOG`
+overrides both as usual.
 
 ## Reconnects
 
@@ -204,7 +203,6 @@ Known upstream issues that are still open on that commit:
 
 ```
 src/main.rs        logging and Driver::run, nothing else
-src/logging.rs     the log filter, with async-opcua kept at info
 src/lib.rs         the crate root, so the tests can reach the parts
 src/config.rs      the connection details, with unit tests
 src/addr.rs        node id addresses, with unit tests

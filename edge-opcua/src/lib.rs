@@ -9,7 +9,6 @@
 //! values.
 //!
 //! - `main.rs` sets up logging and runs the driver, nothing else;
-//! - [`logging`] keeps async-opcua's debug output out of `VERBOSE=ALL`;
 //! - [`config`] checks the connection details;
 //! - [`addr`] parses node ids;
 //! - [`value`] turns OPC UA values into data packets and typed writes
@@ -21,7 +20,6 @@
 pub mod addr;
 pub mod config;
 pub mod handler;
-pub mod logging;
 pub mod subs;
 pub mod value;
 

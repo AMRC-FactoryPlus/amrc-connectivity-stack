@@ -3,7 +3,7 @@
 // Copyright 2026 University of Sheffield
 
 use edge_opcua::OpcuaHandler;
-use rs_edge_driver::{Driver, DriverConfig, Error};
+use rs_edge_driver::{Driver, DriverConfig, Error, init_logging};
 
 const GIT_VERSION: &str = match option_env!("GIT_VERSION") {
     Some(v) => v,
@@ -12,7 +12,7 @@ const GIT_VERSION: &str = match option_env!("GIT_VERSION") {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    edge_opcua::logging::init();
+    init_logging();
     tracing::info!("edge-opcua revision {GIT_VERSION}");
 
     let config = DriverConfig::from_env()?;

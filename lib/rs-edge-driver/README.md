@@ -228,12 +228,14 @@ Name|Meaning
 `RUST_LOG` overrides `VERBOSE` when set. Call `init_logging()` at the
 start of `main` to use them.
 
-`1` or `ALL` leaves rumqttc at `info`, because it logs every MQTT packet
-at `debug` and the edge-agent chart sets `VERBOSE=ALL` by default.
-`VERBOSE=ALL,rumqttc` turns it on. A driver whose own dependencies log
-every message at `debug` can do the same for them: build its filter
-from `log_filter` and add `<crate>=info`, as `edge-opcua` does for
-async-opcua (`edge-opcua/src/logging.rs`).
+With `VERBOSE`, `debug` and `trace` lines from crates cargo downloaded
+(from crates.io or git, such as rumqttc or an OPC UA client) only come
+through for targets `VERBOSE` names. So `VERBOSE=ALL`, the edge-agent
+chart's default, means `debug` for the driver and this library, and
+`VERBOSE=ALL,rumqttc` adds rumqttc's, which logs every MQTT packet.
+`init_logging` tells the crates apart by where their source is:
+anything under cargo's `registry/src` or `git/checkouts` counts as
+downloaded. `RUST_LOG` is used as it is.
 
 `DriverConfig::from_env()` (or `DriverConfig::new(url, username,
 password)`) sets `reconnect_delay` to 5 seconds and `serial_poll` to

@@ -61,3 +61,9 @@ jobs:
       - name: Run the tests
         working-directory: acs-edge
         run: npx jest --ci
+
+      # The split-driver cluster rig's commands run outside jest, so
+      # type-check all of them here.
+      - name: Compile the cluster rig
+        working-directory: acs-edge
+        run: npx tsc -p tests/rig --noEmit

@@ -333,6 +333,15 @@ was edited by hand: make it again.
    objects, rewrites the same values, and leaves alone anything the
    upgrade has moved.
 
+   Each device gets the origin map the Manager would have saved for it,
+   rebuilt from its tags. The upgrade's ISA-95 placement step places
+   each device from the hierarchy in that map, so its
+   `Device_Information/ISA95_Hierarchy` metrics are the same after.
+   A rig loaded by an older loader had no origin maps, and the upgrade
+   placed all its devices at the organisation. Placements are never
+   replaced, so remove that rig with `rig remove --rig /rig/rig.json --yes` (which now
+   deletes the placements too) and load it again before the next run.
+
 3. Wait for the Edge Agents. The edge cluster deploys each one within a
    few minutes:
 
@@ -613,10 +622,13 @@ the summary line names the connection on the line above it.
    rig check compare /rig/before.json /rig/after.json
    ```
 
-   It prints a table with each device's DDATA rate before and after,
-   its longest gap after, and `ok`, `WARN` or `FAIL`, then one line per
-   problem. It exits non-zero if anything failed. It fails a device
-   when:
+   It prints a table with each device's DDATA per second and metrics
+   per DDATA before and after, its longest gap after, and its result:
+   `ok`, `EXPECTED`, `WARN` or `FAIL`. Then it lists the failures, the
+   warnings and the expected differences, one line each. It exits
+   non-zero only if something failed.
+
+   It fails a device when:
 
    - a metric it was born with before is missing after, or a new one
      appears, or a type changed;
@@ -624,11 +636,30 @@ the summary line names the connection on the line above it.
    - its DDATA rate rose above 3 times or fell below half (a split
      driver must not multiply the broker's load, ACS-45).
 
+   These are the differences the move is meant to make, and it reports
+   them as `EXPECTED`, not as failures:
+
+   - a device the built-in connection starved now publishing. On a
+     multi-device OPC UA connection the built-in connection gave values
+     only to the last device;
+   - DateTime metrics getting values, where the built-in sent none;
+   - the UDP device publishing, because before the upgrade nothing
+     outside the cluster could reach the built-in UDP connection;
+   - ISA-95 hierarchy metrics added to a device that had none. The
+     upgrade places such a device at the organisation.
+
    It warns when the DDATA rate rose above 1.5 times (or above 3 times
    while metrics are newly getting values, which add messages of their
-   own), when no birth was seen, when metrics get values only after (expected for multi-device
-   OPC UA connections, and for the UDP device), and when there are more
-   DDEATHs after.
+   own), when no birth was seen, when other metrics get values only
+   after, and when there are more DDEATHs after.
+
+   Metrics are compared by name. A recording that starts while the
+   agents are running gets DDATA, which names metrics only by alias,
+   before the rebirth's DBIRTH. The recorder names those from the
+   device's first DBIRTH in the same recording. Any it can't name are
+   left out and counted in a warning, so record with `--rebirth`.
+   Summaries recorded before this change still hold `(alias N)`
+   metrics, and the comparison skips and counts those too.
 
    What the local runs showed, so you know what to expect: REST, MQTT
    and UDP devices matched exactly, with the same metrics and the same
@@ -636,7 +667,7 @@ the summary line names the connection on the line above it.
    messages after the move: from 1.2 to 2.4 times as many with ACS-45's
    grouping in, which ACS-45 expects and reports as a warning. On a
    multi-device OPC UA connection the devices the built-in connection
-   starved get values after the move, which also shows as a warning.
+   starved get values after the move, which shows as expected.
 
 3. Read the upgrade recording's gaps:
 

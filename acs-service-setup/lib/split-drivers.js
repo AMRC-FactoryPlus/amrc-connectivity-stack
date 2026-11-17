@@ -238,13 +238,18 @@ export class MigrateSplitDrivers {
     /* A connection's host ports as `port_clashes` takes them, with
      * where it runs: its Edge Agent's cluster and the host the agent is
      * pinned to, from the agent's Deployment, as the Manager reads them
-     * (acs-admin/src/utils/hostPorts.js). A connection's own `topology`
+     * (acs-admin/src/utils/hostPorts.js): `values.hostname` if it is
+     * set, else `hostname`. A connection's own `topology`
      * copy was written empty for a long time, so it is used only for an
      * agent with no Deployment. */
     placed (conn, cconf, ports) {
         const deployment = this.deployments.get(cconf.edgeAgent);
         const where = deployment ?? cconf.topology ?? {};
-        const host = where.hostname;
+        /* edge-sync merges the Deployment's values over the chart's
+         * last, so a hostname there decides the host. */
+        const host = deployment
+            ? deployment.values?.hostname ?? deployment.hostname
+            : where.hostname;
         return {
             name:       conn,
             cluster:    where.cluster,

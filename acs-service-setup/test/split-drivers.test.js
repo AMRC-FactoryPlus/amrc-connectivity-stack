@@ -605,3 +605,45 @@ describe("a Manager edit while the move runs", () => {
         assert.deepEqual(drivers(cdb).Printer.hostPaths, mounts);
     });
 });
+
+describe("the host a port clash is checked on", () => {
+    const UDP_A = "cccccccc-0000-4000-8000-0000000000b1";
+    const UDP_B = "cccccccc-0000-4000-8000-0000000000b2";
+    const AGENT_B = "aaaaaaaa-0000-4000-8000-000000000002";
+
+    /* Two agents, each with a built-in UDP connection on port 50205.
+     * The first Deployment names edge-1, but its values pin it to
+     * edge-2, and edge-sync merges the values last, so both run on
+     * edge-2. */
+    function two_agents () {
+        const cdb = fixture();
+        const udp = agent => cconf(Driver.UDP, { port: 50205 }, "JSON",
+            { edgeAgent: agent });
+        cdb.set(App.ConnectionConfiguration, UDP_A, udp(AGENT));
+        cdb.set(App.ConnectionConfiguration, UDP_B, udp(AGENT_B));
+
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.push(entry(UDP_A, "Robot", "UDP",
+            "UDPConnDetails", { port: 50205 }, "JSON", 1000));
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        cdb.set(App.EdgeAgentConfig, AGENT_B, {
+            deviceConnections: [entry(UDP_B, "Arm", "UDP",
+                "UDPConnDetails", { port: 50205 }, "JSON", 1000)],
+        });
+
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.hostname = "edge-2";
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+        cdb.set(Edge.App.Deployment, AGENT_B, {
+            cluster: "cluster-uuid", hostname: "edge-2", chart: "chart-uuid",
+            name: "agent-b", values: { name: "agent-b", uuid: AGENT_B },
+        });
+        return cdb;
+    }
+
+    test("is the host the Deployment's values pin it to", async () => {
+        const count = await run(two_agents(), { UDP: true });
+        assert.equal(count.moved, 1);
+        assert.equal(count.held, 1);
+    });
+});

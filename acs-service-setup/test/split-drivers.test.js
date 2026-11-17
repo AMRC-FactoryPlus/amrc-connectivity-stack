@@ -249,16 +249,17 @@ describe("migrate_split_drivers", () => {
         assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
     });
 
-    /* null holds a protocol on its built-in drivers, for a site whose
-     * Edge Agents still run version 6. It says so on every run. */
-    test("null leaves that protocol's connections alone, counts them and says so", async () => {
+    /* hold keeps a protocol on its built-in drivers, for a site whose
+     * Edge Agents still run version 6. It says so on every run. A
+     * literal null does the same, when it gets through Helm. */
+    test("hold leaves that protocol's connections alone, counts them and says so", async () => {
         const cdb = fixture();
         const lines = [];
-        const run_null = () => new MigrateSplitDrivers({
-            fplus: { ConfigDB: cdb }, settings: { REST: null, MQTT: null },
+        const run_held = () => new MigrateSplitDrivers({
+            fplus: { ConfigDB: cdb }, settings: { REST: "hold", MQTT: null },
             log: (...args) => lines.push(args),
         }).run();
-        const count = await run_null();
+        const count = await run_held();
 
         /* OPC moves. Printer, the REST connection with no devices and
          * Broker are held. */
@@ -270,18 +271,21 @@ describe("migrate_split_drivers", () => {
         assert.equal(cdb.get(App.ConnectionConfiguration, C.empty).driver, Driver.REST);
         assert.deepEqual(Object.keys(drivers(cdb)).sort(), ["OPC", "PLC"]);
 
-        const held = lines.filter(l => /is null, so %d/.test(l[0]));
-        assert.deepEqual(held.map(l => [l[1], l[2]]), [["REST", 2], ["MQTT", 1]]);
+        const held = lines.filter(l => /is %o, so %d/.test(l[0]));
+        assert.deepEqual(held.map(l => [l[1], l[2], l[3]]),
+            [["REST", "hold", 2], ["MQTT", null, 1]]);
         assert.match(held[0][0], /^ERROR: /);
         assert.match(held[0][0], /version 7 Edge Agent can't run/);
         assert.match(held[0][0], /still run version 6/);
+        /* Neither is refused. */
+        assert.equal(lines.filter(l => /there is no move back/.test(l[0])).length, 0);
 
         /* The next run says so again and writes nothing. */
         cdb.writes = [];
         lines.length = 0;
-        await run_null();
+        await run_held();
         assert.deepEqual(cdb.writes, []);
-        assert.equal(lines.filter(l => /is null, so %d/.test(l[0])).length, 2);
+        assert.equal(lines.filter(l => /is %o, so %d/.test(l[0])).length, 2);
 
         /* The next run without it moves them. */
         const after = await run(cdb, {});

@@ -30,7 +30,7 @@ From the epic's cluster test card (ACS-47):
    before, with no gap longer than one restart.
 3. There is no move back (decided 2026-11-17): a version 6
    `splitDrivers.<PROTO>: false` is refused with an `ERROR` line in the
-   service-setup log, and the connections still move. `null` holds a
+   service-setup log, and the connections still move. `hold` holds a
    protocol's not-yet-moved connections on the built-in drivers, with
    an `ERROR` line counting them, for a site whose edge still runs
    version 6. It moves nothing back.
@@ -559,7 +559,7 @@ step 8:
   last until production is upgraded, so the change must not be made
   on production while it runs version 6. Two orders avoid that: upgrade
   production to version 7 with `serviceSetup.config.splitDrivers.MQTT`
-  set to `null`, so its MQTT connections stay built in and the pinned
+  set to `hold`, so its MQTT connections stay built in and the pinned
   agent keeps its image, then make the change, then upgrade again with
   `MQTT: true`; or release the version 7 reading of single objects as a
   version 6 patch first.
@@ -812,10 +812,10 @@ back to.
    `driver-` container goes.
 4. Record (`--label refused`) and compare with `moved.json`: they should
    match.
-5. Upgrade again with `--set serviceSetup.config.splitDrivers.OPCUA=null`.
-   The log has `ERROR: serviceSetup.config.splitDrivers.OPCUA is null,
+5. Upgrade again with `--set serviceSetup.config.splitDrivers.OPCUA=hold`.
+   The log has `ERROR: serviceSetup.config.splitDrivers.OPCUA is 'hold',
    so 0 OPCUA connection(s) stay on the built-in`: every one has
-   already moved, and `null` moves none back. The comparison with
+   already moved, and `hold` moves none back. The comparison with
    `moved.json` matches. Upgrade once more without it.
 
 ### 11. Clean up

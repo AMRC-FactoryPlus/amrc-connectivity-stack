@@ -24,12 +24,13 @@
  *    is sealed into the node's Secret through the Manager's own
  *    endpoint, and the config holds the `__FPSI__` placeholder.
  *  - Device: a Device object, Info, and DeviceInformation
- *    (NewDeviceDialog.vue).
+ *    (NewDeviceDialog.vue), with the origin map and schema the
+ *    Manager's origin map editor saves, rebuilt from the device's
+ *    tags. The ISA-95 placement step at the upgrade places each device
+ *    from the hierarchy in it, so its hierarchy metrics stay the same.
  *  - The Edge Agent config: written whole from the source entries,
  *    pointed at the mocks, as the source site has it today. The
- *    Manager builds it from origin maps instead, which the source
- *    configs don't carry, so don't save these devices or connections
- *    in the Manager: it would rebuild their tags from nothing.
+ *    Manager would build the same tags from the origin maps.
  *
  * UUIDs are made from the rig's prefix and each object's place in the
  * rig, so running it again finds the same objects. A second run

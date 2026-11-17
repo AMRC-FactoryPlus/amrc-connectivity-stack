@@ -39,8 +39,12 @@ export const PayloadFormatMap: { [protocol: string]: { [f: string]: string } } =
  * service-setup's move drops them (the OPC UA split DriverDef has
  * `metricPaths: false`), and so does `to_split` below. The harness
  * also drops them from the built-in run, so that both runs' DBIRTHs
- * have the same properties. The built-in run's DDATA is unchanged by
- * it, because the built-in never read them. A run of an entry
+ * have the same properties. The built-in never read a path for its
+ * value, but the Edge Agent used to keep one metric per address and
+ * path, so dropping the paths of two metrics on one node hid all but
+ * one of them in the recorded built-in runs (ACS-27): the OPC UA
+ * recordings were corrected by hand, see tests/golden/README.md. A
+ * run of an entry
  * service-setup already moved keeps whatever paths it has, so a path
  * the move missed shows as a metric that never updates. */
 export function without_unread_paths (entry: any): any {

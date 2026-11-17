@@ -56,6 +56,7 @@ export const App = {
     EdgeClusterConfiguration:   "bdb13634-0b3d-4e38-a065-9d88c12ee78d",
     DeviceInformation:          "a98ffed5-c613-4e70-bfd3-efeee250ade5",
     ConnectionConfiguration:    "fa8b429c-de3e-11ef-87fd-6382f0eac944",
+    ISA95Placement:             "f9345c57-14e3-4027-b76d-2b0b67eb8fed",
 };
 export const Class = {
     Device:                     "18773d6d-a70d-443a-b29a-3f1583195290",

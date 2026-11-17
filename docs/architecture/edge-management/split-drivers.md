@@ -392,6 +392,11 @@ You may notice these differences:
   DriverDef has `metricPaths: false`). Each device's origin map keeps
   its paths. The `path` property is gone from these metrics in DBIRTH.
   The Manager's form hides the path field for OPC UA, as it did before.
+  Two metrics that read one node, one with a path and one without,
+  had different keys in the Edge Agent's index and both updated. With
+  the paths removed they have the same key, so from version 7 the
+  Edge Agent updates every metric on an address and path, not only the
+  last one (ACS-27).
 - **Every device gets its own values.** On a connection with more than
   one device, the built-in connection gave every device's values to
   the last device's metrics, or dropped them. The driver gives each

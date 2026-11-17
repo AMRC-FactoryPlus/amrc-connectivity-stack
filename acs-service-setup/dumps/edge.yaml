@@ -922,8 +922,8 @@ configs:
     # connections' forms, so connection details keep their field names.
     # Service-setup moves every connection still on a built-in driver
     # to these on upgrade (lib/split-drivers.js). The built-in
-    # DriverDefs are not loaded any more, and service-setup deletes
-    # them once no connection uses them (lib/retired-drivers.js).
+    # DriverDefs are not loaded any more, and service-setup marks them
+    # hidden (lib/retired-drivers.js).
     !u ACS.Driver.RESTSplit:
       polled: true
       presentation:

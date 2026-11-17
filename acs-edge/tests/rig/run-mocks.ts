@@ -15,13 +15,32 @@
  *   POST /mocks/<id>/stop   stop one mock (its device goes offline)
  *   POST /mocks/<id>/start  start it again
  *   POST /stop, /start      all of them
+ *
+ * and, on OPC UA, MQTT and REST mocks, for the reconnect checks:
+ *
+ *   POST /mocks/<id>/freeze          hold every value where it is
+ *   POST /mocks/<id>/thaw            go back to the replay
+ *   POST /mocks/<id>/set             change one address once; the body
+ *                                    is {"address": ..., "value": ...}
+ *   POST /mocks/<id>/drop?seconds=n  cut the clients' connections and
+ *                                    refuse new ones for n seconds
+ *                                    (default 30), server left running
  */
 
 import http from "http";
 
-import { MockOpts, make_mock } from "./mocks/index.js";
+import { MockOpts, control, make_mock } from "./mocks/index.js";
 import type { Mock } from "./mocks/mock.js";
 import { CONTROL_PORT, Protocol, PROTOCOLS, Rig, RigConnection, read_rig } from "./rig.js";
+
+function read_body (req: http.IncomingMessage): Promise<string> {
+    return new Promise((resolve, reject) => {
+        let body = "";
+        req.on("data", c => body += c);
+        req.on("end", () => resolve(body));
+        req.on("error", reject);
+    });
+}
 
 /* Serve the control API. Returns the server. */
 export function control_server (mocks: Mock[], port: number): Promise<http.Server> {
@@ -36,6 +55,15 @@ export function control_server (mocks: Mock[], port: number): Promise<http.Serve
             if (req.method == "GET" && url == "/status")
                 return reply(200, mocks.map(m => m.status()));
             if (req.method != "POST") return reply(404, { error: "not found" });
+
+            const one = url.match(/^\/mocks\/([^/]+)\/(freeze|thaw|set|drop)(?:\?(.*))?$/);
+            if (one) {
+                const x = by_id.get(one[1]);
+                if (!x) return reply(404, { error: "not found" });
+                await control(x, one[2], new URLSearchParams(one[3] ?? ""),
+                    await read_body(req));
+                return reply(200, [x.status()]);
+            }
 
             let m = url.match(/^\/mocks\/([^/]+)\/(stop|start)$/);
             const which = m ? [by_id.get(m[1])] : mocks;

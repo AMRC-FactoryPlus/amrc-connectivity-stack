@@ -253,3 +253,45 @@ export function sparkplug_type (type: string): string {
 export function device_ids (c: RigConnection): string[] {
     return (c.connection.devices ?? []).map((d: any) => d.deviceId);
 }
+
+/* A device's origin map, as the Manager stores it in DeviceInformation,
+ * from the tags of its Edge Agent config entry. This undoes what the
+ * Manager does when it writes the config (createTagsFromOriginMap in
+ * acs-admin's edgeAgentConfigUpdater.js): a `Schema_UUID` or
+ * `Instance_UUID` tag is a property of the object or metric above it,
+ * and any other tag is a metric with its settings. The ISA-95
+ * placement step reads a device's hierarchy from here, so a device
+ * loaded without it would be placed at the organisation and lose its
+ * hierarchy metrics. */
+export function origin_map (tags: any[]): any {
+    const map: any = {};
+    const at = (path: string[]) => {
+        let obj = map;
+        for (const k of path) obj = obj[k] ??= {};
+        return obj;
+    };
+    for (const t of tags) {
+        const path = String(t.Name).split("/");
+        const last = path.at(-1)!;
+        if ((last == "Schema_UUID" || last == "Instance_UUID") && t.type == "UUID") {
+            at(path.slice(0, -1))[last] = t.value;
+            continue;
+        }
+        const metric: any = {
+            Sparkplug_Type:         t.type,
+            Method:                 t.method ?? "GET",
+            Record_To_Historian:    t.recordToDB ?? false,
+        };
+        if (t.address) metric.Address = t.address;
+        if (t.path) metric.Path = t.path;
+        if (t.value !== undefined && t.value !== null) metric.Value = t.value;
+        if (t.engUnit) metric.Eng_Unit = t.engUnit;
+        if (t.engLow !== undefined) metric.Eng_Low = t.engLow;
+        if (t.engHigh !== undefined) metric.Eng_High = t.engHigh;
+        if (t.deadBand !== undefined) metric.Deadband = t.deadBand;
+        if (t.tooltip) metric.Tooltip = t.tooltip;
+        if (t.docs !== undefined) metric.Documentation = t.docs;
+        Object.assign(at(path), metric);
+    }
+    return map;
+}

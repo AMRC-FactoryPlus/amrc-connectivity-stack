@@ -11,7 +11,12 @@ import fs from "node:fs";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { DumpLoader } from "../lib/dumps.js";
-import { MigrateSplitDrivers, SplitDrivers } from "../lib/split-drivers.js";
+import {
+    check_retired_drivers, MovedDrivers, RetiredDrivers,
+} from "../lib/retired-drivers.js";
+import {
+    migrate_split_drivers, MigrateSplitDrivers, SplitDrivers,
+} from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
 import { FakeCDB } from "./fake-cdb.js";
@@ -704,5 +709,47 @@ describe("the host a port clash is checked on", () => {
          * the other moves without its sidecar. */
         assert.equal(count.moved, 5);
         assert.equal(count.no_sidecar, 1);
+    });
+});
+
+/* The split-drivers init container runs migrate_split_drivers and then
+ * check_retired_drivers on every upgrade, and again on every helm
+ * upgrade after it. The first run does the move and hides the removed
+ * drivers; a second run must find nothing to do. */
+describe("the split-drivers step, run twice", () => {
+    const quiet = { bound: () => () => {} };
+    const job = cdb => {
+        const ss = { fplus: { ConfigDB: cdb, debug: quiet }, config: {} };
+        return migrate_split_drivers(ss).then(() => check_retired_drivers(ss));
+    };
+
+    /* A site as the dumps left it before version 7: every removed and
+     * moved driver is in the driver class, with its DriverDef, except
+     * MTConnect, whose DriverDef the crashing version 7 build deleted. */
+    function upgraded_site () {
+        const cdb = fixture();
+        for (const d of [...Object.values(RetiredDrivers), ...Object.values(MovedDrivers)]) {
+            cdb.members.add(d);
+            if (d != Driver.MTConnect)
+                cdb.set(App.DriverDefinition, d, { internal: { connType: "x" } });
+        }
+        return cdb;
+    }
+
+    test("the second run writes and deletes nothing", async () => {
+        const cdb = upgraded_site();
+
+        await job(cdb);
+        assert.ok(cdb.writes.length > 0, "the first run moves and hides");
+        assert.deepEqual(cdb.deletes, []);
+        for (const d of [...Object.values(RetiredDrivers), ...Object.values(MovedDrivers)])
+            assert.equal(cdb.get(App.DriverDefinition, d).hidden, true, d);
+        const after = structuredClone([...cdb.configs]);
+
+        cdb.writes = [];
+        await job(cdb);
+        assert.deepEqual(cdb.writes, []);
+        assert.deepEqual(cdb.deletes, []);
+        assert.deepEqual([...cdb.configs], after);
     });
 });

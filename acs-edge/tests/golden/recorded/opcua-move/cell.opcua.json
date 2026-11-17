@@ -1,5 +1,5 @@
 {
- "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it",
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it; Metric_02 added 2026-11-17 (ACS-27): the recording dropped its path, which hid its values",
  "label": "built-in",
  "fixture": "sample-opcua",
  "duration_ms": 5000,
@@ -223,6 +223,38 @@
     "type": "Double",
     "value": "238.6583286141784",
     "t": 4332.91
+   }
+  ],
+  "Device_1/Metric_02": [
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "412.0804040378561",
+    "t": -785.78
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "416.897946945624",
+    "t": 1267.62
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "426.44086158973494",
+    "t": 2280.56
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "431.79260761432766",
+    "t": 3306.21
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "439.8433209504687",
+    "t": 4332.93
    }
   ],
   "Device_1/Metric_03": [

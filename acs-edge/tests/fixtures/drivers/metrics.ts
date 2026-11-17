@@ -72,15 +72,6 @@ export function connection_metrics (connection: any): ConnectionMetrics {
                     + `because Device only reads methods starting GET`));
                 return;
             }
-            /* The index keeps one metric per address and path, so a
-             * second metric with the same pair never gets a value. */
-            if (index.getByAddrPath(address, path) !== m) {
-                const winner = index.getByAddrPath(address, path);
-                out.findings.push(finding(rm,
-                    `shadowed: "${winner.name}" on the same device has the `
-                    + `same address and path, so only that one is updated`));
-                return;
-            }
             out.read.push(rm);
         });
     }

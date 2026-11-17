@@ -133,8 +133,8 @@ function payload_events (
         }
         if (doc instanceof XmlDoc) doc.set_root(ms.map(u => u.m.path));
 
-        /* Two devices reading the same address and path share a slot,
-         * because they parse the same payload. */
+        /* Two metrics reading the same address and path, on one device
+         * or on two, share a slot, because they parse the same payload. */
         const by_path = new Map<string, Slotted>();
         const slotted: Slotted[] = [];
         const shared: { u: { m: ReadMetric, i: number }, s: Slotted }[] = [];

@@ -6,6 +6,7 @@
 
 import fs from "fs";
 import http from "http";
+import net from "net";
 import path from "path";
 
 import mqtt from "mqtt";
@@ -16,10 +17,11 @@ import * as sparkplug from "sparkplug-payload";
 
 import type { Captured } from "../golden/capture";
 import { make_rig, manifests, requests, value_topics } from "./make-rig";
-import { make_mock } from "./mocks";
+import { control, make_mock } from "./mocks";
+import { sleep } from "./mocks/mock";
 import { as_array } from "./mocks/mqtt";
-import { Rig, RigConnection, rig_entry } from "./rig";
-import { compare_summaries, summarise } from "./summary";
+import { Rig, RigConnection, origin_map, rig_entry } from "./rig";
+import { Expected, compare_summaries, summarise, watch } from "./summary";
 
 const SpB = sparkplug.get("spBv1.0")!;
 const EXAMPLES = path.join(__dirname, "examples");
@@ -40,6 +42,32 @@ const by_proto = (rig: Rig, p: string) =>
 
 /* The same connection on a port no other test uses. */
 const on_port = (c: RigConnection, port: number) => ({ ...c, port });
+
+/* The OPC UA example with security mode and policy None and a login. */
+function none_with_login (c: RigConnection, port: number): RigConnection {
+    const details = { ...c.connection.OPCUAConnDetails,
+        securityMode: "None", securityPolicy: "None", useCredentials: true };
+    return { ...c, port, connection: { ...c.connection, OPCUAConnDetails: details } };
+}
+
+function get (url: string) {
+    return new Promise<string>((resolve, reject) =>
+        http.get(url, { agent: false }, r => {
+            let body = "";
+            r.on("data", d => body += d);
+            r.on("end", () => resolve(body));
+        }).on("error", reject));
+}
+
+/* Whether a new connection to the port is cut straight away. */
+function cut (port: number) {
+    return new Promise<boolean>(resolve => {
+        const sock = net.connect(port, "127.0.0.1");
+        const timer = setTimeout(() => { sock.destroy(); resolve(false); }, 1000);
+        sock.on("error", () => {});
+        sock.once("close", () => { clearTimeout(timer); resolve(true); });
+    });
+}
 
 describe("make_rig", () => {
     const rig = example_rig();
@@ -125,6 +153,31 @@ describe("batched payloads", () => {
     test("an object payload becomes an array of {value, timestamp}", () => {
         const out = JSON.parse(as_array(JSON.stringify({ value: 4.5 })).toString());
         expect(out).toEqual([{ value: 4.5, timestamp: expect.any(Number) }]);
+    });
+});
+
+describe("origin_map", () => {
+    test("undoes the Manager's origin map to tags", () => {
+        const tags = [
+            { Name: "Schema_UUID", type: "UUID", method: "GET", value: "s0" },
+            { Name: "Instance_UUID", type: "UUID", method: "GET", value: "i0" },
+            { Name: "Device_Information/ISA95_Hierarchy/Schema_UUID", type: "UUID", value: "s1" },
+            { Name: "Device_Information/ISA95_Hierarchy/Enterprise", type: "String",
+                method: "GET", value: "Example" },
+            { Name: "Temp", type: "DoubleLE", method: "GET", address: "ns=2;s=T",
+                recordToDB: true, engUnit: "C" },
+            { Name: "Temp/Schema_UUID", type: "UUID", method: "GET", value: "s2" },
+        ];
+        expect(origin_map(tags)).toEqual({
+            Schema_UUID: "s0", Instance_UUID: "i0",
+            Device_Information: { ISA95_Hierarchy: {
+                Schema_UUID: "s1",
+                Enterprise: { Sparkplug_Type: "String", Method: "GET",
+                    Record_To_Historian: false, Value: "Example" },
+            } },
+            Temp: { Sparkplug_Type: "DoubleLE", Method: "GET", Record_To_Historian: true,
+                Address: "ns=2;s=T", Eng_Unit: "C", Schema_UUID: "s2" },
+        });
     });
 });
 
@@ -245,6 +298,148 @@ describe("mocks", () => {
     }, 60_000);
 });
 
+describe("mock controls", () => {
+    const rig = example_rig();
+    beforeEach(() => { jest.spyOn(console, "log").mockImplementation(() => {}); });
+    afterEach(() => jest.restoreAllMocks());
+
+    test("OPC UA with security None and a login lets the client log in", async () => {
+        const c = none_with_login(by_proto(rig, "OPC UA"), 14841);
+        const mock = make_mock(rig, c, { advertise: "127.0.0.1" });
+        await mock.start();
+        const client = OPCUAClient.create({
+            securityMode: MessageSecurityMode.None,
+            securityPolicy: SecurityPolicy.None,
+            endpointMustExist: false,
+            connectionStrategy: { maxRetry: 0 },
+        });
+        try {
+            await client.connect("opc.tcp://127.0.0.1:14841");
+            await expect(client.createSession({
+                type: UserTokenType.UserName, userName: c.username!, password: "wrong",
+            })).rejects.toThrow();
+            const session = await client.createSession({
+                type: UserTokenType.UserName, userName: c.username!, password: c.password!,
+            });
+            await session.close();
+            await expect(client.createSession()).rejects.toThrow();
+        }
+        finally {
+            await client.disconnect();
+            await mock.stop();
+        }
+    }, 60_000);
+
+    test("OPC UA holds a set value through a drop, with the server up", async () => {
+        const c = none_with_login(by_proto(rig, "OPC UA"), 14842);
+        const node = "ns=2;s=Sample/Node_01";
+        const mock = make_mock(rig, c, { advertise: "127.0.0.1" });
+        await mock.start();
+        const client = OPCUAClient.create({
+            endpointMustExist: false,
+            connectionStrategy: { initialDelay: 100, maxDelay: 300, maxRetry: 100 },
+        });
+        const read = async (session: any) =>
+            (await session.read({ nodeId: node, attributeId: AttributeIds.Value })).value.value;
+        try {
+            await client.connect("opc.tcp://127.0.0.1:14842");
+            const session = await client.createSession({
+                type: UserTokenType.UserName, userName: c.username!, password: c.password!,
+            });
+
+            await control(mock, "freeze", new URLSearchParams(), "");
+            const held = await read(session);
+            await sleep(1500);
+            expect(await read(session)).toBe(held);
+
+            mock.drop!(2000);
+            expect(mock.status().running).toBe(true);
+            expect(mock.status().dropped_until).toBeDefined();
+            expect(await cut(14842)).toBe(true);
+            await control(mock, "set", new URLSearchParams(),
+                JSON.stringify({ address: node, value: 1234.5 }));
+            await sleep(2000);
+
+            let got;
+            for (let i = 0; i < 50 && got === undefined; i++) {
+                try { got = await read(session); }
+                catch { await sleep(200); }
+            }
+            expect(got).toBe(1234.5);
+            expect(mock.status().writes).toEqual([]);
+            await session.close();
+        }
+        finally {
+            await client.disconnect();
+            await mock.stop();
+        }
+    }, 60_000);
+
+    test("MQTT stops publishing when frozen, sends a set payload, and drops clients", async () => {
+        const c = on_port(by_proto(rig, "MQTT"), 11884);
+        const mock = make_mock(rig, c);
+        await mock.start();
+        mock.freeze!(true);
+        const client = mqtt.connect("mqtt://127.0.0.1:11884", { reconnectPeriod: 0 });
+        try {
+            const got: [string, string][] = [];
+            client.on("message", (t, p) => got.push([t, p.toString()]));
+            await client.subscribeAsync("#");
+            await sleep(1000);
+            expect(got).toEqual([]);
+
+            const topic = c.connection.devices[0].tags.find((t: any) => t.address).address;
+            await mock.set!(topic, '{"x": 1}');
+            await sleep(200);
+            expect(got.length).toBe(1);
+            expect(got[0][0]).toBe(topic);
+
+            const closed = new Promise<void>(r => client.once("close", () => r()));
+            mock.drop!(1000);
+            await closed;
+            expect(await cut(11884)).toBe(true);
+            expect(mock.status()).toMatchObject({ running: true, frozen: true });
+        }
+        finally {
+            await client.endAsync(true);
+            await mock.stop();
+        }
+    });
+
+    test("REST holds its bodies when frozen and serves a set body until thawed", async () => {
+        const c = on_port(by_proto(rig, "REST"), 18081);
+        const mock = make_mock(rig, c);
+        await mock.start();
+        try {
+            const addr = c.connection.devices[0].tags.find((t: any) => t.address).address;
+            const url = `http://127.0.0.1:18081${addr}`;
+            await control(mock, "freeze", new URLSearchParams(), "");
+            const before = await get(url);
+            await control(mock, "set", new URLSearchParams(),
+                JSON.stringify({ address: addr, value: "<x>1</x>" }));
+            expect(await get(url)).toBe("<x>1</x>");
+            await control(mock, "thaw", new URLSearchParams(), "");
+            expect(await get(url)).not.toBe("<x>1</x>");
+            expect(mock.status().frozen).toBe(false);
+
+            await control(mock, "drop", new URLSearchParams("seconds=1"), "");
+            expect(await cut(18081)).toBe(true);
+            await sleep(1100);
+            expect(await get(url)).toBeTruthy();
+            expect(before).toBeTruthy();
+        }
+        finally {
+            await mock.stop();
+        }
+    });
+
+    test("a mock that can't take a control says so", async () => {
+        const udp = make_mock(rig, by_proto(rig, "UDP"));
+        await expect(control(udp, "freeze", new URLSearchParams(), ""))
+            .rejects.toThrow(/can't freeze/);
+    });
+});
+
 describe("summaries", () => {
     const rig: Rig = {
         ...example_rig(),
@@ -291,5 +486,135 @@ describe("summaries", () => {
         expect(rate.some(p => p.level == "FAIL" && /DDATA rate/.test(p.what))).toBe(true);
         const more = compare_summaries(recording("Float", 1000), recording("Float", 500));
         expect(more.map(p => p.level)).toEqual(["WARN"]);
+    });
+
+    test("DDATA before the first DBIRTH is named from that DBIRTH", () => {
+        const d = dev.deviceId;
+        const msgs = [
+            msg("DDATA", 500, [{ alias: 1, type: "Float", value: 3 }], d),
+            msg("DDATA", 600, [{ alias: 9, type: "Float", value: 3 }], d),
+            msg("DBIRTH", 1000, [{ name: read.Name, alias: 1, type: "Float", value: 4 }], d),
+            msg("DDATA", 2000, [{ alias: 1, type: "Float", value: 5 }], d),
+        ];
+        const s = summarise(rig, "x", 0, 3000, new Map([["N", msgs]]));
+        const ds = s.devices[`N/${d}`];
+        expect(Object.keys(ds.metrics)).toEqual([read.Name]);
+        expect(ds.metrics[read.Name]).toMatchObject({ values: 2, last: "5" });
+        expect(ds.unresolved).toBe(1);
+        expect(ds.ddata_metrics).toBe(3);
+    });
+
+    test("a late DBIRTH gives the same counts as an early one", () => {
+        const d = dev.deviceId;
+        const data = [];
+        for (let t = 1000; t < 300_000; t += 1000)
+            data.push(msg("DDATA", t, [{ alias: 1, type: "Float", value: t % 7000 }], d));
+        const birth = (at: number) =>
+            msg("DBIRTH", at, [{ name: read.Name, alias: 1, type: "Float", value: 0 }], d);
+        const early = summarise(rig, "early", 0, 300_000,
+            new Map([["N", [birth(0), ...data]]]));
+        const late = summarise(rig, "late", 0, 300_000,
+            new Map([["N", [...data.filter(m => m.at < 200_000), birth(200_000),
+                ...data.filter(m => m.at >= 200_000)]]]));
+        const e = early.devices[`N/${d}`], l = late.devices[`N/${d}`];
+        expect(l.metrics[read.Name].values).toBe(e.metrics[read.Name].values);
+        expect(l.ddata).toBe(e.ddata);
+        expect(l.unresolved).toBe(0);
+        expect(compare_summaries(early, late)).toEqual([]);
+    });
+
+    test("the same values in fewer DDATA don't fail", () => {
+        const d = dev.deviceId;
+        const birth = msg("DBIRTH", 0, [1, 2, 3, 4].map(i =>
+            ({ name: i == 1 ? read.Name : `M${i}`, alias: i, type: "Float", value: 0 })), d);
+        const one = [birth], all = [birth];
+        for (let t = 1000; t < 60_000; t += 1000) {
+            for (const i of [1, 2, 3, 4])
+                one.push(msg("DDATA", t, [{ alias: i, type: "Float", value: t }], d));
+            all.push(msg("DDATA", t, [1, 2, 3, 4].map(i => ({ alias: i, type: "Float", value: t })), d));
+        }
+        const before = summarise(rig, "before", 0, 60_000, new Map([["N", one]]));
+        const after = summarise(rig, "after", 0, 60_000, new Map([["N", all]]));
+        expect(after.devices[`N/${d}`].ddata_per_s / before.devices[`N/${d}`].ddata_per_s)
+            .toBeCloseTo(0.25);
+        expect(compare_summaries(before, after)).toEqual([]);
+        /* A real slowdown still fails. */
+        const slow = summarise(rig, "slow", 0, 60_000,
+            new Map([["N", all.filter(m => m.at % 4000 == 0 || m.kind == "DBIRTH")]]));
+        expect(compare_summaries(before, slow).some(p => p.level == "FAIL"
+            && /values per second fell/.test(p.what))).toBe(true);
+    });
+
+    test("one device carrying a starved connection's values is expected to drop", () => {
+        const key = `N/${dev.deviceId}`;
+        const before = recording("Float", 250), after = recording("Float", 1000);
+        const other = "N/Other";
+        before.devices[other] = { ...before.devices[key], device: "Other",
+            ddata: 0, ddata_metrics: 0, metrics: { [read.Name]: { type: "Float", values: 0, distinct: 0 } } };
+        after.devices[other] = { ...after.devices[key], device: "Other",
+            ddata_metrics: 27, metrics: { [read.Name]: { type: "Float", values: 27, distinct: 10 } } };
+        const ps = compare_summaries(before, after).filter(p => p.device == key);
+        expect(ps.map(p => p.level)).toEqual(["EXPECTED"]);
+        expect(ps[0].what).toContain(Expected.shared);
+        /* Without the starved neighbour it is a real drop. */
+        delete before.devices[other];
+        delete after.devices[other];
+        expect(compare_summaries(before, after).some(p => p.level == "FAIL")).toBe(true);
+    });
+
+    test("metrics left as aliases are skipped, not failed", () => {
+        const a = recording("Float", 1000), b = recording("Float", 1000);
+        const d = b.devices[`N/${dev.deviceId}`];
+        d.metrics["(alias 7)"] = { type: "Float", values: 3, distinct: 3 };
+        expect(compare_summaries(a, b).map(p => p.level)).toEqual(["WARN"]);
+    });
+
+    test("the move's own differences are expected, not failures", () => {
+        const key = `N/${dev.deviceId}`;
+        const before = recording("Float", 1000), after = recording("Float", 1000);
+        const x = before.devices[key], y = after.devices[key];
+
+        /* Starved before: no read metric had values. */
+        x.metrics[read.Name].values = 0;
+        let ps = compare_summaries(before, after);
+        expect(ps).toEqual([expect.objectContaining({ level: "EXPECTED",
+            what: expect.stringContaining(Expected.starved) })]);
+        y.protocol = "UDP";
+        expect(compare_summaries(before, after)[0].what).toContain(Expected.udp);
+        y.protocol = x.protocol;
+        x.metrics[read.Name].values = 9;
+
+        /* Hierarchy added where there was none, and lost where there
+         * was one. */
+        const h = "Device_Information/ISA95_Hierarchy/Enterprise";
+        const u = "Device_Information/Instance_UUID";
+        y.metrics[h] = { type: "String", values: 0, distinct: 0 };
+        y.metrics[u] = { type: "UUID", values: 0, distinct: 0 };
+        ps = compare_summaries(before, after);
+        expect(ps.map(p => p.level)).toEqual(["EXPECTED"]);
+        expect(ps[0].what).toContain(Expected.isa95);
+        delete y.metrics[u];
+        x.metrics[h] = y.metrics[h];
+        delete y.metrics[h];
+        expect(compare_summaries(before, after).map(p => p.level)).toEqual(["FAIL"]);
+    });
+
+    test("a watched metric shows each value, death and birth in order", () => {
+        const d = dev.deviceId;
+        const msgs = [
+            msg("DBIRTH", 0, [{ name: read.Name, alias: 1, type: "Float", value: 1 },
+                { name: "Other", alias: 2, type: "Float", value: 0 }], d),
+            msg("DDATA", 1000, [{ alias: 2, type: "Float", value: 5 }], d),
+            msg("DDATA", 2000, [{ alias: 1, type: "Float", value: 2 }], d),
+            msg("DDEATH", 3000, [], d),
+            msg("DBIRTH", 9000, [{ name: read.Name, alias: 1, type: "Float", value: 7 }], d),
+            msg("DDATA", 9500, [{ alias: 1, type: "Float", value: 8 }], "another"),
+        ];
+        expect(watch(msgs, d, read.Name, 0)).toEqual([
+            { at: 0, kind: "DBIRTH", value: "1" },
+            { at: 2, kind: "DDATA", value: "2" },
+            { at: 3, kind: "DDEATH" },
+            { at: 9, kind: "DBIRTH", value: "7" },
+        ]);
     });
 });

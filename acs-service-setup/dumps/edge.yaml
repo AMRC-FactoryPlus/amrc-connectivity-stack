@@ -53,11 +53,8 @@ objects:
 
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST" }
-    !u ACS.Driver.MTConnect:        { name: "MTConnect" }
-    !u ACS.Driver.S7:               { name: "S7" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
-    !u ACS.Driver.UDP:              { name: "UDP" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
     !u ACS.Driver.Test:             { name: "Test" }
@@ -152,117 +149,6 @@ configs:
           - baseURL
           - authMethod
         title: REST Connection Details
-        type: object
-    !u ACS.Driver.MTConnect:
-      polled: true
-      presentation:
-        address:
-          title: "MTConnect Endpoint"
-          description: "The path following the domain in a REST call URL (usually /current)"
-          icon: "industry"
-          placeholder: "e.g. /current"
-        path:
-          title: "XML Path"
-          description: "XPath notation to extract specific values from the XML response (e.g. //*[@componentId='x']//*[@dataItemId='xp']/text())"
-          icon: "code-branch"
-          placeholder: "e.g. //*[@dataItemId='temperature']/text()"
-      internal:
-        connType: MTConnect
-        details: MTConnectConnDetails
-      schema:
-        properties:
-          baseURL:
-            minLength: 1
-            title: Base URL
-            type: string
-            options:
-              order: 1
-          authMethod:
-            default: None
-            enum:
-              - None
-              - Basic
-            minLength: 1
-            title: Authentication Method
-            type: string
-            options:
-              order: 2
-          username:
-            minLength: 1
-            title: Username
-            type: string
-            options:
-              order: 3
-              dependencies:
-                authMethod: Basic
-          password:
-            format: password
-            minLength: 1
-            title: Password
-            type: string
-            options:
-              order: 4
-              dependencies:
-                authMethod: Basic
-        required:
-          - baseURL
-          - authMethod
-        title: MTConnect Connection Details
-        type: object
-    !u ACS.Driver.S7:
-      polled: true
-      presentation:
-        address:
-          title: "Memory Address"
-          description: "Database memory address given as %aa####.* where aa determines the variable type (e.g. %I=input bit, %Q=output bit, %IB=input byte, %QB=output byte, %IW=input word, %QW=output word, %ID=input double word, %QD=output double word)"
-          icon: "microchip"
-          placeholder: "e.g. %QD1026 or %Q1194.0"
-        path:
-          hidden: true
-      internal:
-        connType: S7
-        details: s7ConnDetails
-      schema:
-        properties:
-          hostname:
-            minLength: 1
-            title: Hostname/IP Address
-            type: string
-            options:
-              order: 1
-          port:
-            default: 102
-            minLength: 1
-            title: Port
-            type: number
-            options:
-              order: 2
-          rack:
-            minLength: 1
-            title: Rack
-            type: number
-            options:
-              order: 3
-          slot:
-            minLength: 1
-            title: Slot
-            type: number
-            options:
-              order: 4
-          timeout:
-            default: 5000
-            minLength: 1
-            title: Timeout
-            type: number
-            options:
-              order: 5
-        required:
-          - hostname
-          - port
-          - rack
-          - slot
-          - timeout
-        title: S7 Connection Details
         type: object
     !u ACS.Driver.OPCUA:
       polled: true
@@ -437,33 +323,6 @@ configs:
           - port
           - protocol
         title: MQTT Server Details
-        type: object
-    !u ACS.Driver.UDP:
-      polled: false
-      presentation:
-        address:
-          title: "Port"
-          description: "The UDP port to listen on (e.g. 50205)"
-          icon: "network-wired"
-          placeholder: "e.g. 50205"
-        path:
-          title: "Data Selector"
-          description: "Selector to extract specific values from the UDP message (e.g. data[0] for first byte)"
-          icon: "filter"
-          placeholder: "e.g. data[0]"
-      internal:
-        connType: UDP
-        details: UDPConnDetails
-      schema:
-        properties:
-          port:
-            enum:
-              - 50205
-            title: Port
-            type: number
-            options:
-              order: 1
-        title: UDP Server Details
         type: object
     !u ACS.Driver.Bacnet:
       polled: true

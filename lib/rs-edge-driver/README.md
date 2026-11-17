@@ -95,7 +95,7 @@ impl Handler for ModbusHandler {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt::init();
+    init_logging();
 
     let config = DriverConfig::from_env()?;
     let mut driver = Driver::<ModbusHandler>::new(config);
@@ -104,10 +104,41 @@ async fn main() -> Result<(), Error> {
 ```
 
 See [`examples/test_driver.rs`](./examples/test_driver.rs) for a
-complete, runnable polled-mode driver, and
-[`edge-compass-daq`](../../edge-compass-daq) in the main repo for a
-real async-mode driver (subscribes to a southbound MQTT broker and
-pushes data via `DriverHandle::publish` as it arrives).
+complete, runnable polled-mode driver. `edge-compass-daq`, which is
+kept outside this repository, is a real async-mode driver: it
+subscribes to a southbound MQTT broker and pushes data via
+`DriverHandle::publish` as it arrives.
+
+## Connection status
+
+The driver reports its status to the Edge Agent on
+`fpEdge1/{id}/status`. A handler drives it like this:
+
+- `Handler::connect` returning `Ok(())` sets `UP`. Returning
+  `ConnectError::ConnectionFailed`, `AuthFailed` or `Other` sets
+  `CONN`, `AUTH` or `ERR`, and the driver calls `connect` again after
+  `reconnect_delay` until it succeeds.
+- If the device goes away after `UP`, call
+  `DriverHandle::disconnected(reason)` from anywhere in the handler.
+  The status changes in the same way and the driver reconnects.
+- No data is published unless the status is `UP`.
+
+The driver calls `connect`, `subscribe`, `cmd` and `close` on its own
+tasks, so a slow or unreachable device never holds up the MQTT
+connection to the Edge Agent and its keep-alive pings.
+
+When the Edge Agent sends `active OFFLINE`, the driver closes the
+handler and forgets its configuration until the agent sends `ONLINE`.
+
+## Polling in parallel
+
+`Handler::poll` takes `&mut self`, so polls through it run one at a
+time. If your device client can serve several reads at once, return a
+`Poller` from `Handler::poller` and the driver will call it without
+taking the handler's lock, for every address in a poll request at
+once. Set `serial_poll` in `DriverConfig` to force one poll at a time
+either way. A poll's `poll_timeout` starts when the poll starts, not
+while it waits for the lock.
 
 ## API reference
 
@@ -130,7 +161,19 @@ Name|Meaning
 `EDGE_USERNAME`|Driver connection name
 `EDGE_PASSWORD`|MQTT password
 
-`DriverConfig` also has `reconnect_delay` and `serial_poll` fields, but
-`from_env()` currently hardcodes these (5 seconds, parallel polling)
-rather than reading them from the environment — construct
-`DriverConfig` directly if you need different values.
+`VERBOSE`|Log level, as for the JS drivers: `1` or `ALL` for debug, or a comma-separated list of targets (see `init_logging`)
+
+`RUST_LOG` overrides `VERBOSE` when set. Call `init_logging()` at the
+start of `main` to use them.
+
+`DriverConfig::from_env()` (or `DriverConfig::new(url, username,
+password)`) fills every other field with a default. Change the fields
+on the returned value if you need different ones:
+
+Field|Default|Meaning
+---|---|---
+`reconnect_delay`|5 s|Wait between southbound connection attempts
+`serial_poll`|`false`|Poll one address at a time
+`poll_timeout`|30 s|Longest a single poll may run
+`keep_alive`|30 s|MQTT keep-alive to the Edge Agent
+`max_packet_size`|16 MiB|Largest MQTT packet sent or accepted. rumqttc's own default is 10 KiB, too small for a large `addr` map or data payload

@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -120,9 +121,16 @@ pub trait Handler: Send + Sized {
     /// Connect (or reconnect) to the southbound device.
     ///
     /// Return `Ok(())` on success. The driver will set status `UP`.
-    /// Return `Err(ConnectError::ConnectionFailed)` or
-    /// `Err(ConnectError::AuthFailed)` on failure — the driver will
-    /// retry after the configured reconnect delay.
+    /// Return `Err(ConnectError::ConnectionFailed)`,
+    /// `Err(ConnectError::AuthFailed)` or `Err(ConnectError::Other)`
+    /// on failure — the driver will report `CONN`, `AUTH` or `ERR`
+    /// and retry after the configured reconnect delay.
+    ///
+    /// The driver calls this on its own task, so a slow connect
+    /// doesn't hold up the edge agent's MQTT connection. If the
+    /// connection is lost later, report it with
+    /// [`DriverHandle::disconnected`] and the driver will call
+    /// `connect` again.
     async fn connect(&mut self) -> Result<(), ConnectError>;
 
     /// Clean up resources and disconnect from the device.
@@ -164,4 +172,35 @@ pub trait Handler: Send + Sized {
     /// Commands arrive on `fpEdge1/{id}/cmd/{name}` and are
     /// forwarded here. Override this if the device supports commands.
     async fn cmd(&mut self, _command: &str, _payload: Bytes) {}
+
+    /// **Polled mode, optional**: hand out a [`Poller`] so polls can
+    /// run at the same time as each other.
+    ///
+    /// [`poll`](Handler::poll) takes `&mut self`, so the driver holds
+    /// the handler's lock for each poll and polls run one at a time.
+    /// A handler whose device client can serve several reads at once
+    /// (an HTTP client, a connection pool, a client with its own
+    /// request queue) can return a `Poller` here instead. The driver
+    /// asks for it after each successful [`connect`](Handler::connect)
+    /// and then calls [`Poller::poll`] without taking the handler's
+    /// lock, for as many addresses at once as the edge agent asks for.
+    /// `serial_poll` in [`DriverConfig`](crate::DriverConfig) still
+    /// limits it to one poll at a time.
+    ///
+    /// The default returns `None`, which keeps the locked `poll`.
+    fn poller(&self) -> Option<Arc<dyn Poller<Self::Addr>>> {
+        None
+    }
+}
+
+/// Reads addresses without needing the handler's lock. See
+/// [`Handler::poller`].
+///
+/// A `Poller` is usually a small struct holding a clone of the
+/// handler's device client.
+#[async_trait]
+pub trait Poller<A>: Send + Sync {
+    /// Read data for a single address, as [`Handler::poll`] does.
+    /// Return `None` if the read failed.
+    async fn poll(&self, addr: &A) -> Option<Bytes>;
 }

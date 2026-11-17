@@ -55,12 +55,14 @@ mod config;
 mod driver;
 mod error;
 mod handler;
+mod logging;
 mod redact;
 mod status;
 
-pub use config::DriverConfig;
+pub use config::{DEFAULT_MAX_PACKET_SIZE, DriverConfig};
 pub use driver::{Driver, DriverHandle};
 pub use error::{ConnectError, Error, HandlerError};
-pub use handler::Handler;
+pub use handler::{Handler, Poller};
+pub use logging::{init_logging, log_filter};
 pub use redact::redact;
 pub use status::Status;

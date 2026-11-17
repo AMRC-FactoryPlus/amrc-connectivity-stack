@@ -11,8 +11,8 @@ import path from "path";
 import { App, BuiltIn, Class, Service, conn_uuid, node_uuid } from "./acs";
 import { fake_fplus } from "./fake-acs";
 import { make_rig } from "./make-rig";
-import { batch, load, remove } from "./objects";
-import type { Rig } from "./rig";
+import { batch, cluster_entry, load, remove } from "./objects";
+import { Rig, origin_map } from "./rig";
 
 const EXAMPLES = path.join(__dirname, "examples");
 const CLUSTER = "c0000000-0000-4000-8000-000000000001";
@@ -90,6 +90,17 @@ describe("load", () => {
             expect([...devices.values()].filter(d => d.connection == uuid).length)
                 .toBe(c.connection.devices.length);
         }
+
+        /* Each device has the origin map the Manager would save for
+         * the tags in its Edge Agent config. */
+        const c = rig.connections[0];
+        const dname = c.connection.devices[0].deviceId;
+        const duuid = [...(await cdb.get_all_configs(App.DeviceInformation))]
+            .find(([, d]) => d.connection == conn_uuid(rig, c) && d.sparkplugName == dname)![0];
+        const info = await cdb.get_config(App.DeviceInformation, duuid);
+        expect(info.originMap).toEqual(origin_map(cluster_entry(rig, c).devices[0].tags));
+        expect(Object.keys(info.originMap).length).toBeGreaterThan(0);
+        expect(info.schema).toBe(info.originMap.Schema_UUID ?? null);
 
         /* The OPC UA example logs in: its password is sealed and the
          * configs hold the placeholder. */
@@ -184,6 +195,8 @@ describe("remove", () => {
         expect(dry.deletions).toBeGreaterThan(0);
         expect(cdb.objects.size).toBeGreaterThan(1);
 
+        const device = [...(await cdb.get_all_configs(App.DeviceInformation)).keys()][0];
+        await cdb.put_config(App.ISA95Placement, device, { node: "n" });
         await remove(rig, { dry: false }, fplus);
         expect([...cdb.objects.keys()]).toEqual([OTHER]);
         expect(fplus.Fetch.secrets.size).toBe(0);

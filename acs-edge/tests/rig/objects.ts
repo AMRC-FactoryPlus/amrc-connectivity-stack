@@ -14,7 +14,7 @@ import {
 } from "./acs.js";
 import {
     Rig, RigConnection, device_ids, details_key, manager_config,
-    mock_service, node_connections, rig_entry,
+    mock_service, node_connections, origin_map, rig_entry,
 } from "./rig.js";
 
 /* The connection entry as the loader writes it into the cluster. */
@@ -109,15 +109,17 @@ export async function load (rig: Rig, opts: LoadOpts, client?: any) {
             for (const dev of device_ids(c)) {
                 const duuid = device_uuid(rig, c, dev);
                 const info = await cdb.get_config(App.DeviceInformation, duuid);
+                const tags = entry.devices?.find((d: any) => d.deviceId == dev)?.tags ?? [];
+                const map = origin_map(tags);
                 await w.do(`create device ${duuid} ${dev}`, async () => {
                     await cdb.create_object(Class.Device, duuid);
                     await cdb.put_config(App.Info, duuid, { name: `${rig.prefix}-${dev}` });
                     await cdb.put_config(App.DeviceInformation, duuid, {
                         sparkplugName:  dev,
-                        schema:         null,
+                        schema:         map.Schema_UUID ?? null,
                         connection:     cuuid,
                         node:           nuuid,
-                        originMap:      null,
+                        originMap:      map,
                         createdAt:      info?.createdAt ?? new Date().toISOString(),
                     });
                 });
@@ -221,6 +223,7 @@ export async function remove (rig: Rig, opts: { cluster?: string, dry: boolean }
     for (const [uuid, d] of devices)
         await w.do(`delete device ${d.sparkplugName} (${uuid})`, async () => {
             await gone(() => cdb.delete_config(App.DeviceInformation, uuid));
+            await gone(() => cdb.delete_config(App.ISA95Placement, uuid));
             await gone(() => cdb.delete_config(App.Info, uuid));
             await gone(() => cdb.delete_object(uuid));
         });

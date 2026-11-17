@@ -1,0 +1,10 @@
+# The build context is the repository root; send only what the image
+# needs.
+*
+!lib/js-service-client
+!acs-edge
+**/node_modules
+acs-edge/build
+acs-edge/coverage
+acs-edge/config
+acs-edge/.env

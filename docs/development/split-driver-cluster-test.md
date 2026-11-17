@@ -1,0 +1,728 @@
+# Split-Driver Cluster Test
+
+This is the runbook for proving ACS version 7's split drivers on a dev
+cluster before any production cluster is upgraded. Version 7 moves the
+Edge Agent's built-in REST, MQTT, OPC UA and UDP connections into split
+drivers (sidecar containers in the Edge Agent's pod). The test puts
+mock devices shaped like a real site's connections on a dev cluster,
+loads Edge Agent connections that read them in their built-in form
+(the state a site is in today), records what the Edge Agents publish,
+upgrades to a test build of version 7, records again and compares.
+
+The tools are in [`acs-edge/tests/rig/`](../../acs-edge/tests/rig/).
+Everything that names a real site (the connection configs, the rig
+made from them and the recordings) stays in a private folder outside
+this repository.
+
+Every command that changes the cluster is one you run. Nothing in the
+rig changes a cluster by itself: the loader and the remover print what
+they would do until you add `--yes`.
+
+## What the test must show
+
+From the epic's cluster test card (ACS-47):
+
+1. Upgrading from the current release to a build of
+   `feature/split-drivers`, with built-in REST, MQTT, OPC UA and UDP
+   connections present and publishing, works.
+2. After the upgrade each connection has moved to its split driver, its
+   sidecar is running, and its devices publish the same metrics as
+   before, with no gap longer than one restart.
+3. Each protocol can be moved back with its chart value and returns to
+   what it was.
+4. Connections with dotted names work. A UDP sender outside the
+   cluster reaches the driver on the host port. OPC UA writes work. A
+   device goes offline when its server or broker is stopped and comes
+   back when it returns.
+5. The CPU and memory of each Edge Agent and sidecar, before and after.
+6. Each protocol's own checks, collected in [Protocol
+   checks](#protocol-checks) below.
+
+## What the rig is
+
+| Part | Command | What it does |
+|---|---|---|
+| Generator | `rig make-rig` | Reads connection configs exported from a site (passwords redacted) and writes a rig: one Edge Agent per source Edge Agent, one connection per source connection, a mock port for each, made-up passwords, the Kubernetes manifests for the mocks, and a coverage report. |
+| Mocks | `rig run-mocks` | One pod per protocol. Each connection gets its own mock: an OPC UA server with the same node ids, data types, security mode, policy and login; an HTTP server answering the same paths with JSON or XML of the same shape; an MQTT broker of its own with a publisher sending the same topics and payload shapes. Values come from the driver fixture generator and change all the time. A UDP sender runs outside the cluster, as a real device would. |
+| Loader | `rig load` | Creates the rig's Edge Agents, connections and devices through ConfigDB with the writes the Manager makes, in their built-in form. |
+| Checker | `rig check` | Records the rig's Sparkplug output and compares two recordings. Read-only. |
+| Writer | `rig write` | Sends one metric write through the Command Escalation service, for the OPC UA write check. |
+| Remover | `rig remove` | Deletes everything the loader made. |
+| Local runner | `rig local` | Runs mocks, real Edge Agents and the split drivers on one machine, for proving the rig before it goes on a cluster. |
+
+All of them are in one image, `acs-rig-mocks`, built from this
+repository. It is test support and is not published with ACS.
+
+### What the rig changes from the source configs
+
+A connection keeps its devices, metrics, addresses, paths, payload
+formats, poll interval, OPC UA security mode and policy, and whether
+it logs in. The rig changes only:
+
+- the address it connects to (the mock), and its name, which gets the
+  rig's prefix (`Rig-`) in front so the rig's objects are easy to find;
+- passwords, which are made up when the rig is made;
+- MQTT over TLS and HTTPS, which become plain MQTT and HTTP, because
+  the Edge Agent would not trust a mock's certificate. The rig cannot
+  test TLS. `coverage.md` lists every connection this applies to.
+
+### What the rig cannot show
+
+- Real device timing, real payloads and server quirks. The fixtures
+  README in `acs-edge/tests/fixtures/drivers/` explains this.
+- TLS, as above.
+- Whether a real OPC UA server trusts the split driver's new client
+  certificate. The mocks trust every certificate. Check this on each
+  real server when its connection moves (ACS-27).
+- MQTT brokers shared between connections. Each rig connection has a
+  broker of its own.
+
+## Before you start
+
+You need:
+
+- the dev cluster's kubeconfig, and ACS admin credentials on it;
+- Docker on your machine, and SSH with sudo to the dev cluster's node
+  (to load the mock image into k3s);
+- the private folder with the connection configs and the rigs made
+  from them;
+- for the upgrade, permission to publish a pre-release of this
+  repository (see [Making a Release](./releasing.md)).
+
+Set these in every terminal you use. Replace the parts in angle
+brackets.
+
+```sh
+export KUBECONFIG=<path to the dev cluster's kubeconfig>
+export ACS_DOMAIN=<the dev cluster's ACS domain>
+export RIG=<private folder>/rig/subset        # or rig/full, see "Full rig or subset"
+export EDGE_NS=<the edge cluster's namespace>
+export DIRECTORY_URL=http://directory.$ACS_DOMAIN
+export SERVICE_USERNAME=admin
+export SERVICE_PASSWORD="$(kubectl -n factory-plus get secret admin-password -o jsonpath='{.data.password}' | base64 -d)"
+alias rig='docker run --rm -e DIRECTORY_URL -e SERVICE_USERNAME -e SERVICE_PASSWORD -e MQTT_URL -v "$RIG":/rig acs-rig-mocks:dev'
+```
+
+The `rig` alias runs the image on your machine with the rig folder at
+`/rig`. If the cluster is only reachable on a VPN, connect first. Use
+`https://` in `DIRECTORY_URL` if the cluster serves HTTPS.
+
+### Full rig or subset
+
+`make-rig` can make a rig of every source connection or of a subset
+listed in a file. Each rig Edge Agent requests 100m of CPU and 200 MiB
+of memory (the Edge Agent chart's defaults), and a cluster must have
+room for them all, plus the mocks.
+
+```sh
+kubectl describe nodes | grep -A8 "Allocated resources"
+kubectl top nodes
+```
+
+Add up `cpu Requests` across nodes and subtract from the CPU the nodes
+have. Each rig Edge Agent needs 0.1 of it. If the full rig leaves less
+than 0.5 CPU spare, use the subset. Read `coverage.md` in each rig
+folder: its last table lists every feature (protocol, payload format,
+security mode, path style, odd case) and the connections that have it,
+so you can check the subset still covers everything.
+
+## The steps
+
+Times are for a single-node dev cluster. The longest wait is the test
+build.
+
+| Step | What | Time |
+|---|---|---|
+| 1 | Check the cluster | 5 min |
+| 2 | Build the image and load it into k3s | 15 to 20 min |
+| 3 | Start the mocks | 5 min |
+| 4 | Load the built-in connections | 10 min |
+| 5 | Record the before state | 20 min |
+| 6 | Make a test build | 60 min, unattended |
+| 7 | Upgrade | 20 min, with a recording running across it |
+| 8 | Record the after state and compare | 20 min |
+| 9 | The specific checks | 45 min |
+| 10 | Move each protocol back and forward | 30 min per protocol |
+| 11 | Clean up | 10 min |
+
+### 1. Check the cluster
+
+1. Check nothing has committed to the edge Helm charts' `main`. Version
+   7 needs the edge clusters to get the new charts, see "Edge charts
+   and every split driver move" in
+   [Split Drivers](../architecture/edge-management/split-drivers.md).
+
+   ```sh
+   git ls-remote http://git.$ACS_DOMAIN/git/shared/helm refs/heads/main refs/heads/acs
+   ```
+
+   You should see the same commit hash on both lines. If they differ,
+   merge `acs` into `main` straight after the upgrade in step 7, or the
+   moved connections get no data.
+
+2. Check no Edge Agent Deployment pins its own image (`values.image`),
+   because a pinned agent's sidecars would use an image that doesn't
+   exist:
+
+   ```sh
+   kubectl get helmrelease -n $EDGE_NS -o json | jq -r '.items[] | [.metadata.name, (.spec.values.image // "none" | tostring)] | @tsv'
+   ```
+
+   You should see `none` for every Edge Agent.
+
+3. Note what already runs, so you can check later that the rig didn't
+   disturb it:
+
+   ```sh
+   kubectl get pods -n $EDGE_NS -o wide
+   ```
+
+### 2. Build the image and load it into k3s
+
+From the root of this repository, on the commit you are testing:
+
+1. Build the image for your machine, which runs the loader, checker
+   and UDP sender:
+
+   ```sh
+   docker build -f acs-edge/tests/rig/Dockerfile -t acs-rig-mocks:dev .
+   ```
+
+2. Build it for the cluster's nodes (`amd64` here; the build runs under
+   emulation on an Apple silicon Mac and takes about 10 minutes):
+
+   ```sh
+   docker buildx build --platform linux/amd64 -f acs-edge/tests/rig/Dockerfile -t acs-rig-mocks:amd64 --load .
+   ```
+
+3. Load it into k3s on each node that will run the mocks:
+
+   ```sh
+   docker save acs-rig-mocks:amd64 | ssh <user>@<node> sudo k3s ctr images import -
+   ```
+
+   You should see `unpacking docker.io/library/acs-rig-mocks:amd64`.
+   Check with:
+
+   ```sh
+   ssh <user>@<node> sudo k3s ctr images ls | grep acs-rig-mocks
+   ```
+
+If the cluster can pull from a registry you can push to, push the
+image there instead and make the rig with `--image <that reference>`.
+
+### 3. Start the mocks
+
+The rigs in the private folder are already made. To make one again,
+for example after the configs change:
+
+```sh
+docker run --rm -v <private folder>:/p acs-rig-mocks:dev make-rig /p/rig/subset /p/configs /p/rig/udp-example.json --subset /p/rig/subset.txt --image acs-rig-mocks:amd64
+```
+
+Making a rig again gives new passwords, so load the connections again
+after it (step 4).
+
+1. Start the mocks:
+
+   ```sh
+   kubectl apply -f "$RIG/mocks.yaml"
+   ```
+
+   This creates the namespace `acs-rig`, a Secret holding the rig, and
+   one Deployment and Service per protocol.
+
+2. Wait for them:
+
+   ```sh
+   kubectl -n acs-rig rollout status deploy --timeout=5m
+   kubectl -n acs-rig logs deploy/rig-mqtt | tail
+   ```
+
+   Each mock logs `Started <id> on port <port>`, and the last line is
+   `<n> <protocol> mocks running`. A pod with the heavy MQTT
+   connections takes up to a minute to make its data.
+
+3. Keep a port open to each pod's control API in a spare terminal.
+   You need it for the offline check and the write check:
+
+   ```sh
+   kubectl -n acs-rig port-forward svc/rig-opcua 9001:9000 &
+   kubectl -n acs-rig port-forward svc/rig-mqtt 9002:9000 &
+   kubectl -n acs-rig port-forward svc/rig-rest 9003:9000 &
+   curl -s localhost:9001/status | jq -c '.[] | {id, clients, delivered}'
+   ```
+
+**If it fails.** `ErrImageNeverPulled` or `ImagePullBackOff` means the
+image is not on the node: repeat step 2.3 on that node. A pod that
+restarts with `OOMKilled` needs more memory: the manifests ask for no
+limit, so check the node is not out of memory. A mock that logs
+`EADDRINUSE` has two connections on one port, which means the rig file
+was edited by hand: make it again.
+
+### 4. Load the built-in connections
+
+1. See what the loader would write:
+
+   ```sh
+   rig load --rig /rig/rig.json
+   ```
+
+   It prints the edge cluster and Edge Agent chart it found, then for
+   each rig Edge Agent the objects and configs it would create, and
+   ends `<n> writes would be made (dry run: rerun with --yes)`. If the
+   cluster has more than one edge cluster it stops and lists them: add
+   `--cluster <uuid>`.
+
+2. Load them:
+
+   ```sh
+   rig load --rig /rig/rig.json --yes
+   ```
+
+   About a minute. Running it again is safe: it finds the same
+   objects, rewrites the same values, and leaves alone anything the
+   upgrade has moved.
+
+3. Wait for the Edge Agents. The edge cluster deploys each one within a
+   few minutes:
+
+   ```sh
+   kubectl get pods -n $EDGE_NS -l factory-plus.app=edge-agent -w
+   ```
+
+   You should see one `edge-agent-rig-...` pod per rig Edge Agent,
+   `1/1 Running`. Before the upgrade they have no sidecars, because
+   every connection is built in.
+
+4. Check the mocks have clients:
+
+   ```sh
+   curl -s localhost:9001/status | jq -c '.[] | {id, name, clients, refused}'
+   ```
+
+   Every OPC UA and MQTT mock should have `clients` of 1 or more and
+   `refused` of 0. REST mocks count requests in `delivered`.
+
+5. Start the UDP sender on your machine, outside the cluster, sending
+   to the edge node's address. Leave it running for the rest of the
+   test:
+
+   ```sh
+   docker run --rm --name rig-udp -v "$RIG":/rig acs-rig-mocks:dev run-mocks --rig /rig/rig.json --protocol UDP --udp-target <edge node address> --control-port 9004
+   ```
+
+   Before the upgrade the built-in UDP connection listens inside the
+   Edge Agent's pod, which nothing outside the cluster can reach, so
+   its device publishes no data until the move opens the host port.
+   That is expected. No site has a UDP connection today.
+
+**If it fails.** `401` from the loader means the credentials are wrong
+or the variables are not exported. An Edge Agent pod in
+`CrashLoopBackOff` needs its log
+(`kubectl logs -n $EDGE_NS <pod> --previous`). One source OPC UA
+connection has a device with no addresses, and the built-in connection
+crashes the whole Edge Agent on it (`BadNothingToDo`): that agent
+crash-loops before the upgrade, which is the finding, so note it and
+carry on. A mock with `refused` above 0 is being sent the wrong
+password: run `rig load --yes` again, which reseals it.
+
+### 5. Record the before state
+
+1. Record for 15 minutes:
+
+   ```sh
+   rig check record --rig /rig/rig.json --seconds 900 --label before --rebirth --out /rig/before.json
+   ```
+
+   `--rebirth` asks each rig Edge Agent to send its births again at the
+   start, as the Manager's Rebirth button does, so the checker learns
+   every metric's name. It is the only thing the checker sends. If the
+   checker can't reach the broker, set `MQTT_URL` to the broker's
+   address from your machine (for example `mqtt://mqtt.$ACS_DOMAIN`)
+   and run it again.
+
+   At the end it prints one line per device:
+
+   ```
+   Rig_Example/Device_1 [MQTT Rig-example]: 16 metrics born, 12/12 read metrics got values, 12 changed, 0.98 DDATA/s, longest gap 1.1 s, 1 DBIRTH, 0 DDEATH
+   ```
+
+   Every device should be born, and most read metrics should get
+   values. Read metrics that get none are the fixture's findings (see
+   `coverage.md`) or the built-in connection's own bugs: on a
+   multi-device OPC UA connection the built-in connection gives values
+   only to the last device.
+
+2. Take the resource baseline:
+
+   ```sh
+   kubectl top pods -n $EDGE_NS --containers | tee "$RIG/top-before.txt"
+   kubectl top pods -n acs-rig --containers
+   ```
+
+### 6. Make a test build
+
+A test build is a pre-release of the branch, as
+[Making a Release](./releasing.md) describes under "Test builds of a
+branch". It builds every image and publishes the Helm chart at that
+version.
+
+1. Check every protocol's PRs are merged into `feature/split-drivers`
+   (see [Protocol checks](#protocol-checks)). A protocol whose move is
+   not merged stays built in after the upgrade.
+
+2. Publish it, with the next free number in place of `N`:
+
+   ```sh
+   git fetch origin --tags
+   sha=$(git rev-parse origin/feature/split-drivers)
+   gh release create v7.0.0-dev.N --target "$sha" --prerelease --title "v7.0.0-dev.N" --notes "Test build of feature/split-drivers for the dev-cluster test. Not for production."
+   ```
+
+3. Wait for the `Choose release type` run and the publish jobs it
+   starts:
+
+   ```sh
+   gh run list --workflow release.yaml --limit 1
+   gh run watch <run id>
+   ```
+
+   About an hour. When it is green, the images
+   `ghcr.io/amrc-factoryplus/<image>:v7.0.0-dev.N` exist, including
+   `edge-rest`, `edge-mqtt`, `edge-udp` and `edge-opcua`.
+
+**If it fails.** A failed image job leaves the release without that
+image. Fix it on the branch and publish the next number. Don't reuse a
+tag.
+
+### 7. Upgrade
+
+1. In a second terminal, start a recording that runs across the whole
+   upgrade:
+
+   ```sh
+   rig check record --rig /rig/rig.json --seconds 2700 --label upgrade --out /rig/upgrade.json
+   ```
+
+2. Upgrade:
+
+   ```sh
+   helm repo update amrc-connectivity-stack
+   helm upgrade acs amrc-connectivity-stack/amrc-connectivity-stack -n factory-plus --version 7.0.0-dev.N --reset-then-reuse-values --set serviceSetup.config.splitDrivers.REST=true --set serviceSetup.config.splitDrivers.MQTT=true --set serviceSetup.config.splitDrivers.OPCUA=true --set serviceSetup.config.splitDrivers.UDP=true
+   ```
+
+   `--reset-then-reuse-values` takes the new chart's defaults and keeps
+   your own values. The `--set` lines move every protocol even if the
+   chart's default for one is still off.
+
+3. Watch the service-setup Job and find its summary line:
+
+   ```sh
+   kubectl -n factory-plus get jobs
+   kubectl -n factory-plus logs job/<service-setup job> -c service-setup -f | grep -i "split\|connection"
+   ```
+
+   You should see a line per connection moved, then
+   `Split drivers: <n> connections moved, 0 repaired, 0 already right, 0 failed`,
+   where `<n>` is the number of rig connections plus any others on the
+   cluster.
+
+4. Watch the Edge Agents restart with their sidecars:
+
+   ```sh
+   kubectl get pods -n $EDGE_NS -l factory-plus.app=edge-agent -w
+   ```
+
+   Each rig Edge Agent restarts once or twice. Afterwards each has one
+   container per connection more than before
+   (`2/2`, `3/3` and so on). List them:
+
+   ```sh
+   kubectl get pods -n $EDGE_NS -l factory-plus.app=edge-agent -o jsonpath='{range .items[*]}{.metadata.labels.factory-plus\.name}{": "}{range .status.containerStatuses[*]}{.name}={.ready} {end}{"\n"}{end}'
+   ```
+
+   Every `driver-<id>` container should be `true`.
+
+5. If step 1.1 showed different hashes, merge `acs` into `main` of the
+   chart repository now, as the split drivers page says.
+
+**If it fails.** `ImagePullBackOff` on a `driver-` container means the
+edge cluster has the old charts (step 1.1) or the image is missing
+from the test build (step 6). Either merge the charts, or move that
+protocol back (step 10) to restore data. A `failed` count above 0 in
+the summary line names the connection on the line above it.
+
+### 8. Record the after state and compare
+
+1. Record for 15 minutes once every pod is ready:
+
+   ```sh
+   rig check record --rig /rig/rig.json --seconds 900 --label after --rebirth --out /rig/after.json
+   ```
+
+2. Compare:
+
+   ```sh
+   rig check compare /rig/before.json /rig/after.json
+   ```
+
+   It prints a table with each device's DDATA rate before and after,
+   its longest gap after, and `ok`, `WARN` or `FAIL`, then one line per
+   problem. It exits non-zero if anything failed. It fails a device
+   when:
+
+   - a metric it was born with before is missing after, or a new one
+     appears, or a type changed;
+   - a read metric that got values before gets none after;
+   - its DDATA rate rose above 3 times or fell below half (a split
+     driver must not multiply the broker's load, ACS-45).
+
+   It warns when the DDATA rate rose above 1.5 times, when no birth was
+   seen, when metrics get values only after (expected for multi-device
+   OPC UA connections, and for the UDP device), and when there are more
+   DDEATHs after.
+
+   What the local runs showed, so you know what to expect: REST, MQTT
+   and UDP devices matched exactly, with the same metrics and the same
+   DDATA rates. OPC UA devices send the same values in more DDATA
+   messages after the move: from 1.2 to 2.4 times as many with ACS-45's
+   grouping in, which ACS-45 expects and reports as a warning. On a
+   multi-device OPC UA connection the devices the built-in connection
+   starved get values after the move, which also shows as a warning.
+
+3. Read the upgrade recording's gaps:
+
+   ```sh
+   rig check compare /rig/before.json /rig/upgrade.json
+   ```
+
+   The `longest gap` column is each device's longest time without data
+   across the upgrade. It should be no longer than the Edge Agent's
+   restarts, a few minutes at most. Ignore the rate column here,
+   because the recording includes the outage.
+
+4. Resources after:
+
+   ```sh
+   kubectl top pods -n $EDGE_NS --containers | tee "$RIG/top-after.txt"
+   ```
+
+   Compare each rig Edge Agent's `edge-agent` container with
+   `top-before.txt`, and note each `driver-` container's CPU and
+   memory. Record the figures on the card.
+
+### 9. The specific checks
+
+**Dotted names.** The rig has REST connections with dots and spaces in
+their names. In the service-setup log each has a driver id such as
+`rig-api-example-org-1a2b3c4d`, its sidecar is running, and its device
+passes the comparison.
+
+**UDP from outside the cluster.** With the sender from step 4.5
+running:
+
+1. The UDP Edge Agent's Deployment has a host port:
+
+   ```sh
+   kubectl get deploy -n $EDGE_NS -l factory-plus.name=<UDP rig agent> -o jsonpath='{.items[0].spec.template.spec.containers[*].ports}'
+   ```
+
+   You should see `hostPort` with the connection's port and `UDP`.
+2. On the node, the portmap rule exists:
+
+   ```sh
+   ssh <user>@<node> sudo iptables -t nat -S | grep <port>
+   ```
+3. The UDP device now publishes: its line in the after recording has
+   values and a DDATA rate close to the sender's (one datagram a
+   second for the example). The sender's own count is on its control
+   port: `curl -s localhost:9004/status` from inside the sender's
+   container, or read its log.
+4. Restart the Edge Agent pod mid-stream and check data resumes within
+   a minute (stale UDP connection tracking would stop it):
+
+   ```sh
+   kubectl delete pod -n $EDGE_NS -l factory-plus.name=<UDP rig agent>
+   ```
+
+**OPC UA writes.** Pick an OPC UA device and one of its metrics with an
+address from `coverage.md` or `rig.json`, then:
+
+```sh
+rig write --rig /rig/rig.json --connection <opcua id> --device <device id> --metric <metric name> --value <value>
+curl -s localhost:9001/status | jq '.[] | select(.id=="<opcua id>") | .writes'
+```
+
+The mock lists the write with the node id and value. The device's next
+DDATA has the written value until the mock's data replaces it. The
+writer sends the metric's Sparkplug type (a config type such as
+`FloatLE` is sent as `Float`). No source connection marks a metric as
+writable, so this only shows the path works.
+
+**Offline and back.** Stop one mock of each protocol, wait, start it:
+
+```sh
+curl -s -X POST localhost:9001/mocks/<opcua id>/stop
+sleep 120
+curl -s -X POST localhost:9001/mocks/<opcua id>/start
+```
+
+Run a short recording around it
+(`rig check record ... --seconds 300 --label outage --out /rig/outage.json`).
+Each device on the stopped connection should get a DDEATH within about
+a minute and a DBIRTH after the mock starts again. For REST the split
+driver marks devices offline only when every endpoint has failed for a
+whole poll round, so wait at least that long. Do it for one MQTT
+(`localhost:9002`) and one REST (`localhost:9003`) mock too.
+
+The built-in MQTT connection sends no DDEATH when its broker stops: its
+devices just go quiet and are born again when the broker returns. The
+split MQTT driver sends a DDEATH and a DBIRTH. So run this check after
+the upgrade, and expect the before state to differ.
+
+### Protocol checks
+
+These are the checks each protocol's PR or card asks for at the cluster
+test, collected on 2026-11-17.
+
+**REST (ACS-23, PR 903 merged):**
+
+- every REST connection's data continues with no gap longer than one
+  restart (steps 7 and 8);
+- the new `WARNING: branch main of shared/helm has commits of its own`
+  line, if the chart repository has its own commits;
+- whether any Deployment pins its own image tag (step 1.2);
+- the sidecars' CPU and memory (step 8.4);
+- the Manager offers one REST driver, called "REST", for new
+  connections, and shows moved connections with it.
+
+**MQTT (ACS-25, PR 909 open):**
+
+- the upgrade itself, data continuity, and `kubectl top` of a moved
+  agent (steps 7 and 8);
+- a connection with wildcard topics and TLS, and `ws` or `wss`
+  brokers. The rig has no TLS or WebSockets (see above), so those need
+  a real broker;
+- the Manager offers one MQTT driver for new connections;
+- the heaviest MQTT connection: compare the Edge Agent's and sidecar's
+  CPU before and after (step 8.4), and check no messages are lost at
+  its peak rate (its DDATA rate in step 8.2);
+- an Edge Agent whose Deployment sets `values.image.default` must
+  have that removed before the upgrade, or its sidecar can't pull.
+
+**OPC UA (ACS-26 PR 905 merged, ACS-27 card, no PR yet):**
+
+- each security policy: the rig has None, Basic256, Basic256Sha256 and
+  Aes128_Sha256, with and without a login;
+- metric paths cleared and payload formats rewritten from "Defined by
+  Protocol" when the connection moves: check values and timestamps
+  after the move (step 8);
+- multi-device connections: after the move every device gets values,
+  where the built-in connection gave them only to the last device;
+- DDATA rate after the move (ACS-45): the comparison warns above 1.5
+  times the built-in rate and fails above 3 times or below half;
+- whether each real server trusts the driver's certificate. The mocks
+  can't show this: check it on each real server when its connection
+  moves.
+
+**UDP (ACS-38 PR 907 and ACS-43 PR 904, both merged):**
+
+1. The `split-drivers` summary line counts the UDP connection as moved,
+   the Manager shows its driver as "UDP", and the Edge Agent pod has a
+   running `driver-<id>` container.
+2. The Deployment's values have `hostPorts` for the connection's port
+   and the node has the portmap rule for it. Datagrams from outside the
+   cluster reach the driver (step 9).
+3. Data continues at the device's rate after a restart, and the driver
+   logs no drops at that rate. Restart the agent pod mid-stream and
+   check data resumes.
+4. With two Edge Agents pinned to one host, each with a built-in UDP
+   connection on the same port, one moves and one is held, with the
+   log line, and both keep their data. The rig has one UDP connection,
+   so this needs a second one made by hand.
+5. `UDP: false` moves it back: the sidecar and the host port go, the
+   configs match what they were, and the built-in connection gets data
+   from a sender inside the cluster.
+6. The sidecar's CPU and memory at the device's rate.
+7. Change the port and check it moves, and check any firewall or
+   NetworkPolicy, and the receive buffer after raising
+   `net.core.rmem_max` on the node.
+
+**Grouped DDATA (ACS-45, PR 908 merged):** the DDATA rate check in
+step 8. PR 908 lists no cluster checks of its own. Its
+`DRIVER_DATA_WAIT_MS` setting is off by default, and the remaining
+OPC UA gap needs a driver fix (no `TCP_NODELAY` in the Rust drivers'
+MQTT client), so expect OPC UA warnings, not failures.
+
+### 10. Move each protocol back and forward
+
+For each protocol in turn (`REST`, `MQTT`, `OPCUA`, `UDP`):
+
+1. Record a baseline with everything moved:
+   `rig check record --rig /rig/rig.json --seconds 600 --label moved --rebirth --out /rig/moved.json`.
+2. Move that protocol back:
+
+   ```sh
+   helm upgrade acs amrc-connectivity-stack/amrc-connectivity-stack -n factory-plus --version 7.0.0-dev.N --reuse-values --set serviceSetup.config.splitDrivers.<PROTOCOL>=false
+   ```
+
+3. In the service-setup log, its connections move to the internal
+   driver. In the edge namespace, its `driver-` containers go.
+4. Record (`--label back-<protocol>`) and compare with `before.json`:
+   the protocol's devices should match the before state, including the
+   built-in connection's own bugs.
+5. Move it forward again with `=true`, record (`--label forward-<protocol>`)
+   and compare with `moved.json`: they should match.
+
+`--reuse-values` keeps the other protocols' settings from the last
+upgrade.
+
+### 11. Clean up
+
+1. See what the remover would delete:
+
+   ```sh
+   rig remove --rig /rig/rig.json
+   ```
+
+   It lists the rig's Edge Agents (by UUID and by any Edge Agent named
+   `Rig_...`), their connections and devices.
+2. Delete them:
+
+   ```sh
+   rig remove --rig /rig/rig.json --yes
+   ```
+
+   The edge cluster removes the Edge Agents' pods within a few
+   minutes.
+3. Stop the UDP sender and remove the mocks:
+
+   ```sh
+   docker stop rig-udp
+   kubectl delete namespace acs-rig
+   ```
+
+4. Check what was there before is still there, as in step 1.3, and
+   remove the image from the node if you want the space back:
+
+   ```sh
+   ssh <user>@<node> sudo k3s ctr images rm docker.io/library/acs-rig-mocks:amd64
+   ```
+
+## Trying the rig on one machine
+
+`rig local` runs a few rig connections, real Edge Agents and,
+optionally, the split drivers, all in one process with a local MQTT
+broker, and records the output as `rig check record` would. Build the
+drivers as the golden harness README describes, then:
+
+```sh
+docker run --rm -v <private folder>:/p acs-rig-mocks:dev local --rig /p/rig/full/rig.json --only <id,...> --seconds 120 --label built-in --out /p/rig/local/before.json
+docker run --rm -v <private folder>:/p -v "$PWD/edge-rest/target/release/driver:/drv/rest:ro" acs-rig-mocks:dev local --rig /p/rig/full/rig.json --only <id,...> --seconds 120 --label split --split REST=/drv/rest --out /p/rig/local/after.json
+docker run --rm -v <private folder>:/p acs-rig-mocks:dev check compare /p/rig/local/before.json /p/rig/local/after.json
+```
+
+`--outage <id>:<from s>:<length s>` stops a mock during the run, and
+`--write <id>:<device>:<metric>:<value>:<at s>` sends one write. The
+image is Debian-based so drivers built in `rust:1.99` run in it.

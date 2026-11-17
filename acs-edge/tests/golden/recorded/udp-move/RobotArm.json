@@ -1,0 +1,1781 @@
+{
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it",
+ "label": "built-in",
+ "fixture": "sample-udp-json",
+ "duration_ms": 5000,
+ "speed": 1,
+ "delivered": 50,
+ "ddata": 75,
+ "agent_us_per_input": 1313,
+ "credentials": [],
+ "writes": [],
+ "births": {
+  "DBIRTH Arm_Pose": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "null",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_01",
+     "type": "Double",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.position.x\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_02",
+     "type": "Double",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.position.y\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_03",
+     "type": "Float",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.joints[0]\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_04",
+     "type": "Float",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.joints[1]\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_05",
+     "type": "Int32",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.cycle\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_06",
+     "type": "Boolean",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.moving\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_07",
+     "type": "String",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.mode\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "DBIRTH Arm_Tool": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "null",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_08",
+     "type": "Int32",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.cycle\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_09",
+     "type": "UInt16",
+     "value": "null",
+     "t": -108,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"$.tool\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "NBIRTH": [
+   [
+    {
+     "name": "Schema_UUID",
+     "type": "UUID",
+     "value": "\"15360868-2f35-4b52-990b-49329fb246fe\"",
+     "t": -120
+    },
+    {
+     "name": "Instance_UUID",
+     "type": "UUID",
+     "value": "\"00000000-0000-4000-8000-00000000a6e7\"",
+     "t": -120
+    },
+    {
+     "name": "Config_Revision",
+     "type": "UUID",
+     "value": "\"\\\"golden-config\\\"\"",
+     "t": -120
+    },
+    {
+     "name": "Node Properties/Type",
+     "type": "String",
+     "value": "\"ACS Edge Agent\"",
+     "t": -120
+    },
+    {
+     "name": "Node Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120
+    },
+    {
+     "name": "Node Control/Reload Edge Agent Config",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120
+    },
+    {
+     "name": "Node Control/Payload Compression",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Instance_UUID",
+     "type": "UUID",
+     "value": "\"b09a2fed-eec9-52cf-b824-1a553f8113c8\"",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Type",
+     "type": "UUID",
+     "value": "\"c414c68b-5014-4e46-a0b4-d5f7f8df1d9f\"",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Invalid/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Invalid/Instance_UUID",
+     "type": "UUID",
+     "value": "\"59982376-d40f-582b-a4d0-1f5683014f7c\"",
+     "t": -120
+    },
+    {
+     "name": "Alerts/Config_Invalid/Type",
+     "type": "UUID",
+     "value": "\"99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6\"",
+     "t": -119
+    },
+    {
+     "name": "Alerts/Config_Invalid/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -119
+    }
+   ]
+  ]
+ },
+ "repeated": {},
+ "data": {
+  "Arm_Pose/Metric_01": [
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "252.8066857257464",
+    "t": 54.7
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "283.20915544988344",
+    "t": 153.51
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "310.0754884864319",
+    "t": 252.2
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "329.9831687096062",
+    "t": 354.17
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "337.5234122168279",
+    "t": 451.36
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "337.44372799433734",
+    "t": 552.01
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "327.23918697198764",
+    "t": 653.38
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "310.79699385712865",
+    "t": 761.16
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "282.98007616059414",
+    "t": 856.12
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "257.3792602234718",
+    "t": 950.49
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "219.1685354900597",
+    "t": 1051.82
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "187.0912372338887",
+    "t": 1151.5
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "156.9904347243769",
+    "t": 1251.03
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "129.55293814333825",
+    "t": 1354.66
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "112.23247591093147",
+    "t": 1452.58
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "103.67530107046935",
+    "t": 1554.86
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "101.9655406238624",
+    "t": 1654.7
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "112.91870707521065",
+    "t": 1752.89
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "132.43805295437988",
+    "t": 1852.12
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "160.34166322038263",
+    "t": 1948.74
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "186.81586838240824",
+    "t": 2051.17
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "223.2545883344996",
+    "t": 2148.88
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "252.08104315845065",
+    "t": 2250.24
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "284.0902864912844",
+    "t": 2349.91
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "310.1660900409547",
+    "t": 2452.5
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "326.9642164615229",
+    "t": 2555.07
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "339.70614151632265",
+    "t": 2648.93
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "338.4915507278124",
+    "t": 2751.79
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "331.9272103891982",
+    "t": 2855.81
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "312.0676634576748",
+    "t": 2953.68
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "284.35183869596835",
+    "t": 3051.59
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "257.88920926994956",
+    "t": 3155.31
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "222.3269474856604",
+    "t": 3249.76
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "187.50592274805652",
+    "t": 3351.65
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "158.77623801759944",
+    "t": 3450.5
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "132.87999399521652",
+    "t": 3554.93
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "115.856612297957",
+    "t": 3650.33
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "101.84059812342313",
+    "t": 3751.74
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "104.15654679018375",
+    "t": 3854.69
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "113.19311977823655",
+    "t": 3952.91
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "131.41711146659264",
+    "t": 4050.01
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "160.00293651831416",
+    "t": 4151.26
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "187.400149049084",
+    "t": 4250.99
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "223.69453786996618",
+    "t": 4350.07
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "252.30043690988103",
+    "t": 4451.21
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "286.7491643778681",
+    "t": 4551.99
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "312.45066099287413",
+    "t": 4652.16
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "330.67900269530327",
+    "t": 4753.78
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "338.92530370867917",
+    "t": 4851.99
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "340.00189520852103",
+    "t": 4950.08
+   }
+  ],
+  "Arm_Pose/Metric_02": [
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "218.58157159650636",
+    "t": 54.72
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "221.46911986410208",
+    "t": 153.53
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "225.93643479578526",
+    "t": 252.21
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "227.72206491640188",
+    "t": 354.19
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "231.6708714947093",
+    "t": 451.38
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "233.42775794862996",
+    "t": 552.03
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "236.2613281268098",
+    "t": 653.39
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "240.38268547729385",
+    "t": 761.3
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "240.70735704842141",
+    "t": 856.18
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "243.1167464324063",
+    "t": 950.5
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "246.7130042416292",
+    "t": 1051.83
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "249.26751338792315",
+    "t": 1151.5
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "251.4431303262111",
+    "t": 1251.04
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "253.38354646511849",
+    "t": 1354.67
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "255.12293277799364",
+    "t": 1452.59
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "257.03194199060164",
+    "t": 1554.87
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "257.4502103496431",
+    "t": 1654.7
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "259.104038369918",
+    "t": 1752.9
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "260.81846085696986",
+    "t": 1852.12
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "261.6288736941006",
+    "t": 1948.75
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "262.27740078820744",
+    "t": 2051.18
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "264.2427619495993",
+    "t": 2148.89
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "266.00017033786094",
+    "t": 2250.25
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "265.0600241075766",
+    "t": 2349.92
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "265.4473826528113",
+    "t": 2452.52
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "267.1134441193573",
+    "t": 2555.08
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "266.2522152416725",
+    "t": 2648.95
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "264.9039617636201",
+    "t": 2751.8
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "265.1161935240061",
+    "t": 2855.83
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "264.9968169535873",
+    "t": 2953.73
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "264.89499719629356",
+    "t": 3051.6
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "262.53452891536614",
+    "t": 3155.32
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "263.1437381355927",
+    "t": 3249.78
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "261.53318041964934",
+    "t": 3351.66
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "258.6640929640236",
+    "t": 3450.51
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "258.5970433476678",
+    "t": 3554.94
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "257.4376472374944",
+    "t": 3650.35
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "254.74583070542332",
+    "t": 3751.74
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "253.36589187644879",
+    "t": 3854.7
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "251.19328803209305",
+    "t": 3952.92
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "249.48162582189104",
+    "t": 4050.03
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "246.01906963252992",
+    "t": 4151.29
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "244.8603931171109",
+    "t": 4251
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "242.08143210433192",
+    "t": 4350.08
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "238.4659600147344",
+    "t": 4451.22
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "235.95040116896732",
+    "t": 4552
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "232.987590118513",
+    "t": 4652.17
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "231.93178344675562",
+    "t": 4753.79
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "228.06529742762865",
+    "t": 4852
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "224.69656041140277",
+    "t": 4950.1
+   }
+  ],
+  "Arm_Pose/Metric_03": [
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "255.42990112304688",
+    "t": 54.73
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "258.45843505859375",
+    "t": 153.54
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "260.1810607910156",
+    "t": 252.21
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "262.9314880371094",
+    "t": 354.2
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "265.247314453125",
+    "t": 451.39
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "268.42132568359375",
+    "t": 552.04
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "270.1813049316406",
+    "t": 653.41
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "272.8694152832031",
+    "t": 761.36
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "273.76116943359375",
+    "t": 856.2
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "275.9322814941406",
+    "t": 950.51
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "276.4016418457031",
+    "t": 1051.83
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "277.6077575683594",
+    "t": 1151.51
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "279.2159118652344",
+    "t": 1251.04
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "279.21478271484375",
+    "t": 1354.67
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "279.498046875",
+    "t": 1452.59
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "280.40191650390625",
+    "t": 1554.87
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "279.6882629394531",
+    "t": 1654.71
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "279.2502136230469",
+    "t": 1752.9
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "278.4974060058594",
+    "t": 1852.13
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "277.37841796875",
+    "t": 1948.76
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "276.9307556152344",
+    "t": 2051.19
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "274.21990966796875",
+    "t": 2148.9
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "273.2286376953125",
+    "t": 2250.27
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "271.2620544433594",
+    "t": 2349.93
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "269.6539001464844",
+    "t": 2452.53
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "267.2884826660156",
+    "t": 2555.08
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "264.1781311035156",
+    "t": 2648.95
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "262.25616455078125",
+    "t": 2751.8
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "259.447509765625",
+    "t": 2855.84
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "255.94705200195312",
+    "t": 2953.74
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "254.05490112304688",
+    "t": 3051.6
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "250.7483673095703",
+    "t": 3155.33
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "249.10789489746094",
+    "t": 3249.79
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "246.362060546875",
+    "t": 3351.67
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "243.1499481201172",
+    "t": 3450.51
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "240.31954956054688",
+    "t": 3554.94
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "238.54718017578125",
+    "t": 3650.36
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "236.15231323242188",
+    "t": 3751.75
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "233.9687042236328",
+    "t": 3854.71
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "232.02670288085938",
+    "t": 3952.93
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "229.79751586914062",
+    "t": 4050.04
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "228.816162109375",
+    "t": 4151.32
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "227.2018585205078",
+    "t": 4251
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "225.98097229003906",
+    "t": 4350.09
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "225.8065643310547",
+    "t": 4451.24
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "225.32086181640625",
+    "t": 4552.01
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "224.33802795410156",
+    "t": 4652.18
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "225.19308471679688",
+    "t": 4753.79
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "225.98892211914062",
+    "t": 4852.01
+   },
+   {
+    "name": "Metric_03",
+    "type": "Float",
+    "value": "225.7218017578125",
+    "t": 4950.12
+   }
+  ],
+  "Arm_Pose/Metric_04": [
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "212.57781982421875",
+    "t": 54.74
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "215.4626007080078",
+    "t": 153.55
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "216.69117736816406",
+    "t": 252.22
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "220.19821166992188",
+    "t": 354.21
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "221.45655822753906",
+    "t": 451.4
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "224.8978271484375",
+    "t": 552.05
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "226.9383544921875",
+    "t": 653.42
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "227.830322265625",
+    "t": 761.36
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "230.5424041748047",
+    "t": 856.21
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "232.86155700683594",
+    "t": 950.51
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "234.4061737060547",
+    "t": 1051.84
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "236.1029510498047",
+    "t": 1151.51
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "237.65814208984375",
+    "t": 1251.05
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "239.2012481689453",
+    "t": 1354.68
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "241.03074645996094",
+    "t": 1452.6
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "241.21786499023438",
+    "t": 1554.88
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "242.25404357910156",
+    "t": 1654.72
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "244.1103973388672",
+    "t": 1752.91
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "244.04632568359375",
+    "t": 1852.14
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "245.82679748535156",
+    "t": 1948.77
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "246.43736267089844",
+    "t": 2051.22
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "247.3111114501953",
+    "t": 2148.9
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "246.4040069580078",
+    "t": 2250.27
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "246.5187225341797",
+    "t": 2349.93
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "247.48377990722656",
+    "t": 2452.53
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "246.79595947265625",
+    "t": 2555.09
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "246.1865234375",
+    "t": 2648.96
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "245.37278747558594",
+    "t": 2751.81
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "243.9384002685547",
+    "t": 2855.84
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "243.1930694580078",
+    "t": 2953.74
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "243.78453063964844",
+    "t": 3051.61
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "241.52481079101562",
+    "t": 3155.34
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "239.8389434814453",
+    "t": 3249.8
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "238.9746551513672",
+    "t": 3351.68
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "237.38023376464844",
+    "t": 3450.52
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "236.63218688964844",
+    "t": 3554.95
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "233.56356811523438",
+    "t": 3650.36
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "231.89170837402344",
+    "t": 3751.75
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "229.96951293945312",
+    "t": 3854.71
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "229.00460815429688",
+    "t": 3952.93
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "227.06105041503906",
+    "t": 4050.04
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "223.60418701171875",
+    "t": 4151.34
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "221.66519165039062",
+    "t": 4251.01
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "219.15089416503906",
+    "t": 4350.09
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "217.8136749267578",
+    "t": 4451.24
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "214.5655517578125",
+    "t": 4552.01
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "212.06198120117188",
+    "t": 4652.18
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "210.389404296875",
+    "t": 4753.8
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "207.86549377441406",
+    "t": 4852.02
+   },
+   {
+    "name": "Metric_04",
+    "type": "Float",
+    "value": "205.13766479492188",
+    "t": 4950.13
+   }
+  ],
+  "Arm_Pose/Metric_05": [
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-772",
+    "t": 54.75
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-771",
+    "t": 552.06
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-768",
+    "t": 1151.52
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-764",
+    "t": 1554.88
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-760",
+    "t": 1654.72
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-758",
+    "t": 2452.54
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-756",
+    "t": 2953.75
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-753",
+    "t": 3155.35
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-757",
+    "t": 3450.52
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-762",
+    "t": 3554.95
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-759",
+    "t": 3751.76
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-758",
+    "t": 3952.93
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-759",
+    "t": 4151.36
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-764",
+    "t": 4552.02
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-763",
+    "t": 4652.19
+   },
+   {
+    "name": "Metric_05",
+    "type": "Int32",
+    "value": "-759",
+    "t": 4753.8
+   }
+  ],
+  "Arm_Pose/Metric_06": [
+   {
+    "name": "Metric_06",
+    "type": "Boolean",
+    "value": "false",
+    "t": 54.75
+   },
+   {
+    "name": "Metric_06",
+    "type": "Boolean",
+    "value": "true",
+    "t": 552.07
+   },
+   {
+    "name": "Metric_06",
+    "type": "Boolean",
+    "value": "false",
+    "t": 3554.96
+   },
+   {
+    "name": "Metric_06",
+    "type": "Boolean",
+    "value": "true",
+    "t": 3854.72
+   }
+  ],
+  "Arm_Pose/Metric_07": [
+   {
+    "name": "Metric_07",
+    "type": "String",
+    "value": "\"READY\"",
+    "t": 54.77
+   }
+  ],
+  "Arm_Tool/Metric_08": [
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-772",
+    "t": 54.88
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-771",
+    "t": 552.23
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-768",
+    "t": 1151.58
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-764",
+    "t": 1554.94
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-760",
+    "t": 1654.78
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-758",
+    "t": 2452.66
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-756",
+    "t": 2953.82
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-753",
+    "t": 3155.42
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-757",
+    "t": 3450.59
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-762",
+    "t": 3555.03
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-759",
+    "t": 3751.83
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-758",
+    "t": 3953.01
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-759",
+    "t": 4151.51
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-764",
+    "t": 4552.1
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-763",
+    "t": 4652.28
+   },
+   {
+    "name": "Metric_08",
+    "type": "Int32",
+    "value": "-759",
+    "t": 4753.88
+   }
+  ],
+  "Arm_Tool/Metric_09": [
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "140",
+    "t": 54.89
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "141",
+    "t": 252.29
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "143",
+    "t": 856.41
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "145",
+    "t": 950.59
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "147",
+    "t": 1354.77
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "150",
+    "t": 1752.97
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "151",
+    "t": 2953.82
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "149",
+    "t": 3450.6
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "152",
+    "t": 3555.03
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "156",
+    "t": 3650.43
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "153",
+    "t": 3854.8
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "148",
+    "t": 4050.11
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "145",
+    "t": 4251.08
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "150",
+    "t": 4552.1
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "147",
+    "t": 4652.28
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "148",
+    "t": 4753.88
+   }
+  ]
+ },
+ "counts": {
+  "DBIRTH Arm_Pose": 1,
+  "DBIRTH Arm_Tool": 1,
+  "DDATA Arm_Pose": 50,
+  "DDATA Arm_Tool": 25,
+  "NBIRTH": 1
+ }
+}

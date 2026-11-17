@@ -48,6 +48,10 @@ export interface RunOpts {
     /* Sparkplug commands to send the agent, each at its fixture time
      * after the device first delivers input. */
     commands?:  Command[],
+    /* How much faster than real time to run the fixture, if not
+     * speed_for()'s. A run compared with a recorded run goes at the
+     * recorded run's speed. */
+    speed?:     number,
     /* Give up after this long. */
     timeout_ms?: number,
 }
@@ -148,7 +152,7 @@ function quiet_shutdown (translator: Translator) {
 
 /* Run the Edge Agent once against a fixture and capture its output. */
 export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<RunResult> {
-    const speed = speed_for(fixture);
+    const speed = opts.speed ?? speed_for(fixture);
     const label = opts.driver ? `split (${opts.driver.name})` : "built-in";
     const timeout = opts.timeout_ms
         ?? 30_000 + 3 * fixture.meta.duration_ms / speed;

@@ -759,6 +759,67 @@ Array [
 ]
 `;
 
+exports[`Device._handleData golden output JSON (Batched): object and array topics on one device 1`] = `
+Array [
+  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "hf",
+      "timestamp": 1763380000000,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 10,
+    },
+    Object {
+      "isNull": false,
+      "name": "hf",
+      "timestamp": 1763380000010,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 11,
+    },
+    Object {
+      "isNull": false,
+      "name": "hf",
+      "timestamp": 1763380000030,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 12.5,
+    },
+  ],
+  Array [],
+  Array [],
+  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "hf",
+      "timestamp": 1763380000040,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 13,
+    },
+  ],
+  Array [],
+  Array [],
+  Array [],
+  Array [],
+  Array [],
+  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "hf",
+      "timestamp": 1763380000050,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 15,
+    },
+  ],
+]
+`;
+
 exports[`Device._handleData golden output JSON: every type through a nested path 1`] = `
 Array [
   Array [

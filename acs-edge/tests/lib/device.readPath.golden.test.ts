@@ -212,6 +212,49 @@ const JSON_VALUES: any[] = [
     "9007199254740993", 1e21, "1e3", " 7 ",
 ];
 
+/* A device that mixes the two kinds of MQTT topic: object payloads
+ * read with filter paths, and arrays of {value, timestamp} read with
+ * $.value. */
+const MIXED_TAGS = [
+    { Name: "load", type: "Double", address: "dataset",
+        path: "$.set.datapoints[?(@.name=='ActLoad')].value" },
+    { Name: "prog", type: "String", address: "dataset",
+        path: "$.set.datapoints[?(@.name=='Program')].value" },
+    { Name: "on", type: "Boolean", address: "dataset",
+        path: "$.set.datapoints[?(@.name=='Running')].value" },
+    { Name: "hf", type: "Double", address: "hf", path: "$.value" },
+];
+
+const dataset = (load: any, prog: any, on: any, extra = {}) => j({
+    set: { datapoints: [
+        { name: "ActLoad", value: load },
+        { name: "Program", value: prog },
+        { name: "Running", value: on },
+    ] }, ...extra });
+
+const MIXED_STEPS: Step[] = [
+    { dataset: dataset(1.5, "P1", true) },
+    { hf: j([{ value: 10, timestamp: 1763380000000 },
+        { value: 11, timestamp: 1763380000010 },
+        { value: 11, timestamp: 1763380000020 },
+        { value: "12.5", timestamp: 1763380000030 }]) },
+    { dataset: dataset(1.5, "P1", true) },
+    { dataset: dataset(2.5, "P2", false, { timestamp: 1763380001000 }) },
+    { dataset: dataset(3.5, "P3", true, { timestampNs: "1763380800123456789",
+        simulated: true, run_id: "r1" }) },
+    { hf: j([{ value: 13, timestamp: 1763380000040 }]) },
+    { hf: j({ value: 14, timestamp: 1763380002000 }) },
+    { dataset: JSON.stringify({ set: { datapoints: [
+        { name: "ActLoad", value: 4.5 }] } }) },
+    { dataset: { set: { datapoints: [{ name: "ActLoad", value: 5.5 }] } } },
+    { dataset: b("{bad json") },
+    { dataset: j(0) },
+    { dataset: j("text") },
+    /* Both topics in one call */
+    { dataset: dataset(6.5, "P6", false),
+        hf: j([{ value: 15, timestamp: 1763380000050 }]) },
+];
+
 const CASES: { [name: string]: Case } = {
     "JSON: every type through a nested path": {
         format: "JSON",
@@ -492,6 +535,14 @@ const CASES: { [name: string]: Case } = {
             { a: j([]) },
         ],
     },
+    /* Intended change (ACS-13, for ACS-35): under JSON (Batched), a
+     * payload that is not an array is read as plain JSON, so one device
+     * can take both kinds of topic. Before, it published nothing. */
+    "JSON (Batched): object and array topics on one device": {
+        format: "JSON (Batched)",
+        tags: MIXED_TAGS,
+        steps: [] as Step[],
+    },
     "JSON (Batched) Boolean": {
         /* Intended change (ACS-13): before, a Boolean metric was never
          * published from JSON (Batched), because false was dropped as
@@ -639,6 +690,11 @@ const CHANGED_SHAPES = j({
 {
     const c = CASES["JSON: path shapes jsonpath-plus has changed"];
     c.steps = c.tags.map(t => ({ [t.Name]: CHANGED_SHAPES }));
+}
+
+{
+    const c = CASES["JSON (Batched): object and array topics on one device"];
+    c.steps = MIXED_STEPS;
 }
 
 describe("Device._handleData golden output", () => {

@@ -34,7 +34,7 @@ import { DumpLoader } from "../lib/dumps.js";
 import { MigrateSplitDrivers } from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
-import { FakeCDB } from "./fake-cdb.js";
+import { FakeCDB, jsonb } from "./fake-cdb.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;
@@ -266,7 +266,7 @@ describe("moving a site's UDP connections with the chart's defaults", () => {
         const back = { ...defaults, UDP: false };
         const { count } = await run(cdb, back);
         assert.equal(count.moved, 3);
-        assert.equal(text(state(cdb)), text(SITE.configs));
+        assert.equal(text(jsonb(state(cdb))), text(jsonb(SITE.configs)));
 
         cdb.writes = [];
         await run(cdb, back);

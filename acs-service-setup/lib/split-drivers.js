@@ -103,9 +103,20 @@ export const SplitDrivers = {
 /* How many times to rebuild a config someone else saved first. */
 const ATTEMPTS = 3;
 
-/** Compare two JSON values. */
+/* JSON text of a value with its object keys sorted, so two values
+ * that differ only in key order give the same text. */
+function canonical (value) {
+    return JSON.stringify(value, (_, v) =>
+        v && typeof v == "object" && !Array.isArray(v)
+            ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]]))
+            : v);
+}
+
+/** Compare two JSON values, ignoring key order. The ConfigDB stores
+ * `jsonb`, which returns keys in its own order, not the order they
+ * were written in. */
 function same (a, b) {
-    return JSON.stringify(a) == JSON.stringify(b);
+    return canonical(a) == canonical(b);
 }
 
 export class MigrateSplitDrivers {

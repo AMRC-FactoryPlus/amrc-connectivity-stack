@@ -185,6 +185,7 @@ import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
+import { hostPortClash } from '@utils/hostPorts.js'
 
 const PAYLOAD_FORMATS = [
   "Defined by Protocol",
@@ -599,6 +600,20 @@ export default {
 
       const isFormCorrect = await this.v$.$validate()
       if (!isFormCorrect) return
+
+      /* A driver that listens opens its port on the node, and a node
+       * can open each port once. */
+      const clash = hostPortClash({
+        uuid: this.existingConnection?.uuid,
+        name: this.name,
+        config: _.omit(this.formData, 'payloadFormat'),
+        driverdef: this.selectedDriver?.definition,
+        node: this.node,
+      }, this.cn.data)
+      if (clash) {
+        toast.error('Port already in use', { description: clash })
+        return
+      }
 
       this.isSubmitting = true
 

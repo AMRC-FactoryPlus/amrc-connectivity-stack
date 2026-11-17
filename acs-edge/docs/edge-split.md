@@ -15,9 +15,8 @@ paragraph marked **Implementation** says what the code does. Drivers
 built outside this repository depend on that behaviour, so the
 Implementation notes are the contract for new drivers.
 
-Two decisions in this document are **proposed, awaiting Alex**. They are
-marked where they appear: [Edge Scout](#edge-scout-address-browsing) and
-[write types](#writes-carry-no-type).
+One decision in this document is **proposed, awaiting Alex**. It is
+marked where it appears: [Edge Scout](#edge-scout-address-browsing).
 
 ### Summary for driver authors
 
@@ -31,8 +30,9 @@ Part|Driver must|Notes
 `addr`|Keep the data topic to address map from `addrs`.|`groups` may be ignored.
 `poll`|Read the listed addresses and publish data.|Push-only drivers may ignore it.
 `data`|Publish one packet per address on `data/<data topic>`.|See [Data packet formats](#data-packet-formats).
-`cmd`|Optional. Write the payload to the address.|The address is everything after `cmd/`.
-`err`|Optional.|The Edge Agent ignores it today.
+`cmd`|Optional. Write the payload bytes to the address.|The address is everything after `cmd/`. Subscribe to `cmd` or `write`, not both.
+`write`|Optional. Write the typed value to the address.|Needs an Edge Agent from November 2026 or later. See [Typed writes](#typed-writes).
+`err`|Optional. Report a failed write or an address problem.|The Edge Agent logs it and takes no other action.
 `req`/`rsp`|Optional.|Only for the request kinds the agent serves.
 
 ## Definitions
@@ -200,7 +200,11 @@ underscore:
 Direction|Topics allowed
 ---|---
 Driver publishes|`status`, `data/\w+`, `err/\w+`, `req/\w+`
-Driver subscribes|`active`, `conf`, `addr`, `cmd/#`, `poll`, `rsp/\w+`
+Driver subscribes|`active`, `conf`, `addr`, `cmd/#`, `write/#`, `poll`, `rsp/\w+`
+
+The broker drops a driver's whole connection if it subscribes to
+anything else, so a driver that subscribes to `write/#` only works with
+an Edge Agent that allows it (November 2026 or later).
 
 In these examples the connection name `Conn` will be used. Where
 necessary the data topic name `Data` will also be used.
@@ -333,13 +337,17 @@ name, so the address is the contract:
   Sparkplug type, whatever the device's payload format: integers and
   floats at their natural width in the metric's byte order (big-endian
   unless the metric sets `endianness`), Boolean as one byte 0 or 1, and
-  String, Text and UUID as UTF-8. Other types are not supported.
-  Int64 and UInt64 writes are broken today: the value reaches the
-  encoder as a JS number, the 64-bit write throws, and the Edge Agent
-  sends 8 uninitialised bytes instead. Don't rely on 64-bit writes until
-  that is fixed.
+  String, Text and UUID as UTF-8. Int64 and UInt64 are 8 bytes, exact up
+  to 2^53 because the Edge Agent receives the value as a JS number.
+  Other types, including DateTime, have no `cmd` form, and the Edge
+  Agent sends no `cmd` for them or for a value that doesn't fit its
+  type. (Before November 2026 a 64-bit write sent 8 uninitialised bytes
+  instead of the value.)
+* Every write is also published as a [typed write](#typed-writes) on
+  `write/<address>`. A driver that subscribes only to `cmd/#` never sees
+  it, and gets exactly the `cmd` messages it always has.
 * The Edge Agent does not wait for the driver. It reports the new value
-  in DDATA as soon as the `cmd` is published.
+  in DDATA as soon as the write is published.
 
 The JS and Python libraries before November 2026 took only the first
 level after `cmd/`, so drivers built on them cannot write to an address
@@ -351,26 +359,76 @@ address. If the driver is unable or unwilling to write to the given
 address it should report an `RO` address error. Drivers MAY refuse to
 write to southbound devices in general.
 
-#### Writes carry no type
+    fpEdge1/Conn/write/Address
 
-**Proposed, awaiting Alex.** A `cmd` payload carries only the value's
-bytes, with no Sparkplug type. A driver that needs the type to write
-(OPC UA, S7 and MQTT all do) must know it from the address or from its
-own configuration. This is a known limit and the protocol is not being
-extended for it now, because no built-in tag on our clusters is
-writable today. If a migrated driver needs typed writes, extend the
-protocol then, for example with a JSON `{"type": t, "value": v}`
-payload that the driver opts into.
+#### Typed writes
+
+A `cmd` payload carries only the value's bytes, so a driver can't tell
+an Int16 from a Float or a String. A driver that needs the type to
+write, such as OPC UA, subscribes to `fpEdge1/Conn/write/#` **instead
+of** `cmd/#`. The Edge Agent publishes every write to both topics, so
+it doesn't need to know which form a driver uses, and a driver that
+subscribed to both would write each value twice.
+
+The address is the rest of the topic, under the same rules as for
+`cmd`. The payload is a JSON object:
+
+```json
+{"type": "Int16", "value": -2}
+```
+
+`type` is the metric's Sparkplug type, and `value` is written like this:
+
+Sparkplug type|`value`
+---|---
+Boolean|`true` or `false`
+Int8, Int16, Int32, UInt8, UInt16, UInt32|number, an integer in range for the type
+Int64, UInt64|string of decimal digits, for example `"-9223372036854775808"`, so a driver gets every digit. The Edge Agent receives DCMD values as JS numbers, so today the value is exact up to 2^53.
+Float, Double|number, or the string `"NaN"`, `"Infinity"` or `"-Infinity"`, which JSON can't hold as numbers
+String, Text, UUID|string
+DateTime|number of milliseconds since the epoch
+
+Other types (Bytes, File, DataSet, Template and the property sets) are
+not sent. The byte order in a metric's `endianness` doesn't apply to a
+typed write. A driver MUST ignore keys it does not recognise, so the
+Edge Agent can add some later.
+
+If the write fails or the driver can't use the value, the driver
+SHOULD report it on `err` as described below.
+
+The JS and Rust driver libraries support both forms, and the Python
+library only `cmd`. In `lib/js-edge-driver` a
+handler that has a `write(addr, type, value)` method gets typed writes,
+and one that has only `cmd(addr, payload)` gets `cmd` as before. In
+`lib/rs-edge-driver` a handler sets `TYPED_WRITES` to `true` and
+implements `Handler::write`. In both, a write that fails is reported on
+`err` for the handler.
 
     fpEdge1/Conn/err/Data
 
 The driver publishes to this topic to report an error with a particular
 address.
 
-**Implementation.** The broker lets drivers publish here, but the Edge
-Agent ignores these messages and no driver library publishes them. The
-rest of this section is the intended design. Reporting address errors
-is optional for drivers until the Edge Agent acts on them.
+**Implementation.** The Edge Agent logs each message it receives here,
+with the address, and takes no other action. Reporting errors is
+optional for drivers.
+
+The payload is an error code from the table below, optionally followed
+by a newline and a message for the log, for example `RO` or
+`CMD\nBadTypeMismatch`.
+
+**Failed writes.** A driver that fails to write a `cmd` or typed
+`write` SHOULD publish `RO`, `CMD` or `ERR` to the error topic of the
+data topic for that address. A write error reports that one write
+only: the driver does not clear it, and it does not stop data for the
+address. The Edge Agent has already reported the new value in DDATA
+by then (see `cmd` above), so for now the error only reaches the log.
+When a typed write handler fails, the driver libraries publish the
+code the handler gives (`ERR` if it gives none) with its message, and
+they publish `CMD` for a typed write they can't use.
+
+The rest of this section is the original design for errors reading an
+address, which no driver library implements yet.
 
 If the driver has a problem accessing an address included in the current
 address configuration, it MUST publish a single string from the table

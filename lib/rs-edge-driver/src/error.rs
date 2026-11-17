@@ -8,9 +8,6 @@ pub enum ConnectError {
     ConnectionFailed,
     /// Connected but authentication/authorisation was rejected.
     AuthFailed,
-    /// Some other error, such as a protocol error on the southbound
-    /// connection. Reported to the edge agent as status `ERR`.
-    Other,
 }
 
 /// Error returned by [`Handler::create`] when the configuration

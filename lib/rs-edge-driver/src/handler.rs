@@ -121,10 +121,10 @@ pub trait Handler: Send + Sized {
     /// Connect (or reconnect) to the southbound device.
     ///
     /// Return `Ok(())` on success. The driver will set status `UP`.
-    /// Return `Err(ConnectError::ConnectionFailed)`,
-    /// `Err(ConnectError::AuthFailed)` or `Err(ConnectError::Other)`
-    /// on failure — the driver will report `CONN`, `AUTH` or `ERR`
-    /// and retry after the configured reconnect delay.
+    /// Return `Err(ConnectError::ConnectionFailed)` or
+    /// `Err(ConnectError::AuthFailed)` on failure — the driver will
+    /// report `CONN` or `AUTH` and retry after the configured
+    /// reconnect delay.
     ///
     /// The driver calls this on its own task, so a slow connect
     /// doesn't hold up the edge agent's MQTT connection. If the

@@ -7,7 +7,8 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use common::handler::{Ctl, FakeHandler};
-use common::{FakeAgent, ms, secs, spawn_driver};
+use common::{FakeAgent, ms, secs, spawn_driver, spawn_driver_with};
+use rs_edge_driver::DriverOptions;
 
 fn addrs(n: usize) -> Vec<(String, String)> {
     (0..n).map(|i| (i.to_string(), format!("a{i}"))).collect()
@@ -30,9 +31,9 @@ fn poll_msg(a: &[(String, String)]) -> String {
 #[tokio::test]
 async fn timeout_starts_after_the_lock() {
     let mut agent = FakeAgent::start("Conn").await;
-    let mut config = agent.config();
-    config.poll_timeout = ms(500);
-    let _driver = spawn_driver::<FakeHandler>(config);
+    let mut options = DriverOptions::default();
+    options.poll_timeout = ms(500);
+    let _driver = spawn_driver_with::<FakeHandler>(agent.config(), options);
     let ctl = Ctl::new();
     *ctl.poll_delay.lock().unwrap() = ms(100);
 

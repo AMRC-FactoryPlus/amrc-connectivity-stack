@@ -9,11 +9,11 @@ use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore, mpsc};
 use tokio::task::{JoinHandle, JoinSet};
 
-use crate::config::DriverConfig;
+use crate::config::{DriverConfig, DriverOptions};
 use crate::error::{ConnectError, Error};
 use crate::handler::{Handler, Poller};
 use crate::redact::redact;
-use crate::status::Status;
+use crate::status::State as Status;
 
 /// Maximum number of poll batches that can queue before we start
 /// dropping requests (backpressure). Matches the JS/Python versions.
@@ -49,10 +49,7 @@ pub(crate) enum DriverEvent<A> {
         payload: Bytes,
     },
     /// Handler has lost its southbound connection.
-    Lost {
-        generation: u64,
-        reason: ConnectError,
-    },
+    Lost { generation: u64, status: Status },
     /// A call to `Handler::connect` has finished.
     Connected {
         generation: u64,
@@ -94,15 +91,27 @@ impl<A> DriverHandle<A> {
     /// Tell the driver the southbound connection has gone, after
     /// [`connect`](crate::Handler::connect) had succeeded.
     ///
-    /// The driver reports status `CONN`, `AUTH` or `ERR` to the edge
-    /// agent according to `reason`, stops publishing data, and calls
+    /// The driver reports status `CONN` or `AUTH` to the edge agent
+    /// according to `reason` (use [`error`](DriverHandle::error) for
+    /// `ERR`), stops publishing data, and calls
     /// `connect` again after the configured reconnect delay, retrying
     /// until it succeeds. Further reports while that is in progress
     /// are ignored.
     pub fn disconnected(&self, reason: ConnectError) {
         let _ = self.tx.send(DriverEvent::Lost {
             generation: self.generation,
-            reason,
+            status: status_for(reason),
+        });
+    }
+
+    /// As [`disconnected`](DriverHandle::disconnected), for an error
+    /// that is neither a connection nor an authentication failure,
+    /// such as a protocol error. The driver reports status `ERR` and
+    /// reconnects.
+    pub fn error(&self) {
+        let _ = self.tx.send(DriverEvent::Lost {
+            generation: self.generation,
+            status: Status::Err,
         });
     }
 }
@@ -168,6 +177,7 @@ struct Session<H: Handler> {
 /// ```
 pub struct Driver<H: Handler> {
     config: DriverConfig,
+    options: DriverOptions,
     status: Status,
     handler: Option<Arc<Mutex<H>>>,
     /// Counts handlers created, so events from an old one are ignored.
@@ -202,9 +212,15 @@ pub struct Driver<H: Handler> {
 impl<H: Handler + 'static> Driver<H> {
     /// Create a new driver with the given configuration.
     pub fn new(config: DriverConfig) -> Self {
+        Self::with_options(config, DriverOptions::default())
+    }
+
+    /// Create a new driver with the given configuration and options.
+    pub fn with_options(config: DriverConfig, options: DriverOptions) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         Self {
             config,
+            options,
             status: Status::Down,
             handler: None,
             generation: 0,
@@ -317,7 +333,7 @@ impl<H: Handler + 'static> Driver<H> {
             client.clone(),
             self.config.username.clone(),
             self.config.serial_poll,
-            self.config.poll_timeout,
+            self.options.poll_timeout,
             self.live.clone(),
         ));
 
@@ -485,8 +501,8 @@ impl<H: Handler + 'static> Driver<H> {
             QoS::AtLeastOnce,
             false,
         ));
-        opts.set_keep_alive(self.config.keep_alive);
-        opts.set_max_packet_size(self.config.max_packet_size, self.config.max_packet_size);
+        opts.set_keep_alive(self.options.keep_alive);
+        opts.set_max_packet_size(self.options.max_packet_size, self.options.max_packet_size);
 
         let (client, eventloop) = AsyncClient::new(opts, 64);
         Ok((client, eventloop))
@@ -833,16 +849,16 @@ impl<H: Handler + 'static> Driver<H> {
                 let mtopic = self.topic_with("data", topic);
                 let _ = session.outbound.send((mtopic, QoS::AtMostOnce, payload));
             }
-            DriverEvent::Lost { generation, reason } => {
+            DriverEvent::Lost { generation, status } => {
                 if generation != self.generation
                     || self.handler.is_none()
                     || self.connecting.is_some()
                 {
                     return;
                 }
-                tracing::warn!(?reason, "handler lost its connection, reconnecting");
+                tracing::warn!(%status, "handler lost its connection, reconnecting");
                 self.connected = false;
-                self.set_status(session, status_for(reason));
+                self.set_status(session, status);
                 self.start_connect(self.config.reconnect_delay);
             }
             DriverEvent::Connected {
@@ -938,6 +954,5 @@ fn status_for(reason: ConnectError) -> Status {
     match reason {
         ConnectError::ConnectionFailed => Status::Conn,
         ConnectError::AuthFailed => Status::Auth,
-        ConnectError::Other => Status::Err,
     }
 }

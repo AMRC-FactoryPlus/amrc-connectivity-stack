@@ -115,12 +115,14 @@ The driver reports its status to the Edge Agent on
 `fpEdge1/{id}/status`. A handler drives it like this:
 
 - `Handler::connect` returning `Ok(())` sets `UP`. Returning
-  `ConnectError::ConnectionFailed`, `AuthFailed` or `Other` sets
-  `CONN`, `AUTH` or `ERR`, and the driver calls `connect` again after
+  `ConnectError::ConnectionFailed` or `AuthFailed` sets `CONN` or
+  `AUTH`, and the driver calls `connect` again after
   `reconnect_delay` until it succeeds.
 - If the device goes away after `UP`, call
   `DriverHandle::disconnected(reason)` from anywhere in the handler.
-  The status changes in the same way and the driver reconnects.
+  The status changes in the same way and the driver reconnects. For
+  any other error, such as a protocol error, call
+  `DriverHandle::error()`, which sets `ERR` and reconnects.
 - No data is published unless the status is `UP`.
 
 The driver calls `connect`, `subscribe`, `cmd` and `close` on its own
@@ -137,7 +139,7 @@ time. If your device client can serve several reads at once, return a
 `Poller` from `Handler::poller` and the driver will call it without
 taking the handler's lock, for every address in a poll request at
 once. Set `serial_poll` in `DriverConfig` to force one poll at a time
-either way. A poll's `poll_timeout` starts when the poll starts, not
+either way. A poll's `poll_timeout` (in `DriverOptions`) starts when the poll starts, not
 while it waits for the lock.
 
 ## API reference
@@ -160,20 +162,22 @@ Name|Meaning
 `EDGE_MQTT`|URL of the Edge Agent MQTT broker
 `EDGE_USERNAME`|Driver connection name
 `EDGE_PASSWORD`|MQTT password
-
 `VERBOSE`|Log level, as for the JS drivers: `1` or `ALL` for debug, or a comma-separated list of targets (see `init_logging`)
 
 `RUST_LOG` overrides `VERBOSE` when set. Call `init_logging()` at the
 start of `main` to use them.
 
 `DriverConfig::from_env()` (or `DriverConfig::new(url, username,
-password)`) fills every other field with a default. Change the fields
-on the returned value if you need different ones:
+password)`) sets `reconnect_delay` to 5 seconds and `serial_poll` to
+`false`. Change the fields on the returned value if you need different
+ones, or build the struct yourself.
+
+Further settings are in `DriverOptions`. `Driver::new(config)` uses
+their defaults. To change them, start from `DriverOptions::default()`
+and pass it to `Driver::with_options(config, options)`:
 
 Field|Default|Meaning
 ---|---|---
-`reconnect_delay`|5 s|Wait between southbound connection attempts
-`serial_poll`|`false`|Poll one address at a time
 `poll_timeout`|30 s|Longest a single poll may run
 `keep_alive`|30 s|MQTT keep-alive to the Edge Agent
 `max_packet_size`|16 MiB|Largest MQTT packet sent or accepted. rumqttc's own default is 10 KiB, too small for a large `addr` map or data payload

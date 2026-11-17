@@ -111,13 +111,22 @@ of range) `CMD`, anything else `ERR`.
   keeps its last value). Int64 and UInt64 are sent with every digit and
   the agent reads them exactly up to 2^53; the built-in passed
   node-opcua's `[high, low]` pair. See `src/value.rs`.
-- **A few more DDATA messages.** The driver protocol carries one
-  address per data message. The agent gathers the values that arrive
-  together into one DDATA per device, but a notification's later
-  values sometimes arrive after the agent has sent its first group and
-  go out in a second DDATA: between one and two per notification
-  (measured 1.5 to 2.1 times the built-in's rate for 113 values), where
-  the built-in sent one. The values and timestamps are the same.
+- **Values reach Sparkplug up to 10 ms later.** The driver protocol
+  carries one address per data message, so the agent waits 10 ms after
+  the first value of a notification to gather the rest into one DDATA
+  per device, as the built-in sent (see "Gathering data" in
+  `acs-edge/docs/edge-split.md`). Timestamps don't change.
+
+## Logging
+
+`VERBOSE` works as it does for every Rust driver (see
+[`lib/rs-edge-driver`](../lib/rs-edge-driver)), except that
+async-opcua's crates (`opcua_client`, `opcua_core` and the rest) stay
+at `info` unless `VERBOSE` names them, because at `debug` they log two
+or three lines for every Publish and one for every monitored item, and
+the edge-agent chart sets `VERBOSE=ALL` by default.
+`VERBOSE=ALL,opcua=debug` turns them on, and `RUST_LOG` overrides both
+as usual.
 
 ## Reconnects
 
@@ -155,7 +164,8 @@ waits to go to the agent, new values are dropped, counted and logged
 every 10 seconds, so the driver's memory stays bounded. A dropped value
 is lost: the metric keeps its last value until the item next changes.
 All the values of one notification are handed over back to back, so
-the agent can put them in one DDATA.
+they reach the agent well inside its 10 ms gathering wait and go out
+in one DDATA.
 
 ## Server clocks
 
@@ -194,6 +204,7 @@ Known upstream issues that are still open on that commit:
 
 ```
 src/main.rs        logging and Driver::run, nothing else
+src/logging.rs     the log filter, with async-opcua kept at info
 src/lib.rs         the crate root, so the tests can reach the parts
 src/config.rs      the connection details, with unit tests
 src/addr.rs        node id addresses, with unit tests

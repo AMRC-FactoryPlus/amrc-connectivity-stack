@@ -4,6 +4,8 @@
 
 import  logging
 
+import  kadmin
+
 from    flask                           import Blueprint, current_app, g, jsonify, request
 
 from    amrc.factoryplus                import uuids
@@ -41,7 +43,11 @@ def create_user ():
         return jsonify(error=f"Principal {principal} already exists"), 409
 
     kadm = Kadm(ccache=current_app.config["KADMIN_CCNAME"])
-    kadm.set_password(principal, password)
+    try:
+        kadm.set_password(principal, password)
+    except kadmin.KAdminError as e:
+        log.error(f"Failed to set password for new principal {principal}: {e}")
+        return jsonify(error="Failed to set password"), 500
 
     # If anything below fails the KDC principal from set_password above
     # is left in place - there is no rollback. This mirrors an

@@ -450,6 +450,7 @@ dependencies = [
  "async-opcua",
  "async-trait",
  "bytes",
+ "chrono",
  "futures",
  "rs-edge-driver",
  "rumqttc",

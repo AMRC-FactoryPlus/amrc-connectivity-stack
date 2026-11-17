@@ -22,6 +22,8 @@ rs-edge-driver = { path = "../lib/rs-edge-driver" }
 async-opcua = { git = "https://github.com/freeopcua/async-opcua", rev = "cabe0c61c9fa92ea175c2cf1858e935be060027a", features = ["client"] }
 async-trait = "0.1"
 bytes = "1"
+# The same chrono async-opcua uses, for its clock offset.
+chrono = { version = "0.4", default-features = false }
 futures = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

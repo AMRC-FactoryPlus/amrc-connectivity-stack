@@ -15,8 +15,32 @@
  *   ns=1;s=T/ReadOnly   a Double the client can't write
  *   ns=1;s=T/Bad        a Double with status BadDeviceFailure
  *   ns=1;s=T/Counter    a UInt32 that counts up every 100 ms
+ *   ns=1;s=T/Step       an Int32, 0, which SIGUSR2 adds 1 to
+ *
+ * Settings from the environment, for particular tests:
+ *
+ *   SKEW_MS             the server's clock is this far out
+ *   LATE_MS             ns=1;s=T/Late (Int32 42) only appears this long
+ *                       after start, as on a PLC whose program loads
+ *                       after its server starts
+ *   BULK                that many Doubles ns=1;s=B/<i>, all changing
+ *                       every 100 ms
+ *   BULK_BYTES          make them Strings this long instead
+ *   ITEMS_PER_CALL      MaxMonitoredItemsPerCall
+ *   SUBS_PER_SESSION    MaxSubscriptionsPerSession
  *
  * It prints READY once it is listening. */
+
+/* SKEW_MS puts this server's clock that far out, as a PLC on local
+ * summer time is. It must be set before node-opcua loads. */
+const skew = Number(process.env.SKEW_MS || 0);
+if (skew) {
+    const RealDate = Date;
+    global.Date = class extends RealDate {
+        constructor (...a) { if (a.length) super(...a); else super(RealDate.now() + skew); }
+        static now () { return RealDate.now() + skew; }
+    };
+}
 
 const path = require("path");
 const {
@@ -71,7 +95,14 @@ const Types = {
         /* Each test case drops its driver without closing its session,
          * so allow more than node-opcua's default of 10. */
         maxConnectionsPerEndpoint: 500,
-        serverCapabilities: { maxSessions: 500 },
+        serverCapabilities: {
+            maxSessions: 500,
+            ...(process.env.SUBS_PER_SESSION
+                ? { maxSubscriptionsPerSession: Number(process.env.SUBS_PER_SESSION) } : {}),
+            ...(process.env.ITEMS_PER_CALL
+                ? { operationLimits: { maxMonitoredItemsPerCall: Number(process.env.ITEMS_PER_CALL) } }
+                : {}),
+        },
     });
     await server.initialize();
 
@@ -103,6 +134,34 @@ const Types = {
     counter.setValueFromSource(new Variant({ dataType: DataType.UInt32, value: n }));
     setInterval(() => counter.setValueFromSource(
         new Variant({ dataType: DataType.UInt32, value: ++n })), 100);
+
+    const step = variable("Step", DataType.Int32);
+    let steps = 0;
+    step.setValueFromSource(new Variant({ dataType: DataType.Int32, value: 0 }));
+    process.on("SIGUSR2", () => step.setValueFromSource(
+        new Variant({ dataType: DataType.Int32, value: ++steps })));
+
+    const late = Number(process.env.LATE_MS || 0);
+    if (late)
+        setTimeout(() => variable("Late", DataType.Int32).setValueFromSource(
+            new Variant({ dataType: DataType.Int32, value: 42 })), late);
+
+    const bulk = [];
+    const bytes = Number(process.env.BULK_BYTES || 0);
+    const bulkType = bytes ? DataType.String : DataType.Double;
+    for (let i = 0; i < Number(process.env.BULK || 0); i++)
+        bulk.push(ns.addVariable({
+            componentOf: folder, browseName: `B${i}`, nodeId: `s=B/${i}`,
+            dataType: bulkType, minimumSamplingInterval: 0,
+        }));
+    let b = 0;
+    if (bulk.length)
+        setInterval(() => {
+            b++;
+            const value = bytes ? `${b} `.padEnd(bytes, "x") : b;
+            for (const v of bulk)
+                v.setValueFromSource(new Variant({ dataType: bulkType, value }));
+        }, 100);
 
     await server.start();
     console.log("READY");

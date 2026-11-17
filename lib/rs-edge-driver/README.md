@@ -109,6 +109,16 @@ kept outside this repository, is a real async-mode driver: it
 subscribes to a southbound MQTT broker and pushes data via
 `DriverHandle::publish` as it arrives.
 
+A handler whose device pushes data, rather than answering polls,
+should use `DriverHandle::publish_wait` instead of `publish`.
+`publish` queues without limit, so a device that sends faster than the
+Edge Agent takes data fills the driver's memory. `publish_wait` waits
+while 1000 messages are already on their way to the Edge Agent, so the
+handler stops reading from its device until the agent catches up, and
+the device or its server holds the data back as it would for any slow
+client. Both keep messages in the order they were passed in.
+`edge-mqtt` is an example.
+
 ## Connection status
 
 The driver reports its status to the Edge Agent on

@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, Publish, QoS, SubscribeFilter};
 use serde::Deserialize;
-use tokio::sync::{Mutex, Semaphore, mpsc};
+use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore, mpsc};
 use tokio::task::{JoinHandle, JoinSet};
 
 use crate::config::{DriverConfig, DriverOptions};
@@ -24,6 +24,17 @@ const POLL_QUEUE_MAX: usize = 20;
 /// Most messages held back while an address map is being parsed.
 const DEFER_MAX: usize = 1000;
 
+/// Most data messages from [`DriverHandle::publish_wait`] that can be
+/// on their way to the edge agent at once. A handler calling it waits
+/// while this many are queued, so a device that sends faster than the
+/// edge agent takes data is slowed down instead of filling memory.
+pub(crate) const DATA_QUEUE_MAX: usize = 1000;
+
+/// A message for the publisher task. The permit, if any, is a place in
+/// the [`DATA_QUEUE_MAX`] queue, freed once the message has been
+/// handed to the MQTT client or dropped.
+type Outgoing = (String, QoS, Bytes, Option<OwnedSemaphorePermit>);
+
 /// A handle given to [`Handler`] implementations so they can push
 /// data back to the driver asynchronously, and report a lost
 /// southbound connection.
@@ -38,6 +49,8 @@ pub struct DriverHandle<A> {
     /// Which handler this handle belongs to. Reports from a handler
     /// that has since been replaced are ignored.
     generation: u64,
+    /// Places in the data queue, for [`publish_wait`](DriverHandle::publish_wait).
+    queue: Arc<Semaphore>,
 }
 
 /// Events sent to the driver loop, by handlers and by the driver's own
@@ -48,6 +61,9 @@ pub(crate) enum DriverEvent<A> {
         generation: u64,
         addr: A,
         payload: Bytes,
+        /// The message's place in the data queue, if it came from
+        /// `publish_wait`.
+        permit: Option<OwnedSemaphorePermit>,
     },
     /// Handler has lost its southbound connection.
     Lost { generation: u64, status: Status },
@@ -76,8 +92,16 @@ pub(crate) enum DriverEvent<A> {
 }
 
 impl<A> DriverHandle<A> {
-    pub(crate) fn new(tx: mpsc::UnboundedSender<DriverEvent<A>>, generation: u64) -> Self {
-        Self { tx, generation }
+    pub(crate) fn new(
+        tx: mpsc::UnboundedSender<DriverEvent<A>>,
+        generation: u64,
+        queue: Arc<Semaphore>,
+    ) -> Self {
+        Self {
+            tx,
+            generation,
+            queue,
+        }
     }
 
     /// Publish data for an address back to the edge agent.
@@ -95,6 +119,37 @@ impl<A> DriverHandle<A> {
             generation: self.generation,
             addr,
             payload: data,
+            permit: None,
+        });
+    }
+
+    /// As [`publish`](DriverHandle::publish), but wait first while the
+    /// driver already has a full queue of data on its way to the edge
+    /// agent.
+    ///
+    /// Use this from a handler that receives data pushed by its
+    /// device, such as a subscription, rather than data it asked for.
+    /// [`publish`](DriverHandle::publish) queues without limit, so a
+    /// device that sends faster than the edge agent takes data fills
+    /// memory until the driver is killed. With `publish_wait` the
+    /// handler stops reading from the device instead, and the device
+    /// or its server holds the data back, as it would for any slow
+    /// client. At most 1000 messages from `publish_wait` are queued
+    /// at once.
+    ///
+    /// Messages are published in the order they are passed in, the
+    /// same as with `publish`. Data the driver would drop (see
+    /// `publish`) frees its place at once.
+    pub async fn publish_wait(&self, addr: A, data: Bytes) {
+        // The semaphore is never closed, so this only fails if it is.
+        let Ok(permit) = self.queue.clone().acquire_owned().await else {
+            return;
+        };
+        let _ = self.tx.send(DriverEvent::Data {
+            generation: self.generation,
+            addr,
+            payload: data,
+            permit: Some(permit),
         });
     }
 
@@ -166,7 +221,7 @@ type OpQueue<A> = (mpsc::UnboundedSender<Op<A>>, JoinHandle<()>);
 /// What the driver loop uses to talk to the MQTT session.
 struct Session<H: Handler> {
     /// Messages for the publisher task, which sends them in order.
-    outbound: mpsc::UnboundedSender<(String, QoS, Bytes)>,
+    outbound: mpsc::UnboundedSender<Outgoing>,
     poll_tx: mpsc::Sender<PollJob<H>>,
 }
 
@@ -227,6 +282,9 @@ pub struct Driver<H: Handler> {
     deferred: VecDeque<Publish>,
     tx: mpsc::UnboundedSender<DriverEvent<H::Addr>>,
     rx: Option<mpsc::UnboundedReceiver<DriverEvent<H::Addr>>>,
+    /// Places in the data queue, shared by every handle. See
+    /// [`DriverHandle::publish_wait`].
+    queue: Arc<Semaphore>,
 }
 
 impl<H: Handler + 'static> Driver<H> {
@@ -258,6 +316,7 @@ impl<H: Handler + 'static> Driver<H> {
             deferred: VecDeque::new(),
             tx,
             rx: Some(rx),
+            queue: Arc::new(Semaphore::new(DATA_QUEUE_MAX)),
         }
     }
 
@@ -366,11 +425,30 @@ impl<H: Handler + 'static> Driver<H> {
             poll_tx,
         };
 
+        // rumqttc's event loop runs on its own task, so that its poll
+        // is never cancelled. A poll cancelled while it is writing to
+        // the socket leaves the part already written in its buffer, and
+        // the next poll writes it again, which corrupts the stream.
+        // That happens whenever the edge agent reads more slowly than
+        // the driver sends, and the agent then drops the connection.
+        // While a write waits for the agent the task waits too, so it
+        // stops taking new messages from the client.
+        let (ev_tx, mut events) = mpsc::channel(64);
+        let mqtt_loop = tokio::spawn(async move {
+            loop {
+                let event = eventloop.poll().await;
+                let failed = event.is_err();
+                if ev_tx.send(event).await.is_err() || failed {
+                    break;
+                }
+            }
+        });
+
         // Main event loop. Nothing in it waits for the handler, so the
         // MQTT event loop is always polled and pings go out on time.
         let result: Result<(), Error> = loop {
             tokio::select! {
-                event = eventloop.poll() => {
+                Some(event) = events.recv() => {
                     match event {
                         Ok(Event::Incoming(Incoming::SubAck(_))) => {
                             self.set_status(&session, Status::Ready);
@@ -390,6 +468,7 @@ impl<H: Handler + 'static> Driver<H> {
             }
         };
 
+        mqtt_loop.abort();
         publisher.abort();
         poll_worker.abort();
         result
@@ -400,11 +479,17 @@ impl<H: Handler + 'static> Driver<H> {
     /// `AsyncClient::publish` waits when rumqttc's request queue is
     /// full, and only the driver loop empties that queue, so the loop
     /// must never call it itself.
-    async fn publisher(client: AsyncClient, mut rx: mpsc::UnboundedReceiver<(String, QoS, Bytes)>) {
-        while let Some((topic, qos, payload)) = rx.recv().await {
+    ///
+    /// A data message's place in the data queue is freed once the
+    /// client has taken it. The client only takes more when its own
+    /// queue has room, which is when the edge agent is reading, so the
+    /// data queue fills while the agent is behind.
+    async fn publisher(client: AsyncClient, mut rx: mpsc::UnboundedReceiver<Outgoing>) {
+        while let Some((topic, qos, payload, permit)) = rx.recv().await {
             if let Err(e) = client.publish(&topic, qos, false, payload).await {
                 tracing::error!(%e, %topic, "failed to publish");
             }
+            drop(permit);
         }
     }
 
@@ -625,7 +710,7 @@ impl<H: Handler + 'static> Driver<H> {
         self.close_handler();
         self.generation += 1;
 
-        let handle = DriverHandle::new(self.tx.clone(), self.generation);
+        let handle = DriverHandle::new(self.tx.clone(), self.generation, self.queue.clone());
         match H::create(handle, conf) {
             Ok(handler) => {
                 let handler = Arc::new(Mutex::new(handler));
@@ -912,6 +997,7 @@ impl<H: Handler + 'static> Driver<H> {
             self.topic_with("err", topic),
             QoS::AtLeastOnce,
             Bytes::from(payload),
+            None,
         ));
     }
 
@@ -930,6 +1016,7 @@ impl<H: Handler + 'static> Driver<H> {
             self.topic_with("result", id),
             QoS::AtLeastOnce,
             Bytes::from(payload),
+            None,
         ));
     }
 
@@ -949,6 +1036,7 @@ impl<H: Handler + 'static> Driver<H> {
                 generation,
                 addr,
                 payload,
+                permit,
             } => {
                 if generation != self.generation || self.status != Status::Up {
                     return;
@@ -962,7 +1050,9 @@ impl<H: Handler + 'static> Driver<H> {
                     return;
                 };
                 let mtopic = self.topic_with("data", topic);
-                let _ = session.outbound.send((mtopic, QoS::AtMostOnce, payload));
+                let _ = session
+                    .outbound
+                    .send((mtopic, QoS::AtMostOnce, payload, permit));
             }
             DriverEvent::Lost { generation, status } => {
                 if generation != self.generation
@@ -1075,9 +1165,12 @@ impl<H: Handler + 'static> Driver<H> {
         self.live.store(live, Ordering::SeqCst);
         tracing::info!(%status, "driver status changed");
         let topic = self.topic("status");
-        let _ = session
-            .outbound
-            .send((topic, QoS::AtLeastOnce, Bytes::from(status.to_string())));
+        let _ = session.outbound.send((
+            topic,
+            QoS::AtLeastOnce,
+            Bytes::from(status.to_string()),
+            None,
+        ));
     }
 }
 

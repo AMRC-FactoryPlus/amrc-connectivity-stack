@@ -183,6 +183,7 @@ import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
+import { useNodeStore } from '@store/useNodeStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
 import { hostPortClash } from '@utils/hostPorts.js'
@@ -206,6 +207,7 @@ export default {
       c: useEdgeClusterStore(),
       dr: useDriverStore(),
       cn: useConnectionStore(),
+      n: useNodeStore(),
       d: useDeviceStore(),
     }
   },
@@ -601,17 +603,18 @@ export default {
       const isFormCorrect = await this.v$.$validate()
       if (!isFormCorrect) return
 
-      /* A driver that listens opens its port on the node, and a node
-       * can open each port once. */
+      /* A driver that listens opens its port on the host, so its Edge
+       * Agent must be pinned to a host in a cluster with several, and
+       * a host can open each port once. */
       const clash = hostPortClash({
         uuid: this.existingConnection?.uuid,
         name: this.name,
         config: _.omit(this.formData, 'payloadFormat'),
         driverdef: this.selectedDriver?.definition,
         node: this.node,
-      }, this.cn.data)
+      }, { connections: this.cn.data, nodes: this.n.data, clusters: this.c.data })
       if (clash) {
-        toast.error('Port already in use', { description: clash })
+        toast.error('Unable to save this connection', { description: clash })
         return
       }
 
@@ -653,8 +656,8 @@ export default {
                 payloadFormat: payloadFormat,
               },
               topology: {
-                cluster: this.node.cluster,
-                hostname: this.node.hostname,
+                cluster: this.node.deployment?.cluster,
+                hostname: this.node.deployment?.hostname ?? null,
               },
             })
           ])
@@ -695,8 +698,8 @@ export default {
               payloadFormat: payloadFormat,
             },
             topology: {
-              cluster: this.node.cluster,
-              hostname: this.node.hostname,
+              cluster: this.node.deployment?.cluster,
+              hostname: this.node.deployment?.hostname ?? null,
             },
           }
 

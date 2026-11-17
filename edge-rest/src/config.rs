@@ -8,7 +8,7 @@
 //!
 //! Field|
 //! ---|---
-//! `baseURL`|Joined to the front of every address.
+//! `baseURL`|Joined to the front of every address. Must be an `http` or `https` URL, or empty or just `http://` or `https://` when each address carries the rest of its URL.
 //! `authMethod`|`Basic` sends HTTP Basic auth. Anything else, usually `None`, sends no auth.
 //! `username`, `password`|For `Basic`. Both must be present, as the built-in required.
 
@@ -16,6 +16,8 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use rs_edge_driver::HandlerError;
 use serde_json::Value;
+
+use crate::read::is_http_url;
 
 /// The parsed connection details.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +36,11 @@ impl Conf {
             .and_then(Value::as_str)
             .ok_or_else(|| HandlerError::new("no baseURL in the connection details"))?
             .to_owned();
+        if !base_url_usable(&base_url) {
+            return Err(HandlerError::new(
+                "baseURL is not an http or https URL, so no address can make one with it",
+            ));
+        }
 
         let authorization = match conf.get("authMethod").and_then(Value::as_str) {
             Some("Basic") => {
@@ -53,6 +60,19 @@ impl Conf {
             authorization,
         })
     }
+}
+
+/// Whether some address could join `base` to make an http or https
+/// URL: `base` is one itself, or is empty or just the scheme, so each
+/// address carries the rest. Anything else (`host:8080`, `api/v1`)
+/// can't be completed by an address.
+///
+/// The built-in connection accepted any value, and axios then sent each
+/// request without a host to `http://localhost:80`, the Edge Agent's own
+/// pod, where it failed on every poll.
+pub fn base_url_usable(base: &str) -> bool {
+    let lower = base.to_ascii_lowercase();
+    base.is_empty() || lower == "http://" || lower == "https://" || is_http_url(base)
 }
 
 /// A field as the built-in's template string would print it. Missing
@@ -133,6 +153,24 @@ mod tests {
             json!({"baseURL": "http://h", "authMethod": "Basic", "username": "u", "password": null}),
         ] {
             assert!(Conf::parse(&conf).is_err(), "{conf}");
+        }
+    }
+
+    #[test]
+    fn base_url_must_be_able_to_make_a_url() {
+        for ok in [
+            "http://h",
+            "https://h:8443/api/",
+            "HTTP://H",
+            "",
+            "http://",
+            "HTTPS://",
+        ] {
+            assert!(Conf::parse(&json!({"baseURL": ok})).is_ok(), "{ok:?}");
+        }
+        for bad in ["h", "host:8080", "/api", "//h/x", "ftp://h", "http//h"] {
+            let e = Conf::parse(&json!({"baseURL": bad})).unwrap_err();
+            assert!(e.reason.contains("not an http or https URL"), "{bad:?}");
         }
     }
 

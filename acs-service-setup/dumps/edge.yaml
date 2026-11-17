@@ -59,6 +59,7 @@ objects:
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
     !u ACS.Driver.Test:             { name: "Test" }
+    !u ACS.Driver.TestRust:         { name: "Test (Rust)" }
     !u ACS.Driver.TPlinkSmartPlug:  { name: "TP-Link smart plug" }
     !u ACS.Driver.External:         { name: "External driver" }
     !u ACS.Driver.ADS:              { name: "ADS" }
@@ -422,7 +423,7 @@ configs:
         type: object
     !u ACS.Driver.Test:
       polled: true
-      presentation:
+      presentation: &test_presentation
         address:
           title: "Test Address"
           description: "Format: function:period:amplitude:packing (e.g. sin:3000:50:bd)"
@@ -434,10 +435,20 @@ configs:
           placeholder: "e.g. 0 (must be set to 0)"
       image:
         repository: edge-test
-      schema:
+      schema: &test_schema
         properties: null
         title: Test Connection Details
         type: object
+    # The Rust port of the Test driver, with the same addresses and
+    # output. Hidden from the new-connection form until its image is
+    # published and it has run beside the JS one on a dev cluster.
+    !u ACS.Driver.TestRust:
+      hidden: true
+      polled: true
+      presentation: *test_presentation
+      image:
+        repository: edge-test-rs
+      schema: *test_schema
     !u ACS.Driver.TPlinkSmartPlug:
       polled: true
       presentation:

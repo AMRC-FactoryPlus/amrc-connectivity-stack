@@ -3,7 +3,8 @@
  */
 
 import {
-  UUIDs, is_isa95_tag, isa95_vocabulary, merge_isa95_tags, render_isa95,
+  DEFAULT_PAYLOAD_FORMAT, UUIDs, driver_values, is_isa95_tag,
+  isa95_vocabulary, merge_isa95_tags, render_isa95, set_connection_type,
 } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@/store/useDeviceStore'
 import { useConnectionStore } from '@/store/useConnectionStore'
@@ -42,6 +43,58 @@ export function applyPlacement (tags, device, vocab, existing) {
     ]
   }
   return merge_isa95_tags(tags, rendered)
+}
+
+/**
+ * Builds a connection's entry in the Edge Agent config, without its
+ * devices. The connection type and details key come from the driver,
+ * through the same helper service-setup uses when it moves a connection
+ * between an internal driver and a split driver, so a save here gives
+ * the same entry as the move.
+ *
+ * @param {Object|null} existing - The connection's current entry, which is changed in place, or null for a new one
+ * @param {Object} connection - The connection store entry, with its configuration and bound driver definition
+ * @returns {Object} - The entry
+ */
+export function applyConnection (existing, connection) {
+  const connectionConfiguration = connection.configuration
+  const connDetails = connectionConfiguration.config || undefined
+  const driver = connectionConfiguration.driver
+
+  if (existing) {
+    const update = (key, val) => {
+      if (existing[key] != val) {
+        console.debug('Updating %s from %o to %o', key, existing[key], val)
+        existing[key] = val
+      }
+    }
+    update('pollInt', connectionConfiguration.pollInt)
+    update('payloadFormat', connectionConfiguration.source?.payloadFormat)
+    /* This also removes details held under another driver's key. */
+    return set_connection_type(existing, driver, connDetails)
+  }
+
+  const entry = {
+    uuid: connection.uuid,
+    name: connection.name || 'Connection',
+    pollInt: connectionConfiguration.pollInt || 1000,
+    devices: []
+  }
+  set_connection_type(entry, driver, connDetails)
+
+  if (connectionConfiguration.source?.payloadFormat) {
+    entry.payloadFormat = connectionConfiguration.source.payloadFormat
+  }
+  return entry
+}
+
+/**
+ * The payload format a device takes from its connection.
+ * @param {Object} connectionConfiguration - The connection's configuration
+ * @returns {string}
+ */
+export function devicePayloadFormat (connectionConfiguration) {
+  return connectionConfiguration.source?.payloadFormat || DEFAULT_PAYLOAD_FORMAT
 }
 
 /* How many times to rebuild when someone else saved the config first. */
@@ -239,19 +292,16 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
       }
       console.debug('Found matching connection:', connection.name)
 
-      // Check if we have a driver image definition
-      const image = connection.configuration?.driver?.image;
-      if (!image) {
+      // Split drivers get a sidecar; internal drivers get nothing
+      const values = driver_values(connection.configuration, connection.configuration?.driver)
+      if (!values) {
         console.debug('Driver image not found in connection store');
         console.debug('Connection', connection);
         continue;
       }
-      console.debug('Found driver image from driver store', image);
+      console.debug('Found driver image from driver store', values.image);
 
-      driverMap[deviceConn.name] = {
-        ...(connection.configuration.deployment ?? {}),
-        image,
-      };
+      driverMap[deviceConn.name] = values
     }
 
     /* XXX bmz: Here we need a source for EA-level values. */
@@ -400,11 +450,6 @@ async function buildEdgeAgentConfig({
       console.debug('Processing connection:', connection.name)
       console.debug('Connection configuration:', connectionConfiguration)
 
-      // Find if this connection already exists in the config
-      const connType = connectionConfiguration.driver?.internal?.connType || 'Driver'
-      const connDetailsKey = connectionConfiguration.driver?.internal?.details || 'DriverDetails'
-      const connDetails = connectionConfiguration.config
-
       // Find the connection in the config
       let connectionIndex = -1
       let connectionConfig = null
@@ -418,38 +463,12 @@ async function buildEdgeAgentConfig({
 
       if (connectionIndex >= 0) {
         console.debug('Found existing connection in edge agent config at index:', connectionIndex)
-        connectionConfig = config.deviceConnections[connectionIndex]
-        const update = (key, val) => {
-          if (connectionConfig[key] != val) {
-            console.debug('Updating %s from %o to %o', key, connectionConfig[key], val)
-            connectionConfig[key] = val
-          }
-        }
-        update("pollInt", connectionConfiguration.pollInt)
-        update("payloadFormat", connectionConfiguration.source?.payloadFormat)
-        update("connType", connType)
-        update(connDetailsKey, connDetails)
+        connectionConfig = applyConnection(config.deviceConnections[connectionIndex], connection)
       }
 
       // If connection doesn't exist, create it
       if (connectionIndex < 0) {
-        connectionConfig = {
-          uuid: connection.uuid,
-          name: connection.name || 'Connection',
-          connType: connType,
-          pollInt: connectionConfiguration.pollInt || 1000,
-          devices: []
-        }
-
-        // Add the connection details with the appropriate key
-        if (connDetails) {
-          connectionConfig[connDetailsKey || 'DriverDetails'] = connDetails
-        }
-
-        // Add payloadFormat if it exists
-        if (connectionConfiguration.source?.payloadFormat) {
-          connectionConfig.payloadFormat = connectionConfiguration.source.payloadFormat
-        }
+        connectionConfig = applyConnection(null, connection)
 
         // Add the new connection to the config
         if (!config.deviceConnections) {
@@ -524,7 +543,7 @@ async function buildEdgeAgentConfig({
           templates: [],
           tags: tags,
           pubInterval: device.pub_interval || 0,
-          payloadFormat: connectionConfiguration.source?.payloadFormat || 'Defined by Protocol',
+          payloadFormat: devicePayloadFormat(connectionConfiguration),
           /* Device-level historian override: false suppresses
            * recording for every metric on this device. */
           recordToHistorian: device.deviceInformation.recordToHistorian !== false,

@@ -11,6 +11,7 @@
      - [Edge Bootstrap](./architecture/edge-management/edge-bootstrap.md)
      - [Edge Deployments](./architecture/edge-management/edge-deployments.md)
      - [Edge Scout](./architecture/edge-management/edge-scout.md)
+     - [Split Drivers](./architecture/edge-management/split-drivers.md)
 - ConfigDB
   - [Object Model](./configDB/object-model.md)
 - Development

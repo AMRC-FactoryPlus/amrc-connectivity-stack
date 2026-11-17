@@ -4,11 +4,13 @@ An Edge Agent split driver for HTTP devices, written in Rust on
 [`lib/rs-edge-driver`](../lib/rs-edge-driver). It replaces the Edge
 Agent's built-in REST connection (`acs-edge/lib/devices/REST.ts`) and
 takes the same connection details, so a connection moves to it with no
-change to its details, addresses or metric paths. Its DriverDef is the
-hidden `ACS.Driver.RESTSplit` in `acs-service-setup/dumps/edge.yaml`,
-and service-setup moves connections to it when
-`serviceSetup.config.splitDrivers.REST` is `true`
-(`acs-service-setup/lib/split-drivers.js`).
+change to its details, addresses or metric paths. Its DriverDef is
+`ACS.Driver.RESTSplit` in `acs-service-setup/dumps/edge.yaml`, which the
+Manager offers as "REST", and service-setup moves connections to it when
+`serviceSetup.config.splitDrivers.REST` is `true`, which is the chart's
+default (`acs-service-setup/lib/split-drivers.js`). See
+[Split Drivers](../docs/architecture/edge-management/split-drivers.md)
+for what a site sees when its connections move.
 
 ## Connection details
 

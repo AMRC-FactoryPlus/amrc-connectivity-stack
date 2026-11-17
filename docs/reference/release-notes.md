@@ -12,6 +12,35 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Upgrading: REST connections move to the edge-rest split driver
+
+On upgrade, every Edge Agent connection that uses the built-in REST
+connection moves to `edge-rest`, a split driver that runs as its own
+container beside the Edge Agent. Each connection keeps its details,
+devices and addresses, and its devices publish the same data. Each Edge
+Agent with a REST connection restarts once or twice in the minutes after
+the upgrade, so its REST devices have no data for that time. New REST
+connections in the Manager use the split driver, under the name "REST".
+
+- **Check your edge charts first.** If your site has committed its own
+  changes to `main` in the `shared/helm` repository, the upgrade doesn't
+  update `main`, and the moved connections get no data until it does,
+  because the old charts ask for an `edge-rest` image that doesn't
+  exist. Merge the `acs` branch into `main` as part of the upgrade, or
+  set `serviceSetup.config.splitDrivers.REST: null` until you have.
+- **What you may notice.** A failing endpoint is logged once rather than
+  on every poll, devices go offline only when every endpoint on the
+  connection has failed, requests time out after 25 seconds, page
+  counters in addresses work, and a write posts the value alone as JSON.
+- **To check it worked,** find the `Split drivers:` line in the
+  service-setup Job's log, and check that each Edge Agent pod with REST
+  connections has a running `driver-<name>` container.
+- **To move back,** set `serviceSetup.config.splitDrivers.REST: false`
+  and upgrade again. Every connection's config returns to exactly what
+  it was.
+
+See [Split Drivers](../architecture/edge-management/split-drivers.md).
+
 ### Upgrading: i3X implements version 1.0 of the specification
 
 The i3X service now reports `specVersion: "1.0"` and answers in the 1.0

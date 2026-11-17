@@ -11,9 +11,8 @@ deployed, versioned and fixed in the same way. The protocol between the
 Edge Agent and a split driver is described in
 [`acs-edge/docs/edge-split.md`](../../../acs-edge/docs/edge-split.md).
 
-REST, MQTT and UDP move first. Their split drivers are `edge-rest`,
-`edge-mqtt` and `edge-udp`. OPC UA keeps its built-in connection until
-its driver is ready.
+REST, MQTT, OPC UA and UDP move in version 7. Their split drivers are
+`edge-rest`, `edge-mqtt`, `edge-opcua` and `edge-udp`.
 
 ## The setting
 
@@ -26,8 +25,8 @@ serviceSetup:
     splitDrivers:
       REST: true      # the chart's default
       MQTT: true      # the chart's default
+      OPCUA: true     # the chart's default
       UDP: true       # the chart's default
-      # OPCUA: not set, so it stays built in
       # dryRun: true  # log what would move and change nothing
 ```
 
@@ -93,6 +92,16 @@ the old form allowed, so on a site where two of them can land on one
 host, only the first moves. Give the one that moved another port in the
 Manager (and point its device at it) and the next run moves the other.
 
+Built-in OPC UA connections move the same way, to an `edge-opcua`
+sidecar each, with `OPCUAConnDetails` becoming `DriverDetails` and every
+field kept: endpoint, security mode and policy, credentials and the
+password's secret. Two more things change for OPC UA, because the
+driver hands the Edge Agent JSON where the built-in connection handed
+it decoded values: the connection and its devices change from "Defined
+by Protocol" to JSON, and every metric path on the connection is
+removed. See [What changes for an OPC UA
+connection](#what-changes-for-an-opc-ua-connection).
+
 Service-setup runs the move on every install and upgrade, and a second
 run finds nothing to change. A run that stopped half way through is
 finished by the next one.
@@ -100,11 +109,12 @@ finished by the next one.
 ### New connections
 
 After the upgrade, the connection form in the Manager offers one REST
-driver, called "REST", one MQTT driver, called "MQTT", and one UDP
-driver, called "UDP", which are the split drivers. The built-in drivers
-are called "REST (built-in)", "MQTT (built-in)" and "UDP (built-in)"
-and are shown only on a connection that still uses one, for example on
-a site that has moved a protocol back.
+driver, called "REST", one MQTT driver, called "MQTT", one OPC UA
+driver, called "OPC-UA", and one UDP driver, called "UDP", which are
+the split drivers. The built-in drivers are called "REST (built-in)",
+"MQTT (built-in)", "OPC-UA (built-in)" and "UDP (built-in)" and are
+shown only on a connection that still uses one, for example on a site
+that has moved a protocol back.
 
 ## Edge charts and every split driver move
 
@@ -254,11 +264,9 @@ these differences:
   certificate must be signed by a well-known certificate authority, as
   with the built-in connection, so a broker with a self-signed
   certificate is still refused.
-- **CPU moves between containers.** Each message now crosses the pod's
-  internal broker, and the driver container uses a little CPU of its
-  own. The Edge Agent uses less than it did with the built-in
-  connection, so the pod as a whole uses about the same or less. See
-  "CPU" below.
+- **A little more CPU in the pod.** The Edge Agent uses about the same
+  CPU as with the built-in connection, and the driver container adds 1
+  to 3% of a core. See "CPU" below.
 - **One more container per connection.** Each MQTT connection runs in
   its own `edge-mqtt` container in the Edge Agent's pod.
 
@@ -271,17 +279,19 @@ from a separate broker at 123, 370 and 1,232 messages a second.
 
 | Messages a second | Edge Agent, built-in | Edge Agent, split | `edge-mqtt` |
 |---|---|---|---|
-| 123 | 9 to 10% of a core | 6% | 1% |
-| 370 | 20 to 22% | 14% | 1 to 2% |
-| 1,232 | 37 to 39% | 25% | 2% |
+| 123 | 7 to 8% of a core | 7 to 9% | 1% |
+| 370 | 12% | 14 to 15% | 1 to 2% |
+| 1,232 | 30 to 35% | 34 to 35% | 2 to 3% |
 
 `edge-mqtt` uses about 5 MB of memory, whatever the number of metrics.
 No message was lost or reordered. Before version 7 the Edge Agent ran
 each device's poll timer every millisecond when the connection had no
 poll interval, which is every MQTT connection, and with a split driver
 each tick sent the driver a poll it had nothing to do with. That more
-than doubled the Edge Agent's CPU at 123 messages a second (21 to 24%).
-A device with no poll interval now has no poll timer.
+than doubled the Edge Agent's CPU at 123 messages a second (21 to 24%,
+against 9 to 10% for the built-in connection, which also paid for the
+timer). A device with no poll interval now has no poll timer, which
+lowers the built-in connection's CPU too.
 
 ## What changes for a UDP connection
 
@@ -317,16 +327,73 @@ these differences:
 - **One more container per connection.** Each UDP connection runs in
   its own `edge-udp` container in the Edge Agent's pod.
 
+## What changes for an OPC UA connection
+
+`edge-opcua` subscribes to the same nodes with the same settings as the
+built-in connection, and for one device the Edge Agent publishes the
+same values, with the same Sparkplug types, as before. Both stamp each
+value with the time it arrived, not the server's timestamp. Its full
+behaviour is in [`edge-opcua/README.md`](../../../edge-opcua/README.md).
+You may notice these differences:
+
+- **The payload format is JSON.** The connection and its devices change
+  from "Defined by Protocol" to JSON, which is what the driver sends. A
+  connection with no format of its own gets JSON too.
+- **Metric paths are removed.** The built-in connection never read a
+  metric's path, so some metrics have something in the field that was
+  never meant as a path, such as a unit (`mm`). The Edge Agent reads
+  the driver's JSON through a metric's path, so such a metric would
+  never update. The move removes every path on the connection's
+  metrics in the Edge Agent config, and the Manager leaves them out
+  when it rebuilds the config of a connection on the split driver (its
+  DriverDef has `metricPaths: false`). Each device's origin map keeps
+  its paths. The `path` property is gone from these metrics in DBIRTH.
+  The Manager's form hides the path field for OPC UA, as it did before.
+- **Every device gets its own values.** On a connection with more than
+  one device, the built-in connection gave every device's values to
+  the last device's metrics, or dropped them. The driver gives each
+  device its own values. So after the move, devices that published
+  nothing start publishing, and the last device on such a connection
+  stops publishing values that were never its own.
+- **DateTime metrics publish the date.** The built-in connection
+  published every DateTime value as 0.
+- **A device with nothing to read is harmless.** A device with no
+  addressed metrics made the built-in connection ask the server to
+  monitor nothing, and the server's refusal stopped the whole Edge
+  Agent. The driver subscribes only to addresses it has, so such a
+  device just births and the others carry on. The built-in connection
+  now skips such a device too.
+- **An unreachable server shows.** The devices go offline while their
+  server can't be reached, and send a new DBIRTH when it is back. The
+  built-in connection left them online with their last values.
+- **A few more DDATA messages.** The Edge Agent groups the values the
+  driver sends together into one DDATA per device, but some of a
+  notification's values reach it a little late and go out in a second
+  message, so a device sends up to two DDATA messages for each
+  notification where the built-in connection sent one. The values and
+  timestamps are the same.
+- **Writes are confirmed.** A write shows as written only once the
+  server accepts it, and one the server refuses is answered as failed.
+- **Certificates.** Like the built-in connection, the driver makes a
+  self-signed client certificate when its container starts, with the
+  same application URI. The built-in connection kept its certificate in
+  a folder that every new Edge Agent pod starts without, so a secured
+  server already accepts a new client certificate after every upgrade,
+  and it accepts the driver's in the same way. Both accept any server
+  certificate.
+- **One more container per connection.** Each OPC UA connection runs in
+  its own `edge-opcua` container in the Edge Agent's pod.
+
 ## Checking it worked
 
 1. In the service-setup Job's log, find the line that starts
    `Split drivers:`. It gives how many connections moved, how many
    were held back and how many failed, and the lines above it name each
    connection and say why it was held back.
-2. In the Manager, open a REST, MQTT or UDP connection. Its driver is
-   "REST", "MQTT" or "UDP".
+2. In the Manager, open a moved connection. Its driver is "REST",
+   "MQTT", "OPC-UA" or "UDP".
 3. On the edge cluster, the Edge Agent's pod has a `driver-<name>`
-   container for each REST, MQTT and UDP connection, and each is
+   container for each moved connection, and each is
    running.
 4. The connection's devices are publishing data again a few minutes
    after the upgrade.
@@ -345,6 +412,13 @@ UDP ports on the edge hosts. A UDP connection that was given a port
 other than 50205 after the move keeps it, and the built-in connection
 listens on it inside the pod.
 
+`OPCUA: false` moves OPC UA connections back in the same way, and their
+payload format back to "Defined by Protocol" (also on a connection that
+had no format of its own before the move, which now names it). The
+metric paths the move removed are not put back, because the built-in
+connection never read them. The Manager puts them back from each
+device's origin map the next time it saves the device or connection.
+
 ## Adding a protocol's migration
 
 This is for developers moving another built-in protocol (UDP, OPC UA)
@@ -355,7 +429,10 @@ to its split driver. Follow what REST and MQTT did:
    plainly (for example "MQTT"), and hide the built-in and name it
    "MQTT (built-in)". Both changes are needed, because the connection
    form picks drivers by name. Update the "offer ... and hide the
-   others" test in `acs-service-setup/test/split-drivers.test.js`.
+   others" test in `acs-service-setup/test/split-drivers.test.js`. If
+   the driver's values leave nothing for a metric path to select, give
+   its DriverDef `metricPaths: false`, as OPC UA's has: the move then
+   removes paths and the Manager leaves them out.
 2. **The switch.** Add the protocol to `SplitDrivers` in
    `acs-service-setup/lib/split-drivers.js` if it isn't there, with its
    payload format map, and set it to `true` under
@@ -379,7 +456,11 @@ to its split driver. Follow what REST and MQTT did:
    like "split driver after service-setup's move" that replays your
    `moved.json`, and make your fake device's `connection()` point
    `DriverDetails` at itself as well as the built-in details key (see
-   `devices/http.ts`). Add the folder to the `paths` of
+   `devices/http.ts`). A fake device can check credentials and security
+   when the run asks it to (`secure`, see `devices/opcua.ts`), and a run
+   can send writes (`commands`). Where the built-in connection is wrong,
+   compare against a reference that is right, as the OPC UA case does
+   with one device at a time (`merge_runs`). Add the folder to the `paths` of
    `.github/workflows/split-driver-golden.yaml` and
    `acs-edge-tests.yaml`, and grep for your cases in the golden workflow
    as it does for REST.

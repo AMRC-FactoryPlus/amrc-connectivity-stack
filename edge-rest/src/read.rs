@@ -16,9 +16,12 @@
 //! [`health`](crate::health).
 
 use std::future::Future;
+use std::time::Duration;
 
 use bytes::Bytes;
+use rs_edge_driver::DEFAULT_MAX_PACKET_SIZE;
 use serde_json::value::RawValue;
+use tokio::time::{Instant, timeout_at};
 
 use crate::addr::{Addr, url};
 
@@ -26,11 +29,42 @@ use crate::addr::{Addr, url};
 /// connection had no limit and could loop forever.
 pub const MAX_PAGES: u32 = 100;
 
-/// An HTTP reply: the status and the body.
+/// The largest body sent to the Edge Agent: the driver library's MQTT
+/// packet limit less 64 KiB for the topic and packet header. rumqttc
+/// refuses a larger outgoing packet with an error that ends the MQTT
+/// session, so a bigger body would drop the driver's connection to the
+/// Edge Agent on every poll.
+pub const BODY_LIMIT: usize = DEFAULT_MAX_PACKET_SIZE - 64 * 1024;
+
+/// How long one read may take, all its pages included. It is under the
+/// driver library's 30 second poll timeout, so a read always finishes
+/// and is counted rather than being dropped by the library.
+pub const READ_DEADLINE: Duration = Duration::from_secs(25);
+
+/// The limits a read works within. [`Limits::default`] is what the
+/// driver uses; tests make them smaller.
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    pub deadline: Duration,
+    pub body: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            deadline: READ_DEADLINE,
+            body: BODY_LIMIT,
+        }
+    }
+}
+
+/// An HTTP reply: the status and, for a 200, the body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reply {
     pub status: u16,
     pub body: Bytes,
+    /// The body was over [`BODY_LIMIT`] and was not read.
+    pub too_large: bool,
 }
 
 /// What a read gave.
@@ -42,6 +76,10 @@ pub enum Outcome {
     Status(u16),
     /// Nothing to send for another reason, already logged.
     NoData,
+    /// `baseURL + address` is not an http or https URL.
+    BadUrl,
+    /// A 200 body, or the pages joined, over this many bytes.
+    TooLarge(usize),
     /// The server refused the credentials. `url` is what was asked for.
     Auth { url: String, status: u16 },
     /// The request got no reply.
@@ -53,17 +91,37 @@ pub fn is_auth_failure(status: u16) -> bool {
     status == 401 || status == 403
 }
 
+/// Whether a string is an http or https URL the client can ask for.
+pub fn is_http_url(url: &str) -> bool {
+    reqwest::Url::parse(url).is_ok_and(|u| matches!(u.scheme(), "http" | "https") && u.has_host())
+}
+
 /// Read an address with `get`, which fetches a URL and returns the
-/// reply, or an error message if there was no reply.
-pub async fn read<F, Fut>(base: &str, addr: &Addr, get: F) -> Outcome
+/// reply, or an error message if there was no reply. The read, all its
+/// pages included, ends within `limits.deadline`.
+pub async fn read<F, Fut>(base: &str, addr: &Addr, limits: Limits, get: F) -> Outcome
 where
     F: Fn(String) -> Fut,
     Fut: Future<Output = Result<Reply, String>>,
 {
+    let deadline = Instant::now() + limits.deadline;
+    let fetch = |url: String| {
+        let req = get(url);
+        async move {
+            timeout_at(deadline, req)
+                .await
+                .unwrap_or_else(|_| Err("no reply before the read's deadline".to_owned()))
+        }
+    };
+
     let Some(paging) = addr.paging() else {
         let url = url(base, addr.raw());
-        return match get(url.clone()).await {
+        if !is_http_url(&url) {
+            return Outcome::BadUrl;
+        }
+        return match fetch(url.clone()).await {
             Err(error) => Outcome::Conn { url, error },
+            Ok(r) if r.status == 200 && r.too_large => Outcome::TooLarge(limits.body),
             Ok(r) if r.status == 200 => Outcome::Data(r.body),
             Ok(r) if is_auth_failure(r.status) => Outcome::Auth {
                 url,
@@ -74,16 +132,34 @@ where
     };
 
     // Fetch pages from the start number until one doesn't give 200,
-    // the stop number is reached or MAX_PAGES have been read. The
-    // first page is always fetched, as the built-in's do-while did.
+    // the stop number is reached, MAX_PAGES have been read or the
+    // deadline passes. The first page is always fetched, as the
+    // built-in's do-while did.
     let mut pages = Vec::new();
+    let mut size = 0;
     let mut end = None;
     let mut n = paging.start;
     loop {
         let url = url(base, &paging.page(n));
-        match get(url.clone()).await {
+        if !is_http_url(&url) {
+            return Outcome::BadUrl;
+        }
+        match fetch(url.clone()).await {
+            // No reply to a later page because time ran out: use the
+            // pages there are.
+            Err(_) if !pages.is_empty() && Instant::now() >= deadline => {
+                tracing::debug!(address = addr.raw(), page = n, "deadline reached");
+                break;
+            }
             Err(error) => return Outcome::Conn { url, error },
-            Ok(r) if r.status == 200 => pages.push(r.body),
+            Ok(r) if r.status == 200 && r.too_large => return Outcome::TooLarge(limits.body),
+            Ok(r) if r.status == 200 => {
+                size += r.body.len();
+                if size > limits.body {
+                    return Outcome::TooLarge(limits.body);
+                }
+                pages.push(r.body);
+            }
             Ok(r) if is_auth_failure(r.status) => {
                 return Outcome::Auth {
                     url,
@@ -106,7 +182,7 @@ where
             break;
         }
         if pages.len() as u32 >= MAX_PAGES {
-            tracing::warn!(address = addr.raw(), "stopped after {MAX_PAGES} pages");
+            tracing::debug!(address = addr.raw(), "stopped after {MAX_PAGES} pages");
             break;
         }
     }
@@ -115,9 +191,10 @@ where
         return end.map_or(Outcome::NoData, Outcome::Status);
     }
     match join_pages(&pages) {
+        Some(body) if body.len() > limits.body => Outcome::TooLarge(limits.body),
         Some(body) => Outcome::Data(body),
         None => {
-            tracing::warn!(
+            tracing::debug!(
                 address = addr.raw(),
                 "a page is not JSON, so pages can't be joined"
             );
@@ -155,6 +232,9 @@ mod tests {
     struct Fake {
         replies: Replies,
         asked: Mutex<Vec<String>>,
+        limits: Limits,
+        /// How long each request takes.
+        delay: Duration,
     }
 
     impl Fake {
@@ -162,14 +242,22 @@ mod tests {
             Self {
                 replies: Box::new(f),
                 asked: Mutex::new(Vec::new()),
+                limits: Limits::default(),
+                delay: Duration::ZERO,
             }
         }
 
         async fn read(&self, base: &str, addr: &str) -> Outcome {
-            read(base, &Addr::parse(addr), |url| {
+            let delay = self.delay;
+            read(base, &Addr::parse(addr), self.limits, |url| {
                 self.asked.lock().unwrap().push(url.clone());
                 let r = (self.replies)(&url);
-                async move { r }
+                async move {
+                    if !delay.is_zero() {
+                        tokio::time::sleep(delay).await;
+                    }
+                    r
+                }
             })
             .await
         }
@@ -187,6 +275,15 @@ mod tests {
         Ok(Reply {
             status,
             body: Bytes::from(body.to_owned()),
+            too_large: false,
+        })
+    }
+
+    fn too_large() -> Result<Reply, String> {
+        Ok(Reply {
+            status: 200,
+            body: Bytes::new(),
+            too_large: true,
         })
     }
 
@@ -208,6 +305,7 @@ mod tests {
             Ok(Reply {
                 status: 200,
                 body: Bytes::from_static(&[0, 0xff, 0xfe, 1]),
+                too_large: false,
             })
         });
         assert_eq!(
@@ -348,6 +446,104 @@ mod tests {
                 error: "reset".into()
             }
         );
+    }
+
+    #[tokio::test]
+    async fn a_body_over_the_limit_gives_no_data() {
+        let f = Fake::new(|_| too_large());
+        assert_eq!(
+            f.read("http://h", "/x").await,
+            Outcome::TooLarge(BODY_LIMIT)
+        );
+    }
+
+    /// Each page fits, but together they don't.
+    #[tokio::test]
+    async fn pages_over_the_limit_together_give_no_data() {
+        let mut f = Fake::new(|_| ok("[1234567890]"));
+        f.limits.body = 30;
+        assert_eq!(f.read("http://h", "/p/${0:9}").await, Outcome::TooLarge(30));
+        assert_eq!(f.asked().len(), 3);
+        let mut f = Fake::new(|_| ok("[1234567890]"));
+        f.limits.body = 30;
+        assert_eq!(
+            f.read("http://h", "/p/${0:2}").await,
+            data("[1234567890,1234567890]")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_page_over_the_limit_gives_no_data() {
+        let f = Fake::new(|url| {
+            if url.ends_with('1') {
+                too_large()
+            } else {
+                ok("[0]")
+            }
+        });
+        assert_eq!(
+            f.read("http://h", "/p/${0:5}").await,
+            Outcome::TooLarge(BODY_LIMIT)
+        );
+    }
+
+    /// The pages that came back before the deadline are sent, so a slow
+    /// server can't make a paged read outlast the library's poll
+    /// timeout.
+    #[tokio::test(start_paused = true)]
+    async fn paging_stops_at_the_deadline_with_the_pages_it_has() {
+        let mut f = Fake::new(|url| ok(&format!("[{}]", &url[url.len() - 1..])));
+        f.delay = Duration::from_secs(2);
+        f.limits.deadline = Duration::from_secs(7);
+        let start = Instant::now();
+        assert_eq!(f.read("http://h", "/p/${0:9}").await, data("[0,1,2]"));
+        assert_eq!(start.elapsed(), Duration::from_secs(7));
+        assert_eq!(f.asked().len(), 4);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_default_deadline_is_under_the_poll_timeout() {
+        let mut f = Fake::new(|_| ok("[0]"));
+        f.delay = Duration::from_secs(20);
+        let start = Instant::now();
+        assert_eq!(f.read("http://h", "/p?n=${0:n}").await, data("[0]"));
+        assert!(start.elapsed() <= READ_DEADLINE);
+        assert!(READ_DEADLINE < rs_edge_driver::DriverOptions::default().poll_timeout);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn no_reply_before_the_deadline_is_a_connection_failure() {
+        let mut f = Fake::new(|_| ok("{}"));
+        f.delay = Duration::from_secs(60);
+        assert!(matches!(
+            f.read("http://h", "/x").await,
+            Outcome::Conn { .. }
+        ));
+        assert!(matches!(
+            f.read("http://h", "/p/${0:5}").await,
+            Outcome::Conn { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_address_that_makes_no_url_is_not_asked_for() {
+        let f = Fake::new(|_| ok("{}"));
+        for (base, addr) in [
+            ("foo", "/x"),
+            ("", "/x"),
+            ("host:8080", "/x"),
+            ("ftp://h", "/x"),
+            ("http://", ""),
+        ] {
+            assert_eq!(f.read(base, addr).await, Outcome::BadUrl, "{base}{addr}");
+        }
+        assert_eq!(f.read("", "http://h/x").await, data("{}"));
+        assert_eq!(f.asked(), ["http://h/x"]);
+    }
+
+    #[test]
+    fn the_body_limit_leaves_room_under_the_packet_limit() {
+        assert_eq!(BODY_LIMIT, 16 * 1024 * 1024 - 64 * 1024);
     }
 
     #[test]

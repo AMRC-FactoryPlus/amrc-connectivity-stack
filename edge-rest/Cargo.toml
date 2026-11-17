@@ -26,7 +26,8 @@ tracing = "0.1"
 # The driver-loop test borrows the fake Edge Agent from the library's
 # own tests, which needs these.
 rumqttc = { version = "0.25.1", default-features = false }
-tokio = { version = "1", features = ["full"] }
+# test-util lets tests run timeouts on a paused clock.
+tokio = { version = "1", features = ["full", "test-util"] }
 
 [profile.release]
 strip = true

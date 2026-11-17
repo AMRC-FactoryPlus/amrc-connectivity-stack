@@ -34,17 +34,33 @@ export function variant (v: OpcuaValue) {
     return new Variant({ dataType, value });
 }
 
+/* The security policies a secure device offers: those the private
+ * fixtures' connections use, as node-opcua names them. The connection's
+ * `Aes128_Sha256` is Aes128_Sha256_RsaOaep. */
+const POLICIES = [
+    SecurityPolicy.None, SecurityPolicy.Basic256, SecurityPolicy.Basic256Sha256,
+    SecurityPolicy.Aes128_Sha256_RsaOaep,
+];
+
 /* A node-opcua server with one variable per node in the fixture. The
  * first event sets every node before the connection subscribes, so the
  * subscription's first notification is the starting values. Once the
  * connection has a subscription the later events are applied at their
  * times, scaled by the speed.
  *
- * Security is turned off: the connection is rewritten to
- * SecurityMode None, no credentials, on both runs. The fixtures record
- * which policies a connection uses, but no fixture can run a
- * certificate handshake, so a driver must be checked against a real
- * server for that (see the fixtures README). */
+ * Security is turned off unless the run asks for it: the connection is
+ * rewritten to SecurityMode None, no credentials, on both runs. The
+ * fixtures record which policies a connection uses, but a recorded
+ * connection's server isn't here, so a driver must be checked against
+ * a real server for that (see the fixtures README).
+ *
+ * A secure device keeps the connection's security mode, policy and
+ * credentials, offers every mode and the policies in POLICIES, trusts
+ * any client certificate and accepts any user, and records each login
+ * in `credentials`, so a run shows what the connection sent.
+ *
+ * A value the connection writes to a node is recorded in `writes`, and
+ * stays until the fixture next sets that node. */
 export class OpcuaDevice implements FakeDevice {
     fixture:    Fixture
     opts:       DeviceOpts
@@ -55,8 +71,13 @@ export class OpcuaDevice implements FakeDevice {
     vars:       Map<string, UAVariable> = new Map()
     delivered = 0
     t0?:        number
+    credentials = new Set<string>()
+    writes:     string[] = []
     #replay?:   Promise<void>
     #stopped = false
+    /* True while the fixture sets values, so they aren't taken as
+     * writes. */
+    #setting = false
 
     constructor (fixture: Fixture, opts: DeviceOpts) {
         this.fixture = fixture;
@@ -91,15 +112,32 @@ export class OpcuaDevice implements FakeDevice {
             rootFolder: path.join(this.pki, "server"),
             automaticallyAcceptUnknownCertificate: true,
         });
+        const secure = !!this.opts.secure;
         const server = this.server = new OPCUAServer({
             port:                   this.port,
             hostname:               "127.0.0.1",
-            securityModes:          [MessageSecurityMode.None],
-            securityPolicies:       [SecurityPolicy.None],
+            securityModes:          secure
+                ? [MessageSecurityMode.None, MessageSecurityMode.Sign,
+                    MessageSecurityMode.SignAndEncrypt]
+                : [MessageSecurityMode.None],
+            securityPolicies:       secure ? POLICIES : [SecurityPolicy.None],
             allowAnonymous:         true,
             serverCertificateManager: certs,
+            userManager: {
+                isValidUser: (user: string, password: string) => {
+                    this.credentials.add(`user ${user}:${password}`);
+                    return true;
+                },
+            },
         });
         await server.initialize();
+        server.on("session_activated", (session: any) => {
+            const channel = session.channel;
+            if (!channel || !secure) return;
+            const policy = String(channel.securityPolicy).replace(/^.*#/, "");
+            this.credentials.add(`channel ${MessageSecurityMode[channel.securityMode]}`
+                + ` ${policy}`);
+        });
 
         const space = server.engine.addressSpace!;
         const first = this.events[0]?.values ?? {};
@@ -115,33 +153,51 @@ export class OpcuaDevice implements FakeDevice {
                 dataType:       v.dataType,
                 minimumSamplingInterval: 0,
             });
-            uav.setValueFromSource(variant(v));
+            this.set(uav, v);
+            uav.on("value_changed", (dv: any) => {
+                if (!this.#setting)
+                    this.writes.push(`${id}=${dv.value?.value}`);
+            });
             this.vars.set(id, uav);
         }
 
         await server.start();
     }
 
+    /* The details are under OPCUAConnDetails for the built-in
+     * connection, and DriverDetails once service-setup has moved it. */
     connection (conn: any) {
+        const key = conn.connType == "Driver" ? "DriverDetails" : "OPCUAConnDetails";
+        const endpoint = `opc.tcp://127.0.0.1:${this.port}`;
         return {
             ...conn,
             /* reHashConf gives every device the connection's interval. */
             pollInt: Math.max(1, Math.round(conn.pollInt / OVERSAMPLE)),
-            OPCUAConnDetails: {
-                ...conn.OPCUAConnDetails,
-                endpoint:       `opc.tcp://127.0.0.1:${this.port}`,
-                securityMode:   "None",
-                securityPolicy: "None",
-                useCredentials: false,
-                username:       "",
-                password:       "",
-            },
+            [key]: this.opts.secure
+                ? { ...conn[key], endpoint }
+                : {
+                    ...conn[key],
+                    endpoint,
+                    securityMode:   "None",
+                    securityPolicy: "None",
+                    useCredentials: false,
+                    username:       "",
+                    password:       "",
+                },
         };
     }
 
+    set (uav: UAVariable, v: OpcuaValue) {
+        this.#setting = true;
+        try { uav.setValueFromSource(variant(v)); }
+        finally { this.#setting = false; }
+    }
+
     apply (ev: OpcuaEvent) {
-        for (const [id, v] of Object.entries(ev.values))
-            this.vars.get(id)?.setValueFromSource(variant(v));
+        for (const [id, v] of Object.entries(ev.values)) {
+            const uav = this.vars.get(id);
+            if (uav) this.set(uav, v);
+        }
         this.delivered++;
     }
 

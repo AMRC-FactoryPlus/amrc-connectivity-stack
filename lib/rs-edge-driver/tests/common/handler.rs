@@ -27,6 +27,10 @@ pub struct Ctl {
     pub cmd_delay: Mutex<Duration>,
     /// `subscribe` returns this (default `true`).
     pub subscribe_fails: AtomicBool,
+    /// While above zero, a successful `connect` reports the connection
+    /// lost before it returns, as a device broker that closes the
+    /// socket straight after CONNACK would, and counts down.
+    pub lose_on_connect: AtomicUsize,
 
     pub creates: AtomicUsize,
     pub connects: AtomicUsize,
@@ -107,10 +111,26 @@ impl Handler for FakeHandler {
         self.ctl.connects.fetch_add(1, Ordering::SeqCst);
         let delay = *self.ctl.connect_delay.lock().unwrap();
         tokio::time::sleep(delay).await;
-        match *self.ctl.connect_error.lock().unwrap() {
-            Some(e) => Err(e),
-            None => Ok(()),
+        if let Some(e) = *self.ctl.connect_error.lock().unwrap() {
+            return Err(e);
         }
+        let n = &self.ctl.lose_on_connect;
+        let mut cur = n.load(Ordering::SeqCst);
+        let lose = loop {
+            if cur == 0 {
+                break false;
+            }
+            match n.compare_exchange(cur, cur - 1, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(_) => break true,
+                Err(actual) => cur = actual,
+            }
+        };
+        if lose {
+            self.ctl
+                .handle()
+                .disconnected(ConnectError::ConnectionFailed);
+        }
+        Ok(())
     }
 
     async fn close(&mut self) {

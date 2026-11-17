@@ -70,12 +70,13 @@ const C = {
 };
 const MQTT = [C.json, C.delimited, C.batched, C.xml, C.buffer];
 
-/* serviceSetup.config.splitDrivers as the chart ships it. The site has
- * no connection of any other protocol the chart moves. */
+/* serviceSetup.config.splitDrivers as the chart ships it, but with OPC
+ * UA left where it is: the site's OPC UA connection stands for a
+ * protocol this test doesn't move. opcua-move.test.js moves OPC UA. */
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));
-    return values.serviceSetup.config.splitDrivers;
+    return { ...values.serviceSetup.config.splitDrivers, OPCUA: null };
 }
 
 /* The DriverDefs as edge.yaml loads them on upgrade. */

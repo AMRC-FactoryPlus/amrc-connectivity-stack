@@ -23,6 +23,7 @@ on:
       - 'acs-service-setup/test/rest-move/**'
       - 'acs-service-setup/test/mqtt-move/**'
       - 'acs-service-setup/test/udp-move/**'
+      - 'acs-service-setup/test/opcua-move/**'
       - '.github/workflows/acs-edge-tests.yaml'
 
 jobs:

@@ -9,7 +9,7 @@
 use serde_json::Value;
 
 /// Key fragments that mark a value as sensitive (case-insensitive).
-const SENSITIVE: &[&str] = &["pass", "pwd", "secret", "token", "key", "cred"];
+const SENSITIVE: &[&str] = &["pass", "pwd", "secret", "token", "key", "cred", "auth"];
 const MASK: &str = "***";
 
 fn is_sensitive(key: &str) -> bool {
@@ -50,6 +50,12 @@ fn redact_str(s: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+/// Return a copy of a URL, or any string, with credentials in it
+/// masked, so it is safe to log.
+pub(crate) fn redact_url(s: &str) -> String {
+    redact_str(s)
 }
 
 /// Return a copy of `value` that is safe to log.
@@ -117,11 +123,35 @@ mod tests {
         assert_eq!(
             out,
             json!({
-                "auth": { "user": "u", "password": "***" },
+                "auth": "***",
                 "servers": [{ "host": "a", "token": "***" }, { "host": "b" }],
                 "credentials": "***",
             })
         );
+    }
+
+    #[test]
+    fn masks_authorization_headers() {
+        let out = redact(&json!({
+            "headers": { "Authorization": "Bearer abc", "Accept": "text/plain" },
+            "proxyAuthorization": "Basic xyz",
+        }));
+        assert_eq!(
+            out,
+            json!({
+                "headers": { "Authorization": "***", "Accept": "text/plain" },
+                "proxyAuthorization": "***",
+            })
+        );
+    }
+
+    #[test]
+    fn redact_url_masks_the_password() {
+        assert_eq!(
+            redact_url("mqtt://edge:s3cret@localhost:1883"),
+            "mqtt://edge:***@localhost:1883"
+        );
+        assert_eq!(redact_url("mqtt://localhost"), "mqtt://localhost");
     }
 
     #[test]

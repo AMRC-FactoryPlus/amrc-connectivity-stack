@@ -72,8 +72,9 @@ it logs in. The rig changes only:
   README in `acs-edge/tests/fixtures/drivers/` explains this.
 - TLS, as above.
 - Whether a real OPC UA server trusts the split driver's new client
-  certificate. The mocks trust every certificate. Check this on each
-  real server when its connection moves (ACS-27).
+  certificate. The mocks trust every certificate. The built-in already
+  presented a new certificate from every new pod, so this is expected
+  to work (see ACS-27, PR 911).
 - MQTT brokers shared between connections. Each rig connection has a
   broker of its own.
 
@@ -95,7 +96,7 @@ brackets.
 ```sh
 export KUBECONFIG=<path to the dev cluster's kubeconfig>
 export ACS_DOMAIN=<the dev cluster's ACS domain>
-export RIG=<private folder>/rig/subset        # or rig/full, see "Full rig or subset"
+export RIG=<private folder>/rig/full          # or rig/subset, see "Full rig or subset"
 export EDGE_NS=<the edge cluster's namespace>
 export DIRECTORY_URL=http://directory.$ACS_DOMAIN
 export SERVICE_USERNAME=admin
@@ -109,22 +110,55 @@ The `rig` alias runs the image on your machine with the rig folder at
 
 ### Full rig or subset
 
-`make-rig` can make a rig of every source connection or of a subset
-listed in a file. Each rig Edge Agent requests 100m of CPU and 200 MiB
-of memory (the Edge Agent chart's defaults), and a cluster must have
-room for them all, plus the mocks.
+Use the full rig: one Edge Agent for every source Edge Agent and one
+connection for every source connection. The subset (a list of source
+configs in a file) is the fallback for a cluster with too little room,
+and still covers every feature `coverage.md` lists.
+
+Each rig Edge Agent's own Deployment values ask for 50m of CPU, half
+the Edge Agent chart's default, because rig agents read mocks and sit
+mostly idle, and the chart's defaults for real sites don't change. A
+request is not a limit, so an agent that needs more CPU still gets it
+when the node has it to spare. Memory stays at the chart's 200 MiB,
+except 512 MiB for the two agents with over 1,000 metrics, which used
+about 300 MiB in a local run. The first lines of `coverage.md` give
+the rig's total requests.
+
+Check the cluster has room before step 3:
 
 ```sh
 kubectl describe nodes | grep -A8 "Allocated resources"
+kubectl get nodes -o custom-columns=NAME:.metadata.name,CPU:.status.allocatable.cpu,MEMORY:.status.allocatable.memory
 kubectl top nodes
 ```
 
-Add up `cpu Requests` across nodes and subtract from the CPU the nodes
-have. Each rig Edge Agent needs 0.1 of it. If the full rig leaves less
-than 0.5 CPU spare, use the subset. Read `coverage.md` in each rig
-folder: its last table lists every feature (protocol, payload format,
-security mode, path style, odd case) and the connections that have it,
-so you can check the subset still covers everything.
+Subtract each node's `cpu` and `memory` Requests from what it has
+allocatable. The full rig needs 1,510m CPU and 7,320 MiB (Edge Agents
+1,450m and 6,424 MiB, mock pods 60m and 896 MiB). On the dev cluster
+this was written for (4 CPU, 15,993 MiB allocatable, 915m CPU and
+1,748 MiB already requested), that leaves 1,575m CPU and 6,925 MiB
+free to request, where the chart's defaults would have left 125m. The
+upgrade itself asks for almost nothing more: the central services
+request no CPU apart from InfluxDB, which is already counted, and Edge
+Agents restart one pod at a time (`Recreate`), so no extra pod waits
+beside an old one. Actual use: the dev cluster used 371m CPU and
+6,556 MiB before the rig, and the whole rig run as one local process
+used 0.6 to 1.1 CPU and 850 MiB, so expect roughly 1.5 to 2 CPU and
+11 GiB in use with the rig running.
+
+**How to tell it doesn't fit.** A pod that doesn't fit stays
+`Pending`. After steps 3 and 4, and after the upgrade:
+
+```sh
+kubectl get pods -A --field-selector=status.phase=Pending
+kubectl describe pod -n <namespace> <pod> | sed -n '/^Events:/,$p'
+```
+
+`0/1 nodes are available: 1 Insufficient cpu` (or `memory`) means the
+node is full. Then remove the full rig (step 11), set
+`RIG=<private folder>/rig/subset`, and start again at step 3. A pod
+that is `Pending` for another reason (an image it can't pull, a
+volume) shows that reason instead, and the subset won't help.
 
 ## The steps
 
@@ -139,7 +173,7 @@ build.
 | 4 | Load the built-in connections | 10 min |
 | 5 | Record the before state | 20 min |
 | 6 | Make a test build | 60 min, unattended |
-| 7 | Upgrade | 20 min, with a recording running across it |
+| 7 | The ACS-35 change, then upgrade | 30 min, with a recording running across it |
 | 8 | Record the after state and compare | 20 min |
 | 9 | The specific checks | 45 min |
 | 10 | Move each protocol back and forward | 30 min per protocol |
@@ -217,8 +251,14 @@ The rigs in the private folder are already made. To make one again,
 for example after the configs change:
 
 ```sh
-docker run --rm -v <private folder>:/p acs-rig-mocks:dev make-rig /p/rig/subset /p/configs /p/rig/udp-example.json --subset /p/rig/subset.txt --image acs-rig-mocks:amd64
+docker run --rm -v <private folder>:/p acs-rig-mocks:dev make-rig /p/rig/full /p/configs /p/rig/udp-example.json --image acs-rig-mocks:amd64 --batched <busiest MQTT config name> --pin-tag <the cluster's ACS version, e.g. v6.24.0>
 ```
+
+For the subset, use `/p/rig/subset` and add `--subset /p/rig/subset.txt`.
+`--batched` names the config shaped like the busiest production agent
+(see "The ACS-35 change" in step 7): its `$.value` topics publish
+arrays, and its Edge Agent pins its image to `--pin-tag`, as the real
+one does.
 
 Making a rig again gives new passwords, so load the connections again
 after it (step 4).
@@ -253,7 +293,8 @@ after it (step 4).
    curl -s localhost:9001/status | jq -c '.[] | {id, clients, delivered}'
    ```
 
-**If it fails.** `ErrImageNeverPulled` or `ImagePullBackOff` means the
+**If it fails.** A pod stuck in `Pending` doesn't fit: see "How to tell it
+doesn't fit" above. `ErrImageNeverPulled` or `ImagePullBackOff` means the
 image is not on the node: repeat step 2.3 on that node. A pod that
 restarts with `OOMKilled` needs more memory: the manifests ask for no
 limit, so check the node is not out of memory. A mock that logs
@@ -293,7 +334,15 @@ was edited by hand: make it again.
 
    You should see one `edge-agent-rig-...` pod per rig Edge Agent,
    `1/1 Running`. Before the upgrade they have no sidecars, because
-   every connection is built in.
+   every connection is built in. The one Edge Agent made with
+   `--batched` runs the pinned image:
+
+   ```sh
+   kubectl get helmrelease -n $EDGE_NS -o json | jq -r '.items[] | select(.spec.values.image) | [.spec.values.name, (.spec.values.image | tostring)] | @tsv'
+   ```
+
+   That should print exactly one line, that agent with
+   `{"default":{"tag":"<pin tag>"}}`.
 
 4. Check the mocks have clients:
 
@@ -320,11 +369,12 @@ was edited by hand: make it again.
 **If it fails.** `401` from the loader means the credentials are wrong
 or the variables are not exported. An Edge Agent pod in
 `CrashLoopBackOff` needs its log
-(`kubectl logs -n $EDGE_NS <pod> --previous`). One source OPC UA
-connection has a device with no addresses, and the built-in connection
-crashes the whole Edge Agent on it (`BadNothingToDo`): that agent
-crash-loops before the upgrade, which is the finding, so note it and
-carry on. A mock with `refused` above 0 is being sent the wrong
+(`kubectl logs -n $EDGE_NS <pod> --previous`). Two source OPC UA
+connections have a device with no addresses, and the built-in connection
+crashes the whole Edge Agent on it (`BadNothingToDo`): those two agents
+crash-loop before the upgrade, which is the finding, so note it and
+carry on. An Edge Agent pod stuck in `Pending` doesn't fit: see "How to
+tell it doesn't fit". A mock with `refused` above 0 is being sent the wrong
 password: run `rig load --yes` again, which reseals it.
 
 ### 5. Record the before state
@@ -405,7 +455,29 @@ tag.
    rig check record --rig /rig/rig.json --seconds 2700 --label upgrade --out /rig/upgrade.json
    ```
 
-2. Upgrade:
+2. Make the ACS-35 change on the connection shaped like the busiest
+   production one. See "The ACS-35 change" below for what this proves
+   and what to expect.
+
+   ```sh
+   rig batched --rig /rig/rig.json --connection <its id, from coverage.md: the one with mqtt:array-topics>
+   rig batched --rig /rig/rig.json --connection <the same id> --yes
+   ```
+
+   The first prints the three writes: the connection's payload format
+   to `JSON (Batched)` in its connection config, the same in its Edge
+   Agent config for the connection and every device, and the image pin
+   removed from its Edge Agent's Deployment. The second makes them. The
+   Edge Agent reloads its config at once, and its pod restarts on the
+   chart's image within a few minutes:
+
+   ```sh
+   kubectl get helmrelease -n $EDGE_NS -o json | jq -r '.items[] | select(.spec.values.image) | .spec.values.name'
+   ```
+
+   prints nothing once the pin is gone. Wait 5 minutes, then go on.
+
+3. Upgrade:
 
    ```sh
    helm repo update amrc-connectivity-stack
@@ -416,7 +488,7 @@ tag.
    your own values. The `--set` lines move every protocol even if the
    chart's default for one is still off.
 
-3. Watch the service-setup Job and find its summary line:
+4. Watch the service-setup Job and find its summary line:
 
    ```sh
    kubectl -n factory-plus get jobs
@@ -428,7 +500,7 @@ tag.
    where `<n>` is the number of rig connections plus any others on the
    cluster.
 
-4. Watch the Edge Agents restart with their sidecars:
+5. Watch the Edge Agents restart with their sidecars:
 
    ```sh
    kubectl get pods -n $EDGE_NS -l factory-plus.app=edge-agent -w
@@ -444,8 +516,54 @@ tag.
 
    Every `driver-<id>` container should be `true`.
 
-5. If step 1.1 showed different hashes, merge `acs` into `main` of the
+6. If step 1.1 showed different hashes, merge `acs` into `main` of the
    chart repository now, as the split drivers page says.
+
+#### The ACS-35 change
+
+The busiest production Edge Agent (one MQTT connection, 7 devices,
+2,721 metrics) runs a hand-built image pinned in its Deployment, and
+must move to the standard image before version 7 (ACS-35). Its devices
+read two kinds of topic: some publish one JSON object per message,
+and others publish a JSON array of `{value, timestamp}` items. The
+hand-built image handles both under `JSON`. The standard image needs
+`JSON (Batched)` for the arrays, and from version 7 (ACS-13) it also
+reads a single object under `JSON (Batched)`. So the change is the
+payload format and the pin together, and the image pin also has to go
+before the version 7 upgrade, because a split driver sidecar takes its
+image tag from the same setting and no driver image exists at the old
+tag.
+
+The rig's copy of that connection publishes arrays on its `$.value`
+topics and objects on the rest, and its Edge Agent pins the image tag
+the cluster runs. The dev cluster can't run the hand-built image, so
+before the change the rig's copy runs the standard image under
+`JSON`, which reads the objects and drops the arrays.
+
+What to look for, in the upgrade recording and in the comparison of
+step 8:
+
+- **Between the change and the upgrade**, on the version 6 image: the
+  array metrics start getting values, and the object metrics stop.
+  Every version 6 release rejects a payload that isn't an array under
+  `JSON (Batched)` ("payload must be an array" in the Edge Agent log).
+  On the rig this lasts until the upgrade. On production it would
+  last until production is upgraded, so the change must not be made
+  on production while it runs version 6. Two orders avoid that: upgrade
+  production to version 7 with `serviceSetup.config.splitDrivers.MQTT`
+  set to `null`, so its MQTT connections stay built in and the pinned
+  agent keeps its image, then make the change, then upgrade again with
+  `MQTT: true`; or release the version 7 reading of single objects as a
+  version 6 patch first.
+- **After the upgrade**, on the standard version 7 image and moved to
+  the MQTT split driver: every object metric has values again, and the
+  array metrics keep theirs. In step 8 the comparison with
+  `before.json` lists the array metrics as getting values only after
+  (a warning) and nothing as stopped. That is the proof that the
+  change gives the same data as before, plus the array data the
+  hand-built image gave and the standard image under `JSON` didn't.
+- No `ImagePullBackOff` on its `driver-` container, because the pin is
+  gone.
 
 **If it fails.** `ImagePullBackOff` on a `driver-` container means the
 edge cluster has the old charts (step 1.1) or the image is missing
@@ -478,8 +596,9 @@ the summary line names the connection on the line above it.
    - its DDATA rate rose above 3 times or fell below half (a split
      driver must not multiply the broker's load, ACS-45).
 
-   It warns when the DDATA rate rose above 1.5 times, when no birth was
-   seen, when metrics get values only after (expected for multi-device
+   It warns when the DDATA rate rose above 1.5 times (or above 3 times
+   while metrics are newly getting values, which add messages of their
+   own), when no birth was seen, when metrics get values only after (expected for multi-device
    OPC UA connections, and for the UDP device), and when there are more
    DDEATHs after.
 
@@ -611,7 +730,7 @@ test, collected on 2026-11-17.
 - an Edge Agent whose Deployment sets `values.image.default` must
   have that removed before the upgrade, or its sidecar can't pull.
 
-**OPC UA (ACS-26 PR 905 merged, ACS-27 card, no PR yet):**
+**OPC UA (ACS-26 PR 905 merged, ACS-27 PR 911):**
 
 - each security policy: the rig has None, Basic256, Basic256Sha256 and
   Aes128_Sha256, with and without a login;
@@ -620,11 +739,21 @@ test, collected on 2026-11-17.
   after the move (step 8);
 - multi-device connections: after the move every device gets values,
   where the built-in connection gave them only to the last device;
+- paths stay gone after the Manager saves a moved device (its
+  DriverDef has `metricPaths: false`), and are gone from DBIRTH;
+- a DateTime metric shows a date, where the built-in published 0;
+- an OPC UA mock stopped mid-run marks its devices offline, and they
+  rebirth when it starts again;
 - DDATA rate after the move (ACS-45): the comparison warns above 1.5
-  times the built-in rate and fails above 3 times or below half;
+  times the built-in rate and fails above 3 times or below half. The
+  golden harness measured about 2 times (2.1 DDATA/s against 1.0 for
+  113 metrics at 1 s), so expect the warning, not a failure;
+- `OPCUA: false` moves every connection back and data carries on;
 - whether each real server trusts the driver's certificate. The mocks
-  can't show this: check it on each real server when its connection
-  moves.
+  can't show this. The built-in connection already presented a new
+  self-signed certificate from every new pod (it is kept in an
+  `emptyDir`), so a server that kept working across Edge Agent
+  restarts should accept the driver's.
 
 **UDP (ACS-38 PR 907 and ACS-43 PR 904, both merged):**
 

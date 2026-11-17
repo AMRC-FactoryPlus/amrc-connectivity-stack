@@ -17,6 +17,7 @@ on:
       - 'lib/js-rx-util/**'
       - 'deploy/values.yaml'
       - 'acs-edge/tests/fixtures/drivers/samples/rest-*/**'
+      - 'acs-edge/tests/fixtures/drivers/samples/opcua/**'
       - '.github/workflows/service-setup-tests.yaml'
 
 jobs:

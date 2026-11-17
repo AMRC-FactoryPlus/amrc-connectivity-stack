@@ -35,7 +35,6 @@ import { MigrateSplitDrivers } from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
 import { FakeCDB } from "./fake-cdb.js";
-import { ready_charts } from "./fake-charts.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;
@@ -109,7 +108,7 @@ const text = s => JSON.stringify(s, null, 2) + "\n";
 async function run (cdb, settings) {
     const lines = [];
     const count = await new MigrateSplitDrivers({
-        fplus: { ConfigDB: cdb }, settings, edge_charts: ready_charts(),
+        fplus: { ConfigDB: cdb }, settings,
         log: (fmt, ...args) => lines.push(util.format(fmt, ...args)),
     }).run();
     return { count, lines };
@@ -293,7 +292,9 @@ describe("moving a site's UDP connections with the chart's defaults", () => {
     });
 });
 
-/* Change where a connection and its agent run. */
+/* Change where a connection's Edge Agent runs. The move reads it from
+ * the agent's Deployment, as the Manager does; the connection's own
+ * `topology` copy is changed to match. */
 const place = (conn, agent, topology) => configs => {
     configs[App.ConnectionConfiguration][conn].topology = topology;
     const dep = configs[Edge.App.Deployment][agent];
@@ -356,6 +357,24 @@ describe("moving UDP connections whose ports would clash on a host", () => {
         assert.equal(count.moved, 2);
         assert.equal(count.held, 1);
         assert.match(held_lines(lines)[0], new RegExp(`^Connection ${C.delim}: `));
+    });
+
+    test("an empty topology copy on the connection doesn't matter", async () => {
+        /* The Manager wrote every connection's copy empty until ACS-44,
+         * so where each agent runs comes from its Deployment. */
+        const cdb = site(configs => {
+            for (const [conn] of UDP)
+                configs[App.ConnectionConfiguration][conn].topology = {};
+        });
+        const { count } = await run(cdb, defaults);
+        assert.equal(count.moved, 3);
+        assert.equal(count.held, 0);
+    });
+
+    test("a Deployment on \"Floating\" is not pinned to a host", async () => {
+        const cdb = site(place(C.delim, A.gauge, { cluster: CLUSTER, hostname: "Floating" }));
+        const { count } = await run(cdb, defaults);
+        assert.equal(count.held, 1);
     });
 
     test("agents on one host name in different clusters don't clash", async () => {

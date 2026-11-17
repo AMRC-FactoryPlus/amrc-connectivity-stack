@@ -114,7 +114,7 @@ export class MigrateSplitDrivers {
     }
 
     async run () {
-        const count = { moved: 0, repaired: 0, unchanged: 0, failed: 0 };
+        const count = { moved: 0, repaired: 0, unchanged: 0, failed: 0, held: 0 };
 
         if (this.dry_run)
             this.log("Dry run: logging what would change, writing nothing");
@@ -167,9 +167,9 @@ export class MigrateSplitDrivers {
             }
         }
 
-        this.log("Split drivers: %d connections %s, %d repaired, %d already right, %d failed",
+        this.log("Split drivers: %d connections %s, %d repaired, %d already right, %d held back, %d failed",
             count.moved, this.dry_run ? "would move" : "moved",
-            count.repaired, count.unchanged, count.failed);
+            count.repaired, count.unchanged, count.held, count.failed);
         return count;
     }
 

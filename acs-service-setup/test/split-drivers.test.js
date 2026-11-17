@@ -15,7 +15,6 @@ import { MigrateSplitDrivers, SplitDrivers } from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
 import { FakeCDB } from "./fake-cdb.js";
-import { ready_charts } from "./fake-charts.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;
@@ -131,8 +130,8 @@ function fixture () {
     return cdb;
 }
 
-const run = (cdb, settings, edge_charts = ready_charts()) => new MigrateSplitDrivers({
-    fplus: { ConfigDB: cdb }, settings, edge_charts, log: () => {},
+const run = (cdb, settings) => new MigrateSplitDrivers({
+    fplus: { ConfigDB: cdb }, settings, log: () => {},
 }).run();
 
 const conn_entry = (cdb, uuid) =>

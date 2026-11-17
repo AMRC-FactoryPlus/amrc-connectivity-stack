@@ -14,13 +14,6 @@
  *     OPCUA:  false    # move OPC UA connections back to the Edge Agent
  *     dryRun: true     # log what would change and write nothing
  *
- * This runs as bin/split-drivers.js, after edge-helm-charts has
- * written this release's edge charts. A connection only moves to a
- * split driver when the edge clusters will run this release's images
- * (lib/edge-charts.js) and its Edge Agent's Deployment doesn't pin its
- * own image; otherwise the move waits for a later run and the log says
- * why. Moves back to the internal driver always run.
- *
  * A protocol that is not named, or is null, is left alone. The chart
  * sets `REST: true`, so REST connections move on upgrade unless a site
  * sets it to `false` or `null`; MQTT and OPC UA don't move unless a
@@ -52,15 +45,12 @@
  * names all work as ids is not written.
  */
 
-import path from "path";
-
 import {
     ServiceError, UUIDs,
     driver_id, driver_values, move_connection, move_entry,
     move_payload_format, set_driver_ids,
 } from "@amrc-factoryplus/service-client";
 
-import { EdgeCharts } from "./edge-charts.js";
 import { ACS, Edge } from "./uuids.js";
 
 const { App } = UUIDs;
@@ -101,10 +91,6 @@ export class MigrateSplitDrivers {
     constructor (opts) {
         this.cdb = opts.fplus.ConfigDB;
         this.log = opts.log ?? opts.fplus.debug.bound("split-drivers");
-        /* `check()` says whether the edge clusters will run this
-         * release's images (see edge-charts.js). Without it nothing
-         * moves to a split driver. */
-        this.edge_charts = opts.edge_charts;
 
         const settings = opts.settings ?? {};
         this.dry_run = !!settings.dryRun;
@@ -114,7 +100,7 @@ export class MigrateSplitDrivers {
     }
 
     async run () {
-        const count = { moved: 0, repaired: 0, unchanged: 0, failed: 0, held: 0 };
+        const count = { moved: 0, repaired: 0, unchanged: 0, failed: 0 };
 
         if (this.dry_run)
             this.log("Dry run: logging what would change, writing nothing");
@@ -126,15 +112,11 @@ export class MigrateSplitDrivers {
             return count;
         }
 
-        const wanted = await this.check_edge_charts();
-        if (!wanted.length) return count;
-
         const { cdb } = this;
-        this.pins = new Map();
         this.cconfs = await cdb.get_all_configs(App.ConnectionConfiguration);
         this.drivers = await cdb.get_all_configs(App.DriverDefinition);
 
-        for (const [name, to_split] of wanted) {
+        for (const [name, to_split] of this.wanted) {
             const proto = SplitDrivers[name];
             const [from, to] = to_split
                 ? [proto.internal, proto.split]
@@ -169,48 +151,10 @@ export class MigrateSplitDrivers {
             }
         }
 
-        this.log("Split drivers: %d connections %s, %d repaired, %d already right, %d held back, %d failed",
+        this.log("Split drivers: %d connections %s, %d repaired, %d already right, %d failed",
             count.moved, this.dry_run ? "would move" : "moved",
-            count.repaired, count.unchanged, count.held, count.failed);
+            count.repaired, count.unchanged, count.failed);
         return count;
-    }
-
-    /* The moves to make this run. Moves to a split driver are dropped,
-     * all of them, unless the edge clusters will run this release's
-     * images, which have the split drivers. Moves back to the internal
-     * driver always run. */
-    async check_edge_charts () {
-        const to_split = this.wanted.filter(([, s]) => s).map(([p]) => p);
-        if (!to_split.length) return this.wanted;
-
-        const charts = this.edge_charts
-            ? await this.edge_charts.check()
-            : { ready: false, reason: "no edge chart check was given" };
-        if (charts.ready) return this.wanted;
-
-        this.log("Not moving %s connections to split drivers this run, because the "
-            + "edge clusters would not get this release's images and the moved "
-            + "connections would get no data: %s. To fix, merge branch acs into "
-            + "main in the edge Helm chart repo %s; the next service-setup run "
-            + "then moves them.",
-            to_split.join(", "), charts.reason, this.edge_charts?.path ?? "");
-        return this.wanted.filter(([, s]) => !s);
-    }
-
-    /* Why an agent's Deployment would keep an older image, or undefined
-     * if it wouldn't. A tag or registry in its values overrides the
-     * chart's, for the agent or for every image. */
-    async pinned (agent) {
-        if (!agent) return;
-        if (!this.pins.has(agent)) {
-            const [deployment] = await this.cdb.get_config_with_etag(Edge.App.Deployment, agent);
-            const image = deployment?.values?.image ?? {};
-            const pins = ["default", "edgeAgent"].flatMap(k =>
-                ["registry", "tag"].filter(f => image[k]?.[f] != undefined)
-                    .map(f => `image.${k}.${f} ${image[k][f]}`));
-            this.pins.set(agent, pins.length ? pins.join(", ") : undefined);
-        }
-        return this.pins.get(agent);
     }
 
     /* Give the split driver connections of every agent their driver
@@ -281,17 +225,6 @@ export class MigrateSplitDrivers {
      * done. Its payload format is left as it is. */
     async move (conn, cconf, proto, to_split, to_def) {
         const moving = cconf.driver != (to_split ? proto.split : proto.internal);
-
-        /* A Deployment with its own image tag keeps images that may
-         * not have the split driver. */
-        const pin = moving && to_split && await this.pinned(cconf.edgeAgent);
-        if (pin) {
-            this.log("Connection %s: not moving to the split driver, because its "
-                + "Edge Agent's Deployment sets %s. Remove that from the "
-                + "Deployment's values; the next service-setup run then moves it.",
-                conn, pin);
-            return "held";
-        }
         const next = moving ? move_connection(cconf, proto, to_split) : cconf;
         const original = cconf.splitMigration?.payloadFormat;
         const format = moving
@@ -417,12 +350,7 @@ function formats (entry) {
 
 export function migrate_split_drivers (ss) {
     return new MigrateSplitDrivers({
-        fplus:          ss.fplus,
-        settings:       ss.config?.splitDrivers,
-        edge_charts:    new EdgeCharts({
-            fplus:  ss.fplus,
-            path:   ss.edge_charts_path,
-            dir:    ss.checkouts && path.join(ss.checkouts, "edge-charts-check"),
-        }),
+        fplus:      ss.fplus,
+        settings:   ss.config?.splitDrivers,
     }).run();
 }

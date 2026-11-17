@@ -14,7 +14,6 @@
   "dependencies": {
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@kubernetes/client-node": "^1.4.0",
-    "isomorphic-git": "^1.32.2",
     "tsort": "^0.0.1",
     "uuid": "^11.1.0",
     "yaml": "^2.8.2"

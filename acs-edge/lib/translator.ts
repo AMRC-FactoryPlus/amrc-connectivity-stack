@@ -366,8 +366,9 @@ export class Translator extends EventEmitter {
             connection[deviceInfo.connectionDetails],
             /* XXX These additional parameters are a hack for now to
              * make the DriverConnection work. They want refactoring
-             * later. */
-            connection.name,
+             * later. A split driver's id is its name unless the config
+             * gives it a driverId, because the name can't be an id. */
+            connection.driverId ?? connection.name,
             this.broker);
 
         this.checkPayloadFormats(connection);

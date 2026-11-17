@@ -287,6 +287,54 @@ const CASES: { [name: string]: Case } = {
             { a: j({ a: { b: { c: 7 } } }) },
         ],
     },
+    /* Path shapes whose handling the jsonpath-plus changelog says
+     * changed between 5.x and 11.x, so an upgrade shows up here. */
+    "JSON: path shapes jsonpath-plus has changed": {
+        format: "JSON",
+        tags: [
+            { Name: "slice_zero_end", type: "Int32", path: "$.arr[0:0]" },
+            { Name: "slice_step", type: "Int32", path: "$.arr[0:4:2]" },
+            { Name: "slice_neg", type: "Int32", path: "$.arr[-2:]" },
+            { Name: "union_index", type: "Int32", path: "$.arr[2,0]" },
+            { Name: "union_quoted", type: "String", path: "$['x','y']" },
+            { Name: "comma_key", type: "String", path: "$['a,b']" },
+            { Name: "dot_key", type: "String", path: "$['c.d']" },
+            { Name: "at_in_literal", type: "Double",
+                path: "$.pts[?(@.name=='a@ b')].v" },
+            { Name: "bare_at", type: "Int32", path: "$.arr[?(@>2)]" },
+            { Name: "not_equal", type: "Double",
+                path: "$.pts[?(@.name!='p1')].v" },
+            { Name: "strict_eq", type: "Double",
+                path: "$.pts[?(@.name==='p1')].v" },
+            { Name: "loose_num", type: "Double",
+                path: "$.pts[?(@.id=='2')].v" },
+            { Name: "and_or", type: "Double",
+                path: "$.pts[?(@.id>1 && @.v<100 || @.name=='p1')].v" },
+            { Name: "method", type: "Double",
+                path: "$.pts[?(@.name.startsWith('p2'))].v" },
+            { Name: "regex", type: "Double",
+                path: "$.pts[?(@.name.match(/^p3/))].v" },
+            { Name: "property", type: "String",
+                path: "$.obj[?(@property=='k2')]" },
+            { Name: "parent", type: "Double",
+                path: "$.pts[?(@parent.length==3)].v" },
+            { Name: "nested_filter", type: "String",
+                path: "$.groups[?(@.items[?(@.on==true)])].name" },
+            { Name: "typeof", type: "Double",
+                path: "$.pts[?(typeof @.v === 'string')].v" },
+            { Name: "in_array", type: "Double",
+                path: "$.pts[?(['p1','p3'].includes(@.name))].v" },
+            { Name: "root_ref", type: "Double",
+                path: "$.pts[?(@.id==@root.pick)].v" },
+            { Name: "bad_script", type: "Double",
+                path: "$.pts[?(@.name==)].v" },
+            { Name: "type_selector", type: "Double", path: "$.pts[*].v@number()" },
+            { Name: "keys", type: "String", path: "$.obj.*~" },
+        ].map(t => ({ ...t, address: t.Name })),
+        /* One address per path, so a path that throws only loses its
+         * own message. */
+        steps: [] as Step[],
+    },
     "JSON: payload already parsed or a string, as REST hands it": {
         format: "JSON",
         tags: [
@@ -572,6 +620,26 @@ const CASES: { [name: string]: Case } = {
         ],
     },
 };
+
+/* The payload for "JSON: path shapes jsonpath-plus has changed". */
+const CHANGED_SHAPES = j({
+        arr: [1, 2, 3, 4, 5],
+        x: "ex", y: "why", "a,b": "comma", "c.d": "dotted",
+        pts: [
+            { name: "p1", id: 1, v: 1.5 },
+            { name: "p2", id: 2, v: 250 },
+            { name: "p3", id: 3, v: "3.5" },
+            { name: "a@ b", id: 4, v: 4.5 },
+        ],
+        obj: { k1: "v1", k2: "v2" },
+        groups: [{ name: "g1", items: [{ on: false }] },
+            { name: "g2", items: [{ on: true }] }],
+        pick: 3,
+});
+{
+    const c = CASES["JSON: path shapes jsonpath-plus has changed"];
+    c.steps = c.tags.map(t => ({ [t.Name]: CHANGED_SHAPES }));
+}
 
 describe("Device._handleData golden output", () => {
     for (const [name, c] of Object.entries(CASES)) {

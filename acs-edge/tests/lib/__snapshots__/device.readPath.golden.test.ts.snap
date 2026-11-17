@@ -4466,6 +4466,194 @@ Array [
 ]
 `;
 
+exports[`Device._handleData golden output JSON: path shapes jsonpath-plus has changed 1`] = `
+Array [
+  Array [
+    Object {
+      "isNull": false,
+      "name": "slice_zero_end",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Int32",
+      "value": 1,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "slice_step",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Int32",
+      "value": 1,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "slice_neg",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Int32",
+      "value": 4,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "union_index",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Int32",
+      "value": 3,
+    },
+  ],
+  Array [],
+  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dot_key",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "String",
+      "value": "dotted",
+    },
+  ],
+  Array [],
+  Object {
+    "threw": "Error: jsonPath: Invalid or unexpected token: @>2",
+  },
+  Array [
+    Object {
+      "isNull": false,
+      "name": "not_equal",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 250,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "strict_eq",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 1.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "loose_num",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 250,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "and_or",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 1.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "method",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 250,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "regex",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 3.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "property",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "String",
+      "value": "v2",
+    },
+  ],
+  Array [],
+  Object {
+    "threw": "Error: jsonPath: Unexpected token '?': _$_v.items[?(_$_v.on==true",
+  },
+  Array [
+    Object {
+      "isNull": false,
+      "name": "typeof",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 3.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "in_array",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 1.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "root_ref",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 3.5,
+    },
+  ],
+  Object {
+    "threw": "Error: jsonPath: Unexpected end of input: _$_v.name==",
+  },
+  Array [
+    Object {
+      "isNull": false,
+      "name": "type_selector",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 1.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "keys",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "String",
+      "value": "k1",
+    },
+  ],
+]
+`;
+
 exports[`Device._handleData golden output JSON: payload already parsed or a string, as REST hands it 1`] = `
 Array [
   Array [

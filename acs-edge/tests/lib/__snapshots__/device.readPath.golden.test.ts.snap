@@ -250,9 +250,16 @@ Array [
       "value": 0,
     },
   ],
-  Object {
-    "threw": "RangeError: The value of \\"offset\\" is out of range. It must be >= 0 and <= 0. Received 4",
-  },
+  Array [
+    Object {
+      "isNull": false,
+      "name": "f",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Float",
+      "value": 1,
+    },
+  ],
 ]
 `;
 
@@ -922,32 +929,7 @@ Array [
     },
   ],
   Array [],
-  Array [
-    Object {
-      "isNull": false,
-      "name": "load",
-      "timestamp": "<now>",
-      "timestampNs": "<now_ns>",
-      "type": "Double",
-      "value": 0,
-    },
-    Object {
-      "isNull": false,
-      "name": "prog",
-      "timestamp": "<now>",
-      "timestampNs": "<now_ns>",
-      "type": "String",
-      "value": 0,
-    },
-    Object {
-      "isNull": false,
-      "name": "on",
-      "timestamp": "<now>",
-      "timestampNs": "<now_ns>",
-      "type": "Boolean",
-      "value": 0,
-    },
-  ],
+  Array [],
   Array [],
   Array [
     Object {
@@ -4874,9 +4856,7 @@ Array [
     },
   ],
   Array [],
-  Object {
-    "threw": "Error: jsonPath: Invalid or unexpected token: @>2",
-  },
+  Array [],
   Array [
     Object {
       "isNull": false,
@@ -4948,9 +4928,7 @@ Array [
     },
   ],
   Array [],
-  Object {
-    "threw": "Error: jsonPath: Unexpected token '?': _$_v.items[?(_$_v.on==true",
-  },
+  Array [],
   Array [
     Object {
       "isNull": false,
@@ -4981,9 +4959,7 @@ Array [
       "value": 3.5,
     },
   ],
-  Object {
-    "threw": "Error: jsonPath: Unexpected end of input: _$_v.name==",
-  },
+  Array [],
   Array [
     Object {
       "isNull": false,
@@ -5781,9 +5757,7 @@ Array [
       "value": 2,
     },
   ],
-  Object {
-    "threw": "TypeError: Cannot read properties of null (reading 'hasOwnProperty')",
-  },
+  Array [],
   Array [
     Object {
       "isNull": false,
@@ -6072,9 +6046,7 @@ Array [
     },
   ],
   Array [],
-  Object {
-    "threw": "TypeError: Cannot read properties of undefined (reading 'nodeType')",
-  },
+  Array [],
   Array [
     Object {
       "isNull": false,

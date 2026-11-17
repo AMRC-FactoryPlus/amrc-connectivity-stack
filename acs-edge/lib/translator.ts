@@ -480,8 +480,18 @@ export class Translator extends EventEmitter {
                 }
                 if (union) owners = [...union].sort((a, b) => a - b);
                 if (!owners) return;
-                for (const i of owners)
-                    this.devices[confs[i].deviceId]?._handleData(obj, parseVals, group);
+                /* One device failing must not stop the others. Device
+                 * catches a payload it can't read; this catches the
+                 * rest, which on a split driver would otherwise be
+                 * uncaught and end the process. */
+                for (const i of owners) {
+                    try {
+                        this.devices[confs[i].deviceId]?._handleData(obj, parseVals, group);
+                    }
+                    catch (e) {
+                        console.error(`Device ${confs[i].deviceId} failed to handle data: ${(e as Error)?.message ?? e}`);
+                    }
+                }
             })
 
             // What to do when device connection dies. Every device is told,

@@ -558,8 +558,9 @@ const CASES: { [name: string]: Case } = {
         ],
     },
     /* Intended change (ACS-13, for ACS-35): under JSON (Batched), a
-     * payload that is not an array is read as plain JSON, so one device
-     * can take both kinds of topic. Before, it published nothing. */
+     * JSON object is read as plain JSON, so one device can take both
+     * kinds of topic. Before, it published nothing. Other payloads that
+     * are not arrays are still dropped (ACS-51). */
     "JSON (Batched): object and array topics on one device": {
         format: "JSON (Batched)",
         tags: MIXED_TAGS,
@@ -727,13 +728,21 @@ describe("Device._handleData golden output", () => {
     }
 
     /* Under JSON (Batched), an object payload gives exactly what plain
-     * JSON gives. Invalid JSON is the one difference: JSON (Batched)
-     * skips it, and plain JSON reads every path as 0. */
+     * JSON gives. Anything else that is not an array (invalid JSON,
+     * null, a number, a string, a boolean) is dropped by JSON
+     * (Batched), where plain JSON reads a falsy one as 0 (ACS-51). */
     test("JSON (Batched) reads an object payload exactly as JSON does", () => {
+        const is_object = (p: any) => {
+            try {
+                const v = Buffer.isBuffer(p) || typeof p == "string"
+                    ? JSON.parse(p.toString()) : p;
+                return typeof v == "object" && v !== null && !Array.isArray(v);
+            }
+            catch { return false; }
+        };
         const steps = MIXED_STEPS
             .filter(st => Object.keys(st).length == 1 && "dataset" in st)
-            .filter(st => !(Buffer.isBuffer((st as Msg).dataset)
-                && (st as Msg).dataset.toString() == "{bad json"));
+            .filter(st => is_object((st as Msg).dataset));
         expect(steps.length).toBeGreaterThan(5);
         const tags = MIXED_TAGS.filter(t => t.address == "dataset");
         const batched = run({ format: "JSON (Batched)", tags, steps });

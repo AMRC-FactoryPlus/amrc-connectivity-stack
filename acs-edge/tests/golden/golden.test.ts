@@ -136,6 +136,25 @@ describe("Golden-output harness", () => {
         });
     });
 
+    /* A connection named after a web address can't use its name as
+     * its driver id, because the driver broker drops a dotted id. The
+     * move gives it a driverId, and the driver runs under that. */
+    describe.each(of_protocol("REST").slice(0, 1))("dotted connection name %s", (name, fixture) => {
+        it("the reference REST driver matches built-in REST", async () => {
+            if (!reference_ready())
+                throw new Error("The reference REST driver needs lib/js-edge-driver's "
+                    + "dependencies: run `npm ci` in lib/js-edge-driver");
+            const connection_name = "api.example.org";
+            const r = await golden({ a: fixture }, {
+                a: { connection_name },
+                b: { connection_name, driver: rest_reference() },
+            });
+            show(`${name} dotted name`, r);
+            expect(r.comparison.values).toBeGreaterThan(0);
+            expect(explain(r)).toBe("");
+        });
+    });
+
     describe.each(of_protocol("REST").slice(0, 1))("in-process driver %s", (name, fixture) => {
         it("an in-process REST driver matches built-in REST", async () => {
             const r = await golden({ a: fixture }, { b: { driver: inproc_rest() } });

@@ -13,11 +13,11 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  move_connection, move_entry, move_payload_format,
+  move_connection, move_entry, move_payload_format, set_driver_ids,
 } from '@amrc-factoryplus/service-client'
 
 import {
-  applyConnection, devicePayloadFormat,
+  applyConnection, deploymentDrivers, devicePayloadFormat,
 } from '../src/utils/edgeAgentConfigUpdater.js'
 
 /* The DriverDefs, as acs-service-setup/dumps/edge.yaml has them. The
@@ -147,5 +147,39 @@ describe('applyConnection', () => {
   it('gives devices the default format when the connection has none', () => {
     expect(devicePayloadFormat({})).toBe('Defined by Protocol')
     expect(devicePayloadFormat({ source: { payloadFormat: 'JSON' } })).toBe('JSON')
+  })
+})
+
+describe('deploymentDrivers', () => {
+  const split = PROTOCOLS[2].split
+  const internal = PROTOCOLS[2].internal
+  const conn = (uuid, name, driver) => ({
+    uuid, name, configuration: { config: {}, driver: driver.def },
+  })
+  const connections = [
+    conn('1a2b3c4d-0000-4000-8000-000000000001', 'web.example.org', split),
+    conn('2a2b3c4d-0000-4000-8000-000000000002', 'plc-1', split),
+    conn('3a2b3c4d-0000-4000-8000-000000000003', 'api.example.org', internal),
+  ]
+  /* The entries as updateEdgeAgentConfig saves them. */
+  const entries = () => set_driver_ids(connections.map(c => ({
+    ...applyConnection(null, c), devices: [{ deviceId: 'd' }],
+  })))
+
+  it('keys each split driver by its driver id', () => {
+    expect(deploymentDrivers(entries(), connections)).toEqual({
+      'web-example-org-1a2b3c4d': { image: split.def.image },
+      'plc-1': { image: split.def.image },
+    })
+  })
+
+  it('gives the config the same ids, and none to built-in connections', () => {
+    expect(entries().map(e => e.driverId))
+      .toEqual(['web-example-org-1a2b3c4d', undefined, undefined])
+  })
+
+  it('keeps the name a connection is shown with', () => {
+    expect(entries().map(e => e.name))
+      .toEqual(['web.example.org', 'plc-1', 'api.example.org'])
   })
 })

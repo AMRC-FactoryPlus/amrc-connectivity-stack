@@ -15,13 +15,16 @@
  *     dryRun: true     # log what would change and write nothing
  *
  * A protocol that is not named, or is null, is left alone. The chart
- * sets `REST: true`, `MQTT: true` and `UDP: true`, so REST, MQTT and
- * UDP connections move on upgrade unless a site sets them to `false`
- * or `null`; OPC UA doesn't move unless a site asks. For each
- * connection of a named protocol this rewrites:
+ * sets `REST: true`, `MQTT: true`, `OPCUA: true` and `UDP: true`, so
+ * those connections move on upgrade unless a site sets them to
+ * `false` or `null`. For each connection of a named protocol this
+ * rewrites:
  *
  *  - its Edge Agent config entry: `connType`, the details key and,
- *    where the protocol needs it, the payload format;
+ *    where the protocol needs it, the payload format, and its metric
+ *    paths where the split DriverDef has `metricPaths: false` (OPC
+ *    UA's built-in connection never read them; the driver's data
+ *    would be read through them);
  *  - `values.drivers.<id>` in its Edge Agent Deployment, so the
  *    sidecar and its password are rendered, or removed on the way
  *    back. The id is the connection's driver id, which is its name

@@ -14,6 +14,9 @@ export interface DeviceOpts {
     speed:  number,
     /* The connection entry the run uses, if not the fixture's. */
     entry?: any,
+    /* Keep the connection's security settings and credentials, where
+     * the device can check them, instead of turning security off. */
+    secure?: boolean,
 }
 
 /* A fake device replays a fixture's device input to whichever
@@ -44,9 +47,14 @@ export interface FakeDevice {
     delivered: number,
 
     /* The distinct credentials the connection sent, where the device
-     * can see them (the HTTP stub's Authorization headers, and what the
-     * MQTT broker's clients connected with). */
+     * can see them (the HTTP stub's Authorization headers, what the
+     * MQTT broker's clients connected with, and the OPC UA server's
+     * logins when secure). */
     credentials?: Set<string>,
+
+    /* Values written to the device by the connection, in order, where
+     * the device can see them. */
+    writes?: string[],
 }
 
 export type DeviceFactory = (fixture: Fixture, opts: DeviceOpts) => FakeDevice;

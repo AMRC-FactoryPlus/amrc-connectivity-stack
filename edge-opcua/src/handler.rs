@@ -505,4 +505,19 @@ mod tests {
             ]
         );
     }
+
+    /// A device with nothing to read adds no subscription, so the
+    /// server is never asked to monitor an empty list (BadNothingToDo,
+    /// which crashed the built-in connection's agent).
+    #[test]
+    fn devices_with_nothing_to_read_add_no_subscription() {
+        let groups = [group("Empty", 1000, &[]), group("Bad", 500, &["bad"])];
+        assert!(plan(&[], &groups).is_empty());
+        assert!(plan(&[a("bad")], &groups).is_empty());
+        let p = plan(
+            &[a("ns=2;s=A")],
+            &[group("A", 1000, &["ns=2;s=A"]), groups[0].clone()],
+        );
+        assert_eq!(p.len(), 1);
+    }
 }

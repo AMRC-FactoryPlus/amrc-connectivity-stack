@@ -22,19 +22,27 @@ Agent with a REST connection restarts once or twice in the minutes after
 the upgrade, so its REST devices have no data for that time. New REST
 connections in the Manager use the split driver, under the name "REST".
 
-- **Check your edge charts first.** If your site has committed its own
-  changes to `main` in the `shared/helm` repository, the upgrade doesn't
-  update `main`, and the moved connections get no data until it does,
-  because the old charts ask for an `edge-rest` image that doesn't
-  exist. Merge the `acs` branch into `main` as part of the upgrade, or
-  set `serviceSetup.config.splitDrivers.REST: null` until you have.
+- **The move waits if your edge clusters wouldn't get the new images.**
+  If your site has committed its own changes to `main` in the
+  `shared/helm` repository and not merged this release's `acs` branch,
+  or an Edge Agent's Deployment pins its own image tag or registry, the
+  connections affected stay on the built-in REST connection and the
+  service-setup log says why, in a line starting `Not moving` or naming
+  each connection. Merge `acs` into `main`, or remove the pin, and the
+  next upgrade moves them.
+- **One case it can't see.** An edge cluster that can't fetch from the
+  central git server keeps its old charts, but its Edge Agent may still
+  load the moved config, and then its REST devices get no data until
+  the edge cluster can fetch again. Check every edge cluster is syncing
+  before you upgrade.
 - **What you may notice.** A failing endpoint is logged once rather than
   on every poll, devices go offline only when every endpoint on the
   connection has failed, requests time out after 25 seconds, page
   counters in addresses work, and a write posts the value alone as JSON.
-- **To check it worked,** find the `Split drivers:` line in the
-  service-setup Job's log, and check that each Edge Agent pod with REST
-  connections has a running `driver-<name>` container.
+- **To check it worked,** find the `Split drivers:` line in the log of
+  the service-setup Job's `split-drivers` container, and check that
+  each Edge Agent pod with REST connections has a running
+  `driver-<name>` container.
 - **To move back,** set `serviceSetup.config.splitDrivers.REST: false`
   and upgrade again. Every connection's config returns to exactly what
   it was.

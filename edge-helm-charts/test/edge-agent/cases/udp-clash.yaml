@@ -1,0 +1,14 @@
+# Two drivers on one agent asking for the same UDP port.
+name: Agent-Five
+uuid: 55555555-5555-4555-8555-555555555555
+cluster: example-cluster
+directory_url: http://directory.example
+drivers:
+  robot-a:
+    image: { repository: edge-udp }
+    hostPorts: [{ protocol: UDP, port: 5000 }]
+  robot-b:
+    image: { repository: edge-udp }
+    hostPorts: [{ protocol: UDP, port: 5000 }]
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

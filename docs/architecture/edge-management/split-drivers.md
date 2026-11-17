@@ -154,14 +154,15 @@ clusters run.
    example `REST: null`) for this upgrade. Its connections then stay
    built in, and you can set it back to `true` on a later upgrade, once
    you have merged.
-4. **Check no Edge Agent pins its own image.** A sidecar's image is its
-   repository with the tag and registry from `image.default` in the
-   Edge Agent Deployment's values. An Edge Agent whose Deployment sets
-   its own `image.default.tag` or `image.default.registry` therefore
-   asks for `edge-rest` or `edge-mqtt` at that tag and registry, which
-   don't have it, and its moved devices get no data. Remove the setting
-   before you upgrade, or hold that protocol back with `null` until you
-   have.
+4. **Remove any image pin from your Edge Agents.** A sidecar's image is
+   its repository with the tag and registry from `image.default` in the
+   Edge Agent Deployment's values, so for an Edge Agent whose Deployment
+   sets its own tag or registry (under `image.default` or
+   `image.edgeAgent`) no split driver image exists. Service-setup
+   doesn't move that agent's connections: it counts them as held back
+   and logs a line for each that says `not moving to the split driver`
+   and names the setting. Remove the setting and the next upgrade moves
+   them.
 
 The service-setup Job's `edge-helm-charts` container logs a line
 starting `WARNING: branch main of shared/helm has commits of its own`
@@ -253,10 +254,11 @@ these differences:
   certificate must be signed by a well-known certificate authority, as
   with the built-in connection, so a broker with a self-signed
   certificate is still refused.
-- **More CPU in the Edge Agent pod.** Each message now crosses the
-  pod's internal broker, which costs the Edge Agent more CPU per
-  message than reading the broker itself did, and the driver container
-  adds a little more. See "CPU" below.
+- **CPU moves between containers.** Each message now crosses the pod's
+  internal broker, and the driver container uses a little CPU of its
+  own. The Edge Agent uses less than it did with the built-in
+  connection, so the pod as a whole uses about the same or less. See
+  "CPU" below.
 - **One more container per connection.** Each MQTT connection runs in
   its own `edge-mqtt` container in the Edge Agent's pod.
 
@@ -269,17 +271,17 @@ from a separate broker at 123, 370 and 1,232 messages a second.
 
 | Messages a second | Edge Agent, built-in | Edge Agent, split | `edge-mqtt` |
 |---|---|---|---|
-| 123 | 9 to 10% of a core | 21 to 24% | 2% |
-| 370 | 20 to 22% | 25 to 32% | 3 to 4% |
-| 1,232 | 37 to 39% | 39 to 40% | 4% |
+| 123 | 9 to 10% of a core | 6% | 1% |
+| 370 | 20 to 22% | 14% | 1 to 2% |
+| 1,232 | 37 to 39% | 25% | 2% |
 
 `edge-mqtt` uses about 5 MB of memory, whatever the number of metrics.
-No message was lost or reordered. Most of the Edge Agent's extra CPU is
-a fixed cost, not a cost per message: a connection with no poll
-interval, which is every MQTT connection, makes the Edge Agent ask the
-driver for a poll every millisecond for each device, and an MQTT driver
-has nothing to poll. Without those polls the split Edge Agent used 6%,
-14% and 25% at the same rates, less than the built-in connection.
+No message was lost or reordered. Before version 7 the Edge Agent ran
+each device's poll timer every millisecond when the connection had no
+poll interval, which is every MQTT connection, and with a split driver
+each tick sent the driver a poll it had nothing to do with. That more
+than doubled the Edge Agent's CPU at 123 messages a second (21 to 24%).
+A device with no poll interval now has no poll timer.
 
 ## What changes for a UDP connection
 

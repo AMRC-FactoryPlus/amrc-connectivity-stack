@@ -1,0 +1,500 @@
+{
+  "fa8b429c-de3e-11ef-87fd-6382f0eac944": {
+    "cccccccc-0000-4000-8000-000000000001": {
+      "driver": "5ede3d8d-7a45-47e4-9ee3-c4be844e40b2",
+      "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+      "config": {
+        "baseURL": "https://api.example.org/v1",
+        "authMethod": "Basic",
+        "username": "reader",
+        "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000001"
+      },
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "deployment": {},
+      "source": {
+        "payloadFormat": "JSON"
+      },
+      "topology": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-1"
+      },
+      "pollInt": 20000,
+      "splitMigration": {
+        "from": "c9f5c6ac-de4d-11ef-befa-ef66bbfc8926",
+        "payloadFormat": "JSON"
+      }
+    },
+    "cccccccc-0000-4000-8000-000000000002": {
+      "driver": "5ede3d8d-7a45-47e4-9ee3-c4be844e40b2",
+      "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+      "config": {
+        "baseURL": "http://weather-station.local:8080",
+        "authMethod": "None"
+      },
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "deployment": {},
+      "source": {
+        "payloadFormat": "XML"
+      },
+      "topology": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-1"
+      },
+      "pollInt": 1000,
+      "splitMigration": {
+        "from": "c9f5c6ac-de4d-11ef-befa-ef66bbfc8926",
+        "payloadFormat": "XML"
+      }
+    },
+    "cccccccc-0000-4000-8000-000000000003": {
+      "driver": "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
+      "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+      "config": {
+        "host": "plc.local",
+        "port": 502,
+        "protocol": "tcp"
+      },
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "deployment": {},
+      "source": {
+        "payloadFormat": "Buffer"
+      },
+      "topology": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-1"
+      },
+      "pollInt": 1000
+    },
+    "cccccccc-0000-4000-8000-000000000004": {
+      "driver": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+      "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
+      "config": {
+        "host": "broker.local",
+        "port": 8883,
+        "protocol": "mqtts",
+        "clientId": "",
+        "username": "line",
+        "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000002",
+        "cleanSession": true,
+        "keepAlive": 60,
+        "useSSL": true
+      },
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "deployment": {},
+      "source": {
+        "payloadFormat": "JSON"
+      },
+      "topology": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-2"
+      }
+    }
+  },
+  "aac6f843-cfee-4683-b121-6943bfdf9173": {
+    "aaaaaaaa-0000-4000-8000-00000000000a": {
+      "sparkplug": {
+        "asyncPubMode": true
+      },
+      "deviceConnections": [
+        {
+          "name": "api.example.org",
+          "uuid": "cccccccc-0000-4000-8000-000000000001",
+          "connType": "Driver",
+          "payloadFormat": "JSON",
+          "pollInt": 20000,
+          "devices": [
+            {
+              "deviceId": "Grid_Intensity",
+              "deviceType": "00000000-0000-4000-8000-000000000001",
+              "pollInt": 20000,
+              "pubInterval": 0,
+              "payloadFormat": "JSON",
+              "templates": [],
+              "tags": [
+                {
+                  "Name": "Metric_01",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_01",
+                  "path": "$.data[0].intensity.actual",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "gCO2/kWh"
+                },
+                {
+                  "Name": "Metric_02",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_01",
+                  "path": "$.data[0].intensity.forecast",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "gCO2/kWh"
+                },
+                {
+                  "Name": "Metric_03",
+                  "type": "String",
+                  "method": "GET",
+                  "address": "resource_01",
+                  "path": "$.data[0].intensity.index",
+                  "value": null,
+                  "recordToDB": true
+                },
+                {
+                  "Name": "Metric_04",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_02",
+                  "path": "$.data.generationmix[?(@.fuel == \"gas\")].perc",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "%"
+                },
+                {
+                  "Name": "Metric_05",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_02",
+                  "path": "$.data.generationmix[?(@.fuel == \"coal\")].perc",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "%"
+                },
+                {
+                  "Name": "Metric_06",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_02",
+                  "path": "$.data.generationmix[?(@.fuel == \"biomass\")].perc",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "%"
+                },
+                {
+                  "Name": "Metric_07",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_02",
+                  "path": "$.data.generationmix[?(@.fuel == \"nuclear\")].perc",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "%"
+                },
+                {
+                  "Name": "Metric_08",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_02",
+                  "path": "$.data.generationmix[?(@.fuel == \"hydro\")].perc",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "%"
+                },
+                {
+                  "Name": "Metric_09",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_03",
+                  "path": "$.data[0].data[0].intensity.actual",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "gCO2/kWh"
+                },
+                {
+                  "Name": "Metric_10",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_03",
+                  "path": "$.data[0].data[0].intensity.forecast",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "gCO2/kWh"
+                },
+                {
+                  "Name": "Metric_11",
+                  "type": "String",
+                  "method": "GET",
+                  "address": "resource_03",
+                  "path": "$.data[0].data[0].intensity.index",
+                  "value": null,
+                  "recordToDB": true
+                },
+                {
+                  "Name": "Metric_12",
+                  "type": "FloatLE",
+                  "method": "GET",
+                  "address": "resource_03",
+                  "path": "$.data[0].data[0].generationmix[?(@.fuel == \"biomass\")].perc",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "%"
+                }
+              ]
+            }
+          ],
+          "DriverDetails": {
+            "baseURL": "https://api.example.org/v1",
+            "authMethod": "Basic",
+            "username": "reader",
+            "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000001"
+          },
+          "driverId": "api-example-org-cccccccc"
+        },
+        {
+          "name": "WeatherStation",
+          "uuid": "cccccccc-0000-4000-8000-000000000002",
+          "connType": "Driver",
+          "payloadFormat": "XML",
+          "pollInt": 1000,
+          "devices": [
+            {
+              "deviceId": "Weather_1",
+              "deviceType": "00000000-0000-4000-8000-000000000001",
+              "pollInt": 1000,
+              "pubInterval": 0,
+              "payloadFormat": "XML",
+              "templates": [],
+              "tags": [
+                {
+                  "Name": "Metric_01",
+                  "type": "DoubleLE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1VelAct']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "mm/s"
+                },
+                {
+                  "Name": "Metric_02",
+                  "type": "DoubleLE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1VelCom']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "mm/s"
+                },
+                {
+                  "Name": "Metric_03",
+                  "type": "DoubleLE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1Act']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "mm"
+                },
+                {
+                  "Name": "Metric_04",
+                  "type": "DoubleLE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1Com']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "mm"
+                },
+                {
+                  "Name": "Metric_05",
+                  "type": "FloatBE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1Current']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "A"
+                },
+                {
+                  "Name": "Metric_06",
+                  "type": "FloatBE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1VelError']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "mm/s"
+                },
+                {
+                  "Name": "Metric_07",
+                  "type": "FloatBE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='x1']//*[@dataItemId='x1Follow']/text()",
+                  "value": null,
+                  "recordToDB": true,
+                  "engUnit": "mm"
+                },
+                {
+                  "Name": "Metric_08",
+                  "type": "String",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='path']//*[@dataItemId='currentJobGuid']/text()",
+                  "value": null,
+                  "recordToDB": true
+                },
+                {
+                  "Name": "Metric_09",
+                  "type": "UInt16BE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='path']//*[@dataItemId='layers']/text()",
+                  "value": null,
+                  "recordToDB": true
+                },
+                {
+                  "Name": "Metric_10",
+                  "type": "UInt32BE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='path']//*[@dataItemId='elaTime']/text()",
+                  "value": null,
+                  "recordToDB": true
+                },
+                {
+                  "Name": "Metric_11",
+                  "type": "UInt64BE",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='path']//*[@dataItemId='submissionTime']/text()",
+                  "value": null,
+                  "recordToDB": true
+                },
+                {
+                  "Name": "Metric_12",
+                  "type": "DateTime",
+                  "method": "GET",
+                  "address": "/resource_01",
+                  "path": "//*[@componentId='modelBay1']//*[@dataItemId='mb1MfgDate']/text()",
+                  "value": null,
+                  "recordToDB": true
+                }
+              ]
+            }
+          ],
+          "DriverDetails": {
+            "baseURL": "http://weather-station.local:8080",
+            "authMethod": "None"
+          }
+        },
+        {
+          "uuid": "cccccccc-0000-4000-8000-000000000003",
+          "name": "PLC-1",
+          "connType": "Driver",
+          "pollInt": 1000,
+          "payloadFormat": "Buffer",
+          "DriverDetails": {
+            "host": "plc.local",
+            "port": 502,
+            "protocol": "tcp"
+          },
+          "devices": [
+            {
+              "deviceId": "Press_1",
+              "deviceType": "00000000-0000-4000-8000-000000000001",
+              "pollInt": 1000,
+              "pubInterval": 0,
+              "payloadFormat": "Buffer",
+              "templates": [],
+              "tags": [
+                {
+                  "Name": "Count",
+                  "type": "UInt16BE",
+                  "method": "GET",
+                  "address": "1,3,0,1",
+                  "path": "",
+                  "value": null,
+                  "recordToDB": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "aaaaaaaa-0000-4000-8000-00000000000b": {
+      "sparkplug": {
+        "asyncPubMode": true
+      },
+      "deviceConnections": [
+        {
+          "uuid": "cccccccc-0000-4000-8000-000000000004",
+          "name": "LineBroker",
+          "connType": "MQTT",
+          "payloadFormat": "JSON",
+          "MQTTConnDetails": {
+            "host": "broker.local",
+            "port": 8883,
+            "protocol": "mqtts",
+            "clientId": "",
+            "username": "line",
+            "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000002",
+            "cleanSession": true,
+            "keepAlive": 60,
+            "useSSL": true
+          },
+          "devices": [
+            {
+              "deviceId": "Line_1",
+              "deviceType": "00000000-0000-4000-8000-000000000001",
+              "pubInterval": 0,
+              "payloadFormat": "JSON",
+              "templates": [],
+              "tags": [
+                {
+                  "Name": "Speed",
+                  "type": "Double",
+                  "method": "GET",
+                  "address": "line/1",
+                  "path": "$.speed",
+                  "value": null,
+                  "recordToDB": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "f2b9417a-ef7f-421f-b387-bb8183a48cdb": {
+    "aaaaaaaa-0000-4000-8000-00000000000a": {
+      "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+      "hostname": "edge-1",
+      "chart": "dddddddd-0000-4000-8000-000000000001",
+      "name": "rest-agent",
+      "values": {
+        "name": "rest-agent",
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000a",
+        "drivers": {
+          "PLC-1": {
+            "image": {
+              "repository": "edge-modbus"
+            }
+          },
+          "api-example-org-cccccccc": {
+            "image": {
+              "repository": "edge-rest"
+            }
+          },
+          "WeatherStation": {
+            "image": {
+              "repository": "edge-rest"
+            }
+          }
+        }
+      }
+    },
+    "aaaaaaaa-0000-4000-8000-00000000000b": {
+      "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+      "hostname": "edge-2",
+      "chart": "dddddddd-0000-4000-8000-000000000001",
+      "name": "line-agent",
+      "values": {
+        "name": "line-agent",
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b"
+      }
+    }
+  }
+}

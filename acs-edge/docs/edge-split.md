@@ -645,7 +645,12 @@ values in the group that belong to it.
 
 A driver SHOULD publish the values it gets together (one notification,
 the results of one poll) back to back, so that they reach the agent in
-as few socket reads as possible. Nothing else in the protocol changes.
+as few socket reads as possible, and SHOULD set `TCP_NODELAY` on its
+connection to the agent. Without it, Nagle's algorithm holds the second
+and later packets of a burst until the agent acknowledges the first,
+which on Linux can take 40 ms, so they miss the first packet's group.
+The Rust driver library's MQTT client (rumqttc 0.24) can't set it yet.
+Nothing else in the protocol changes.
 
 With 100 values changing 10 times a second on one device through a
 split driver, the agent publishes 10 DDATA a second, as the built-in

@@ -77,6 +77,8 @@ export interface CpuUse {
 
 export interface RunResult {
     label:      string,
+    /* The driver that served the connection, if not the built-in. */
+    driver?:    string,
     output:     Output,
     t0:         number,
     /* Messages or responses the fake device delivered. */
@@ -263,7 +265,7 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
         const output = decode(client.messages);
         const ddata = client.messages.filter(m => m.kind == "DDATA").length;
         result = {
-            label, output, t0: device.t0 ?? start,
+            label, driver: opts.driver?.name, output, t0: device.t0 ?? start,
             delivered: device.delivered, ddata,
             cpu,
             wall_ms, log: "", timed_out,
@@ -391,7 +393,7 @@ export function compare_runs (a: RunResult, b: RunResult, allowance?: number): G
      * too late to join its group, and an OPC UA notification can come
      * out as two DDATA. So more is a warning, and a failure only with
      * GOLDEN_STRICT_DDATA set. */
-    const more = opts.b?.driver && !opts.a?.driver ? ddata_excess(a, b) : [];
+    const more = b.driver && !a.driver ? ddata_excess(a, b) : [];
     if (more.length && process.env.GOLDEN_STRICT_DDATA) {
         comparison.ok = false;
         comparison.diffs.push(...more);

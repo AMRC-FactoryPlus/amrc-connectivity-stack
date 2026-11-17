@@ -14,10 +14,9 @@ The protocol between the Edge Agent and a split driver is described in
 The move is one way. When a site upgrades to ACS 7, service-setup moves
 every built-in REST, MQTT, OPC UA and UDP connection to its split
 driver, and there is no setting that moves a connection back, because
-the Edge Agent has nothing left to move it back to. Read [Before you
-upgrade](#before-you-upgrade) first, and [Rolling back to version
-6](#rolling-back-to-version-6) before you plan an upgrade on a site
-you can't afford to lose data from.
+the Edge Agent has nothing left to move it back to, and going back to
+version 6 is not supported. Read [Before you
+upgrade](#before-you-upgrade) first.
 
 ## Before you upgrade
 
@@ -40,25 +39,25 @@ you can't afford to lose data from.
      moved connections' devices have no data, because the version 6
      charts can't start their sidecars.
    - Or hold the move until the edge is on version 7. Set each protocol
-     your site uses to `null` for this upgrade:
+     your site uses to `hold` for this upgrade:
 
      ```yaml
      serviceSetup:
        config:
          splitDrivers:
-           REST: null
-           MQTT: null
-           OPCUA: null
-           UDP: null
+           REST: hold
+           MQTT: hold
+           OPCUA: hold
+           UDP: hold
      ```
 
      Service-setup leaves those connections on their built-in drivers,
      which the version 6 Edge Agents still run, so nothing stops. It
      logs a line each run starting `ERROR:
-     serviceSetup.config.splitDrivers.REST is null` that counts them.
+     serviceSetup.config.splitDrivers.REST is 'hold'` that counts them.
      Merge `acs` into `main` when you can. Your Edge Agents then start
      version 7, which can't run built-in connections, so the held
-     connections have no data until the next step: remove the `null`
+     connections have no data until the next step: remove the `hold`
      settings and run the upgrade again (or re-run the service-setup
      Job), which moves them. Do the two close together.
 2. **Check every edge cluster is fetching from the central git server.**
@@ -99,9 +98,7 @@ you can't afford to lose data from.
    the upgrade gives the port to one connection, and the other gets no
    data until you give it another port. Plan the new port, and how to
    point the device at it, before you upgrade.
-6. **Take a backup of the ConfigDB.** The upgrade rewrites the
-   connections' configs, and [rolling back to version
-   6](#rolling-back-to-version-6) doesn't undo that.
+6. **Take a backup of the ConfigDB**, as before any major upgrade.
 
 ## What an upgrade does
 
@@ -180,13 +177,14 @@ for each protocol, `REST`, `MQTT`, `OPCUA` and `UDP`:
 | Value | What service-setup does on every install or upgrade |
 |---|---|
 | not set, or `true` | Moves the protocol's connections to its split driver. |
-| `null` | Leaves them on the built-in driver, and logs an `ERROR:` line counting them. Only for a site whose Edge Agents still run version 6, as in step 1 of [Before you upgrade](#before-you-upgrade): a version 7 Edge Agent can't run them. |
+| `hold` | Leaves them on the built-in driver, and logs an `ERROR:` line counting them. Only for a site whose Edge Agents still run version 6, as in step 1 of [Before you upgrade](#before-you-upgrade): a version 7 Edge Agent can't run them. |
 | `false` | Refused, because there is no move back: it logs an `ERROR:` line and moves the connections as if it were not set. |
 
-The chart's default is `splitDrivers: {}`, with no protocol named. Keep
-it that way in any values you change: Helm drops a site's `null` for a
-key the chart's defaults name, so the hold would not reach
-service-setup.
+Use the string `hold`, not `null`. Version 6 took `null` to leave a
+protocol alone, and service-setup still holds a protocol it finds set
+to null, but Helm 4.0 drops a null from a site's values before
+service-setup sees it, and the connections would then move. The chart's
+default is `splitDrivers: {}`, with no protocol named.
 
 `dryRun: true` logs each change service-setup would make and writes
 nothing. Use it only on a test cluster: on a site, a connection a dry
@@ -443,11 +441,11 @@ in this order:
 
 - **A `driver-<name>` container can't pull its image.** The edge cluster
   has the old charts: merge `acs` into `main` as in [Edge
-  charts](#edge-charts). Setting the protocol to `null` now doesn't
+  charts](#edge-charts). Setting the protocol to `hold` now doesn't
   help: it holds connections that haven't moved yet, and doesn't move
   any back.
 - **The service-setup log has `ERROR: serviceSetup.config.splitDrivers.<PROTOCOL>
-  is null`, and the Edge Agent runs version 7.** The held connections
+  is 'hold'`, and the Edge Agent runs version 7.** The held connections
   can't run on it. Remove the setting and run the upgrade again.
 - **The connection has no `driver-<name>` container.** Look in the
   service-setup log for an `ERROR: Connection` line naming it. A UDP
@@ -473,21 +471,8 @@ in this order:
 
 ## Rolling back to version 6
 
-Rolling back to version 6 does not bring the connections back by itself.
-The move rewrites each connection's config in the ConfigDB, and a
-rollback doesn't undo that. A version 6 Edge Agent can run a split
-driver connection, but version 6 publishes no `edge-rest`, `edge-mqtt`,
-`edge-opcua` or `edge-udp` image, so after a rollback each moved
-connection's sidecar can't pull its image, and its Edge Agent's pod
-doesn't start, which stops every connection on that agent, not only the
-moved ones. Version 6 has no step that moves connections back either.
-
-So if you must roll back, restore the ConfigDB from the backup in step 6
-of [Before you upgrade](#before-you-upgrade) as part of the rollback.
-Each moved connection's ConnectionConfiguration also records the
-built-in driver and payload format it had (`splitMigration`), which is
-enough to put one connection back by hand. The better course is almost
-always to fix forward, as in [If a connection has no data
+Going back to version 6 after upgrading to version 7 is not supported.
+Fix forward instead, as in [If a connection has no data
 afterwards](#if-a-connection-has-no-data-afterwards).
 
 ## For developers

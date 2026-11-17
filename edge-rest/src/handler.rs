@@ -5,14 +5,17 @@
 //! The [`Handler`] that joins HTTP to the driver library.
 //!
 //! The built-in connection was always up: it had nothing to connect
-//! to, and a failed request only meant no data. This driver reports a
-//! failed request instead, as `CONN` when there was no reply and `AUTH`
-//! for `401` or `403`, so the Edge Agent marks the device dead. The
-//! library then calls [`connect`](Handler::connect) every few seconds,
-//! which asks for the URL that failed again and reports `UP` once it
-//! gets a reply that isn't `401` or `403`.
+//! to, and a failed request only meant no data. This driver does the
+//! same while any address gets replies, and reports `CONN` (no reply)
+//! or `AUTH` (`401` or `403`) only when every address is failing, as
+//! [`health`](crate::health) decides. The library then calls
+//! [`connect`](Handler::connect) every few seconds, which asks for
+//! every failing address's URL again, all at once, and reports `UP`
+//! once any of them gets a reply that isn't `401` or `403`.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -23,6 +26,7 @@ use serde_json::Value;
 
 use crate::addr::{Addr, url};
 use crate::config::Conf;
+use crate::health::{Failure, Health, Read};
 use crate::http::Client;
 use crate::read::{Outcome, is_auth_failure, read};
 
@@ -35,8 +39,10 @@ pub struct RestHandler {
 struct Rest {
     client: Client,
     handle: DriverHandle<Addr>,
-    /// The URL whose request failed, for `connect` to try again.
-    failed: Mutex<Option<String>>,
+    /// The URL each failing address last failed on, by address, for
+    /// `connect` to try again.
+    failed: Mutex<HashMap<String, String>>,
+    health: Mutex<Health>,
 }
 
 impl Rest {
@@ -46,26 +52,59 @@ impl Rest {
         if addr.raw() == "undefined" {
             return None;
         }
+        self.health
+            .lock()
+            .unwrap()
+            .polled(addr.raw(), Instant::now());
         let outcome = read(self.client.base_url(), addr, |url| self.client.get(url)).await;
-        match outcome {
-            Outcome::Data(body) => Some(body),
-            Outcome::NoData => None,
+
+        if !matches!(outcome, Outcome::Auth { .. } | Outcome::Conn { .. }) {
+            self.failed.lock().unwrap().remove(addr.raw());
+        }
+        let (data, read, why) = match outcome {
+            Outcome::Data(body) => (Some(body), Read::Data, String::new()),
+            Outcome::Status(s) => (None, Read::Status(s), format!("HTTP {s}, no data")),
+            Outcome::NoData => (None, Read::NoData, String::new()),
             Outcome::Auth { url, status } => {
-                tracing::warn!(address = addr.raw(), status, "credentials refused");
-                self.lost(url, ConnectError::AuthFailed);
-                None
+                self.failed
+                    .lock()
+                    .unwrap()
+                    .insert(addr.raw().to_owned(), url);
+                let why = format!("HTTP {status}, credentials refused");
+                (None, Read::Failed(Failure::Auth), why)
             }
             Outcome::Conn { url, error } => {
-                tracing::warn!(address = addr.raw(), "no reply: {error}");
-                self.lost(url, ConnectError::ConnectionFailed);
-                None
+                self.failed
+                    .lock()
+                    .unwrap()
+                    .insert(addr.raw().to_owned(), url);
+                (
+                    None,
+                    Read::Failed(Failure::Conn),
+                    format!("no reply: {error}"),
+                )
             }
-        }
-    }
+        };
 
-    fn lost(&self, url: String, reason: ConnectError) {
-        *self.failed.lock().unwrap() = Some(url);
-        self.handle.disconnected(reason);
+        let verdict = self
+            .health
+            .lock()
+            .unwrap()
+            .read(addr.raw(), read, Instant::now());
+        if verdict.log && !why.is_empty() {
+            tracing::warn!(
+                address = addr.raw(),
+                "{why} (logged once until it recovers)"
+            );
+        }
+        if verdict.recovered {
+            tracing::info!(address = addr.raw(), "giving data again");
+        }
+        if let Some(reason) = verdict.lost {
+            tracing::warn!(?reason, "every address is failing");
+            self.handle.disconnected(reason);
+        }
+        data
     }
 }
 
@@ -91,7 +130,8 @@ impl Handler for RestHandler {
             rest: Arc::new(Rest {
                 client,
                 handle,
-                failed: Mutex::new(None),
+                failed: Mutex::new(HashMap::new()),
+                health: Mutex::new(Health::new(Instant::now())),
             }),
         })
     }
@@ -100,24 +140,39 @@ impl Handler for RestHandler {
         Some(Addr::parse(addr))
     }
 
-    /// Up straight away, as the built-in was, unless a request has
-    /// failed: then up once that URL gets a reply other than 401 or
-    /// 403.
+    /// Up straight away, as the built-in was, unless every address was
+    /// failing: then ask each failing address's URL again, all at once,
+    /// and come up if any gets a reply other than 401 or 403. `AUTH` if
+    /// every reply was 401 or 403, otherwise `CONN`.
     async fn connect(&mut self) -> Result<(), ConnectError> {
-        let Some(url) = self.rest.failed.lock().unwrap().clone() else {
-            return Ok(());
-        };
-        match self.rest.client.get(url).await {
-            Err(error) => {
-                tracing::debug!("still no reply: {error}");
-                Err(ConnectError::ConnectionFailed)
+        let urls: Vec<String> = self.rest.failed.lock().unwrap().values().cloned().collect();
+        if !urls.is_empty() {
+            let mut probes = tokio::task::JoinSet::new();
+            for url in urls {
+                let client = self.rest.client.clone();
+                probes.spawn(async move { client.get(url).await });
             }
-            Ok(r) if is_auth_failure(r.status) => Err(ConnectError::AuthFailed),
-            Ok(_) => {
-                *self.rest.failed.lock().unwrap() = None;
-                Ok(())
+            let mut auth = false;
+            let mut up = false;
+            while let Some(res) = probes.join_next().await {
+                match res {
+                    Ok(Ok(r)) if is_auth_failure(r.status) => auth = true,
+                    Ok(Ok(_)) => up = true,
+                    Ok(Err(error)) => tracing::debug!("still no reply: {error}"),
+                    Err(_) => {}
+                }
             }
+            if !up {
+                return Err(if auth {
+                    ConnectError::AuthFailed
+                } else {
+                    ConnectError::ConnectionFailed
+                });
+            }
+            self.rest.failed.lock().unwrap().clear();
         }
+        self.rest.health.lock().unwrap().reset(Instant::now());
+        Ok(())
     }
 
     async fn poll(&mut self, addr: &Addr) -> Option<Bytes> {

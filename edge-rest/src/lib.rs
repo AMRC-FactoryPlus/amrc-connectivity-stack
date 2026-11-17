@@ -10,14 +10,15 @@
 //!
 //! - [`addr`] parses addresses, including `${n:m}` page counters;
 //! - [`config`] reads the connection details and builds Basic auth;
-//! - [`read`] turns replies into data, `AUTH` or `CONN`, and fetches
-//!   pages;
+//! - [`read`] turns replies into data or failures, and fetches pages;
+//! - [`health`] decides when failures take the connection down;
 //! - [`http`] is the HTTP client;
 //! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait.
 
 pub mod addr;
 pub mod config;
 pub mod handler;
+pub mod health;
 pub mod http;
 pub mod read;
 

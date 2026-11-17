@@ -3,7 +3,8 @@
 // Copyright 2026 University of Sheffield
 
 //! The driver end to end: polls become GETs whose bodies come back as
-//! data, Basic auth reaches the server, `401` gives `AUTH`, no server
+//! data, Basic auth reaches the server, one failing address leaves the
+//! connection up, `401` on every address gives `AUTH` and no server
 //! gives `CONN`, both recover, and a typed write becomes a POST that is
 //! answered once the server accepts it. The fake Edge Agent is the one
 //! `rs-edge-driver` tests itself with.
@@ -222,6 +223,36 @@ async fn polls_pass_bodies_through_with_basic_auth() {
     }
 }
 
+/// Send `poll` for `topics` every 250 ms for `dur`, as the Edge Agent's
+/// timer does, and return everything the driver sent meanwhile.
+async fn poll_for(
+    agent: &mut FakeAgent,
+    topics: &str,
+    dur: std::time::Duration,
+) -> Vec<FromDriver> {
+    let mut seen = Vec::new();
+    let end = tokio::time::Instant::now() + dur;
+    while tokio::time::Instant::now() < end {
+        agent.send("poll", topics);
+        seen.extend(agent.drain(ms(250)).await);
+    }
+    seen
+}
+
+/// The statuses the driver sent, with repeats collapsed: the library
+/// sends `CONN` or `AUTH` again after each failed reconnect.
+fn statuses(events: &[FromDriver]) -> Vec<String> {
+    let mut out: Vec<String> = events
+        .iter()
+        .filter_map(|e| match e {
+            FromDriver::Status(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect();
+    out.dedup();
+    out
+}
+
 #[tokio::test]
 async fn refused_credentials_report_auth_then_recover() {
     let stub = Stub::start(|_| (401, Vec::new())).await;
@@ -233,8 +264,8 @@ async fn refused_credentials_report_auth_then_recover() {
         .await;
     agent.wait_status("UP", secs(5)).await;
 
-    agent.send("poll", "1");
-    agent.wait_status("AUTH", secs(5)).await;
+    let seen = poll_for(&mut agent, "1", secs(3)).await;
+    assert_eq!(statuses(&seen), ["AUTH"]);
 
     stub.set_route(|_| (200, b"ok".to_vec()));
     agent.wait_status("UP", secs(5)).await;
@@ -263,8 +294,8 @@ async fn no_server_reports_conn_then_recovers() {
         .await;
     agent.wait_status("UP", secs(5)).await;
 
-    agent.send("poll", "1");
-    agent.wait_status("CONN", secs(5)).await;
+    let seen = poll_for(&mut agent, "1", secs(3)).await;
+    assert_eq!(statuses(&seen), ["CONN"]);
 
     let stub = Stub::on(port, Arc::new(|_| (200, b"back".to_vec()))).await;
     assert_eq!(stub.port, port);
@@ -273,6 +304,59 @@ async fn no_server_reports_conn_then_recovers() {
     assert_eq!(
         agent.collect_data(1, secs(5)).await,
         [("1".to_owned(), Bytes::from_static(b"back"))]
+    );
+}
+
+/// One failing endpoint only loses its own data, as with the built-in:
+/// the connection stays up and the other address keeps giving data.
+/// When both fail the connection goes down, and it comes back up when
+/// the server answers again.
+#[tokio::test]
+async fn one_failing_address_leaves_the_connection_up() {
+    let stub = Stub::start(|req| match req.path.as_str() {
+        "/good" => (200, b"g".to_vec()),
+        _ => (401, Vec::new()),
+    })
+    .await;
+    let mut agent = FakeAgent::start("Rest").await;
+    let _driver = spawn_driver::<RestHandler>(config(&agent));
+
+    agent
+        .handshake(
+            serde_json::json!({"baseURL": stub.base}),
+            &[("1", "/good"), ("2", "/bad")],
+        )
+        .await;
+    agent.wait_status("UP", secs(5)).await;
+
+    let seen = poll_for(&mut agent, "1\n2", secs(3)).await;
+    assert_eq!(statuses(&seen), Vec::<String>::new());
+    let data: Vec<&str> = seen
+        .iter()
+        .filter_map(|e| match e {
+            FromDriver::Data { topic, .. } => Some(topic.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(data.len() >= 8, "{data:?}");
+    assert!(data.iter().all(|t| *t == "1"), "{data:?}");
+
+    // Now every address fails.
+    stub.set_route(|_| (401, Vec::new()));
+    let seen = poll_for(&mut agent, "1\n2", secs(3)).await;
+    assert_eq!(statuses(&seen), ["AUTH"]);
+
+    // And recovers.
+    stub.set_route(|req| match req.path.as_str() {
+        "/good" => (200, b"g".to_vec()),
+        _ => (401, Vec::new()),
+    });
+    agent.wait_status("UP", secs(5)).await;
+    let seen = poll_for(&mut agent, "1\n2", secs(2)).await;
+    assert_eq!(statuses(&seen), Vec::<String>::new());
+    assert!(
+        seen.iter()
+            .any(|e| matches!(e, FromDriver::Data { topic, .. } if topic == "1"))
     );
 }
 

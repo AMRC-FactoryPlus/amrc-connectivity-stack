@@ -7,12 +7,13 @@
 //!
 //! - A `200` reply's body goes to the Edge Agent as it is, and the agent
 //!   parses it with the device's payload format.
-//! - `401` and `403` are an authentication failure, which the driver
-//!   reports as `AUTH`.
+//! - `401` and `403` are an authentication failure.
 //! - A request that gets no reply at all (refused, DNS, TLS, a timeout or
-//!   a dropped connection) is a connection failure, reported as `CONN`.
-//! - Any other status gives no data and is logged, as the built-in
-//!   connection did.
+//!   a dropped connection) is a connection failure.
+//! - Any other status gives no data, as the built-in connection did.
+//!
+//! What a failure does to the connection's status is decided in
+//! [`health`](crate::health).
 
 use std::future::Future;
 
@@ -37,7 +38,9 @@ pub struct Reply {
 pub enum Outcome {
     /// The bytes to send to the Edge Agent.
     Data(Bytes),
-    /// Nothing to send, and nothing wrong with the connection.
+    /// A reply other than 200, 401 or 403: nothing to send.
+    Status(u16),
+    /// Nothing to send for another reason, already logged.
     NoData,
     /// The server refused the credentials. `url` is what was asked for.
     Auth { url: String, status: u16 },
@@ -66,10 +69,7 @@ where
                 url,
                 status: r.status,
             },
-            Ok(r) => {
-                tracing::warn!(address = addr.raw(), status = r.status, "GET gave no data");
-                Outcome::NoData
-            }
+            Ok(r) => Outcome::Status(r.status),
         };
     };
 
@@ -77,6 +77,7 @@ where
     // the stop number is reached or MAX_PAGES have been read. The
     // first page is always fetched, as the built-in's do-while did.
     let mut pages = Vec::new();
+    let mut end = None;
     let mut n = paging.start;
     loop {
         let url = url(base, &paging.page(n));
@@ -90,6 +91,7 @@ where
                 };
             }
             Ok(r) => {
+                end = Some(r.status);
                 tracing::debug!(
                     address = addr.raw(),
                     page = n,
@@ -110,8 +112,7 @@ where
     }
 
     if pages.is_empty() {
-        tracing::warn!(address = addr.raw(), "the first page gave no data");
-        return Outcome::NoData;
+        return end.map_or(Outcome::NoData, Outcome::Status);
     }
     match join_pages(&pages) {
         Some(body) => Outcome::Data(body),
@@ -234,7 +235,10 @@ mod tests {
                     assert_eq!((url.as_str(), status), ("http://h/x", code));
                     "auth"
                 }
-                Outcome::NoData => "none",
+                Outcome::Status(s) => {
+                    assert_eq!(s, code);
+                    "none"
+                }
                 ref o => panic!("{code}: {o:?}"),
             };
             assert_eq!(kind, want, "{code}");
@@ -314,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn a_failed_first_page_gives_no_data() {
         let f = Fake::new(|_| status(404, ""));
-        assert_eq!(f.read("http://h", "/p/${0:5}").await, Outcome::NoData);
+        assert_eq!(f.read("http://h", "/p/${0:5}").await, Outcome::Status(404));
     }
 
     #[tokio::test]

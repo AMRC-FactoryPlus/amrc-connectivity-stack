@@ -30,13 +30,25 @@ XML and so on) as it did for the built-in connection.
 Reply|What happens|Built-in
 ---|---|---
 `200`|The body is sent as data.|Same.
-`401` or `403`|No data, and the driver reports `AUTH`. The Edge Agent marks the device dead.|No data, nothing reported.
-No reply (refused, DNS, TLS, timeout)|No data, and the driver reports `CONN`.|No data, nothing reported.
-Anything else|No data, logged.|Same.
+Any other reply, including `401` and `403`|No data for that address, logged once until it recovers.|No data, logged every time.
+No reply (refused, DNS, TLS, timeout)|No data for that address, logged once until it recovers.|No data, logged every time.
 
-After `AUTH` or `CONN` the driver asks for the URL that failed every 5
-seconds and reports `UP` again once it gets any reply other than `401`
-or `403`.
+A failing address doesn't take the connection down, because a REST
+connection often has several endpoints feeding different devices. The
+driver reports `AUTH` (every failure was `401` or `403`) or `CONN`
+(otherwise) only when every address is failing and none has had a reply
+for a whole poll round. A round is the longest time between two polls
+of one address, plus a second, because each device has its own poll
+timer. Any reply other than `401` or `403`, even a `404`, shows the
+server is there. The Edge Agent then marks the devices dead.
+
+After `AUTH` or `CONN` the driver asks again for every failing
+address's URL every 5 seconds, all at once, and reports `UP` once any of
+them gets a reply other than `401` or `403`.
+
+The driver library has no way for a driver to report a failed poll on
+an address's `err` topic (it uses that only for writes), so a failing
+address is only logged.
 
 A request gives up after 25 seconds. The built-in waited for ever.
 Redirects are followed up to 21 times and gzip and deflate bodies are

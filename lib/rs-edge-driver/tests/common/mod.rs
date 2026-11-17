@@ -55,9 +55,9 @@ pub struct Stats {
     pub expired: AtomicUsize,
     /// Every topic filter the driver has subscribed to, in order.
     pub subscriptions: Mutex<Vec<String>>,
-    /// While set, the broker stops reading from the driver, as an edge
-    /// agent too busy to keep up would.
-    pub stalled: std::sync::atomic::AtomicBool,
+    /// Milliseconds to wait before each read from the driver, to play
+    /// an agent that is slower than the driver.
+    pub read_delay_ms: std::sync::atomic::AtomicU64,
 }
 
 impl Stats {
@@ -257,14 +257,16 @@ async fn serve(
             }
         };
 
-        let stalled = stats.stalled.load(Ordering::SeqCst);
-        tokio::select! {
-            _ = tokio::time::sleep(Duration::from_millis(10)), if stalled => {
-                // Nothing is read, so the keep-alive doesn't count
-                // down while stalled.
-                last_rx = Instant::now();
+        let delay = stats.read_delay_ms.load(Ordering::SeqCst);
+        let read = async {
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
             }
-            n = rd.read_buf(&mut buf), if !stalled => {
+            rd.read_buf(&mut buf).await
+        };
+
+        tokio::select! {
+            n = read => {
                 match n {
                     Ok(0) | Err(_) => break 'conn,
                     Ok(_) => last_rx = Instant::now(),

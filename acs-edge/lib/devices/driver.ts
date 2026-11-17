@@ -393,7 +393,9 @@ export class DriverConnection extends DeviceConnection {
     #msg_data (data: string, payload: Buffer) {
         const addr = this.addrs.get(data);
         //log(`Driver [${this.id}]: data ${data} ${addr}`);
-        if (addr)
+        /* The empty string is an address: the UDP connection delivers
+         * every datagram to it. */
+        if (addr !== undefined)
             this.emit("data", { [addr]: payload });
     }
 

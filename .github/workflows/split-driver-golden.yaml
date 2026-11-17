@@ -22,6 +22,7 @@ on:
     paths:
       - 'edge-mqtt/**'
       - 'edge-rest/**'
+      - 'edge-udp/**'
       - 'lib/rs-edge-driver/**'
       - 'acs-edge/lib/**'
       - 'acs-edge/tests/golden/**'
@@ -50,6 +51,8 @@ jobs:
             test_env: EDGE_MQTT_MOSQUITTO=1
           - driver: edge-rest
             protocol: REST
+          - driver: edge-udp
+            protocol: UDP
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

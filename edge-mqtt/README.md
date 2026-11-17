@@ -49,8 +49,9 @@ order the broker sent them. Messages larger than 16 MiB less 64 KiB,
 the most the driver's link to the agent carries, are dropped with a
 warning.
 
-If the agent falls behind, the driver holds at most 1000 messages for
-it (`DriverHandle::publish_wait` in the library) and then stops reading
+If the agent falls behind, the driver holds at most 16 MiB of messages
+for it (`publish_queue_bytes`, met with `DriverHandle::publish_wait`)
+and then stops reading
 from the broker until the agent catches up. The broker then holds or
 drops messages as it would for any slow client. The built-in behaves
 the same way, because a busy agent stops reading its socket.

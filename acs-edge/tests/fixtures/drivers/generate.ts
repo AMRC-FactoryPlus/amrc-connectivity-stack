@@ -60,7 +60,7 @@ function finish (dir: string, fixture: Fixture, extra: Finding[]) {
     fixture.meta.findings.push(...extra);
     fixture.meta.counts.events = fixture.events.length;
     fixture.meta.counts.bytes = fixture.events.reduce((n, e) =>
-        n + (e.type == "mqtt" ? e.payload.length
+        n + (e.type == "mqtt" || e.type == "udp" ? e.payload.length
             : e.type == "http" ? e.body.length
             : JSON.stringify(e.values).length), 0);
     write_fixture(dir, fixture);

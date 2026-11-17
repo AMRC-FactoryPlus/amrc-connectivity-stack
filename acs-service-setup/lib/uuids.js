@@ -136,6 +136,7 @@ export const ACS = {
         RESTSplit:              "5ede3d8d-7a45-47e4-9ee3-c4be844e40b2",
         MQTTSplit:              "540ae6a1-16c5-43d2-be9e-0bf0a628641e",
         OPCUASplit:             "d4d50f58-8af7-4690-8eac-9817b991eecf",
+        UDPSplit:               "877577c1-19db-4701-b5be-9a4ff21d6661",
 
         /* Stock in-cluster drivers */
         Bacnet:                 "bdc64178-de4c-11ef-b15e-3711aef7cf9b",

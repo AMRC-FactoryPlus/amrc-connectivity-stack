@@ -34,6 +34,7 @@ export class HttpDevice implements FakeDevice {
     counts:     Map<string, number> = new Map()
     polls:      number
     delivered = 0
+    credentials: Set<string> = new Set()
     t0?:        number
     #done!:     () => void
     #finished:  Promise<void>
@@ -64,11 +65,14 @@ export class HttpDevice implements FakeDevice {
         this.base = `http://127.0.0.1:${port}${PREFIX}`;
     }
 
+    /* A connection already moved to a split driver has its details
+     * under DriverDetails. */
     connection (conn: any) {
+        const key = conn.connType == "Driver" ? "DriverDetails" : "RESTConnDetails";
         return {
             ...conn,
-            RESTConnDetails: {
-                ...conn.RESTConnDetails,
+            [key]: {
+                ...conn[key],
                 baseURL: this.base,
             },
         };
@@ -90,6 +94,9 @@ export class HttpDevice implements FakeDevice {
             res.writeHead(404).end();
             return;
         }
+
+        if (req.headers.authorization)
+            this.credentials.add(req.headers.authorization);
 
         const n = this.counts.get(path) ?? 0;
         this.counts.set(path, n + 1);

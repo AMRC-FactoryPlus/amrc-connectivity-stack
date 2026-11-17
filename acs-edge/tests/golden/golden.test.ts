@@ -9,6 +9,8 @@ import dgram from "dgram";
 import fs from "fs";
 import path from "path";
 
+import * as UUIDs from "../../lib/uuids.js";
+
 import { Fixture, read_fixture } from "../fixtures/drivers/fixture.js";
 import { Kinds } from "./devices/index.js";
 import { UdpDevice } from "./devices/udp.js";
@@ -52,6 +54,27 @@ const ONE_EACH = RUNNABLE.filter(([, f], i) =>
  * Without it the reference REST driver runs against REST fixtures. */
 const DRIVER = env_driver();
 const DRIVER_PROTOCOL = DRIVER ? process.env.GOLDEN_PROTOCOL ?? "REST" : "REST";
+
+/* The site service-setup's REST move test starts from, and the configs
+ * the move leaves. Each case is a REST connection on the site's agent:
+ * [name, sample, entry before, entry after]. */
+const REST_MOVE = (() => {
+    const dir = path.join(__dirname, "../../../acs-service-setup/test/rest-move");
+    const read = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+    const site = read("site.json");
+    const moved = read("moved.json");
+    const agent_configs = (configs: any) =>
+        Object.values(configs[UUIDs.App.AgentConfig]) as any[];
+    const find = (configs: any, uuid: string) => agent_configs(configs)
+        .flatMap(c => c.deviceConnections)
+        .find((e: any) => e.uuid == uuid);
+    const cases = Object.entries(site.samples as { [uuid: string]: string })
+        .map(([uuid, sample]): [string, string, any, any] => {
+            const before = find(site.configs, uuid);
+            return [before.name, sample, before, find(moved, uuid)];
+        });
+    return { cases, secrets: site.secrets as { [k: string]: string } };
+})();
 
 function show (name: string, r: GoldenResult) {
     process.stdout.write(`\n[${name}] ${r.summary}\n`);
@@ -154,6 +177,43 @@ describe("Golden-output harness", () => {
             expect(explain(r)).toBe("");
         });
     });
+
+    /* The site acs-service-setup/test/rest-move.test.js moves with the
+     * chart's defaults: the built-in REST connections as the site had
+     * them, against the Edge Agent config entries service-setup left.
+     * That test checks the move gives exactly moved.json, so this runs
+     * what an upgrade writes, not a copy of the move. */
+    describe.each(DRIVER_PROTOCOL == "REST" ? REST_MOVE.cases : [])(
+        "split driver after service-setup's move %s",
+        (name, sample, before, after) => {
+            const driver = DRIVER ?? rest_reference();
+            it(`${driver.name} matches built-in REST`, async () => {
+                if (!DRIVER && !reference_ready())
+                    throw new Error("The reference REST driver needs lib/js-edge-driver's "
+                        + "dependencies: run `npm ci` in lib/js-edge-driver");
+                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
+                const fixture = truncate(read_fixture(path.join(SAMPLES, sample)), cap);
+                const { secrets } = REST_MOVE;
+                const r = await golden({ a: fixture }, {
+                    a: { entry: before, secrets },
+                    b: { entry: after, secrets, driver },
+                });
+                show(`${name} after the move`, r);
+                expect(after.connType).toBe("Driver");
+                expect(r.comparison.values).toBeGreaterThan(0);
+                expect(explain(r)).toBe("");
+
+                /* The driver sends the credentials the built-in did, with
+                 * the secret filled in from its placeholder. */
+                const details = before.RESTConnDetails;
+                const expected = details.authMethod == "Basic"
+                    ? ["Basic " + Buffer.from(
+                        `${details.username}:${secrets[details.password]}`).toString("base64")]
+                    : [];
+                expect(r.a.credentials).toEqual(expected);
+                expect(r.b.credentials).toEqual(expected);
+            });
+        });
 
     describe.each(of_protocol("REST").slice(0, 1))("in-process driver %s", (name, fixture) => {
         it("an in-process REST driver matches built-in REST", async () => {

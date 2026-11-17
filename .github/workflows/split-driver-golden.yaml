@@ -25,6 +25,8 @@ on:
       - 'acs-edge/package.json'
       - 'acs-edge/package-lock.json'
       - 'acs-service-setup/lib/split-drivers.js'
+      # The site the REST move test moves, which the harness replays.
+      - 'acs-service-setup/test/rest-move/**'
       - 'lib/js-service-client/**'
       - '.github/workflows/split-driver-golden.yaml'
 
@@ -95,3 +97,5 @@ jobs:
         run: |
           npx jest --ci tests/golden -t "split driver" 2>&1 | tee golden.log
           grep -q "matches built-in" golden.log
+          # REST also replays what service-setup's move leaves.
+          if [ "$GOLDEN_PROTOCOL" = REST ]; then grep -q "after the move" golden.log; fi

@@ -32,8 +32,16 @@ export interface RunOpts {
     /* Leave out for the built-in connection. With a driver, the
      * connection is switched to `Driver` and this driver serves it. */
     driver?:    DriverSpec,
+    /* The connection entry to run, if not the fixture's. It must have
+     * the fixture's devices. An entry that is already `Driver`, as
+     * service-setup left it, is run as it is; any other is moved to
+     * the split driver when there is a driver. */
+    entry?:     any,
     /* The connection's name, if not the fixture's. */
     connection_name?: string,
+    /* Secrets for the agent to fill `__FPSI__` placeholders from, as
+     * the chart mounts them, keyed by placeholder. */
+    secrets?:   { [placeholder: string]: string },
     /* Give up after this long. */
     timeout_ms?: number,
 }
@@ -66,6 +74,8 @@ export interface RunResult {
     busy:       number,
     /* What the agent and driver printed, for a failure report. */
     log:        string,
+    /* The credentials the device saw, sorted. */
+    credentials: string[],
     timed_out:  boolean,
 }
 
@@ -127,6 +137,8 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
     const device = make_device(fixture, { speed });
     const held = hold_console();
     const pwdir = fs.mkdtempSync(path.join(os.tmpdir(), "golden-"));
+    const secrets = fs.mkdtempSync(path.join(os.tmpdir(), "golden-secrets-"));
+    const saved_secrets_path = process.env.SECRETS_PATH;
     let translator: Translator | undefined;
     let driver: RunningDriver | undefined;
     let timed_out = false;
@@ -135,11 +147,18 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
 
     try {
         await device.start();
-        let entry = scale(device.connection(fixture.connection), speed);
+        let entry = scale(device.connection(opts.entry ?? fixture.connection), speed);
         if (opts.connection_name)
             entry.name = opts.connection_name;
-        if (opts.driver)
+        if (opts.driver && entry.connType != "Driver")
             entry = to_split(entry, fixture.meta.protocol);
+        if (!opts.driver && entry.connType == "Driver")
+            throw new Error("A Driver connection needs a driver to run it");
+        if (opts.secrets) {
+            for (const [name, value] of Object.entries(opts.secrets))
+                fs.writeFileSync(path.join(secrets, name), value);
+            process.env.SECRETS_PATH = secrets;
+        }
         const config = { deviceConnections: [entry] };
 
         /* Port 0: the broker takes whatever port is free, and the
@@ -216,6 +235,7 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
             delivered: device.delivered, ddata,
             cpu,
             wall_ms, log: "", timed_out,
+            credentials: [...device.credentials ?? []].sort(),
             busy: device.t0 ? cpu.agent_us / 1000 / Math.max(1, end - device.t0) : 0,
         };
         return result;
@@ -232,7 +252,12 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
         /* Let the agent's closing messages and timers drain. */
         await sleep(50);
         held.restore();
+        if (opts.secrets) {
+            if (saved_secrets_path === undefined) delete process.env.SECRETS_PATH;
+            else process.env.SECRETS_PATH = saved_secrets_path;
+        }
         fs.rmSync(pwdir, { recursive: true, force: true });
+        fs.rmSync(secrets, { recursive: true, force: true });
         const log = [...held.lines, ...(driver ? [driver.output()] : [])].join("\n");
         if (result) result.log = log;
         if (failed) failed.message += `\n\nAgent and driver output:\n${log}`;

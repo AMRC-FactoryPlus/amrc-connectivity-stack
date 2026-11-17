@@ -504,6 +504,64 @@ describe("summaries", () => {
         expect(ds.ddata_metrics).toBe(3);
     });
 
+    test("a late DBIRTH gives the same counts as an early one", () => {
+        const d = dev.deviceId;
+        const data = [];
+        for (let t = 1000; t < 300_000; t += 1000)
+            data.push(msg("DDATA", t, [{ alias: 1, type: "Float", value: t % 7000 }], d));
+        const birth = (at: number) =>
+            msg("DBIRTH", at, [{ name: read.Name, alias: 1, type: "Float", value: 0 }], d);
+        const early = summarise(rig, "early", 0, 300_000,
+            new Map([["N", [birth(0), ...data]]]));
+        const late = summarise(rig, "late", 0, 300_000,
+            new Map([["N", [...data.filter(m => m.at < 200_000), birth(200_000),
+                ...data.filter(m => m.at >= 200_000)]]]));
+        const e = early.devices[`N/${d}`], l = late.devices[`N/${d}`];
+        expect(l.metrics[read.Name].values).toBe(e.metrics[read.Name].values);
+        expect(l.ddata).toBe(e.ddata);
+        expect(l.unresolved).toBe(0);
+        expect(compare_summaries(early, late)).toEqual([]);
+    });
+
+    test("the same values in fewer DDATA don't fail", () => {
+        const d = dev.deviceId;
+        const birth = msg("DBIRTH", 0, [1, 2, 3, 4].map(i =>
+            ({ name: i == 1 ? read.Name : `M${i}`, alias: i, type: "Float", value: 0 })), d);
+        const one = [birth], all = [birth];
+        for (let t = 1000; t < 60_000; t += 1000) {
+            for (const i of [1, 2, 3, 4])
+                one.push(msg("DDATA", t, [{ alias: i, type: "Float", value: t }], d));
+            all.push(msg("DDATA", t, [1, 2, 3, 4].map(i => ({ alias: i, type: "Float", value: t })), d));
+        }
+        const before = summarise(rig, "before", 0, 60_000, new Map([["N", one]]));
+        const after = summarise(rig, "after", 0, 60_000, new Map([["N", all]]));
+        expect(after.devices[`N/${d}`].ddata_per_s / before.devices[`N/${d}`].ddata_per_s)
+            .toBeCloseTo(0.25);
+        expect(compare_summaries(before, after)).toEqual([]);
+        /* A real slowdown still fails. */
+        const slow = summarise(rig, "slow", 0, 60_000,
+            new Map([["N", all.filter(m => m.at % 4000 == 0 || m.kind == "DBIRTH")]]));
+        expect(compare_summaries(before, slow).some(p => p.level == "FAIL"
+            && /values per second fell/.test(p.what))).toBe(true);
+    });
+
+    test("one device carrying a starved connection's values is expected to drop", () => {
+        const key = `N/${dev.deviceId}`;
+        const before = recording("Float", 250), after = recording("Float", 1000);
+        const other = "N/Other";
+        before.devices[other] = { ...before.devices[key], device: "Other",
+            ddata: 0, ddata_metrics: 0, metrics: { [read.Name]: { type: "Float", values: 0, distinct: 0 } } };
+        after.devices[other] = { ...after.devices[key], device: "Other",
+            ddata_metrics: 27, metrics: { [read.Name]: { type: "Float", values: 27, distinct: 10 } } };
+        const ps = compare_summaries(before, after).filter(p => p.device == key);
+        expect(ps.map(p => p.level)).toEqual(["EXPECTED"]);
+        expect(ps[0].what).toContain(Expected.shared);
+        /* Without the starved neighbour it is a real drop. */
+        delete before.devices[other];
+        delete after.devices[other];
+        expect(compare_summaries(before, after).some(p => p.level == "FAIL")).toBe(true);
+    });
+
     test("metrics left as aliases are skipped, not failed", () => {
         const a = recording("Float", 1000), b = recording("Float", 1000);
         const d = b.devices[`N/${dev.deviceId}`];

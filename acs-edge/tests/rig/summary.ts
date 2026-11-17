@@ -28,7 +28,9 @@ export const Limits = {
      * hundreds of times more. */
     rate_warn:  1.5,
     rate_fail:  3,
-    /* Below this it fails: data has slowed down. */
+    /* Metric values per second after / before. Below this it fails:
+     * data has slowed down. It is values, not DDATA, because grouping
+     * sends the same values in fewer messages. */
     rate_down:  0.5,
 };
 
@@ -194,8 +196,10 @@ function resolve_aliases (data: Map<string, Metric[]>, id: string,
 
 /* Metrics per DDATA message, or undefined if not known. */
 function per_ddata (d?: DeviceSummary) {
-    if (!d || d.ddata_metrics == undefined || !d.ddata) return;
-    return d.ddata_metrics / d.ddata;
+    if (!d || !d.ddata) return;
+    const n = d.ddata_metrics
+        ?? Object.values(d.metrics).reduce((t, m) => t + m.values, 0);
+    return n / d.ddata;
 }
 
 /* What a device's summary says, in one line. */
@@ -238,13 +242,29 @@ export interface Problem {
  *    outside the cluster could reach the built-in UDP connection;
  *  - ISA-95 hierarchy metrics added to a device that had none, which
  *    the placement step puts at the organisation, with the
- *    Device_Information UUIDs if it had no Device_Information. */
+ *    Device_Information UUIDs if it had no Device_Information;
+ *  - on a connection whose other devices the built-in starved, the
+ *    device that did get values getting fewer. The built-in OPC UA
+ *    connection put every device's values into one device, so that
+ *    device sent the whole connection's values; after the move each
+ *    device gets its own. It counts as this only if the connection's
+ *    values per second held up. */
 export const Expected = {
     starved:    "now publishing: the built-in connection gave it no values",
     datetime:   "DateTime metrics now get values",
     udp:        "UDP now reachable from outside the cluster",
     isa95:      "ISA-95 hierarchy metrics added at the organisation",
+    shared:     "fewer values: the built-in gave it its starved neighbours' values too",
 };
+
+/* Metric values a device published per second, counting values known
+ * only by alias. Older summaries have no `ddata_metrics`, but keep
+ * alias values in `metrics`. */
+function values_per_s (d: DeviceSummary, seconds: number) {
+    const n = d.ddata_metrics
+        ?? Object.values(d.metrics).reduce((t, m) => t + m.values, 0);
+    return n / Math.max(seconds, 1e-3);
+}
 
 const ISA95 = /^Device_Information\/ISA95_Hierarchy\//;
 /* A device with no Device_Information object gains its UUID tags with
@@ -264,6 +284,22 @@ function named (d: DeviceSummary) {
 export function compare_summaries (a: Summary, b: Summary): Problem[] {
     const out: Problem[] = [];
     const keys = new Set([...Object.keys(a.devices), ...Object.keys(b.devices)]);
+
+    /* Per connection: whether the built-in starved any device on it,
+     * and its values per second before and after. */
+    const conns = new Map<string, { starved: boolean, before: number, after: number }>();
+    for (const key of keys) {
+        const x = a.devices[key], y = b.devices[key];
+        if (!x || !y) continue;
+        const ck = `${x.node}/${x.connection}`;
+        const c = conns.get(ck) ?? { starved: false, before: 0, after: 0 };
+        const got = (d: DeviceSummary) => d.read.some(n => (d.metrics[n]?.values ?? 0) > 0);
+        if (!got(x) && got(y)) c.starved = true;
+        c.before += values_per_s(x, a.seconds);
+        c.after += values_per_s(y, b.seconds);
+        conns.set(ck, c);
+    }
+
     for (const key of [...keys].sort()) {
         const x = a.devices[key], y = b.devices[key];
         const p = (level: Problem["level"], what: string) =>
@@ -337,8 +373,15 @@ export function compare_summaries (a: Summary, b: Summary): Problem[] {
                 p("WARN", `DDATA rate ${rates}, with ${started.length} metrics newly getting values`);
             else if (ratio > Limits.rate_warn)
                 p("WARN", `DDATA rate ${rates}`);
-            else if (ratio < Limits.rate_down)
-                p("FAIL", `DDATA rate fell to ${ratio.toFixed(2)}x (${x.ddata_per_s.toFixed(2)}/s to ${y.ddata_per_s.toFixed(2)}/s)`);
+        }
+        const vx = values_per_s(x, a.seconds), vy = values_per_s(y, b.seconds);
+        if (vx > 0 && vy / vx < Limits.rate_down) {
+            const fell = `values per second fell to ${(vy / vx).toFixed(2)}x (${vx.toFixed(2)}/s to ${vy.toFixed(2)}/s)`;
+            const c = conns.get(`${x.node}/${x.connection}`)!;
+            if (c.starved && c.after >= c.before * Limits.rate_down)
+                p("EXPECTED", `${Expected.shared}: ${fell}, connection ${c.before.toFixed(2)}/s to ${c.after.toFixed(2)}/s`);
+            else
+                p("FAIL", fell);
         }
         if (y.deaths > x.deaths)
             p("WARN", `${y.deaths} DDEATH in ${b.label}, ${x.deaths} in ${a.label}`);

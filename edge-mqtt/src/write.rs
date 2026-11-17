@@ -30,6 +30,9 @@ pub fn payload(value: &WriteValue) -> Bytes {
         WriteValue::Double(f) => float(*f, f.to_string()),
         WriteValue::String(s) | WriteValue::Text(s) | WriteValue::Uuid(s) => s.clone(),
         WriteValue::DateTime(ms) => ms.to_string(),
+        // WriteValue is non_exhaustive: a type added later is written
+        // as the library displays it.
+        other => other.to_string(),
     };
     Bytes::from(text)
 }

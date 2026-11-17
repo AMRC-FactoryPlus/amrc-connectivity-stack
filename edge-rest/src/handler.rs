@@ -220,6 +220,13 @@ pub fn write_body(value: &WriteValue) -> Result<Vec<u8>, WriteError> {
         WriteValue::Double(v) => finite(*v)?,
         WriteValue::String(v) | WriteValue::Text(v) | WriteValue::Uuid(v) => Value::from(v.clone()),
         WriteValue::DateTime(v) => Value::from(*v),
+        // WriteValue is non_exhaustive: refuse a type added later.
+        other => {
+            return Err(WriteError::BadValue(format!(
+                "{} writes are not supported",
+                other.type_name()
+            )));
+        }
     };
     serde_json::to_vec(&json).map_err(|e| WriteError::Failed(e.to_string()))
 }

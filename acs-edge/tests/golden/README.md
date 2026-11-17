@@ -87,7 +87,7 @@ To add a kind, write a class implementing `FakeDevice` in `devices/device.ts` an
 `compare.ts` compares the second run with the first:
 
 - **NBIRTH and each device's DBIRTH**: the same metrics by name, with the same types, values and properties, sent the same number of times.
-  A DBIRTH that straight away repeats the same device's DBIRTH, with the same metrics, is left out before counting, because it tells a consumer nothing new. The built-in MQTT connection sends one such repeat per device at startup: the agent's `DeviceConnection.open()` emits `open` at once, and the MQTT client emits it again when it connects. A split driver only reports `UP` once it is connected, so it sends one.
+  In both runs alike, a DBIRTH that straight away repeats the same device's DBIRTH, with the same metrics, is left out before counting, because it tells a consumer nothing new. The built-in MQTT connection sends one such repeat per device at startup: the agent's `DeviceConnection.open()` emits `open` at once, and the MQTT client emits it again when it connects. A split driver only reports `UP` once it is connected, so it sends one.
 - **DDATA**: for each device and metric, the same sequence of values, with the same types and properties. How values are grouped into DDATA messages is not compared, because it depends on which response arrives first.
 - **DDEATH**: the same number per device. A death mid-run means the device went away.
 

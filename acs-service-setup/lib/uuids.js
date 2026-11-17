@@ -141,6 +141,7 @@ export const ACS = {
         Bacnet:                 "bdc64178-de4c-11ef-b15e-3711aef7cf9b",
         Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
+        TestRust:               "e5d8a95c-caf9-4cc6-beff-ad114dc3116b",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
         ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
         RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",

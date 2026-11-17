@@ -113,6 +113,7 @@ export class MigrateSplitDrivers {
         }
 
         const { cdb } = this;
+        this.no_drivers = new Map();
         this.cconfs = await cdb.get_all_configs(App.ConnectionConfiguration);
         this.drivers = await cdb.get_all_configs(App.DriverDefinition);
 
@@ -155,6 +156,17 @@ export class MigrateSplitDrivers {
             count.moved, this.dry_run ? "would move" : "moved",
             count.repaired, count.unchanged, count.failed);
         return count;
+    }
+
+    /* Whether an agent's Deployment had no `values.drivers` when this
+     * run first looked at it. A move to a split driver adds the key,
+     * and the connection records that so moving back can remove it. */
+    async lacks_drivers (agent) {
+        if (!this.no_drivers.has(agent)) {
+            const [deployment] = await this.cdb.get_config_with_etag(Edge.App.Deployment, agent);
+            this.no_drivers.set(agent, !!deployment && !deployment.values?.drivers);
+        }
+        return this.no_drivers.get(agent);
     }
 
     /* Give the split driver connections of every agent their driver
@@ -226,6 +238,13 @@ export class MigrateSplitDrivers {
     async move (conn, cconf, proto, to_split, to_def) {
         const moving = cconf.driver != (to_split ? proto.split : proto.internal);
         const next = moving ? move_connection(cconf, proto, to_split) : cconf;
+        /* Every connection the run moves off an agent whose Deployment
+         * had no `values.drivers` says so, so whichever is moved back
+         * last removes the empty map and the Deployment is as it was. */
+        if (moving && to_split && cconf.edgeAgent
+                && await this.lacks_drivers(cconf.edgeAgent))
+            next.splitMigration.addedDrivers = true;
+        const drop_empty = !to_split && !!cconf.splitMigration?.addedDrivers;
         const original = cconf.splitMigration?.payloadFormat;
         const format = moving
             ? f => move_payload_format(f, proto.payloadFormat, to_split, original)
@@ -239,7 +258,7 @@ export class MigrateSplitDrivers {
              * gives it no driver values either. */
             if (entry) {
                 const dep = await this.update_deployment(agent, entry,
-                    driver_values(next, to_def));
+                    driver_values(next, to_def), drop_empty);
                 changed = entry.changed || dep;
             }
         }
@@ -314,8 +333,9 @@ export class MigrateSplitDrivers {
 
     /* Set or remove the connection's sidecar in the deployment, under
      * its driver id. An entry under its name, from before it had a
-     * driver id, is removed. */
-    async update_deployment (agent, entry, values) {
+     * driver id, is removed. With `drop_empty`, a removal that leaves
+     * `values.drivers` empty removes that too. */
+    async update_deployment (agent, entry, values, drop_empty) {
         const { name, id } = entry;
         return await this.rewrite(Edge.App.Deployment, agent, deployment => {
             /* Never create a Deployment: the Manager does that when
@@ -324,7 +344,9 @@ export class MigrateSplitDrivers {
 
             const drivers = deployment.values?.drivers ?? {};
             const stale = name != id && name in drivers;
-            if (same(drivers[id], values) && !stale) return;
+            const empty = drop_empty && !values && deployment.values?.drivers
+                && Object.keys(drivers).every(k => k == id || (stale && k == name));
+            if (same(drivers[id], values) && !stale && !empty) return;
 
             this.log("Agent %s: values.drivers.%s %s", agent, id,
                 values ? `set to image ${values.image?.repository}` : "removed");
@@ -337,6 +359,7 @@ export class MigrateSplitDrivers {
             if (stale) delete next[name];
             if (values) next[id] = values;
             else delete next[id];
+            if (empty) delete out.values.drivers;
             return out;
         });
     }

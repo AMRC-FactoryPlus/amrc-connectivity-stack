@@ -11,7 +11,7 @@ import path from "path";
 import { App, BuiltIn, Class, Service, conn_uuid, node_uuid } from "./acs";
 import { fake_fplus } from "./fake-acs";
 import { make_rig } from "./make-rig";
-import { load, remove } from "./objects";
+import { batch, load, remove } from "./objects";
 import type { Rig } from "./rig";
 
 const EXAMPLES = path.join(__dirname, "examples");
@@ -70,7 +70,8 @@ describe("load", () => {
             expect(cdb.objects.get(uuid)).toBe(Class.EdgeAgent);
             expect(await cdb.get_config(App.Info, uuid)).toEqual({ name: node.name });
             expect(await cdb.get_config(App.EdgeAgentDeployment, uuid))
-                .toMatchObject({ name: node.name, cluster: CLUSTER, chart: CHART });
+                .toMatchObject({ name: node.name, cluster: CLUSTER, chart: CHART,
+                    values: { limits: { cpu: "50m", memory: "200Mi" } } });
             const config = await cdb.get_config(App.EdgeAgentConfig, uuid);
             expect(config.deviceConnections.length).toBe(1);
         }
@@ -135,6 +136,37 @@ describe("load", () => {
             .toBe("Driver");
         expect((await cdb.get_config(App.EdgeAgentDeployment, nuuid)).values)
             .toEqual({ drivers: { x: {} } });
+    });
+});
+
+describe("batch", () => {
+    beforeEach(() => { quiet(); });
+    afterEach(() => jest.restoreAllMocks());
+
+    test("sets JSON (Batched) and removes the image pin together", async () => {
+        const rig = example_rig();
+        const mq = rig.connections.find(c => c.protocol == "MQTT")!;
+        const node = rig.nodes.find(n => n.name == mq.node)!;
+        node.values.image = { default: { tag: "v1.2.3" } };
+        const fplus = await cluster();
+        const cdb = fplus.ConfigDB;
+        await load(rig, { dry: false }, fplus);
+        const nuuid = node_uuid(rig, mq.node), cuuid = conn_uuid(rig, mq);
+        expect((await cdb.get_config(App.EdgeAgentDeployment, nuuid)).values.image)
+            .toEqual({ default: { tag: "v1.2.3" } });
+
+        const writes = cdb.writes;
+        await batch(rig, { connection: mq.id, dry: true }, fplus);
+        expect(cdb.writes).toBe(writes);
+
+        await batch(rig, { connection: mq.id, dry: false }, fplus);
+        expect((await cdb.get_config(App.ConnectionConfiguration, cuuid)).source.payloadFormat)
+            .toBe("JSON (Batched)");
+        const entry = (await cdb.get_config(App.EdgeAgentConfig, nuuid)).deviceConnections[0];
+        expect(entry.payloadFormat).toBe("JSON (Batched)");
+        for (const d of entry.devices) expect(d.payloadFormat).toBe("JSON (Batched)");
+        const dep = await cdb.get_config(App.EdgeAgentDeployment, nuuid);
+        expect(dep.values).toEqual({ limits: { cpu: "50m", memory: "200Mi" } });
     });
 });
 

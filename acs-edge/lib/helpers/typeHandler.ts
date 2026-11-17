@@ -257,10 +257,12 @@ export class Metrics {
 
     constructor(metricArr: sparkplugMetric[]) {
         this.#array = metricArr;
-        this.#nameIndex = {};
-        this.#aliasIndex = {};
-        this.#addrPathIndex = {};
-        this.#addrIndex = {};
+        /* Null-prototype objects, because a name, address or path can
+         * be any string, "__proto__" and "constructor" included. */
+        this.#nameIndex = Object.create(null);
+        this.#aliasIndex = Object.create(null);
+        this.#addrPathIndex = Object.create(null);
+        this.#addrIndex = Object.create(null);
         this.#buildIndices();
     }
 
@@ -279,7 +281,7 @@ export class Metrics {
                 }
                 this.#addrIndex[addr].push(i);
                 if (!this.#addrPathIndex[addr]) {
-                    this.#addrPathIndex[addr] = {};
+                    this.#addrPathIndex[addr] = Object.create(null);
                 }
                 this.#addrPathIndex[addr][path] = i;
             }
@@ -1102,6 +1104,8 @@ export function toBigInt64(value: unknown, signed: boolean): bigint {
  * the payload of a cmd to a split driver and of a Buffer-format write.
  * Throws if the type isn't supported or the value doesn't fit it. */
 export function writeValToBuffer(metric: sparkplugMetric): Buffer {
+    if (metric.type !== sparkplugDataType.dateTime)
+        refuse_null(metric);
     const buf = Buffer.alloc(8);
     const endianness = metric.properties?.endianness?.value as byteOrder ?? byteOrder.bigEndian;
     const be = endianness === byteOrder.bigEndian;
@@ -1158,6 +1162,16 @@ export function writeValToBuffer(metric: sparkplugMetric): Buffer {
     return buf.subarray(0, len);
 }
 
+/* A command with no value (a Sparkplug null) has nothing to write.
+ * Coerced, it would reach the device as 0, false or an empty string,
+ * so refuse it. Only for the types a write can carry: any other type
+ * is refused as unsupported, with its own message. */
+function refuse_null (metric: sparkplugMetric) {
+    if (metric.value !== null && metric.value !== undefined) return;
+    if (!TYPED_WRITE_TYPES.has(metric.type)) return;
+    throw new Error(`${metric.name ?? "The metric"} has no value to write`);
+}
+
 /* The Sparkplug types a typed write can carry. */
 export const TYPED_WRITE_TYPES: ReadonlySet<string> = new Set([
     sparkplugDataType.boolean,
@@ -1187,6 +1201,7 @@ const INT_RANGES: Record<string, [number, number]> = {
  * DateTime is milliseconds since the epoch. See docs/edge-split.md.
  * Throws if the type isn't supported or the value doesn't fit it. */
 export function writeValToJSON(metric: sparkplugMetric): Buffer {
+    refuse_null(metric);
     const { type } = metric;
     const value = metric.value as any;
     let out: boolean | number | string;

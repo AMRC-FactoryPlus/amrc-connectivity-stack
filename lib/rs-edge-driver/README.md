@@ -116,6 +116,12 @@ with the device's poll interval and its addresses (`AddrGroup`). The
 default calls `subscribe`. `edge-opcua` uses it to sample and publish
 each device's nodes at the device's interval.
 
+Each call to `subscribe` replaces the previous set of addresses. If the
+address map becomes empty after a handler has subscribed to some
+addresses, `subscribe` is called with an empty list, so drop every
+subscription then. It is never called empty before the first
+non-empty call.
+
 ### A device that sends faster than the Edge Agent can take
 
 `DriverHandle::publish` queues without limit. That suits a device that
@@ -149,7 +155,17 @@ The driver reports its status to the Edge Agent on
   The status changes in the same way and the driver reconnects. For
   any other error, such as a protocol error, call
   `DriverHandle::error()`, which sets `ERR` and reconnects.
-- No data is published unless the status is `UP`.
+- Each report belongs to the latest `connect` call made before it.
+  Reports from an earlier attempt are ignored, so a burst of reports
+  about one lost connection causes one reconnect. A report made while
+  `connect` is still running, such as from a device that drops the
+  connection straight after accepting it, is acted on when `connect`
+  returns, rather than reporting `UP`.
+- A rejected address map is reported as `ADDR`, and stays `ADDR` when
+  the handler connects again, until a good map arrives.
+- No data is published unless the status is `UP`. A message over
+  `max_packet_size` is dropped with a warning, because the MQTT client
+  would otherwise end the whole session for it.
 
 The driver calls `connect`, `subscribe`, `cmd`, `write` and `close` on its own
 tasks, so a slow or unreachable device never holds up the MQTT

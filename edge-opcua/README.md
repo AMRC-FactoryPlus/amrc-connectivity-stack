@@ -84,6 +84,12 @@ of range) `CMD`, anything else `ERR`.
   the driver ignores polls. The built-in's one-off read only ran on a
   rebirth request, and it matched results to metrics by position, so
   it could give a metric another node's value. That bug is gone.
+- **Every device gets its own values.** The built-in made one
+  subscription per device but looked every notification up in the last
+  device's subscription. node-opcua numbers each subscription's
+  monitored items from 1, so on a connection with more than one device
+  the other devices' values were dropped or reported as the last
+  device's node. This driver gives each value to its own address.
 - **The server going away is reported.** The driver reports `CONN`
   while the session is down, so the agent marks the devices offline
   and sends a new DBIRTH when it is back. The built-in kept them

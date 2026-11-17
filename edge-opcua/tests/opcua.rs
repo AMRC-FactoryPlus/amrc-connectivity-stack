@@ -473,3 +473,43 @@ async fn reconnects_after_the_server_restarts() {
     );
     wait_value(&mut agent, "t1", &json!(7)).await;
 }
+
+/// Two devices with different poll intervals get a subscription each,
+/// and each device's values reach its own data topic. The built-in
+/// connection read every subscription's notifications through the last
+/// device's subscription, whose monitored items are also numbered from
+/// 1, so on a connection with several devices all but the last device
+/// got nothing and the last one got their values.
+#[tokio::test(flavor = "multi_thread")]
+async fn each_device_gets_its_own_values() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start().await;
+    let mut agent = FakeAgent::start("OPCUA").await;
+    let _driver = spawn_driver::<OpcuaHandler>(agent.config());
+    agent.wait_status("READY", secs(5)).await;
+    agent.send("conf", conf(&server, "None", "None", None).to_string());
+    agent.send(
+        "addr",
+        json!({
+            "version": 1,
+            "addrs": {
+                "a": node("Double"), "b": node("Int16"),
+                "c": node("String"), "d": node("Boolean"),
+            },
+            "groups": {
+                "First": { "poll": 100, "addrs": ["a", "b"] },
+                "Second": { "poll": 250, "addrs": ["c", "d"] },
+                "Third": { "poll": 500, "addrs": ["d"] },
+            },
+        })
+        .to_string(),
+    );
+    agent.wait_status("UP", secs(30)).await;
+    let v = values(&mut agent, &["a", "b", "c", "d"], secs(10)).await;
+    assert_eq!(v["a"], json!(2.2));
+    assert_eq!(v["b"], json!(-300));
+    assert_eq!(v["c"], json!("hello"));
+    assert_eq!(v["d"], json!(true));
+}

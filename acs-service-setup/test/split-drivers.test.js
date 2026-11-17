@@ -383,3 +383,108 @@ describe("migrate_split_drivers", () => {
         assert.equal(cdb.get(App.ConnectionConfiguration, C.empty).driver, Driver.RESTSplit);
     });
 });
+
+/* A connection whose name has a dot, say, can't be a split driver's
+ * id, so it gets a driverId, and its deployment values are keyed by
+ * that. The UUIDs end the ids, so these are fixed. */
+describe("driver ids", () => {
+    const PLC_ID = "plc-example-org-cccccccc";
+    const WEB_ID = "web-example-org-cccccccc";
+
+    /* The fixture with names that can't be ids, as a site upgrading
+     * would have them. */
+    function dotted () {
+        const cdb = fixture();
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        const name = (uuid, n) => config.deviceConnections.find(c => c.uuid == uuid).name = n;
+        name(C.modbus, "plc.example.org");
+        name(C.rest, "web.example.org");
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.drivers = { "plc.example.org": dep.values.drivers.PLC };
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+        return cdb;
+    }
+
+    test("an existing split driver gets an id with no move asked for", async () => {
+        const cdb = dotted();
+        const count = await run(cdb, {});
+
+        assert.equal(count.ids, 1);
+        assert.equal(conn_entry(cdb, C.modbus).driverId, PLC_ID);
+        assert.equal(conn_entry(cdb, C.modbus).name, "plc.example.org");
+        assert.deepEqual(drivers(cdb), { [PLC_ID]: { image: { repository: "edge-modbus" } } });
+        /* The built-in REST connection has no sidecar, so no id. */
+        assert.equal(conn_entry(cdb, C.rest).driverId, undefined);
+    });
+
+    test("a second run changes nothing", async () => {
+        const cdb = dotted();
+        await run(cdb, {});
+        const writes = cdb.writes.length;
+        const count = await run(cdb, {});
+        assert.equal(cdb.writes.length, writes);
+        assert.equal(count.ids, 0);
+    });
+
+    test("a dry run writes nothing", async () => {
+        const cdb = dotted();
+        const count = await run(cdb, { dryRun: true });
+        assert.deepEqual(cdb.writes, []);
+        assert.equal(count.ids, 1);
+    });
+
+    test("an agent whose names all work is not written", async () => {
+        const cdb = fixture();
+        const count = await run(cdb, {});
+        assert.deepEqual(cdb.writes, []);
+        assert.equal(count.ids, 0);
+    });
+
+    test("finishes a deployment left keyed by the name", async () => {
+        const cdb = dotted();
+        await run(cdb, {});
+        /* The config was written, the deployment was not. */
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.drivers = { "plc.example.org": dep.values.drivers[PLC_ID] };
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+
+        assert.equal((await run(cdb, {})).ids, 1);
+        assert.deepEqual(Object.keys(drivers(cdb)), [PLC_ID]);
+    });
+
+    test("a connection moved to its split driver uses its id", async () => {
+        const cdb = dotted();
+        await run(cdb, { REST: true });
+
+        const e = conn_entry(cdb, C.rest);
+        assert.equal(e.connType, "Driver");
+        assert.equal(e.driverId, WEB_ID);
+        assert.deepEqual(Object.keys(drivers(cdb)).sort(), [PLC_ID, WEB_ID]);
+        assert.deepEqual(drivers(cdb)[WEB_ID].image, { repository: "edge-rest" });
+    });
+
+    test("a connection moved back loses its id and its sidecar", async () => {
+        const start = dotted();
+        await run(start, {});
+        const cdb = dotted();
+        await run(cdb, { REST: true });
+        await run(cdb, { REST: false });
+
+        for (const app of [App.ConnectionConfiguration, App.EdgeAgentConfig, Edge.App.Deployment])
+            assert.deepEqual(
+                Object.fromEntries(cdb.app(app)),
+                Object.fromEntries(start.app(app)));
+    });
+
+    test("a deployment keyed by both name and id keeps the id's values", async () => {
+        const cdb = dotted();
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.drivers[PLC_ID] = { image: { repository: "edge-modbus" }, hostPaths: [] };
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+
+        await run(cdb, {});
+        assert.deepEqual(drivers(cdb),
+            { [PLC_ID]: { image: { repository: "edge-modbus" }, hostPaths: [] } });
+    });
+});

@@ -8,6 +8,7 @@ import {
     Metrics,
     parseNsTimestampFromPayload,
     parseSimTagsFromPayload,
+    DecodedPayload,
     parseTimeStampFromPayload,
     sparkplugMetricProperties,
     parseValueFromPayload,
@@ -343,6 +344,8 @@ export class Device {
         for (let addr in obj) {
             // Get all payload paths registered for this address
             const paths = this._metrics.getPathsForAddr(addr);
+            // Decode the payload at most once, for every metric on it
+            const decoded = new DecodedPayload(obj[addr]);
             // Iterate through each path
             paths.forEach((path) => {
                 // Get the complete metric according to its address and path
@@ -356,18 +359,10 @@ export class Device {
                         obj).length == 1))) {
                         // Handle JSON (Batched) format explicitly
                         if (parseVals && this._payloadFormat === serialisationType.JSONBatched) {
-                            // Parse the payload as JSON
-                            let payload: any;
-                            try {
-                                if (typeof obj[addr] === "string") {
-                                    payload = JSON.parse(obj[addr]);
-                                } else if (Buffer.isBuffer(obj[addr])) {
-                                    payload = JSON.parse(obj[addr].toString());
-                                } else {
-                                    payload = obj[addr];
-                                }
-                            } catch (e) {
-                                log(`Failed to parse JSON (Batched) payload: ${e}`);
+                            // The payload as JSON, parsed once per message
+                            const { value: payload, err } = decoded.json_result();
+                            if (err) {
+                                log(`Failed to parse JSON (Batched) payload: ${err}`);
                                 return;
                             }
 
@@ -399,7 +394,7 @@ export class Device {
                             });
                         } else {
                             // Standard processing for all other payload formats
-                            let newVal = parseVals ? parseValueFromPayload(obj[addr],
+                            let newVal = parseVals ? parseValueFromPayload(decoded,
                                 metric,
                                 this._payloadFormat,
                                 this._delimiter
@@ -428,12 +423,12 @@ export class Device {
                                 // Extract timestamps from the payload if provided.
                                 // timestampNs takes precedence for sub-ms precision;
                                 // timestamp is the ms fallback.
-                                const timestamp = parseTimeStampFromPayload(obj[addr],
+                                const timestamp = parseTimeStampFromPayload(decoded,
                                     metric,
                                     this._payloadFormat,
                                     this._delimiter
                                 );
-                                const timestampNs = parseNsTimestampFromPayload(obj[addr],
+                                const timestampNs = parseNsTimestampFromPayload(decoded,
                                     metric,
                                     this._payloadFormat
                                 );
@@ -451,7 +446,7 @@ export class Device {
                                 // properties so the historians can
                                 // tag the points.
                                 const simTags = parseSimTagsFromPayload(
-                                    obj[addr], this._payloadFormat);
+                                    decoded, this._payloadFormat);
                                 if (simTags.simulated) {
                                     updated.properties = {
                                         ...(updated.properties ?? {}),

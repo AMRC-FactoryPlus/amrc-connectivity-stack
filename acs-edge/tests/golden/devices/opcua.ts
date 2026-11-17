@@ -24,7 +24,9 @@ import { DeviceOpts, FakeDevice, free_port, sleep } from "./device.js";
  * change makes every change seen exactly once. */
 const OVERSAMPLE = 4;
 
-function variant (v: OpcuaValue) {
+/* A node-opcua Variant for a fixture value. Also used by the cluster
+ * rig's mock OPC UA server. */
+export function variant (v: OpcuaValue) {
     const dataType = (DataType as any)[v.dataType];
     if (dataType == undefined)
         throw new Error(`Unknown OPC UA data type ${v.dataType}`);

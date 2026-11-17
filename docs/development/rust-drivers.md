@@ -133,6 +133,14 @@ The workflow pins the Rust version in `RUSTUP_TOOLCHAIN`, and the
 Dockerfiles pin the same version in `rust_version`. Change both
 together, so that the code CI passes is the code the images build.
 
+A driver that replaces a built-in Edge Agent connection must also give
+the same Sparkplug output as the built-in, which the golden-output
+harness in `acs-edge/tests/golden` checks.
+`.github/workflows/split-driver-golden.yaml` builds each such driver
+and runs the harness against it. Add the driver's directory and the
+protocol of the fixtures it replaces to its matrix, and the directory
+to its `paths`.
+
 ## 4. Publishing the image
 
 Images are built and pushed by `.github/workflows/publish.yml` when an

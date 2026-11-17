@@ -21,7 +21,7 @@ On the committed samples this runs:
 | split driver | Each REST sample through the built-in REST connection and through the reference REST driver. They must match. |
 | in-process driver | One REST sample through a small in-process driver, to cover that path. |
 
-Each run prints the comparison and the CPU time it used.
+Each run prints the comparison, the CPU time it used and the DDATA messages it sent per device.
 
 To run the private fixtures, cut to their first minute and limited to REST:
 
@@ -100,7 +100,7 @@ To add a kind, write a class implementing `FakeDevice` in `devices/device.ts` an
 
 - **NBIRTH and each device's DBIRTH**: the same metrics by name, with the same types, values and properties, sent the same number of times.
   In both runs alike, a DBIRTH that straight away repeats the same device's DBIRTH, with the same metrics, is left out before counting, because it tells a consumer nothing new. The built-in MQTT connection sends one such repeat per device at startup: the agent's `DeviceConnection.open()` emits `open` at once, and the MQTT client emits it again when it connects. A split driver only reports `UP` once it is connected, so it sends one.
-- **DDATA**: for each device and metric, the same sequence of values, with the same types and properties. How values are grouped into DDATA messages is not compared, because it depends on which response arrives first.
+- **DDATA**: for each device and metric, the same sequence of values, with the same types and properties. How values are grouped into DDATA messages is not compared, because it depends on which response arrives first. Each run's DDATA message count per device is reported, and a split driver run fails if it sends more DDATA messages for a device than the built-in connection did. It may send fewer, because the agent gathers the values a driver sends together (see "Gathering data" in `docs/edge-split.md`).
 - **DDEATH**: the same number per device. A death mid-run means the device went away.
 
 **Timing allowance.** A DDATA metric's timestamp is when the agent handled the value, which can never match to the millisecond between two runs. Each timestamp is taken as an offset from the moment the fake device first delivered input in that run, and the two offsets may differ by at most the allowance. The allowance is `GOLDEN_TIME_ALLOWANCE_MS` (100 ms) plus the agent's CPU time per input message in the slower run, because the agent stamps each metric as it works through a message, so one message's metrics are spread over the time it takes to handle it. On the samples that adds 1 to 20 ms, and matching runs differ by under 40 ms. A large XML document read by a hundred metrics costs the agent about 200 ms a poll, which raises the allowance to about 300 ms. Birth timestamps are not compared, because they record when a driver finished starting, not anything about the data. Nothing else has any allowance. Each run prints the allowance it used.

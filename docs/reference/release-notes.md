@@ -136,6 +136,9 @@ historian queries that read those devices. Other changes you may see:
 
 - A DateTime metric publishes the date. The built-in connection
   published 0.
+- A device with no addressed metrics no longer stops the Edge Agent.
+  The built-in connection crashed the whole agent on one, and now
+  skips it; the split driver never had the problem.
 - The devices go offline while their OPC UA server can't be reached,
   and come back with a new birth certificate. The built-in connection
   left them online with their last values.

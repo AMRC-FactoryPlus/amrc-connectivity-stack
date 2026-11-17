@@ -357,6 +357,12 @@ You may notice these differences:
   stops publishing values that were never its own.
 - **DateTime metrics publish the date.** The built-in connection
   published every DateTime value as 0.
+- **A device with nothing to read is harmless.** A device with no
+  addressed metrics made the built-in connection ask the server to
+  monitor nothing, and the server's refusal stopped the whole Edge
+  Agent. The driver subscribes only to addresses it has, so such a
+  device just births and the others carry on. The built-in connection
+  now skips such a device too.
 - **An unreachable server shows.** The devices go offline while their
   server can't be reached, and send a new DBIRTH when it is back. The
   built-in connection left them online with their last values.

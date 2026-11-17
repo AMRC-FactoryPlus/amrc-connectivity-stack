@@ -320,12 +320,19 @@ describe("Golden-output harness", () => {
                 /* The built-in connection gives several devices' values
                  * to the wrong device, so with several devices the
                  * reference is the built-in run with one device at a
-                 * time. Runs share the process's environment, so they
-                 * go one after another. */
+                 * time. Devices with nothing to read go with the first:
+                 * the built-in makes them no subscription, so they don't
+                 * upset it, and the fake server only starts once some
+                 * device has subscribed. Runs share the process's
+                 * environment, so they go one after another. */
+                const empty = before.devices.filter((d: any) =>
+                    !d.tags.some((t: any) => t.address));
+                const reading = before.devices.filter((d: any) => !empty.includes(d));
                 const runs = [];
-                for (const d of before.devices.length == 1 ? [] : before.devices)
+                for (const [i, d] of (before.devices.length == 1 ? [] : reading).entries())
                     runs.push(await run_agent(fixture(), {
-                        entry: { ...before, devices: [d] }, secrets, secure: true, commands,
+                        entry: { ...before, devices: i ? [d] : [d, ...empty] },
+                        secrets, secure: true, commands,
                     }));
                 const reference = runs.length
                     ? merge_runs(runs, "built-in, one device at a time")
@@ -334,6 +341,11 @@ describe("Golden-output harness", () => {
                 show(`${name} after the move`, r);
                 expect(r.comparison.values).toBeGreaterThan(0);
                 expect(explain(r)).toBe("");
+
+                /* Every device births, including one with nothing to
+                 * read, which crashed the built-in connection's agent. */
+                for (const d of after.devices)
+                    expect(split.output.births.has(`DBIRTH ${d.deviceId}`)).toBe(true);
 
                 /* The driver logs in as the built-in did, with the same
                  * security and the secret filled in. */

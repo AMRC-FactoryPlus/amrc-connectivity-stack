@@ -16,6 +16,7 @@ import {migrate_edge_agent_config} from "./manager-devices.js";
 import {migrate_deployment_charts} from "./deployment-charts.js";
 import { setup_openid }         from "./openid.js";
 import { migrate_split_drivers } from "./split-drivers.js";
+import { check_retired_drivers } from "./retired-drivers.js";
 import { setup_grafana_permissions } from "./grafana-permissions.js";
 
 export class ServiceSetup {
@@ -83,6 +84,9 @@ export class ServiceSetup {
 
         this.log("Moving connections between internal and split drivers");
         await migrate_split_drivers(this);
+
+        this.log("Checking for connections on removed drivers");
+        await check_retired_drivers(this);
 
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);

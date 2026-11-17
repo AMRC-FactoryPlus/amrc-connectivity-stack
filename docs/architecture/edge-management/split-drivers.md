@@ -79,44 +79,82 @@ driver, called "REST", which is the split driver. The built-in driver is
 called "REST (built-in)" and is shown only on a connection that still
 uses it, for example on a site that has moved REST back.
 
-## When a move waits
+## Edge charts and every split driver move
 
-The Edge Agent and its split driver sidecars take their image tag from
-the edge Helm charts. Each install or upgrade writes this release's
-charts to the `acs` branch of the `shared/helm` repository on the
-central cluster, and moves `main` there too if nobody has committed to
-`main`. Edge clusters deploy from `main`. A split driver that is new in
-this release has no image at an older release's tag, so a connection
-moved to it while its edge cluster runs older charts would get no data.
+This section applies to every protocol's move to a split driver: REST
+now, and MQTT, OPC UA and UDP when they follow. It is a property of how
+the edge Helm charts reach edge clusters, not of any one driver.
 
-So service-setup moves connections to a split driver only when it can
-see that the edge clusters will run this release's images. The move
-runs in its own step of the service-setup Job, `split-drivers`, after
-the edge charts are written, and it holds a move back in these cases:
+An Edge Agent and its split driver sidecars take their image tag from
+the edge Helm charts, which every image in one ACS release shares. Each
+install or upgrade of the central cluster writes that release's charts
+to the `acs` branch of the `shared/helm` git repository on the central
+cluster. Edge clusters deploy from the `main` branch of the same
+repository, which they check every few minutes. The upgrade moves
+`main` to the new charts only if nobody has committed to `main`. A site
+that has committed its own changes to `main` (for example a changed
+resource limit or an extra chart) must merge `acs` into `main` itself
+on every upgrade, and until it does, its edge clusters keep running the
+older release's images.
 
-- **Customised edge charts.** If `main` in `shared/helm` gives the Edge
-  Agent chart a different default image tag or registry from `acs`,
-  which happens when a site has committed its own changes to `main` and
-  not yet merged this release, no connection of any protocol moves to a
-  split driver on that run, and nothing is written. The Job's log has
-  one line starting `Not moving` that says why. Merge `acs` into `main`
-  (your own changes are kept), and the next service-setup run, which is
-  the next install or upgrade, moves them. The same happens if the
-  repository can't be read or either branch is missing.
-- **A Deployment that pins its image.** If an Edge Agent's Deployment
-  sets its own `image.default.tag`, `image.default.registry`,
-  `image.edgeAgent.tag` or `image.edgeAgent.registry` in its values, that
-  agent's connections are not moved, and the log names each one.
-  Remove the setting and the next run moves them.
+That was already true for every image, but a split driver makes it
+cost data. A split driver that is new in a release has no image at an
+older release's tag, so on an edge cluster still running older charts
+its sidecar can't start, and a connection moved to it gets no data. The
+connection's config has already moved, because service-setup moves it
+on the central cluster, which doesn't know which charts the edge
+clusters run.
 
-Moves back to the built-in connection never wait.
+### Before you upgrade
 
-One case service-setup can't see: an edge cluster that can't reach the
-central git server keeps its old charts, but if its Edge Agent can
+1. **Check whether your site has its own edge chart changes.** List the
+   two branches of the chart repository, signing in as the ACS admin
+   user when asked:
+
+   ```sh
+   git ls-remote https://git.<your ACS domain>/git/shared/helm refs/heads/main refs/heads/acs
+   ```
+
+   If both lines show the same commit hash, nobody has changed `main`
+   and the upgrade moves it for you, so there is nothing more to do.
+   If they differ, your site has its own changes, so carry on.
+2. **Plan to merge `acs` into `main` straight after the upgrade.** Once
+   the service-setup Job has finished, clone the repository, merge
+   `origin/acs` into `main`, keeping your own changes, and push `main`.
+   The edge clusters pick it up within a few minutes.
+3. **Or hold the move back.** If you can't merge straight away, set the
+   protocol to `null` under `serviceSetup.config.splitDrivers` (for
+   example `REST: null`) for this upgrade. Its connections then stay
+   built in, and you can set it back to `true` on a later upgrade, once
+   you have merged.
+
+The service-setup Job's `edge-helm-charts` container logs a line
+starting `WARNING: branch main of shared/helm has commits of its own`
+whenever it leaves `main` alone, so you can also check after the
+upgrade.
+
+### If an upgrade has already moved connections
+
+If the upgrade moved connections to a split driver and your edge
+clusters didn't get the new charts, the moved connections' devices show
+no data, and each Edge Agent pod has a `driver-<name>` container that
+can't pull its image (`ImagePullBackOff`). To recover, do either of
+these:
+
+- Merge `acs` into `main` in `shared/helm` and push it, as in step 2
+  above. Within a few minutes the edge clusters run this release's
+  images, the sidecars start, and the data comes back. Nothing else
+  needs doing.
+- Set the protocol to `false` and upgrade again. The connections move
+  back to the built-in connection, exactly as they were, and their
+  sidecars are removed.
+
+One more case looks the same: an edge cluster that can't fetch from
+the central git server keeps its old charts, but if its Edge Agent can
 still reach the ConfigDB, it loads the moved config and waits for a
 sidecar that hasn't arrived. Its moved devices have no data until the
-edge cluster can fetch from the central cluster again. Check that every
-edge cluster is syncing before you upgrade.
+edge cluster can fetch again. Check that every edge cluster is syncing
+before you upgrade.
 
 ## What changes for a REST connection
 
@@ -149,11 +187,9 @@ these differences:
 
 ## Checking it worked
 
-1. In the log of the service-setup Job's `split-drivers` container,
-   find the line that starts `Split drivers:`. It gives how many
-   connections moved, were held back and failed, and the lines above it
-   name each connection. If there is a line starting `Not moving`, the
-   move waited (see "When a move waits").
+1. In the service-setup Job's log, find the line that starts
+   `Split drivers:`. It gives how many connections moved and how many
+   failed, and the lines above it name each connection.
 2. In the Manager, open a REST connection. Its driver is "REST".
 3. On the edge cluster, the Edge Agent's pod has a `driver-<name>`
    container for each REST connection, and each is running.
@@ -184,9 +220,10 @@ UA) to its split driver. Follow what REST did:
 2. **The switch.** Add the protocol to `SplitDrivers` in
    `acs-service-setup/lib/split-drivers.js` if it isn't there, with its
    payload format map, and set it to `true` under
-   `serviceSetup.config.splitDrivers` in `deploy/values.yaml`. The edge
-   chart guard and the pinned-Deployment check apply to every protocol,
-   so there is nothing to add for them.
+   `serviceSetup.config.splitDrivers` in `deploy/values.yaml`. Point the
+   release note at "Edge charts and every split driver move" above
+   rather than explaining it again, because it applies to every
+   protocol, and say the move needs a major release.
 3. **The whole-site test.** Copy `acs-service-setup/test/rest-move.test.js`
    and its `rest-move/` folder. `site.json` is the site before the move.
    Build its connections from the golden samples

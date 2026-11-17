@@ -5,14 +5,15 @@ into the Edge Agent itself. Others run as a split driver, which is a
 small container (a sidecar) in the Edge Agent's pod that talks to the
 device and passes what it reads to the Edge Agent over a broker inside
 the pod. Modbus, BACnet, ADS and the other drivers with their own image
-have always worked this way. The built-in REST, MQTT and OPC UA
+have always worked this way. The built-in REST, MQTT, OPC UA and UDP
 connections are moving to split drivers so that every protocol is
 deployed, versioned and fixed in the same way. The protocol between the
 Edge Agent and a split driver is described in
 [`acs-edge/docs/edge-split.md`](../../../acs-edge/docs/edge-split.md).
 
-REST is the first to move. Its split driver is `edge-rest`. MQTT and
-OPC UA keep their built-in connections until their drivers are ready.
+REST and UDP are the first to move. Their split drivers are `edge-rest`
+and `edge-udp`. MQTT and OPC UA keep their built-in connections until
+their drivers are ready.
 
 ## The setting
 
@@ -24,6 +25,7 @@ serviceSetup:
   config:
     splitDrivers:
       REST: true      # the chart's default
+      UDP: true       # the chart's default
       # MQTT, OPCUA: not set, so they stay built in
       # dryRun: true  # log what would move and change nothing
 ```
@@ -68,6 +70,23 @@ expect an Edge Agent with REST connections to restart once or twice in
 the minutes after the upgrade, and its REST devices to have no data for
 that time.
 
+Built-in UDP connections move the same way, to an `edge-udp` sidecar
+each, with `UDPConnDetails` becoming `DriverDetails` and the port kept.
+Each sidecar also opens the connection's port on the edge host its Edge
+Agent runs on (a Kubernetes `hostPort`), and a host can open each port
+once. So before it moves a UDP connection, service-setup checks its
+port against every connection that already opens one, with the rule the
+Manager uses when you save a connection: two connections clash if they
+are in the same cluster and either their Edge Agents are pinned to the
+same host or either agent is not pinned. Where an agent runs comes from
+its Edge Agent Deployment. A connection that would clash is not moved:
+it stays on the built-in connection, keeps working as before, and the
+log has a line for it ending `Give one of them another port`. Every
+built-in UDP connection uses port 50205, because that was the only port
+the old form allowed, so on a site where two of them can land on one
+host, only the first moves. Give the one that moved another port in the
+Manager (and point its device at it) and the next run moves the other.
+
 Service-setup runs the move on every install and upgrade, and a second
 run finds nothing to change. A run that stopped half way through is
 finished by the next one.
@@ -77,7 +96,8 @@ finished by the next one.
 After the upgrade, the connection form in the Manager offers one REST
 driver, called "REST", which is the split driver. The built-in driver is
 called "REST (built-in)" and is shown only on a connection that still
-uses it, for example on a site that has moved REST back.
+uses it, for example on a site that has moved REST back. UDP is the
+same: the split driver is "UDP" and the built-in is "UDP (built-in)".
 
 ## Edge charts and every split driver move
 
@@ -185,14 +205,50 @@ these differences:
 - **One more container per connection.** Each REST connection runs in
   its own `edge-rest` container in the Edge Agent's pod.
 
+## What changes for a UDP connection
+
+`edge-udp` hands the Edge Agent each datagram as it arrived, as the
+built-in connection did, and the Edge Agent reads it with the device's
+payload format (JSON, Buffer or Delimited String), so the data your
+devices publish doesn't change. Its full behaviour is in
+[`edge-udp/README.md`](../../../edge-udp/README.md). You may notice
+these differences:
+
+- **The port opens on the edge host.** A device outside the cluster can
+  now send to the host's address on the connection's port, which it
+  couldn't with the built-in connection. The port must be free on the
+  host, and the host's firewall must let UDP in on it.
+  [Connecting a UDP device](../../services/udp-devices.md) covers the
+  address to send to, the firewall and network policy rules, and
+  pinning.
+- **Pinning isn't checked by the move.** On a cluster with more than one
+  host, a device outside the cluster needs the Edge Agent pinned to one
+  host. The Manager asks for that when you save a UDP connection, but
+  the move does not, so pin the agent with **Move** on the node's page.
+- **The port can be changed.** The split driver's form takes any port
+  from 1 to 65535, where the built-in form only took 50205.
+- **Metric addresses stay empty.** Every datagram goes to the empty
+  address, as before, so a metric with an address never gets a value.
+  The form now labels the field "Address (leave empty)".
+- **Writes are refused.** A write to a UDP metric is answered as failed.
+  The built-in connection ignored it and never answered.
+- **Drops are counted.** The driver asks for a bigger receive buffer
+  and logs a warning every 10 seconds in which datagrams were lost,
+  saying where. Raising `net.core.rmem_max` on the host lets fast
+  devices use the bigger buffer.
+- **One more container per connection.** Each UDP connection runs in
+  its own `edge-udp` container in the Edge Agent's pod.
+
 ## Checking it worked
 
 1. In the service-setup Job's log, find the line that starts
-   `Split drivers:`. It gives how many connections moved and how many
-   failed, and the lines above it name each connection.
-2. In the Manager, open a REST connection. Its driver is "REST".
+   `Split drivers:`. It gives how many connections moved, how many
+   were held back by a port clash and how many failed, and the lines
+   above it name each connection.
+2. In the Manager, open a REST or UDP connection. Its driver is "REST"
+   or "UDP".
 3. On the edge cluster, the Edge Agent's pod has a `driver-<name>`
-   container for each REST connection, and each is running.
+   container for each REST or UDP connection, and each is running.
 4. The connection's devices are publishing data again a few minutes
    after the upgrade.
 
@@ -204,7 +260,10 @@ the built-in connection, removes its sidecar, and leaves each
 connection's config exactly as it was before it moved. A REST
 connection created in the Manager after the move uses the split driver,
 and the next upgrade with `REST: false` moves it to the built-in
-connection too.
+connection too. `UDP: false` does the same for UDP connections and
+closes their ports on the edge hosts. A UDP connection that was given a
+port other than 50205 after the move keeps it, and the built-in
+connection listens on it inside the pod.
 
 ## Adding a protocol's migration
 
@@ -220,7 +279,9 @@ UA) to its split driver. Follow what REST did:
 2. **The switch.** Add the protocol to `SplitDrivers` in
    `acs-service-setup/lib/split-drivers.js` if it isn't there, with its
    payload format map, and set it to `true` under
-   `serviceSetup.config.splitDrivers` in `deploy/values.yaml`. Point the
+   `serviceSetup.config.splitDrivers` in `deploy/values.yaml`. A
+   split DriverDef with `hostPorts` gets the host port check without
+   anything to add. Point the
    release note at "Edge charts and every split driver move" above
    rather than explaining it again, because it applies to every
    protocol, and say the move needs a major release.

@@ -24,10 +24,37 @@ export const PayloadFormatMap: { [protocol: string]: { [f: string]: string } } =
     "MQTT":     {},
     "OPC UA":   { "Defined by Protocol": "JSON" },
     /* edge-udp passes datagrams through as bytes, as the built-in
-     * connection does, so no format changes. service-setup has no
-     * UDP move yet (ACS-38). */
+     * connection does, so no format changes. */
     "UDP":      {},
 };
+
+/* A device whose payload format is "Defined by Protocol" gets the
+ * values the built-in connection decoded, and the Edge Agent never
+ * reads its metrics' paths. Once the device's format is JSON the agent
+ * reads the decoded-value packet `{"value", "timestamp"}` through each
+ * path, and a path left over from before, such as `mm`, finds nothing.
+ * So a move away from "Defined by Protocol" has to drop the paths, and
+ * then the path is gone from the metric's properties in DBIRTH too.
+ *
+ * service-setup's move (ACS-21) does not do this yet, and the Admin UI
+ * copies each metric's `Path` from the device's origin map into the
+ * Edge Agent config. Moving OPC UA connections (ACS-27) must clear
+ * those, or metrics with a path stop updating.
+ *
+ * The harness drops these paths for both runs, so that it compares what
+ * the driver sends and not what the move leaves behind. The built-in
+ * run's DDATA is unchanged by it, because the built-in never read
+ * them. */
+export function without_unread_paths (entry: any): any {
+    const next = JSON.parse(JSON.stringify(entry));
+    for (const device of next.devices ?? []) {
+        const format = device.payloadFormat ?? next.payloadFormat;
+        if (format != "Defined by Protocol") continue;
+        for (const tag of device.tags ?? [])
+            delete tag.path;
+    }
+    return next;
+}
 
 /* The connection entry as service-setup leaves it after moving the
  * connection to its split driver: `move_entry()` with a DriverDef that

@@ -66,7 +66,7 @@ pub use config::{
 };
 pub use driver::{Driver, DriverHandle};
 pub use error::{ConnectError, Error, HandlerError, WriteError};
-pub use handler::{Handler, Poller};
+pub use handler::{AddrGroup, Handler, Poller};
 pub use logging::{init_logging, log_filter};
 pub use redact::redact;
 pub use status::Status;

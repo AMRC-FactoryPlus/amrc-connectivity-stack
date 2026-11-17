@@ -160,24 +160,29 @@ const CASES = [
 
 describe("the split DriverDefs", () => {
     test("share the internal driver's form, so connection details keep their fields", () => {
-        for (const p of Object.values(SplitDrivers)) {
+        for (const [name, p] of Object.entries(SplitDrivers)) {
             const [internal, split] = [DEFS[p.internal], DEFS[p.split]];
             assert.ok(internal.internal, "the internal DriverDef is internal");
             assert.ok(split.image?.repository, "the split DriverDef has an image");
             assert.equal(split.internal, undefined);
+            assert.equal(split.polled, internal.polled);
+            /* UDP's split driver has its own form (udp-move.test.js
+             * checks it takes every built-in config). */
+            if (name == "UDP") continue;
             assert.deepEqual(split.schema, internal.schema);
             assert.deepEqual(split.presentation, internal.presentation);
-            assert.equal(split.polled, internal.polled);
         }
     });
 
     /* The new-connection form offers DriverDefs that aren't hidden, and
-     * picks them by name. REST's split driver has replaced the
-     * built-in; MQTT's and OPC UA's images aren't published yet. */
-    test("offer REST's split driver as \"REST\" and hide the others", () => {
-        const { REST, MQTT, OPCUA } = SplitDrivers;
-        assert.equal(DEFS[REST.split].hidden, undefined);
-        assert.equal(DEFS[REST.internal].hidden, true);
+     * picks them by name. REST's and UDP's split drivers have replaced
+     * the built-ins; MQTT's and OPC UA's images aren't published yet. */
+    test("offer REST's and UDP's split drivers by their names and hide the others", () => {
+        const { REST, MQTT, OPCUA, UDP } = SplitDrivers;
+        for (const p of [REST, UDP]) {
+            assert.equal(DEFS[p.split].hidden, undefined);
+            assert.equal(DEFS[p.internal].hidden, true);
+        }
         for (const p of [MQTT, OPCUA]) {
             assert.equal(DEFS[p.split].hidden, true);
             assert.equal(DEFS[p.internal].hidden, undefined);
@@ -186,10 +191,13 @@ describe("the split DriverDefs", () => {
         const names = load_names();
         assert.equal(names[REST.split], "REST");
         assert.equal(names[REST.internal], "REST (built-in)");
+        assert.equal(names[UDP.split], "UDP");
+        assert.equal(names[UDP.internal], "UDP (built-in)");
         const offered = Object.entries(DEFS)
             .filter(([, d]) => !d.hidden)
             .map(([uuid]) => names[uuid]);
         assert.equal(offered.filter(n => /^REST\b/.test(n)).length, 1);
+        assert.equal(offered.filter(n => /^UDP\b/.test(n)).length, 1);
         assert.equal(new Set(offered).size, offered.length, "offered names are unique");
     });
 });

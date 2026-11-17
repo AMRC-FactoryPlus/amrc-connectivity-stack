@@ -48,8 +48,10 @@ export class UdpDevice implements FakeDevice {
         this.#replay = this.replay();
     }
 
+    /* The built-in's `UDPConnDetails`, or a split driver's
+     * `DriverDetails` after service-setup's move. */
     connection (conn: any) {
-        const key = Object.keys(conn).find(k => /ConnDetails$/.test(k)) ?? "UDPConnDetails";
+        const key = Object.keys(conn).find(k => /^(UDPConn|Driver)Details$/.test(k)) ?? "UDPConnDetails";
         return { ...conn, [key]: { ...conn[key], port: this.port } };
     }
 

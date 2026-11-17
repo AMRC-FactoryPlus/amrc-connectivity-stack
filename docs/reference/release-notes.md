@@ -98,8 +98,12 @@ Manager offers one driver per protocol for new connections: "REST",
    only for Edge Agents still on version 6. `false` (version 6's move
    back) is refused with an `ERROR:` line and treated as unset.
 
-**Check it worked.** Find the line starting `Split drivers:` in the
-`service-setup` container's log. It says how many connections moved,
+**Check it worked.** The move runs in the `split-drivers` container of
+the `service-setup` Job, after `edge-helm-charts` has published this
+release's edge charts, so it never moves a connection before they are
+published. Its lines, and every `service-setup` log line about the move
+in this section, are in that container's log. Find the line starting
+`Split drivers:`. It says how many connections moved,
 how many were held back because their Edge Agent pins its image or has
 no Deployment, how many moved without their container because of a UDP
 port clash, and how many failed, and the lines above it name each

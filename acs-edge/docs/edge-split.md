@@ -398,8 +398,9 @@ SHOULD report it on `err` as described below.
 
 The JS and Rust driver libraries support both forms, and the Python
 library only `cmd`. In `lib/js-edge-driver` a
-handler that has a `write(addr, type, value)` method gets typed writes,
-and one that has only `cmd(addr, payload)` gets `cmd` as before. In
+handler class that sets `static typedWrites = true` gets typed writes
+through its `write(addr, type, value)` method, and any other handler
+gets `cmd` as before. In
 `lib/rs-edge-driver` a handler sets `TYPED_WRITES` to `true` and
 implements `Handler::write`. In both, a write that fails is reported on
 `err` for the handler.

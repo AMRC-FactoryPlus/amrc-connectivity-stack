@@ -206,19 +206,31 @@ The method is passed the name of the command and the data object, which
 is a buffer. It is the responsibility of the southbound driver to parse
 the buffer depending on the command.
 
-Only one of `cmd` and `write` is called. If the handler class has a
-`write` method, the driver subscribes to typed writes and `cmd` is
-never called.
+Only one of `cmd` and `write` is called. If the handler class sets
+`typedWrites`, the driver subscribes to typed writes and `cmd` is never
+called.
+
+### `typedWrites`
+
+    class MyHandler {
+        static typedWrites = true;
+        ...
+    }
+
+This property is optional, and needs an Edge Agent from November 2026
+or later.
+
+If a handler class sets this static property to `true`, the driver
+subscribes to typed writes and calls `write` instead of `cmd`. Without
+it the driver behaves as before, even if the handler has a method
+called `write` for its own use.
 
 ### `write`
 
     await handler.write(spec, type, value);
 
-This method is optional, and needs an Edge Agent from November 2026 or
-later.
-
-If this method exists the driver receives typed writes instead of
-`cmd`. The method is passed the address spec as returned from
+This method is called only when the handler class sets `typedWrites`.
+It receives each typed write instead of `cmd`. The method is passed the address spec as returned from
 `parseAddr`, the metric's Sparkplug type as a string (`"Int16"`,
 `"Float"`, `"String"` and so on) and the value as a JS value:
 

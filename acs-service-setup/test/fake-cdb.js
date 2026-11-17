@@ -6,6 +6,21 @@
 
 import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 
+/* A copy of a JSON value with its object keys in the order Postgres
+ * `jsonb` returns them, which the ConfigDB stores: shorter keys first,
+ * then by bytes. So `{privileged, image}` comes back `{image,
+ * privileged}`. */
+export function jsonb (value) {
+    if (Array.isArray(value)) return value.map(jsonb);
+    if (value === null || typeof value != "object") return value;
+    const bytes = k => Buffer.from(k, "utf8");
+    return Object.fromEntries(Object.keys(value)
+        .filter(k => value[k] !== undefined)
+        .sort((a, b) => bytes(a).length - bytes(b).length
+            || Buffer.compare(bytes(a), bytes(b)))
+        .map(k => [k, jsonb(value[k])]));
+}
+
 /* An in-memory ConfigDB with the calls the step makes. Every write is
  * recorded. `stale` lists [app, obj] writes to refuse once with 412. */
 export class FakeCDB {
@@ -21,7 +36,7 @@ export class FakeCDB {
         return this.configs.get(a);
     }
     set (a, o, c) {
-        this.app(a).set(o, structuredClone(c));
+        this.app(a).set(o, jsonb(c));
         const k = `${a}/${o}`;
         this.versions.set(k, (this.versions.get(k) ?? 0) + 1);
     }

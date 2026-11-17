@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { set_driver_ids } from '@amrc-factoryplus/service-client'
 
 import { applyConnection, deploymentDrivers } from '../src/utils/edgeAgentConfigUpdater.js'
-import { hostCount, hostPortClash, moveHostClash, pinnedHost } from '../src/utils/hostPorts.js'
+import { hostCount, hostPortClash, moveHostClash, nodePlace, pinnedHost } from '../src/utils/hostPorts.js'
 
 /* As acs-service-setup/dumps/edge.yaml has them. */
 const UDP = {
@@ -135,6 +135,16 @@ describe('hostPortClash: saving a connection', () => {
     /* The topology copy says another host; the agent is on host-a. */
     const stale = [conn('u1', 'robot', UDP, { port: 5000 }, 'agent-a', { hostname: 'host-b' })]
     expect(hostPortClash(saving(5000), stores(stale))).toMatch(/"robot"/)
+  })
+
+  it('takes the host from the Deployment\'s values when they set one', () => {
+    /* edge-sync merges the Deployment's values last, so values.hostname
+     * decides where the agent runs. */
+    const pinned = { uuid: 'agent-v', name: 'agent-v',
+      deployment: { cluster: 'multi', hostname: 'host-b', values: { hostname: 'host-a' } } }
+    expect(nodePlace(pinned)).toEqual({ cluster: 'multi', hostname: 'host-a' })
+    const s = { ...stores(existing), nodes: [...nodes, pinned] }
+    expect(hostPortClash(saving(5000, 'agent-v', { node: pinned }), s)).toMatch(/"robot"/)
   })
 
   it('falls back on the topology copy for an agent the store does not know', () => {

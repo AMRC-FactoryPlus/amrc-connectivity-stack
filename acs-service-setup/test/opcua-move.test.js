@@ -198,11 +198,16 @@ describe("moving a site's OPC UA connections with the chart's defaults", () => {
             "nothing about the other agent or the Modbus drivers is written");
 
         /* An edge-opcua sidecar per connection, keyed by its driver id,
-         * with the chart's default tag. */
+         * with the chart's default tag and the state directory its
+         * DriverDef names, where the driver keeps its certificate. */
+        const opcua = {
+            image:      { repository: "edge-opcua" },
+            stateDir:   "/var/lib/edge-driver",
+        };
         assert.deepEqual(cdb.get(Edge.App.Deployment, AGENT).values.drivers, {
             "PLC-1":            { image: { repository: "edge-modbus" } },
-            [cell.driverId]:    { image: { repository: "edge-opcua" } },
-            "Furnace":          { image: { repository: "edge-opcua" } },
+            [cell.driverId]:    opcua,
+            "Furnace":          opcua,
         });
 
         if (process.env.UPDATE_OPCUA_MOVE)

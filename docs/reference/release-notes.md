@@ -79,13 +79,15 @@ devices get no data.
    with REST, MQTT or UDP connections has a running `driver-<name>`
    container for each of them, and their devices are publishing again a
    few minutes after the upgrade.
-6. **Check any Edge Agent that pins its own image.** A sidecar takes its
+6. **Remove any image pin from your Edge Agents.** A sidecar takes its
    image tag and registry from the Edge Agent Deployment's
-   `image.default`, so an Edge Agent whose Deployment sets its own tag
-   or registry there asks for `edge-rest` or `edge-mqtt` at that tag,
-   which doesn't exist, and its moved devices get no data. Remove the
-   setting before you upgrade, or keep that protocol's switch at `null`
-   until you have.
+   `image.default`, so on an Edge Agent whose Deployment sets its own
+   tag or registry there (under `image.default` or `image.edgeAgent`)
+   the split drivers' images wouldn't exist. The upgrade leaves that
+   agent's connections on the built-in connections, and the
+   `service-setup` log has a line for each, saying `not moving to the
+   split driver` and naming the setting. Remove the setting, preferably
+   before you upgrade, and the next upgrade moves them.
 
 **If REST, MQTT or UDP devices have no data after the upgrade**, and their Edge
 Agent pod's `driver-<name>` container can't pull its image
@@ -114,8 +116,10 @@ built-in connection built the message from the device's payload format
 and the metric's path. A message larger than about 16 MB is dropped
 with a warning. A topic that another device still reads stays
 subscribed when a device is removed. Each message now passes through
-the Edge Agent pod's internal broker, so the pod uses more CPU for a
-busy MQTT connection: see the CPU section of the split drivers page.
+the Edge Agent pod's internal broker, and the driver container uses a
+little CPU of its own, but the Edge Agent itself uses less than it did,
+so the pod as a whole uses about the same or less: see the CPU section
+of the split drivers page.
 
 **What a site with a UDP device must know.** A moved UDP connection's
 port now opens on the edge host its Edge Agent runs on, so a device on

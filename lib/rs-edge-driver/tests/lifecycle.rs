@@ -162,3 +162,24 @@ async fn good_addrs_after_bad_restore_up() {
         vec![("2".to_owned(), Bytes::from("b"))]
     );
 }
+
+/// The cmd address is everything after `cmd/`, slashes included
+/// (`acs-edge/docs/edge-split.md`, "fpEdge1/Conn/cmd/Address").
+#[tokio::test]
+async fn cmd_address_keeps_its_slashes() {
+    let mut agent = FakeAgent::start("Conn").await;
+    let _driver = spawn_driver::<FakeHandler>(agent.config());
+    let ctl = Ctl::new();
+
+    agent
+        .handshake(ctl.conf(), &[("1", "plant/line1/speed")])
+        .await;
+    agent.wait_status("UP", secs(5)).await;
+
+    agent.send("cmd/plant/line1/speed", "7");
+    tokio::time::sleep(ms(500)).await;
+    assert_eq!(
+        *ctl.cmds.lock().unwrap(),
+        vec![("plant/line1/speed".to_owned(), Bytes::from("7"))]
+    );
+}

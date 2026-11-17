@@ -80,7 +80,7 @@
       "pollInt": 1000
     },
     "cccccccc-0000-4000-8000-000000000005": {
-      "driver": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+      "driver": "540ae6a1-16c5-43d2-be9e-0bf0a628641e",
       "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000c",
       "config": {
         "host": "broker.local",
@@ -99,6 +99,10 @@
       "topology": {
         "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
         "hostname": "edge-3"
+      },
+      "splitMigration": {
+        "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        "payloadFormat": "JSON"
       }
     }
   },
@@ -472,7 +476,7 @@
         {
           "name": "LineBroker",
           "uuid": "cccccccc-0000-4000-8000-000000000005",
-          "connType": "MQTT",
+          "connType": "Driver",
           "payloadFormat": "JSON",
           "devices": [
             {
@@ -494,7 +498,7 @@
               ]
             }
           ],
-          "MQTTConnDetails": {
+          "DriverDetails": {
             "host": "broker.local",
             "port": 1883,
             "protocol": "mqtt",
@@ -589,7 +593,14 @@
       "name": "line-agent",
       "values": {
         "name": "line-agent",
-        "uuid": "aaaaaaaa-0000-4000-8000-00000000000c"
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000c",
+        "drivers": {
+          "LineBroker": {
+            "image": {
+              "repository": "edge-mqtt"
+            }
+          }
+        }
       }
     }
   }

@@ -22,6 +22,14 @@
  *
  * Nothing is moved or deleted from a connection. A site keeps its
  * config, and can move it to a split driver when one exists.
+ *
+ * Since ACS 7 the Edge Agent has no built-in REST, MQTT, OPC UA or UDP
+ * connection either, and split-drivers.js moves those connections to
+ * their split drivers. Their built-in DriverDefs are no longer loaded,
+ * and are deleted here the same way once no ConnectionConfiguration
+ * uses them. One a connection still uses (an Edge Agent that pins its
+ * own version 6 image keeps its built-in connections) stays, so the
+ * Manager can still open that connection.
  */
 
 import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
@@ -39,6 +47,15 @@ export const RetiredDrivers = {
     "S7":           Driver.S7,
     "EtherNet/IP":  Driver.EtherNetIP,
     "Websocket":    Driver.Websocket,
+};
+
+/* The built-in drivers ACS 7 replaced with split drivers, by Edge Agent
+ * `connType`. Their connections are moved, not warned about here. */
+export const MovedDrivers = {
+    "REST":         Driver.REST,
+    "MQTT":         Driver.MQTT,
+    "OPC UA":       Driver.OPCUA,
+    "UDP":          Driver.UDP,
 };
 
 export class RetiredDriverCheck {
@@ -77,8 +94,13 @@ export class RetiredDriverCheck {
             }
         }
 
+        for (const [, cconf] of cconfs)
+            if (Object.values(MovedDrivers).includes(cconf?.driver))
+                in_use.add(cconf.driver);
+
         const removed = [];
-        for (const [type, driver] of Object.entries(RetiredDrivers)) {
+        const all = { ...RetiredDrivers, ...MovedDrivers };
+        for (const [type, driver] of Object.entries(all)) {
             if (in_use.has(driver)) {
                 this.log("Keeping the %s DriverDef while connections use it", type);
                 continue;

@@ -66,7 +66,7 @@
       "pollInt": 1000
     },
     "cccccccc-0000-4000-8000-000000000004": {
-      "driver": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+      "driver": "540ae6a1-16c5-43d2-be9e-0bf0a628641e",
       "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
       "config": {
         "host": "broker.local",
@@ -87,6 +87,10 @@
       "topology": {
         "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
         "hostname": "edge-2"
+      },
+      "splitMigration": {
+        "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        "payloadFormat": "JSON"
       }
     }
   },
@@ -421,19 +425,8 @@
         {
           "uuid": "cccccccc-0000-4000-8000-000000000004",
           "name": "LineBroker",
-          "connType": "MQTT",
+          "connType": "Driver",
           "payloadFormat": "JSON",
-          "MQTTConnDetails": {
-            "host": "broker.local",
-            "port": 8883,
-            "protocol": "mqtts",
-            "clientId": "",
-            "username": "line",
-            "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000002",
-            "cleanSession": true,
-            "keepAlive": 60,
-            "useSSL": true
-          },
           "devices": [
             {
               "deviceId": "Line_1",
@@ -453,7 +446,18 @@
                 }
               ]
             }
-          ]
+          ],
+          "DriverDetails": {
+            "host": "broker.local",
+            "port": 8883,
+            "protocol": "mqtts",
+            "clientId": "",
+            "username": "line",
+            "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000002",
+            "cleanSession": true,
+            "keepAlive": 60,
+            "useSSL": true
+          }
         }
       ]
     }
@@ -493,7 +497,14 @@
       "name": "line-agent",
       "values": {
         "name": "line-agent",
-        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b"
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b",
+        "drivers": {
+          "LineBroker": {
+            "image": {
+              "repository": "edge-mqtt"
+            }
+          }
+        }
       }
     }
   }

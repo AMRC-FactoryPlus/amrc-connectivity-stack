@@ -428,20 +428,17 @@ serviceSetup:
       admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707"
       editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
 
-    # Which Edge Agent connections run on split drivers (sidecar
-    # containers) instead of the driver built into the Edge Agent.
-    # Each protocol takes `true` (move its connections to the split
-    # driver), `false` (move them back to the built-in driver) or
-    # `null` (leave them where they are). Service-setup does the move
-    # on every install or upgrade, and each Edge Agent with a moved
-    # connection restarts once. `dryRun: true` logs what would move
-    # and changes nothing. See
+    # Since ACS 7 the Edge Agent has no built-in REST, MQTT, OPC UA or
+    # UDP connection. On every install or upgrade service-setup moves
+    # each connection still on one of those built-in drivers to its
+    # split driver (a sidecar container), and each Edge Agent with a
+    # moved connection restarts once. There is no move back. The only
+    # setting is `dryRun: true`, which logs what would move and changes
+    # nothing; a connection it leaves on a built-in driver gets no data.
+    # The version 6 per-protocol settings (`REST: false` and so on) are
+    # refused with an error in service-setup's log. See
     # docs/architecture/edge-management/split-drivers.md.
-    splitDrivers:
-      REST: true
-      MQTT: true
-      OPCUA: true
-      UDP: true
+    splitDrivers: {}
 
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.

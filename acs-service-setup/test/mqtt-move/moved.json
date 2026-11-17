@@ -109,8 +109,7 @@
       },
       "splitMigration": {
         "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
-        "payloadFormat": "XML",
-        "addedDrivers": true
+        "payloadFormat": "XML"
       }
     },
     "cccccccc-0000-4000-8000-000000000005": {
@@ -138,8 +137,7 @@
       },
       "splitMigration": {
         "from": "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
-        "payloadFormat": "Buffer",
-        "addedDrivers": true
+        "payloadFormat": "Buffer"
       }
     },
     "cccccccc-0000-4000-8000-000000000006": {
@@ -162,7 +160,7 @@
       "pollInt": 1000
     },
     "cccccccc-0000-4000-8000-000000000007": {
-      "driver": "f32fed40-de4d-11ef-a011-1711bd498427",
+      "driver": "d4d50f58-8af7-4690-8eac-9817b991eecf",
       "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
       "config": {
         "endpoint": "opc.tcp://oven.local:4840",
@@ -173,13 +171,17 @@
       "createdAt": "2026-01-01T00:00:00.000Z",
       "deployment": {},
       "source": {
-        "payloadFormat": "Defined by Protocol"
+        "payloadFormat": "JSON"
       },
       "topology": {
         "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
         "hostname": "edge-2"
       },
-      "pollInt": 1000
+      "pollInt": 1000,
+      "splitMigration": {
+        "from": "f32fed40-de4d-11ef-a011-1711bd498427",
+        "payloadFormat": "Defined by Protocol"
+      }
     }
   },
   "aac6f843-cfee-4683-b121-6943bfdf9173": {
@@ -582,22 +584,16 @@
         {
           "uuid": "cccccccc-0000-4000-8000-000000000007",
           "name": "Oven",
-          "connType": "OPC UA",
+          "connType": "Driver",
           "pollInt": 1000,
-          "payloadFormat": "Defined by Protocol",
-          "OPCUAConnDetails": {
-            "endpoint": "opc.tcp://oven.local:4840",
-            "securityPolicy": "None",
-            "securityMode": "None",
-            "useCredentials": false
-          },
+          "payloadFormat": "JSON",
           "devices": [
             {
               "deviceId": "Oven",
               "deviceType": "00000000-0000-4000-8000-000000000001",
               "pollInt": 1000,
               "pubInterval": 0,
-              "payloadFormat": "Defined by Protocol",
+              "payloadFormat": "JSON",
               "templates": [],
               "tags": [
                 {
@@ -611,7 +607,13 @@
                 }
               ]
             }
-          ]
+          ],
+          "DriverDetails": {
+            "endpoint": "opc.tcp://oven.local:4840",
+            "securityPolicy": "None",
+            "securityMode": "None",
+            "useCredentials": false
+          }
         }
       ]
     },
@@ -909,7 +911,14 @@
       "name": "oven-agent",
       "values": {
         "name": "oven-agent",
-        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b"
+        "uuid": "aaaaaaaa-0000-4000-8000-00000000000b",
+        "drivers": {
+          "Oven": {
+            "image": {
+              "repository": "edge-opcua"
+            }
+          }
+        }
       }
     },
     "aaaaaaaa-0000-4000-8000-00000000000c": {

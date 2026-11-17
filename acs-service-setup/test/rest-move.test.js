@@ -1,6 +1,6 @@
 /*
  * ACS service setup
- * A whole site's REST connections moved by the chart's defaults, and back
+ * A whole site's REST connections moved by the chart's defaults
  * Copyright 2026 University of Sheffield AMRC
  *
  * rest-move/site.json is a site before an upgrade: one Edge Agent with
@@ -52,12 +52,11 @@ const C = {
     broker: "cccccccc-0000-4000-8000-000000000004",
 };
 
-/* serviceSetup.config.splitDrivers as the chart ships it, for REST
- * only: each other protocol's move has its own test like this one. */
+/* serviceSetup.config.splitDrivers as the chart ships it. */
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));
-    return { REST: values.serviceSetup.config.splitDrivers.REST };
+    return values.serviceSetup.config.splitDrivers;
 }
 
 /* The DriverDefs as edge.yaml loads them on upgrade. */
@@ -102,8 +101,9 @@ const site_entry = (agent, conn) => SITE.configs[App.EdgeAgentConfig][agent]
 describe("moving a site's REST connections with the chart's defaults", () => {
     const defaults = chart_defaults();
 
-    test("the chart moves REST", () => {
-        assert.equal(defaults.REST, true);
+    test("the chart holds no protocol back", () => {
+        for (const p of ["REST", "MQTT", "OPCUA", "UDP"])
+            assert.ok(!(p in defaults), `splitDrivers.${p} is set`);
     });
 
     test("the site's REST connections are the golden-output samples", () => {
@@ -121,10 +121,11 @@ describe("moving a site's REST connections with the chart's defaults", () => {
         }
     });
 
-    test("moves every built-in REST connection and nothing else", async () => {
+    test("moves every built-in REST connection", async () => {
         const cdb = site();
         const count = await run(cdb, defaults);
-        assert.equal(count.moved, 2);
+        /* The two REST connections and the other agent's MQTT one. */
+        assert.equal(count.moved, 3);
         assert.equal(count.failed, 0);
 
         /* ConnectionConfigurations: the driver changes, and nothing
@@ -159,10 +160,12 @@ describe("moving a site's REST connections with the chart's defaults", () => {
         assert.equal(xml.driverId, undefined);
         assert.equal(xml.name, "WeatherStation");
 
-        /* The Modbus driver and the other agent are untouched. */
+        /* The Modbus driver is untouched. The other agent's MQTT
+         * connection moves too, as every built-in connection does. */
         assert.deepEqual(entry(cdb, AGENT, C.plc), site_entry(AGENT, C.plc));
-        assert.ok(!cdb.writes.some(w => w.obj == OTHER || w.obj == C.plc || w.obj == C.broker),
-            "nothing about the other agent, its MQTT connection or the Modbus driver is written");
+        assert.ok(!cdb.writes.some(w => w.obj == C.plc), "the Modbus driver is not written");
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.broker).driver, Driver.MQTTSplit);
+        assert.equal(entry(cdb, OTHER, C.broker).connType, "Driver");
 
         /* The Deployment gets an edge-rest sidecar per connection,
          * keyed by its driver id, with no tag of its own: the chart's
@@ -186,28 +189,5 @@ describe("moving a site's REST connections with the chart's defaults", () => {
         const count = await run(cdb, defaults);
         assert.deepEqual(cdb.writes, []);
         assert.equal(count.moved, 0);
-    });
-
-    test("moving back leaves every config as it was, byte for byte", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        /* A site sets REST to false in its own values; Helm merges that
-         * over the chart's. */
-        const back = { ...defaults, REST: false };
-        const count = await run(cdb, back);
-        assert.equal(count.moved, 2);
-        assert.equal(text(state(cdb)), text(SITE.configs));
-
-        cdb.writes = [];
-        await run(cdb, back);
-        assert.deepEqual(cdb.writes, [], "a second run back writes nothing");
-    });
-
-    test("moving again after moving back gives the same configs", async () => {
-        const cdb = site();
-        await run(cdb, defaults);
-        await run(cdb, { ...defaults, REST: false });
-        await run(cdb, defaults);
-        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
     });
 });

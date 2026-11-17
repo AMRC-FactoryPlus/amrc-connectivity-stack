@@ -52,10 +52,6 @@ objects:
         - !u MetaDB.Class.ConfigEntry
 
   !u Edge.Class.Driver:
-    !u ACS.Driver.REST:             { name: "REST (built-in)" }
-    !u ACS.Driver.OPCUA:            { name: "OPC-UA (built-in)" }
-    !u ACS.Driver.MQTT:             { name: "MQTT (built-in)" }
-    !u ACS.Driver.UDP:              { name: "UDP (built-in)" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
     !u ACS.Driver.Test:             { name: "Test" }
@@ -103,273 +99,6 @@ configs:
   #       placeholder: "e.g. temperature"
   #       hidden: false
   !u Edge.App.DriverDef:
-    # The built-in REST driver. New REST connections use the split
-    # driver below, so this one is hidden from the new-connection form,
-    # but a connection a site has moved back to it still shows it.
-    !u ACS.Driver.REST:
-      hidden: true
-      polled: true
-      presentation: &rest_presentation
-        address:
-          title: "REST Endpoint"
-          description: "The path following the domain in a REST call URL (e.g. /status)"
-          icon: "globe"
-          placeholder: "e.g. /api/status"
-        path:
-          title: "JSON Path"
-          description: "JSONPath notation to extract specific values from the JSON response (e.g. $.status.value)"
-          icon: "code"
-          placeholder: "e.g. $.data.value"
-      internal:
-        connType: REST
-        details: RESTConnDetails
-      schema: &rest_schema
-        properties:
-          authMethod:
-            default: None
-            enum:
-              - None
-              - Basic
-            minLength: 1
-            title: Authentication Method
-            type: string
-          baseURL:
-            minLength: 1
-            title: Base URL
-            type: string
-          password:
-            format: password
-            minLength: 1
-            options:
-              dependencies:
-                authMethod: Basic
-            title: Password
-            type: string
-          username:
-            minLength: 1
-            options:
-              dependencies:
-                authMethod: Basic
-            title: Username
-            type: string
-        required:
-          - baseURL
-          - authMethod
-        title: REST Connection Details
-        type: object
-    # The built-in OPC UA driver. New OPC UA connections use the split
-    # driver below, so this one is hidden like the built-in REST one.
-    !u ACS.Driver.OPCUA:
-      hidden: true
-      polled: true
-      presentation: &opcua_presentation
-        address:
-          title: "Node ID"
-          description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
-          icon: "sitemap"
-          placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
-        path:
-          hidden: true
-      internal:
-        connType: OPC UA
-        details: OPCUAConnDetails
-      schema: &opcua_schema
-        properties:
-          endpoint:
-            minLength: 1
-            title: Endpoint
-            type: string
-            pattern: ^opc\.tcp://[^/]+:\d+(/.*)?$
-            options:
-              order: 1
-              inputAttributes:
-                placeholder: e.g. opc.tcp://myserver:1234
-              patternmessage: This doesn't look like a valid OPC UA address (opc.tcp://host:port or opc.tcp://host:port/path).
-          securityMode:
-            default: None
-            enum:
-              - None
-              - Sign
-              - SignAndEncrypt
-            minLength: 1
-            title: Security Mode
-            type: string
-            options:
-              order: 2
-          securityPolicy:
-            default: None
-            enum:
-              - None
-              - Basic128
-              - Basic192
-              - Basic192Rsa15
-              - Basic256Rsa15
-              - Basic256Sha256
-              - Aes128_Sha256
-              - Aes128_Sha256_RsaOaep
-              - PubSub_Aes128_CTR
-              - PubSub_Aes256_CTR
-              - Basic128Rsa15
-              - Basic256
-            minLength: 1
-            title: Security Policy
-            type: string
-            options:
-              order: 3
-          useCredentials:
-            format: checkbox
-            title: Use credentials
-            type: boolean
-            options:
-              order: 4
-          username:
-            minLength: 1
-            title: Username
-            type: string
-            options:
-              order: 5
-              dependencies:
-                useCredentials: true
-          password:
-            format: password
-            minLength: 1
-            title: Password
-            type: string
-            options:
-              order: 6
-              dependencies:
-                useCredentials: true
-        required:
-          - endpoint
-          - securityPolicy
-          - securityMode
-          - useCredentials
-        title: OPC-UA Server Details
-        type: object
-    # The built-in MQTT driver. New MQTT connections use the split
-    # driver below, so this one is hidden from the new-connection form,
-    # but a connection a site has moved back to it still shows it.
-    !u ACS.Driver.MQTT:
-      hidden: true
-      polled: false
-      presentation: &mqtt_presentation
-        address:
-          title: "Topic"
-          description: "The MQTT topic to subscribe to (e.g. device/+/data or factory/area1/#)"
-          icon: "exchange-alt"
-          placeholder: "e.g. /robot01/axis/1/position"
-        path:
-          title: "JSON Path"
-          description: "JSONPath notation to extract specific values from the message payload (e.g. $.data.temperature)"
-          icon: "code"
-          placeholder: "e.g. $.value"
-      internal:
-        connType: MQTT
-        details: MQTTConnDetails
-      schema: &mqtt_schema
-        properties:
-          host:
-            minLength: 1
-            title: Hostname/IP
-            type: string
-            options:
-              order: 1
-          port:
-            default: 1883
-            minLength: 1
-            title: Port
-            type: number
-            options:
-              order: 2
-          protocol:
-            default: mqtt
-            enum:
-              - mqtt
-              - mqtts
-              - tcp
-              - tls
-              - ws
-              - wss
-            minLength: 1
-            title: Protocol
-            type: string
-            options:
-              order: 3
-          clientId:
-            title: Client ID
-            type: string
-            options:
-              order: 4
-              inputAttributes:
-                placeholder: Leave blank for auto generation
-          username:
-            title: Username
-            type: string
-            options:
-              order: 5
-          password:
-            format: password
-            title: Password
-            type: string
-            options:
-              order: 6
-          cleanSession:
-            default: true
-            format: checkbox
-            title: Clean Session
-            type: boolean
-            options:
-              order: 7
-          keepAlive:
-            default: 60
-            title: Keep Alive Interval (sec)
-            type: number
-            options:
-              order: 8
-          useSSL:
-            format: checkbox
-            title: Use SSL?
-            type: boolean
-            options:
-              order: 9
-        required:
-          - host
-          - port
-          - protocol
-        title: MQTT Server Details
-        type: object
-    # The built-in UDP driver. New UDP connections use the split driver
-    # (ACS.Driver.UDPSplit), so this one is hidden from the
-    # new-connection form, but a connection a site has moved back to it
-    # still shows it.
-    !u ACS.Driver.UDP:
-      hidden: true
-      polled: false
-      presentation:
-        address:
-          title: "Port"
-          description: "The UDP port to listen on (e.g. 50205)"
-          icon: "network-wired"
-          placeholder: "e.g. 50205"
-        path:
-          title: "Data Selector"
-          description: "Selector to extract specific values from the UDP message (e.g. data[0] for first byte)"
-          icon: "filter"
-          placeholder: "e.g. data[0]"
-      internal:
-        connType: UDP
-        details: UDPConnDetails
-      schema: &udp_schema
-        properties:
-          port:
-            enum:
-              - 50205
-            title: Port
-            type: number
-            options:
-              order: 1
-        title: UDP Server Details
-        type: object
     !u ACS.Driver.Bacnet:
       polled: true
       presentation:
@@ -1188,25 +917,149 @@ configs:
         title: "Pathfindr Connection Details"
         type: object
 
-    # Split drivers that replace the internal REST, MQTT and OPC UA
-    # drivers. They share the internal driver's form, so connection
-    # details keep their field names. Service-setup moves connections
-    # between the two when serviceSetup.config.splitDrivers says so
-    # (lib/split-drivers.js). REST, MQTT and OPC UA have replaced
-    # their built-ins: each is offered under the plain name, and the
-    # chart moves their connections by default.
+    # The split drivers that replaced the Edge Agent's built-in REST,
+    # MQTT, OPC UA and UDP connections in ACS 7. They have the built-in
+    # connections' forms, so connection details keep their field names.
+    # Service-setup moves every connection still on a built-in driver
+    # to these on upgrade (lib/split-drivers.js). The built-in
+    # DriverDefs are not loaded any more, and service-setup deletes
+    # them once no connection uses them (lib/retired-drivers.js).
     !u ACS.Driver.RESTSplit:
       polled: true
-      presentation: *rest_presentation
+      presentation:
+        address:
+          title: "REST Endpoint"
+          description: "The path following the domain in a REST call URL (e.g. /status)"
+          icon: "globe"
+          placeholder: "e.g. /api/status"
+        path:
+          title: "JSON Path"
+          description: "JSONPath notation to extract specific values from the JSON response (e.g. $.status.value)"
+          icon: "code"
+          placeholder: "e.g. $.data.value"
       image:
         repository: edge-rest
-      schema: *rest_schema
+      schema:
+        properties:
+          authMethod:
+            default: None
+            enum:
+              - None
+              - Basic
+            minLength: 1
+            title: Authentication Method
+            type: string
+          baseURL:
+            minLength: 1
+            title: Base URL
+            type: string
+          password:
+            format: password
+            minLength: 1
+            options:
+              dependencies:
+                authMethod: Basic
+            title: Password
+            type: string
+          username:
+            minLength: 1
+            options:
+              dependencies:
+                authMethod: Basic
+            title: Username
+            type: string
+        required:
+          - baseURL
+          - authMethod
+        title: REST Connection Details
+        type: object
     !u ACS.Driver.MQTTSplit:
       polled: false
-      presentation: *mqtt_presentation
+      presentation:
+        address:
+          title: "Topic"
+          description: "The MQTT topic to subscribe to (e.g. device/+/data or factory/area1/#)"
+          icon: "exchange-alt"
+          placeholder: "e.g. /robot01/axis/1/position"
+        path:
+          title: "JSON Path"
+          description: "JSONPath notation to extract specific values from the message payload (e.g. $.data.temperature)"
+          icon: "code"
+          placeholder: "e.g. $.value"
       image:
         repository: edge-mqtt
-      schema: *mqtt_schema
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          port:
+            default: 1883
+            minLength: 1
+            title: Port
+            type: number
+            options:
+              order: 2
+          protocol:
+            default: mqtt
+            enum:
+              - mqtt
+              - mqtts
+              - tcp
+              - tls
+              - ws
+              - wss
+            minLength: 1
+            title: Protocol
+            type: string
+            options:
+              order: 3
+          clientId:
+            title: Client ID
+            type: string
+            options:
+              order: 4
+              inputAttributes:
+                placeholder: Leave blank for auto generation
+          username:
+            title: Username
+            type: string
+            options:
+              order: 5
+          password:
+            format: password
+            title: Password
+            type: string
+            options:
+              order: 6
+          cleanSession:
+            default: true
+            format: checkbox
+            title: Clean Session
+            type: boolean
+            options:
+              order: 7
+          keepAlive:
+            default: 60
+            title: Keep Alive Interval (sec)
+            type: number
+            options:
+              order: 8
+          useSSL:
+            format: checkbox
+            title: Use SSL?
+            type: boolean
+            options:
+              order: 9
+        required:
+          - host
+          - port
+          - protocol
+        title: MQTT Server Details
+        type: object
     # OPC UA's split driver sends each value as `{"value", "timestamp"}`,
     # with nothing for a metric path to select, so its metrics take no
     # path: the admin UI leaves it out and a move here clears it
@@ -1214,12 +1067,89 @@ configs:
     !u ACS.Driver.OPCUASplit:
       polled: true
       metricPaths: false
-      presentation: *opcua_presentation
+      presentation:
+        address:
+          title: "Node ID"
+          description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
+          icon: "sitemap"
+          placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
+        path:
+          hidden: true
       image:
         repository: edge-opcua
-      schema: *opcua_schema
-    # It has replaced the built-in: it is offered as "UDP", and the
-    # chart moves UDP connections to it by default.
+      schema:
+        properties:
+          endpoint:
+            minLength: 1
+            title: Endpoint
+            type: string
+            pattern: ^opc\.tcp://[^/]+:\d+(/.*)?$
+            options:
+              order: 1
+              inputAttributes:
+                placeholder: e.g. opc.tcp://myserver:1234
+              patternmessage: This doesn't look like a valid OPC UA address (opc.tcp://host:port or opc.tcp://host:port/path).
+          securityMode:
+            default: None
+            enum:
+              - None
+              - Sign
+              - SignAndEncrypt
+            minLength: 1
+            title: Security Mode
+            type: string
+            options:
+              order: 2
+          securityPolicy:
+            default: None
+            enum:
+              - None
+              - Basic128
+              - Basic192
+              - Basic192Rsa15
+              - Basic256Rsa15
+              - Basic256Sha256
+              - Aes128_Sha256
+              - Aes128_Sha256_RsaOaep
+              - PubSub_Aes128_CTR
+              - PubSub_Aes256_CTR
+              - Basic128Rsa15
+              - Basic256
+            minLength: 1
+            title: Security Policy
+            type: string
+            options:
+              order: 3
+          useCredentials:
+            format: checkbox
+            title: Use credentials
+            type: boolean
+            options:
+              order: 4
+          username:
+            minLength: 1
+            title: Username
+            type: string
+            options:
+              order: 5
+              dependencies:
+                useCredentials: true
+          password:
+            format: password
+            minLength: 1
+            title: Password
+            type: string
+            options:
+              order: 6
+              dependencies:
+                useCredentials: true
+        required:
+          - endpoint
+          - securityPolicy
+          - securityMode
+          - useCredentials
+        title: OPC-UA Server Details
+        type: object
     # The address field can't be hidden (the Admin UI only hides the
     # path), and every datagram goes to the empty address, so the form
     # says to leave it empty.
@@ -1244,7 +1174,7 @@ configs:
       hostPorts:
         - protocol: UDP
           field: port
-      # Its own schema: the built-in's allows only port 50205.
+      # The built-in's form allowed only port 50205.
       schema:
         properties:
           port:

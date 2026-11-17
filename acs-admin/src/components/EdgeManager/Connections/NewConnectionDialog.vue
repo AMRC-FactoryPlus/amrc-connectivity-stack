@@ -277,9 +277,10 @@ export default {
 
   computed: {
     sortedDrivers() {
-      /* A hidden driver (a split driver whose image is not published
-       * yet) is not offered for new connections, but a connection that
-       * already uses one still shows it. */
+      /* A hidden driver is not offered for new connections, but a
+       * connection that already uses one still shows it: since ACS 7
+       * that is a built-in driver kept for a connection on an Edge
+       * Agent that pins its own version 6 image. */
       const current = this.existingConnection?.configuration?.driver_uuid
       return this.dr.data
         .filter(d => !d.definition?.hidden || d.uuid === current)

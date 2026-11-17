@@ -11,7 +11,7 @@ import fs from "node:fs";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { DumpLoader } from "../lib/dumps.js";
-import { RetiredDriverCheck, RetiredDrivers } from "../lib/retired-drivers.js";
+import { MovedDrivers, RetiredDriverCheck, RetiredDrivers } from "../lib/retired-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
 const { App } = UUIDs;
@@ -94,15 +94,13 @@ describe("check_retired_drivers", () => {
             .configs[Edge.App.DriverDef];
         const members = docs.find(d => d.objects?.[Edge.Class.Driver])
             .objects[Edge.Class.Driver];
-        for (const d of Object.values(RetiredDrivers)) {
+        for (const d of [...Object.values(RetiredDrivers), ...Object.values(MovedDrivers)]) {
             assert.equal(defs[d], undefined);
             assert.equal(members[d], undefined);
         }
-        for (const d of [Driver.REST, Driver.UDP]) {
-            assert.ok(defs[d], `${d} must stay`);
-            assert.ok(members[d], `${d} must stay a driver`);
-        }
-        assert.equal(defs[Driver.UDP].internal.connType, "UDP");
+        /* Nothing loaded is built into the Edge Agent any more. */
+        for (const [d, def] of Object.entries(defs))
+            assert.equal(def.internal, undefined, `${d} is built in`);
     });
 
     test("a connection on a removed driver is warned about and keeps its DriverDef", async () => {
@@ -131,26 +129,34 @@ describe("check_retired_drivers", () => {
 
         const { res } = await run(cdb);
 
-        assert.deepEqual(res.removed, ["MTConnect"]);
+        assert.deepEqual(res.removed, ["MTConnect", "REST", "UDP"]);
         assert.ok(!cdb.app(App.DriverDefinition).has(Driver.MTConnect));
         assert.ok(!cdb.members.has(Driver.MTConnect));
     });
 
-    test("REST, UDP and the other kept drivers are never touched", async () => {
-        const cdb = site();
-        await run(cdb);
-        for (const d of [Driver.REST, Driver.UDP]) {
-            assert.ok(cdb.app(App.DriverDefinition).has(d));
-            assert.ok(cdb.members.has(d));
-            assert.ok(cdb.deleted.every(([, o]) => o != d));
-            assert.ok(cdb.unclassed.every(o => o != d));
-        }
+    /* ACS 7 moved REST, MQTT, OPC UA and UDP connections to split
+     * drivers. Their built-in DriverDefs go once nothing uses them. */
+    test("the four moved built-in drivers are the ones split-drivers.js moves", () => {
+        assert.deepEqual(MovedDrivers, {
+            "REST": Driver.REST, "MQTT": Driver.MQTT,
+            "OPC UA": Driver.OPCUA, "UDP": Driver.UDP,
+        });
     });
 
-    test("UDP is not retired: its connections get no warning", async () => {
-        assert.equal(Object.values(RetiredDrivers).includes(Driver.UDP), false);
-        assert.equal("UDP" in RetiredDrivers, false);
+    test("an unused moved built-in driver loses its DriverDef and class membership", async () => {
+        const cdb = site();
+        const { res } = await run(cdb);
+        for (const d of [Driver.REST, Driver.UDP]) {
+            assert.ok(!cdb.app(App.DriverDefinition).has(d));
+            assert.ok(!cdb.members.has(d));
+        }
+        assert.ok(res.removed.includes("REST"));
+        assert.ok(res.removed.includes("UDP"));
+    });
 
+    /* A connection held on its pinned version 6 Edge Agent keeps its
+     * built-in driver, so the Manager can still open it. */
+    test("a moved built-in driver a connection still uses is kept, with no warning", async () => {
         const cdb = site();
         cdb.set(App.ConnectionConfiguration, C.udp,
             { driver: Driver.UDP, name: "robot", edgeAgent: AGENT });
@@ -163,6 +169,9 @@ describe("check_retired_drivers", () => {
         assert.deepEqual(warnings(lines), []);
         assert.deepEqual(res.warned, []);
         assert.ok(!res.removed.includes("UDP"));
+        assert.ok(cdb.app(App.DriverDefinition).has(Driver.UDP));
+        assert.ok(cdb.members.has(Driver.UDP));
+        assert.ok(res.removed.includes("REST"));
     });
 
     test("a hand-written agent config naming a removed type is warned about", async () => {

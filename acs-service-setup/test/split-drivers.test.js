@@ -159,31 +159,40 @@ const CASES = [
 ];
 
 describe("the split DriverDefs", () => {
-    test("share the internal driver's form, so connection details keep their fields", () => {
-        for (const [name, p] of Object.entries(SplitDrivers)) {
-            const [internal, split] = [DEFS[p.internal], DEFS[p.split]];
-            assert.ok(internal.internal, "the internal DriverDef is internal");
+    /* The built-in DriverDefs are no longer loaded, so check the split
+     * forms take the details a built-in connection has. UDP's has its
+     * own form (udp-move.test.js checks it takes every built-in
+     * config). */
+    test("take a built-in connection's details field for field", () => {
+        const cases = [
+            [SplitDrivers.OPCUA, OPCUA_DETAILS], [SplitDrivers.MQTT, MQTT_DETAILS],
+            [SplitDrivers.REST, { ...REST_DETAILS, username: "u", password: "p" }],
+        ];
+        for (const [p, details] of cases) {
+            const split = DEFS[p.split];
             assert.ok(split.image?.repository, "the split DriverDef has an image");
             assert.equal(split.internal, undefined);
-            assert.equal(split.polled, internal.polled);
-            /* UDP's split driver has its own form (udp-move.test.js
-             * checks it takes every built-in config). */
-            if (name == "UDP") continue;
-            assert.deepEqual(split.schema, internal.schema);
-            assert.deepEqual(split.presentation, internal.presentation);
+            for (const k of Object.keys(details))
+                assert.ok(k in split.schema.properties, `${p.split} takes ${k}`);
         }
     });
 
+    test("the built-in DriverDefs are not loaded", () => {
+        for (const p of Object.values(SplitDrivers))
+            assert.equal(DEFS[p.internal], undefined);
+        for (const [uuid, def] of Object.entries(DEFS))
+            assert.equal(def.internal, undefined, `${uuid} is built in`);
+    });
+
     /* The new-connection form offers DriverDefs that aren't hidden, and
-     * picks them by name. Every split driver has replaced its built-in. */
-    test("offer every split driver by its plain name and hide the built-ins", () => {
+     * picks them by name: one choice per protocol. */
+    test("offer every split driver by its plain name, once", () => {
         const { REST, MQTT, OPCUA, UDP } = SplitDrivers;
         const names = load_names();
         for (const [p, name] of [[REST, "REST"], [MQTT, "MQTT"], [OPCUA, "OPC-UA"], [UDP, "UDP"]]) {
             assert.equal(DEFS[p.split].hidden, undefined);
-            assert.equal(DEFS[p.internal].hidden, true);
             assert.equal(names[p.split], name);
-            assert.equal(names[p.internal], `${name} (built-in)`);
+            assert.equal(names[p.internal], undefined);
         }
         const offered = Object.entries(DEFS)
             .filter(([, d]) => !d.hidden)
@@ -208,19 +217,41 @@ describe("the split DriverDefs", () => {
 });
 
 describe("migrate_split_drivers", () => {
-    test("does nothing by default", async () => {
-        for (const settings of [undefined, {}, { dryRun: true }, { REST: "yes" }]) {
+    /* Every built-in connection moves: there is nothing else for it
+     * to run on. */
+    test("moves every built-in connection, whatever the settings", async () => {
+        for (const settings of [undefined, {}, { REST: "yes" },
+                                { REST: true, MQTT: true, OPCUA: true, UDP: true }]) {
             const cdb = fixture();
-            await run(cdb, settings);
-            assert.deepEqual(cdb.writes, []);
+            const count = await run(cdb, settings);
+            assert.equal(count.moved, 4);
+            for (const c of CASES)
+                assert.equal(conn_entry(cdb, c.conn).connType, "Driver");
         }
+    });
+
+    /* Version 6 took false (move back) and null (leave alone). Either
+     * would leave connections the Edge Agent can't run. */
+    test("refuses false and null with an ERROR line, and still moves", async () => {
+        const cdb = fixture();
+        const lines = [];
+        const count = await new MigrateSplitDrivers({
+            fplus: { ConfigDB: cdb }, settings: { OPCUA: false, MQTT: null },
+            log: (...args) => lines.push(args),
+        }).run();
+
+        assert.equal(count.moved, 4);
+        const refused = lines.filter(l => /^ERROR: serviceSetup.config.splitDrivers/.test(l[0]));
+        assert.deepEqual(refused.map(l => [l[1], l[2]]), [["MQTT", null], ["OPCUA", false]]);
+        assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
+        assert.equal(conn_entry(cdb, C.mqtt).connType, "Driver");
     });
 
     for (const c of CASES) {
         test(`moves ${c.name} connections to the split driver`, async () => {
             const cdb = fixture();
             const before = cdb.get(App.ConnectionConfiguration, c.conn);
-            const count = await run(cdb, { [c.name]: true });
+            await run(cdb);
 
             const cc = cdb.get(App.ConnectionConfiguration, c.conn);
             assert.equal(cc.driver, SplitDrivers[c.name].split);
@@ -235,59 +266,38 @@ describe("migrate_split_drivers", () => {
             assert.equal(e[c.key], undefined);
             assert.equal(e.payloadFormat, c.format[1]);
             assert.deepEqual(e.devices.map(d => d.payloadFormat), [c.format[1], c.format[1]]);
-            /* Tags and everything else are untouched. */
-            assert.deepEqual(e.devices.map(d => d.tags), [0, 1].map(() => device("x").tags));
+            /* Tags are untouched, but for OPC UA's paths, which its
+             * split driver doesn't take. */
+            const tags = device("x").tags.map(t => c.name == "OPCUA" ? { ...t, path: "" } : t);
+            assert.deepEqual(e.devices.map(d => d.tags), [tags, tags]);
             assert.equal(e.name, c.entry_name);
 
             assert.deepEqual(drivers(cdb)[c.entry_name],
                 { ...(c.deployment ?? {}), image: { repository: c.image } });
             /* Other connections are untouched. */
             assert.deepEqual(drivers(cdb).PLC, { image: { repository: "edge-modbus" } });
-
-            if (c.name == "REST") {
-                /* The REST connection with no devices moves too. */
-                assert.equal(count.moved, 2);
-                assert.equal(cdb.get(App.ConnectionConfiguration, C.empty).driver, Driver.RESTSplit);
-            }
-            else assert.equal(count.moved, 1);
-        });
-
-        test(`moves ${c.name} connections back to exactly where they were`, async () => {
-            const start = fixture();
-            const cdb = fixture();
-            await run(cdb, { [c.name]: true });
-            await run(cdb, { [c.name]: false });
-
-            for (const app of [App.ConnectionConfiguration, App.EdgeAgentConfig, Edge.App.Deployment])
-                assert.deepEqual(
-                    Object.fromEntries(cdb.app(app)),
-                    Object.fromEntries(start.app(app)));
         });
     }
 
-    test("only touches the protocols it is asked to", async () => {
+    test("moves the REST connection with no devices too", async () => {
         const cdb = fixture();
-        await run(cdb, { OPCUA: true });
-        assert.equal(conn_entry(cdb, C.mqtt).connType, "MQTT");
-        assert.equal(conn_entry(cdb, C.rest).connType, "REST");
-        assert.equal(cdb.get(App.ConnectionConfiguration, C.rest).driver, Driver.REST);
-        assert.deepEqual(Object.keys(drivers(cdb)).sort(), ["OPC", "PLC"]);
+        await run(cdb);
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.empty).driver, Driver.RESTSplit);
     });
 
     test("moves every protocol at once", async () => {
         const cdb = fixture();
-        await run(cdb, { OPCUA: true, MQTT: true, REST: true });
+        await run(cdb);
         assert.deepEqual(Object.keys(drivers(cdb)).sort(), ["Broker", "OPC", "PLC", "Printer"]);
         for (const c of CASES)
             assert.equal(conn_entry(cdb, c.conn).connType, "Driver");
+        assert.equal(conn_entry(cdb, C.modbus).connType, "Driver");
     });
 
     test("a second run changes nothing", async () => {
-        for (const settings of [{ OPCUA: true, MQTT: true, REST: true },
-                                { OPCUA: false, MQTT: false, REST: false }]) {
+        for (const settings of [{}, { OPCUA: false, MQTT: null }]) {
             const cdb = fixture();
-            await run(cdb, { OPCUA: true, MQTT: true, REST: true });
-            await run(cdb, settings);
+            await run(cdb);
             const writes = cdb.writes.length;
             const count = await run(cdb, settings);
             assert.equal(cdb.writes.length, writes);
@@ -297,19 +307,19 @@ describe("migrate_split_drivers", () => {
 
     test("a dry run writes nothing but counts what would move", async () => {
         const cdb = fixture();
-        const count = await run(cdb, { OPCUA: true, REST: true, dryRun: true });
+        const count = await run(cdb, { dryRun: true });
         assert.deepEqual(cdb.writes, []);
-        assert.equal(count.moved, 3);
+        assert.equal(count.moved, 4);
     });
 
     test("finishes a move a failed run left half done", async () => {
         const cdb = fixture();
-        /* The agent config was written but the connection was not. */
+        /* The agent config was written but the connections were not. */
         const half = fixture();
-        await run(half, { OPCUA: true });
+        await run(half);
         cdb.set(App.EdgeAgentConfig, AGENT, half.get(App.EdgeAgentConfig, AGENT));
 
-        await run(cdb, { OPCUA: true });
+        await run(cdb);
         for (const app of [App.ConnectionConfiguration, App.EdgeAgentConfig, Edge.App.Deployment])
             assert.deepEqual(
                 Object.fromEntries(cdb.app(app)),
@@ -318,15 +328,15 @@ describe("migrate_split_drivers", () => {
 
     test("repairs an agent entry for a connection already on the split driver", async () => {
         const cdb = fixture();
-        await run(cdb, { REST: true });
-        /* Someone hand-edits the agent config back to the internal type. */
+        await run(cdb);
+        /* Someone hand-edits the agent config back to the built-in type. */
         const config = cdb.get(App.EdgeAgentConfig, AGENT);
         const e = config.deviceConnections.find(c => c.uuid == C.rest);
         e.connType = "REST";
         e.RESTConnDetails = e.DriverDetails;
         cdb.set(App.EdgeAgentConfig, AGENT, config);
 
-        const count = await run(cdb, { REST: true });
+        const count = await run(cdb);
         assert.equal(count.repaired, 1);
         assert.equal(conn_entry(cdb, C.rest).connType, "Driver");
         assert.equal(conn_entry(cdb, C.rest).RESTConnDetails, undefined);
@@ -335,13 +345,13 @@ describe("migrate_split_drivers", () => {
     test("rebuilds a config someone else saved first", async () => {
         const cdb = fixture();
         cdb.stale.push([App.EdgeAgentConfig, AGENT], [Edge.App.Deployment, AGENT]);
-        const count = await run(cdb, { OPCUA: true });
-        assert.equal(count.moved, 1);
+        const count = await run(cdb);
+        assert.equal(count.moved, 4);
         assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
         assert.ok(drivers(cdb).OPC);
     });
 
-    test("keeps an OPC UA connection's JSON format both ways", async () => {
+    test("keeps an OPC UA connection's JSON format", async () => {
         const cdb = fixture();
         const cc = cdb.get(App.ConnectionConfiguration, C.opcua);
         cc.source.payloadFormat = "JSON";
@@ -352,9 +362,7 @@ describe("migrate_split_drivers", () => {
         e.devices.forEach(d => d.payloadFormat = "JSON");
         cdb.set(App.EdgeAgentConfig, AGENT, config);
 
-        await run(cdb, { OPCUA: true });
-        assert.equal(conn_entry(cdb, C.opcua).payloadFormat, "JSON");
-        await run(cdb, { OPCUA: false });
+        await run(cdb);
         assert.equal(conn_entry(cdb, C.opcua).payloadFormat, "JSON");
         assert.equal(cdb.get(App.ConnectionConfiguration, C.opcua).source.payloadFormat, "JSON");
     });
@@ -365,14 +373,22 @@ describe("migrate_split_drivers", () => {
         const def = structuredClone(DEFS[Driver.OPCUASplit]);
         delete def.image;
         cdb.set(App.DriverDefinition, Driver.OPCUASplit, def);
-        await run(cdb, { REST: true, OPCUA: true });
-        assert.deepEqual(cdb.writes, []);
+        const lines = [];
+        const count = await new MigrateSplitDrivers({
+            fplus: { ConfigDB: cdb }, settings: {}, log: (...args) => lines.push(args),
+        }).run();
+
+        assert.equal(count.moved, 1);
+        assert.equal(conn_entry(cdb, C.mqtt).connType, "Driver");
+        assert.equal(conn_entry(cdb, C.rest).connType, "REST");
+        assert.equal(conn_entry(cdb, C.opcua).connType, "OPC UA");
+        assert.equal(lines.filter(l => /^ERROR: %s: split DriverDef/.test(l[0])).length, 2);
     });
 
     test("never creates a Deployment", async () => {
         const cdb = fixture();
         cdb.app(Edge.App.Deployment).delete(AGENT);
-        await run(cdb, { OPCUA: true });
+        await run(cdb);
         assert.equal(cdb.get(Edge.App.Deployment, AGENT), undefined);
         assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
     });
@@ -385,9 +401,9 @@ describe("migrate_split_drivers", () => {
                 throw new Error("boom");
             return put(a, o, c, opts);
         };
-        const count = await run(cdb, { REST: true });
+        const count = await run(cdb);
         assert.equal(count.failed, 1);
-        assert.equal(count.moved, 1);
+        assert.equal(count.moved, 3);
         assert.equal(cdb.get(App.ConnectionConfiguration, C.empty).driver, Driver.RESTSplit);
     });
 });
@@ -414,16 +430,15 @@ describe("driver ids", () => {
         return cdb;
     }
 
-    test("an existing split driver gets an id with no move asked for", async () => {
+    test("an existing split driver gets an id before the moves", async () => {
         const cdb = dotted();
         const count = await run(cdb, {});
 
         assert.equal(count.ids, 1);
         assert.equal(conn_entry(cdb, C.modbus).driverId, PLC_ID);
         assert.equal(conn_entry(cdb, C.modbus).name, "plc.example.org");
-        assert.deepEqual(drivers(cdb), { [PLC_ID]: { image: { repository: "edge-modbus" } } });
-        /* The built-in REST connection has no sidecar, so no id. */
-        assert.equal(conn_entry(cdb, C.rest).driverId, undefined);
+        assert.deepEqual(drivers(cdb)[PLC_ID], { image: { repository: "edge-modbus" } });
+        assert.equal(drivers(cdb)["plc.example.org"], undefined);
     });
 
     test("a second run changes nothing", async () => {
@@ -442,11 +457,12 @@ describe("driver ids", () => {
         assert.equal(count.ids, 1);
     });
 
-    test("an agent whose names all work is not written", async () => {
+    test("an agent whose names all work gets no driver ids", async () => {
         const cdb = fixture();
         const count = await run(cdb, {});
-        assert.deepEqual(cdb.writes, []);
         assert.equal(count.ids, 0);
+        for (const e of cdb.get(App.EdgeAgentConfig, AGENT).deviceConnections)
+            assert.equal(e.driverId, undefined);
     });
 
     test("finishes a deployment left keyed by the name", async () => {
@@ -458,31 +474,19 @@ describe("driver ids", () => {
         cdb.set(Edge.App.Deployment, AGENT, dep);
 
         assert.equal((await run(cdb, {})).ids, 1);
-        assert.deepEqual(Object.keys(drivers(cdb)), [PLC_ID]);
+        assert.ok(drivers(cdb)[PLC_ID]);
+        assert.equal(drivers(cdb)["plc.example.org"], undefined);
     });
 
     test("a connection moved to its split driver uses its id", async () => {
         const cdb = dotted();
-        await run(cdb, { REST: true });
+        await run(cdb);
 
         const e = conn_entry(cdb, C.rest);
         assert.equal(e.connType, "Driver");
         assert.equal(e.driverId, WEB_ID);
-        assert.deepEqual(Object.keys(drivers(cdb)).sort(), [PLC_ID, WEB_ID]);
+        assert.deepEqual(Object.keys(drivers(cdb)).sort(), ["Broker", "OPC", PLC_ID, WEB_ID]);
         assert.deepEqual(drivers(cdb)[WEB_ID].image, { repository: "edge-rest" });
-    });
-
-    test("a connection moved back loses its id and its sidecar", async () => {
-        const start = dotted();
-        await run(start, {});
-        const cdb = dotted();
-        await run(cdb, { REST: true });
-        await run(cdb, { REST: false });
-
-        for (const app of [App.ConnectionConfiguration, App.EdgeAgentConfig, Edge.App.Deployment])
-            assert.deepEqual(
-                Object.fromEntries(cdb.app(app)),
-                Object.fromEntries(start.app(app)));
     });
 
     test("a deployment keyed by both name and id keeps the id's values", async () => {
@@ -492,7 +496,8 @@ describe("driver ids", () => {
         cdb.set(Edge.App.Deployment, AGENT, dep);
 
         await run(cdb, {});
-        assert.deepEqual(drivers(cdb),
-            { [PLC_ID]: { image: { repository: "edge-modbus" }, hostPaths: [] } });
+        assert.deepEqual(drivers(cdb)[PLC_ID],
+            { image: { repository: "edge-modbus" }, hostPaths: [] });
+        assert.equal(drivers(cdb)["plc.example.org"], undefined);
     });
 });

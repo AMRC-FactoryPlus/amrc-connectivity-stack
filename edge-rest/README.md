@@ -2,7 +2,7 @@
 
 An Edge Agent split driver for HTTP devices, written in Rust on
 [`lib/rs-edge-driver`](../lib/rs-edge-driver). It replaces the Edge
-Agent's built-in REST connection (`acs-edge/lib/devices/REST.ts`) and
+Agent's built-in REST connection, which ACS 7 removed, and
 takes the same connection details, so a connection moves to it with no
 change to its details, addresses or metric paths. Its DriverDef is
 `ACS.Driver.RESTSplit` in `acs-service-setup/dumps/edge.yaml`, which the
@@ -104,9 +104,9 @@ tests/driver.rs    the driver end to end against a fake Edge Agent and a stub se
 cargo test
 ```
 
-The golden-output harness runs the real Edge Agent once with the
-built-in REST connection and once with this driver, and requires the
-same Sparkplug output. Build the driver, then from `acs-edge`:
+The golden-output harness runs the real Edge Agent with this driver and
+requires the same Sparkplug output as the built-in REST connection gave,
+from runs recorded before ACS 7 removed it. Build the driver, then from `acs-edge`:
 
 ```sh
 GOLDEN_DRIVER=../edge-rest/target/release/driver GOLDEN_PROTOCOL=REST npx jest tests/golden -t "split driver"

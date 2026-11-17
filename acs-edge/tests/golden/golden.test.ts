@@ -1,7 +1,7 @@
 /*
  * ACS Edge Agent
- * Golden-output harness: the built-in connections against themselves,
- * and split drivers against the built-in connections they replace
+ * Golden-output harness: split drivers against the recorded runs of the
+ * built-in connections they replaced
  * Copyright 2026 University of Sheffield
  */
 
@@ -9,83 +9,47 @@ import dgram from "dgram";
 import fs from "fs";
 import path from "path";
 
-import * as UUIDs from "../../lib/uuids.js";
-
-import { Fixture, read_fixture } from "../fixtures/drivers/fixture.js";
+import type { Fixture } from "../fixtures/drivers/fixture.js";
 import { Kinds } from "./devices/index.js";
 import { UdpDevice } from "./devices/udp.js";
-import { env_driver, reference_ready, rest_reference } from "./driver.js";
-import { compare_runs, golden, GoldenResult, merge_runs, run_agent } from "./harness.js";
+import { DriverSpec, env_driver, reference_ready, rest_reference } from "./driver.js";
+import { compare_runs, GoldenResult, run_agent, RunOpts, RunResult } from "./harness.js";
 import { inproc_rest } from "./inproc-rest.js";
 import { PayloadFormatMap } from "./migrate.js";
+import {
+    ALL, DATETIME_KEY, DATETIMES, datetime_fixture, dotted_key,
+    DOTTED_NAME, MoveCase, move_key, MQTT_MOVE, of_protocol, OPCUA_MOVE,
+    opcua_writes, read_sample, recorded, references, REST_MOVE, sample_key,
+    several_key, UDP_MOVE,
+} from "./references.js";
+import { read_snapshot, snapshot_path } from "./snapshot.js";
 import { tamper } from "./tamper.js";
 
 jest.setTimeout(180_000);
-
-const SAMPLES = path.join(__dirname, "../fixtures/drivers/samples");
-/* Samples the fixture generator can't make, built by hand. */
-const HAND_MADE = path.join(__dirname, "samples");
-
-/* The committed samples, or every fixture in GOLDEN_FIXTURES. */
-function fixtures (): [string, Fixture][] {
-    const dirs = process.env.GOLDEN_FIXTURES
-        ? [process.env.GOLDEN_FIXTURES] : [SAMPLES, HAND_MADE];
-    const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-    return dirs.flatMap(dir => fs.readdirSync(dir).sort()
-        .filter(d => fs.existsSync(path.join(dir, d, "fixture.json")))
-        .map((d): [string, Fixture] => [d, truncate(read_fixture(path.join(dir, d)), cap)]));
-}
-
-/* A fixture cut to its first `cap` ms, for long private fixtures. */
-function truncate (f: Fixture, cap: number): Fixture {
-    if (f.meta.duration_ms <= cap) return f;
-    return {
-        ...f,
-        meta: { ...f.meta, duration_ms: cap },
-        events: f.events.filter(e => e.t <= cap),
-    };
-}
-
-const ALL = fixtures();
-const RUNNABLE = ALL.filter(([, f]) => Kinds[f.meta.protocol]);
-const of_protocol = (p: string) => RUNNABLE.filter(([, f]) => f.meta.protocol == p);
-/* The first fixture of each protocol. */
-const ONE_EACH = RUNNABLE.filter(([, f], i) =>
-    RUNNABLE.findIndex(([, g]) => g.meta.protocol == f.meta.protocol) == i);
 
 /* GOLDEN_DRIVER runs a real driver against GOLDEN_PROTOCOL fixtures.
  * Without it the reference REST driver runs against REST fixtures. */
 const DRIVER = env_driver();
 const DRIVER_PROTOCOL = DRIVER ? process.env.GOLDEN_PROTOCOL ?? "REST" : "REST";
 
-/* The site one of service-setup's move tests starts from, and the
- * configs the move leaves. Each case is a connection the test moves:
- * [name, sample, entry before, entry after]. A sample is a directory
- * of the committed samples, or a path from acs-edge/tests. */
-const move_cases = (test: string) => {
-    const dir = path.join(__dirname, "../../../acs-service-setup/test", test);
-    const read = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-    const site = read("site.json");
-    const moved = read("moved.json");
-    const agent_configs = (configs: any) =>
-        Object.values(configs[UUIDs.App.AgentConfig]) as any[];
-    const find = (configs: any, uuid: string) => agent_configs(configs)
-        .flatMap(c => c.deviceConnections)
-        .find((e: any) => e.uuid == uuid);
-    const cases = Object.entries(site.samples as { [uuid: string]: string })
-        .map(([uuid, sample]): [string, string, any, any] => {
-            const before = find(site.configs, uuid);
-            return [before.name, sample, before, find(moved, uuid)];
-        });
-    return { cases, secrets: site.secrets as { [k: string]: string } };
-};
-const REST_MOVE = move_cases("rest-move");
-const MQTT_MOVE = move_cases("mqtt-move");
-const UDP_MOVE = move_cases("udp-move");
-const OPCUA_MOVE = move_cases("opcua-move");
+/* The driver under test, which needs lib/js-edge-driver's dependencies
+ * when it is the reference REST driver. */
+function driver (): DriverSpec {
+    if (DRIVER) return DRIVER;
+    if (!reference_ready())
+        throw new Error("The reference REST driver needs lib/js-edge-driver's "
+            + "dependencies: run `npm ci` in lib/js-edge-driver");
+    return rest_reference();
+}
+const DRIVER_NAME = DRIVER?.name ?? "the reference REST driver";
 
-const sample_dir = (sample: string) => sample.includes("/")
-    ? path.join(__dirname, "..", sample) : path.join(SAMPLES, sample);
+/* Run `fixture` and compare it with the recorded built-in run `key`, at
+ * the speed that run was recorded at. */
+async function against (key: string, fixture: Fixture, opts: RunOpts) {
+    const ref = recorded(key, fixture);
+    const run = await run_agent(fixture, { ...opts, speed: ref.speed });
+    return compare_runs(ref.run, run);
+}
 
 /* What the fake MQTT broker records for a connection's details: see
  * session() in devices/mqtt.ts. */
@@ -110,10 +74,29 @@ function explain (r: GoldenResult) {
         + `\n\n--- ${r.b.label} output ---\n${r.b.log.slice(-4000)}`;
 }
 
+/* describe.each, but defining nothing for an empty table, which jest
+ * refuses. */
+function each<T extends any[]> (table: T[]) {
+    return table.length ? describe.each(table)
+        : (_name: string, _fn: (...args: T) => void) => {};
+}
+
+/* Each protocol's move cases, when that protocol's driver is under
+ * test. */
+const moves = (p: string, cases: MoveCase[]): [string, MoveCase][] =>
+    DRIVER_PROTOCOL == p ? cases.map(c => [c.name, c]) : [];
+
 describe("Golden-output harness", () => {
     it("has a fake device for every fixture protocol", () => {
         const missing = ALL.filter(([, f]) => !Kinds[f.meta.protocol])
             .map(([d, f]) => `${d} (${f.meta.protocol})`);
+        expect(missing).toEqual([]);
+    });
+
+    it("has a recorded built-in run for every comparison", () => {
+        const missing = references().map(r => r.key)
+            .filter(k => !read_snapshot(k))
+            .map(k => snapshot_path(k));
         expect(missing).toEqual([]);
     });
 
@@ -149,19 +132,27 @@ describe("Golden-output harness", () => {
         expect(dev.delivered).toBe(3);
     });
 
-    describe.each(RUNNABLE)("self-check %s", (name, fixture) => {
-        it("built-in matches built-in", async () => {
-            const r = await golden({ a: fixture });
+    /* The driver twice on one sample: the runs must match, which shows
+     * the harness and the driver are deterministic. */
+    each(of_protocol(DRIVER_PROTOCOL).slice(0, 1))("self-check %s", (name, fixture) => {
+        it(`${DRIVER_NAME} matches itself`, async () => {
+            const a = await run_agent(fixture, { driver: driver() });
+            const b = await run_agent(fixture, { driver: driver() });
+            const r = compare_runs(a, b);
             show(`${name} self-check`, r);
             expect(r.comparison.values).toBeGreaterThan(0);
             expect(explain(r)).toBe("");
         });
     });
 
-    describe.each(ONE_EACH)("negative check %s", (name, fixture) => {
+    /* One recorded value changed: the comparison with the recorded run
+     * must fail and name the metric. */
+    each(of_protocol(DRIVER_PROTOCOL).slice(0, 1))("negative check %s", (name, fixture) => {
         it("a changed value fails with a diff naming the metric", async () => {
             const changed = tamper(fixture);
-            const r = await golden({ a: fixture, b: changed.fixture });
+            const ref = recorded(sample_key(name), fixture);
+            const run = await run_agent(changed.fixture, { driver: driver(), speed: ref.speed });
+            const r = compare_runs(ref.run, run);
             show(`${name} negative check`, r);
             expect(r.comparison.ok).toBe(false);
             const text = r.comparison.diffs.join("\n");
@@ -170,13 +161,9 @@ describe("Golden-output harness", () => {
         });
     });
 
-    describe.each(of_protocol(DRIVER_PROTOCOL))("split driver %s", (name, fixture) => {
-        const driver = DRIVER ?? rest_reference();
-        it(`${driver.name} matches built-in ${DRIVER_PROTOCOL}`, async () => {
-            if (!DRIVER && !reference_ready())
-                throw new Error("The reference REST driver needs lib/js-edge-driver's "
-                    + "dependencies: run `npm ci` in lib/js-edge-driver");
-            const r = await golden({ a: fixture }, { b: { driver } });
+    each(of_protocol(DRIVER_PROTOCOL))("split driver %s", (name, fixture) => {
+        it(`${DRIVER_NAME} matches the recorded built-in ${DRIVER_PROTOCOL}`, async () => {
+            const r = await against(sample_key(name), fixture, { driver: driver() });
             show(`${name} split`, r);
             expect(r.comparison.values).toBeGreaterThan(0);
             expect(explain(r)).toBe("");
@@ -187,14 +174,10 @@ describe("Golden-output harness", () => {
      * its driver id, because the driver broker drops a dotted id. The
      * move gives it a driverId, and the driver runs under that. */
     describe.each(of_protocol("REST").slice(0, 1))("dotted connection name %s", (name, fixture) => {
-        it("the reference REST driver matches built-in REST", async () => {
-            if (!reference_ready())
-                throw new Error("The reference REST driver needs lib/js-edge-driver's "
-                    + "dependencies: run `npm ci` in lib/js-edge-driver");
-            const connection_name = "api.example.org";
-            const r = await golden({ a: fixture }, {
-                a: { connection_name },
-                b: { connection_name, driver: rest_reference() },
+        it(`${DRIVER_PROTOCOL == "REST" ? DRIVER_NAME : "the reference REST driver"} matches the recorded built-in REST`, async () => {
+            const r = await against(dotted_key(name), fixture, {
+                connection_name: DOTTED_NAME,
+                driver: DRIVER_PROTOCOL == "REST" ? driver() : rest_reference(),
             });
             show(`${name} dotted name`, r);
             expect(r.comparison.values).toBeGreaterThan(0);
@@ -202,35 +185,23 @@ describe("Golden-output harness", () => {
         });
     });
 
-    /* The site acs-service-setup/test/rest-move.test.js moves with the
-     * chart's defaults: the built-in REST connections as the site had
-     * them, against the Edge Agent config entries service-setup left.
-     * That test checks the move gives exactly moved.json, so this runs
-     * what an upgrade writes, not a copy of the move. */
-    /* jest refuses an empty table, so only define these for REST. */
-    if (DRIVER_PROTOCOL == "REST") describe.each(REST_MOVE.cases)(
-        "split driver after service-setup's move %s",
-        (name, sample, before, after) => {
-            const driver = DRIVER ?? rest_reference();
-            it(`${driver.name} matches built-in REST`, async () => {
-                if (!DRIVER && !reference_ready())
-                    throw new Error("The reference REST driver needs lib/js-edge-driver's "
-                        + "dependencies: run `npm ci` in lib/js-edge-driver");
-                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-                const fixture = truncate(read_fixture(sample_dir(sample)), cap);
+    /* The connections of the site service-setup's REST move test moves,
+     * as the move left them, against the built-in connections as the
+     * site had them. */
+    each(moves("REST", REST_MOVE.cases))(
+        "split driver after service-setup's move %s", (name, c) => {
+            it(`${DRIVER_NAME} matches the recorded built-in REST`, async () => {
                 const { secrets } = REST_MOVE;
-                const r = await golden({ a: fixture }, {
-                    a: { entry: before, secrets },
-                    b: { entry: after, secrets, driver },
-                });
+                const r = await against(move_key("rest-move", name), read_sample(c.sample),
+                    { entry: c.after, secrets, driver: driver() });
                 show(`${name} after the move`, r);
-                expect(after.connType).toBe("Driver");
+                expect(c.after.connType).toBe("Driver");
                 expect(r.comparison.values).toBeGreaterThan(0);
                 expect(explain(r)).toBe("");
 
                 /* The driver sends the credentials the built-in did, with
                  * the secret filled in from its placeholder. */
-                const details = before.RESTConnDetails;
+                const details = c.before.RESTConnDetails;
                 const expected = details.authMethod == "Basic"
                     ? ["Basic " + Buffer.from(
                         `${details.username}:${secrets[details.password]}`).toString("base64")]
@@ -240,100 +211,68 @@ describe("Golden-output harness", () => {
             });
         });
 
-    /* The same for service-setup's MQTT move test. MQTT has no
-     * reference driver, so this needs GOLDEN_DRIVER. The fake broker
-     * serves TLS where the connection uses it, and records the client
-     * id, credentials, keep-alive and clean session each run connected
+    /* The same for service-setup's MQTT move test. The fake broker serves
+     * TLS where the connection uses it, and records the client id,
+     * credentials, keep-alive and clean session each run connected
      * with, which must be the connection's details in both runs. */
-    if (DRIVER && DRIVER_PROTOCOL == "MQTT") describe.each(MQTT_MOVE.cases)(
-        "split driver after service-setup's move %s",
-        (name, sample, before, after) => {
-            it(`${DRIVER!.name} matches built-in MQTT`, async () => {
-                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-                const fixture = truncate(read_fixture(sample_dir(sample)), cap);
+    each(moves("MQTT", MQTT_MOVE.cases))(
+        "split driver after service-setup's move %s", (name, c) => {
+            it(`${DRIVER_NAME} matches the recorded built-in MQTT`, async () => {
                 const { secrets } = MQTT_MOVE;
-                const r = await golden({ a: fixture }, {
-                    a: { entry: before, secrets },
-                    b: { entry: after, secrets, driver: DRIVER },
-                });
+                const r = await against(move_key("mqtt-move", name), read_sample(c.sample),
+                    { entry: c.after, secrets, driver: driver() });
                 show(`${name} after the move`, r);
-                expect(after.connType).toBe("Driver");
+                expect(c.after.connType).toBe("Driver");
                 expect(r.comparison.values).toBeGreaterThan(0);
                 expect(explain(r)).toBe("");
 
-                const expected = [mqtt_session(before.MQTTConnDetails, secrets)];
+                const expected = [mqtt_session(c.before.MQTTConnDetails, secrets)];
                 expect(r.a.credentials).toEqual(expected);
                 expect(r.b.credentials).toEqual(expected);
             });
         });
 
-    /* The same for acs-service-setup/test/udp-move.test.js: three UDP
-     * connections, one in each payload format, on three agents. Each
-     * runs with its port opened on the host in the real cluster; here
-     * the sender sends to the driver's port on localhost. */
-    if (DRIVER_PROTOCOL == "UDP") describe.each(UDP_MOVE.cases)(
-        "split driver after service-setup's move %s",
-        (name, sample, before, after) => {
-            it(`${DRIVER!.name} matches built-in UDP`, async () => {
-                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-                const fixture = truncate(read_fixture(sample_dir(sample)), cap);
-                const r = await golden({ a: fixture }, {
-                    a: { entry: before },
-                    b: { entry: after, driver: DRIVER! },
-                });
+    /* The same for service-setup's UDP move test: three UDP connections,
+     * one in each payload format, on three agents. Each runs with its
+     * port opened on the host in the real cluster; here the sender
+     * sends to the driver's port on localhost. */
+    each(moves("UDP", UDP_MOVE.cases))(
+        "split driver after service-setup's move %s", (name, c) => {
+            it(`${DRIVER_NAME} matches the recorded built-in UDP`, async () => {
+                const r = await against(move_key("udp-move", name), read_sample(c.sample),
+                    { entry: c.after, driver: driver() });
                 show(`${name} after the move`, r);
-                expect(before.connType).toBe("UDP");
-                expect(after.connType).toBe("Driver");
-                expect(after.DriverDetails).toEqual(before.UDPConnDetails);
+                expect(c.before.connType).toBe("UDP");
+                expect(c.after.connType).toBe("Driver");
+                expect(c.after.DriverDetails).toEqual(c.before.UDPConnDetails);
                 expect(r.comparison.values).toBeGreaterThan(0);
                 expect(explain(r)).toBe("");
             });
         });
 
-    /* The same for acs-service-setup/test/opcua-move.test.js. Both
-     * runs keep the connection's security and credentials, and send
-     * the same write, so the fake server sees what each sent. */
-    if (DRIVER_PROTOCOL == "OPC UA") describe.each(OPCUA_MOVE.cases)(
-        "split driver after service-setup's move %s",
-        (name, sample, before, after) => {
-            const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-            const fixture = () => truncate(read_fixture(path.join(SAMPLES, sample)), cap);
+    /* The same for service-setup's OPC UA move test. Both runs kept the
+     * connection's security and credentials, and sent the same write,
+     * so the fake server saw what each sent. The built-in connection
+     * gave several devices' values to the wrong device, so where a
+     * connection has several devices the recorded run is the built-in
+     * run with one device at a time. */
+    each(moves("OPC UA", OPCUA_MOVE.cases))(
+        "split driver after service-setup's move %s", (name, c) => {
             const { secrets } = OPCUA_MOVE;
-            const details = before.OPCUAConnDetails;
+            const details = c.before.OPCUAConnDetails;
+            const { writable, commands } = opcua_writes(c.before);
 
-            /* A metric the move left writable. */
-            const writable = before.devices.flatMap((d: any) => d.tags
-                .filter((t: any) => /SET/.test(t.method))
-                .map((t: any) => ({ device: d.deviceId, tag: t })));
-            const commands = writable.map(({ device, tag }: any) => ({
-                t: 1500, device, metric: tag.Name, type: "Double", value: 300.25,
-            }));
+            it(`${DRIVER_NAME} matches the recorded built-in OPC UA`, async () => {
+                expect(c.before.connType).toBe("OPC UA");
+                expect(c.after.connType).toBe("Driver");
+                expect(c.after.DriverDetails).toEqual(details);
 
-            it(`${DRIVER!.name} matches built-in OPC UA`, async () => {
-                expect(before.connType).toBe("OPC UA");
-                expect(after.connType).toBe("Driver");
-                expect(after.DriverDetails).toEqual(details);
-
-                const split = await run_agent(fixture(), {
-                    entry: after, secrets, secure: true, commands, driver: DRIVER!,
-                });
-                /* The built-in connection gives several devices' values
-                 * to the wrong device, so with several devices the
-                 * reference is the built-in run with one device at a
-                 * time. Runs share the process's environment, so they
-                 * go one after another. */
-                const runs = [];
-                for (const d of before.devices.length == 1 ? [] : before.devices)
-                    runs.push(await run_agent(fixture(), {
-                        entry: { ...before, devices: [d] }, secrets, secure: true, commands,
-                    }));
-                const reference = runs.length
-                    ? merge_runs(runs, "built-in, one device at a time")
-                    : await run_agent(fixture(), { entry: before, secrets, secure: true, commands });
-                const r = compare_runs(reference, split);
+                const r = await against(move_key("opcua-move", name), read_sample(c.sample),
+                    { entry: c.after, secrets, secure: true, commands, driver: driver() });
                 show(`${name} after the move`, r);
                 expect(r.comparison.values).toBeGreaterThan(0);
                 expect(explain(r)).toBe("");
+                const reference: RunResult = r.a, split: RunResult = r.b;
 
                 /* The driver logs in as the built-in did, with the same
                  * security and the secret filled in. */
@@ -357,57 +296,38 @@ describe("Golden-output harness", () => {
                 }
             });
 
-            if (before.devices.length > 1)
-                it("the built-in connection gives values to the wrong device", async () => {
-                    /* Why the reference above runs one device at a time.
-                     * The release notes warn that such devices start
-                     * publishing values after the move. */
-                    const built_in = await run_agent(fixture(), { entry: before, secrets });
-                    const split = await run_agent(fixture(), { entry: after, secrets, driver: DRIVER! });
-                    const r = compare_runs(built_in, split);
+            if (c.before.devices.length > 1)
+                it("the built-in connection gave values to the wrong device", async () => {
+                    /* Why the recorded run above is one device at a
+                     * time. The release notes warn that such devices
+                     * start publishing values after the move. */
+                    const r = await against(several_key(name), read_sample(c.sample),
+                        { entry: c.after, secrets, driver: driver() });
                     show(`${name} built-in with several devices`, r);
                     expect(r.comparison.ok).toBe(false);
                 });
         });
 
-    /* The built-in connection hands the agent node-opcua's Date for a
-     * DateTime node, which the agent publishes as 0. The driver sends
+    /* The built-in connection handed the agent node-opcua's Date for a
+     * DateTime node, which the agent published as 0. The driver sends
      * milliseconds, which the agent publishes as the date. One real
      * metric is a DateTime, so this pins the difference rather than
      * leaving DateTime out of the comparison unremarked. */
-    if (DRIVER_PROTOCOL == "OPC UA") describe("split driver DateTime", () => {
+    each(DRIVER_PROTOCOL == "OPC UA" ? [["DateTime"]] : [])("split driver %s", () => {
         it("publishes the date where the built-in published 0", async () => {
-            const base = read_fixture(path.join(SAMPLES, "opcua-types"));
-            const id = "ns=2;s=Types/DateTime";
-            const dates = ["2026-01-01T00:00:00.000Z", "2026-03-01T12:30:00.000Z"];
-            const fixture: Fixture = {
-                meta: { ...base.meta, name: "sample-opcua-datetime" },
-                connection: {
-                    ...base.connection,
-                    devices: [{
-                        ...base.connection.devices[0],
-                        tags: [{ Name: "Types/DateTime", type: "DateTime", method: "GET",
-                            address: id, value: null, recordToDB: true }],
-                    }],
-                },
-                events: dates.map((value, i) => ({
-                    t: i * 2000, type: "opcua",
-                    values: { [id]: { dataType: "DateTime", value } },
-                })) as any,
-            };
-            const values = (r: any) => r.output.data.get("Device_1/Types/DateTime")
-                ?.map((m: any) => m.value);
-            const built_in = await run_agent(fixture);
-            const split = await run_agent(fixture, { driver: DRIVER! });
-            show("DateTime", compare_runs(built_in, split));
-            expect(values(built_in)).toEqual(dates.map(() => "0"));
-            expect(values(split)).toEqual(dates.map(d => String(Date.parse(d))));
+            const fixture = datetime_fixture();
+            const values = (r: RunResult) => r.output.data
+                .get("Device_1/Types/DateTime")?.map(m => m.value);
+            const r = await against(DATETIME_KEY, fixture, { driver: driver() });
+            show("DateTime", r);
+            expect(values(r.a)).toEqual(DATETIMES.map(() => "0"));
+            expect(values(r.b)).toEqual(DATETIMES.map(d => String(Date.parse(d))));
         });
     });
 
     describe.each(of_protocol("REST").slice(0, 1))("in-process driver %s", (name, fixture) => {
-        it("an in-process REST driver matches built-in REST", async () => {
-            const r = await golden({ a: fixture }, { b: { driver: inproc_rest() } });
+        it("an in-process REST driver matches the recorded built-in REST", async () => {
+            const r = await against(sample_key(name), fixture, { driver: inproc_rest() });
             show(`${name} in-process`, r);
             expect(explain(r)).toBe("");
         });

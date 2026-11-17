@@ -29,8 +29,10 @@ import { to_split, without_unread_paths } from "./migrate.js";
 export const DEFAULT_INTERVAL_MS = process.env.CI ? 400 : 200;
 
 export interface RunOpts {
-    /* Leave out for the built-in connection. With a driver, the
-     * connection is switched to `Driver` and this driver serves it. */
+    /* The split driver that serves the connection. A connection that
+     * isn't `Driver` yet is switched to it first. Every run needs one:
+     * the Edge Agent has no built-in connections since ACS 7, and the
+     * built-in runs to compare with are recorded (references.ts). */
     driver?:    DriverSpec,
     /* The connection entry to run, if not the fixture's. It must have
      * the fixture's devices. An entry that is already `Driver`, as
@@ -134,26 +136,13 @@ function hold_console () {
     return { lines, restore: () => Object.assign(console, saved) };
 }
 
-/* Translator.stop() does not wait for its devices to stop, so the
- * built-in MQTT connection closes its client while each device's
- * unsubscribe is still pending, and a device that shares a topic with
- * another gets an empty handle that mqtt.js refuses. Both reject with
- * nobody listening, which jest reports as a test failure. This is a
- * shutdown problem in the agent, not part of what is compared, so the
- * harness catches those rejections. */
-function quiet_shutdown (translator: Translator) {
-    for (const conn of Object.values(translator.connections ?? {})) {
-        const unsub = conn.unsubscribe?.bind(conn);
-        if (!unsub) continue;
-        conn.unsubscribe = (h: any) => Promise.resolve()
-            .then(() => unsub(h)).catch(() => {});
-    }
-}
-
 /* Run the Edge Agent once against a fixture and capture its output. */
 export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<RunResult> {
     const speed = opts.speed ?? speed_for(fixture);
-    const label = opts.driver ? `split (${opts.driver.name})` : "built-in";
+    if (!opts.driver)
+        throw new Error("A run needs a driver: the Edge Agent has no "
+            + "built-in connections since ACS 7");
+    const label = `split (${opts.driver.name})`;
     const timeout = opts.timeout_ms
         ?? 30_000 + 3 * fixture.meta.duration_ms / speed;
 
@@ -174,10 +163,8 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
             scale(device.connection(opts.entry ?? fixture.connection), speed));
         if (opts.connection_name)
             entry.name = opts.connection_name;
-        if (opts.driver && entry.connType != "Driver")
+        if (entry.connType != "Driver")
             entry = to_split(entry, fixture.meta.protocol);
-        if (!opts.driver && entry.connType == "Driver")
-            throw new Error("A Driver connection needs a driver to run it");
         if (opts.secrets) {
             for (const [name, value] of Object.entries(opts.secrets))
                 fs.writeFileSync(path.join(secrets, name), value);
@@ -202,19 +189,17 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
         if (!translator.sparkplugNode)
             throw new Error("The Edge Agent did not start");
 
-        if (opts.driver) {
-            const password = crypto.randomBytes(16).toString("hex");
-            /* The id the chart gives the sidecar: see driver_id in
-             * lib/js-service-client/lib/edge-connection.js. */
-            const id = entry.driverId ?? entry.name;
-            fs.writeFileSync(path.join(pwdir, id), password);
-            const { port } = translator.broker.server!.address() as AddressInfo;
-            driver = await opts.driver.start({
-                EDGE_MQTT:      `mqtt://127.0.0.1:${port}`,
-                EDGE_USERNAME:  id,
-                EDGE_PASSWORD:  password,
-            });
-        }
+        const password = crypto.randomBytes(16).toString("hex");
+        /* The id the chart gives the sidecar: see driver_id in
+         * lib/js-service-client/lib/edge-connection.js. */
+        const id = entry.driverId ?? entry.name;
+        fs.writeFileSync(path.join(pwdir, id), password);
+        const { port } = translator.broker.server!.address() as AddressInfo;
+        driver = await opts.driver.start({
+            EDGE_MQTT:      `mqtt://127.0.0.1:${port}`,
+            EDGE_USERNAME:  id,
+            EDGE_PASSWORD:  password,
+        });
 
         /* Take CPU readings when the first input is delivered. */
         let done = false;
@@ -285,7 +270,6 @@ export async function run_agent (fixture: Fixture, opts: RunOpts = {}): Promise<
     }
     finally {
         await driver?.stop().catch(() => {});
-        if (translator) quiet_shutdown(translator);
         await translator?.stop().catch(() => {});
         await device.stop().catch(() => {});
         /* Let the agent's closing messages and timers drain. */
@@ -364,7 +348,8 @@ export function ddata_line (a: RunResult, b: RunResult) {
 }
 
 /* Run a fixture twice and compare: `a` is the reference, `b` the run
- * under test. Each defaults to the built-in connection. */
+ * under test. Each needs a driver; to compare with a built-in run, use
+ * a recorded one (references.ts) with compare_runs(). */
 export async function golden (fixtures: { a: Fixture, b?: Fixture },
     opts: { a?: RunOpts, b?: RunOpts, allowance_ms?: number } = {},
 ): Promise<GoldenResult> {
@@ -428,9 +413,9 @@ export function compare_runs (a: RunResult, b: RunResult, allowance?: number): G
     return { a, b, comparison, summary };
 }
 
-/* Several runs, one per device, as if they were one run: the reference
- * for a connection whose built-in run is wrong with several devices
- * (the built-in OPC UA connection). Each run's device has its own
+/* Several runs, one per device, as if they were one run. The recorded
+ * reference for the built-in OPC UA connection, which was wrong with
+ * several devices, was made this way. Each run's device has its own
  * messages, so they don't overlap. Timestamps are moved so that each
  * run's first input is at the first run's, and the node's own messages
  * are the first run's. */

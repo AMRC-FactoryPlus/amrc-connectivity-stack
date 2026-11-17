@@ -113,7 +113,7 @@ export function from_snapshot (s: Snapshot): RunResult {
         counts: new Map(Object.entries(s.counts)),
     };
     return {
-        label:      s.label,
+        label:      `recorded ${s.label}`,
         output,
         t0:         0,
         delivered:  s.delivered,

@@ -469,3 +469,111 @@ async fn typed_writes_post_and_are_confirmed() {
         ]
     );
 }
+
+/// A body over the limit is not read, whether the server says its
+/// length up front or sends it in chunks.
+#[tokio::test]
+async fn bodies_over_the_limit_are_not_read() {
+    let stub = Stub::start(|_| (200, vec![b'x'; 100])).await;
+    let conf = edge_rest::config::Conf::parse(&serde_json::json!({"baseURL": stub.base})).unwrap();
+    let client = edge_rest::http::Client::new(&conf).unwrap();
+
+    let r = client
+        .clone()
+        .with_body_limit(50)
+        .get(format!("{}/x", stub.base))
+        .await
+        .unwrap();
+    assert_eq!((r.status, r.too_large, r.body.len()), (200, true, 0));
+    let r = client
+        .clone()
+        .with_body_limit(100)
+        .get(format!("{}/x", stub.base))
+        .await
+        .unwrap();
+    assert_eq!((r.status, r.too_large, r.body.len()), (200, false, 100));
+
+    // No Content-Length: three 64-byte chunks.
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        loop {
+            let Ok((mut sock, _)) = listener.accept().await else {
+                return;
+            };
+            tokio::spawn(async move {
+                if read_request(&mut sock).await.is_none() {
+                    return;
+                }
+                let mut out =
+                    b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+                        .to_vec();
+                for _ in 0..3 {
+                    out.extend_from_slice(b"40\r\n");
+                    out.extend_from_slice(&[b'y'; 64]);
+                    out.extend_from_slice(b"\r\n");
+                }
+                out.extend_from_slice(b"0\r\n\r\n");
+                let _ = sock.write_all(&out).await;
+                let _ = sock.shutdown().await;
+            });
+        }
+    });
+    let url = format!("http://127.0.0.1:{port}/c");
+    let r = client
+        .clone()
+        .with_body_limit(150)
+        .get(url.clone())
+        .await
+        .unwrap();
+    assert_eq!((r.too_large, r.body.len()), (true, 0));
+    let r = client.clone().with_body_limit(192).get(url).await.unwrap();
+    assert_eq!((r.too_large, r.body.len()), (false, 192));
+    server.abort();
+}
+
+/// An address map that arrives while the connection is down decides
+/// when it comes back: the failing address has left, and the new one
+/// is worth trying, so the connection comes up and the new address
+/// gives data.
+#[tokio::test]
+async fn a_new_address_map_while_down_brings_the_connection_up() {
+    let stub = Stub::start(|req| match req.path.as_str() {
+        "/good" => (200, b"g".to_vec()),
+        _ => (401, Vec::new()),
+    })
+    .await;
+    let mut agent = FakeAgent::start("Rest").await;
+    let _driver = spawn_driver::<RestHandler>(config(&agent));
+
+    agent
+        .handshake(serde_json::json!({"baseURL": stub.base}), &[("1", "/bad")])
+        .await;
+    agent.wait_status("UP", secs(5)).await;
+    let seen = poll_for(&mut agent, "1", secs(3)).await;
+    assert_eq!(statuses(&seen), ["AUTH"]);
+
+    agent.send_addrs(&[("2", "/good")]);
+    agent.wait_status("UP", secs(5)).await;
+    let seen = poll_for(&mut agent, "2", secs(2)).await;
+    assert_eq!(statuses(&seen), Vec::<String>::new());
+    assert!(
+        seen.iter()
+            .any(|e| matches!(e, FromDriver::Data { topic, .. } if topic == "2"))
+    );
+}
+
+/// A baseURL no address can complete is a config error, not a server
+/// that never answers.
+#[tokio::test]
+async fn a_base_url_that_is_not_a_url_reports_conf() {
+    let mut agent = FakeAgent::start("Rest").await;
+    let _driver = spawn_driver::<RestHandler>(config(&agent));
+    agent
+        .handshake(
+            serde_json::json!({"baseURL": "device-host:8080"}),
+            &[("1", "/x")],
+        )
+        .await;
+    agent.wait_status("CONF", secs(5)).await;
+}

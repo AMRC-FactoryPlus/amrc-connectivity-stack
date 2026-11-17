@@ -13,10 +13,11 @@
 
 use std::time::Duration;
 
+use bytes::{Bytes, BytesMut};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 
 use crate::config::Conf;
-use crate::read::Reply;
+use crate::read::{BODY_LIMIT, Reply};
 
 /// How long one request may take, from sending it to the end of the
 /// body. It is under the driver library's 30 second poll timeout, so a
@@ -32,6 +33,7 @@ const MAX_REDIRECTS: usize = 21;
 pub struct Client {
     http: reqwest::Client,
     base_url: String,
+    body_limit: usize,
 }
 
 impl Client {
@@ -53,7 +55,14 @@ impl Client {
         Ok(Self {
             http,
             base_url: conf.base_url.clone(),
+            body_limit: BODY_LIMIT,
         })
+    }
+
+    /// Use a smaller body limit than [`BODY_LIMIT`], for tests.
+    pub fn with_body_limit(mut self, limit: usize) -> Self {
+        self.body_limit = limit;
+        self
     }
 
     pub fn base_url(&self) -> &str {
@@ -62,11 +71,39 @@ impl Client {
 
     /// GET a URL. `Err` means no reply, with a message that leaves the
     /// URL out, because a base URL can carry a key in its query.
+    ///
+    /// Only a 200 reply's body is read, because no other is used, and
+    /// it is read in chunks and abandoned once it passes [`BODY_LIMIT`],
+    /// so a huge reply costs no more than the limit in memory. A body
+    /// over the limit gives a reply with `too_large` set and no body.
     pub async fn get(&self, url: String) -> Result<Reply, String> {
-        let res = self.http.get(url).send().await.map_err(describe)?;
+        let mut res = self.http.get(url).send().await.map_err(describe)?;
         let status = res.status().as_u16();
-        let body = res.bytes().await.map_err(describe)?;
-        Ok(Reply { status, body })
+        let mut reply = Reply {
+            status,
+            body: Bytes::new(),
+            too_large: false,
+        };
+        if status != 200 {
+            return Ok(reply);
+        }
+        if res
+            .content_length()
+            .is_some_and(|n| n > self.body_limit as u64)
+        {
+            reply.too_large = true;
+            return Ok(reply);
+        }
+        let mut body = BytesMut::new();
+        while let Some(chunk) = res.chunk().await.map_err(describe)? {
+            if body.len() + chunk.len() > self.body_limit {
+                reply.too_large = true;
+                return Ok(reply);
+            }
+            body.extend_from_slice(&chunk);
+        }
+        reply.body = body.freeze();
+        Ok(reply)
     }
 
     /// POST a JSON body to a URL.
@@ -80,8 +117,11 @@ impl Client {
             .await
             .map_err(describe)?;
         let status = res.status().as_u16();
-        let body = res.bytes().await.unwrap_or_default();
-        Ok(Reply { status, body })
+        Ok(Reply {
+            status,
+            body: Bytes::new(),
+            too_large: false,
+        })
     }
 }
 

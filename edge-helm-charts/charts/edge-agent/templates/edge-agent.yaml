@@ -10,6 +10,26 @@
   {{- end }}
 {{- end -}}
 
+{{- /* Host ports: a driver that listens (the UDP driver) has its port
+     opened on the node. Kubernetes refuses a pod that opens one
+     port twice, so say which drivers clash. */}}
+{{- $hostPorts := dict }}
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- if not $driver.external }}
+    {{- range $hp := coalesce $driver.hostPorts list }}
+      {{- $port := int $hp.port }}
+      {{- if or (lt $port 1) (gt $port 65535) (not (has $hp.protocol (list "UDP" "TCP"))) }}
+        {{- fail (printf "Edge Agent %s, driver %s: host port %v/%v is not a port from 1 to 65535 with protocol UDP or TCP" $.Values.name $name $hp.port $hp.protocol) }}
+      {{- end }}
+      {{- $key := printf "%d/%s" $port $hp.protocol }}
+      {{- if hasKey $hostPorts $key }}
+        {{- fail (printf "Edge Agent %s: drivers %s and %s both listen on %s. Give one of the connections another port." $.Values.name (get $hostPorts $key) $name $key) }}
+      {{- end }}
+      {{- $_ := set $hostPorts $key $name }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
 # This deployment is configured to completely disable Kubernetes
 # back-offs for edge agents. This ensures that when an edge agent fails,
 # it will be restarted immediately without any exponential back-off
@@ -167,6 +187,14 @@ spec:
     {{- if $driver.privileged }}
           securityContext:
             privileged: true
+    {{- end }}
+    {{- with $driver.hostPorts }}
+          ports:
+      {{- range . }}
+            - containerPort: {{ int .port }}
+              hostPort: {{ int .port }}
+              protocol: {{ .protocol }}
+      {{- end }}
     {{- end }}
           env:
             - name: EDGE_MQTT

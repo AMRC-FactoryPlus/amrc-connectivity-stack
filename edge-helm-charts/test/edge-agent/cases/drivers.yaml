@@ -1,0 +1,22 @@
+# Split drivers with no host ports: a privileged driver with a host
+# path, an external one and a plain one. Rendered the same before and
+# after host ports were added to the chart.
+name: Agent-Two
+uuid: 22222222-2222-4222-8222-222222222222
+cluster: example-cluster
+directory_url: http://directory.example
+hostname: node-a
+drivers:
+  Serial-Rig:
+    image: modbus
+    privileged: true
+    hostPaths:
+      - hostPath: /dev/ttyUSB0
+        mountPath: /dev/rig
+  rest-api:
+    image:
+      repository: edge-rest
+  ext-driver:
+    external: true
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

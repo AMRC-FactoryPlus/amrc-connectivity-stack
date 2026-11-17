@@ -40,6 +40,7 @@
    - [ISA-95 Placement](./services/isa95-placement.md)
    - [Notify v2](./services/notify-v2.md)
    - [Schema Editor](./services/schema-editor.md)
+   - [Connecting a UDP Device](./services/udp-devices.md)
 - Authentication
    - [Overview](./auth/README.md)
    - [Connecting OAuth applications](./auth/oauth-clients.md)

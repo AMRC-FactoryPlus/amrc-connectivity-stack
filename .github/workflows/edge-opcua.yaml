@@ -1,0 +1,96 @@
+name: OPC UA driver
+
+# Runs the OPC UA split driver (edge-opcua) against real things:
+#
+#   - its integration tests against a node-opcua server, which cover
+#     every security mode and policy, credentials, the values of every
+#     OPC UA type, typed writes of every type and reconnecting;
+#   - the golden-output harness (acs-edge/tests/golden), which runs the
+#     real Edge Agent once with the built-in OPC UA connection and once
+#     with this driver and requires the same Sparkplug output.
+#
+# rust.yaml does the formatting, lint and unit tests.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'edge-opcua/**'
+      - 'lib/rs-edge-driver/**'
+      # The agent side of the comparison.
+      - 'acs-edge/**'
+      - 'lib/js-service-client/lib/edge-connection.js'
+      - 'acs-service-setup/lib/split-drivers.js'
+      - '.github/workflows/edge-opcua.yaml'
+
+env:
+  # The same as rust.yaml and the driver's Dockerfile.
+  RUSTUP_TOOLCHAIN: '1.99'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            edge-opcua/target
+          key: ${{ runner.os }}-cargo-${{ env.RUSTUP_TOOLCHAIN }}-edge-opcua-release-${{ hashFiles('edge-opcua/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.RUSTUP_TOOLCHAIN }}-edge-opcua-release-
+
+      # The same major version as the JS base image the agent runs on.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # As acs-edge-tests.yaml: the npm shipped with Node 22 crashes on
+      # file: dependencies, and the service client's optional GSSAPI
+      # module needs the Kerberos headers.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      # node-opcua comes from here, for both the agent's built-in
+      # connection and the test server.
+      - name: Install Edge Agent dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      - name: Install driver library dependencies
+        working-directory: lib/js-edge-driver
+        run: npm ci
+
+      - name: Build the driver
+        working-directory: edge-opcua
+        run: cargo build --release --locked
+
+      - name: Integration tests against node-opcua
+        working-directory: edge-opcua
+        env:
+          EDGE_OPCUA_SERVER_TESTS: '1'
+        run: cargo test --release --locked --test opcua
+
+      - name: Golden-output harness
+        working-directory: acs-edge
+        env:
+          GOLDEN_DRIVER: ../edge-opcua/target/release/driver
+          GOLDEN_PROTOCOL: OPC UA
+        run: npx jest --ci tests/golden -t "split driver"

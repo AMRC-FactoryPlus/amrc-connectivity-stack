@@ -346,6 +346,15 @@ export class Device {
             const paths = this._metrics.getPathsForAddr(addr);
             // Decode the payload at most once, for every metric on it
             const decoded = new DecodedPayload(obj[addr]);
+            // JSON (Batched) reads a payload that is not an array exactly
+            // as plain JSON does, so one device can take topics that carry
+            // single objects and topics that carry arrays of items. A
+            // payload that is not valid JSON is still skipped.
+            let format = this._payloadFormat;
+            if (parseVals && format === serialisationType.JSONBatched && paths.length) {
+                const { value, err } = decoded.json_result();
+                if (!err && !Array.isArray(value)) format = serialisationType.JSON;
+            }
             // Iterate through each path
             paths.forEach((path) => {
                 // Get the complete metric according to its address and path
@@ -358,7 +367,7 @@ export class Device {
                     if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
                         obj).length == 1))) {
                         // Handle JSON (Batched) format explicitly
-                        if (parseVals && this._payloadFormat === serialisationType.JSONBatched) {
+                        if (parseVals && format === serialisationType.JSONBatched) {
                             // The payload as JSON, parsed once per message
                             const { value: payload, err } = decoded.json_result();
                             if (err) {
@@ -399,7 +408,7 @@ export class Device {
                             // Standard processing for all other payload formats
                             let newVal = parseVals ? parseValueFromPayload(decoded,
                                 metric,
-                                this._payloadFormat,
+                                format,
                                 this._delimiter
                             ) : obj[addr];
 
@@ -428,12 +437,12 @@ export class Device {
                                 // timestamp is the ms fallback.
                                 const timestamp = parseTimeStampFromPayload(decoded,
                                     metric,
-                                    this._payloadFormat,
+                                    format,
                                     this._delimiter
                                 );
                                 const timestampNs = parseNsTimestampFromPayload(decoded,
                                     metric,
-                                    this._payloadFormat
+                                    format
                                 );
 
                                 // Update the metric value and push it to the array of changed metrics
@@ -449,7 +458,7 @@ export class Device {
                                 // properties so the historians can
                                 // tag the points.
                                 const simTags = parseSimTagsFromPayload(
-                                    decoded, this._payloadFormat);
+                                    decoded, format);
                                 if (simTags.simulated) {
                                     updated.properties = {
                                         ...(updated.properties ?? {}),

@@ -704,6 +704,31 @@ describe("Device._handleData golden output", () => {
         });
     }
 
+    /* Under JSON (Batched), an object payload gives exactly what plain
+     * JSON gives. Invalid JSON is the one difference: JSON (Batched)
+     * skips it, and plain JSON reads every path as 0. */
+    test("JSON (Batched) reads an object payload exactly as JSON does", () => {
+        const steps = MIXED_STEPS
+            .filter(st => Object.keys(st).length == 1 && "dataset" in st)
+            .filter(st => !(Buffer.isBuffer((st as Msg).dataset)
+                && (st as Msg).dataset.toString() == "{bad json"));
+        expect(steps.length).toBeGreaterThan(5);
+        const tags = MIXED_TAGS.filter(t => t.address == "dataset");
+        const batched = run({ format: "JSON (Batched)", tags, steps });
+        const plain = run({ format: "JSON", tags, steps });
+        expect(batched).toEqual(plain);
+        expect(batched.flat().length).toBeGreaterThan(0);
+    });
+
+    /* Arrays under plain JSON are not batched: JSON does not detect
+     * arrays, so a $.value metric reads nothing from one. */
+    test("JSON does not read an array payload as a batch", () => {
+        const tags = MIXED_TAGS.filter(t => t.address == "hf");
+        const out = run({ format: "JSON", tags, steps: [
+            { hf: j([{ value: 10, timestamp: 1763380000000 }]) }] });
+        expect(out).toEqual([[]]);
+    });
+
     for (const fx of ["mqtt-json", "mqtt-delimited", "rest-json",
         "rest-xml", "rest-xml-contains"])
     {

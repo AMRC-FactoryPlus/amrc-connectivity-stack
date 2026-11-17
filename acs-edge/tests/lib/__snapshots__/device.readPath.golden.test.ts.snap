@@ -612,7 +612,16 @@ Array [
       "value": "parsed",
     },
   ],
-  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "d",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 5,
+    },
+  ],
   Array [
     Object {
       "isNull": false,
@@ -761,7 +770,32 @@ Array [
 
 exports[`Device._handleData golden output JSON (Batched): object and array topics on one device 1`] = `
 Array [
-  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 1.5,
+    },
+    Object {
+      "isNull": false,
+      "name": "prog",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "String",
+      "value": "P1",
+    },
+    Object {
+      "isNull": false,
+      "name": "on",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Boolean",
+      "value": true,
+    },
+  ],
   Array [
     Object {
       "isNull": false,
@@ -789,8 +823,64 @@ Array [
     },
   ],
   Array [],
-  Array [],
-  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "timestamp": 1763380001000,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 2.5,
+    },
+    Object {
+      "isNull": false,
+      "name": "prog",
+      "timestamp": 1763380001000,
+      "timestampNs": "<undefined>",
+      "type": "String",
+      "value": "P2",
+    },
+    Object {
+      "isNull": false,
+      "name": "on",
+      "timestamp": 1763380001000,
+      "timestampNs": "<undefined>",
+      "type": "Boolean",
+      "value": false,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "run_id": "r1",
+      "simulated": true,
+      "timestamp": "<now>",
+      "timestampNs": "1763380800123456789",
+      "type": "Double",
+      "value": 3.5,
+    },
+    Object {
+      "isNull": false,
+      "name": "prog",
+      "run_id": "r1",
+      "simulated": true,
+      "timestamp": "<now>",
+      "timestampNs": "1763380800123456789",
+      "type": "String",
+      "value": "P3",
+    },
+    Object {
+      "isNull": false,
+      "name": "on",
+      "run_id": "r1",
+      "simulated": true,
+      "timestamp": "<now>",
+      "timestampNs": "1763380800123456789",
+      "type": "Boolean",
+      "value": true,
+    },
+  ],
   Array [
     Object {
       "isNull": false,
@@ -801,13 +891,89 @@ Array [
       "value": 13,
     },
   ],
-  Array [],
-  Array [],
-  Array [],
-  Array [],
-  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "hf",
+      "timestamp": 1763380002000,
+      "timestampNs": "<undefined>",
+      "type": "Double",
+      "value": 14,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 4.5,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 5.5,
+    },
+  ],
   Array [],
   Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 0,
+    },
+    Object {
+      "isNull": false,
+      "name": "prog",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "String",
+      "value": 0,
+    },
+    Object {
+      "isNull": false,
+      "name": "on",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Boolean",
+      "value": 0,
+    },
+  ],
+  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "load",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Double",
+      "value": 6.5,
+    },
+    Object {
+      "isNull": false,
+      "name": "prog",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "String",
+      "value": "P6",
+    },
+    Object {
+      "isNull": false,
+      "name": "on",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "Boolean",
+      "value": false,
+    },
     Object {
       "isNull": false,
       "name": "hf",

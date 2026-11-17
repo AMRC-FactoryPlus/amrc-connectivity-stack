@@ -15,20 +15,21 @@
  * protocol (REST, MQTT, OPCUA, UDP):
  *
  *  - unset or `true`: move its connections, as above;
- *  - `null`: leave them on the built-in driver, with an ERROR line on
+ *  - `hold`: leave them on the built-in driver, with an ERROR line on
  *    every run that counts them. A version 7 Edge Agent can't run
  *    them, so this is only for a site whose Edge Agents still run
  *    version 6, for example because its edge Helm charts have
  *    diverged and it hasn't merged them yet. The next run without it
- *    moves them;
+ *    moves them. A literal `null` does the same, but Helm 4.0 drops a
+ *    null from a site's values before service-setup sees it, so the
+ *    documented value is the string `hold`;
  *  - `false` (version 6's move back): refused with an ERROR line,
  *    because there is nothing to move back to, and treated as unset.
  *
- * The chart's default is `splitDrivers: {}`, with no protocol named,
- * so that a site's `null` survives Helm's merge of its values over the
- * chart's: Helm deletes a key a site sets to null only where the
- * chart's defaults have it. `dryRun: true` logs what would change and
- * writes nothing.
+ * The chart's default is `splitDrivers: {}`, with no protocol named.
+ * deploy/test/split-drivers-values.sh checks a site's `hold` reaches
+ * service-setup. `dryRun: true` logs what would change and writes
+ * nothing.
  *
  * For each connection on a built-in driver this rewrites:
  *
@@ -165,15 +166,18 @@ export class MigrateSplitDrivers {
         this.log = opts.log ?? opts.fplus.debug.bound("split-drivers");
 
         const settings = opts.settings ?? {};
+        this.settings = settings;
         this.dry_run = !!settings.dryRun;
         /* Protocols a site holds on their built-in drivers, while its
-         * Edge Agents still run version 6. */
+         * Edge Agents still run version 6: `hold`, or a null that got
+         * through Helm. */
+        const holds = v => v === "hold" || v === null;
         this.left = new Set(Object.keys(SplitDrivers)
-            .filter(p => p in settings && settings[p] === null));
+            .filter(p => p in settings && holds(settings[p])));
         /* Any other value but true, such as version 6's false (move
          * back), is refused and treated as unset. */
         this.refused = Object.keys(SplitDrivers)
-            .filter(p => p in settings && settings[p] !== true && settings[p] !== null)
+            .filter(p => p in settings && settings[p] !== true && !holds(settings[p]))
             .map(p => [p, settings[p]]);
     }
 
@@ -204,13 +208,13 @@ export class MigrateSplitDrivers {
             if (this.left.has(name)) {
                 const n = [...this.cconfs.values()]
                     .filter(c => c.driver == proto.internal).length;
-                this.log("ERROR: serviceSetup.config.splitDrivers.%s is null, so %d "
+                this.log("ERROR: serviceSetup.config.splitDrivers.%s is %o, so %d "
                     + "%s connection(s) stay on the built-in %s connection, which a "
                     + "version 7 Edge Agent can't run: on one, their devices get no "
                     + "data. Use this only while the site's Edge Agents still run "
                     + "version 6 (for example until its edge Helm charts are merged). "
                     + "The next run without the setting moves them.",
-                    name, n, name, name);
+                    name, this.settings[name], n, name, name);
                 count.held += n;
                 continue;
             }

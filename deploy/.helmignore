@@ -25,3 +25,5 @@ Makefile
 .idea/
 *.tmproj
 .vscode/
+# Chart checks, not part of the chart
+test/

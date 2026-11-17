@@ -233,17 +233,17 @@ describe("moving a site's MQTT connections with the chart's defaults", () => {
             l.startsWith("ERROR: serviceSetup.config.splitDrivers.MQTT is false.")).length, 1);
     });
 
-    /* A site whose Edge Agents still run version 6 holds MQTT with null. */
-    test("null holds every MQTT connection where it is, and says how many", async () => {
+    /* A site whose Edge Agents still run version 6 holds MQTT. */
+    test("hold keeps every MQTT connection where it is, and says how many", async () => {
         const cdb = site();
-        const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: null });
+        const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: "hold" });
         assert.equal(count.held, 5);
         /* Only the oven's OPC UA connection moves. */
         assert.equal(count.moved, 1);
         for (const conn of MQTT)
             assert.deepEqual(entry(cdb, conn), site_entry(conn));
         assert.equal(lines.filter(l => l.startsWith(
-            "ERROR: serviceSetup.config.splitDrivers.MQTT is null, so 5 MQTT")).length, 1);
+            "ERROR: serviceSetup.config.splitDrivers.MQTT is 'hold', so 5 MQTT")).length, 1);
 
         const again = await run_logged(cdb, defaults);
         assert.equal(again.count.moved, 5);

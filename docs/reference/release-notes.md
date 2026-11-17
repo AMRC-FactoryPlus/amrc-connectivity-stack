@@ -17,7 +17,7 @@ the upgrade, and some change what clients see.
 The release with this change is a major release, ACS version 7. Read
 this section before upgrading a production installation. The move it
 makes is one way: there is no setting that moves a connection back, and
-rolling back to version 6 doesn't bring the connections back either.
+going back to version 6 after upgrading is not supported.
 Some sites must act straight after the upgrade, or some devices have no
 data until they do.
 
@@ -50,15 +50,15 @@ Manager offers one driver per protocol for new connections: "REST",
    - Merge as soon as the `service-setup` Job has finished. Until you
      do, every moved connection's devices have no data, because the
      version 6 charts can't start their split drivers.
-   - Or set `serviceSetup.config.splitDrivers.REST: null` (and `MQTT`,
+   - Or set `serviceSetup.config.splitDrivers.REST: hold` (and `MQTT`,
      `OPCUA`, `UDP`) for this upgrade. Those connections stay on the
      built-in connections, which your version 6 Edge Agents still run,
      and the `service-setup` log has an `ERROR:` line each run counting
      them. When you merge, your Edge Agents start version 7, which can't
-     run them, so straight after merging remove the `null` settings and
-     run the upgrade again: that run moves them. Leave the protocols
-     out of any other values: Helm drops a `null` for a key the chart's
-     defaults name, and the chart's default is `splitDrivers: {}`.
+     run them, so straight after merging remove the `hold` settings and
+     run the upgrade again: that run moves them. Use `hold`, not
+     version 6's `null`: Helm 4.0 drops a null before service-setup sees
+     it, and the connections would move.
 2. **Check every edge cluster is fetching from the central cluster's git
    server.** One that can't keeps its old software, and its moved
    devices have no data until it can.
@@ -92,10 +92,9 @@ Manager offers one driver per protocol for new connections: "REST",
    hosts), plan a new port for one of them and how to point its device
    at it. The upgrade gives the port to the first, and the other has no
    data until it has another port.
-6. **Take a backup of the ConfigDB.** A rollback to version 6 does not
-   undo the move: see "Rolling back" below.
+6. **Take a backup of the ConfigDB**, as before any major upgrade.
 7. **Check `serviceSetup.config.splitDrivers` in your values.** Unset
-   or `true` moves a protocol. `null` holds it, as in step 1, and is
+   or `true` moves a protocol. `hold` holds it, as in step 1, and is
    only for Edge Agents still on version 6. `false` (version 6's move
    back) is refused with an `ERROR:` line and treated as unset.
 
@@ -118,9 +117,9 @@ running.
   (`ImagePullBackOff`): your edge clusters didn't get the new charts.
   Merge `acs` into `main` in `shared/helm` and push it, as in step 1,
   and the data comes back within a few minutes with nothing else to do.
-  A `null` set now doesn't help: it holds connections that haven't
+  A `hold` set now doesn't help: it holds connections that haven't
   moved, and moves none back.
-- The `service-setup` log says a protocol `is null` and your Edge Agents
+- The `service-setup` log says a protocol `is 'hold'` and your Edge Agents
   run version 7: remove the setting and run the upgrade again.
 - A UDP connection has no `driver-<name>` container, and the
   `service-setup` log has a line for it starting `ERROR: Connection`
@@ -130,12 +129,8 @@ running.
   on a built-in driver. Upgrade again so service-setup moves it, or open
   it in the Manager, pick its split driver and save it.
 
-**Rolling back.** Rolling back to version 6 does not bring the
-connections back. The move rewrites the connections' configs, and
-version 6 has no split driver images, so after a rollback each moved
-connection's container can't pull its image and its Edge Agent's pod
-doesn't start, which stops every connection on that agent. Restore the
-ConfigDB backup from step 6 as part of any rollback.
+**Rolling back.** Going back to version 6 after upgrading to version 7
+is not supported. Fix forward, as above.
 
 **What you may notice afterwards.** A failing REST endpoint is logged
 once until it recovers, rather than on every poll. One failing endpoint

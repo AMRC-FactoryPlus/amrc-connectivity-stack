@@ -1,0 +1,61 @@
+name: Edge Agent golden output
+
+# Runs the golden-output harness (acs-edge/tests/golden) on the
+# committed driver fixture samples: each built-in connection against
+# itself, a deliberately changed value that must fail, and split
+# drivers against the built-in connections they replace. A change to
+# the Edge Agent or a driver that alters the Sparkplug output fails
+# here.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      # Staging branches for epics, such as feature/split-drivers.
+      - 'feature/**'
+    paths:
+      - 'acs-edge/**'
+      - 'edge-*/**'
+      - 'lib/js-edge-driver/**'
+      - 'lib/rs-edge-driver/**'
+      - 'lib/js-service-client/lib/edge-connection.js'
+      - 'acs-service-setup/lib/split-drivers.js'
+      - '.github/workflows/edge-golden.yaml'
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # The npm shipped with Node 22 crashes on file: dependencies.
+      # Pin to the same npm as the JS base image.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      # The GSSAPI module is native and needs the Kerberos headers.
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install Edge Agent dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      # The reference REST driver runs on lib/js-edge-driver.
+      - name: Install driver library dependencies
+        working-directory: lib/js-edge-driver
+        run: npm ci
+
+      # Only the harness and the fixture checks: other acs-edge suites
+      # are repaired separately.
+      - name: Run the harness
+        working-directory: acs-edge
+        run: npx jest tests/golden tests/fixtures/drivers

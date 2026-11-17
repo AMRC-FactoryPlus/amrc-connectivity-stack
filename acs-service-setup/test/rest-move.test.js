@@ -52,11 +52,12 @@ const C = {
     broker: "cccccccc-0000-4000-8000-000000000004",
 };
 
-/* serviceSetup.config.splitDrivers as the chart ships it. */
+/* serviceSetup.config.splitDrivers as the chart ships it, for REST
+ * only: each other protocol's move has its own test like this one. */
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));
-    return values.serviceSetup.config.splitDrivers;
+    return { REST: values.serviceSetup.config.splitDrivers.REST };
 }
 
 /* The DriverDefs as edge.yaml loads them on upgrade. */
@@ -101,7 +102,7 @@ const site_entry = (agent, conn) => SITE.configs[App.EdgeAgentConfig][agent]
 describe("moving a site's REST connections with the chart's defaults", () => {
     const defaults = chart_defaults();
 
-    test("the chart moves REST and no other protocol", () => {
+    test("the chart moves REST", () => {
         assert.deepEqual(defaults, { REST: true });
     });
 

@@ -54,7 +54,7 @@ objects:
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST (built-in)" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
-    !u ACS.Driver.MQTT:             { name: "MQTT" }
+    !u ACS.Driver.MQTT:             { name: "MQTT (built-in)" }
     !u ACS.Driver.UDP:              { name: "UDP" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
@@ -66,7 +66,7 @@ objects:
     !u ACS.Driver.RTDE:             { name: "RTDE" }
     !u ACS.Driver.Pathfindr:        { name: "Pathfindr" }
     !u ACS.Driver.RESTSplit:        { name: "REST" }
-    !u ACS.Driver.MQTTSplit:        { name: "MQTT (split driver)" }
+    !u ACS.Driver.MQTTSplit:        { name: "MQTT" }
     !u ACS.Driver.OPCUASplit:       { name: "OPC-UA (split driver)" }
     !u ACS.Driver.UDPSplit:         { name: "UDP (split driver)" }
 
@@ -243,7 +243,11 @@ configs:
           - useCredentials
         title: OPC-UA Server Details
         type: object
+    # The built-in MQTT driver. New MQTT connections use the split
+    # driver below, so this one is hidden from the new-connection form,
+    # but a connection a site has moved back to it still shows it.
     !u ACS.Driver.MQTT:
+      hidden: true
       polled: false
       presentation: &mqtt_presentation
         address:
@@ -1180,10 +1184,10 @@ configs:
     # drivers. They share the internal driver's form, so connection
     # details keep their field names. Service-setup moves connections
     # between the two when serviceSetup.config.splitDrivers says so
-    # (lib/split-drivers.js). MQTT and OPC UA stay hidden from the
-    # new-connection form until their images are published. REST has
-    # replaced the built-in: it is offered as "REST", and the chart
-    # moves REST connections to it by default.
+    # (lib/split-drivers.js). OPC UA stays hidden from the
+    # new-connection form until its image is published. REST and MQTT
+    # have replaced the built-ins: they are offered as "REST" and
+    # "MQTT", and the chart moves their connections by default.
     !u ACS.Driver.RESTSplit:
       polled: true
       presentation: *rest_presentation
@@ -1191,7 +1195,6 @@ configs:
         repository: edge-rest
       schema: *rest_schema
     !u ACS.Driver.MQTTSplit:
-      hidden: true
       polled: false
       presentation: *mqtt_presentation
       image:

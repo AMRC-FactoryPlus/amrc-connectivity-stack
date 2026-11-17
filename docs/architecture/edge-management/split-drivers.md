@@ -11,8 +11,9 @@ deployed, versioned and fixed in the same way. The protocol between the
 Edge Agent and a split driver is described in
 [`acs-edge/docs/edge-split.md`](../../../acs-edge/docs/edge-split.md).
 
-REST is the first to move. Its split driver is `edge-rest`. MQTT and
-OPC UA keep their built-in connections until their drivers are ready.
+REST and OPC UA are the first to move. Their split drivers are
+`edge-rest` and `edge-opcua`. MQTT keeps its built-in connection until
+its driver is ready.
 
 ## The setting
 
@@ -24,7 +25,8 @@ serviceSetup:
   config:
     splitDrivers:
       REST: true      # the chart's default
-      # MQTT, OPCUA: not set, so they stay built in
+      OPCUA: true     # the chart's default
+      # MQTT: not set, so it stays built in
       # dryRun: true  # log what would move and change nothing
 ```
 
@@ -68,6 +70,16 @@ expect an Edge Agent with REST connections to restart once or twice in
 the minutes after the upgrade, and its REST devices to have no data for
 that time.
 
+Built-in OPC UA connections move the same way, to an `edge-opcua`
+sidecar each, with `OPCUAConnDetails` becoming `DriverDetails` and every
+field kept: endpoint, security mode and policy, credentials and the
+password's secret. Two more things change for OPC UA, because the
+driver hands the Edge Agent JSON where the built-in connection handed
+it decoded values: the connection and its devices change from "Defined
+by Protocol" to JSON, and every metric path on the connection is
+removed. See [What changes for an OPC UA
+connection](#what-changes-for-an-opc-ua-connection).
+
 Service-setup runs the move on every install and upgrade, and a second
 run finds nothing to change. A run that stopped half way through is
 finished by the next one.
@@ -77,7 +89,9 @@ finished by the next one.
 After the upgrade, the connection form in the Manager offers one REST
 driver, called "REST", which is the split driver. The built-in driver is
 called "REST (built-in)" and is shown only on a connection that still
-uses it, for example on a site that has moved REST back.
+uses it, for example on a site that has moved REST back. OPC UA is the
+same: the split driver is "OPC-UA" and the built-in is "OPC-UA
+(built-in)".
 
 ## Edge charts and every split driver move
 
@@ -185,14 +199,65 @@ these differences:
 - **One more container per connection.** Each REST connection runs in
   its own `edge-rest` container in the Edge Agent's pod.
 
+## What changes for an OPC UA connection
+
+`edge-opcua` subscribes to the same nodes with the same settings as the
+built-in connection, and for one device the Edge Agent publishes the
+same values, with the same Sparkplug types, as before. Both stamp each
+value with the time it arrived, not the server's timestamp. Its full
+behaviour is in [`edge-opcua/README.md`](../../../edge-opcua/README.md).
+You may notice these differences:
+
+- **The payload format is JSON.** The connection and its devices change
+  from "Defined by Protocol" to JSON, which is what the driver sends. A
+  connection with no format of its own gets JSON too.
+- **Metric paths are removed.** The built-in connection never read a
+  metric's path, so some metrics have something in the field that was
+  never meant as a path, such as a unit (`mm`). The Edge Agent reads
+  the driver's JSON through a metric's path, so such a metric would
+  never update. The move removes every path on the connection's
+  metrics in the Edge Agent config, and the Manager leaves them out
+  when it rebuilds the config of a connection on the split driver (its
+  DriverDef has `metricPaths: false`). Each device's origin map keeps
+  its paths. The `path` property is gone from these metrics in DBIRTH.
+  The Manager's form hides the path field for OPC UA, as it did before.
+- **Every device gets its own values.** On a connection with more than
+  one device, the built-in connection gave every device's values to
+  the last device's metrics, or dropped them. The driver gives each
+  device its own values. So after the move, devices that published
+  nothing start publishing, and the last device on such a connection
+  stops publishing values that were never its own.
+- **DateTime metrics publish the date.** The built-in connection
+  published every DateTime value as 0.
+- **An unreachable server shows.** The devices go offline while their
+  server can't be reached, and send a new DBIRTH when it is back. The
+  built-in connection left them online with their last values.
+- **More DDATA messages, for now.** The Edge Agent publishes one DDATA
+  message for each value the driver sends, where the built-in
+  connection published one for each subscription notification. The
+  values and timestamps are the same. A later change to the Edge Agent
+  groups them again.
+- **Writes are confirmed.** A write shows as written only once the
+  server accepts it, and one the server refuses is answered as failed.
+- **Certificates.** Like the built-in connection, the driver makes a
+  self-signed client certificate when its container starts, with the
+  same application URI. The built-in connection kept its certificate in
+  a folder that every new Edge Agent pod starts without, so a secured
+  server already accepts a new client certificate after every upgrade,
+  and it accepts the driver's in the same way. Both accept any server
+  certificate.
+- **One more container per connection.** Each OPC UA connection runs in
+  its own `edge-opcua` container in the Edge Agent's pod.
+
 ## Checking it worked
 
 1. In the service-setup Job's log, find the line that starts
    `Split drivers:`. It gives how many connections moved and how many
    failed, and the lines above it name each connection.
-2. In the Manager, open a REST connection. Its driver is "REST".
+2. In the Manager, open a REST or OPC UA connection. Its driver is
+   "REST" or "OPC-UA".
 3. On the edge cluster, the Edge Agent's pod has a `driver-<name>`
-   container for each REST connection, and each is running.
+   container for each REST and OPC UA connection, and each is running.
 4. The connection's devices are publishing data again a few minutes
    after the upgrade.
 
@@ -206,6 +271,13 @@ connection created in the Manager after the move uses the split driver,
 and the next upgrade with `REST: false` moves it to the built-in
 connection too.
 
+`OPCUA: false` moves OPC UA connections back in the same way, and their
+payload format back to "Defined by Protocol" (also on a connection that
+had no format of its own before the move, which now names it). The
+metric paths the move removed are not put back, because the built-in
+connection never read them. The Manager puts them back from each
+device's origin map the next time it saves the device or connection.
+
 ## Adding a protocol's migration
 
 This is for developers moving another built-in protocol (MQTT, UDP, OPC
@@ -216,7 +288,10 @@ UA) to its split driver. Follow what REST did:
    plainly (for example "MQTT"), and hide the built-in and name it
    "MQTT (built-in)". Both changes are needed, because the connection
    form picks drivers by name. Update the "offer ... and hide the
-   others" test in `acs-service-setup/test/split-drivers.test.js`.
+   others" test in `acs-service-setup/test/split-drivers.test.js`. If
+   the driver's values leave nothing for a metric path to select, give
+   its DriverDef `metricPaths: false`, as OPC UA's has: the move then
+   removes paths and the Manager leaves them out.
 2. **The switch.** Add the protocol to `SplitDrivers` in
    `acs-service-setup/lib/split-drivers.js` if it isn't there, with its
    payload format map, and set it to `true` under
@@ -238,7 +313,11 @@ UA) to its split driver. Follow what REST did:
    like "split driver after service-setup's move" that replays your
    `moved.json`, and make your fake device's `connection()` point
    `DriverDetails` at itself as well as the built-in details key (see
-   `devices/http.ts`). Add the folder to the `paths` of
+   `devices/http.ts`). A fake device can check credentials and security
+   when the run asks it to (`secure`, see `devices/opcua.ts`), and a run
+   can send writes (`commands`). Where the built-in connection is wrong,
+   compare against a reference that is right, as the OPC UA case does
+   with one device at a time (`merge_runs`). Add the folder to the `paths` of
    `.github/workflows/split-driver-golden.yaml` and
    `acs-edge-tests.yaml`, and grep for your cases in the golden workflow
    as it does for REST.

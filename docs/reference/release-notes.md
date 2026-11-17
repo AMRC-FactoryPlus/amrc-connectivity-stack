@@ -12,26 +12,32 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
-### Before you upgrade: version 7 moves REST connections out of the Edge Agent
+### Before you upgrade: version 7 moves REST and OPC UA connections out of the Edge Agent
 
 The release with this change is a major release, ACS version 7. Read
 this section before upgrading a production installation, because a
 site with its own changes to its edge Helm charts must take one manual
 step during the upgrade, and a site that misses it loses data from
-some devices until it does.
+some devices until it does. A site with OPC UA connections should also
+read what changes for them, because some devices publish different
+data afterwards.
 
 **What changes.** An Edge Agent reads devices either with code built
 into the Edge Agent or with a separate small program, a split driver,
 that runs in its own container beside it. In version 7, every Edge
 Agent connection that uses the built-in REST connection moves to a new
-REST split driver, `edge-rest`, by itself on upgrade. Each connection
-keeps its details, devices and addresses, and its devices publish the
-same data. Each Edge Agent with a REST connection restarts once or
-twice in the minutes after the upgrade, as the new container is added,
-so its REST devices have no data for that time. New REST connections in
-the Manager use the split driver, under the name "REST". MQTT, OPC UA
-and UDP connections stay built in for now and will move the same way in
-later releases.
+REST split driver, `edge-rest`, by itself on upgrade, and every one that
+uses the built-in OPC UA connection moves to `edge-opcua`. Each
+connection keeps its details, devices and addresses, including OPC UA
+security settings and credentials. REST devices publish the same data.
+OPC UA devices publish the same data too, with the exceptions under
+"What a site with OPC UA connections must know" below. Each Edge Agent
+with a REST or OPC UA connection restarts once or twice in the minutes
+after the upgrade, as the new container is added, so those devices
+have no data for that time. New REST and OPC UA connections in the
+Manager use the split drivers, under the names "REST" and "OPC-UA".
+MQTT and UDP connections stay built in for now and will move the same
+way in later releases.
 
 **Why some sites must act.** Edge clusters get their software from the
 edge Helm charts in the `shared/helm` git repository on the central
@@ -39,9 +45,10 @@ cluster. Each upgrade writes the new charts to the `acs` branch, but
 edge clusters deploy from `main`, and the upgrade only moves `main` if
 nobody has committed to it. On a site that has committed its own
 changes to `main`, the edge clusters keep running the older release,
-which has no `edge-rest`. The REST connections move anyway, because the
-move happens on the central cluster, so on those edge clusters the new
-container can't start and the moved REST devices get no data.
+which has no `edge-rest` or `edge-opcua`. The connections move anyway,
+because the move happens on the central cluster, so on those edge
+clusters the new containers can't start and the moved devices get no
+data.
 
 **Upgrade procedure.**
 
@@ -54,32 +61,34 @@ container can't start and the moved REST devices get no data.
    - Upgrade, then as soon as the `service-setup` Job has finished,
      merge `acs` into `main` in `shared/helm` (keeping your own changes)
      and push `main`. Your edge clusters pick it up within a few
-     minutes, and the REST devices' data resumes.
+     minutes, and the moved devices' data resumes.
    - Or, to upgrade now and merge later, set
-     `serviceSetup.config.splitDrivers.REST: null` in your values for
-     this upgrade. Your REST connections stay built in. Set it back to
-     `true` (or remove it) on a later upgrade, once you have merged.
+     `serviceSetup.config.splitDrivers.REST: null` and
+     `serviceSetup.config.splitDrivers.OPCUA: null` in your values for
+     this upgrade. Your REST and OPC UA connections stay built in. Set
+     them back to `true` (or remove them) on a later upgrade, once you
+     have merged.
 3. **Check every edge cluster is syncing** from the central cluster
    before you upgrade. An edge cluster that can't fetch from the central
-   git server keeps its old software, and its moved REST devices have no
+   git server keeps its old software, and its moved devices have no
    data until it can.
 4. **Run the upgrade, and wait for the `service-setup` Job to
    complete.** The `edge-helm-charts` container's log has a line
    starting `WARNING: branch main of shared/helm has commits of its own`
    if your site needs step 2.
 5. **Check it worked.** Find the line starting `Split drivers:` in the
-   `service-setup` container's log, which says how many REST connections
-   moved and how many failed. Each Edge Agent pod with REST connections
-   has a running `driver-<name>` container, and the REST devices are
-   publishing again a few minutes after the upgrade.
+   `service-setup` container's log, which says how many connections
+   moved and how many failed. Each Edge Agent pod with REST or OPC UA
+   connections has a running `driver-<name>` container for each, and
+   their devices are publishing again a few minutes after the upgrade.
 
-**If the REST devices have no data after the upgrade**, and their Edge
+**If the moved devices have no data after the upgrade**, and their Edge
 Agent pod's `driver-<name>` container can't pull its image
 (`ImagePullBackOff`), your edge clusters didn't get the new charts.
 Merge `acs` into `main` in `shared/helm` and push it, as in step 2, and
 the data comes back within a few minutes with nothing else to do. Or
-set `serviceSetup.config.splitDrivers.REST: false` and upgrade again to
-move the connections back to the built-in connection.
+set `serviceSetup.config.splitDrivers.REST: false` (or `OPCUA: false`)
+and upgrade again to move the connections back to the built-in connection.
 
 **What you may notice afterwards.** A failing REST endpoint is logged
 once until it recovers, rather than on every poll. One failing endpoint
@@ -90,9 +99,40 @@ where the built-in connection waited for ever. Page counters in
 addresses (such as `${1:_}`) now work. A write posts the value alone as
 JSON, and shows as written only once the device accepts it.
 
+**What a site with OPC UA connections must know.** On an OPC UA
+connection with more than one device, the built-in connection gave
+the values of every device but the last to the last device's metrics,
+or dropped them. The split driver gives each device its own values. So
+after the upgrade, some OPC UA devices start publishing values they
+never published before, and the last device on such a connection stops
+publishing values that were never its own. Check the dashboards and
+historian queries that read those devices. Other changes you may see:
+
+- A DateTime metric publishes the date. The built-in connection
+  published 0.
+- The devices go offline while their OPC UA server can't be reached,
+  and come back with a new birth certificate. The built-in connection
+  left them online with their last values.
+- Each moved connection's payload format changes from "Defined by
+  Protocol" to JSON, and the path of every metric on it is removed.
+  The built-in connection never read these paths, and some hold a
+  unit typed into the wrong field. The Manager keeps them in the
+  device's origin map, and the form hides the path field for OPC UA.
+- The Edge Agent sends one data message per changed value, rather than
+  one per batch of values from the server, so there are more, smaller
+  messages with the same values and timestamps. A later release groups
+  them again.
+- A write shows as written only once the server accepts it.
+- A secured server already accepts a new client certificate from every
+  new Edge Agent pod, because the built-in connection made one each
+  time, and it accepts the split driver's in the same way.
+
 **To move back** at any time, set
-`serviceSetup.config.splitDrivers.REST: false` and upgrade again. Every
-connection's config returns to exactly what it was.
+`serviceSetup.config.splitDrivers.REST: false` (or `OPCUA: false`) and
+upgrade again. Every REST connection's config returns to exactly what
+it was. OPC UA connections return to the built-in connection with their
+details and "Defined by Protocol", and the Manager puts their metric
+paths back the next time it saves the device.
 
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.

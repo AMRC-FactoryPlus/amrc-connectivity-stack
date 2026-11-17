@@ -5,10 +5,13 @@ An Edge Agent split driver for OPC UA servers, written in Rust on
 [async-opcua](https://github.com/freeopcua/async-opcua) client. It
 replaces the Edge Agent's built-in OPC UA connection
 (`acs-edge/lib/devices/OPCUA.ts`) and takes the same connection
-details, so moving a connection to it only moves them from
-`OPCUAConnDetails` to `DriverDetails`. Moving connections is not part
-of this driver: service-setup does it per protocol (see
-`acs-service-setup/lib/split-drivers.js`).
+details. Service-setup moves every built-in OPC UA connection to it on
+upgrade (`acs-service-setup/lib/split-drivers.js`): the details move
+from `OPCUAConnDetails` to `DriverDetails`, the payload format changes
+from "Defined by Protocol" to JSON, and metric paths are removed,
+because this driver's values leave nothing for a path to select (its
+DriverDef has `metricPaths: false`). See
+[Split Drivers](../docs/architecture/edge-management/split-drivers.md).
 
 [Adding a Rust Driver](../docs/development/rust-drivers.md) covers the
 build, CI and publishing steps.
@@ -94,6 +97,9 @@ of range) `CMD`, anything else `ERR`.
   while the session is down, so the agent marks the devices offline
   and sends a new DBIRTH when it is back. The built-in kept them
   online with stale values.
+- **DateTime values.** Sent as milliseconds, which the agent publishes
+  as the date. The built-in passed node-opcua's `Date`, which the agent
+  published as 0.
 - **Values JSON can't hold.** NaN is dropped by the agent (the metric
   keeps its last value). Int64 and UInt64 are sent with every digit and
   the agent reads them exactly up to 2^53; the built-in passed

@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use bytes::Bytes;
-use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, Publish, QoS, SubscribeFilter};
+use rumqttc::{
+    AsyncClient, Event, EventLoop, Incoming, MqttOptions, Publish, QoS, SubscribeFilter,
+};
 use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore, mpsc};
 use tokio::task::{JoinHandle, JoinSet};
@@ -20,6 +22,9 @@ use crate::write::WriteValue;
 /// dropping requests (backpressure). Matches the JS/Python versions.
 /// In parallel mode it is also the most batches that run at once.
 const POLL_QUEUE_MAX: usize = 20;
+
+/// Most packets from the edge agent waiting for the driver loop.
+const NETWORK_QUEUE: usize = 256;
 
 /// Most messages held back while an address map is being parsed.
 const DEFER_MAX: usize = 1000;
@@ -444,7 +449,9 @@ impl<H: Handler + 'static> Driver<H> {
         &mut self,
         rx: &mut mpsc::UnboundedReceiver<DriverEvent<H::Addr>>,
     ) -> Result<(), Error> {
-        let (client, mut eventloop) = self.connect_mqtt()?;
+        let (client, eventloop) = self.connect_mqtt()?;
+        let (net_tx, mut net_rx) = mpsc::channel(NETWORK_QUEUE);
+        let network = tokio::spawn(Self::network(eventloop, net_tx));
 
         // Subscribe to our control topics. READY goes out when the
         // SUBACK comes back, as the spec asks.
@@ -482,18 +489,17 @@ impl<H: Handler + 'static> Driver<H> {
         // MQTT event loop is always polled and pings go out on time.
         let result: Result<(), Error> = loop {
             tokio::select! {
-                event = eventloop.poll() => {
+                event = net_rx.recv() => {
                     match event {
-                        Ok(Event::Incoming(Incoming::SubAck(_))) => {
+                        Some(Ok(Incoming::SubAck(_))) => {
                             self.set_status(&session, Status::Ready);
                         }
-                        Ok(Event::Incoming(Incoming::Publish(publish))) => {
+                        Some(Ok(Incoming::Publish(publish))) => {
                             self.on_publish(&session, publish);
                         }
-                        Ok(_) => {}
-                        Err(e) => {
-                            break Err(Error::Mqtt(e.to_string()));
-                        }
+                        Some(Ok(_)) => {}
+                        Some(Err(e)) => break Err(Error::Mqtt(e)),
+                        None => break Err(Error::Mqtt("MQTT event loop stopped".into())),
                     }
                 }
                 Some(event) = rx.recv() => {
@@ -502,9 +508,37 @@ impl<H: Handler + 'static> Driver<H> {
             }
         };
 
+        network.abort();
         publisher.abort();
         poll_worker.abort();
         result
+    }
+
+    /// Run rumqttc's event loop on its own task, passing what arrives
+    /// to the driver loop.
+    ///
+    /// `EventLoop::poll` writes queued packets to the socket inside
+    /// the future it returns. If that future is dropped part way
+    /// through a write, as it is when it loses a `select!` race, the
+    /// bytes already written are sent again by the next `poll`, and
+    /// the broker can no longer parse the stream. That happens
+    /// whenever the edge agent reads more slowly than the driver
+    /// publishes, so `poll` must only ever be awaited to completion.
+    async fn network(mut eventloop: EventLoop, tx: mpsc::Sender<Result<Incoming, String>>) {
+        loop {
+            match eventloop.poll().await {
+                Ok(Event::Incoming(incoming)) => {
+                    if tx.send(Ok(incoming)).await.is_err() {
+                        return;
+                    }
+                }
+                Ok(Event::Outgoing(_)) => {}
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string())).await;
+                    return;
+                }
+            }
+        }
     }
 
     /// Send messages from the driver loop to the broker, in order.
@@ -622,7 +656,7 @@ impl<H: Handler + 'static> Driver<H> {
     }
 
     /// Create the MQTT client and set up connection options.
-    fn connect_mqtt(&self) -> Result<(AsyncClient, rumqttc::EventLoop), Error> {
+    fn connect_mqtt(&self) -> Result<(AsyncClient, EventLoop), Error> {
         let url = url::Url::parse(&self.config.mqtt_url)
             .map_err(|e| Error::Mqtt(format!("invalid MQTT URL: {e}")))?;
 

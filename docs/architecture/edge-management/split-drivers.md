@@ -264,11 +264,9 @@ these differences:
   certificate must be signed by a well-known certificate authority, as
   with the built-in connection, so a broker with a self-signed
   certificate is still refused.
-- **CPU moves between containers.** Each message now crosses the pod's
-  internal broker, and the driver container uses a little CPU of its
-  own. The Edge Agent uses less than it did with the built-in
-  connection, so the pod as a whole uses about the same or less. See
-  "CPU" below.
+- **A little more CPU in the pod.** The Edge Agent uses about the same
+  CPU as with the built-in connection, and the driver container adds 1
+  to 3% of a core. See "CPU" below.
 - **One more container per connection.** Each MQTT connection runs in
   its own `edge-mqtt` container in the Edge Agent's pod.
 
@@ -281,17 +279,19 @@ from a separate broker at 123, 370 and 1,232 messages a second.
 
 | Messages a second | Edge Agent, built-in | Edge Agent, split | `edge-mqtt` |
 |---|---|---|---|
-| 123 | 9 to 10% of a core | 6% | 1% |
-| 370 | 20 to 22% | 14% | 1 to 2% |
-| 1,232 | 37 to 39% | 25% | 2% |
+| 123 | 7 to 8% of a core | 7 to 9% | 1% |
+| 370 | 12% | 14 to 15% | 1 to 2% |
+| 1,232 | 30 to 35% | 34 to 35% | 2 to 3% |
 
 `edge-mqtt` uses about 5 MB of memory, whatever the number of metrics.
 No message was lost or reordered. Before version 7 the Edge Agent ran
 each device's poll timer every millisecond when the connection had no
 poll interval, which is every MQTT connection, and with a split driver
 each tick sent the driver a poll it had nothing to do with. That more
-than doubled the Edge Agent's CPU at 123 messages a second (21 to 24%).
-A device with no poll interval now has no poll timer.
+than doubled the Edge Agent's CPU at 123 messages a second (21 to 24%,
+against 9 to 10% for the built-in connection, which also paid for the
+timer). A device with no poll interval now has no poll timer, which
+lowers the built-in connection's CPU too.
 
 ## What changes for a UDP connection
 

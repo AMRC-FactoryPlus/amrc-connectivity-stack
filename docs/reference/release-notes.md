@@ -121,10 +121,9 @@ built-in connection built the message from the device's payload format
 and the metric's path. A message larger than about 16 MB is dropped
 with a warning. A topic that another device still reads stays
 subscribed when a device is removed. Each message now passes through
-the Edge Agent pod's internal broker, and the driver container uses a
-little CPU of its own, but the Edge Agent itself uses less than it did,
-so the pod as a whole uses about the same or less: see the CPU section
-of the split drivers page.
+the Edge Agent pod's internal broker. The Edge Agent uses about the
+same CPU as with the built-in connection, and the driver container adds
+1 to 3% of a core: see the CPU section of the split drivers page.
 
 **What a site with OPC UA connections must know.** On an OPC UA
 connection with more than one device, the built-in connection gave

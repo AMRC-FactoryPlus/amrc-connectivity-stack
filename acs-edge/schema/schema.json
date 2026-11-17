@@ -229,7 +229,7 @@
                             },
                             "useCredentials": {
                                 "title": "Use credentials",
-                                "type": "boolean",
+                                "type": "boolean"
                             },
                             "username": {
                                 "title": "Username",

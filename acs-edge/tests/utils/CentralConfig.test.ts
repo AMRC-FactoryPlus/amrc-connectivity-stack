@@ -3,68 +3,69 @@
  *  Copyright 2023 AMRC
  */
 
-import axios from "axios";
-import {CentralConfig} from "../../utils/CentralConfig"; 
+/* utils/CentralConfig.ts once held a CentralConfig class, which these
+ * tests were written for. It is now a set of functions. Importing the
+ * module parses and compiles schema/schema.json, so these tests also
+ * catch a schema that is not valid JSON or not a valid JSON Schema.
+ * ConfigPOST and fetchConfig talk to a config server and are not
+ * tested here. */
 
+import { validateConfig, wait } from "../../utils/CentralConfig";
 
-describe('LoadConfig', () => {
+const sparkplug = {
+    serverUrl: "mqtt://broker.example:1883",
+    groupId: "Dummy",
+    edgeNode: "Dummy_Node",
+    username: "user",
+    password: "password",
+    asyncPubMode: true,
+    pubInterval: 1000,
+    compressPayload: false,
+};
 
-    const config = new CentralConfig(process.env.CONFIG_URL);
+function config (conn: object) {
+    return { sparkplug, deviceConnections: [conn] };
+}
 
-    const validAPIData = {
-        sparkplug: {
-            serverUrl: "ssl://amrc-factoryplus.shef.ac.uk:8883",
-            groupId: "Dummy",
-            edgeNode: "Dummy_Node",
-            username: "BZQlJZdO",
-            password: "v,G67XL}9sOy3+gOx]Rxfb0<(?MQ&vQY",
-            asyncPubMode: true,
-            pubInterval: 1000,
-            compressPayload: false
-        },
-        deviceConnections: [{}]
-    };
-
-    describe('.poll', () => {
-        let mockFetchConfig = jest.fn();
-        let mockIsValid = jest.fn();
-
-
-
-        test('should return api data if the condition validates', async () => {
-            mockIsValid.mockReturnValueOnce(() => true);
-            mockFetchConfig.mockReturnValueOnce(validAPIData);
-            expect(await config.poll(mockFetchConfig, mockIsValid, 1000)).toMatchObject(validAPIData);
-            expect(mockIsValid).toHaveBeenCalledTimes( 1 ); 
-            expect(mockFetchConfig).toHaveBeenCalledTimes( 1 ); 
-        });
+describe("validateConfig", () => {
+    test("accepts a config with a REST connection", () => {
+        expect(validateConfig(config({
+            name: "api", connType: "REST",
+            RESTConnDetails: { baseURL: "http://example.com", authMethod: "None" },
+        }))).toBe(true);
     });
 
-    describe('.isValid', () => {
+    test("rejects a connection with no connType", () => {
+        expect(validateConfig(config({ name: "api" }))).toBe(false);
+    });
 
-        let invalidData = {};
-
-        test('should return true if the result is valid', () => {
-            //expect(config.isValid(validAPIData)).toBeTruthy();
+    test.each(["S7", "UDP", "MTConnect", "EtherNet/IP", "Fieldbus"])(
+        "rejects the removed connection type %s", connType => {
+            expect(validateConfig(config({ name: "old", connType }))).toBe(false);
         });
 
-        test('should return false if the result is invalid', () => {
-            //expect(config.isValid(invalidData)).toBeFalsy();
-        });
+    test("rejects a Sparkplug group ID containing a /", () => {
+        expect(validateConfig({
+            sparkplug: { ...sparkplug, groupId: "a/b" },
+            deviceConnections: [],
+        })).toBe(false);
     });
+});
 
-    describe('.fetchConfig', () => {
-        //TODO: Change this so that it expects the return value from the server. 
-        test('should API Data', () => {
-            expect(config.fetchConfig).not.toBeNull();
-        })
+describe("wait", () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    test("resolves after the given number of seconds, not before", async () => {
+        let done = false;
+        const p = wait(2).then(() => { done = true; });
+
+        jest.advanceTimersByTime(1999);
+        await Promise.resolve();
+        expect(done).toBe(false);
+
+        jest.advanceTimersByTime(1);
+        await p;
+        expect(done).toBe(true);
     });
-
-    describe('.wait', () => {
-        
-        test('promise should resolve', async () => {
-            await expect(config.wait).toBe(config.wait);
-        })
-
-    });
-})
+});

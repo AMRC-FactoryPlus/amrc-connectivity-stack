@@ -463,6 +463,7 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-test-rs
+          - edge-mqtt
           - edge-rest
           - edge-udp
           - edge-openprotocol
@@ -511,6 +512,7 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-test-rs
+          - edge-mqtt
           - edge-rest
           - edge-udp
           - edge-openprotocol
@@ -559,6 +561,7 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-test-rs
+          - edge-mqtt
           - edge-rest
           - edge-udp
           - edge-openprotocol

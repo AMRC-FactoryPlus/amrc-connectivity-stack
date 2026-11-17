@@ -40,7 +40,13 @@ function security_policy (name: string): SecurityPolicy {
  * sessions. It trusts any client certificate, as a server that has
  * been told to trust the Edge Agent's would: whether a real server
  * trusts the split driver's new certificate is not something a mock
- * can show. */
+ * can show.
+ *
+ * A connection that logs in on a None endpoint is offered Basic256Sha256
+ * as well, because node-opcua offers a username token on a None
+ * endpoint only with an encrypting policy the server has. The password
+ * is then encrypted with the server's certificate, as real servers set
+ * up this way do. Without it no client could log in. */
 export class OpcuaMock implements Mock {
     conn:       RigConnection
     fixture:    Fixture
@@ -79,7 +85,8 @@ export class OpcuaMock implements Mock {
             port:               this.conn.port,
             hostname:           this.advertise,
             securityModes:      [mode],
-            securityPolicies:   [policy],
+            securityPolicies:   creds && policy == SecurityPolicy.None
+                ? [policy, SecurityPolicy.Basic256Sha256] : [policy],
             allowAnonymous:     !creds,
             userManager: {
                 isValidUser: (user: string, password: string) => {

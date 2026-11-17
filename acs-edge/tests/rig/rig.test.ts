@@ -41,6 +41,13 @@ const by_proto = (rig: Rig, p: string) =>
 /* The same connection on a port no other test uses. */
 const on_port = (c: RigConnection, port: number) => ({ ...c, port });
 
+/* The OPC UA example with security mode and policy None and a login. */
+function none_with_login (c: RigConnection, port: number): RigConnection {
+    const details = { ...c.connection.OPCUAConnDetails,
+        securityMode: "None", securityPolicy: "None", useCredentials: true };
+    return { ...c, port, connection: { ...c.connection, OPCUAConnDetails: details } };
+}
+
 describe("make_rig", () => {
     const rig = example_rig();
 
@@ -237,6 +244,33 @@ describe("mocks", () => {
             const dv = await session.read({ nodeId: tag.address, attributeId: AttributeIds.Value });
             expect(dv.statusCode.isGood()).toBe(true);
             await session.close();
+        }
+        finally {
+            await client.disconnect();
+            await mock.stop();
+        }
+    }, 60_000);
+
+    test("OPC UA with security None and a login lets the client log in", async () => {
+        const c = none_with_login(by_proto(rig, "OPC UA"), 14841);
+        const mock = make_mock(rig, c, { advertise: "127.0.0.1" });
+        await mock.start();
+        const client = OPCUAClient.create({
+            securityMode: MessageSecurityMode.None,
+            securityPolicy: SecurityPolicy.None,
+            endpointMustExist: false,
+            connectionStrategy: { maxRetry: 0 },
+        });
+        try {
+            await client.connect("opc.tcp://127.0.0.1:14841");
+            await expect(client.createSession({
+                type: UserTokenType.UserName, userName: c.username!, password: "wrong",
+            })).rejects.toThrow();
+            const session = await client.createSession({
+                type: UserTokenType.UserName, userName: c.username!, password: c.password!,
+            });
+            await session.close();
+            await expect(client.createSession()).rejects.toThrow();
         }
         finally {
             await client.disconnect();

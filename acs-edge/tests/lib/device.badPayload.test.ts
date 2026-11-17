@@ -106,8 +106,8 @@ describe("plain JSON with a bare payload", () => {
 });
 
 /* The split-driver path: a DriverConnection gathers data and hands it
- * to the devices from a setImmediate, where a throw is uncaught and
- * ends the process. */
+ * to the devices from a timer (10 ms by default), where a throw is
+ * uncaught and ends the process. */
 describe("a bare payload from a split driver", () => {
     const ID = "drv";
 
@@ -172,7 +172,8 @@ describe("a bare payload from a split driver", () => {
                 t.send("bad", JSON.stringify(v));
                 t.send("ok", JSON.stringify({ value: 1.25 }));
                 t.send("good", JSON.stringify({ value: 2.5 }));
-                await new Promise(r => setImmediate(r));
+                /* Past the agent's gathering wait. */
+                await new Promise(r => setTimeout(r, 30));
                 await new Promise(r => setImmediate(r));
             }
             finally {

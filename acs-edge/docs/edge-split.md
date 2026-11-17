@@ -621,15 +621,24 @@ Agent gathers the data packets that arrive together and hands them to
 the devices as one group. Each device publishes one DDATA for the
 values in the group that belong to it.
 
-* Packets that arrive in the same turn of the agent's event loop form a
-  group: in practice, whatever the agent reads from the driver's socket
-  in one go. The group is handed on at the end of that turn, so a
-  packet on its own is not held back.
+* Packets that arrive within 10 milliseconds of the first packet of a
+  group join it, and the group is handed on 10 milliseconds after that
+  first packet. So every value reaches Sparkplug up to 10 ms later than
+  it arrived, a lone one included. Its timestamp doesn't change: a
+  value without one is still stamped with when its packet arrived.
 
-* `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment makes it wait
-  that many milliseconds after the first packet of a group instead,
-  up to 100. The default is 0. Every packet waits up to that long, a
-  lone one included.
+* The wait is there because a driver writes each data packet to its
+  socket on its own, and an agent with nothing else to do wakes for
+  the first packet and would hand it on before the rest had arrived.
+  Measured with the OPC UA driver, a notification of 20 values went
+  out as 2.9 DDATA on average with no wait, 1.2 with 1 ms and 1.0
+  with 5 or 10 ms; 10 ms gave one DDATA per notification of up to 100
+  values whether the machine was idle, busy or limited to one CPU.
+
+* `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment sets the wait,
+  up to 100. `0` waits for nothing past the current turn of the event
+  loop: whatever the agent reads from the driver's
+  socket in one go forms a group.
 
 * A second packet for an address already in the group hands the group
   on first, so every value is published, in the order the driver sent

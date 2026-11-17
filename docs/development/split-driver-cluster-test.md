@@ -790,9 +790,10 @@ test, collected on 2026-11-17.
 
 **Grouped DDATA (ACS-45, PR 908 merged):** the DDATA rate check in
 step 8. PR 908 lists no cluster checks of its own. Its
-`DRIVER_DATA_WAIT_MS` setting is off by default, and the remaining
-OPC UA gap needs a driver fix (no `TCP_NODELAY` in the Rust drivers'
-MQTT client), so expect OPC UA warnings, not failures.
+`DRIVER_DATA_WAIT_MS` setting was off by default then. It is 10 ms
+now, which gathers each OPC UA notification into one DDATA (see
+"Gathering data" in `acs-edge/docs/edge-split.md`), so the OPC UA
+DDATA rate should match the built-in's.
 
 ### 10. Check a version 6 `false` is refused
 

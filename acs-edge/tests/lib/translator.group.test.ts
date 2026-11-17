@@ -42,6 +42,8 @@ function device (id: string, addrs: string[]) {
 
 const range = (p: string, n: number) => Array.from({ length: n }, (_, i) => `${p}${i}`);
 const turn = () => new Promise(r => setImmediate(r));
+/* Past the agent's 10 ms gathering wait. */
+const gathered = () => new Promise(r => setTimeout(r, 30));
 
 /* Each Device starts a ready timer; unref them so jest can exit. */
 const realSetInterval = global.setInterval;
@@ -84,7 +86,7 @@ describe("Values a split driver sends together", () => {
         const addrs = range("n", 100);
         const t = await setup([device("Dev", addrs)]);
         addrs.forEach((a, i) => t.send(a, i + 0.5));
-        await turn();
+        await gathered();
 
         expect(t.ddata).toHaveLength(1);
         expect(t.ddata[0].device).toBe("Dev");
@@ -92,15 +94,32 @@ describe("Values a split driver sends together", () => {
         t.close();
     });
 
-    it("give one value per DDATA when each comes in its own turn, as before", async () => {
+    it("give one value per DDATA when each comes after the wait", async () => {
         const addrs = range("n", 5);
         const t = await setup([device("Dev", addrs)]);
         for (const [i, a] of addrs.entries()) {
             t.send(a, i);
-            await turn();
+            await gathered();
         }
         expect(t.ddata.map(d => d.metrics.length)).toEqual([1, 1, 1, 1, 1]);
         t.close();
+    });
+
+    it("give one value per DDATA when each comes in its own turn, with DRIVER_DATA_WAIT_MS=0", async () => {
+        process.env.DRIVER_DATA_WAIT_MS = "0";
+        try {
+            const addrs = range("n", 5);
+            const t = await setup([device("Dev", addrs)]);
+            for (const [i, a] of addrs.entries()) {
+                t.send(a, i);
+                await turn();
+            }
+            expect(t.ddata.map(d => d.metrics.length)).toEqual([1, 1, 1, 1, 1]);
+            t.close();
+        }
+        finally {
+            delete process.env.DRIVER_DATA_WAIT_MS;
+        }
     });
 
     it("give each device on the connection its own DDATA", async () => {
@@ -111,7 +130,7 @@ describe("Values a split driver sends together", () => {
             t.send(b[i], 100 + i);
             t.send(a[i], i);
         }
-        await turn();
+        await gathered();
 
         expect(t.ddata.map(d => [d.device, d.metrics.length])).toEqual([["A", 10], ["B", 10]]);
         expect(t.ddata[0].metrics).toEqual(a.map((x, i) => ({ name: `m_${x}`, value: i })));
@@ -126,7 +145,7 @@ describe("Values a split driver sends together", () => {
         t.send("x", 2);
         t.send("y", 2);
         t.send("x", 3);
-        await turn();
+        await gathered();
 
         expect(t.ddata.map(d => d.metrics.map(m => `${m.name}=${m.value}`))).toEqual([
             ["m_x=1", "m_y=1"],

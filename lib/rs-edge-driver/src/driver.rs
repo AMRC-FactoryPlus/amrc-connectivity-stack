@@ -742,7 +742,15 @@ impl<H: Handler + 'static> Driver<H> {
         opts.set_keep_alive(self.options.keep_alive);
         opts.set_max_packet_size(self.options.max_packet_size, self.options.max_packet_size);
 
-        let (client, eventloop) = AsyncClient::new(opts, 64);
+        let (client, mut eventloop) = AsyncClient::new(opts, 64);
+        // Without no-delay, Nagle's algorithm holds every value after
+        // the first in a burst until the agent ACKs the first, which
+        // an agent that has just sent us something delays by about
+        // 40 ms. Those values then miss the DDATA the agent builds
+        // from the values that arrive together.
+        let mut network = eventloop.network_options();
+        network.set_tcp_nodelay(true);
+        eventloop.set_network_options(network);
         Ok((client, eventloop))
     }
 

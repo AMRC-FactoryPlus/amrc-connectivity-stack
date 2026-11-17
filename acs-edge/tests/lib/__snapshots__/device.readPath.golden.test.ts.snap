@@ -674,11 +674,43 @@ Array [
       "timestamp": "<now>",
       "timestampNs": "<undefined>",
       "type": "Boolean",
+      "value": false,
+    },
+    Object {
+      "isNull": false,
+      "name": "b",
+      "timestamp": "<now>",
+      "timestampNs": "<undefined>",
+      "type": "Boolean",
       "value": true,
+    },
+    Object {
+      "isNull": false,
+      "name": "b",
+      "timestamp": "<now>",
+      "timestampNs": "<undefined>",
+      "type": "Boolean",
+      "value": false,
     },
   ],
   Array [],
   Array [
+    Object {
+      "isNull": false,
+      "name": "b",
+      "timestamp": "<now>",
+      "timestampNs": "<undefined>",
+      "type": "Boolean",
+      "value": true,
+    },
+    Object {
+      "isNull": false,
+      "name": "b",
+      "timestamp": "<now>",
+      "timestampNs": "<undefined>",
+      "type": "Boolean",
+      "value": false,
+    },
     Object {
       "isNull": false,
       "name": "b",
@@ -707,6 +739,14 @@ Array [
     },
   ],
   Array [
+    Object {
+      "isNull": false,
+      "name": "nb",
+      "timestamp": "<now>",
+      "timestampNs": "<undefined>",
+      "type": "Boolean",
+      "value": false,
+    },
     Object {
       "isNull": false,
       "name": "nb",

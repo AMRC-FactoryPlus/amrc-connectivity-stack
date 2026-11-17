@@ -379,8 +379,11 @@ export class Device {
                                     processedValue = Long.fromString(processedValue.toString());
                                 }
 
-                                // If it has a sensible value and is different from the current value
-                                if ((processedValue || processedValue === 0) && (metric.value !== processedValue)) {
+                                // If it has a sensible value and is different from the current value.
+                                // false is a value: without it a Boolean metric never published false,
+                                // and so never published again after its first true.
+                                if ((processedValue || processedValue === 0 || processedValue === false)
+                                    && (metric.value !== processedValue)) {
                                     // Create a copy of the metric with the new value and timestamp.
                                     // timestampNs takes precedence for sub-ms precision, same as
                                     // the non-batched JSON path.

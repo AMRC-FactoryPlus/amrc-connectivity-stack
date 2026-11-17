@@ -8,6 +8,7 @@ import {
     Metrics,
     parseNsTimestampFromPayload,
     parseSimTagsFromPayload,
+    DecodedPayload,
     parseTimeStampFromPayload,
     sparkplugMetricProperties,
     parseValueFromPayload,
@@ -343,6 +344,17 @@ export class Device {
         for (let addr in obj) {
             // Get all payload paths registered for this address
             const paths = this._metrics.getPathsForAddr(addr);
+            // Decode the payload at most once, for every metric on it
+            const decoded = new DecodedPayload(obj[addr]);
+            // JSON (Batched) reads a payload that is not an array exactly
+            // as plain JSON does, so one device can take topics that carry
+            // single objects and topics that carry arrays of items. A
+            // payload that is not valid JSON is still skipped.
+            let format = this._payloadFormat;
+            if (parseVals && format === serialisationType.JSONBatched && paths.length) {
+                const { value, err } = decoded.json_result();
+                if (!err && !Array.isArray(value)) format = serialisationType.JSON;
+            }
             // Iterate through each path
             paths.forEach((path) => {
                 // Get the complete metric according to its address and path
@@ -355,19 +367,11 @@ export class Device {
                     if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
                         obj).length == 1))) {
                         // Handle JSON (Batched) format explicitly
-                        if (parseVals && this._payloadFormat === serialisationType.JSONBatched) {
-                            // Parse the payload as JSON
-                            let payload: any;
-                            try {
-                                if (typeof obj[addr] === "string") {
-                                    payload = JSON.parse(obj[addr]);
-                                } else if (Buffer.isBuffer(obj[addr])) {
-                                    payload = JSON.parse(obj[addr].toString());
-                                } else {
-                                    payload = obj[addr];
-                                }
-                            } catch (e) {
-                                log(`Failed to parse JSON (Batched) payload: ${e}`);
+                        if (parseVals && format === serialisationType.JSONBatched) {
+                            // The payload as JSON, parsed once per message
+                            const { value: payload, err } = decoded.json_result();
+                            if (err) {
+                                log(`Failed to parse JSON (Batched) payload: ${err}`);
                                 return;
                             }
 
@@ -384,8 +388,11 @@ export class Device {
                                     processedValue = Long.fromString(processedValue.toString());
                                 }
 
-                                // If it has a sensible value and is different from the current value
-                                if ((processedValue || processedValue === 0) && (metric.value !== processedValue)) {
+                                // If it has a sensible value and is different from the current value.
+                                // false is a value: without it a Boolean metric never published false,
+                                // and so never published again after its first true.
+                                if ((processedValue || processedValue === 0 || processedValue === false)
+                                    && (metric.value !== processedValue)) {
                                     // Create a copy of the metric with the new value and timestamp.
                                     // timestampNs takes precedence for sub-ms precision, same as
                                     // the non-batched JSON path.
@@ -399,9 +406,9 @@ export class Device {
                             });
                         } else {
                             // Standard processing for all other payload formats
-                            let newVal = parseVals ? parseValueFromPayload(obj[addr],
+                            let newVal = parseVals ? parseValueFromPayload(decoded,
                                 metric,
-                                this._payloadFormat,
+                                format,
                                 this._delimiter
                             ) : obj[addr];
 
@@ -428,14 +435,14 @@ export class Device {
                                 // Extract timestamps from the payload if provided.
                                 // timestampNs takes precedence for sub-ms precision;
                                 // timestamp is the ms fallback.
-                                const timestamp = parseTimeStampFromPayload(obj[addr],
+                                const timestamp = parseTimeStampFromPayload(decoded,
                                     metric,
-                                    this._payloadFormat,
+                                    format,
                                     this._delimiter
                                 );
-                                const timestampNs = parseNsTimestampFromPayload(obj[addr],
+                                const timestampNs = parseNsTimestampFromPayload(decoded,
                                     metric,
-                                    this._payloadFormat
+                                    format
                                 );
 
                                 // Update the metric value and push it to the array of changed metrics
@@ -451,7 +458,7 @@ export class Device {
                                 // properties so the historians can
                                 // tag the points.
                                 const simTags = parseSimTagsFromPayload(
-                                    obj[addr], this._payloadFormat);
+                                    decoded, format);
                                 if (simTags.simulated) {
                                     updated.properties = {
                                         ...(updated.properties ?? {}),

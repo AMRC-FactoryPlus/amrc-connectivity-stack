@@ -45,6 +45,13 @@
  * on the internal driver and the log names the other connection. The
  * built-in UDP connection only allowed port 50205, so this matters.
  *
+ * A connection is not moved to a split driver either when its Edge
+ * Agent's Deployment pins its own image tag or registry
+ * (`values.image.default` or `values.image.edgeAgent`), because a
+ * sidecar takes its tag and registry from `image.default`, and no split
+ * driver image exists at another release's tag or in a private
+ * registry. The log names the setting. Moves back are never held.
+ *
  * Before any move, and whether or not a move is asked for, every split
  * driver connection whose name can't be its driver id is given a
  * `driverId` in its Edge Agent config, and its `values.drivers` entry
@@ -174,6 +181,18 @@ export class MigrateSplitDrivers {
         return count;
     }
 
+    /* The image settings an agent's Deployment pins, as text, or
+     * undefined if it pins none. A tag or registry under image.default
+     * applies to the Edge Agent and every sidecar; one under
+     * image.edgeAgent keeps the agent on another release. */
+    pinned (agent) {
+        const image = this.deployments.get(agent)?.values?.image ?? {};
+        const pins = ["default", "edgeAgent"].flatMap(k =>
+            ["registry", "tag"].filter(f => image[k]?.[f] != undefined)
+                .map(f => `image.${k}.${f} ${image[k][f]}`));
+        return pins.length ? pins.join(", ") : undefined;
+    }
+
     /* Whether an agent's Deployment had no `values.drivers` when this
      * run first looked at it. A move to a split driver adds the key,
      * and the connection records that so moving back can remove it. */
@@ -294,6 +313,20 @@ export class MigrateSplitDrivers {
      * done. Its payload format is left as it is. */
     async move (conn, cconf, proto, to_split, to_def) {
         const moving = cconf.driver != (to_split ? proto.split : proto.internal);
+
+        /* A sidecar takes its tag and registry from the Deployment's
+         * image.default, so a Deployment that pins its own would ask
+         * for a split driver image that isn't there. */
+        const pin = moving && to_split && this.pinned(cconf.edgeAgent);
+        if (pin) {
+            this.log("Connection %s: not moving to the split driver, because its "
+                + "Edge Agent's Deployment sets %s, so the driver's container would "
+                + "ask for an image that doesn't exist. Remove that from the "
+                + "Deployment's values; the next service-setup run then moves it.",
+                conn, pin);
+            return "held";
+        }
+
         const next = moving ? move_connection(cconf, proto, to_split) : cconf;
         /* Every connection the run moves off an agent whose Deployment
          * had no `values.drivers` says so, so whichever is moved back

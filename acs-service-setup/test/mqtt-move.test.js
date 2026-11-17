@@ -33,6 +33,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import util from "node:util";
 
 import yaml from "yaml";
 
@@ -265,5 +266,77 @@ describe("moving a site's MQTT connections with the chart's defaults", () => {
         const cdb = site();
         await run(cdb, { ...defaults, MQTT: null });
         assert.equal(text(state(cdb)), text(SITE.configs));
+    });
+});
+
+/* A run that keeps what it logs. */
+async function run_logged (cdb, settings) {
+    const lines = [];
+    const count = await new MigrateSplitDrivers({
+        fplus: { ConfigDB: cdb }, settings,
+        log: (fmt, ...args) => lines.push(util.format(fmt, ...args)),
+    }).run();
+    return { count, lines };
+}
+
+function pin (cdb, agent, image) {
+    const dep = cdb.get(Edge.App.Deployment, agent);
+    if (image) dep.values.image = image;
+    else delete dep.values.image;
+    cdb.set(Edge.App.Deployment, agent, dep);
+}
+
+describe("an Edge Agent whose Deployment pins its image", () => {
+    const defaults = chart_defaults();
+    const CELL_MQTT = [C.xml, C.buffer];
+
+    for (const [what, image] of [
+        ["the default tag", { default: { tag: "batch.2" } }],
+        ["the default registry", { default: { registry: "registry.example.org" } }],
+        ["the Edge Agent's tag", { edgeAgent: { tag: "v6.24.2" } }],
+    ]) {
+        test(`pinning ${what} holds back that agent's connections and no others`, async () => {
+            const cdb = site();
+            pin(cdb, CELL, image);
+            const { count, lines } = await run_logged(cdb, defaults);
+            assert.equal(count.held, 2);
+            assert.equal(count.moved, 3);
+
+            for (const conn of CELL_MQTT) {
+                assert.equal(cdb.get(App.ConnectionConfiguration, conn).driver, Driver.MQTT);
+                assert.deepEqual(entry(cdb, conn), site_entry(conn));
+            }
+            assert.equal(cdb.get(Edge.App.Deployment, CELL).values.drivers, undefined);
+            const held = lines.filter(l => /not moving to the split driver/.test(l));
+            assert.equal(held.length, 2, "one line per connection");
+            assert.match(held[0], /Deployment sets image\./);
+            assert.match(held[0], /Remove that from the Deployment's values/);
+
+            /* Removing the pin lets the next run move them, and the
+             * result is the same as moving without a pin. */
+            pin(cdb, CELL);
+            const again = await run_logged(cdb, defaults);
+            assert.equal(again.count.moved, 2);
+            assert.equal(again.count.held, 0);
+            assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+        });
+    }
+
+    test("a pinned Deployment still moves back", async () => {
+        const cdb = site();
+        await run(cdb, defaults);
+        pin(cdb, CELL, { default: { tag: "batch.2" } });
+        const { count } = await run_logged(cdb, { ...defaults, MQTT: false });
+        assert.equal(count.moved, 5);
+        assert.equal(count.held, 0);
+        assert.equal(entry(cdb, C.xml).connType, "MQTT");
+    });
+
+    test("a pin without a tag or registry doesn't hold anything back", async () => {
+        const cdb = site();
+        pin(cdb, CELL, { default: { pullPolicy: "Always" } });
+        const { count } = await run_logged(cdb, defaults);
+        assert.equal(count.moved, 5);
+        assert.equal(count.held, 0);
     });
 });

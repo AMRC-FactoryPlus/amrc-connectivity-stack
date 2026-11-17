@@ -165,10 +165,15 @@ export abstract class DeviceConnection extends EventEmitter {
     async startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
         this.#subHandles.set(deviceId,
             await this.subscribe(metrics.addresses));
-        this.#intHandles[deviceId] = setInterval(() => {
-            this.readMetrics(metrics, payloadFormat, delimiter);
-
-        }, interval);
+        /* Only a positive interval polls. A connection with no poll
+         * interval (every MQTT and UDP connection) passes undefined,
+         * which setInterval takes as 1 ms, so it read every
+         * millisecond: nothing for a built-in push connection, but a
+         * poll message to a split driver each time. */
+        if (interval > 0)
+            this.#intHandles[deviceId] = setInterval(() => {
+                this.readMetrics(metrics, payloadFormat, delimiter);
+            }, interval);
         subscriptionStartCallback();
     }
 

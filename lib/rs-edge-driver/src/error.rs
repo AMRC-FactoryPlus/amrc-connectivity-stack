@@ -26,6 +26,42 @@ impl HandlerError {
     }
 }
 
+/// Error returned by [`Handler::write`](crate::Handler::write) when a
+/// typed write fails. The driver reports it to the edge agent on
+/// `fpEdge1/{id}/err/{data topic}` as the error code, a newline and
+/// the message.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum WriteError {
+    /// The address can't be written. Reported as `RO`.
+    #[error("read-only: {0}")]
+    ReadOnly(String),
+    /// The value isn't acceptable for the address, for example the
+    /// wrong type for the device. Reported as `CMD`.
+    #[error("bad value: {0}")]
+    BadValue(String),
+    /// The write failed for another reason. Reported as `ERR`.
+    #[error("write failed: {0}")]
+    Failed(String),
+}
+
+impl WriteError {
+    /// The error code from the protocol's address error table.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::ReadOnly(_) => "RO",
+            Self::BadValue(_) => "CMD",
+            Self::Failed(_) => "ERR",
+        }
+    }
+
+    /// The message, without the code.
+    pub fn message(&self) -> &str {
+        match self {
+            Self::ReadOnly(m) | Self::BadValue(m) | Self::Failed(m) => m,
+        }
+    }
+}
+
 /// Top-level errors produced by the driver runtime.
 #[derive(Debug, Error)]
 pub enum Error {

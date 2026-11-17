@@ -10,10 +10,11 @@ use tokio::sync::{Mutex, Semaphore, mpsc};
 use tokio::task::{JoinHandle, JoinSet};
 
 use crate::config::{DriverConfig, DriverOptions};
-use crate::error::{ConnectError, Error};
+use crate::error::{ConnectError, Error, WriteError};
 use crate::handler::{Handler, Poller};
 use crate::redact::redact;
 use crate::status::State as Status;
+use crate::write::WriteValue;
 
 /// Maximum number of poll batches that can queue before we start
 /// dropping requests (backpressure). Matches the JS/Python versions.
@@ -56,12 +57,18 @@ pub(crate) enum DriverEvent<A> {
         result: Result<(), ConnectError>,
         poller: Option<Arc<dyn Poller<A>>>,
     },
-    /// An address map has been parsed. `None` if the handler rejected
-    /// an address.
+    /// An address map has been parsed, as (data topic, address,
+    /// parsed address). `None` if the handler rejected an address.
     Parsed {
         generation: u64,
         seq: u64,
-        addrs: Option<Vec<(String, A)>>,
+        addrs: Option<Vec<(String, String, A)>>,
+    },
+    /// A typed write failed, to report on `err/{topic}`.
+    WriteFailed {
+        generation: u64,
+        topic: String,
+        error: WriteError,
     },
 }
 
@@ -132,6 +139,12 @@ enum Op<A> {
     },
     Subscribe(Vec<A>),
     Cmd(String, Bytes),
+    /// A typed write, with the data topic to report a failure on.
+    Write {
+        topic: String,
+        addr: A,
+        value: WriteValue,
+    },
 }
 
 /// One `poll` message's worth of addresses.
@@ -159,8 +172,8 @@ struct Session<H: Handler> {
 /// device-specific protocol logic.
 ///
 /// The MQTT loop never waits for the handler: `connect`, the retries
-/// after a failed connect, address parsing, `subscribe`, `cmd`, `poll`
-/// and `close` all run on other tasks, so pings keep flowing to the
+/// after a failed connect, address parsing, `subscribe`, `cmd`,
+/// `write`, `poll` and `close` all run on other tasks, so pings keep flowing to the
 /// edge agent however long the device takes.
 ///
 /// # Usage
@@ -200,6 +213,8 @@ pub struct Driver<H: Handler> {
     addrs: HashMap<String, H::Addr>,
     /// parsed address → topic (reverse lookup for async publishing)
     topics: HashMap<H::Addr, String>,
+    /// address string → topic, for writes
+    addr_topics: HashMap<String, String>,
     addr_seq: u64,
     /// The address map being parsed, if any. Messages that depend on
     /// it wait in `deferred` until it is done.
@@ -232,6 +247,7 @@ impl<H: Handler + 'static> Driver<H> {
             closing: None,
             addrs: HashMap::new(),
             topics: HashMap::new(),
+            addr_topics: HashMap::new(),
             addr_seq: 0,
             parsing: None,
             deferred: VecDeque::new(),
@@ -315,7 +331,10 @@ impl<H: Handler + 'static> Driver<H> {
 
         // Subscribe to our control topics. READY goes out when the
         // SUBACK comes back, as the spec asks.
-        let subs = ["active", "conf", "addr", "poll", "cmd/#"]
+        // The agent sends each write as raw bytes on cmd/ and typed on
+        // write/. Take only the form the handler wants.
+        let writes = if H::TYPED_WRITES { "write/#" } else { "cmd/#" };
+        let subs = ["active", "conf", "addr", "poll", writes]
             .iter()
             .map(|s| SubscribeFilter::new(self.topic(s), QoS::AtMostOnce))
             .collect::<Vec<_>>();
@@ -530,9 +549,19 @@ impl<H: Handler + 'static> Driver<H> {
             _ if self.parsing.is_some() => self.defer(publish),
             "addr" => self.on_addr(session, &publish.payload),
             "poll" => self.on_poll(session, &publish.payload),
+            // Only one form of a write is subscribed to. Ignore the
+            // other in case a broker delivers it anyway, so a value is
+            // never written twice.
+            "cmd" if H::TYPED_WRITES => {}
+            "write" if !H::TYPED_WRITES => {}
             "cmd" => {
                 if let Some(name) = data {
                     self.on_cmd(name, publish.payload);
+                }
+            }
+            "write" => {
+                if let Some(addr) = data {
+                    self.on_write(session, addr, &publish.payload);
                 }
             }
             other => {
@@ -648,8 +677,8 @@ impl<H: Handler + 'static> Driver<H> {
         }));
     }
 
-    /// Do handler work in order: address parsing, `subscribe` and
-    /// `cmd`.
+    /// Do handler work in order: address parsing, `subscribe`, `cmd`
+    /// and `write`.
     async fn ops_worker(
         handler: Arc<Mutex<H>>,
         generation: u64,
@@ -663,7 +692,7 @@ impl<H: Handler + 'static> Driver<H> {
                     let mut parsed = Some(Vec::with_capacity(raw.len()));
                     for (topic, addr) in raw {
                         match h.parse_addr(&addr) {
-                            Some(a) => parsed.as_mut().unwrap().push((topic, a)),
+                            Some(a) => parsed.as_mut().unwrap().push((topic, addr, a)),
                             None => {
                                 tracing::error!(addr, "handler rejected address");
                                 parsed = None;
@@ -684,6 +713,15 @@ impl<H: Handler + 'static> Driver<H> {
                     }
                 }
                 Op::Cmd(name, payload) => h.cmd(&name, payload).await,
+                Op::Write { topic, addr, value } => {
+                    if let Err(error) = h.write(&addr, value).await {
+                        let _ = tx.send(DriverEvent::WriteFailed {
+                            generation,
+                            topic,
+                            error,
+                        });
+                    }
+                }
             }
         }
     }
@@ -732,14 +770,15 @@ impl<H: Handler + 'static> Driver<H> {
 
     /// An address map has been parsed: store it, then handle the
     /// messages that were waiting for it.
-    fn on_parsed(&mut self, session: &Session<H>, addrs: Option<Vec<(String, H::Addr)>>) {
+    fn on_parsed(&mut self, session: &Session<H>, addrs: Option<Vec<(String, String, H::Addr)>>) {
         self.parsing = None;
         self.clear_addrs();
 
         match addrs {
             Some(addrs) => {
-                for (topic, parsed) in addrs {
+                for (topic, raw, parsed) in addrs {
                     self.topics.insert(parsed.clone(), topic.clone());
+                    self.addr_topics.insert(raw, topic.clone());
                     self.addrs.insert(topic, parsed);
                 }
                 tracing::info!(count = self.addrs.len(), "addresses configured");
@@ -818,6 +857,40 @@ impl<H: Handler + 'static> Driver<H> {
         self.send_op(Op::Cmd(command, payload));
     }
 
+    /// Handle a typed `write` — queue it for the handler, or report it
+    /// as `CMD` if it can't be used.
+    fn on_write(&self, session: &Session<H>, addr: String, payload: &[u8]) {
+        let Some(topic) = self.addr_topics.get(&addr).cloned() else {
+            tracing::warn!(addr, "write to an address not in the address map");
+            return;
+        };
+        let Some(parsed) = self.addrs.get(&topic).cloned() else {
+            return;
+        };
+        match WriteValue::from_json(payload) {
+            Ok(value) => {
+                self.send_op(Op::Write {
+                    topic,
+                    addr: parsed,
+                    value,
+                });
+            }
+            Err(e) => self.report_write_error(session, &topic, &WriteError::BadValue(e)),
+        }
+    }
+
+    /// Publish a failed write on `err/{topic}` as the code, a newline
+    /// and the message.
+    fn report_write_error(&self, session: &Session<H>, topic: &str, error: &WriteError) {
+        tracing::warn!(topic, %error, "write failed");
+        let payload = format!("{}\n{}", error.code(), error.message());
+        let _ = session.outbound.send((
+            self.topic_with("err", topic),
+            QoS::AtLeastOnce,
+            Bytes::from(payload),
+        ));
+    }
+
     /// Queue handler.subscribe() if we're UP and have addresses.
     fn try_subscribe(&self) {
         if self.status != Status::Up || self.addrs.is_empty() {
@@ -893,12 +966,22 @@ impl<H: Handler + 'static> Driver<H> {
                     self.on_parsed(session, addrs);
                 }
             }
+            DriverEvent::WriteFailed {
+                generation,
+                topic,
+                error,
+            } => {
+                if generation == self.generation {
+                    self.report_write_error(session, &topic, &error);
+                }
+            }
         }
     }
 
     fn clear_addrs(&mut self) {
         self.addrs.clear();
         self.topics.clear();
+        self.addr_topics.clear();
     }
 
     /// Close the current handler (if any) and reset address state.

@@ -137,8 +137,17 @@ function ts_ns (ts: any): bigint {
 
 /* A run's output decoded and grouped for comparison. */
 export interface Output {
-    /* NBIRTH and each device's DBIRTHs, in the order sent. */
+    /* NBIRTH and each device's DBIRTHs, in the order sent, without
+     * repeats (see `repeated`). */
     births:     Map<string, Metric[][]>,
+    /* DBIRTHs left out of `births` because they repeat the device's
+     * previous message, a DBIRTH with the same metrics, so a consumer
+     * learns nothing from them. The built-in MQTT connection sends one
+     * of these per device at startup: the agent's DeviceConnection
+     * emits "open" as soon as it is opened and the MQTT client emits it
+     * again when it connects, and each "open" sends a DBIRTH. Key
+     * `DBIRTH device`. */
+    repeated?:  Map<string, number>,
     /* Each metric's DDATA values in order. Key `device/metric`. */
     data:       Map<string, Metric[]>,
     /* Messages of each kind per device: `DDATA device` and so on. */
@@ -149,6 +158,9 @@ export interface Output {
  * is named from the latest DBIRTH of its device. */
 export function decode (messages: Captured[]): Output {
     const births = new Map<string, Metric[][]>();
+    const repeated = new Map<string, number>();
+    /* Each device's previous message, to spot a repeated DBIRTH. */
+    const last = new Map<string, Kind>();
     const data = new Map<string, Metric[]>();
     const counts = new Map<string, number>();
     const aliases = new Map<string, Map<string, { name: string, type: string }>>();
@@ -175,7 +187,12 @@ export function decode (messages: Captured[]): Output {
             aliases.set(dev, map);
             const bkey = msg.kind == "NBIRTH" ? "NBIRTH" : `DBIRTH ${dev}`;
             const all = births.get(bkey) ?? [];
-            all.push(list);
+            const prev = all[all.length - 1];
+            if (msg.kind == "DBIRTH" && last.get(dev) == "DBIRTH"
+                && prev && same_birth(prev, list))
+                repeated.set(bkey, (repeated.get(bkey) ?? 0) + 1);
+            else
+                all.push(list);
             births.set(bkey, all);
         }
         else if (msg.kind == "DDATA") {
@@ -195,6 +212,14 @@ export function decode (messages: Captured[]): Output {
                 data.set(k, list);
             }
         }
+        if (msg.device != undefined) last.set(dev, msg.kind);
     }
-    return { births, data, counts };
+    return { births, repeated, data, counts };
+}
+
+/* Whether two births carry the same metrics. Timestamps say when the
+ * birth was sent, so they are left out. */
+function same_birth (a: Metric[], b: Metric[]) {
+    const key = (m: Metric) => JSON.stringify([m.name, m.type, m.value, m.props]);
+    return a.length == b.length && a.every((m, i) => key(m) == key(b[i]));
 }

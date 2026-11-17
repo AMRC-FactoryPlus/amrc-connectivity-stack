@@ -94,6 +94,24 @@ This MUST be a short string consisting of letters, numbers and
 underscores. The name is assigned by the Edge Agent configuration and
 needs to be supplied to the driver when it is deployed.
 
+**Implementation.** The name is the connection's driver id: its
+`driverId` in the Edge Agent config if it has one, or else its `name`.
+The id is also the key of the driver in `values.drivers` of the Edge
+Agent Deployment, so the chart uses it for `EDGE_USERNAME`, the
+driver's password and, as `driver-<id>` in lowercase, the sidecar's
+container name. A Kubernetes container name is at most 63 lowercase
+letters, digits and hyphens, so a connection name only works as the
+id if it is letters, digits and hyphens, ends in a letter or digit and
+is at most 56 characters. A split driver connection with any other
+name, such as `api.example.org`, is given a `driverId` when its config
+is built: the name in lowercase with each run of other characters
+replaced by a hyphen, then a hyphen and the first 8 hex digits of the
+connection's UUID, here `api-example-org-1a2b3c4d`. The id is kept
+once given, and the connection keeps its name everywhere else. The
+Admin UI and service-setup both use `driver_ids` in
+`lib/js-service-client/lib/edge-connection.js` for this, and
+service-setup gives existing connections their ids when it runs.
+
 ### Data packet
 
 When a driver reads an address, or an address pushes data to the driver
@@ -151,7 +169,7 @@ environment variables:
 Name|Meaning
 ---|---
 `EDGE_MQTT`|URL of the Edge Agent MQTT broker
-`EDGE_USERNAME`|Driver connection name
+`EDGE_USERNAME`|Driver connection name (its driver id)
 `EDGE_PASSWORD`|MQTT password
 
 Drivers MUST accept and support `mqtt://` URLs, including understanding

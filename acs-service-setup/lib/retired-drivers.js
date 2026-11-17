@@ -3,8 +3,9 @@
  * Warn about and tidy up drivers removed from the Edge Agent
  * Copyright 2026 University of Sheffield AMRC
  *
- * The Edge Agent no longer runs the MTConnect, S7, UDP, EtherNet/IP
- * and Websocket connection types itself. An Edge Agent given a
+ * The Edge Agent no longer runs the MTConnect, S7, EtherNet/IP and
+ * Websocket connection types itself. (UDP was removed too, then put
+ * back because it is needed: it is not retired.) An Edge Agent given a
  * connection of one of these types logs an error and runs its other
  * connections, so the devices on it publish nothing.
  *
@@ -36,7 +37,6 @@ const { Driver } = ACS;
 export const RetiredDrivers = {
     "MTConnect":    Driver.MTConnect,
     "S7":           Driver.S7,
-    "UDP":          Driver.UDP,
     "EtherNet/IP":  Driver.EtherNetIP,
     "Websocket":    Driver.Websocket,
 };

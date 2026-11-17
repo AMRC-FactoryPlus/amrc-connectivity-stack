@@ -7,6 +7,7 @@
  * publish nothing, whether or not DEBUG is set. */
 
 import { RestConnection } from "../../lib/devices/REST";
+import { UDPConnection } from "../../lib/devices/UDP";
 import { RETIRED_CONN_TYPES, Translator } from "../../lib/translator";
 
 function setup () {
@@ -34,9 +35,24 @@ test.each(RETIRED_CONN_TYPES)("a %s connection logs a clear error and is not sta
     expect(errors[0]).toContain(`The ${type} connection type has been removed`);
 });
 
-test("the five retired types are the ones named in the release note", () => {
+test("the four retired types are the ones named in the release note", () => {
     expect([...RETIRED_CONN_TYPES].sort())
-        .toEqual(["EtherNet/IP", "MTConnect", "S7", "UDP", "Websocket"]);
+        .toEqual(["EtherNet/IP", "MTConnect", "S7", "Websocket"]);
+});
+
+/* UDP was retired with the others, then put back because it is needed
+ * for robot data. It must start like any other built-in type. */
+test("a UDP connection is started, with no error", async () => {
+    const { translator, errors } = setup();
+    expect(RETIRED_CONN_TYPES).not.toContain("UDP");
+
+    await translator.setupConnection({
+        connType: "UDP", name: "robot", UDPConnDetails: { port: 0 },
+    });
+
+    expect(errors).toEqual([]);
+    expect(translator.connections.UDP).toBeInstanceOf(UDPConnection);
+    await translator.connections.UDP.close();
 });
 
 test("an unknown type gets an error naming the type", async () => {

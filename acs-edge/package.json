@@ -25,7 +25,8 @@
     "clean": "tsc --build --clean",
     "start": "node --es-module-specifier-resolution=node app.js",
     "local": "node --es-module-specifier-resolution=node build/app.js",
-    "test": "npx jest --coverage"
+    "test": "npx jest --coverage",
+    "bench": "node bench/build.mjs && node --expose-gc bench/run.mjs"
   },
   "type": "module",
   "dependencies": {

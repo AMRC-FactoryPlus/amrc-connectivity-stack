@@ -9,17 +9,18 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use common::handler::{Ctl, FakeHandler};
-use common::{FakeAgent, ms, secs, spawn_driver};
-use rs_edge_driver::ConnectError;
+use common::{FakeAgent, ms, secs, spawn_driver_with};
+use rs_edge_driver::{ConnectError, DriverOptions};
 
 /// Hold the device down for `down`, check pings kept flowing and the
 /// broker never dropped the driver, then bring it back.
 async fn device_down_for(keep_alive: Duration, reconnect_delay: Duration, down: Duration) {
     let mut agent = FakeAgent::start("Conn").await;
     let mut config = agent.config();
-    config.keep_alive = keep_alive;
+    let mut options = DriverOptions::default();
+    options.keep_alive = keep_alive;
     config.reconnect_delay = reconnect_delay;
-    let _driver = spawn_driver::<FakeHandler>(config);
+    let _driver = spawn_driver_with::<FakeHandler>(config, options);
     let ctl = Ctl::new();
     *ctl.connect_error.lock().unwrap() = Some(ConnectError::ConnectionFailed);
 
@@ -64,9 +65,9 @@ async fn pings_flow_while_device_is_down_for_two_minutes() {
 #[tokio::test]
 async fn slow_connect_does_not_block_mqtt() {
     let mut agent = FakeAgent::start("Conn").await;
-    let mut config = agent.config();
-    config.keep_alive = secs(1);
-    let _driver = spawn_driver::<FakeHandler>(config);
+    let mut options = DriverOptions::default();
+    options.keep_alive = secs(1);
+    let _driver = spawn_driver_with::<FakeHandler>(agent.config(), options);
     let ctl = Ctl::new();
     *ctl.connect_delay.lock().unwrap() = secs(5);
 
@@ -88,9 +89,9 @@ async fn slow_connect_does_not_block_mqtt() {
 #[tokio::test]
 async fn slow_cmd_does_not_block_mqtt() {
     let mut agent = FakeAgent::start("Conn").await;
-    let mut config = agent.config();
-    config.keep_alive = secs(1);
-    let _driver = spawn_driver::<FakeHandler>(config);
+    let mut options = DriverOptions::default();
+    options.keep_alive = secs(1);
+    let _driver = spawn_driver_with::<FakeHandler>(agent.config(), options);
     let ctl = Ctl::new();
     *ctl.cmd_delay.lock().unwrap() = secs(4);
 

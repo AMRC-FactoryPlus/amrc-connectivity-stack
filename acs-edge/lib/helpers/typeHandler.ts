@@ -3,6 +3,7 @@
  */
 
 import { JSONPath } from "jsonpath-plus";
+import * as vm from "vm";
 import * as xpath from "xpath";
 import { DOMParser } from "@xmldom/xmldom";
 import * as jsonpointer from 'jsonpointer';
@@ -378,6 +379,54 @@ export class Metrics {
 
 
 
+/* jsonpath-plus 5 runs each filter script, such as the
+ * "@.name=='ActLoad'" in $.set.datapoints[?(@.name=='ActLoad')].value,
+ * with vm.runInNewContext: a new V8 context for every JSONPath call and
+ * a fresh compile for every array element it tests. That cost 170 to
+ * 290 us per metric for a filter over 10 to 100 elements, far more
+ * than parsing the payload.
+ *
+ * So each path string gets one JSONPath object, made once and reused,
+ * whose vm compiles each script once and runs it in one shared
+ * context. jsonpath-plus sets every variable a script reads (_$_v,
+ * _$_root and so on) on that context before it runs the script, so a
+ * script sees what it saw in its own context. Only a script that sets
+ * a global of its own would now see it again next time, which no
+ * metric path does. */
+const jsonpath_context = vm.createContext({});
+const jsonpath_scripts = new Map<string, vm.Script>();
+const jsonpath_vm = {
+    runInNewContext (code: string, sandbox: any) {
+        let script = jsonpath_scripts.get(code);
+        if (!script) {
+            script = new vm.Script(code);
+            jsonpath_scripts.set(code, script);
+        }
+        return script.runInContext(vm.isContext(sandbox)
+            ? sandbox : vm.createContext(sandbox));
+    },
+};
+const jsonpath_cache = new Map<string, any>();
+
+/* JSONPath({ path, json }), with the path compiled once. */
+function query_json (path: string, json: any): any {
+    let jp = jsonpath_cache.get(path);
+    if (!jp) {
+        jp = new (JSONPath as any)({
+            autostart: false, path, sandbox: jsonpath_context });
+        jp.vm = jsonpath_vm;
+        jsonpath_cache.set(path, jp);
+    }
+    /* @root reads the json the object was made with */
+    jp.json = json;
+    try {
+        return jp.evaluate(path, json);
+    }
+    finally {
+        jp.json = undefined;
+    }
+}
+
 /**
  * Processes a JSON batched payload and returns an array of values and timestamps
  * This function expects an array of objects and uses the metric's path to extract values
@@ -410,10 +459,7 @@ export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetri
             /* Work around a bug in the JSONPath library */
             let newVal = path === "$" && item === false
                 ? [false]
-                : JSONPath({
-                    path: path,
-                    json: item
-                });
+                : query_json(path, item);
 
             if (item === 0 || !Array.isArray(newVal)) {
                 value = 0;
@@ -466,14 +512,136 @@ export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetri
 
 
 
+/* Decode a JSON payload the way every reader below always has: a string
+ * or Buffer is parsed, anything else (REST hands over a parsed object)
+ * is used as it is, and invalid JSON gives undefined. */
+function decode_json (msg: any): { value: any, err?: any } {
+    try {
+        if (typeof msg == "string") return { value: JSON.parse(msg) };
+        if (Buffer.isBuffer(msg)) return { value: JSON.parse(msg.toString()) };
+        return { value: msg };
+    }
+    catch (err: any) {
+        return { value: undefined, err };
+    }
+}
+
+/**
+ * One payload for one address, decoded at most once.
+ *
+ * Device._handleData reads every metric on an address from the same
+ * payload. It used to hand each reader the raw message, so the payload
+ * was parsed again for every metric (and up to three more times when
+ * the value changed). Wrap the message in one of these instead and the
+ * JSON value, XML document or delimited fields are worked out on first
+ * use and shared by every metric. Decoding is lazy so a payload is only
+ * decoded if a metric needs it, as before.
+ *
+ * Nothing in the read path changes the decoded payload: values are read
+ * out of it, and a metric whose value is an object holds a reference
+ * into it, as REST payloads (already parsed by axios) always have.
+ */
+export class DecodedPayload {
+    readonly raw: any;
+    #json?: { value: any, err?: any };
+    #json_warned = false;
+    #xml?: { doc?: any, err?: any };
+    #fields?: { value: any };
+
+    constructor (raw: any) {
+        this.raw = raw;
+    }
+
+    /* The JSON decode as { value, err }, with err set if the payload is
+     * not valid JSON. Logs nothing. */
+    json_result (): { value: any, err?: any } {
+        if (!this.#json) this.#json = decode_json(this.raw);
+        return this.#json;
+    }
+
+    /* The payload as a JSON value, or undefined if it is not valid
+     * JSON. Logs a parse failure once per message. */
+    json (): any {
+        const res = this.json_result();
+        if ("err" in res && !this.#json_warned) {
+            this.#json_warned = true;
+            log('Failed to parse JSON data');
+        }
+        return res.value;
+    }
+
+    /* The XML document. If parsing threw, every caller gets the same
+     * error, as each metric did when it parsed for itself. */
+    xml (): any {
+        if (!this.#xml) {
+            try { this.#xml = { doc: new DOMParser().parseFromString(this.raw.toString()) }; }
+            catch (err) { this.#xml = { err }; }
+        }
+        if ("err" in this.#xml) throw this.#xml.err;
+        return this.#xml.doc;
+    }
+
+    /* Delimited String fields, or the whole string with no delimiter. */
+    fields (delimiter?: string): any {
+        if (!this.#fields) {
+            this.#fields = { value: (delimiter != '')
+                ? this.raw.toString().split(delimiter) : this.raw.toString() };
+        }
+        return this.#fields.value;
+    }
+}
+
+function as_decoded (msg: any): DecodedPayload {
+    return msg instanceof DecodedPayload ? msg : new DecodedPayload(msg);
+}
+
+/* Compiled XPath expressions by path string. A path that fails to
+ * compile maps to null, and is passed to xpath.select each time so it
+ * throws exactly the error it always has. */
+const xpath_cache = new Map<string, any>();
+
+/* Exported by the xpath package but missing from its types */
+const XPathResult = (xpath as any).XPathResult;
+
+function compiled_xpath (path: string): any {
+    let expr = xpath_cache.get(path);
+    if (expr === undefined) {
+        try { expr = (xpath as any).createExpression(path, null); }
+        catch { expr = null; }
+        xpath_cache.set(path, expr);
+    }
+    return expr;
+}
+
+/* xpath.select(path, doc), with the expression compiled once. This is
+ * what select does inside: evaluate as ANY_TYPE and unwrap the result. */
+function select_xpath (path: string, doc: any): any {
+    const expr = compiled_xpath(path);
+    /* Keep the old error for a document that did not parse */
+    if (expr === null || !doc) return xpath.select(path, doc);
+    const res = expr.evaluate(doc, XPathResult.ANY_TYPE, null);
+    switch (res.resultType) {
+        case XPathResult.STRING_TYPE:     return res.stringValue;
+        case XPathResult.NUMBER_TYPE:     return res.numberValue;
+        case XPathResult.BOOLEAN_TYPE:    return res.booleanValue;
+        default:                                return res.nodes;
+    }
+}
+
+/**
+ * Read one metric's value from a payload.
+ * @param msg The raw message, or a DecodedPayload to share one decode
+ *  between every metric on the address.
+ */
 export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string, delimiter?: string) {
     let payload: any;
+    const decoded = as_decoded(msg);
+    msg = decoded.raw;
     const path = (typeof metric.properties !== "undefined" && typeof metric.properties.path !== "undefined" ? metric.properties.path.value as string : "");
     switch (payloadFormat) {
         case serialisationType.delimited:
             // Handle no delimiter
-            payload = (delimiter != '') ? msg.toString()
-                .split(delimiter) : msg.toString();
+            payload = decoded.fields(delimiter);
 
             // Handle no path parsing
             if (path == null || path == '') {
@@ -482,17 +650,8 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 return parseTypeFromString(metric.type, payload[path]);
             }
         case serialisationType.JSON:
-            try { // Handles error if invalid JSON is sent in
-                if (typeof msg == "string") {
-                    payload = JSON.parse(msg);
-                } else if (Buffer.isBuffer(msg)) {
-                    payload = JSON.parse(msg.toString());
-                } else {
-                    payload = msg;
-                }
-            } catch (e: any) {
-                log('Failed to parse JSON data')
-            }
+            // Undefined if invalid JSON is sent in
+            payload = decoded.json();
 
             // Note: Array payloads are now handled in _handleData using processArrayPayload
             // This function only processes non-array payloads or is called for a single item
@@ -501,10 +660,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 /* Work around a bug in the JSONPath library */
                 let newVal = path === "$" && payload === false
                     ? [false]
-                    : JSONPath({
-                        path: path,
-                        json: payload
-                    });
+                    : query_json(path, payload);
                 if (payload === 0 || !Array.isArray(newVal)) {
                     return 0;
                 } else {
@@ -543,8 +699,8 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
             return null;
         case serialisationType.XML:
             if (path) {
-                const doc = new DOMParser().parseFromString(msg.toString());
-                const xPathResults = xpath.select(path, doc);
+                const doc = decoded.xml();
+                const xPathResults = select_xpath(path, doc);
                 let res = xPathResults.toString();
                 return parseTypeFromString(metric.type, res)
             }
@@ -613,28 +769,18 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
     let payload: any;
     switch (payloadFormat) {
         case serialisationType.JSON:
-            try { // Handles error if invalid JSON is sent in
-                if (typeof msg == "string") {
-                    payload = JSON.parse(msg);
-                } else if (Buffer.isBuffer(msg)) {
-                    payload = JSON.parse(msg.toString());
-                } else {
-                    payload = msg;
-                }
-            } catch (e: any) {
-                log('Failed to parse JSON data')
-            }
+            // Undefined if invalid JSON is sent in
+            payload = as_decoded(msg).json();
 
             // Note: Array payloads are now handled in _handleData using processArrayPayload
             // This function only processes non-array payloads
 
-            // Extract timestamp from the payload
-            const timestamp = JSONPath({
-                path: '$.timestamp',
-                json: payload
-            });
-
-            const extractedTimestamp = Array.isArray(timestamp) ? timestamp[0] : undefined;
+            // Extract timestamp from the payload. This is what
+            // JSONPath "$.timestamp" gives: nothing for a falsy payload,
+            // and the property only if it is the payload's own.
+            const extractedTimestamp = payload
+                && Object.prototype.hasOwnProperty.call(payload, "timestamp")
+                ? payload.timestamp : undefined;
 
             // The timestamp will be a unix timestamp in milliseconds or
             // seconds, however upstream Factory+ expects it to be in
@@ -692,12 +838,7 @@ export function parseTimeStampFromPayload(msg: any, metric: sparkplugMetric, pay
  * the data. Only JSON payloads can carry them. */
 export function parseSimTagsFromPayload(msg: any, payloadFormat: serialisationType | string): { simulated?: boolean, run_id?: string } {
     if (payloadFormat !== serialisationType.JSON) return {};
-    let payload: any;
-    try {
-        if (typeof msg == "string") payload = JSON.parse(msg);
-        else if (Buffer.isBuffer(msg)) payload = JSON.parse(msg.toString());
-        else payload = msg;
-    } catch { return {}; }
+    const payload = as_decoded(msg).json();
     if (typeof payload !== "object" || payload === null) return {};
     const out: { simulated?: boolean, run_id?: string } = {};
     if (payload.simulated === true) out.simulated = true;
@@ -708,18 +849,8 @@ export function parseSimTagsFromPayload(msg: any, payloadFormat: serialisationTy
 export function parseNsTimestampFromPayload(msg: any, metric: sparkplugMetric, payloadFormat: serialisationType | string): bigint | undefined {
     if (payloadFormat !== serialisationType.JSON) return undefined;
 
-    let payload: any;
-    try {
-        if (typeof msg == "string") {
-            payload = JSON.parse(msg);
-        } else if (Buffer.isBuffer(msg)) {
-            payload = JSON.parse(msg.toString());
-        } else {
-            payload = msg;
-        }
-    } catch (e: any) {
-        return undefined;
-    }
+    // Undefined if invalid JSON is sent in
+    const payload = as_decoded(msg).json();
 
     const raw = payload?.timestampNs;
     if (raw == null) return undefined;
@@ -814,11 +945,17 @@ export function writeValuesToPayload(metrics: sparkplugMetric[], payloadFormat: 
         case serialisationType.fixedBuffer:
             payload = Buffer.alloc(0);
             metrics.forEach((metric) => {
-                if (payload.length) {
-                    payload = Buffer.concat([payload, writeValToBuffer(metric)]);
-                } else {
-                    payload = writeValToBuffer(metric);
+                /* Skip a value that can't be written rather than
+                 * sending bytes that don't mean anything. */
+                let bytes: Buffer;
+                try {
+                    bytes = writeValToBuffer(metric);
                 }
+                catch (err) {
+                    log(`Can't write ${metric.name}: ${(err as Error).message}`);
+                    return;
+                }
+                payload = Buffer.concat([payload, bytes]);
             })
             if (payload && payload.length) {
                 return payload;
@@ -935,73 +1072,173 @@ export function parseValFromBuffer(type: sparkplugDataType, endianness: byteOrde
     }
 }
 
-export function writeValToBuffer(metric: sparkplugMetric): Buffer {
-    // Writes out a variable of the specified metric.type type to output buffer buf
-    // Datetime, string, and buffer are not implemented...yet
-    let buf = Buffer.allocUnsafe(8);
-    let len = 0;
-    const endianness = metric.properties?.endianness?.value as byteOrder ?? byteOrder.bigEndian
-
-    try {
-        switch (metric.type) {
-            case sparkplugDataType.boolean:
-                len = buf.writeUInt8(metric.value ? 1 : 0);
-                break;
-            case sparkplugDataType.int8:
-                len = buf.writeInt8(metric.value as number);
-                break;
-
-            case sparkplugDataType.int16:
-                if (endianness === byteOrder.bigEndian) len = buf.writeInt16BE(metric.value as number); else len = buf.writeInt16LE(metric.value as number);
-                break;
-
-            case sparkplugDataType.int32:
-                if (endianness === byteOrder.bigEndian) len = buf.writeInt32BE(metric.value as number); else len = buf.writeInt32LE(metric.value as number);
-                break;
-
-            case sparkplugDataType.int64:
-                if (endianness === byteOrder.bigEndian) len = buf.writeBigInt64BE(metric.value as bigint); else len = buf.writeBigInt64LE(metric.value as bigint);
-                break;
-
-            case sparkplugDataType.uInt8:
-                len = buf.writeUInt8(metric.value as number);
-                break;
-
-            case sparkplugDataType.uInt16:
-                if (endianness === byteOrder.bigEndian) len = buf.writeUInt16BE(metric.value as number); else len = buf.writeUInt16LE(metric.value as number);
-                break;
-            case sparkplugDataType.uInt32:
-                if (endianness === byteOrder.bigEndian) len = buf.writeUInt32BE(metric.value as number); else len = buf.writeUInt32LE(metric.value as number);
-                break;
-
-            case sparkplugDataType.uInt64:
-                if (endianness === byteOrder.bigEndian) len = buf.writeBigUInt64BE(metric.value as bigint); else len = buf.writeBigUInt64LE(metric.value as bigint);
-                break;
-
-            case sparkplugDataType.float:
-                if (endianness === byteOrder.bigEndian) len = buf.writeFloatBE(metric.value as number); else len = buf.writeFloatLE(metric.value as number);
-                break;
-
-            case sparkplugDataType.double:
-                if (endianness === byteOrder.bigEndian) len = buf.writeDoubleBE(metric.value as number); else len = buf.writeDoubleLE(metric.value as number);
-                break;
-
-            case sparkplugDataType.string:
-            case sparkplugDataType.text:
-            case sparkplugDataType.uuid:
-                /* Variable length: written as UTF-8, not into the
-                 * fixed 8-byte buffer. */
-                return Buffer.from(String(metric.value ?? ""), "utf8");
-
-            default:
-                throw new Error(`Type ${metric.type} not supported for buffer parsing`);
-        }
-
-        return buf.slice(0, len);
-    } catch (err) {
-        console.log(err);
-        return buf.slice(0);
+/* Convert a value written to a 64-bit integer metric to a BigInt.
+ * A DCMD value arrives as a Long, which the device turns into a JS
+ * number, so precision above 2^53 is already lost by the time it gets
+ * here. Throws if the value isn't an integer in range. */
+export function toBigInt64(value: unknown, signed: boolean): bigint {
+    let big: bigint;
+    if (typeof value == "bigint")
+        big = value;
+    else if (Long.isLong(value))
+        big = BigInt((value as Long).toString());
+    else if (typeof value == "number") {
+        if (!Number.isFinite(value))
+            throw new Error(`Can't write ${value} as a 64-bit integer`);
+        big = BigInt(Math.trunc(value));
     }
+    else if (typeof value == "string" && /^\s*-?\d+\s*$/.test(value))
+        big = BigInt(value.trim());
+    else
+        throw new Error(`Can't write ${String(value)} as a 64-bit integer`);
+
+    const fits = signed ? BigInt.asIntN(64, big) : BigInt.asUintN(64, big);
+    if (fits != big)
+        throw new Error(`${big} is out of range for ${signed ? "Int64" : "UInt64"}`);
+    return big;
+}
+
+/* Write a metric's value as raw bytes for its Sparkplug type. This is
+ * the payload of a cmd to a split driver and of a Buffer-format write.
+ * Throws if the type isn't supported or the value doesn't fit it. */
+export function writeValToBuffer(metric: sparkplugMetric): Buffer {
+    const buf = Buffer.alloc(8);
+    const endianness = metric.properties?.endianness?.value as byteOrder ?? byteOrder.bigEndian;
+    const be = endianness === byteOrder.bigEndian;
+    let len: number;
+
+    switch (metric.type) {
+        case sparkplugDataType.boolean:
+            len = buf.writeUInt8(metric.value ? 1 : 0);
+            break;
+        case sparkplugDataType.int8:
+            len = buf.writeInt8(metric.value as number);
+            break;
+        case sparkplugDataType.int16:
+            len = be ? buf.writeInt16BE(metric.value as number) : buf.writeInt16LE(metric.value as number);
+            break;
+        case sparkplugDataType.int32:
+            len = be ? buf.writeInt32BE(metric.value as number) : buf.writeInt32LE(metric.value as number);
+            break;
+        case sparkplugDataType.int64: {
+            const v = toBigInt64(metric.value, true);
+            len = be ? buf.writeBigInt64BE(v) : buf.writeBigInt64LE(v);
+            break;
+        }
+        case sparkplugDataType.uInt8:
+            len = buf.writeUInt8(metric.value as number);
+            break;
+        case sparkplugDataType.uInt16:
+            len = be ? buf.writeUInt16BE(metric.value as number) : buf.writeUInt16LE(metric.value as number);
+            break;
+        case sparkplugDataType.uInt32:
+            len = be ? buf.writeUInt32BE(metric.value as number) : buf.writeUInt32LE(metric.value as number);
+            break;
+        case sparkplugDataType.uInt64: {
+            const v = toBigInt64(metric.value, false);
+            len = be ? buf.writeBigUInt64BE(v) : buf.writeBigUInt64LE(v);
+            break;
+        }
+        case sparkplugDataType.float:
+            len = be ? buf.writeFloatBE(metric.value as number) : buf.writeFloatLE(metric.value as number);
+            break;
+        case sparkplugDataType.double:
+            len = be ? buf.writeDoubleBE(metric.value as number) : buf.writeDoubleLE(metric.value as number);
+            break;
+        case sparkplugDataType.string:
+        case sparkplugDataType.text:
+        case sparkplugDataType.uuid:
+            /* Variable length: written as UTF-8, not into the
+             * fixed 8-byte buffer. */
+            return Buffer.from(String(metric.value ?? ""), "utf8");
+        default:
+            throw new Error(`Type ${metric.type} not supported for buffer writes`);
+    }
+
+    return buf.subarray(0, len);
+}
+
+/* The Sparkplug types a typed write can carry. */
+export const TYPED_WRITE_TYPES: ReadonlySet<string> = new Set([
+    sparkplugDataType.boolean,
+    sparkplugDataType.int8, sparkplugDataType.int16,
+    sparkplugDataType.int32, sparkplugDataType.int64,
+    sparkplugDataType.uInt8, sparkplugDataType.uInt16,
+    sparkplugDataType.uInt32, sparkplugDataType.uInt64,
+    sparkplugDataType.float, sparkplugDataType.double,
+    sparkplugDataType.string, sparkplugDataType.text,
+    sparkplugDataType.uuid, sparkplugDataType.dateTime,
+]);
+
+const INT_RANGES: Record<string, [number, number]> = {
+    [sparkplugDataType.int8]:   [-0x80, 0x7f],
+    [sparkplugDataType.int16]:  [-0x8000, 0x7fff],
+    [sparkplugDataType.int32]:  [-0x80000000, 0x7fffffff],
+    [sparkplugDataType.uInt8]:  [0, 0xff],
+    [sparkplugDataType.uInt16]: [0, 0xffff],
+    [sparkplugDataType.uInt32]: [0, 0xffffffff],
+};
+
+/* Write a metric's value as the JSON payload of a typed write to a
+ * split driver: {"type": <Sparkplug type>, "value": <value>}. Int64
+ * and UInt64 values are decimal strings, so a driver gets every digit.
+ * Float and Double NaN and infinities are the strings "NaN",
+ * "Infinity" and "-Infinity", which JSON can't hold as numbers.
+ * DateTime is milliseconds since the epoch. See docs/edge-split.md.
+ * Throws if the type isn't supported or the value doesn't fit it. */
+export function writeValToJSON(metric: sparkplugMetric): Buffer {
+    const { type } = metric;
+    const value = metric.value as any;
+    let out: boolean | number | string;
+
+    switch (type) {
+        case sparkplugDataType.boolean:
+            out = typeof value == "string"
+                ? value.trim().toLowerCase() == "true"
+                : Boolean(value);
+            break;
+        case sparkplugDataType.int8:
+        case sparkplugDataType.int16:
+        case sparkplugDataType.int32:
+        case sparkplugDataType.uInt8:
+        case sparkplugDataType.uInt16:
+        case sparkplugDataType.uInt32: {
+            const n = Math.trunc(Long.isLong(value) ? value.toNumber() : Number(value));
+            const [min, max] = INT_RANGES[type];
+            if (!Number.isFinite(n) || n < min || n > max)
+                throw new Error(`${String(value)} is out of range for ${type}`);
+            out = n;
+            break;
+        }
+        case sparkplugDataType.int64:
+        case sparkplugDataType.uInt64:
+            out = toBigInt64(value, type == sparkplugDataType.int64).toString();
+            break;
+        case sparkplugDataType.float:
+        case sparkplugDataType.double: {
+            const n = Number(value);
+            out = Number.isFinite(n) ? n : String(n);
+            break;
+        }
+        case sparkplugDataType.string:
+        case sparkplugDataType.text:
+        case sparkplugDataType.uuid:
+            out = String(value ?? "");
+            break;
+        case sparkplugDataType.dateTime: {
+            const n = value instanceof Date ? value.getTime()
+                : Long.isLong(value) ? value.toNumber()
+                : Number(value);
+            if (!Number.isFinite(n))
+                throw new Error(`${String(value)} is not a valid DateTime`);
+            out = Math.trunc(n);
+            break;
+        }
+        default:
+            throw new Error(`Type ${type} not supported for typed writes`);
+    }
+
+    return Buffer.from(JSON.stringify({ type, value: out }));
 }
 
 /**

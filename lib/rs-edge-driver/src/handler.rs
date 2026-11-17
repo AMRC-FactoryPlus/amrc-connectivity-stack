@@ -5,7 +5,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 
 use crate::driver::DriverHandle;
-use crate::error::{ConnectError, HandlerError};
+use crate::error::{ConnectError, HandlerError, WriteError};
+use crate::write::WriteValue;
 
 /// The trait that driver authors implement to define how to communicate
 /// with a specific southbound device.
@@ -99,6 +100,23 @@ pub trait Handler: Send + Sized {
     /// Defaults to `true`.
     const SUPPORTS_POLL: bool = true;
 
+    /// Whether this handler takes typed writes through
+    /// [`write`](Handler::write) instead of raw bytes through
+    /// [`cmd`](Handler::cmd).
+    ///
+    /// The edge agent sends every write in both forms, so the driver
+    /// subscribes to only one: `cmd/#` when this is `false`, and
+    /// `write/#` when it is `true`. Only one of `cmd` and `write` is
+    /// ever called.
+    ///
+    /// Set it to `true` for a device that needs the value's type to
+    /// write it, such as OPC UA. The edge agent must be from November
+    /// 2026 or later: an older one refuses the `write/#` subscription
+    /// and drops the driver's connection.
+    ///
+    /// Defaults to `false`, which keeps `cmd` exactly as before.
+    const TYPED_WRITES: bool = false;
+
     /// Construct a new handler from the configuration object sent
     /// by the edge agent.
     ///
@@ -121,10 +139,10 @@ pub trait Handler: Send + Sized {
     /// Connect (or reconnect) to the southbound device.
     ///
     /// Return `Ok(())` on success. The driver will set status `UP`.
-    /// Return `Err(ConnectError::ConnectionFailed)`,
-    /// `Err(ConnectError::AuthFailed)` or `Err(ConnectError::Other)`
-    /// on failure — the driver will report `CONN`, `AUTH` or `ERR`
-    /// and retry after the configured reconnect delay.
+    /// Return `Err(ConnectError::ConnectionFailed)` or
+    /// `Err(ConnectError::AuthFailed)` on failure — the driver will
+    /// report `CONN` or `AUTH` and retry after the configured
+    /// reconnect delay.
     ///
     /// The driver calls this on its own task, so a slow connect
     /// doesn't hold up the edge agent's MQTT connection. If the
@@ -172,6 +190,31 @@ pub trait Handler: Send + Sized {
     /// Commands arrive on `fpEdge1/{id}/cmd/{name}` and are
     /// forwarded here. Override this if the device supports commands.
     async fn cmd(&mut self, _command: &str, _payload: Bytes) {}
+
+    /// Handle a typed write from the edge agent. Only called when
+    /// [`TYPED_WRITES`](Handler::TYPED_WRITES) is `true`.
+    ///
+    /// Typed writes arrive on `fpEdge1/{id}/write/{address}`. The
+    /// driver looks the address up in the current address map and
+    /// passes its parsed form, so `parse_addr` has already accepted
+    /// it. `value` carries the metric's Sparkplug type and its value.
+    ///
+    /// Return `Err` if the write fails, and the driver reports it to
+    /// the edge agent on the address's `err` topic. A write the driver
+    /// can't use (bad JSON, a value that doesn't fit its type, or an
+    /// address not in the map) is reported as `CMD` without calling
+    /// this.
+    ///
+    /// The default refuses every write. It is never called unless
+    /// `TYPED_WRITES` is `true`, and a handler that leaves
+    /// `TYPED_WRITES` at `false` gets its writes through `cmd` as
+    /// before.
+    async fn write(&mut self, _addr: &Self::Addr, value: WriteValue) -> Result<(), WriteError> {
+        Err(WriteError::Failed(format!(
+            "typed writes are not implemented ({} write refused)",
+            value.type_name()
+        )))
+    }
 
     /// **Polled mode, optional**: hand out a [`Poller`] so polls can
     /// run at the same time as each other.

@@ -58,11 +58,13 @@ mod handler;
 mod logging;
 mod redact;
 mod status;
+mod write;
 
-pub use config::{DEFAULT_MAX_PACKET_SIZE, DriverConfig};
+pub use config::{DEFAULT_MAX_PACKET_SIZE, DriverConfig, DriverOptions};
 pub use driver::{Driver, DriverHandle};
-pub use error::{ConnectError, Error, HandlerError};
+pub use error::{ConnectError, Error, HandlerError, WriteError};
 pub use handler::{Handler, Poller};
 pub use logging::{init_logging, log_filter};
 pub use redact::redact;
 pub use status::Status;
+pub use write::WriteValue;

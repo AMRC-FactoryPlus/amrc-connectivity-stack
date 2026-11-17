@@ -2,14 +2,14 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
-import {Metrics, serialisationType, writeValToBuffer} from "../helpers/typeHandler.js";
+import {Metrics, serialisationType, sparkplugMetric, writeValToBuffer, writeValToJSON} from "../helpers/typeHandler.js";
 import {log} from "../helpers/log.js";
 
 import {DriverBroker} from "../driverBroker.js";
 import {DeviceConnection} from "../device.js";
 
-/* Whether an address can go in a cmd topic. MQTT forbids the wildcards
- * and NUL in a topic name. */
+/* Whether an address can go in a cmd or write topic. MQTT forbids the
+ * wildcards and NUL in a topic name. */
 export function cmd_addressable (addr: string) {
     return !/[+#\0]/.test(addr);
 }
@@ -89,11 +89,12 @@ export class DriverConnection extends DeviceConnection {
         let err;
 
         metrics.array.forEach(m => {
-            /* A cmd goes to cmd/<address>, not cmd/<data topic>, because
-             * every published driver library takes the address from the
-             * topic. The address is the whole rest of the topic, so it
-             * may contain "/", but it can't contain the MQTT wildcards
-             * or NUL. See docs/edge-split.md. */
+            /* A write goes to cmd/<address> and write/<address>, not to
+             * the data topic, because every published driver library
+             * takes the address from the topic. The address is the
+             * whole rest of the topic, so it may contain "/", but it
+             * can't contain the MQTT wildcards or NUL. See
+             * docs/edge-split.md. */
             const addr = m.properties?.address?.value as string | undefined;
             if (!addr || !this.topics.has(addr)) {
                 err = new Error(`Address ${addr} not found`);
@@ -104,19 +105,46 @@ export class DriverConnection extends DeviceConnection {
                 return;
             }
 
-            const payload = writeValToBuffer(m);
-
-            this.broker.publish({
-                id:         this.id,
-                msg:        "cmd",
-                data:       addr,
-                payload:    payload,
-            });
+            const e = this.#write_metric(addr, m);
+            if (e) err = e;
         });
 
         // Call the writeCallback when complete, setting the error if
         // necessary
         writeCallback(err);
+    }
+
+    /* Send one write in both forms. A driver subscribes to the form it
+     * understands, so the agent doesn't need to know which: cmd/ is
+     * the value as raw bytes, as drivers have always had it, and
+     * write/ is JSON with the Sparkplug type. A form that can't carry
+     * this value is left out. Returns an error only if neither can. */
+    #write_metric (addr: string, m: sparkplugMetric): Error | undefined {
+        const forms: Array<[string, (m: sparkplugMetric) => Buffer]> = [
+            ["cmd", writeValToBuffer],
+            ["write", writeValToJSON],
+        ];
+        const errs: string[] = [];
+
+        for (const [msg, encode] of forms) {
+            let payload: Buffer;
+            try {
+                payload = encode(m);
+            }
+            catch (e) {
+                errs.push(`${msg}: ${(e as Error).message}`);
+                continue;
+            }
+            this.broker.publish({ id: this.id, msg, data: addr, payload });
+        }
+
+        if (errs.length == 0) return;
+        const why = `Can't write ${m.name} to ${addr}: ${errs.join(", ")}`;
+        if (errs.length < forms.length) {
+            log(`DRIVER [${this.id}]: ${why}`);
+            return;
+        }
+        return new Error(why);
     }
 
     /**
@@ -188,6 +216,7 @@ export class DriverConnection extends DeviceConnection {
         case "conf":
         case "addr":
         case "cmd":
+        case "write":
         case "poll":
             return;
         }
@@ -281,5 +310,18 @@ export class DriverConnection extends DeviceConnection {
             this.emit("data", { [addr]: payload });
     }
 
-    #msg_err (data: string, error: string) { }
+    /* A driver reports a problem with an address, such as a failed
+     * write, as an error code, optionally followed by a newline and a
+     * message. Nothing acts on it yet, so log it. This goes to the
+     * console rather than the debug log because an operator needs to
+     * see a failed write. */
+    #msg_err (data: string, error: string) {
+        const addr = this.addrs.get(data) ?? `data topic ${data}`;
+        const [code, ...rest] = error.split("\n");
+        const msg = rest.join("\n").trim();
+        if (code == "")
+            console.log(`DRIVER [${this.id}]: error cleared on ${addr}`);
+        else
+            console.log(`DRIVER [${this.id}]: error ${code} on ${addr}` + (msg ? `: ${msg}` : ""));
+    }
 }

@@ -90,9 +90,29 @@
                             "",
                             "MQTT",
                             "OPC UA",
-                            "REST"
+                            "REST",
+                            "UDP"
                         ],
                         "minLength": 1
+                    },
+                    "UDPConnDetails": {
+                        "type": "object",
+                        "title": "UDP Server Details",
+                        "options": {
+                            "dependencies": {
+                                "connType": "UDP"
+                            },
+                            "collapsed": false
+                        },
+                        "properties": {
+                            "port": {
+                                "title": "Port",
+                                "type": "number",
+                                "enum": [
+                                    50205
+                                ]
+                            }
+                        }
                     },
                     "MQTTConnDetails": {
                         "type": "object",
@@ -229,7 +249,7 @@
                             },
                             "useCredentials": {
                                 "title": "Use credentials",
-                                "type": "boolean",
+                                "type": "boolean"
                             },
                             "username": {
                                 "title": "Username",

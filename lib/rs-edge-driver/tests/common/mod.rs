@@ -18,7 +18,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use bytes::{Bytes, BytesMut};
-use rs_edge_driver::{Driver, DriverConfig, Handler};
+use rs_edge_driver::{Driver, DriverConfig, DriverOptions, Handler};
 use rumqttc::mqttbytes::v4::{
     ConnAck, ConnectReturnCode, Packet, PingResp, PubAck, Publish, SubAck, SubscribeReasonCode,
 };
@@ -53,6 +53,8 @@ pub struct Stats {
     pub pings: AtomicUsize,
     /// Connections dropped because the keep-alive ran out.
     pub expired: AtomicUsize,
+    /// Every topic filter the driver has subscribed to, in order.
+    pub subscriptions: Mutex<Vec<String>>,
 }
 
 impl Stats {
@@ -64,6 +66,9 @@ impl Stats {
     }
     pub fn expired(&self) -> usize {
         self.expired.load(Ordering::SeqCst)
+    }
+    pub fn subscriptions(&self) -> Vec<String> {
+        self.subscriptions.lock().unwrap().clone()
     }
 }
 
@@ -273,6 +278,8 @@ async fn serve(
                                 .unwrap();
                         }
                         Packet::Subscribe(s) => {
+                            stats.subscriptions.lock().unwrap()
+                                .extend(s.filters.iter().map(|f| f.path.clone()));
                             let codes = s
                                 .filters
                                 .iter()
@@ -336,6 +343,17 @@ impl Drop for RunningDriver {
 pub fn spawn_driver<H: Handler + 'static>(config: DriverConfig) -> RunningDriver {
     RunningDriver(tokio::spawn(async move {
         let mut driver = Driver::<H>::new(config);
+        let _ = driver.run().await;
+    }))
+}
+
+/// Start a driver built with [`Driver::with_options`].
+pub fn spawn_driver_with<H: Handler + 'static>(
+    config: DriverConfig,
+    options: DriverOptions,
+) -> RunningDriver {
+    RunningDriver(tokio::spawn(async move {
+        let mut driver = Driver::<H>::with_options(config, options);
         let _ = driver.run().await;
     }))
 }

@@ -115,20 +115,41 @@ The driver reports its status to the Edge Agent on
 `fpEdge1/{id}/status`. A handler drives it like this:
 
 - `Handler::connect` returning `Ok(())` sets `UP`. Returning
-  `ConnectError::ConnectionFailed`, `AuthFailed` or `Other` sets
-  `CONN`, `AUTH` or `ERR`, and the driver calls `connect` again after
+  `ConnectError::ConnectionFailed` or `AuthFailed` sets `CONN` or
+  `AUTH`, and the driver calls `connect` again after
   `reconnect_delay` until it succeeds.
 - If the device goes away after `UP`, call
   `DriverHandle::disconnected(reason)` from anywhere in the handler.
-  The status changes in the same way and the driver reconnects.
+  The status changes in the same way and the driver reconnects. For
+  any other error, such as a protocol error, call
+  `DriverHandle::error()`, which sets `ERR` and reconnects.
 - No data is published unless the status is `UP`.
 
-The driver calls `connect`, `subscribe`, `cmd` and `close` on its own
+The driver calls `connect`, `subscribe`, `cmd`, `write` and `close` on its own
 tasks, so a slow or unreachable device never holds up the MQTT
 connection to the Edge Agent and its keep-alive pings.
 
 When the Edge Agent sends `active OFFLINE`, the driver closes the
 handler and forgets its configuration until the agent sends `ONLINE`.
+
+## Writes
+
+The Edge Agent sends each write in two forms, and a handler takes one
+of them:
+
+- By default the driver subscribes to `cmd/#` and calls
+  `Handler::cmd` with the address and the value as raw bytes, as it
+  always has.
+- A handler that sets `const TYPED_WRITES: bool = true` gets typed
+  writes instead. The driver subscribes to `write/#` and calls
+  `Handler::write` with the parsed address and a `WriteValue`, which
+  carries the Sparkplug type and the value (`WriteValue::Int16(-2)`,
+  `WriteValue::Double(0.5)` and so on). Return `WriteError::ReadOnly`,
+  `BadValue` or `Failed` if the write fails, and the driver reports it
+  to the Edge Agent as `RO`, `CMD` or `ERR`. This needs an Edge Agent
+  from November 2026 or later.
+
+See "Typed writes" in `acs-edge/docs/edge-split.md` for the protocol.
 
 ## Polling in parallel
 
@@ -137,7 +158,7 @@ time. If your device client can serve several reads at once, return a
 `Poller` from `Handler::poller` and the driver will call it without
 taking the handler's lock, for every address in a poll request at
 once. Set `serial_poll` in `DriverConfig` to force one poll at a time
-either way. A poll's `poll_timeout` starts when the poll starts, not
+either way. A poll's `poll_timeout` (in `DriverOptions`) starts when the poll starts, not
 while it waits for the lock.
 
 ## API reference
@@ -160,20 +181,22 @@ Name|Meaning
 `EDGE_MQTT`|URL of the Edge Agent MQTT broker
 `EDGE_USERNAME`|Driver connection name
 `EDGE_PASSWORD`|MQTT password
-
 `VERBOSE`|Log level, as for the JS drivers: `1` or `ALL` for debug, or a comma-separated list of targets (see `init_logging`)
 
 `RUST_LOG` overrides `VERBOSE` when set. Call `init_logging()` at the
 start of `main` to use them.
 
 `DriverConfig::from_env()` (or `DriverConfig::new(url, username,
-password)`) fills every other field with a default. Change the fields
-on the returned value if you need different ones:
+password)`) sets `reconnect_delay` to 5 seconds and `serial_poll` to
+`false`. Change the fields on the returned value if you need different
+ones, or build the struct yourself.
+
+Further settings are in `DriverOptions`. `Driver::new(config)` uses
+their defaults. To change them, start from `DriverOptions::default()`
+and pass it to `Driver::with_options(config, options)`:
 
 Field|Default|Meaning
 ---|---|---
-`reconnect_delay`|5 s|Wait between southbound connection attempts
-`serial_poll`|`false`|Poll one address at a time
 `poll_timeout`|30 s|Longest a single poll may run
 `keep_alive`|30 s|MQTT keep-alive to the Edge Agent
 `max_packet_size`|16 MiB|Largest MQTT packet sent or accepted. rumqttc's own default is 10 KiB, too small for a large `addr` map or data payload

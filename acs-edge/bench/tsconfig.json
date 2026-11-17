@@ -1,0 +1,16 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "..",
+        "outDir": "../node_modules/.cache/edge-bench",
+        "tsBuildInfoFile": "../node_modules/.cache/edge-bench/.tsbuildinfo",
+        "incremental": true
+    },
+    "include": [],
+    "files": [
+        "../lib/device.ts",
+        "../lib/sparkplugNode.ts",
+        "../lib/driverBroker.ts",
+        "../lib/devices/driver.ts"
+    ]
+}

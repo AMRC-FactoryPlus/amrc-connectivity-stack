@@ -335,3 +335,88 @@ async fn large_messages_pass() {
     let data = agent.collect_data(1, secs(5)).await;
     assert_eq!(data, [("1".to_owned(), Bytes::from(payload))]);
 }
+
+/// With a blank client id, the made-up `NO-ID-<uuid>` is kept across
+/// reconnects, as the built-in keeps it, so a persistent session on
+/// the broker is resumed instead of a new one being left each time.
+#[tokio::test]
+async fn a_made_up_client_id_is_kept_across_reconnects() {
+    let mut broker = FakeBroker::start().await;
+    let mut conf = broker.conf();
+    conf["clientId"] = "".into();
+    conf["cleanSession"] = false.into();
+    let (mut agent, _driver) = up(conf, &[("1", "a")]).await;
+
+    let id = |e: &Seen| match e {
+        Seen::Connect { client_id, .. } => Some(client_id.clone()),
+        _ => None,
+    };
+    let first = broker.wait(secs(2), id).await;
+    assert!(first.starts_with("NO-ID-"), "{first}");
+
+    broker.kick();
+    agent.wait_status("CONN", secs(5)).await;
+    agent.wait_status("UP", secs(5)).await;
+    let second = broker.wait(secs(2), id).await;
+    assert_eq!(second, first, "a new id was made up on reconnect");
+}
+
+/// A broker that closes the connection straight after accepting it
+/// must not leave the status UP with nothing connected: the driver
+/// reports CONN and connects again.
+///
+/// The defect was that the read loop's report could reach the driver
+/// before `connect` returned, when the driver ignores it, and then
+/// nothing reconnected. That order is rare and this test can't force
+/// it (it did not happen in 60 runs of the old code), so it checks
+/// that the driver recovers, on several threads and a few times over.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_connection_closed_after_connack_is_retried() {
+    for _ in 0..5 {
+        let mut broker = FakeBroker::start().await;
+        broker.drop_after_connack(1);
+        let (mut agent, _driver) = up(broker.conf(), &[("1", "a")]).await;
+
+        agent.wait_status("CONN", secs(5)).await;
+        agent.wait_status("UP", secs(5)).await;
+        loop {
+            if broker.wait(secs(2), subscribed).await == ["a"] {
+                break;
+            }
+        }
+        broker.publish("a", b"back".to_vec());
+        let data = agent.collect_data(1, secs(2)).await;
+        assert_eq!(data, [("1".to_owned(), Bytes::from_static(b"back"))]);
+    }
+}
+
+/// `ws` and `wss` connect to the path `/`, as the built-in does: its
+/// URL has no path, and mqtt.js then uses `/`. The listener reads the
+/// WebSocket upgrade request and records the path it asks for.
+#[tokio::test]
+async fn websockets_use_the_root_path() {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let request = tokio::spawn(async move {
+        let (sock, _) = listener.accept().await.unwrap();
+        let mut line = String::new();
+        BufReader::new(sock).read_line(&mut line).await.unwrap();
+        line
+    });
+
+    let mut agent = FakeAgent::start("MQTT").await;
+    let _driver = spawn_driver::<MqttHandler>(agent.config());
+    let conf = serde_json::json!({
+        "protocol": "ws", "host": "127.0.0.1", "port": port,
+        "clientId": "edge-ws", "cleanSession": true, "keepAlive": 60,
+    });
+    agent.handshake(conf, &[("1", "a")]).await;
+
+    let line = tokio::time::timeout(secs(5), request)
+        .await
+        .expect("no WebSocket request")
+        .unwrap();
+    assert_eq!(line.trim_end(), "GET / HTTP/1.1");
+}

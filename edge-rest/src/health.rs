@@ -14,13 +14,19 @@
 //! So a round is measured: it is the longest time between two polls of
 //! any one address, plus [`SLACK`]. The connection is lost when every
 //! address is failing and no address has had a reply for longer than a
-//! round. An address that hasn't been polled for three of its own gaps
-//! is taken to have left the address map and is forgotten.
+//! round.
+//!
+//! The table holds exactly the addresses in the Edge Agent's current
+//! address map, which the handler passes to [`Health::set_addrs`]
+//! whenever the map changes. An address is never dropped for not being
+//! polled, so a working address polled every few minutes keeps the
+//! connection up for as long as it works, and one that has not been
+//! polled yet counts as not failing.
 //!
 //! "A reply" is any HTTP reply other than 401 or 403, so a 404 or 500
 //! from one endpoint shows the server is there.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use rs_edge_driver::ConnectError;
@@ -48,8 +54,11 @@ pub enum Read {
     /// Another status: the server is there, but no data.
     Status(u16),
     /// Nothing usable for another reason, such as a page that isn't
-    /// JSON. The server replied.
+    /// JSON or an address that doesn't make a URL. Not the server's
+    /// fault, or the server replied.
     NoData,
+    /// A 200 reply too large to send to the Edge Agent.
+    TooLarge,
     Failed(Failure),
 }
 
@@ -68,7 +77,8 @@ pub struct Verdict {
 
 #[derive(Debug)]
 struct Entry {
-    last_poll: Instant,
+    /// When it was last polled, if it has been.
+    last_poll: Option<Instant>,
     /// The time between this address's last two polls.
     gap: Option<Duration>,
     /// The last read, if it didn't give data.
@@ -103,28 +113,32 @@ impl Health {
         self.reported = false;
     }
 
+    /// The Edge Agent's address map has changed: keep exactly these
+    /// addresses. An address that has left is forgotten, and a new one
+    /// starts out not failing.
+    pub fn set_addrs<'a>(&mut self, addrs: impl IntoIterator<Item = &'a str>) {
+        let current: HashSet<&str> = addrs.into_iter().collect();
+        self.addrs.retain(|a, _| current.contains(a.as_str()));
+        for a in current {
+            self.addrs.entry(a.to_owned()).or_insert(Entry {
+                last_poll: None,
+                gap: None,
+                state: None,
+            });
+        }
+    }
+
     /// A poll of `addr` is starting.
     pub fn polled(&mut self, addr: &str, now: Instant) {
-        match self.addrs.get_mut(addr) {
-            Some(e) => {
-                e.gap = Some(now.saturating_duration_since(e.last_poll));
-                e.last_poll = now;
-            }
-            None => {
-                self.addrs.insert(
-                    addr.to_owned(),
-                    Entry {
-                        last_poll: now,
-                        gap: None,
-                        state: None,
-                    },
-                );
-            }
-        }
-        self.addrs.retain(|_, e| {
-            let keep_for = e.gap.map_or(Duration::from_secs(60), |g| g * 3 + SLACK);
-            now.saturating_duration_since(e.last_poll) <= keep_for
+        let e = self.addrs.entry(addr.to_owned()).or_insert(Entry {
+            last_poll: None,
+            gap: None,
+            state: None,
         });
+        if let Some(last) = e.last_poll {
+            e.gap = Some(now.saturating_duration_since(last));
+        }
+        e.last_poll = Some(now);
     }
 
     /// The longest time between two polls of one address, plus
@@ -348,16 +362,56 @@ mod tests {
     /// An address that leaves the map stops counting, so the others
     /// decide.
     #[test]
-    fn addresses_no_longer_polled_are_forgotten() {
+    fn addresses_that_leave_the_map_are_forgotten() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/old", "/a"]);
         run(
             &mut h,
             &c,
             (0, 2_000, 250),
             &[("/old", Read::Data), ("/a", CONN)],
         );
-        let got = run(&mut h, &c, (2_000, 10_000, 250), &[("/a", CONN)]);
+        assert_eq!(run(&mut h, &c, (2_000, 10_000, 250), &[("/a", CONN)]), None);
+        h.set_addrs(["/a"]);
+        let got = run(&mut h, &c, (10_000, 20_000, 250), &[("/a", CONN)]);
         assert_eq!(got.unwrap().1, ConnectError::ConnectionFailed);
+    }
+
+    /// The review's case: a working address polled every 120 s and a
+    /// failing one polled every second, over ten minutes. The working
+    /// one is never dropped, so the connection stays up throughout.
+    #[test]
+    fn a_rarely_polled_working_address_is_never_dropped() {
+        let c = Clock(Instant::now());
+        let mut h = Health::new(c.at(0));
+        h.set_addrs(["/slow", "/fast"]);
+        let mut t = 0;
+        while t < 600_000 {
+            if t % 120_000 == 0 {
+                h.polled("/slow", c.at(t));
+                assert_eq!(h.read("/slow", Read::Data, c.at(t + 5)).lost, None, "{t}");
+            }
+            h.polled("/fast", c.at(t));
+            assert_eq!(h.read("/fast", CONN, c.at(t + 5)).lost, None, "{t}");
+            t += 1_000;
+        }
+    }
+
+    /// An address in the map that hasn't been polled yet isn't failing,
+    /// so it holds the connection up until it has been tried.
+    #[test]
+    fn an_address_not_yet_polled_is_not_failing() {
+        let c = Clock(Instant::now());
+        let mut h = Health::new(c.at(0));
+        h.set_addrs(["/later", "/a"]);
+        assert_eq!(run(&mut h, &c, (0, 10_000, 250), &[("/a", CONN)]), None);
+        h.polled("/later", c.at(10_000));
+        // Once it has been tried and failed too, every address is
+        // failing, so this read loses the connection.
+        assert_eq!(
+            h.read("/later", CONN, c.at(10_005)).lost,
+            Some(ConnectError::ConnectionFailed)
+        );
     }
 }

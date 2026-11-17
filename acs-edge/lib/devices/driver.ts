@@ -225,10 +225,13 @@ export class DriverConnection extends DeviceConnection {
      * understands, so the agent doesn't need to know which: cmd/ is
      * the value as raw bytes, as drivers have always had it, and
      * write/ is JSON with the Sparkplug type. A form that can't carry
-     * this value is left out. Returns an error only if neither can, or
-     * if the write expects an answer (it has an id) and the typed form
-     * can't carry the value, because only a typed-write driver answers.
-     * The id goes in the typed form for the driver to answer with. */
+     * this value is left out, unless it is the one the driver reads:
+     * a write that expects an answer (it has an id) goes to a driver
+     * that answers typed writes, and any other write may go to a
+     * driver that only reads cmd/. If that form can't carry the value,
+     * nothing is sent and the write is an error, so the device doesn't
+     * report a value no driver received. The id goes in the typed form
+     * for the driver to answer with. */
     #write_metric (addr: string, m: sparkplugMetric, id?: string): Error | undefined {
         const typed = id === undefined
             ? writeValToJSON
@@ -239,29 +242,31 @@ export class DriverConnection extends DeviceConnection {
             ["cmd", writeValToBuffer],
             ["write", typed],
         ];
+        const needed = id === undefined ? "cmd" : "write";
+        const payloads: Array<[string, Buffer]> = [];
         const errs: string[] = [];
 
         for (const [msg, encode] of forms) {
-            let payload: Buffer;
             try {
-                payload = encode(m);
+                payloads.push([msg, encode(m)]);
             }
             catch (e) {
                 errs.push(`${msg}: ${(e as Error).message}`);
-                continue;
             }
-            this.broker.publish({ id: this.id, msg, data: addr, payload });
         }
 
-        if (errs.length == 0) return;
         const why = `Can't write ${m.name} to ${addr}: ${errs.join(", ")}`;
-        if (id !== undefined && errs.some(e => e.startsWith("write:")))
-            return new Error(`it can't be sent as a typed write: ${errs.join(", ")}`);
-        if (errs.length < forms.length) {
-            log(`DRIVER [${this.id}]: ${why}`);
-            return;
+        if (errs.some(e => e.startsWith(`${needed}:`))) {
+            return id === undefined
+                ? new Error(`${why}. This driver doesn't answer writes, `
+                    + `so it reads cmd/, which can't carry this value.`)
+                : new Error(`it can't be sent as a typed write: ${errs.join(", ")}`);
         }
-        return new Error(why);
+
+        for (const [msg, payload] of payloads)
+            this.broker.publish({ id: this.id, msg, data: addr, payload });
+        if (errs.length)
+            log(`DRIVER [${this.id}]: ${why}`);
     }
 
     /**

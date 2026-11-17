@@ -12,8 +12,17 @@
 //! [`connect`](Handler::connect) every few seconds, which asks for
 //! every failing address's URL again, all at once, and reports `UP`
 //! once any of them gets a reply that isn't `401` or `403`.
+//!
+//! The handler keeps exactly the Edge Agent's current addresses. The
+//! library passes them to [`subscribe`](Handler::subscribe) whenever the
+//! map changes while the connection is up, and after each successful
+//! `connect`. A map that arrives while the connection is down only
+//! reaches `subscribe` after `connect`, so `parse_addr` also records
+//! each address it is given, and `connect` uses those when there are
+//! any: an address that has left the map can't keep the connection
+//! down, or bring it up.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -28,7 +37,7 @@ use crate::addr::{Addr, url};
 use crate::config::Conf;
 use crate::health::{Failure, Health, Read};
 use crate::http::Client;
-use crate::read::{Outcome, is_auth_failure, read};
+use crate::read::{Limits, Outcome, is_auth_failure, read};
 
 /// The handler. Its work is done by [`Rest`], which polls share.
 pub struct RestHandler {
@@ -43,6 +52,12 @@ struct Rest {
     /// `connect` to try again.
     failed: Mutex<HashMap<String, String>>,
     health: Mutex<Health>,
+    /// The addresses `subscribe` was last given, which the library
+    /// polls.
+    current: Mutex<HashSet<String>>,
+    /// Addresses `parse_addr` has been given since the last
+    /// `subscribe`: a new address map not yet subscribed to.
+    parsed: Mutex<HashSet<String>>,
 }
 
 impl Rest {
@@ -56,7 +71,10 @@ impl Rest {
             .lock()
             .unwrap()
             .polled(addr.raw(), Instant::now());
-        let outcome = read(self.client.base_url(), addr, |url| self.client.get(url)).await;
+        let outcome = read(self.client.base_url(), addr, Limits::default(), |url| {
+            self.client.get(url)
+        })
+        .await;
 
         if !matches!(outcome, Outcome::Auth { .. } | Outcome::Conn { .. }) {
             self.failed.lock().unwrap().remove(addr.raw());
@@ -65,6 +83,16 @@ impl Rest {
             Outcome::Data(body) => (Some(body), Read::Data, String::new()),
             Outcome::Status(s) => (None, Read::Status(s), format!("HTTP {s}, no data")),
             Outcome::NoData => (None, Read::NoData, String::new()),
+            Outcome::BadUrl => (
+                None,
+                Read::NoData,
+                "baseURL and this address don't make an http or https URL".to_owned(),
+            ),
+            Outcome::TooLarge(limit) => (
+                None,
+                Read::TooLarge,
+                format!("the reply is over {limit} bytes, too large to send"),
+            ),
             Outcome::Auth { url, status } => {
                 self.failed
                     .lock()
@@ -132,20 +160,65 @@ impl Handler for RestHandler {
                 handle,
                 failed: Mutex::new(HashMap::new()),
                 health: Mutex::new(Health::new(Instant::now())),
+                current: Mutex::new(HashSet::new()),
+                parsed: Mutex::new(HashSet::new()),
             }),
         })
     }
 
     fn parse_addr(&self, addr: &str) -> Option<Addr> {
+        self.rest.parsed.lock().unwrap().insert(addr.to_owned());
         Some(Addr::parse(addr))
+    }
+
+    /// Nothing to subscribe to: the driver is polled. This keeps the
+    /// health table and the failed URLs to the current addresses.
+    async fn subscribe(&mut self, addrs: &[Addr]) -> bool {
+        let set: HashSet<String> = addrs.iter().map(|a| a.raw().to_owned()).collect();
+        self.rest
+            .health
+            .lock()
+            .unwrap()
+            .set_addrs(set.iter().map(String::as_str));
+        self.rest
+            .failed
+            .lock()
+            .unwrap()
+            .retain(|a, _| set.contains(a));
+        self.rest.parsed.lock().unwrap().clear();
+        *self.rest.current.lock().unwrap() = set;
+        true
     }
 
     /// Up straight away, as the built-in was, unless every address was
     /// failing: then ask each failing address's URL again, all at once,
     /// and come up if any gets a reply other than 401 or 403. `AUTH` if
     /// every reply was 401 or 403, otherwise `CONN`.
+    ///
+    /// Only the current addresses count: those of a map parsed since the
+    /// last `subscribe` if there is one, otherwise those last
+    /// subscribed. A current address that hasn't failed (it is new) is
+    /// worth trying, so the connection comes up for it.
     async fn connect(&mut self) -> Result<(), ConnectError> {
-        let urls: Vec<String> = self.rest.failed.lock().unwrap().values().cloned().collect();
+        let urls = {
+            let parsed = self.rest.parsed.lock().unwrap();
+            let current = self.rest.current.lock().unwrap();
+            let addrs = if parsed.is_empty() {
+                &*current
+            } else {
+                &*parsed
+            };
+            let failed = self.rest.failed.lock().unwrap();
+            let untried = addrs.iter().any(|a| !failed.contains_key(a));
+            if untried || addrs.is_empty() {
+                Vec::new()
+            } else {
+                addrs
+                    .iter()
+                    .filter_map(|a| failed.get(a).cloned())
+                    .collect()
+            }
+        };
         if !urls.is_empty() {
             let mut probes = tokio::task::JoinSet::new();
             for url in urls {
@@ -169,8 +242,8 @@ impl Handler for RestHandler {
                     ConnectError::ConnectionFailed
                 });
             }
-            self.rest.failed.lock().unwrap().clear();
         }
+        self.rest.failed.lock().unwrap().clear();
         self.rest.health.lock().unwrap().reset(Instant::now());
         Ok(())
     }
@@ -220,6 +293,13 @@ pub fn write_body(value: &WriteValue) -> Result<Vec<u8>, WriteError> {
         WriteValue::Double(v) => finite(*v)?,
         WriteValue::String(v) | WriteValue::Text(v) | WriteValue::Uuid(v) => Value::from(v.clone()),
         WriteValue::DateTime(v) => Value::from(*v),
+        // WriteValue is non_exhaustive: refuse a type added later.
+        other => {
+            return Err(WriteError::BadValue(format!(
+                "{} writes are not supported",
+                other.type_name()
+            )));
+        }
     };
     serde_json::to_vec(&json).map_err(|e| WriteError::Failed(e.to_string()))
 }

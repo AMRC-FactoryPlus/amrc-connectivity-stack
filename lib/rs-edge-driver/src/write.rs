@@ -13,7 +13,11 @@ use serde::Deserialize;
 use serde_json::Value;
 
 /// The value of a typed write, with its Sparkplug type.
+///
+/// `#[non_exhaustive]`: Sparkplug has more types than these, and the
+/// edge agent may send more of them in future, so match with a `_` arm.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum WriteValue {
     Boolean(bool),
     Int8(i8),
@@ -125,7 +129,12 @@ impl WriteValue {
                 Value::String(s) => s.parse().ok()?,
                 _ => v.as_u64()?,
             }),
-            "Float" => Self::Float(float(v)? as f32),
+            // `as f32` turns a finite value too big for f32 into
+            // infinity, which is not what was asked for.
+            "Float" => Self::Float(match float(v)? {
+                f if f.is_finite() && f.abs() > f64::from(f32::MAX) => return None,
+                f => f as f32,
+            }),
             "Double" => Self::Double(float(v)?),
             "String" => Self::String(string(v)?),
             "Text" => Self::Text(string(v)?),
@@ -216,6 +225,23 @@ mod tests {
     }
 
     #[test]
+    fn float_keeps_values_that_fit_f32() {
+        assert_eq!(
+            parse(r#"{"type":"Float","value":3.4e38}"#).unwrap(),
+            Float(3.4e38)
+        );
+        assert_eq!(
+            parse(r#"{"type":"Float","value":"Infinity"}"#).unwrap(),
+            Float(f32::INFINITY)
+        );
+        // Too big for f32 is fine as a Double.
+        assert_eq!(
+            parse(r#"{"type":"Double","value":1e39}"#).unwrap(),
+            Double(1e39)
+        );
+    }
+
+    #[test]
     fn ignores_unknown_keys() {
         assert_eq!(
             parse(r#"{"type":"Int16","value":3,"extra":1}"#).unwrap(),
@@ -235,6 +261,8 @@ mod tests {
             r#"{"type":"UInt64","value":"-1"}"#,
             r#"{"type":"Boolean","value":"true"}"#,
             r#"{"type":"Double","value":"nan"}"#,
+            r#"{"type":"Float","value":1e39}"#,
+            r#"{"type":"Float","value":-3.5e38}"#,
             r#"{"type":"String","value":5}"#,
             r#"{"type":"Bytes","value":"AA=="}"#,
             r#"{"type":"Int16"}"#,

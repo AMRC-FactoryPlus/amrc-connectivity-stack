@@ -9,7 +9,9 @@ bytes = "1"
 futures = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rumqttc = "0.24"
+# 0.25 is the first release that can set TCP_NODELAY. The link to the
+# edge agent is plain TCP, so no TLS backend is built.
+rumqttc = { version = "0.25.1", default-features = false }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -20,3 +22,7 @@ url = "2"
 [[example]]
 name = "test_driver"
 path = "examples/test_driver.rs"
+
+[[example]]
+name = "rate_stub"
+path = "examples/rate_stub.rs"

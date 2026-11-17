@@ -348,11 +348,11 @@ export async function golden (fixtures: { a: Fixture, b?: Fixture },
      * the built-in connection, because the agent gathers the values a
      * driver sends together, but it should not send more: more loads
      * the central broker and every subscriber. The Rust drivers can't
-     * meet that yet. Their MQTT client doesn't set TCP_NODELAY, so the
-     * second and later values of a burst reach the agent about 40 ms
-     * after the first (Nagle's algorithm waiting for a delayed ACK),
-     * too late to join its group, and an OPC UA notification can come
-     * out as two DDATA. So more is a warning, and a failure only with
+     * always meet that yet. Their MQTT client (rumqttc) writes each
+     * message to the socket on its own, so the agent can read the
+     * first value of an OPC UA notification before the rest arrive,
+     * and the notification comes out as two DDATA in about one run
+     * in three. So more is a warning, and a failure only with
      * GOLDEN_STRICT_DDATA set. */
     const more = opts.b?.driver && !opts.a?.driver ? ddata_excess(a, b) : [];
     if (more.length && process.env.GOLDEN_STRICT_DDATA) {

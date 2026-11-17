@@ -25,13 +25,8 @@ import { log } from "./helpers/log.js";
 import { serialisationType, sparkplugConfig, } from "./helpers/typeHandler.js";
 
 import { RestConnection } from "./devices/REST.js";
-import { S7Connection } from "./devices/S7.js";
 import { OPCUAConnection } from "./devices/OPCUA.js";
 import { MQTTConnection } from "./devices/MQTT.js";
-import { UDPConnection } from "./devices/UDP.js";
-import { WebsocketConnection } from "./devices/websocket.js";
-import { MTConnectConnection } from "./devices/MTConnect.js";
-import { EtherNetIPConnection } from "./devices/EtherNetIP.js";
 import { DriverConnection } from "./devices/driver.js";
 import { Scout, ScoutResult } from "./scout.js";
 
@@ -39,6 +34,32 @@ import { Scout, ScoutResult } from "./scout.js";
  * memory several times over while it encodes and sends it, so raising
  * this a long way also means raising the agent's memory limit. */
 const DEFAULT_FILE_LIMIT = 10 * 1024 * 1024;
+
+/* Connection types the Edge Agent used to run itself and no longer
+ * does. A config naming one of these is from before the upgrade, so it
+ * gets a message saying what happened rather than a generic one. */
+export const RETIRED_CONN_TYPES = [
+    "MTConnect", "S7", "UDP", "EtherNet/IP", "Websocket",
+];
+
+/* The error for a connection whose type the agent cannot run. It goes
+ * to stderr, not through log(), which prints only with DEBUG set: the
+ * devices on this connection publish nothing, and a site must be able
+ * to see why. The other connections carry on. */
+export function unknownConnTypeMessage (connection: any): string {
+    const cType = connection?.connType;
+    const name = connection?.name ?? "(unnamed)";
+    const devices = (connection?.devices ?? [])
+        .map((d: any) => d?.deviceId)
+        .filter((d: any) => d != null);
+    const devs = devices.length ? devices.join(", ") : "none";
+    const why = RETIRED_CONN_TYPES.includes(cType)
+        ? `The ${cType} connection type has been removed from the Edge `
+            + `Agent. Move this connection to a split driver for ${cType}.`
+        : `The Edge Agent does not know the connection type '${cType}'.`;
+    return `ERROR: Connection '${name}' was not started and its devices `
+        + `will publish no data (devices: ${devs}). ${why}`;
+}
 
 /* Does this parsed config contain a secret placeholder anywhere, in a
  * key or in a string value? Uses an explicit stack, as a config can be
@@ -334,7 +355,7 @@ export class Translator extends EventEmitter {
         const deviceInfo = this.chooseDeviceInfo(cType);
 
         if (deviceInfo == undefined) {
-            log(`Failed to find DeviceInfo for connection type '${cType}'`);
+            console.error(unknownConnTypeMessage(connection));
             return;
         }
 
@@ -478,8 +499,7 @@ export class Translator extends EventEmitter {
 
     /* Map each address to the indices (into confs) of the devices that
      * read it, in ascending order. Addresses come from the devices as
-     * currently registered in this.devices. Websocket and UDP data use
-     * the address "". */
+     * currently registered in this.devices. */
     buildRoutes (confs: deviceOptions[]): Map<string, number[]> {
         const routes = new Map<string, number[]>();
         confs.forEach((conf, i) => {
@@ -502,18 +522,6 @@ export class Translator extends EventEmitter {
                 return {
                     connection: RestConnection, connectionDetails: 'RESTConnDetails'
                 }
-            case "MTConnect":
-                return {
-                    connection: MTConnectConnection, connectionDetails: 'MTConnectConnDetails'
-                }
-            case "EtherNet/IP":
-                return {
-                    connection: EtherNetIPConnection, connectionDetails: 'EtherNetIPConnDetails'
-                }
-            case "S7":
-                return {
-                    connection: S7Connection, connectionDetails: 's7ConnDetails'
-                }
             case "OPC UA":
                 return {
                     connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
@@ -521,15 +529,6 @@ export class Translator extends EventEmitter {
             case "MQTT":
                 return {
                     connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
-                }
-            case "Websocket":
-                return {
-                    connection: WebsocketConnection, connectionDetails: 'WebsocketConnDetails'
-                }
-            case "UDP":
-                return {
-                    connection: UDPConnection, connectionDetails: 'UDPConnDetails'
-
                 }
             case "Driver":
                 return {

@@ -31,7 +31,11 @@ impl HandlerError {
 /// error code, a newline and the message: on `fpEdge1/{id}/result/{write
 /// id}` if the agent is waiting for an answer, otherwise on
 /// `fpEdge1/{id}/err/{data topic}`.
+///
+/// `#[non_exhaustive]`, so more error codes can be added later; match
+/// with a `_` arm.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum WriteError {
     /// The address can't be written. Reported as `RO`.
     #[error("read-only: {0}")]

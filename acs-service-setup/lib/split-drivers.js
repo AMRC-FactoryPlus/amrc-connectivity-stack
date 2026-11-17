@@ -3,7 +3,7 @@
  * Move connections between internal drivers and their split drivers
  * Copyright 2026 University of Sheffield AMRC
  *
- * The REST, MQTT and OPC UA drivers are moving out of the Edge Agent
+ * The REST, MQTT, OPC UA and UDP drivers are moving out of the Edge Agent
  * into split drivers, which run as sidecars. Each split driver has
  * its own DriverDef, so a site moves one protocol at a time, and can
  * move it back, by setting `serviceSetup.config.splitDrivers` in the
@@ -15,9 +15,10 @@
  *     dryRun: true     # log what would change and write nothing
  *
  * A protocol that is not named, or is null, is left alone. The chart
- * sets `REST: true`, so REST connections move on upgrade unless a site
- * sets it to `false` or `null`; MQTT and OPC UA don't move unless a
- * site asks. For each connection of a named protocol this rewrites:
+ * sets `REST: true` and `UDP: true`, so REST and UDP connections move
+ * on upgrade unless a site sets them to `false` or `null`; MQTT and
+ * OPC UA don't move unless a site asks. For each connection of a
+ * named protocol this rewrites:
  *
  *  - its Edge Agent config entry: `connType`, the details key and,
  *    where the protocol needs it, the payload format;
@@ -36,6 +37,14 @@
  * functions the admin UI uses when a connection is saved, so a later
  * save gives the same config.
  *
+ * A split driver can open a port on the host its Edge Agent runs on
+ * (`hostPorts` in its DriverDef: UDP does), and a host can open each
+ * port once. A connection is not moved to such a driver when a
+ * connection that can run on the same host already has its port, by
+ * the same rule the admin UI checks on save (`port_clashes`); it stays
+ * on the internal driver and the log names the other connection. The
+ * built-in UDP connection only allowed port 50205, so this matters.
+ *
  * Before any move, and whether or not a move is asked for, every split
  * driver connection whose name can't be its driver id is given a
  * `driverId` in its Edge Agent config, and its `values.drivers` entry
@@ -47,8 +56,8 @@
 
 import {
     ServiceError, UUIDs,
-    driver_id, driver_values, move_connection, move_entry,
-    move_payload_format, set_driver_ids,
+    driver_id, driver_ports, driver_values, move_connection, move_entry,
+    move_payload_format, port_clashes, set_driver_ids,
 } from "@amrc-factoryplus/service-client";
 
 import { ACS, Edge } from "./uuids.js";
@@ -59,8 +68,8 @@ const { Driver } = ACS;
 /* What each protocol moves between, and how the payload format
  * changes. Built-in OPC UA hands the Edge Agent decoded values, which
  * only "Defined by Protocol" reads; the split driver sends
- * `{"value", "timestamp"}` JSON per address, as edge-sim does. MQTT
- * and REST pass the device's bytes through unchanged. */
+ * `{"value", "timestamp"}` JSON per address, as edge-sim does. MQTT,
+ * REST and UDP pass the device's bytes through unchanged. */
 export const SplitDrivers = {
     REST:   {
         internal:       Driver.REST,
@@ -76,6 +85,11 @@ export const SplitDrivers = {
         internal:       Driver.OPCUA,
         split:          Driver.OPCUASplit,
         payloadFormat:  { "Defined by Protocol": "JSON" },
+    },
+    UDP:    {
+        internal:       Driver.UDP,
+        split:          Driver.UDPSplit,
+        payloadFormat:  {},
     },
 };
 
@@ -115,6 +129,8 @@ export class MigrateSplitDrivers {
         const { cdb } = this;
         this.cconfs = await cdb.get_all_configs(App.ConnectionConfiguration);
         this.drivers = await cdb.get_all_configs(App.DriverDefinition);
+        this.deployments = await cdb.get_all_configs(Edge.App.Deployment);
+        this.host_ports = this.open_ports();
 
         for (const [name, to_split] of this.wanted) {
             const proto = SplitDrivers[name];
@@ -155,6 +171,47 @@ export class MigrateSplitDrivers {
             count.moved, this.dry_run ? "would move" : "moved",
             count.repaired, count.unchanged, count.failed);
         return count;
+    }
+
+    /* The host ports each connection opens now, as `port_clashes`
+     * takes them, keyed by connection. */
+    open_ports () {
+        const open = new Map();
+        for (const [conn, cconf] of this.cconfs) {
+            const ports = driver_ports(cconf, this.drivers.get(cconf.driver));
+            if (ports.length) open.set(conn, this.placed(conn, cconf, ports));
+        }
+        return open;
+    }
+
+    /* A connection's host ports as `port_clashes` takes them, with
+     * where it runs: its Edge Agent's cluster and the host the agent is
+     * pinned to, from the agent's Deployment, as the Manager reads them
+     * (acs-admin/src/utils/hostPorts.js). A connection's own `topology`
+     * copy was written empty for a long time, so it is used only for an
+     * agent with no Deployment. */
+    placed (conn, cconf, ports) {
+        const deployment = this.deployments.get(cconf.edgeAgent);
+        const where = deployment ?? cconf.topology ?? {};
+        const host = where.hostname;
+        return {
+            name:       conn,
+            cluster:    where.cluster,
+            hostname:   host && host != "Floating" ? host : undefined,
+            ports,
+        };
+    }
+
+    /* A connection whose host ports another connection that can run on
+     * the same host has open, as `{ protocol, port, names }`, or
+     * undefined. */
+    port_clash (conn, cconf, ports) {
+        const me = this.placed(conn, cconf, ports);
+        for (const [other, theirs] of this.host_ports) {
+            if (other == conn) continue;
+            const [clash] = port_clashes([me, theirs]);
+            if (clash) return clash;
+        }
     }
 
     /* Give the split driver connections of every agent their driver
@@ -226,6 +283,27 @@ export class MigrateSplitDrivers {
     async move (conn, cconf, proto, to_split, to_def) {
         const moving = cconf.driver != (to_split ? proto.split : proto.internal);
         const next = moving ? move_connection(cconf, proto, to_split) : cconf;
+
+        /* A port another connection has open on the host would stop
+         * this Edge Agent, or that one, from starting. */
+        const ports = driver_ports(next, to_def);
+        if (moving && ports.length) {
+            const clash = this.port_clash(conn, next, ports);
+            if (clash) {
+                this.log("Connection %s: not moving to the split driver, because "
+                    + "connection %s, which can run on the same host, already opens "
+                    + "%s port %s there. Give one of them another port; the next "
+                    + "service-setup run then moves it.",
+                    conn, clash.names[1], clash.protocol, clash.port);
+                return "held";
+            }
+        }
+        if (moving) {
+            if (ports.length)
+                this.host_ports.set(conn, this.placed(conn, next, ports));
+            else
+                this.host_ports.delete(conn);
+        }
         const original = cconf.splitMigration?.payloadFormat;
         const format = moving
             ? f => move_payload_format(f, proto.payloadFormat, to_split, original)

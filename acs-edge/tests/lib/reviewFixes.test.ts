@@ -116,3 +116,60 @@ describe("a null command value", () => {
         conn.close();
     });
 });
+
+/* Finding 4 */
+describe("several split-driver connections on one agent", () => {
+    function driver_conn (name: string) {
+        return {
+            connType: "Driver", name, DriverDetails: {},
+            devices: [{
+                deviceId: `dev-${name}`, pollInt: 3_600_000, pubInterval: 0,
+                templates: [], payloadFormat: "JSON",
+                tags: [{ Name: "m", type: "Double", method: "GET",
+                    address: `${name}/x`, value: null, recordToDB: true }],
+            }],
+        };
+    }
+
+    async function start (broker: FakeBroker, names: string[]) {
+        const tr = new Translator({} as any, 100, broker as any);
+        tr.sparkplugNode = {
+            publishDBirth: () => Promise.resolve(),
+            publishDData: () => {}, publishDDeath: () => {},
+            stop: async () => {},
+        } as any;
+        (tr as any).broker.stop = async () => {};
+        const conf = reHashConf({ deviceConnections: names.map(driver_conn) });
+        for (const c of conf.deviceConnections)
+            await tr.setupConnection(c);
+        return tr;
+    }
+
+    it("closes every one on stop, so each driver is told OFFLINE", async () => {
+        jest.spyOn(console, "log").mockImplementation(() => {});
+        const broker = new FakeBroker();
+        const tr = await start(broker, ["one", "two", "three"]);
+        expect(broker.listeners).toHaveLength(3);
+
+        await tr.stop();
+
+        const offline = broker.of("active")
+            .filter(p => p.payload.toString() == "OFFLINE")
+            .map(p => p.id).sort();
+        expect(offline).toEqual(["one", "three", "two"]);
+        expect(broker.listeners).toHaveLength(0);
+    });
+
+    it("leaves no connection of the old config behind after a reload", async () => {
+        jest.spyOn(console, "log").mockImplementation(() => {});
+        const broker = new FakeBroker();
+        const first = await start(broker, ["one", "two"]);
+        await first.stop();
+        const second = await start(broker, ["one", "two"]);
+
+        /* Only the new config's two connections hear the driver. */
+        expect(broker.listeners).toHaveLength(2);
+        await second.stop();
+        expect(broker.listeners).toHaveLength(0);
+    });
+});

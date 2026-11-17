@@ -57,7 +57,18 @@ Manager offers one driver per protocol for new connections: "REST",
    Deployment). They keep that image and their built-in connections,
    which keep working, but they are not upgraded until you remove the
    setting.
-4. **Find UDP connections that would share a port.** Every built-in UDP
+4. **Find Edge Agents with no Edge Agent Deployment config.** ACS
+   didn't deploy them, so they keep the image they were given, and the
+   upgrade leaves their connections on the built-in drivers: on a
+   version 6 image those keep working, on a version 7 image they get no
+   data. Compare the objects of the ConfigDB's Edge Agent config app
+   (`aac6f843-cfee-4683-b121-6943bfdf9173`) with those of its Edge Agent
+   Deployment app (`f2b9417a-ef7f-421f-b387-bb8183a48cdb`): an agent in
+   the first and not the second with a REST, MQTT, OPC UA or UDP
+   connection is one. Give it a Deployment config, and the next upgrade
+   moves its connections. The `service-setup` log names each such
+   connection in a line starting `ERROR: Connection`.
+5. **Find UDP connections that would share a port.** Every built-in UDP
    connection uses port 50205, the only port the version 6 form allowed,
    and in version 7 the port opens on the edge host, which can open it
    once. List the UDP connections in the Manager with their Edge
@@ -66,19 +77,19 @@ Manager offers one driver per protocol for new connections: "REST",
    hosts), plan a new port for one of them and how to point its device
    at it. The upgrade gives the port to the first, and the other has no
    data until it has another port.
-5. **Take a backup of the ConfigDB.** A rollback to version 6 does not
+6. **Take a backup of the ConfigDB.** A rollback to version 6 does not
    undo the move: see "Rolling back" below.
-6. **Remove `serviceSetup.config.splitDrivers.REST`, `MQTT`, `OPCUA` and
+7. **Remove `serviceSetup.config.splitDrivers.REST`, `MQTT`, `OPCUA` and
    `UDP` from your values**, if you set them for a version 7 test build.
    `false` and `null` are refused: service-setup logs an `ERROR:` line
    and moves the connections anyway.
 
 **Check it worked.** Find the line starting `Split drivers:` in the
 `service-setup` container's log. It says how many connections moved,
-how many were held back because their Edge Agent pins its image, how
-many moved without their container because of a UDP port clash, and
-how many failed, and the lines above it name each connection. Act on
-every line starting `ERROR:`. Each Edge Agent pod has a running
+how many were held back because their Edge Agent pins its image or has
+no Deployment, how many moved without their container because of a UDP
+port clash, and how many failed, and the lines above it name each
+connection. Act on every line starting `ERROR:`. Each Edge Agent pod has a running
 `driver-<name>` container for each of these connections, and their
 devices are publishing again a few minutes after the upgrade. An Edge
 Agent given a connection it can't run logs a line starting
@@ -105,7 +116,7 @@ connections back. The move rewrites the connections' configs, and
 version 6 has no split driver images, so after a rollback each moved
 connection's container can't pull its image and its Edge Agent's pod
 doesn't start, which stops every connection on that agent. Restore the
-ConfigDB backup from step 5 as part of any rollback.
+ConfigDB backup from step 6 as part of any rollback.
 
 **What you may notice afterwards.** A failing REST endpoint is logged
 once until it recovers, rather than on every poll. One failing endpoint

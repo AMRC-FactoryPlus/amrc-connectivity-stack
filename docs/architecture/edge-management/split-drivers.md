@@ -45,7 +45,20 @@ you can't afford to lose data from.
    Edge Agent, which still has the built-in connections. That is safe,
    but the agent isn't upgraded. Remove the setting when you want it
    upgraded, and the next upgrade moves its connections.
-4. **Find UDP connections that would share a port.** Every built-in UDP
+4. **Find Edge Agents with no Edge Agent Deployment config.** ACS
+   deploys an Edge Agent from its Deployment config. One without it was
+   deployed some other way, and keeps whatever image it was given, so
+   service-setup leaves its connections on the built-in drivers. On a
+   version 6 image they keep working. If that agent is ever given a
+   version 7 image, they get no data. To find them, list the objects of
+   the Edge Agent config app (`aac6f843-cfee-4683-b121-6943bfdf9173`)
+   and of the Edge Agent Deployment app
+   (`f2b9417a-ef7f-421f-b387-bb8183a48cdb`) in the ConfigDB, for
+   example with `GET /v1/app/<app>/object` on the ConfigDB service:
+   every Edge Agent in the first list and not the second that has a
+   REST, MQTT, OPC UA or UDP connection is one. Give it a Deployment
+   config so ACS deploys it, and the next upgrade moves its connections.
+5. **Find UDP connections that would share a port.** Every built-in UDP
    connection listens on port 50205, the only port the version 6 form
    allowed. In version 7 each UDP connection opens its port on the edge
    host its Edge Agent runs on, and a host can open a port once. List
@@ -55,7 +68,7 @@ you can't afford to lose data from.
    the upgrade gives the port to one connection, and the other gets no
    data until you give it another port. Plan the new port, and how to
    point the device at it, before you upgrade.
-5. **Take a backup of the ConfigDB.** The upgrade rewrites the
+6. **Take a backup of the ConfigDB.** The upgrade rewrites the
    connections' configs, and [rolling back to version
    6](#rolling-back-to-version-6) doesn't undo that.
 
@@ -113,6 +126,11 @@ definitions, as it did for the drivers ACS 6 retired.
   in a private registry, so moving the connection would stop the pod.
   The service-setup log has a line for each such connection that says
   which setting to remove.
+- **An Edge Agent with no Edge Agent Deployment config** keeps its
+  built-in connections, because nothing would run a sidecar for it, as
+  step 4 of [Before you upgrade](#before-you-upgrade) says. The
+  service-setup log has a line for each such connection starting
+  `ERROR: Connection` and ending with how to fix it.
 - **A UDP connection whose port another connection on the same host
   already has** is moved, but without its sidecar. The connection that
   got the port first keeps it and its data. The Edge Agent pod of the
@@ -380,8 +398,9 @@ You may notice these differences:
 
 1. In the service-setup Job's log, find the line that starts
    `Split drivers:`. It gives how many connections moved, how many were
-   held back by a pinned image, how many moved without a sidecar because
-   of a port clash, and how many failed. The lines above it name each
+   held back by a pinned image or by an Edge Agent with no Deployment,
+   how many moved without a sidecar because of a port clash, and how
+   many failed. The lines above it name each
    connection, and any line starting `ERROR:` needs acting on.
 2. In the Manager, open a REST, MQTT, OPC UA or UDP connection. Its
    driver is "REST", "MQTT", "OPC-UA" or "UDP".
@@ -403,6 +422,11 @@ in this order:
   connection whose port another connection has needs another port, as
   in [Two cases the move treats
   differently](#two-cases-the-move-treats-differently).
+- **The connection's Edge Agent has no Deployment** and runs a version
+  7 image. Its connections were left on the built-in drivers, which
+  that image doesn't have. Give the agent a Deployment config, as in
+  step 4 of [Before you upgrade](#before-you-upgrade), or put it back
+  on a version 6 image until you can.
 - **The Edge Agent's log has `ERROR: Connection '<name>' was not
   started`.** The connection is still on a built-in driver, which this
   Edge Agent doesn't have. Its Node also raises the alert
@@ -426,7 +450,7 @@ connection's sidecar can't pull its image, and its Edge Agent's pod
 doesn't start, which stops every connection on that agent, not only the
 moved ones. Version 6 has no step that moves connections back either.
 
-So if you must roll back, restore the ConfigDB from the backup in step 5
+So if you must roll back, restore the ConfigDB from the backup in step 6
 of [Before you upgrade](#before-you-upgrade) as part of the rollback.
 Each moved connection's ConnectionConfiguration also records the
 built-in driver and payload format it had (`splitMigration`), which is

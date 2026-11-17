@@ -59,7 +59,8 @@
  *    charts, so it runs whatever image it was given: on a version 6
  *    image its built-in connections keep working, and on a version 7
  *    one they get no data. The log has an ERROR line for each such
- *    connection saying how to fix it.
+ *    connection: give the agent a Deployment, and the next run moves
+ *    it.
  *
  *  - An Edge Agent whose Deployment pins its own image tag or registry
  *    (`values.image.default` or `values.image.edgeAgent`) keeps its
@@ -403,10 +404,11 @@ export class MigrateSplitDrivers {
                 this.log("ERROR: Connection %s: not moving to the split driver, "
                     + "because its Edge Agent %s has no Edge Agent Deployment config, "
                     + "so nothing would run the driver's container. It stays on the "
-                    + "built-in driver, which a version 7 Edge Agent doesn't have, so "
-                    + "its devices get no data there. Deploy the Edge Agent from the "
-                    + "Manager; the next service-setup run then moves it. Until then "
-                    + "only a version 6 Edge Agent image runs it.", conn, agent);
+                    + "built-in driver. That Edge Agent is not deployed by ACS and keeps "
+                    + "the image it was given: a version 6 image still runs the "
+                    + "connection, a version 7 one gives it no data. Give the Edge "
+                    + "Agent an Edge Agent Deployment config so ACS deploys it; the "
+                    + "next service-setup run then moves the connection.", conn, agent);
                 return "no_deployment";
             }
         }

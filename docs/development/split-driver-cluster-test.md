@@ -31,6 +31,10 @@ From the epic's cluster test card (ACS-47):
 3. There is no move back (decided 2026-11-17): a version 6
    `splitDrivers.<PROTO>: false` or `null` is refused with an `ERROR`
    line in the service-setup log, and the connections still move.
+   An Edge Agent with no Edge Agent Deployment config keeps its
+   built-in connections, with an `ERROR: Connection` line each in the
+   service-setup log, and they keep publishing while that agent runs a
+   version 6 image.
 4. Connections with dotted names work. A UDP sender outside the
    cluster reaches the driver on the host port. OPC UA writes work. A
    device goes offline when its server or broker is stopped and comes

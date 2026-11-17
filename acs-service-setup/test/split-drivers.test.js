@@ -584,7 +584,7 @@ describe("an Edge Agent with no Deployment", () => {
         const errors = lines.filter(l => /no Edge Agent Deployment config/.test(l[0]));
         assert.equal(errors.length, 4);
         assert.match(errors[0][0], /^ERROR: /);
-        assert.match(errors[0][0], /Deploy the Edge Agent from the Manager/);
+        assert.match(errors[0][0], /Give the Edge Agent an Edge Agent Deployment config/);
     });
 });
 

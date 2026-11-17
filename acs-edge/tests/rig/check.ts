@@ -5,6 +5,7 @@
  *
  *   check record --rig <rig.json> --seconds <n> --out <file.json>
  *       [--label <name>] [--mqtt-url <url>] [--rebirth]
+ *       [--watch <node>/<device>/<metric>]
  *   check compare <before.json> <after.json> [--rig <rig.json>]
  *
  * `record` subscribes to the Sparkplug topics of the rig's Edge Agents
@@ -16,6 +17,10 @@
  * once at the start, as the Manager's Rebirth button does, so a
  * recording that starts while the agents are already running learns
  * metric names (DDATA carries only aliases).
+ *
+ * --watch also prints every value one metric was published with, and
+ * its device's births and deaths, for the reconnect checks. It names
+ * the rig Edge Agent, the device id and the Sparkplug metric name.
  *
  * It connects as a service client (DIRECTORY_URL, SERVICE_USERNAME,
  * SERVICE_PASSWORD), or straight to a broker with --mqtt-url, which is
@@ -32,7 +37,8 @@ import mqtt from "mqtt";
 import type { Captured, Kind } from "../golden/capture.js";
 import { Rig, read_rig } from "./rig.js";
 import {
-    Summary, compare_summaries, print_comparison, print_summary, summarise,
+    Summary, compare_summaries, print_comparison, print_summary, print_watch,
+    summarise, watch,
 } from "./summary.js";
 
 const KINDS = ["NBIRTH", "NDEATH", "DBIRTH", "DDEATH", "DDATA", "NDATA"];
@@ -118,6 +124,11 @@ export async function record (rig: Rig, args: Args): Promise<Summary> {
     const ended = Date.now();
     await client.endAsync();
 
+    if (typeof args.watch == "string") {
+        const [node, device, ...metric] = args.watch.split("/");
+        const lines = watch(by_node.get(node) ?? [], device, metric.join("/"), started);
+        print_watch(device, metric.join("/"), lines);
+    }
     return summarise(rig, String(args.label ?? "recording"), started, ended, by_node);
 }
 
@@ -138,7 +149,7 @@ async function main () {
     }
     else {
         console.error("Usage: check record --rig <rig.json> --seconds <n> --out <file> "
-            + "[--label name] [--mqtt-url url] [--rebirth]\n"
+            + "[--label name] [--mqtt-url url] [--rebirth] [--watch node/device/metric]\n"
             + "       check compare <before.json> <after.json>");
         process.exit(2);
     }

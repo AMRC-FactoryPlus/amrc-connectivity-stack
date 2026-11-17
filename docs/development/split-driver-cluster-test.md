@@ -292,7 +292,7 @@ after it (step 4).
    connections takes up to a minute to make its data.
 
 3. Keep a port open to each pod's control API in a spare terminal.
-   You need it for the offline check and the write check:
+   You need it for the offline, reconnect and write checks:
 
    ```sh
    kubectl -n acs-rig port-forward svc/rig-opcua 9001:9000 &
@@ -333,6 +333,15 @@ was edited by hand: make it again.
    objects, rewrites the same values, and leaves alone anything the
    upgrade has moved.
 
+   Each device gets the origin map the Manager would have saved for it,
+   rebuilt from its tags. The upgrade's ISA-95 placement step places
+   each device from the hierarchy in that map, so its
+   `Device_Information/ISA95_Hierarchy` metrics are the same after.
+   A rig loaded by an older loader had no origin maps, and the upgrade
+   placed all its devices at the organisation. Placements are never
+   replaced, so remove that rig with `rig remove --rig /rig/rig.json --yes` (which now
+   deletes the placements too) and load it again before the next run.
+
 3. Wait for the Edge Agents. The edge cluster deploys each one within a
    few minutes:
 
@@ -351,6 +360,23 @@ was edited by hand: make it again.
 
    That should print exactly one line, that agent with
    `{"default":{"tag":"<pin tag>"}}`.
+
+   Then restart any rig Edge Agent that started before its sealed
+   passwords reached the cluster. Such an agent logs
+   `Error reading secret ... ENOENT` once at startup, never tries
+   again, and never connects, so its mocks show `clients` of 0. The
+   loader seals the passwords and creates the agents in the same run,
+   and an agent can start first. To find and restart them:
+
+   ```sh
+   for p in $(kubectl get pods -n $EDGE_NS -l factory-plus.app=edge-agent -o name | grep edge-agent-rig-); do
+     kubectl logs -n $EDGE_NS $p | grep -q 'Error reading secret' && echo $p
+   done
+   kubectl delete -n $EDGE_NS <each pod printed>
+   ```
+
+   The new pods read the passwords. The first run on the dev cluster
+   needed this for 3 of the 29 agents.
 
 4. Check the mocks have clients:
 
@@ -383,7 +409,9 @@ crashes the whole Edge Agent on it (`BadNothingToDo`): those two agents
 crash-loop before the upgrade, which is the finding, so note it and
 carry on. An Edge Agent pod stuck in `Pending` doesn't fit: see "How to
 tell it doesn't fit". A mock with `refused` above 0 is being sent the wrong
-password: run `rig load --yes` again, which reseals it.
+password: run `rig load --yes` again, which reseals it. A mock with
+`clients` and `refused` both 0 has an agent that never connected: look
+for `Error reading secret` in that agent's log and restart it (step 4.3).
 
 ### 5. Record the before state
 
@@ -594,10 +622,13 @@ the summary line names the connection on the line above it.
    rig check compare /rig/before.json /rig/after.json
    ```
 
-   It prints a table with each device's DDATA rate before and after,
-   its longest gap after, and `ok`, `WARN` or `FAIL`, then one line per
-   problem. It exits non-zero if anything failed. It fails a device
-   when:
+   It prints a table with each device's DDATA per second and metrics
+   per DDATA before and after, its longest gap after, and its result:
+   `ok`, `EXPECTED`, `WARN` or `FAIL`. Then it lists the failures, the
+   warnings and the expected differences, one line each. It exits
+   non-zero only if something failed.
+
+   It fails a device when:
 
    - a metric it was born with before is missing after, or a new one
      appears, or a type changed;
@@ -605,11 +636,30 @@ the summary line names the connection on the line above it.
    - its DDATA rate rose above 3 times or fell below half (a split
      driver must not multiply the broker's load, ACS-45).
 
+   These are the differences the move is meant to make, and it reports
+   them as `EXPECTED`, not as failures:
+
+   - a device the built-in connection starved now publishing. On a
+     multi-device OPC UA connection the built-in connection gave values
+     only to the last device;
+   - DateTime metrics getting values, where the built-in sent none;
+   - the UDP device publishing, because before the upgrade nothing
+     outside the cluster could reach the built-in UDP connection;
+   - ISA-95 hierarchy metrics added to a device that had none. The
+     upgrade places such a device at the organisation.
+
    It warns when the DDATA rate rose above 1.5 times (or above 3 times
    while metrics are newly getting values, which add messages of their
-   own), when no birth was seen, when metrics get values only after (expected for multi-device
-   OPC UA connections, and for the UDP device), and when there are more
-   DDEATHs after.
+   own), when no birth was seen, when other metrics get values only
+   after, and when there are more DDEATHs after.
+
+   Metrics are compared by name. A recording that starts while the
+   agents are running gets DDATA, which names metrics only by alias,
+   before the rebirth's DBIRTH. The recorder names those from the
+   device's first DBIRTH in the same recording. Any it can't name are
+   left out and counted in a warning, so record with `--rebirth`.
+   Summaries recorded before this change still hold `(alias N)`
+   metrics, and the comparison skips and counts those too.
 
    What the local runs showed, so you know what to expect: REST, MQTT
    and UDP devices matched exactly, with the same metrics and the same
@@ -617,7 +667,7 @@ the summary line names the connection on the line above it.
    messages after the move: from 1.2 to 2.4 times as many with ACS-45's
    grouping in, which ACS-45 expects and reports as a warning. On a
    multi-device OPC UA connection the devices the built-in connection
-   starved get values after the move, which also shows as a warning.
+   starved get values after the move, which shows as expected.
 
 3. Read the upgrade recording's gaps:
 
@@ -709,6 +759,61 @@ devices just go quiet and are born again when the broker returns. The
 split MQTT driver sends a DDEATH and a DBIRTH. So run this check after
 the upgrade, and expect the before state to differ.
 
+**A value that changes while the connection is down.** This is the
+check for the OPC UA driver's reconnect fix: after a short network drop
+in which the server stays up, the driver must report a value that
+changed during the drop, even though it does not change again. A server
+restart doesn't test this, because the driver then makes a new session
+and subscription and reads every value afresh. Run it after the
+upgrade on one OPC UA connection, then on one MQTT and one REST
+connection if you want the same for those drivers.
+
+The mocks' control API holds values still and cuts connections with
+the server left running:
+
+| Request | What it does |
+|---|---|
+| `POST /mocks/<id>/freeze` | Hold every value where it is. The replay carries on underneath, but nothing is applied. |
+| `POST /mocks/<id>/set` with `{"address": ..., "value": ...}` | Change one address once: an OPC UA node id (the value as the node's type), an MQTT topic (the payload, or a bare value on an array topic) or a REST path (the body, held until `thaw`). |
+| `POST /mocks/<id>/drop?seconds=<n>` | Cut every client's connection and reset any new one for `n` seconds (default 30). The server stays up, so the client sees a network drop, not a restart. |
+| `POST /mocks/<id>/thaw` | Go back to the replay. |
+
+Pick an OPC UA connection, one of its devices and one numeric metric,
+with its node id, from `rig.json`. Then, in two terminals:
+
+1. Start a recording that watches the metric, from the checker's shell:
+
+   ```sh
+   rig check record --rig /rig/rig.json --seconds 240 --label reconnect --out /rig/reconnect.json --watch <rig node>/<device id>/<metric name>
+   ```
+
+2. In the other terminal, freeze the mock, wait for the metric to
+   settle, drop the clients for 60 seconds, change the value 10
+   seconds into the drop, and leave it still:
+
+   ```sh
+   M=localhost:9001/mocks/<opcua id>
+   curl -s -X POST $M/freeze; sleep 30
+   curl -s -X POST "$M/drop?seconds=60"; sleep 10
+   curl -s -X POST $M/set -d '{"address": "<node id>", "value": 4321}'
+   ```
+
+3. When the recording ends, thaw the mock:
+
+   ```sh
+   curl -s -X POST $M/thaw
+   ```
+
+The `--watch` lines list every value the metric was published with,
+with the seconds since the recording started. **Pass:** after the drop
+ends (about 40 s plus the driver's reconnect time), a DDATA or DBIRTH
+has `4321`. **Fail:** the metric stays at the frozen value to the end
+of the recording. A DDEATH during the drop, then a DBIRTH, is expected.
+
+`curl -s localhost:9001/status` shows `frozen` and, during a drop,
+`dropped_until`. The same requests work on MQTT (`localhost:9002`) and
+REST (`localhost:9003`) mocks. UDP mocks have no clients to drop.
+
 ### Protocol checks
 
 These are the checks each protocol's PR or card asks for at the cluster
@@ -753,6 +858,9 @@ test, collected on 2026-11-17.
 - a DateTime metric shows a date, where the built-in published 0;
 - an OPC UA mock stopped mid-run marks its devices offline, and they
   rebirth when it starts again;
+- a value changed during a short network drop, and still after it, is
+  reported after the driver reconnects (step 9, "A value that changes
+  while the connection is down");
 - DDATA rate after the move (ACS-45): the comparison warns above 1.5
   times the built-in rate and fails above 3 times or below half. The
   golden harness measured about 2 times (2.1 DDATA/s against 1.0 for

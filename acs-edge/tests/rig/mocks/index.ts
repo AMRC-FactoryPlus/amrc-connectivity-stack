@@ -40,3 +40,28 @@ export function make_mock (rig: Rig, c: RigConnection, opts: MockOpts = {}): Moc
     case "UDP":     return new UdpMock(c, fixture, { target: opts.udp_target });
     }
 }
+
+/* One of the reconnect controls on one mock. */
+export async function control (x: Mock, action: string, query: URLSearchParams, body: string) {
+    const name = `${x.conn.id} (${x.conn.name})`;
+    switch (action) {
+    case "freeze":
+    case "thaw":
+        if (!x.freeze) throw new Error(`${x.conn.protocol} mocks can't freeze`);
+        console.log("%s %s", action == "freeze" ? "Freezing" : "Thawing", name);
+        return x.freeze(action == "freeze");
+    case "set": {
+        if (!x.set) throw new Error(`${x.conn.protocol} mocks can't set a value`);
+        const { address, value } = JSON.parse(body || "{}");
+        if (address == undefined) throw new Error("set needs an address");
+        console.log("Setting %s on %s to %o", address, name, value);
+        return x.set(address, value);
+    }
+    case "drop": {
+        if (!x.drop) throw new Error(`${x.conn.protocol} mocks can't drop`);
+        const secs = Number(query.get("seconds") ?? 30);
+        console.log("Dropping %s's clients for %d s", name, secs);
+        return x.drop(secs * 1000);
+    }
+    }
+}

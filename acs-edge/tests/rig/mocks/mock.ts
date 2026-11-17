@@ -10,7 +10,15 @@
  * which replay a fixture once as fast as possible for a comparison,
  * mocks listen on fixed ports on every interface and can be stopped
  * and started to take a device offline.
+ *
+ * The OPC UA, MQTT and REST mocks can also be driven by hand, for the
+ * reconnect checks: `freeze` holds every value where it is, `set`
+ * changes one address once, and `drop` cuts the clients' connections
+ * for a while with the server left running, as a short network drop
+ * would.
  */
+
+import type net from "net";
 
 import type { Fixture, FixtureEvent } from "../../fixtures/drivers/fixture.js";
 import type { RigConnection } from "../rig.js";
@@ -29,6 +37,10 @@ export interface MockStatus {
     refused?:   number,
     /* Writes the connection made, newest last (at most 20). */
     writes?:    { at: string, address: string, value: string }[],
+    /* Values held by `freeze`. */
+    frozen?:    boolean,
+    /* While a `drop` lasts, when it ends. */
+    dropped_until?: string,
 }
 
 export interface Mock {
@@ -36,6 +48,49 @@ export interface Mock {
     start (): Promise<void>,
     stop (): Promise<void>,
     status (): MockStatus,
+    /* Hold every value where it is (true) or go back to the replay. */
+    freeze? (on: boolean): void,
+    /* Change one address once: an OPC UA node id, an MQTT topic or a
+     * REST path. The value is the node's value, or the payload or
+     * body as a string. */
+    set? (address: string, value: any): Promise<void>,
+    /* Cut every client's connection, and refuse new ones until `ms`
+     * has passed. The server keeps running. */
+    drop? (ms: number): void,
+}
+
+/* The client sockets of a server, and the drop window. A socket that
+ * connects during a drop is cut straight away, so a client sees its
+ * connection reset each time it retries until the drop ends. */
+export class Sockets {
+    all:    Set<net.Socket> = new Set()
+    until = 0
+
+    watch (srv: net.Server) {
+        srv.on("connection", sock => {
+            if (this.dropped) return sock.destroy();
+            this.all.add(sock);
+            sock.once("close", () => this.all.delete(sock));
+        });
+    }
+
+    get dropped () { return Date.now() < this.until; }
+
+    drop (ms: number) {
+        this.until = Date.now() + ms;
+        for (const s of this.all) s.destroy();
+    }
+
+    destroy () {
+        for (const s of this.all) s.destroy();
+    }
+
+    get size () { return this.all.size; }
+
+    status (): Pick<MockStatus, "dropped_until"> {
+        return this.dropped
+            ? { dropped_until: new Date(this.until).toISOString() } : {};
+    }
 }
 
 export const sleep = (ms: number) =>

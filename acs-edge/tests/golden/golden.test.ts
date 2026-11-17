@@ -183,7 +183,8 @@ describe("Golden-output harness", () => {
      * them, against the Edge Agent config entries service-setup left.
      * That test checks the move gives exactly moved.json, so this runs
      * what an upgrade writes, not a copy of the move. */
-    describe.each(DRIVER_PROTOCOL == "REST" ? REST_MOVE.cases : [])(
+    /* jest refuses an empty table, so only define these for REST. */
+    if (DRIVER_PROTOCOL == "REST") describe.each(REST_MOVE.cases)(
         "split driver after service-setup's move %s",
         (name, sample, before, after) => {
             const driver = DRIVER ?? rest_reference();

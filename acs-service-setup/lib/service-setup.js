@@ -82,12 +82,6 @@ export class ServiceSetup {
         this.log("Migrating managed edge agent config");
         await migrate_edge_agent_config(this);
 
-        this.log("Moving connections between internal and split drivers");
-        await migrate_split_drivers(this);
-
-        this.log("Checking for connections on removed drivers");
-        await check_retired_drivers(this);
-
         this.log("Migrating legacy Auth groups");
         await migrate_auth_groups(this);
 
@@ -106,5 +100,23 @@ export class ServiceSetup {
         }
 
         this.log("Finished setup");
+    }
+
+    /* The split-driver move, run as its own step (SS_STEP=split-drivers)
+     * in an init container after edge-helm-charts. It rewrites Edge
+     * Agent connections for this release's split driver images, so it
+     * must only run once this release's edge charts are published: init
+     * containers run in order, each only after the last succeeded. */
+    async run_split_drivers () {
+        const { fplus } = this;
+        await this.wait_for(fplus.ConfigDB, "2.0.0");
+
+        this.log("Moving connections from built-in to split drivers");
+        await migrate_split_drivers(this);
+
+        this.log("Checking for connections on removed drivers");
+        await check_retired_drivers(this);
+
+        this.log("Finished the split-driver move");
     }
 }

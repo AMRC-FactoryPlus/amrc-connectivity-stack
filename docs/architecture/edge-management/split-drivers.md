@@ -138,6 +138,13 @@ expect an Edge Agent with these connections to restart once or twice in
 the minutes after the upgrade, and their devices to have no data for
 that time.
 
+The move runs in the service-setup Job's `split-drivers` init
+container, after the `edge-helm-charts` container has published this
+release's edge charts. An init container runs only once the one before
+it has succeeded, so connections are never moved for charts that
+weren't published. Every service-setup log line this page mentions
+about the move is in that container's log.
+
 Service-setup runs the move on every install and upgrade, so a site
 that upgrades from any version 6 release, however late, is moved. A
 second run finds nothing to change, and a run that stopped half way
@@ -421,8 +428,8 @@ You may notice these differences:
 
 ## Checking it worked
 
-1. In the service-setup Job's log, find the line that starts
-   `Split drivers:`. It gives how many connections moved, how many were
+1. In the log of the service-setup Job's `split-drivers` container,
+   find the line that starts `Split drivers:`. It gives how many connections moved, how many were
    held back by a pinned image or by an Edge Agent with no Deployment,
    how many moved without a sidecar because of a port clash, and how
    many failed. The lines above it name each

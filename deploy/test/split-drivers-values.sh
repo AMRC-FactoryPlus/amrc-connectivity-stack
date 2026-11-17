@@ -57,4 +57,17 @@ expect "false from a values file" "$site" '\"MQTT\":false'
 expect "hold from --set" \
     "$(render --set serviceSetup.config.splitDrivers.REST=hold)" '\"REST\":\"hold\"'
 
+# The move runs in its own init container, after edge-helm-charts, and
+# must get the same config.
+order=$(helm template acs "$tmp/chart" -n factory-plus -f "$tmp/site.yaml" \
+    --show-only templates/service-setup.yaml \
+    | sed -n 's/^        - name: \([a-z-]*\)$/\1/p' | tr '\n' ' ')
+expect "split-drivers runs after edge-helm-charts" "$order" \
+    'service-setup edge-helm-charts split-drivers'
+step=$(helm template acs "$tmp/chart" -n factory-plus -f "$tmp/site.yaml" \
+    --show-only templates/service-setup.yaml \
+    | sed -n '/^        - name: split-drivers$/,/^        - name: /p')
+expect "split-drivers has its step" "$step" 'value: split-drivers'
+expect "split-drivers gets the site's hold" "$step" '\"REST\":\"hold\"'
+
 exit $failed

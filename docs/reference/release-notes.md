@@ -55,13 +55,18 @@ Manager offers one driver per protocol for new connections: "REST",
 3. **Find Edge Agents that pin their own image** (`image.default` or
    `image.edgeAgent` with a `tag` or `registry` in the Edge Agent's
    Deployment). They keep that image and their built-in connections,
-   which keep working, but they are not upgraded until you remove the
-   setting.
+   which keep working, but they are not upgraded. You can switch such an
+   agent over later, in one step: make any changes you planned for it,
+   remove the pin from its Deployment, and run the upgrade again (or
+   re-run the `service-setup` Job). That run moves its connections, and
+   the agent restarts on this release's image with its sidecars.
 4. **Find Edge Agents with no Edge Agent Deployment config.** ACS
    didn't deploy them, so they keep the image they were given, and the
    upgrade leaves their connections on the built-in drivers: on a
    version 6 image those keep working, on a version 7 image they get no
-   data. Compare the objects of the ConfigDB's Edge Agent config app
+   data. No site should rely on this: check for such agents, and either
+   give each a Deployment config or remove it before you upgrade.
+   Compare the objects of the ConfigDB's Edge Agent config app
    (`aac6f843-cfee-4683-b121-6943bfdf9173`) with those of its Edge Agent
    Deployment app (`f2b9417a-ef7f-421f-b387-bb8183a48cdb`): an agent in
    the first and not the second with a REST, MQTT, OPC UA or UDP

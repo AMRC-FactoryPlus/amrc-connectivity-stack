@@ -43,14 +43,18 @@ you can't afford to lose data from.
    `image.edgeAgent.registry` keeps running that image after the
    upgrade. Its connections are not moved and keep working on the old
    Edge Agent, which still has the built-in connections. That is safe,
-   but the agent isn't upgraded. Remove the setting when you want it
-   upgraded, and the next upgrade moves its connections.
+   but the agent isn't upgraded. To switch it over later, remove the
+   setting and run the upgrade again (or re-run the service-setup Job):
+   that run moves its connections, and the agent restarts on this
+   release's image with its sidecars.
 4. **Find Edge Agents with no Edge Agent Deployment config.** ACS
    deploys an Edge Agent from its Deployment config. One without it was
    deployed some other way, and keeps whatever image it was given, so
    service-setup leaves its connections on the built-in drivers. On a
    version 6 image they keep working. If that agent is ever given a
-   version 7 image, they get no data. To find them, list the objects of
+   version 7 image, they get no data. Don't rely on this: give each such
+   agent a Deployment config, or remove it if it is no longer used,
+   before you upgrade. To find them, list the objects of
    the Edge Agent config app (`aac6f843-cfee-4683-b121-6943bfdf9173`)
    and of the Edge Agent Deployment app
    (`f2b9417a-ef7f-421f-b387-bb8183a48cdb`) in the ConfigDB, for

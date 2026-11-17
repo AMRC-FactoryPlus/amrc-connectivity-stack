@@ -244,7 +244,7 @@ export interface nestedMetricIndex {
  * process.hrtime.bigint() is monotonic so timestamps never go backwards. */
 const HRTIME_OFFSET = BigInt(Date.now()) * 1_000_000n - process.hrtime.bigint();
 
-function now_ns(): bigint {
+export function now_ns(): bigint {
     return process.hrtime.bigint() + HRTIME_OFFSET;
 }
 

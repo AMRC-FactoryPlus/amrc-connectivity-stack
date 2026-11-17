@@ -26,7 +26,8 @@
     "start": "node --es-module-specifier-resolution=node app.js",
     "local": "node --es-module-specifier-resolution=node build/app.js",
     "test": "npx jest --coverage",
-    "bench": "node bench/build.mjs && node --expose-gc bench/run.mjs"
+    "bench": "node bench/build.mjs && node --expose-gc bench/run.mjs",
+    "bench:rate": "node bench/build.mjs && node bench/rate.mjs"
   },
   "type": "module",
   "dependencies": {

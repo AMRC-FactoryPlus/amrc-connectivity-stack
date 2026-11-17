@@ -16,7 +16,7 @@ import { ServiceClient } from "@amrc-factoryplus/utilities";
 
 import { reHashConf } from "../utils/FormatConfig.js";
 
-import { Device, DeviceConnection, deviceOptions } from "./device.js";
+import { DataGroup, Device, DeviceConnection, deviceOptions } from "./device.js";
 import { DriverBroker } from "./driverBroker.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
@@ -453,10 +453,12 @@ export class Translator extends EventEmitter {
             // Only the devices that own one of the addresses in the message
             // can use it, so call just those, in config order, with the
             // whole message. Splitting the message per address would change
-            // what _handleData sees (it checks the number of keys).
+            // what _handleData sees (it checks the number of keys). A split
+            // driver's connection gathers messages that arrive together and
+            // passes a DataGroup, which _handleData reads per address.
             let routes: Map<string, number[]> = new Map();
             let routeGen = -1;
-            newConn.on('data', (obj: { [index: string]: any }, parseVals = true) => {
+            newConn.on('data', (obj: { [index: string]: any }, parseVals = true, group?: DataGroup) => {
                 //log(util.format("Received data for %s: (%s) %O",
                 //    connection.name, parseVals, obj));
                 const confs: deviceOptions[] = connection.devices ?? [];
@@ -479,7 +481,7 @@ export class Translator extends EventEmitter {
                 if (union) owners = [...union].sort((a, b) => a - b);
                 if (!owners) return;
                 for (const i of owners)
-                    this.devices[confs[i].deviceId]?._handleData(obj, parseVals);
+                    this.devices[confs[i].deviceId]?._handleData(obj, parseVals, group);
             })
 
             // What to do when device connection dies. Every device is told,

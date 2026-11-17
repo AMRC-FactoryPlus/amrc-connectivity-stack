@@ -41,6 +41,23 @@ export interface deviceOptions {
 
 type Timer = ReturnType<typeof setTimeout> | null | undefined;
 
+/* When a connection's message for an address arrived: Date.now() and
+ * the agent's nanosecond clock, read together. */
+export interface Received {
+    ms: number,
+    ns: bigint,
+}
+
+/* A connection that gathers several messages, each carrying one
+ * address, into one data event passes this with it. Each address is
+ * then read as if it had come alone, as it did: a metric with no path
+ * reads the whole payload, which it only does for a message with one
+ * address. A metric whose payload has no timestamp is stamped with
+ * when its message arrived, not when the group is handled. */
+export interface DataGroup {
+    received: { [addr: string]: Received },
+}
+
 /**
  * DeviceConnection is a superclass which is to be extended to provide  metric access
  * to a specific type of device connection. All methods are empty templates and should be overloaded
@@ -337,9 +354,14 @@ export class Device {
 
     }
 
-    _handleData(obj: { [p: string]: any }, parseVals: boolean) {
+    _handleData(obj: { [p: string]: any }, parseVals: boolean, group?: DataGroup) {
         // Array to keep track of values that changed
         let changedMetrics: sparkplugMetric[] = [];
+        // A metric with no path reads the whole payload, which only makes
+        // sense for a message carrying one address. A group is many such
+        // messages, so each of its addresses counts as one. Counted once
+        // here, not per metric: a group can hold thousands of addresses.
+        const alone = group !== undefined || Object.keys(obj).length == 1;
         // Iterate through each key in obj
         for (let addr in obj) {
             // Get all payload paths registered for this address
@@ -364,8 +386,7 @@ export class Device {
                     /^GET/g) > -1) {
                     // If the value is not to be parsed, or if so a path to the value is provided or there is only one
                     // value
-                    if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
-                        obj).length == 1))) {
+                    if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || alone))) {
                         // Handle JSON (Batched) format explicitly
                         if (parseVals && format === serialisationType.JSONBatched) {
                             // The payload as JSON, parsed once per message
@@ -397,7 +418,8 @@ export class Device {
                                     // timestampNs takes precedence for sub-ms precision, same as
                                     // the non-batched JSON path.
                                     const updatedMetric = {
-                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue, timestamp || Date.now(), timestampNs)
+                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue,
+                                            timestamp || group?.received[addr]?.ms || Date.now(), timestampNs)
                                     };
 
                                     // Add to the list of changed metrics
@@ -445,13 +467,19 @@ export class Device {
                                     format
                                 );
 
+                                // With no timestamp in the payload the metric is
+                                // stamped now, or, in a group, when its message
+                                // arrived, which is when it would have been
+                                // handled had it come alone.
+                                const at = timestamp ? undefined : group?.received[addr];
+
                                 // Update the metric value and push it to the array of changed metrics
                                 const updated = {
                                     ...(this._metrics.setValueByAddrPath(addr,
                                         path,
                                         newVal,
-                                        timestamp,
-                                        timestampNs))
+                                        timestamp || at?.ms,
+                                        timestampNs ?? at?.ns))
                                 };
                                 // Simulated-data markers ride each
                                 // payload and go out as metric

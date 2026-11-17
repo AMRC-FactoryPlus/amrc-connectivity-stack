@@ -303,3 +303,56 @@ async fn lost_reported_during_connect_is_not_ignored() {
     let later = statuses(&agent.drain(ms(500)).await);
     assert!(later.is_empty(), "status changed after UP: {later:?}");
 }
+
+/// Both orders at once: reports made before the next attempt starts
+/// (duplicates about the old connection) are ignored, and a report
+/// made during that attempt is acted on. So exactly one extra connect.
+#[tokio::test]
+async fn stale_reports_are_ignored_and_a_report_during_connect_is_not() {
+    let mut agent = FakeAgent::start("Conn").await;
+    let _driver = spawn_driver::<FakeHandler>(agent.config());
+    let ctl = Ctl::new();
+
+    agent.handshake(ctl.conf(), &[("1", "a")]).await;
+    agent.wait_status("UP", secs(5)).await;
+
+    // Attempt 2 loses its connection during connect; attempt 3 holds.
+    ctl.lose_on_connect.store(1, Ordering::SeqCst);
+    for _ in 0..3 {
+        ctl.handle().disconnected(ConnectError::ConnectionFailed);
+    }
+    agent.wait_status("UP", secs(5)).await;
+    tokio::time::sleep(ms(600)).await;
+    assert_eq!(Ctl::count(&ctl.connects), 3);
+    let later = statuses(&agent.drain(ms(300)).await);
+    assert!(later.is_empty(), "status changed after UP: {later:?}");
+}
+
+// ---------------------------------------------------------------------
+// Item 12: an address map that becomes empty is passed to subscribe.
+
+#[tokio::test]
+async fn subscribe_is_told_when_the_map_becomes_empty() {
+    let mut agent = FakeAgent::start("Conn").await;
+    let _driver = spawn_driver::<FakeHandler>(agent.config());
+    let ctl = Ctl::new();
+
+    // UP before any map: no subscribe call with nothing in it.
+    agent.wait_status("READY", secs(5)).await;
+    agent.send("conf", ctl.conf().to_string());
+    agent.wait_status("UP", secs(5)).await;
+    tokio::time::sleep(ms(200)).await;
+    assert!(ctl.subscribed.lock().unwrap().is_empty());
+
+    agent.send_addrs(&[("1", "a")]);
+    tokio::time::sleep(ms(200)).await;
+    agent.send_addrs(&[]);
+    tokio::time::sleep(ms(200)).await;
+    agent.send_addrs(&[]);
+    tokio::time::sleep(ms(200)).await;
+    assert_eq!(
+        *ctl.subscribed.lock().unwrap(),
+        vec![vec!["a".to_owned()], vec![]],
+        "one empty call after the map emptied, and only one"
+    );
+}

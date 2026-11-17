@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -46,6 +46,9 @@ pub struct DriverHandle<A> {
     /// The data waiting to go to the edge agent, shared by every
     /// handle the driver gives out.
     queue: Arc<PublishQueue>,
+    /// How many times the driver has called `Handler::connect`, so a
+    /// lost connection can be tied to the attempt it was reported in.
+    attempts: Arc<AtomicU64>,
 }
 
 /// How much data is waiting to go to the edge agent: published by a
@@ -144,11 +147,17 @@ pub(crate) enum DriverEvent<A> {
         payload: Bytes,
         queued: Queued,
     },
-    /// Handler has lost its southbound connection.
-    Lost { generation: u64, status: Status },
-    /// A call to `Handler::connect` has finished.
+    /// Handler has lost its southbound connection, as reported during
+    /// connect attempt `attempt` or after it.
+    Lost {
+        generation: u64,
+        attempt: u64,
+        status: Status,
+    },
+    /// Connect attempt `attempt` has finished.
     Connected {
         generation: u64,
+        attempt: u64,
         result: Result<(), ConnectError>,
         poller: Option<Arc<dyn Poller<A>>>,
     },
@@ -175,11 +184,13 @@ impl<A> DriverHandle<A> {
         tx: mpsc::UnboundedSender<DriverEvent<A>>,
         generation: u64,
         queue: Arc<PublishQueue>,
+        attempts: Arc<AtomicU64>,
     ) -> Self {
         Self {
             tx,
             generation,
             queue,
+            attempts,
         }
     }
 
@@ -261,12 +272,24 @@ impl<A> DriverHandle<A> {
     /// according to `reason` (use [`error`](DriverHandle::error) for
     /// `ERR`), stops publishing data, and calls
     /// `connect` again after the configured reconnect delay, retrying
-    /// until it succeeds. Further reports while that is in progress
-    /// are ignored.
+    /// until it succeeds.
+    ///
+    /// Each report belongs to the latest call to `connect` made before
+    /// it. A report from an earlier attempt is ignored, so repeated or
+    /// late reports about a connection the driver has already replaced
+    /// don't cause another reconnect. A report made while `connect` is
+    /// still running, for example by a device that drops the
+    /// connection straight after accepting it, is acted on when
+    /// `connect` returns, instead of the driver reporting `UP`.
     pub fn disconnected(&self, reason: ConnectError) {
+        self.lost(status_for(reason));
+    }
+
+    fn lost(&self, status: Status) {
         let _ = self.tx.send(DriverEvent::Lost {
             generation: self.generation,
-            status: status_for(reason),
+            attempt: self.attempts.load(Ordering::SeqCst),
+            status,
         });
     }
 
@@ -275,10 +298,7 @@ impl<A> DriverHandle<A> {
     /// such as a protocol error. The driver reports status `ERR` and
     /// reconnects.
     pub fn error(&self) {
-        let _ = self.tx.send(DriverEvent::Lost {
-            generation: self.generation,
-            status: Status::Err,
-        });
+        self.lost(Status::Err);
     }
 }
 
@@ -418,12 +438,16 @@ pub struct Driver<H: Handler> {
     /// The handler rejected the latest address map, so the status is
     /// `ADDR`, not `UP`, until a good one arrives.
     addr_rejected: bool,
-    /// Set by the connect task once it has called `Handler::connect`,
-    /// so a lost connection reported after that is about this attempt.
-    connect_started: Option<Arc<AtomicBool>>,
-    /// A lost connection reported while `connect` was running, to act
-    /// on when it returns.
+    /// Connect attempts started, shared with the handles.
+    attempts: Arc<AtomicU64>,
+    /// The attempt whose result the driver loop has taken in last.
+    done_attempt: u64,
+    /// A lost connection reported during the connect attempt now
+    /// running, to act on when it returns.
     lost_while_connecting: Option<Status>,
+    /// Whether the handler's last `subscribe` had addresses, so it is
+    /// told when the map becomes empty.
+    subscribed: bool,
 }
 
 impl<H: Handler + 'static> Driver<H> {
@@ -459,8 +483,10 @@ impl<H: Handler + 'static> Driver<H> {
             tx,
             rx: Some(rx),
             addr_rejected: false,
-            connect_started: None,
+            attempts: Arc::new(AtomicU64::new(0)),
+            done_attempt: 0,
             lost_while_connecting: None,
+            subscribed: false,
         }
     }
 
@@ -965,7 +991,12 @@ impl<H: Handler + 'static> Driver<H> {
         self.close_handler();
         self.generation += 1;
 
-        let handle = DriverHandle::new(self.tx.clone(), self.generation, self.queue.clone());
+        let handle = DriverHandle::new(
+            self.tx.clone(),
+            self.generation,
+            self.queue.clone(),
+            self.attempts.clone(),
+        );
         match H::create(handle, conf) {
             Ok(handler) => {
                 let handler = Arc::new(Mutex::new(handler));
@@ -1000,8 +1031,7 @@ impl<H: Handler + 'static> Driver<H> {
         let generation = self.generation;
         let tx = self.tx.clone();
         let closing = self.closing.take();
-        let started = Arc::new(AtomicBool::new(false));
-        self.connect_started = Some(started.clone());
+        let attempts = self.attempts.clone();
         self.lost_while_connecting = None;
 
         self.connecting = Some(tokio::spawn(async move {
@@ -1013,13 +1043,14 @@ impl<H: Handler + 'static> Driver<H> {
             tokio::time::sleep(delay).await;
 
             let mut h = handler.lock().await;
-            started.store(true, Ordering::SeqCst);
+            let attempt = attempts.fetch_add(1, Ordering::SeqCst) + 1;
             let result = h.connect().await;
             let poller = if result.is_ok() { h.poller() } else { None };
             drop(h);
 
             let _ = tx.send(DriverEvent::Connected {
                 generation,
+                attempt,
                 result,
                 poller,
             });
@@ -1304,11 +1335,17 @@ impl<H: Handler + 'static> Driver<H> {
         ));
     }
 
-    /// Queue handler.subscribe() if we're UP and have addresses.
-    fn try_subscribe(&self) {
-        if self.status != Status::Up || self.addrs.is_empty() {
+    /// Queue handler.subscribe() if we're UP. With no addresses it is
+    /// called only if the handler last subscribed to some, so it can
+    /// drop those subscriptions.
+    fn try_subscribe(&mut self) {
+        if self.status != Status::Up {
             return;
         }
+        if self.addrs.is_empty() && !self.subscribed {
+            return;
+        }
+        self.subscribed = !self.addrs.is_empty();
         let specs: Vec<H::Addr> = self.addrs.values().cloned().collect();
         let groups = self
             .groups
@@ -1354,24 +1391,27 @@ impl<H: Handler + 'static> Driver<H> {
                     Some(generation),
                 ));
             }
-            DriverEvent::Lost { generation, status } => {
+            DriverEvent::Lost {
+                generation,
+                attempt,
+                status,
+            } => {
                 if generation != self.generation || self.handler.is_none() {
                     return;
                 }
                 if self.connecting.is_some() {
-                    // A loss reported once connect has been called is
-                    // about this attempt (a device that drops the
-                    // connection straight after accepting it), so act
-                    // on it when connect returns. One reported before
-                    // is about the old connection, which this attempt
-                    // replaces.
-                    let started = self
-                        .connect_started
-                        .as_ref()
-                        .is_some_and(|s| s.load(Ordering::SeqCst));
-                    if started {
+                    // Reported during the attempt now running (a device
+                    // that drops the connection straight after
+                    // accepting it): act on it when connect returns.
+                    // Reported before that attempt began: about the
+                    // connection it replaces, so ignore it.
+                    if attempt > self.done_attempt {
                         self.lost_while_connecting = Some(status);
                     }
+                    return;
+                }
+                if attempt < self.done_attempt {
+                    // About a connection an earlier attempt replaced.
                     return;
                 }
                 tracing::warn!(%status, "handler lost its connection, reconnecting");
@@ -1381,6 +1421,7 @@ impl<H: Handler + 'static> Driver<H> {
             }
             DriverEvent::Connected {
                 generation,
+                attempt,
                 result,
                 poller,
             } => {
@@ -1388,7 +1429,7 @@ impl<H: Handler + 'static> Driver<H> {
                     return;
                 }
                 self.connecting = None;
-                self.connect_started = None;
+                self.done_attempt = attempt;
                 let lost = self.lost_while_connecting.take();
                 match result {
                     Ok(()) if lost.is_some() => {
@@ -1461,8 +1502,8 @@ impl<H: Handler + 'static> Driver<H> {
         // a Connected from a connect that finished just before the
         // abort, must not count for whatever comes next.
         self.generation += 1;
-        self.connect_started = None;
         self.lost_while_connecting = None;
+        self.subscribed = false;
         self.addr_rejected = false;
         self.connected = false;
         self.poller = None;

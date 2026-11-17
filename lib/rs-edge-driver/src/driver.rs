@@ -1,28 +1,31 @@
-use std::collections::HashMap;
-use std::marker::PhantomData;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use bytes::Bytes;
-use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
+use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, Publish, QoS, SubscribeFilter};
 use serde::Deserialize;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{Mutex, Semaphore, mpsc};
+use tokio::task::{JoinHandle, JoinSet};
 
 use crate::config::DriverConfig;
 use crate::error::{ConnectError, Error};
-use crate::handler::Handler;
+use crate::handler::{Handler, Poller};
 use crate::redact::redact;
 use crate::status::Status;
 
 /// Maximum number of poll batches that can queue before we start
 /// dropping requests (backpressure). Matches the JS/Python versions.
+/// In parallel mode it is also the most batches that run at once.
 const POLL_QUEUE_MAX: usize = 20;
 
-/// Timeout for a single poll operation.
-const POLL_TIMEOUT: Duration = Duration::from_secs(30);
+/// Most messages held back while an address map is being parsed.
+const DEFER_MAX: usize = 1000;
 
 /// A handle given to [`Handler`] implementations so they can push
-/// data back to the driver asynchronously.
+/// data back to the driver asynchronously, and report a lost
+/// southbound connection.
 ///
 /// This is the primary mechanism for async/event-driven handlers:
 /// store the handle in your handler struct, then call
@@ -31,17 +34,43 @@ const POLL_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Clone)]
 pub struct DriverHandle<A> {
     tx: mpsc::UnboundedSender<DriverEvent<A>>,
+    /// Which handler this handle belongs to. Reports from a handler
+    /// that has since been replaced are ignored.
+    generation: u64,
 }
 
-/// Internal events sent from the handler back to the driver loop.
+/// Events sent to the driver loop, by handlers and by the driver's own
+/// background tasks.
 pub(crate) enum DriverEvent<A> {
     /// Handler is publishing data for an address.
-    Data { addr: A, payload: Bytes },
+    Data {
+        generation: u64,
+        addr: A,
+        payload: Bytes,
+    },
+    /// Handler has lost its southbound connection.
+    Lost {
+        generation: u64,
+        reason: ConnectError,
+    },
+    /// A call to `Handler::connect` has finished.
+    Connected {
+        generation: u64,
+        result: Result<(), ConnectError>,
+        poller: Option<Arc<dyn Poller<A>>>,
+    },
+    /// An address map has been parsed. `None` if the handler rejected
+    /// an address.
+    Parsed {
+        generation: u64,
+        seq: u64,
+        addrs: Option<Vec<(String, A)>>,
+    },
 }
 
 impl<A> DriverHandle<A> {
-    pub(crate) fn new(tx: mpsc::UnboundedSender<DriverEvent<A>>) -> Self {
-        Self { tx }
+    pub(crate) fn new(tx: mpsc::UnboundedSender<DriverEvent<A>>, generation: u64) -> Self {
+        Self { tx, generation }
     }
 
     /// Publish data for an address back to the edge agent.
@@ -52,11 +81,28 @@ impl<A> DriverHandle<A> {
     /// from — the driver resolves it to the data topic name the edge
     /// agent assigned. Data for an address the edge agent isn't
     /// currently interested in (e.g. after reconfiguration) is
-    /// silently dropped.
+    /// silently dropped, and so is data sent while the driver's
+    /// status isn't `UP`.
     pub fn publish(&self, addr: A, data: Bytes) {
         let _ = self.tx.send(DriverEvent::Data {
+            generation: self.generation,
             addr,
             payload: data,
+        });
+    }
+
+    /// Tell the driver the southbound connection has gone, after
+    /// [`connect`](crate::Handler::connect) had succeeded.
+    ///
+    /// The driver reports status `CONN`, `AUTH` or `ERR` to the edge
+    /// agent according to `reason`, stops publishing data, and calls
+    /// `connect` again after the configured reconnect delay, retrying
+    /// until it succeeds. Further reports while that is in progress
+    /// are ignored.
+    pub fn disconnected(&self, reason: ConnectError) {
+        let _ = self.tx.send(DriverEvent::Lost {
+            generation: self.generation,
+            reason,
         });
     }
 }
@@ -68,11 +114,45 @@ struct AddrConfig {
     addrs: HashMap<String, String>,
 }
 
+/// Work done on a handler, one at a time and in order, by its own
+/// task.
+enum Op<A> {
+    Parse {
+        seq: u64,
+        raw: HashMap<String, String>,
+    },
+    Subscribe(Vec<A>),
+    Cmd(String, Bytes),
+}
+
+/// One `poll` message's worth of addresses.
+struct PollJob<H: Handler> {
+    generation: u64,
+    handler: Arc<Mutex<H>>,
+    poller: Option<Arc<dyn Poller<H::Addr>>>,
+    polls: Vec<(String, H::Addr)>,
+}
+
+/// A handler's op queue and the task working through it.
+type OpQueue<A> = (mpsc::UnboundedSender<Op<A>>, JoinHandle<()>);
+
+/// What the driver loop uses to talk to the MQTT session.
+struct Session<H: Handler> {
+    /// Messages for the publisher task, which sends them in order.
+    outbound: mpsc::UnboundedSender<(String, QoS, Bytes)>,
+    poll_tx: mpsc::Sender<PollJob<H>>,
+}
+
 /// The driver runtime. Manages the MQTT connection to the edge agent,
 /// handler lifecycle, and data flow.
 ///
 /// Generic over the [`Handler`] implementation, which defines the
 /// device-specific protocol logic.
+///
+/// The MQTT loop never waits for the handler: `connect`, the retries
+/// after a failed connect, address parsing, `subscribe`, `cmd`, `poll`
+/// and `close` all run on other tasks, so pings keep flowing to the
+/// edge agent however long the device takes.
 ///
 /// # Usage
 ///
@@ -90,23 +170,57 @@ pub struct Driver<H: Handler> {
     config: DriverConfig,
     status: Status,
     handler: Option<Arc<Mutex<H>>>,
+    /// Counts handlers created, so events from an old one are ignored.
+    generation: u64,
+    /// The generation whose data may be published now, or 0 if none
+    /// (the status isn't `UP`). Shared with the poll tasks.
+    live: Arc<AtomicU64>,
+    /// Whether the current handler's `connect` has succeeded and it
+    /// hasn't reported a lost connection since.
+    connected: bool,
+    poller: Option<Arc<dyn Poller<H::Addr>>>,
+    /// The current handler's op queue and the task working through it.
+    ops: Option<OpQueue<H::Addr>>,
+    /// A `connect` (or the wait before one) in progress.
+    connecting: Option<JoinHandle<()>>,
+    /// Closing of replaced handlers, which a new handler's first
+    /// `connect` waits for.
+    closing: Option<JoinHandle<()>>,
     /// topic → parsed address
     addrs: HashMap<String, H::Addr>,
     /// parsed address → topic (reverse lookup for async publishing)
     topics: HashMap<H::Addr, String>,
-    _marker: PhantomData<H>,
+    addr_seq: u64,
+    /// The address map being parsed, if any. Messages that depend on
+    /// it wait in `deferred` until it is done.
+    parsing: Option<u64>,
+    deferred: VecDeque<Publish>,
+    tx: mpsc::UnboundedSender<DriverEvent<H::Addr>>,
+    rx: Option<mpsc::UnboundedReceiver<DriverEvent<H::Addr>>>,
 }
 
 impl<H: Handler + 'static> Driver<H> {
     /// Create a new driver with the given configuration.
     pub fn new(config: DriverConfig) -> Self {
+        let (tx, rx) = mpsc::unbounded_channel();
         Self {
             config,
             status: Status::Down,
             handler: None,
+            generation: 0,
+            live: Arc::new(AtomicU64::new(0)),
+            connected: false,
+            poller: None,
+            ops: None,
+            connecting: None,
+            closing: None,
             addrs: HashMap::new(),
             topics: HashMap::new(),
-            _marker: PhantomData,
+            addr_seq: 0,
+            parsing: None,
+            deferred: VecDeque::new(),
+            tx,
+            rx: Some(rx),
         }
     }
 
@@ -129,13 +243,18 @@ impl<H: Handler + 'static> Driver<H> {
     ///
     /// # Lifecycle
     ///
-    /// 1. Connect to MQTT broker, publish status `READY`
+    /// 1. Connect to MQTT broker, subscribe, publish status `READY`
     /// 2. Receive device config → call `Handler::create`
-    /// 3. Call `Handler::connect` → status `UP` on success
+    /// 3. Call `Handler::connect` → status `UP` on success; on failure
+    ///    status `CONN`, `AUTH` or `ERR` and retry after the reconnect
+    ///    delay
     /// 4. Receive address mappings → call `Handler::parse_addr`
-    /// 5. **Polled**: respond to poll requests via `Handler::poll`
+    /// 5. **Polled**: respond to poll requests via `Handler::poll` (or
+    ///    the handler's [`Poller`])
     ///    **Async**: call `Handler::subscribe`, receive data via `DriverHandle::publish`
     /// 6. On reconfiguration: call `Handler::close`, restart from step 2
+    /// 7. On `active OFFLINE`: call `Handler::close` and wait for a new
+    ///    config
     pub async fn run(&mut self) -> Result<(), Error> {
         tracing::info!(
             mqtt = %self.config.mqtt_url,
@@ -143,30 +262,25 @@ impl<H: Handler + 'static> Driver<H> {
             "driver starting"
         );
 
-        let (tx, mut rx) = mpsc::unbounded_channel::<DriverEvent<H::Addr>>();
-        self.run_loop(&tx, &mut rx).await
-    }
+        let mut rx = self
+            .rx
+            .take()
+            .ok_or_else(|| Error::Other("Driver::run is already running".into()))?;
 
-    async fn run_loop(
-        &mut self,
-        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
-        rx: &mut mpsc::UnboundedReceiver<DriverEvent<H::Addr>>,
-    ) -> Result<(), Error> {
         loop {
             tracing::info!("connecting to MQTT broker");
-            let result = self.mqtt_session(tx, rx).await;
-            match result {
-                Ok(()) => {
-                    tracing::info!("MQTT session ended cleanly");
-                }
-                Err(e) => {
-                    tracing::error!(%e, "MQTT session error");
-                }
+            match self.mqtt_session(&mut rx).await {
+                Ok(()) => tracing::info!("MQTT session ended cleanly"),
+                Err(e) => tracing::error!(%e, "MQTT session error"),
             }
 
-            // Clean up handler on disconnect
-            self.close_handler().await;
+            // Clean up the handler before connecting again.
+            self.close_handler();
+            if let Some(closing) = self.closing.take() {
+                let _ = closing.await;
+            }
             self.status = Status::Down;
+            self.live.store(0, Ordering::SeqCst);
 
             tracing::info!(
                 delay = ?self.config.reconnect_delay,
@@ -179,47 +293,50 @@ impl<H: Handler + 'static> Driver<H> {
     /// Run a single MQTT session. Returns when the connection is lost.
     async fn mqtt_session(
         &mut self,
-        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
         rx: &mut mpsc::UnboundedReceiver<DriverEvent<H::Addr>>,
     ) -> Result<(), Error> {
         let (client, mut eventloop) = self.connect_mqtt()?;
 
-        // Subscribe to our control topics
-        let subs = ["active", "conf", "addr", "poll", "cmd/#"];
-        for sub in &subs {
-            client
-                .subscribe(self.topic(sub), QoS::AtMostOnce)
-                .await
-                .map_err(|e| Error::Mqtt(e.to_string()))?;
-        }
+        // Subscribe to our control topics. READY goes out when the
+        // SUBACK comes back, as the spec asks.
+        let subs = ["active", "conf", "addr", "poll", "cmd/#"]
+            .iter()
+            .map(|s| SubscribeFilter::new(self.topic(s), QoS::AtMostOnce))
+            .collect::<Vec<_>>();
+        client
+            .subscribe_many(subs)
+            .await
+            .map_err(|e| Error::Mqtt(e.to_string()))?;
 
-        self.set_status(Status::Ready, &client).await;
+        let (out_tx, out_rx) = mpsc::unbounded_channel();
+        let publisher = tokio::spawn(Self::publisher(client.clone(), out_rx));
 
-        // Create the bounded poll channel for this session
-        let (poll_tx, poll_rx) = mpsc::channel::<Vec<(String, H::Addr)>>(POLL_QUEUE_MAX);
-
-        // Shared handler reference for the poll worker. Updated by
-        // on_conf when a new handler is created.
-        let poll_handler: Arc<Mutex<Option<Arc<Mutex<H>>>>> = Arc::new(Mutex::new(None));
-
-        // Spawn the poll worker task
+        let (poll_tx, poll_rx) = mpsc::channel::<PollJob<H>>(POLL_QUEUE_MAX);
         let poll_worker = tokio::spawn(Self::poll_worker(
             poll_rx,
-            poll_handler.clone(),
             client.clone(),
             self.config.username.clone(),
             self.config.serial_poll,
+            self.config.poll_timeout,
+            self.live.clone(),
         ));
 
-        // Main event loop: select between MQTT events and handler data
+        let session = Session {
+            outbound: out_tx,
+            poll_tx,
+        };
+
+        // Main event loop. Nothing in it waits for the handler, so the
+        // MQTT event loop is always polled and pings go out on time.
         let result: Result<(), Error> = loop {
             tokio::select! {
                 event = eventloop.poll() => {
                     match event {
-                        Ok(Event::Incoming(incoming)) => {
-                            self.handle_incoming(
-                                &client, tx, &poll_tx, &poll_handler, incoming,
-                            ).await?;
+                        Ok(Event::Incoming(Incoming::SubAck(_))) => {
+                            self.set_status(&session, Status::Ready);
+                        }
+                        Ok(Event::Incoming(Incoming::Publish(publish))) => {
+                            self.on_publish(&session, publish);
                         }
                         Ok(_) => {}
                         Err(e) => {
@@ -228,108 +345,126 @@ impl<H: Handler + 'static> Driver<H> {
                     }
                 }
                 Some(event) = rx.recv() => {
-                    self.handle_driver_event(&client, event).await;
+                    self.on_event(&session, event);
                 }
             }
         };
 
-        // Clean up the poll worker when the session ends
+        publisher.abort();
         poll_worker.abort();
         result
     }
 
-    /// Background task that processes poll requests from the channel.
+    /// Send messages from the driver loop to the broker, in order.
+    ///
+    /// `AsyncClient::publish` waits when rumqttc's request queue is
+    /// full, and only the driver loop empties that queue, so the loop
+    /// must never call it itself.
+    async fn publisher(client: AsyncClient, mut rx: mpsc::UnboundedReceiver<(String, QoS, Bytes)>) {
+        while let Some((topic, qos, payload)) = rx.recv().await {
+            if let Err(e) = client.publish(&topic, qos, false, payload).await {
+                tracing::error!(%e, %topic, "failed to publish");
+            }
+        }
+    }
+
+    /// Background task that runs poll requests from the channel.
+    ///
+    /// In parallel mode up to `POLL_QUEUE_MAX` batches run at once; in
+    /// serial mode one batch runs at a time.
     async fn poll_worker(
-        mut poll_rx: mpsc::Receiver<Vec<(String, H::Addr)>>,
-        handler_ref: Arc<Mutex<Option<Arc<Mutex<H>>>>>,
+        mut poll_rx: mpsc::Receiver<PollJob<H>>,
         client: AsyncClient,
         id: String,
         serial: bool,
+        timeout: Duration,
+        live: Arc<AtomicU64>,
     ) {
-        while let Some(polls) = poll_rx.recv().await {
-            let handler_arc = {
-                let guard = handler_ref.lock().await;
-                match guard.clone() {
-                    Some(h) => h,
-                    None => continue,
-                }
+        let slots = Arc::new(Semaphore::new(if serial { 1 } else { POLL_QUEUE_MAX }));
+        // Dropping the set when this task is aborted aborts the polls.
+        let mut running = JoinSet::new();
+
+        loop {
+            let Ok(permit) = slots.clone().acquire_owned().await else {
+                return;
             };
+            let Some(job) = poll_rx.recv().await else {
+                return;
+            };
+            while running.try_join_next().is_some() {}
 
-            if serial {
-                Self::poll_serial(&handler_arc, &client, &id, &polls).await;
-            } else {
-                Self::poll_parallel(&handler_arc, &client, &id, polls).await;
-            }
-        }
-    }
-
-    /// Poll addresses one at a time, holding the handler lock for each.
-    async fn poll_serial(
-        handler: &Arc<Mutex<H>>,
-        client: &AsyncClient,
-        id: &str,
-        polls: &[(String, H::Addr)],
-    ) {
-        for (topic, addr) in polls {
-            let result = tokio::time::timeout(POLL_TIMEOUT, async {
-                let mut h = handler.lock().await;
-                h.poll(addr).await
-            })
-            .await;
-
-            match result {
-                Ok(Some(data)) => {
-                    let mtopic = format!("fpEdge1/{id}/data/{topic}");
-                    if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await {
-                        tracing::error!(%e, %topic, "failed to publish poll data");
-                    }
-                }
-                Ok(None) => {}
-                Err(_) => {
-                    tracing::warn!(%topic, "poll timed out");
-                }
-            }
-        }
-    }
-
-    /// Poll all addresses concurrently, each in its own task.
-    async fn poll_parallel(
-        handler: &Arc<Mutex<H>>,
-        client: &AsyncClient,
-        id: &str,
-        polls: Vec<(String, H::Addr)>,
-    ) {
-        let mut tasks = Vec::with_capacity(polls.len());
-
-        for (topic, addr) in polls {
-            let handler = handler.clone();
             let client = client.clone();
-            let id = id.to_owned();
-
-            tasks.push(tokio::spawn(async move {
-                let result = tokio::time::timeout(POLL_TIMEOUT, async {
-                    let mut h = handler.lock().await;
-                    h.poll(&addr).await
-                })
-                .await;
-
-                match result {
-                    Ok(Some(data)) => {
-                        let mtopic = format!("fpEdge1/{id}/data/{topic}");
-                        if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await
-                        {
-                            tracing::error!(%e, %topic, "failed to publish poll data");
-                        }
-                    }
-                    Ok(None) => {}
-                    Err(_) => {
-                        tracing::warn!(%topic, "poll timed out");
-                    }
-                }
-            }));
+            let id = id.clone();
+            let live = live.clone();
+            running.spawn(async move {
+                Self::run_batch(job, &client, &id, serial, timeout, &live).await;
+                drop(permit);
+            });
         }
+    }
 
-        futures::future::join_all(tasks).await;
+    /// Poll every address in a batch and publish the results.
+    async fn run_batch(
+        job: PollJob<H>,
+        client: &AsyncClient,
+        id: &str,
+        serial: bool,
+        timeout: Duration,
+        live: &AtomicU64,
+    ) {
+        if serial {
+            for (topic, addr) in &job.polls {
+                let result = Self::poll_one(&job, addr, timeout).await;
+                Self::publish_poll(client, id, live, job.generation, topic, result).await;
+            }
+        } else {
+            futures::future::join_all(job.polls.iter().map(|(topic, addr)| async {
+                let result = Self::poll_one(&job, addr, timeout).await;
+                Self::publish_poll(client, id, live, job.generation, topic, result).await;
+            }))
+            .await;
+        }
+    }
+
+    /// Poll one address. The timeout starts once the poll has started,
+    /// so time spent waiting for the handler lock doesn't count.
+    async fn poll_one(
+        job: &PollJob<H>,
+        addr: &H::Addr,
+        timeout: Duration,
+    ) -> Result<Option<Bytes>, tokio::time::error::Elapsed> {
+        match &job.poller {
+            Some(poller) => tokio::time::timeout(timeout, poller.poll(addr)).await,
+            None => {
+                let mut handler = job.handler.lock().await;
+                tokio::time::timeout(timeout, handler.poll(addr)).await
+            }
+        }
+    }
+
+    async fn publish_poll(
+        client: &AsyncClient,
+        id: &str,
+        live: &AtomicU64,
+        generation: u64,
+        topic: &str,
+        result: Result<Option<Bytes>, tokio::time::error::Elapsed>,
+    ) {
+        match result {
+            Ok(Some(data)) => {
+                // The spec forbids data unless the status is UP, and a
+                // replaced handler's topics may now mean something else.
+                if live.load(Ordering::SeqCst) != generation {
+                    return;
+                }
+                let mtopic = format!("fpEdge1/{id}/data/{topic}");
+                if let Err(e) = client.publish(&mtopic, QoS::AtMostOnce, false, data).await {
+                    tracing::error!(%e, %topic, "failed to publish poll data");
+                }
+            }
+            Ok(None) => {}
+            Err(_) => tracing::warn!(%topic, "poll timed out"),
+        }
     }
 
     /// Create the MQTT client and set up connection options.
@@ -350,30 +485,15 @@ impl<H: Handler + 'static> Driver<H> {
             QoS::AtLeastOnce,
             false,
         ));
-        opts.set_keep_alive(std::time::Duration::from_secs(30));
+        opts.set_keep_alive(self.config.keep_alive);
+        opts.set_max_packet_size(self.config.max_packet_size, self.config.max_packet_size);
 
         let (client, eventloop) = AsyncClient::new(opts, 64);
         Ok((client, eventloop))
     }
 
     /// Handle an incoming MQTT message.
-    async fn handle_incoming(
-        &mut self,
-        client: &AsyncClient,
-        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
-        poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>,
-        poll_handler: &Arc<Mutex<Option<Arc<Mutex<H>>>>>,
-        incoming: Incoming,
-    ) -> Result<(), Error> {
-        let publish = match incoming {
-            Incoming::Publish(p) => p,
-            Incoming::ConnAck(_) => {
-                self.set_status(Status::Ready, client).await;
-                return Ok(());
-            }
-            _ => return Ok(()),
-        };
-
+    fn on_publish(&mut self, session: &Session<H>, publish: Publish) {
         let prefix = self.topic("");
         let suffix = publish
             .topic
@@ -382,53 +502,69 @@ impl<H: Handler + 'static> Driver<H> {
 
         // Split into message type and optional data
         let (msg, data) = match suffix.split_once('/') {
-            Some((m, d)) => (m, Some(d)),
-            None => (suffix, None),
+            Some((m, d)) => (m.to_owned(), Some(d.to_owned())),
+            None => (suffix.to_owned(), None),
         };
 
-        match msg {
-            "active" => self.on_active(client, &publish.payload).await,
-            "conf" => {
-                self.on_conf(client, tx, poll_handler, &publish.payload)
-                    .await;
-            }
-            "addr" => self.on_addr(client, &publish.payload).await,
-            "poll" => self.on_poll(poll_tx, &publish.payload),
+        match msg.as_str() {
+            "active" => self.on_active(session, &publish.payload),
+            "conf" => self.on_conf(session, &publish.payload),
+            // Everything else depends on the address map, so it waits
+            // for one being parsed.
+            _ if self.parsing.is_some() => self.defer(publish),
+            "addr" => self.on_addr(session, &publish.payload),
+            "poll" => self.on_poll(session, &publish.payload),
             "cmd" => {
                 if let Some(name) = data {
-                    self.on_cmd(name, Bytes::from(publish.payload.to_vec()))
-                        .await;
+                    self.on_cmd(name, publish.payload);
                 }
             }
             other => {
                 tracing::warn!(msg = other, "unhandled message type");
             }
         }
+    }
 
-        Ok(())
+    fn defer(&mut self, publish: Publish) {
+        if self.deferred.len() >= DEFER_MAX {
+            tracing::warn!(topic = %publish.topic, "too many messages waiting for addresses, dropping");
+            return;
+        }
+        self.deferred.push_back(publish);
     }
 
     /// Handle `active` message from the edge agent.
-    async fn on_active(&mut self, client: &AsyncClient, payload: &[u8]) {
-        if payload == b"ONLINE" {
-            tracing::info!("edge agent online");
-            self.set_status(Status::Ready, client).await;
+    fn on_active(&mut self, session: &Session<H>, payload: &[u8]) {
+        match payload {
+            b"ONLINE" => {
+                tracing::info!("edge agent online");
+                // READY makes the agent send conf and addr again.
+                self.set_status(session, Status::Ready);
+            }
+            b"OFFLINE" => {
+                // The spec says to discard the configuration, revert to
+                // READY and disconnect from the device. READY is not
+                // published: the agent has closed this connection, and
+                // READY would make it send the old conf again. It goes
+                // out when the agent sends ONLINE.
+                tracing::info!("edge agent offline, closing handler");
+                self.close_handler();
+                self.status = Status::Ready;
+                self.live.store(0, Ordering::SeqCst);
+            }
+            other => {
+                tracing::warn!(payload = ?String::from_utf8_lossy(other), "unknown active message");
+            }
         }
     }
 
     /// Handle `conf` message — create a new handler.
-    async fn on_conf(
-        &mut self,
-        client: &AsyncClient,
-        tx: &mpsc::UnboundedSender<DriverEvent<H::Addr>>,
-        poll_handler: &Arc<Mutex<Option<Arc<Mutex<H>>>>>,
-        payload: &[u8],
-    ) {
+    fn on_conf(&mut self, session: &Session<H>, payload: &[u8]) {
         let conf: serde_json::Value = match serde_json::from_slice(payload) {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(%e, "failed to parse conf JSON");
-                self.set_status(Status::Conf, client).await;
+                self.set_status(session, Status::Conf);
                 return;
             }
         };
@@ -436,109 +572,175 @@ impl<H: Handler + 'static> Driver<H> {
         // The config may contain secrets from the edge agent.
         tracing::debug!(conf = ?redact(&conf), "received device configuration");
 
-        self.close_handler().await;
-        // Clear the poll worker's handler reference
-        *poll_handler.lock().await = None;
+        self.close_handler();
+        self.generation += 1;
 
-        // Create new handler
-        let handle = DriverHandle::new(tx.clone());
+        let handle = DriverHandle::new(self.tx.clone(), self.generation);
         match H::create(handle, conf) {
             Ok(handler) => {
                 let handler = Arc::new(Mutex::new(handler));
-                self.handler = Some(handler.clone());
-                *poll_handler.lock().await = Some(handler);
-                self.connect_handler(client).await;
+                let (ops_tx, ops_rx) = mpsc::unbounded_channel();
+                let worker = tokio::spawn(Self::ops_worker(
+                    handler.clone(),
+                    self.generation,
+                    ops_rx,
+                    self.tx.clone(),
+                ));
+                self.ops = Some((ops_tx, worker));
+                self.handler = Some(handler);
+                self.start_connect(Duration::ZERO);
             }
             Err(e) => {
                 tracing::error!(reason = %e, "handler rejected configuration");
-                self.set_status(Status::Conf, client).await;
+                self.set_status(session, Status::Conf);
             }
         }
     }
 
-    /// Attempt to connect the handler to its southbound device,
-    /// retrying on failure after the configured delay.
-    async fn connect_handler(&mut self, client: &AsyncClient) {
-        loop {
-            let handler = match self.handler.as_ref() {
-                Some(h) => h,
-                None => return,
-            };
+    /// Run `connect` on its own task after `delay`, unless a connect
+    /// is already in progress. The result comes back as
+    /// [`DriverEvent::Connected`].
+    fn start_connect(&mut self, delay: Duration) {
+        if self.connecting.is_some() {
+            return;
+        }
+        let Some(handler) = self.handler.clone() else {
+            return;
+        };
+        let generation = self.generation;
+        let tx = self.tx.clone();
+        let closing = self.closing.take();
 
-            let result = handler.lock().await.connect().await;
-            match result {
-                Ok(()) => {
-                    self.set_status(Status::Up, client).await;
-                    self.try_subscribe().await;
-                    return;
-                }
-                Err(ConnectError::ConnectionFailed) => {
-                    tracing::warn!("handler connection failed, retrying");
-                    self.set_status(Status::Conn, client).await;
-                }
-                Err(ConnectError::AuthFailed) => {
-                    tracing::warn!("handler auth failed, retrying");
-                    self.set_status(Status::Auth, client).await;
-                }
+        self.connecting = Some(tokio::spawn(async move {
+            // A replaced handler must be closed before this one
+            // connects, as they may share a device.
+            if let Some(closing) = closing {
+                let _ = closing.await;
             }
+            tokio::time::sleep(delay).await;
 
-            tokio::time::sleep(self.config.reconnect_delay).await;
+            let mut h = handler.lock().await;
+            let result = h.connect().await;
+            let poller = if result.is_ok() { h.poller() } else { None };
+            drop(h);
+
+            let _ = tx.send(DriverEvent::Connected {
+                generation,
+                result,
+                poller,
+            });
+        }));
+    }
+
+    /// Do handler work in order: address parsing, `subscribe` and
+    /// `cmd`.
+    async fn ops_worker(
+        handler: Arc<Mutex<H>>,
+        generation: u64,
+        mut ops: mpsc::UnboundedReceiver<Op<H::Addr>>,
+        tx: mpsc::UnboundedSender<DriverEvent<H::Addr>>,
+    ) {
+        while let Some(op) = ops.recv().await {
+            let mut h = handler.lock().await;
+            match op {
+                Op::Parse { seq, raw } => {
+                    let mut parsed = Some(Vec::with_capacity(raw.len()));
+                    for (topic, addr) in raw {
+                        match h.parse_addr(&addr) {
+                            Some(a) => parsed.as_mut().unwrap().push((topic, a)),
+                            None => {
+                                tracing::error!(addr, "handler rejected address");
+                                parsed = None;
+                                break;
+                            }
+                        }
+                    }
+                    drop(h);
+                    let _ = tx.send(DriverEvent::Parsed {
+                        generation,
+                        seq,
+                        addrs: parsed,
+                    });
+                }
+                Op::Subscribe(specs) => {
+                    if !h.subscribe(&specs).await {
+                        tracing::error!("handler subscription failed");
+                    }
+                }
+                Op::Cmd(name, payload) => h.cmd(&name, payload).await,
+            }
+        }
+    }
+
+    fn send_op(&self, op: Op<H::Addr>) -> bool {
+        match &self.ops {
+            Some((tx, _)) => tx.send(op).is_ok(),
+            None => false,
         }
     }
 
     /// Handle `addr` message — parse and store address mappings.
-    async fn on_addr(&mut self, client: &AsyncClient, payload: &[u8]) {
+    fn on_addr(&mut self, session: &Session<H>, payload: &[u8]) {
         let pkt: AddrConfig = match serde_json::from_slice(payload) {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(%e, "failed to parse addr JSON");
-                self.set_status(Status::Addr, client).await;
+                self.set_status(session, Status::Addr);
                 return;
             }
         };
 
         if pkt.version != 1 {
             tracing::error!(version = pkt.version, "unsupported addr config version");
-            self.set_status(Status::Addr, client).await;
+            self.set_status(session, Status::Addr);
             return;
         }
 
-        let handler = match self.handler.as_ref() {
-            Some(h) => h,
-            None => {
-                tracing::warn!("received addrs without handler");
-                return;
-            }
-        };
-
-        // Parse all addresses while holding the handler lock, collecting
-        // into a temporary vec to release the lock before mutating self.
-        let guard = handler.lock().await;
-        let mut parsed_addrs = Vec::with_capacity(pkt.addrs.len());
-        for (topic, raw_addr) in &pkt.addrs {
-            match guard.parse_addr(raw_addr) {
-                Some(parsed) => {
-                    parsed_addrs.push((topic.clone(), parsed));
-                }
-                None => {
-                    tracing::error!(addr = raw_addr, "handler rejected address");
-                    drop(guard);
-                    self.clear_addrs();
-                    self.set_status(Status::Addr, client).await;
-                    return;
-                }
-            }
+        if self.handler.is_none() {
+            tracing::warn!("received addrs without handler");
+            return;
         }
-        drop(guard);
 
+        // parse_addr needs the handler, which may be busy (in connect,
+        // say), so parse on the handler's own task and hold back
+        // anything that depends on the result.
+        self.addr_seq += 1;
+        let seq = self.addr_seq;
+        if self.send_op(Op::Parse {
+            seq,
+            raw: pkt.addrs,
+        }) {
+            self.parsing = Some(seq);
+        }
+    }
+
+    /// An address map has been parsed: store it, then handle the
+    /// messages that were waiting for it.
+    fn on_parsed(&mut self, session: &Session<H>, addrs: Option<Vec<(String, H::Addr)>>) {
+        self.parsing = None;
         self.clear_addrs();
-        for (topic, parsed) in parsed_addrs {
-            self.topics.insert(parsed.clone(), topic.clone());
-            self.addrs.insert(topic, parsed);
+
+        match addrs {
+            Some(addrs) => {
+                for (topic, parsed) in addrs {
+                    self.topics.insert(parsed.clone(), topic.clone());
+                    self.addrs.insert(topic, parsed);
+                }
+                tracing::info!(count = self.addrs.len(), "addresses configured");
+                if self.status == Status::Addr && self.connected {
+                    self.set_status(session, Status::Up);
+                }
+                self.try_subscribe();
+            }
+            None => self.set_status(session, Status::Addr),
         }
 
-        tracing::info!(count = self.addrs.len(), "addresses configured");
-        self.try_subscribe().await;
+        while self.parsing.is_none() {
+            let Some(publish) = self.deferred.pop_front() else {
+                break;
+            };
+            self.on_publish(session, publish);
+        }
     }
 
     /// Handle `poll` message — resolve topics and send to the poll worker.
@@ -546,10 +748,17 @@ impl<H: Handler + 'static> Driver<H> {
     /// This returns immediately without awaiting any handler calls,
     /// keeping the MQTT event loop responsive. If the poll queue is
     /// full, the request is dropped (backpressure).
-    fn on_poll(&self, poll_tx: &mpsc::Sender<Vec<(String, H::Addr)>>, payload: &[u8]) {
+    fn on_poll(&self, session: &Session<H>, payload: &[u8]) {
         if !H::SUPPORTS_POLL {
             return;
         }
+        if self.status != Status::Up {
+            tracing::debug!(status = %self.status, "ignoring poll while not UP");
+            return;
+        }
+        let Some(handler) = self.handler.clone() else {
+            return;
+        };
 
         let payload_str = match std::str::from_utf8(payload) {
             Ok(s) => s,
@@ -577,37 +786,42 @@ impl<H: Handler + 'static> Driver<H> {
             return;
         }
 
-        if poll_tx.try_send(polls).is_err() {
+        let job = PollJob {
+            generation: self.generation,
+            handler,
+            poller: self.poller.clone(),
+            polls,
+        };
+        if session.poll_tx.try_send(job).is_err() {
             tracing::warn!("poll queue full, dropping request");
         }
     }
 
-    /// Handle `cmd` message — forward to handler.
-    async fn on_cmd(&mut self, command: &str, payload: Bytes) {
-        if let Some(handler) = self.handler.as_ref() {
-            handler.lock().await.cmd(command, payload).await;
-        }
+    /// Handle `cmd` message — queue it for the handler.
+    fn on_cmd(&self, command: String, payload: Bytes) {
+        self.send_op(Op::Cmd(command, payload));
     }
 
-    /// Try to call handler.subscribe() if we're UP and have addresses.
-    async fn try_subscribe(&mut self) {
+    /// Queue handler.subscribe() if we're UP and have addresses.
+    fn try_subscribe(&self) {
         if self.status != Status::Up || self.addrs.is_empty() {
             return;
         }
-
         let specs: Vec<H::Addr> = self.addrs.values().cloned().collect();
-
-        if let Some(handler) = self.handler.as_ref() {
-            if !handler.lock().await.subscribe(&specs).await {
-                tracing::error!("handler subscription failed");
-            }
-        }
+        self.send_op(Op::Subscribe(specs));
     }
 
-    /// Handle a DriverEvent from the handler channel (async data publish).
-    async fn handle_driver_event(&self, client: &AsyncClient, event: DriverEvent<H::Addr>) {
+    /// Handle an event from a handler or a background task.
+    fn on_event(&mut self, session: &Session<H>, event: DriverEvent<H::Addr>) {
         match event {
-            DriverEvent::Data { addr, payload } => {
+            DriverEvent::Data {
+                generation,
+                addr,
+                payload,
+            } => {
+                if generation != self.generation || self.status != Status::Up {
+                    return;
+                }
                 // The edge agent only recognises data published on the topic
                 // name it assigned (see `self.topics`); an address it no
                 // longer knows about (e.g. after reconfiguration) has
@@ -617,11 +831,50 @@ impl<H: Handler + 'static> Driver<H> {
                     return;
                 };
                 let mtopic = self.topic_with("data", topic);
-                if let Err(e) = client
-                    .publish(&mtopic, QoS::AtMostOnce, false, payload)
-                    .await
+                let _ = session.outbound.send((mtopic, QoS::AtMostOnce, payload));
+            }
+            DriverEvent::Lost { generation, reason } => {
+                if generation != self.generation
+                    || self.handler.is_none()
+                    || self.connecting.is_some()
                 {
-                    tracing::error!(%e, topic, "failed to publish async data");
+                    return;
+                }
+                tracing::warn!(?reason, "handler lost its connection, reconnecting");
+                self.connected = false;
+                self.set_status(session, status_for(reason));
+                self.start_connect(self.config.reconnect_delay);
+            }
+            DriverEvent::Connected {
+                generation,
+                result,
+                poller,
+            } => {
+                if generation != self.generation {
+                    return;
+                }
+                self.connecting = None;
+                match result {
+                    Ok(()) => {
+                        self.connected = true;
+                        self.poller = poller;
+                        self.set_status(session, Status::Up);
+                        self.try_subscribe();
+                    }
+                    Err(reason) => {
+                        tracing::warn!(?reason, "handler connection failed, retrying");
+                        self.set_status(session, status_for(reason));
+                        self.start_connect(self.config.reconnect_delay);
+                    }
+                }
+            }
+            DriverEvent::Parsed {
+                generation,
+                seq,
+                addrs,
+            } => {
+                if generation == self.generation && self.parsing == Some(seq) {
+                    self.on_parsed(session, addrs);
                 }
             }
         }
@@ -633,23 +886,58 @@ impl<H: Handler + 'static> Driver<H> {
     }
 
     /// Close the current handler (if any) and reset address state.
-    async fn close_handler(&mut self) {
-        if let Some(handler) = self.handler.take() {
-            handler.lock().await.close().await;
+    ///
+    /// The handler finishes its queued work and is closed on its own
+    /// task; the next handler's first `connect` waits for that.
+    fn close_handler(&mut self) {
+        if let Some(connecting) = self.connecting.take() {
+            connecting.abort();
         }
+        self.connected = false;
+        self.poller = None;
+        self.live.store(0, Ordering::SeqCst);
+        self.parsing = None;
+        self.deferred.clear();
         self.clear_addrs();
+
+        let Some(handler) = self.handler.take() else {
+            return;
+        };
+        let ops = self.ops.take();
+        let previous = self.closing.take();
+        self.closing = Some(tokio::spawn(async move {
+            if let Some(previous) = previous {
+                let _ = previous.await;
+            }
+            if let Some((tx, worker)) = ops {
+                drop(tx);
+                let _ = worker.await;
+            }
+            handler.lock().await.close().await;
+        }));
     }
 
-    async fn set_status(&mut self, status: Status, client: &AsyncClient) {
+    fn set_status(&mut self, session: &Session<H>, status: Status) {
         self.status = status;
+        let live = if status == Status::Up {
+            self.generation
+        } else {
+            0
+        };
+        self.live.store(live, Ordering::SeqCst);
         tracing::info!(%status, "driver status changed");
         let topic = self.topic("status");
-        let payload = status.to_string();
-        if let Err(e) = client
-            .publish(&topic, QoS::AtLeastOnce, false, payload)
-            .await
-        {
-            tracing::error!(%e, "failed to publish status");
-        }
+        let _ = session
+            .outbound
+            .send((topic, QoS::AtLeastOnce, Bytes::from(status.to_string())));
+    }
+}
+
+/// The status to report for a failed or lost southbound connection.
+fn status_for(reason: ConnectError) -> Status {
+    match reason {
+        ConnectError::ConnectionFailed => Status::Conn,
+        ConnectError::AuthFailed => Status::Auth,
+        ConnectError::Other => Status::Err,
     }
 }

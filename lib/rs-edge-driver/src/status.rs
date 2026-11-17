@@ -18,6 +18,9 @@ pub enum Status {
     Auth,
     /// Fully operational — connected to the device and ready for data.
     Up,
+    /// Some other error, such as a protocol error on the southbound
+    /// connection.
+    Err,
 }
 
 impl fmt::Display for Status {
@@ -30,6 +33,7 @@ impl fmt::Display for Status {
             Status::Conn => "CONN",
             Status::Auth => "AUTH",
             Status::Up => "UP",
+            Status::Err => "ERR",
         };
         f.write_str(s)
     }

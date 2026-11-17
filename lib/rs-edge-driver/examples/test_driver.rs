@@ -118,7 +118,7 @@ impl Handler for TestHandler {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt::init();
+    init_logging();
 
     let config = DriverConfig::from_env()?;
     let mut driver = Driver::<TestHandler>::new(config);

@@ -8,6 +8,12 @@ import {log} from "../helpers/log.js";
 import {DriverBroker} from "../driverBroker.js";
 import {DeviceConnection} from "../device.js";
 
+/* Whether an address can go in a cmd topic. MQTT forbids the wildcards
+ * and NUL in a topic name. */
+export function cmd_addressable (addr: string) {
+    return !/[+#\0]/.test(addr);
+}
+
 interface addrGroup {
     poll:   number,
     addrs:  Set<string>,
@@ -83,14 +89,18 @@ export class DriverConnection extends DeviceConnection {
         let err;
 
         metrics.array.forEach(m => {
-
-            // @ts-ignore
-            const foundKey = [...this.addrs.entries()].find(([key, value]) => value === m.properties.address.value)?.[0];
-            // @ts-ignore
-            const addr = this.addrs.get(foundKey);
-            if (!addr) {
-                // @ts-ignore
-                err = new Error(`Address ${m.properties.address.value} not found`);
+            /* A cmd goes to cmd/<address>, not cmd/<data topic>, because
+             * every published driver library takes the address from the
+             * topic. The address is the whole rest of the topic, so it
+             * may contain "/", but it can't contain the MQTT wildcards
+             * or NUL. See docs/edge-split.md. */
+            const addr = m.properties?.address?.value as string | undefined;
+            if (!addr || !this.topics.has(addr)) {
+                err = new Error(`Address ${addr} not found`);
+                return;
+            }
+            if (!cmd_addressable(addr)) {
+                err = new Error(`Address ${addr} can't be written: it contains + # or NUL`);
                 return;
             }
 

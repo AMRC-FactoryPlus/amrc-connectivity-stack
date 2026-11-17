@@ -1,11 +1,39 @@
 # Edge Agent driver protocol
 
-This is a specification for a proposed protocol between the two halves
-of a divided Edge Agent. The top half (the Edge Agent) will handle
-configuration, Sparkplug encoding, report-by-exception, and interaction
-with the rest of Factory+. The bottom half (the driver) will handle
-getting data out of the southbound device and making it available to the
-Edge Agent.
+This is the specification of the protocol between the two halves of a
+divided Edge Agent. The top half (the Edge Agent) handles configuration,
+Sparkplug encoding, report-by-exception, and interaction with the rest
+of Factory+. The bottom half (the driver) handles getting data out of
+the southbound device and making it available to the Edge Agent.
+
+The protocol was first written in June 2024 as a proposal. In November
+2026 it was checked against the code and updated to describe what the
+Edge Agent (`acs-edge`) and the three driver libraries
+(`lib/js-edge-driver`, `lib/py-edge-driver`, `lib/rs-edge-driver`)
+actually do. Where the code differs from the original proposal, a
+paragraph marked **Implementation** says what the code does. Drivers
+built outside this repository depend on that behaviour, so the
+Implementation notes are the contract for new drivers.
+
+Two decisions in this document are **proposed, awaiting Alex**. They are
+marked where they appear: [Edge Scout](#edge-scout-address-browsing) and
+[write types](#writes-carry-no-type).
+
+### Summary for driver authors
+
+What a driver must do, and what it may leave out:
+
+Part|Driver must|Notes
+---|---|---
+`status`|Publish `READY`, then `UP` or an error status. LWT `DOWN`.|
+`active`|Publish its status on `ONLINE`.|`OFFLINE` may be ignored. No library acts on it today.
+`conf`|Accept the driver configuration as JSON.|
+`addr`|Keep the data topic to address map from `addrs`.|`groups` may be ignored.
+`poll`|Read the listed addresses and publish data.|Push-only drivers may ignore it.
+`data`|Publish one packet per address on `data/<data topic>`.|See [Data packet formats](#data-packet-formats).
+`cmd`|Optional. Write the payload to the address.|The address is everything after `cmd/`.
+`err`|Optional.|The Edge Agent ignores it today.
+`req`/`rsp`|Optional.|Only for the request kinds the agent serves.
 
 ## Definitions
 
@@ -43,6 +71,13 @@ JSON form and is an object with these properties:
     * `poll`: An integer giving the requested poll interval in
       milliseconds for this group.
 
+**Implementation.** The Edge Agent makes one group per device, named
+after the device, with the device's polling interval. It sends `groups`
+but no driver library reads it. The Edge Agent owns the poll timer: it
+sends a `poll` message for each device on that device's interval,
+whether or not the driver's data source is asynchronous. A driver MAY
+ignore `groups` entirely.
+
 ### Asynchronous (driver address)
 
 Some driver addresses are asynchronous, meaning that data arrives from
@@ -74,6 +109,10 @@ the Edge Agent is interested in at the moment. Because device addresses
 are potentially long strings containing arbitrary characters, the Edge
 Agent assigns a data topic name to each address it is currently using.
 These MUST be short strings of numbers, letters and underscores.
+
+**Implementation.** The Edge Agent uses random integers below 100000,
+written in decimal. They are not stable across restarts, so a driver
+MUST NOT store them.
 
 The Edge Agent MUST manage data topic names in such a way as to avoid
 problems with synchronisation, and MUST NOT assume a driver will react
@@ -140,6 +179,11 @@ drivers SHOULD obey these conventions:
 
 Drivers MAY instead choose to publish and subscribe entirely at QoS 0.
 
+**Implementation.** The Edge Agent publishes everything at QoS 0. The
+driver libraries subscribe and publish at their client's default QoS
+(0 or 1) and do not follow the QoS 2 conventions above. Nothing in the
+protocol relies on QoS above 0.
+
 Packets MUST NOT be published with the RETAIN flag set. The broker MUST
 NOT allow retained messages.
 
@@ -148,6 +192,15 @@ NOT allow retained messages.
 All topics are under the namespace `fpEdge1`. Each driver then
 communicates using topics under its own connection name. The Edge Agent
 SHOULD disallow publish or subscribe packets to other topics.
+
+**Implementation.** The Edge Agent's broker enforces these ACLs, where
+`Conn` is the driver's connection name and `\w` is a letter, digit or
+underscore:
+
+Direction|Topics allowed
+---|---
+Driver publishes|`status`, `data/\w+`, `err/\w+`, `req/\w+`
+Driver subscribes|`active`, `conf`, `addr`, `cmd/#`, `poll`, `rsp/\w+`
 
 In these examples the connection name `Conn` will be used. Where
 necessary the data topic name `Data` will also be used.
@@ -167,6 +220,14 @@ Status|Meaning
 `CONN`|The driver cannot connect because of networking problems
 `AUTH`|The driver cannot authenticate southbound
 `ERR`|Some other error has occurred
+
+**Implementation.** On `READY` the Edge Agent publishes `conf` and then
+`addr` straight after it. On the first `UP` it publishes DBIRTH for the
+connection's devices. A move from `UP` to `DOWN`, `CONF`, `CONN`, `AUTH`
+or `ERR` makes it publish DDEATH. The JS library also publishes `ADDR`
+when it rejects an address configuration. That status is not in the
+table above, and the Edge Agent treats it as "not `UP`" without a
+DDEATH.
 
 `CONN` should be used for situations such as a hostname that won't
 resolve or a southbound device not accepting incoming connections.
@@ -193,6 +254,14 @@ driver MUST publish its current status to its `status` topic. On receipt
 of an `OFFLINE` status, the driver MUST discard any configuration and
 revert to `READY` status, and SHOULD disconnect from its data sources if
 possible.
+
+**Implementation.** The Edge Agent publishes `ONLINE` when it opens the
+connection and `OFFLINE` when it closes it, for example while reloading
+its configuration. None of the three driver libraries acts on
+`OFFLINE`. (The Python library also misses `ONLINE`, because it compares
+the payload bytes' `str()` form with the string.) They wait for the next `ONLINE` and `conf` instead, which
+works because the Edge Agent always sends a fresh `conf` after `READY`.
+Handling `OFFLINE` is optional for drivers.
 
     fpEdge1/Conn/conf
 
@@ -236,22 +305,72 @@ The driver MAY publish to this topic asynchronously if its southbound
 data source is asynchronous. The driver SHOULD NOT attempt to poll on a
 timer, leaving that up to the Edge Agent.
 
-    fpEdge1/Conn/cmd/Data
+The data packet format is up to the driver and the device configuration
+together. See [Data packet formats](#data-packet-formats).
 
-The driver subscribes to these topics, preferably with a wildcard
-subscription. The Edge Agent publishes to these topics to write data to
-the driver's southbound device.
+    fpEdge1/Conn/cmd/Address
+
+The driver subscribes to these topics with the wildcard subscription
+`fpEdge1/Conn/cmd/#`. The Edge Agent publishes to these topics to write
+data to the driver's southbound device.
+
+**Implementation.** The original proposal put the data topic name after
+`cmd/`. The Edge Agent has always put the **address** there instead, and
+every published driver passes that string to its handler as the command
+name, so the address is the contract:
+
+* The address is everything in the topic after `fpEdge1/Conn/cmd/`. It
+  MAY contain `/`, so a driver MUST NOT take only the next topic level.
+  For example, a write to the address `plant/line1/speed` arrives on
+  `fpEdge1/Conn/cmd/plant/line1/speed`.
+* An MQTT topic cannot contain `+`, `#` or NUL, so the Edge Agent refuses
+  to write to an address containing any of them and sends nothing.
+* The Edge Agent only writes to addresses in the current address
+  configuration.
+* The Edge Agent publishes one `cmd` per metric written. Two metrics on
+  the same address give two `cmd` messages.
+* The payload is the metric's new value written as raw bytes for its
+  Sparkplug type, whatever the device's payload format: integers and
+  floats at their natural width in the metric's byte order (big-endian
+  unless the metric sets `endianness`), Boolean as one byte 0 or 1, and
+  String, Text and UUID as UTF-8. Other types are not supported.
+  Int64 and UInt64 writes are broken today: the value reaches the
+  encoder as a JS number, the 64-bit write throws, and the Edge Agent
+  sends 8 uninitialised bytes instead. Don't rely on 64-bit writes until
+  that is fixed.
+* The Edge Agent does not wait for the driver. It reports the new value
+  in DDATA as soon as the `cmd` is published.
+
+The JS and Python libraries before November 2026 took only the first
+level after `cmd/`, so drivers built on them cannot write to an address
+containing `/`. The Rust library has always taken the whole remainder.
 
 When the Edge Agent publishes to this topic, the driver SHOULD attempt
 to write the data to its southbound device at the location given by the
-corresponding address. If the driver is unable or unwilling to write to
-the given address it should report an `RO` address error. Drivers MAY
-refuse to write to southbound devices in general.
+address. If the driver is unable or unwilling to write to the given
+address it should report an `RO` address error. Drivers MAY refuse to
+write to southbound devices in general.
+
+#### Writes carry no type
+
+**Proposed, awaiting Alex.** A `cmd` payload carries only the value's
+bytes, with no Sparkplug type. A driver that needs the type to write
+(OPC UA, S7 and MQTT all do) must know it from the address or from its
+own configuration. This is a known limit and the protocol is not being
+extended for it now, because no built-in tag on our clusters is
+writable today. If a migrated driver needs typed writes, extend the
+protocol then, for example with a JSON `{"type": t, "value": v}`
+payload that the driver opts into.
 
     fpEdge1/Conn/err/Data
 
 The driver publishes to this topic to report an error with a particular
 address.
+
+**Implementation.** The broker lets drivers publish here, but the Edge
+Agent ignores these messages and no driver library publishes them. The
+rest of this section is the intended design. Reporting address errors
+is optional for drivers until the Edge Agent acts on them.
 
 If the driver has a problem accessing an address included in the current
 address configuration, it MUST publish a single string from the table
@@ -291,3 +410,86 @@ topic listed and publish a data packet, as soon as possible. If an error
 occurs reading the address, an address error or driver status error MUST
 be published. If a particular address cannot be explicitly read because
 the data source is entirely asynchronous it MUST be ignored.
+
+**Implementation.** The Edge Agent sends a pending address
+configuration before any `poll` or `cmd` that depends on it, and never
+sends an empty `poll`.
+
+    fpEdge1/Conn/req/Kind
+    fpEdge1/Conn/rsp/Kind
+
+**Implementation.** These topics were added after the original proposal.
+A driver has no Factory+ identity of its own, so it asks the Edge Agent
+to fetch specific things on its behalf. The driver publishes a request
+to `req/<kind>` and the Edge Agent answers on `rsp/<kind>`. The driver
+must subscribe to `rsp/<kind>` itself, because the libraries don't. Both
+are optional, and only the kinds below exist:
+
+Kind|Request payload|Reply (JSON)|Used by
+---|---|---|---
+`cassette`|A Cassette UUID|`{"uuid", "cassette"}` or `{"uuid", "error"}`|edge-sim
+`file`|A Files service file UUID|`{"uuid", "size", "content"}` (content is base64) or `{"uuid", "error"}`|edge-ftp
+
+Any other kind gets `{"error": "Unknown request: <kind>"}`. Files over
+the Edge Agent's `DRIVER_FILE_LIMIT` are refused.
+
+## Data packet formats
+
+The Edge Agent decodes a data packet using the device's payload format
+(`payloadFormat` in the device configuration) and each metric's path.
+"Defined by Protocol" only suits connections built into the Edge Agent
+and gives nothing for a split driver, so every split driver's devices
+must name a real format. There are two kinds of split driver.
+
+### Pass-through drivers (MQTT, REST and similar)
+
+A driver whose southbound data is already a byte payload, such as an
+MQTT message or an HTTP response body, publishes those bytes unchanged
+as the data packet. The device's existing payload format (JSON, XML,
+Delimited String, Buffer and so on) and the metric paths keep working
+exactly as they do for the built-in connection.
+
+### Decoded-value drivers (OPC UA and similar)
+
+A driver whose southbound library hands it typed values, such as an OPC
+UA client, publishes one JSON object per address:
+
+```json
+{"value": 21.5, "timestamp": 1763380800123}
+```
+
+The device uses payload format `JSON` and each metric's path is empty.
+With an empty path the Edge Agent takes `payload.value`, and it takes
+the timestamp from `$.timestamp`. A timestamp in seconds is converted
+to milliseconds. Two optional keys are also read: `timestampNs`, a
+string of nanoseconds since the epoch, which takes precedence for
+sub-millisecond precision, and `simulated` with `run_id`, which
+edge-sim uses to mark simulated data.
+
+The Edge Agent tests (`tests/lib/helpers/driverPayload.test.ts`) check
+how each Sparkplug type survives the trip from this payload to a
+Sparkplug payload and back:
+
+Sparkplug type|JSON `value`|Result
+---|---|---
+Int8, Int16, Int32, UInt8, UInt16, UInt32|number|Exact
+Int64, UInt64|number|Exact up to 2^53. Larger values lose precision, even when sent as a string.
+Float|number|Rounded to 32 bits by Sparkplug, as for the built-in connection
+Double|number|Exact. NaN and infinities can't be sent, because JSON writes them as `null`.
+Boolean|`true` or `false`|Exact
+String, Text|string|Exact, except that the empty string is published as null
+DateTime|milliseconds since the epoch, or an ISO 8601 string|Exact to the millisecond
+
+Numbers may also be sent as strings, which are parsed for the metric's
+type. A `null` value is ignored, so the metric keeps its last value.
+This is the format edge-sim already uses.
+
+## Edge Scout (address browsing)
+
+**Proposed, awaiting Alex.** Edge Scout, which lists a device's
+addresses for the Admin UI, is not supported for split drivers for now.
+The protocol has no browse message, and only the built-in OPC UA and
+MQTT connections implement browsing. No Scout code is removed while
+those built-in connections remain. If browsing is needed for a split
+driver later, it can be added as a new `req`/`rsp` kind without changing
+the rest of the protocol.

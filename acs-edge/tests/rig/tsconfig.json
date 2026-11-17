@@ -9,6 +9,6 @@
     "include": [],
     "files": [
         "run-mocks.ts", "make-rig.ts", "load.ts", "remove.ts",
-        "write.ts"
+        "check.ts", "local.ts", "write.ts"
     ]
 }

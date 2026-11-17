@@ -10,7 +10,10 @@ import util from "util";
 import Aedes from "aedes";
 
 const prefix = "fpEdge1";
-const topicrx = new RegExp(`^${prefix}/([\\w-]+)/(\\w+)(?:/(\\w+))?$`);
+/* The data part is a data topic for data, err, req and rsp, but a
+ * whole device address for cmd, which may contain any character MQTT
+ * allows in a topic, including "/". The ACLs keep drivers to \w+. */
+const topicrx = new RegExp(`^${prefix}/([\\w-]+)/(\\w+)(?:/(.+))?$`);
 
 function log (f, ...a) {
     const msg = util.format(f, ...a);

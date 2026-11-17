@@ -630,10 +630,20 @@ values in the group that belong to it.
 * The wait is there because a driver writes each data packet to its
   socket on its own, and an agent with nothing else to do wakes for
   the first packet and would hand it on before the rest had arrived.
-  Measured with the OPC UA driver, a notification of 20 values went
-  out as 2.9 DDATA on average with no wait, 1.2 with 1 ms and 1.0
-  with 5 or 10 ms; 10 ms gave one DDATA per notification of up to 100
-  values whether the machine was idle, busy or limited to one CPU.
+  Measured with the OPC UA driver and the real agent, DDATA per
+  notification:
+
+  Wait | 66 values | 1,000 values | A lone value is held
+  ---|---|---|---
+  0 | 1.13 to 1.37 | 1.47 to 1.70 | 0.1 ms
+  5 ms | 1.03 to 1.10 | 1.27 to 1.40 | 6.6 ms (p99 9 to 11 ms)
+  10 ms | 1.00 to 1.07 | 1.00 to 1.10 | 12 ms (p99 15 to 16 ms)
+  20 ms | 1.00 | 1.00 to 1.03 | 23 ms (p99 30 ms)
+
+  The ranges cover an idle machine, one CPU and half a CPU. On a
+  loaded cluster node with no wait, a 66-value notification went out
+  as about 4 DDATA. If 10 ms still splits notifications on a busy
+  node, raise `DRIVER_DATA_WAIT_MS` to 20.
 
 * `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment sets the wait,
   up to 100. `0` waits for nothing past the current turn of the event

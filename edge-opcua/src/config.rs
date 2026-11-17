@@ -87,16 +87,17 @@ impl Config {
         let mode_name = details.security_mode.unwrap_or_default();
         let mode = security_mode(&mode_name)
             .ok_or_else(|| format!("unknown security mode {mode_name:?}"))?;
-        let policy = security_policy(&details.security_policy.unwrap_or_default())?;
-
-        // No security has no policy, whatever the policy field says. A
-        // secure mode needs one.
-        let policy = match (mode, policy) {
-            (MessageSecurityMode::None, _) => SecurityPolicy::None,
-            (m, SecurityPolicy::None) => {
-                return Err(format!("security mode {m:?} needs a security policy"));
-            }
-            (_, p) => p,
+        // No security has no policy, whatever the policy field says, so
+        // it isn't read. (The built-in sent the policy anyway and the
+        // server refused the channel.) A secure mode needs one.
+        let policy = match mode {
+            MessageSecurityMode::None => SecurityPolicy::None,
+            m => match security_policy(&details.security_policy.unwrap_or_default())? {
+                SecurityPolicy::None => {
+                    return Err(format!("security mode {m:?} needs a security policy"));
+                }
+                p => p,
+            },
         };
 
         let credentials = details.use_credentials.then(|| {
@@ -199,8 +200,15 @@ mod tests {
 
     #[test]
     fn no_security_ignores_the_policy() {
-        let c = Config::from_json(conf("None", "Basic256Sha256")).unwrap();
-        assert_eq!(c.policy, SecurityPolicy::None);
+        for policy in [
+            "Basic256Sha256",
+            "Basic192",
+            "PubSub_Aes128_CTR",
+            "Nonsense",
+        ] {
+            let c = Config::from_json(conf("None", policy)).unwrap();
+            assert_eq!(c.policy, SecurityPolicy::None, "{policy}");
+        }
     }
 
     #[test]

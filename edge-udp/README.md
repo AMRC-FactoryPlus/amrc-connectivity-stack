@@ -29,9 +29,11 @@ datagram with its path and the device's payload format. A metric with
 any other address never gets a value, and the driver logs a warning
 when no metric has the empty address.
 
-The UDP DriverDef labels the address field "Port", which suggests
-typing the port number there. That gives a metric no value, on the
-built-in connection and here: leave the address empty.
+Leave the address empty. The built-in UDP DriverDef labels the address
+field "Port", which suggests typing the port number there and gives
+the metric no value. This driver's DriverDef (`ACS.Driver.UDPSplit`)
+labels it "Address (leave empty)" instead, because the Admin UI can
+hide the path field but not the address field.
 
 ## What it does
 

@@ -25,20 +25,38 @@ Nothing needs editing by hand, and if you change the port on the
 connection, the open port moves with it when the Edge Agent restarts
 with the new deployment.
 
-Each port can be open once on a host. If another connection that can
-run on the same host already uses the port, the Manager refuses to save
-and names that connection, so choose another port.
-
 The address to use depends on how the Edge Agent is placed:
 
 - **On a single-node edge cluster** the address is that machine's
-  address on the plant network.
-- **On a cluster with several hosts** pin the Edge Agent to one host
-  (its host in the Manager) and use that host's address. An Edge Agent
+  address on the plant network. The Edge Agent can be pinned to it or
+  left floating.
+- **On a cluster with several hosts** the Edge Agent must be pinned to
+  one host, and the device sends to that host's address. An Edge Agent
   that is not pinned can move to another host when it restarts, and the
-  device would then be sending to the wrong machine. While it is not
-  pinned, the Manager treats it as on every host when it checks ports,
-  so it refuses a port that any connection in the cluster uses.
+  device would then be sending to the wrong machine. Pin it with
+  **Move** on the node's page before you add the connection.
+
+The Manager checks these rules whenever you save the connection or move
+its Edge Agent:
+
+- **Saving a connection** whose Edge Agent is not pinned, in a cluster
+  that reports more than one host, is refused, and the message says to
+  move the Edge Agent to a host first.
+- **Moving an Edge Agent to Floating** in such a cluster is refused
+  while it has a UDP split driver connection.
+- **Each port can be open once on a host.** Saving a connection, or
+  moving its Edge Agent, is refused if another connection that can run
+  on the same host already uses the port, and the message names that
+  connection. An Edge Agent that is not pinned (in a single-host
+  cluster) counts as on every host.
+- A cluster that reports no hosts yet (not set up, or its edge-sync is
+  not running) might have only one, so the Manager allows the save.
+
+These checks are in the Manager only. A connection saved before they
+existed, or moved to the UDP split driver by a service-setup migration,
+still deploys as it is, even on an Edge Agent that is not pinned, so
+check those by hand: pin the Edge Agent with **Move** if its cluster
+has more than one host.
 
 Use a port that nothing else on the host uses. The host passes every
 datagram for the port to the driver, so a program on the host listening

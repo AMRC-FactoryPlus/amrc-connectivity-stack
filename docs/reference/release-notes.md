@@ -12,84 +12,100 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
-### Before you upgrade: version 7 moves REST, OPC UA and UDP connections out of the Edge Agent
+### Before you upgrade: version 7 removes the Edge Agent's built-in REST, MQTT, OPC UA and UDP connections
 
 The release with this change is a major release, ACS version 7. Read
-this section before upgrading a production installation, because a
-site with its own changes to its edge Helm charts must take one manual
-step during the upgrade, and a site that misses it loses data from
-some devices until it does. A site with OPC UA connections should also
-read what changes for them, because some devices publish different
-data afterwards.
+this section before upgrading a production installation. The move it
+makes is one way: there is no setting that moves a connection back, and
+rolling back to version 6 doesn't bring the connections back either.
+Some sites must act straight after the upgrade, or some devices have no
+data until they do.
 
 **What changes.** An Edge Agent reads devices either with code built
 into the Edge Agent or with a separate small program, a split driver,
-that runs in its own container beside it. In version 7, every Edge
-Agent connection that uses the built-in REST connection moves to a new
-REST split driver, `edge-rest`, by itself on upgrade, and every one that
-uses the built-in OPC UA or UDP connection moves to `edge-opcua` or
-`edge-udp`. Each connection keeps its details, devices and addresses,
-including OPC UA security settings and credentials. REST and UDP
+that runs in its own container beside it. Version 7 removes the
+built-in REST, MQTT, OPC UA and UDP connections. On upgrade, every Edge
+Agent connection that used one moves by itself to its split driver,
+`edge-rest`, `edge-mqtt`, `edge-opcua` or `edge-udp`. Each connection
+keeps its details (TLS, usernames and passwords, MQTT client ids, OPC
+UA security settings), devices and addresses. REST, MQTT and UDP
 devices publish the same data. OPC UA devices publish the same data
 too, with the exceptions under "What a site with OPC UA connections
-must know" below. Each Edge Agent with a REST, OPC UA or UDP connection
+must know" below. Each Edge Agent with one of these connections
 restarts once or twice in the minutes after the upgrade, as the new
-container is added, so those devices have no data for that time. New
-REST, OPC UA and UDP connections in the Manager use the split drivers,
-under the names "REST", "OPC-UA" and "UDP". MQTT connections stay
-built in for now and will move the same way in a later release.
+containers are added, so those devices have no data for that time. The
+Manager offers one driver per protocol for new connections: "REST",
+"MQTT", "OPC-UA" and "UDP".
 
-**Why some sites must act.** Edge clusters get their software from the
-edge Helm charts in the `shared/helm` git repository on the central
-cluster. Each upgrade writes the new charts to the `acs` branch, but
-edge clusters deploy from `main`, and the upgrade only moves `main` if
-nobody has committed to it. On a site that has committed its own
-changes to `main`, the edge clusters keep running the older release,
-which has no `edge-rest`, `edge-opcua` or `edge-udp`. The connections
-move anyway, because the move happens on the central cluster, so on
-those edge clusters the new containers can't start and the moved
-devices get no data.
-
-**Upgrade procedure.**
+**Before you upgrade.**
 
 1. **Find out whether your site has its own edge chart changes.**
    Signing in as the ACS admin user when asked, run
    `git ls-remote https://git.<your ACS domain>/git/shared/helm refs/heads/main refs/heads/acs`.
-   If both lines show the same commit hash, you have no changes of your
-   own and the upgrade handles everything: skip to step 3.
-2. **If the hashes differ, choose one of these.**
-   - Upgrade, then as soon as the `service-setup` Job has finished,
-     merge `acs` into `main` in `shared/helm` (keeping your own changes)
-     and push `main`. Your edge clusters pick it up within a few
-     minutes, and the moved devices' data resumes.
-   - Or, to upgrade now and merge later, set
-     `serviceSetup.config.splitDrivers.REST: null` and
-     `serviceSetup.config.splitDrivers.OPCUA: null` and
-     `serviceSetup.config.splitDrivers.UDP: null` in your values for
-     this upgrade. Your REST, OPC UA and UDP connections stay built in.
-     Set them back to `true` (or remove them) on a later upgrade, once
-     you have merged.
-3. **Check every edge cluster is syncing** from the central cluster
-   before you upgrade. An edge cluster that can't fetch from the central
-   git server keeps its old software, and its moved devices have no
-   data until it can.
-4. **Run the upgrade, and wait for the `service-setup` Job to
-   complete.** The `edge-helm-charts` container's log has a line
-   starting `WARNING: branch main of shared/helm has commits of its own`
-   if your site needs step 2.
-5. **Check it worked.** Find the line starting `Split drivers:` in the
-   `service-setup` container's log, which says how many connections
-   moved and how many failed. Each Edge Agent pod with REST, OPC UA or
-   UDP connections has a running `driver-<name>` container for each, and
-   their devices are publishing again a few minutes after the upgrade.
+   If both lines show the same commit hash, the upgrade moves your edge
+   clusters to the new charts by itself. If they differ, your site has
+   committed its own changes to `main`, so as soon as the
+   `service-setup` Job has finished you must merge `acs` into `main`
+   (keeping your own changes) and push `main`. Until you do, your edge
+   clusters run the old release, which has no split driver images, and
+   every moved connection's devices have no data.
+2. **Check every edge cluster is fetching from the central cluster's git
+   server.** One that can't keeps its old software, and its moved
+   devices have no data until it can.
+3. **Find Edge Agents that pin their own image** (`image.default` or
+   `image.edgeAgent` with a `tag` or `registry` in the Edge Agent's
+   Deployment). They keep that image and their built-in connections,
+   which keep working, but they are not upgraded until you remove the
+   setting.
+4. **Find UDP connections that would share a port.** Every built-in UDP
+   connection uses port 50205, the only port the version 6 form allowed,
+   and in version 7 the port opens on the edge host, which can open it
+   once. List the UDP connections in the Manager with their Edge
+   Agents. Where two could land on one host (two Edge Agents pinned to
+   the same host, or one not pinned to a host in a cluster with several
+   hosts), plan a new port for one of them and how to point its device
+   at it. The upgrade gives the port to the first, and the other has no
+   data until it has another port.
+5. **Take a backup of the ConfigDB.** A rollback to version 6 does not
+   undo the move: see "Rolling back" below.
+6. **Remove `serviceSetup.config.splitDrivers.REST`, `MQTT`, `OPCUA` and
+   `UDP` from your values**, if you set them for a version 7 test build.
+   `false` and `null` are refused: service-setup logs an `ERROR:` line
+   and moves the connections anyway.
 
-**If the moved devices have no data after the upgrade**, and their Edge
-Agent pod's `driver-<name>` container can't pull its image
-(`ImagePullBackOff`), your edge clusters didn't get the new charts.
-Merge `acs` into `main` in `shared/helm` and push it, as in step 2, and
-the data comes back within a few minutes with nothing else to do. Or
-set `serviceSetup.config.splitDrivers.REST: false` (or `OPCUA: false`)
-and upgrade again to move the connections back to the built-in connection.
+**Check it worked.** Find the line starting `Split drivers:` in the
+`service-setup` container's log. It says how many connections moved,
+how many were held back because their Edge Agent pins its image, how
+many moved without their container because of a UDP port clash, and
+how many failed, and the lines above it name each connection. Act on
+every line starting `ERROR:`. Each Edge Agent pod has a running
+`driver-<name>` container for each of these connections, and their
+devices are publishing again a few minutes after the upgrade. An Edge
+Agent given a connection it can't run logs a line starting
+`ERROR: Connection '<name>' was not started` and raises the alert
+`Alerts/Connection/<name>` on its Node, and its other connections keep
+running.
+
+**If devices have no data after the upgrade**, fix forward:
+
+- A `driver-<name>` container can't pull its image
+  (`ImagePullBackOff`): your edge clusters didn't get the new charts.
+  Merge `acs` into `main` in `shared/helm` and push it, as in step 1,
+  and the data comes back within a few minutes with nothing else to do.
+- A UDP connection has no `driver-<name>` container, and the
+  `service-setup` log has a line for it starting `ERROR: Connection`
+  that names the connection with its port: give it another port in the
+  Manager, save it, and point the device at the new port.
+- The Edge Agent logs `was not started` for a connection: it is still
+  on a built-in driver. Upgrade again so service-setup moves it, or open
+  it in the Manager, pick its split driver and save it.
+
+**Rolling back.** Rolling back to version 6 does not bring the
+connections back. The move rewrites the connections' configs, and
+version 6 has no split driver images, so after a rollback each moved
+connection's container can't pull its image and its Edge Agent's pod
+doesn't start, which stops every connection on that agent. Restore the
+ConfigDB backup from step 5 as part of any rollback.
 
 **What you may notice afterwards.** A failing REST endpoint is logged
 once until it recovers, rather than on every poll. One failing endpoint
@@ -99,6 +115,16 @@ come back as soon as one answers. A request gives up after 25 seconds,
 where the built-in connection waited for ever. Page counters in
 addresses (such as `${1:_}`) now work. A write posts the value alone as
 JSON, and shows as written only once the device accepts it.
+
+For MQTT, the devices on a connection now go offline while the driver
+can't reach its broker, or the broker refuses its username or
+password, and come back when it reconnects, where the built-in
+connection left them online with their last values. A write to an MQTT
+metric publishes the value alone as text (`21.5`, `true`), where the
+built-in connection built the message from the device's payload format
+and the metric's path. A message larger than about 16 MB is dropped
+with a warning. A topic that another device still reads stays
+subscribed when a device is removed.
 
 **What a site with OPC UA connections must know.** On an OPC UA
 connection with more than one device, the built-in connection gave
@@ -131,32 +157,12 @@ historian queries that read those devices. Other changes you may see:
 port now opens on the edge host its Edge Agent runs on, so a device on
 the plant network can send to that host's address, which it could not
 do with the built-in connection. That also means the port must be free
-on the host and allowed through the host's firewall. Every built-in UDP
-connection uses port 50205, because that was the only port the old form
-allowed, and a host can open each port once. So when two UDP
-connections could land on the same host (two Edge Agents pinned to one
-host, or an Edge Agent that is not pinned in a cluster with several
-hosts), only the first moves, and the other stays on the built-in
-connection and keeps working as before. The `service-setup` log names
-it in a line ending `Give one of them another port`. Give the
-connection that moved another port in the Manager, and point its device
-at the new port, and the next upgrade moves the one that stayed. (The
-built-in form only offers 50205, so the one that stayed can't be given
-another port.) The upgrade does not check
-that an Edge Agent with a UDP connection is pinned to a host, so on a
-cluster with more than one host, pin it with **Move** on the node's
-page before you point a device outside the cluster at it. See
+on the host and allowed through the host's firewall. The upgrade does
+not check that an Edge Agent with a UDP connection is pinned to a host,
+so on a cluster with more than one host, pin it with **Move** on the
+node's page before you point a device outside the cluster at it. See
 [Connecting a UDP device](../services/udp-devices.md) for the address
 to send to, the firewall rules and the host's receive buffer.
-
-**To move back** at any time, set
-`serviceSetup.config.splitDrivers.REST: false` (or `OPCUA: false`, or
-`UDP: false`) and upgrade again. Every REST and UDP connection's config
-returns to exactly what it was, and a moved UDP connection's port is
-closed on the host again. OPC UA connections return to the built-in
-connection with their details and "Defined by Protocol", and the
-Manager puts their metric paths back the next time it saves the
-device.
 
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.

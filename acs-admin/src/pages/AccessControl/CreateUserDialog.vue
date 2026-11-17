@@ -39,14 +39,15 @@
           <Input
               class="flex-1"
               type="password"
+              revealable
               v-model="v$.password.$model"
               :v="v$.password"
           />
           <Button type="button" variant="outline" title="Generate a password" @click="generatePassword">
-            <i class="fa-solid fa-dice"></i>
+            <i class="fa-solid fa-arrows-rotate"></i>
           </Button>
         </div>
-        <Copyable v-if="password" :text="password" class="text-xs text-gray-500">
+        <Copyable v-if="isGeneratedPassword" :text="password" class="text-xs text-gray-500">
           Generated: <span class="font-mono">{{ password }}</span> (click to copy)
         </Copyable>
       </div>
@@ -122,6 +123,7 @@ export default {
       this.principal = null
       this.password = null
       this.autoPrincipal = null
+      this.lastGeneratedPassword = null
     },
 
     generatePassword () {
@@ -131,6 +133,7 @@ export default {
       const bytes = new Uint32Array(20)
       crypto.getRandomValues(bytes)
       this.password = Array.from(bytes, b => charset[b % charset.length]).join('')
+      this.lastGeneratedPassword = this.password
     },
 
     // "Jane Smith" -> "jane.smith@REALM"
@@ -172,6 +175,12 @@ export default {
     }
   },
 
+  computed: {
+    isGeneratedPassword () {
+      return !!this.password && this.password === this.lastGeneratedPassword
+    },
+  },
+
   data () {
     return {
       dialogOpen: false,
@@ -180,6 +189,7 @@ export default {
       principal: null,
       password: null,
       autoPrincipal: null,
+      lastGeneratedPassword: null,
     }
   },
 

@@ -52,6 +52,11 @@ const props = defineProps({
     type: Function,
     required: false,
     default: null
+  },
+  revealable: {
+    type: Boolean,
+    required: false,
+    default: false
   }
 })
 
@@ -82,11 +87,22 @@ const modelValue = useVModel(props, 'modelValue', emits, {
         :step="step"
         class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         :class="[
-          { 'border-red-500': v?.$error, 'pl-[2.1rem]': icon },
+          { 'border-red-500': v?.$error, 'pl-[2.1rem]': icon, 'pr-10': revealable },
           className,
           inputClass
         ]"
       />
+      <!-- Reveal/hide toggle for password fields -->
+      <button
+        v-if="revealable && !isEncrypting"
+        type="button"
+        tabindex="-1"
+        class="absolute right-0 top-0 bottom-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+        :title="revealed ? 'Hide password' : 'Show password'"
+        @click="revealed = !revealed"
+      >
+        <i :class="revealed ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+      </button>
     </div>
     <p v-if="info" class="text-xs text-gray-500">
       {{info}}
@@ -138,6 +154,10 @@ export default {
     info: {
       type: String,
       default: null
+    },
+    revealable: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -150,12 +170,14 @@ export default {
   data() {
     return {
       isEncrypting: false,
-      localValue: this.modelValue
+      localValue: this.modelValue,
+      revealed: false
     }
   },
 
   computed: {
     inputType() {
+      if (this.revealable) return this.revealed ? 'text' : this.type
       return this.type
     },
 

@@ -20,8 +20,8 @@ import { make_rig, manifests, requests, value_topics } from "./make-rig";
 import { control, make_mock } from "./mocks";
 import { sleep } from "./mocks/mock";
 import { as_array } from "./mocks/mqtt";
-import { Rig, RigConnection, rig_entry } from "./rig";
-import { compare_summaries, summarise, watch } from "./summary";
+import { Rig, RigConnection, origin_map, rig_entry } from "./rig";
+import { Expected, compare_summaries, summarise, watch } from "./summary";
 
 const SpB = sparkplug.get("spBv1.0")!;
 const EXAMPLES = path.join(__dirname, "examples");
@@ -153,6 +153,31 @@ describe("batched payloads", () => {
     test("an object payload becomes an array of {value, timestamp}", () => {
         const out = JSON.parse(as_array(JSON.stringify({ value: 4.5 })).toString());
         expect(out).toEqual([{ value: 4.5, timestamp: expect.any(Number) }]);
+    });
+});
+
+describe("origin_map", () => {
+    test("undoes the Manager's origin map to tags", () => {
+        const tags = [
+            { Name: "Schema_UUID", type: "UUID", method: "GET", value: "s0" },
+            { Name: "Instance_UUID", type: "UUID", method: "GET", value: "i0" },
+            { Name: "Device_Information/ISA95_Hierarchy/Schema_UUID", type: "UUID", value: "s1" },
+            { Name: "Device_Information/ISA95_Hierarchy/Enterprise", type: "String",
+                method: "GET", value: "Example" },
+            { Name: "Temp", type: "DoubleLE", method: "GET", address: "ns=2;s=T",
+                recordToDB: true, engUnit: "C" },
+            { Name: "Temp/Schema_UUID", type: "UUID", method: "GET", value: "s2" },
+        ];
+        expect(origin_map(tags)).toEqual({
+            Schema_UUID: "s0", Instance_UUID: "i0",
+            Device_Information: { ISA95_Hierarchy: {
+                Schema_UUID: "s1",
+                Enterprise: { Sparkplug_Type: "String", Method: "GET",
+                    Record_To_Historian: false, Value: "Example" },
+            } },
+            Temp: { Sparkplug_Type: "DoubleLE", Method: "GET", Record_To_Historian: true,
+                Address: "ns=2;s=T", Eng_Unit: "C", Schema_UUID: "s2" },
+        });
     });
 });
 
@@ -461,6 +486,56 @@ describe("summaries", () => {
         expect(rate.some(p => p.level == "FAIL" && /DDATA rate/.test(p.what))).toBe(true);
         const more = compare_summaries(recording("Float", 1000), recording("Float", 500));
         expect(more.map(p => p.level)).toEqual(["WARN"]);
+    });
+
+    test("DDATA before the first DBIRTH is named from that DBIRTH", () => {
+        const d = dev.deviceId;
+        const msgs = [
+            msg("DDATA", 500, [{ alias: 1, type: "Float", value: 3 }], d),
+            msg("DDATA", 600, [{ alias: 9, type: "Float", value: 3 }], d),
+            msg("DBIRTH", 1000, [{ name: read.Name, alias: 1, type: "Float", value: 4 }], d),
+            msg("DDATA", 2000, [{ alias: 1, type: "Float", value: 5 }], d),
+        ];
+        const s = summarise(rig, "x", 0, 3000, new Map([["N", msgs]]));
+        const ds = s.devices[`N/${d}`];
+        expect(Object.keys(ds.metrics)).toEqual([read.Name]);
+        expect(ds.metrics[read.Name]).toMatchObject({ values: 2, last: "5" });
+        expect(ds.unresolved).toBe(1);
+        expect(ds.ddata_metrics).toBe(3);
+    });
+
+    test("metrics left as aliases are skipped, not failed", () => {
+        const a = recording("Float", 1000), b = recording("Float", 1000);
+        const d = b.devices[`N/${dev.deviceId}`];
+        d.metrics["(alias 7)"] = { type: "Float", values: 3, distinct: 3 };
+        expect(compare_summaries(a, b).map(p => p.level)).toEqual(["WARN"]);
+    });
+
+    test("the move's own differences are expected, not failures", () => {
+        const key = `N/${dev.deviceId}`;
+        const before = recording("Float", 1000), after = recording("Float", 1000);
+        const x = before.devices[key], y = after.devices[key];
+
+        /* Starved before: no read metric had values. */
+        x.metrics[read.Name].values = 0;
+        let ps = compare_summaries(before, after);
+        expect(ps).toEqual([expect.objectContaining({ level: "EXPECTED",
+            what: expect.stringContaining(Expected.starved) })]);
+        y.protocol = "UDP";
+        expect(compare_summaries(before, after)[0].what).toContain(Expected.udp);
+        y.protocol = x.protocol;
+        x.metrics[read.Name].values = 9;
+
+        /* Hierarchy added where there was none, and lost where there
+         * was one. */
+        const h = "Device_Information/ISA95_Hierarchy/Enterprise";
+        y.metrics[h] = { type: "String", values: 0, distinct: 0 };
+        ps = compare_summaries(before, after);
+        expect(ps.map(p => p.level)).toEqual(["EXPECTED"]);
+        expect(ps[0].what).toContain(Expected.isa95);
+        x.metrics[h] = y.metrics[h];
+        delete y.metrics[h];
+        expect(compare_summaries(before, after).map(p => p.level)).toEqual(["FAIL"]);
     });
 
     test("a watched metric shows each value, death and birth in order", () => {

@@ -181,7 +181,7 @@ async fn accept(
                             break 'conn;
                         }
                         loop {
-                            let pkt = match rumqttc::mqttbytes::v4::read(&mut buf, 1 << 28) {
+                            let pkt = match Packet::read(&mut buf, 1 << 28) {
                                 Ok(p) => p,
                                 Err(rumqttc::mqttbytes::Error::InsufficientBytes(_)) => break,
                                 Err(e) => panic!("fake broker could not parse a packet: {e:?}"),

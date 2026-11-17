@@ -31,7 +31,7 @@ tracing = "0.1"
 [dev-dependencies]
 # The driver-loop test borrows the fake Edge Agent from the library's
 # own tests, which needs these.
-rumqttc = "0.24"
+rumqttc = { version = "0.25.1", default-features = false }
 tokio = { version = "1", features = ["full"] }
 
 [profile.release]

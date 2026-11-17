@@ -143,6 +143,8 @@ The rest are limits of the generator (a JSONPath wildcard or an XPath function i
 | `opcua` | OPC UA, `SignAndEncrypt` with credentials, several types and byte orders |
 | `mqtt-json` | MQTT JSON, `$.value` and `[?(@.name=='...')]` filters, many metrics per topic |
 | `mqtt-delimited` | MQTT delimited string with no delimiter (the whole payload is the value), two devices reading one topic |
+| `mqtt-xml` | MQTT XML, `//*[@attr='v']` steps (made with `synth` from a made-up config) |
+| `mqtt-buffer` | MQTT Buffer, both byte orders, bits and a trailing string (made with `synth` from a made-up config) |
 | `rest-json` | REST JSON, array indexes and filters |
 | `rest-xml` | REST XML in MTConnect style, `//*[@attr='v']` steps |
 | `rest-xml-contains` | REST XML with `[Name[contains(text(),'...')]]` predicates |

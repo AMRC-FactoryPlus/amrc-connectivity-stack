@@ -12,14 +12,14 @@ From `acs-edge`, after `npm install` there and `npm ci` in `lib/js-edge-driver`:
 npx jest tests/golden
 ```
 
-On the committed samples this runs:
+On the committed samples this runs. They are the generated samples in `../fixtures/drivers/samples` and the hand-made ones in `samples/` here: `mqtt-batched` has JSON (Batched) payloads, which the generator can't make, with arrays and single objects on one device and wildcard addresses (`samples/mqtt-batched/make.mjs` writes it).
 
 | Test | What it shows |
 |---|---|
 | self-check | Each sample through the built-in connection twice. The two runs must match, which shows the harness itself is deterministic. |
 | negative check | One sample per protocol with one recorded value changed in the second run. The comparison must fail and name the metric. |
 | split driver | Each REST sample through the built-in REST connection and through the reference REST driver. They must match. |
-| split driver after service-setup's move | The REST connections of the site in `acs-service-setup/test/rest-move/site.json`, through the built-in connection as the site had them and through the driver as service-setup's move left them (`moved.json`). Both runs must match and send the same credentials. `acs-service-setup/test/rest-move.test.js` checks that the move gives exactly `moved.json`. |
+| split driver after service-setup's move | The REST connections of the site in `acs-service-setup/test/rest-move/site.json`, through the built-in connection as the site had them and through the driver as service-setup's move left them (`moved.json`). Both runs must match and send the same credentials. `acs-service-setup/test/rest-move.test.js` checks that the move gives exactly `moved.json`. With `GOLDEN_PROTOCOL=MQTT` and `GOLDEN_DRIVER` set, the same runs for the MQTT connections in `acs-service-setup/test/mqtt-move/`, and both runs must connect over TLS where the connection uses it, with the same client id, credentials, keep-alive and clean session. |
 | in-process driver | One REST sample through a small in-process driver, to cover that path. |
 
 Each run prints the comparison and the CPU time it used.
@@ -89,7 +89,7 @@ The fake devices:
 | Protocol | Fake device |
 |---|---|
 | REST | An HTTP stub. The n-th GET of a path gets the response that was current at fixture time n × interval, so both runs see the same sequence of responses however their poll timing differs. |
-| MQTT | An Aedes broker. Once every topic has a subscriber it publishes the recorded messages in order, at their scaled times. |
+| MQTT | An Aedes broker. Once every topic has a subscriber it publishes the recorded messages in order, at their scaled times. For a connection over `mqtts`, `tls` or `wss` it also serves TLS with a certificate from a CA made with `openssl` for the run, which the agent (Node's default CA list) and the driver (`SSL_CERT_FILE`) trust while it runs. It accepts any credentials and records what each client connected with. A `__NOW_MS-<ms>__` in a payload becomes the send time less `<ms>`, for payloads that carry their own timestamps. |
 | OPC UA | A node-opcua server with one variable per node. Security is off on both runs, because no fixture can run a certificate handshake. The connection samples four times per value change, so no change is missed or seen twice. |
 | UDP | A sender that waits for the connection to bind its port, then sends each datagram to `127.0.0.1` at its scaled time. |
 

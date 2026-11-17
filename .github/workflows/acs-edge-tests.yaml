@@ -21,6 +21,7 @@ on:
       - 'acs-service-setup/lib/split-drivers.js'
       # The site the REST move test moves, which the harness replays.
       - 'acs-service-setup/test/rest-move/**'
+      - 'acs-service-setup/test/mqtt-move/**'
       - '.github/workflows/acs-edge-tests.yaml'
 
 jobs:

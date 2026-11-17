@@ -12,6 +12,8 @@ import type { Fixture } from "../../fixtures/drivers/fixture.js";
 export interface DeviceOpts {
     /* Fixture time runs this many times faster than real time. */
     speed:  number,
+    /* The connection entry the run uses, if not the fixture's. */
+    entry?: any,
 }
 
 /* A fake device replays a fixture's device input to whichever
@@ -42,7 +44,8 @@ export interface FakeDevice {
     delivered: number,
 
     /* The distinct credentials the connection sent, where the device
-     * can see them (the HTTP stub's Authorization headers). */
+     * can see them (the HTTP stub's Authorization headers, and what the
+     * MQTT broker's clients connected with). */
     credentials?: Set<string>,
 }
 

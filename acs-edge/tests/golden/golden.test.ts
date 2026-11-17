@@ -23,14 +23,17 @@ import { tamper } from "./tamper.js";
 jest.setTimeout(180_000);
 
 const SAMPLES = path.join(__dirname, "../fixtures/drivers/samples");
+/* Samples the fixture generator can't make, built by hand. */
+const HAND_MADE = path.join(__dirname, "samples");
 
 /* The committed samples, or every fixture in GOLDEN_FIXTURES. */
 function fixtures (): [string, Fixture][] {
-    const dir = process.env.GOLDEN_FIXTURES || SAMPLES;
+    const dirs = process.env.GOLDEN_FIXTURES
+        ? [process.env.GOLDEN_FIXTURES] : [SAMPLES, HAND_MADE];
     const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-    return fs.readdirSync(dir).sort()
+    return dirs.flatMap(dir => fs.readdirSync(dir).sort()
         .filter(d => fs.existsSync(path.join(dir, d, "fixture.json")))
-        .map(d => [d, truncate(read_fixture(path.join(dir, d)), cap)]);
+        .map((d): [string, Fixture] => [d, truncate(read_fixture(path.join(dir, d)), cap)]));
 }
 
 /* A fixture cut to its first `cap` ms, for long private fixtures. */
@@ -55,11 +58,12 @@ const ONE_EACH = RUNNABLE.filter(([, f], i) =>
 const DRIVER = env_driver();
 const DRIVER_PROTOCOL = DRIVER ? process.env.GOLDEN_PROTOCOL ?? "REST" : "REST";
 
-/* The site service-setup's REST move test starts from, and the configs
- * the move leaves. Each case is a REST connection on the site's agent:
- * [name, sample, entry before, entry after]. */
-const REST_MOVE = (() => {
-    const dir = path.join(__dirname, "../../../acs-service-setup/test/rest-move");
+/* The site one of service-setup's move tests starts from, and the
+ * configs the move leaves. Each case is a connection the test moves:
+ * [name, sample, entry before, entry after]. A sample is a directory
+ * of the committed samples, or a path from acs-edge/tests. */
+const read_move = (test: string) => {
+    const dir = path.join(__dirname, "../../../acs-service-setup/test", test);
     const read = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
     const site = read("site.json");
     const moved = read("moved.json");
@@ -74,7 +78,24 @@ const REST_MOVE = (() => {
             return [before.name, sample, before, find(moved, uuid)];
         });
     return { cases, secrets: site.secrets as { [k: string]: string } };
-})();
+};
+const REST_MOVE = read_move("rest-move");
+const MQTT_MOVE = read_move("mqtt-move");
+
+const sample_dir = (sample: string) => sample.includes("/")
+    ? path.join(__dirname, "..", sample) : path.join(SAMPLES, sample);
+
+/* What the fake MQTT broker records for a connection's details: see
+ * session() in devices/mqtt.ts. */
+function mqtt_session (d: any, secrets: { [k: string]: string }) {
+    const id = d.clientId ? d.clientId : "NO-ID-*";
+    const creds = d.username
+        ? `username ${d.username} password ${secrets[d.password] ?? d.password}`
+        : "no credentials";
+    const tls = ["mqtts", "tls", "wss"].includes(d.protocol);
+    return `MQTT client ${id}, ${creds}, keepalive ${d.keepAlive}, `
+        + `clean ${d.cleanSession}, ${tls ? "TLS" : "plain"}`;
+}
 
 function show (name: string, r: GoldenResult) {
     process.stdout.write(`\n[${name}] ${r.summary}\n`);
@@ -193,7 +214,7 @@ describe("Golden-output harness", () => {
                     throw new Error("The reference REST driver needs lib/js-edge-driver's "
                         + "dependencies: run `npm ci` in lib/js-edge-driver");
                 const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
-                const fixture = truncate(read_fixture(path.join(SAMPLES, sample)), cap);
+                const fixture = truncate(read_fixture(sample_dir(sample)), cap);
                 const { secrets } = REST_MOVE;
                 const r = await golden({ a: fixture }, {
                     a: { entry: before, secrets },
@@ -211,6 +232,33 @@ describe("Golden-output harness", () => {
                     ? ["Basic " + Buffer.from(
                         `${details.username}:${secrets[details.password]}`).toString("base64")]
                     : [];
+                expect(r.a.credentials).toEqual(expected);
+                expect(r.b.credentials).toEqual(expected);
+            });
+        });
+
+    /* The same for service-setup's MQTT move test. MQTT has no
+     * reference driver, so this needs GOLDEN_DRIVER. The fake broker
+     * serves TLS where the connection uses it, and records the client
+     * id, credentials, keep-alive and clean session each run connected
+     * with, which must be the connection's details in both runs. */
+    if (DRIVER && DRIVER_PROTOCOL == "MQTT") describe.each(MQTT_MOVE.cases)(
+        "split driver after service-setup's move %s",
+        (name, sample, before, after) => {
+            it(`${DRIVER!.name} matches built-in MQTT`, async () => {
+                const cap = Number(process.env.GOLDEN_DURATION_MS) || Infinity;
+                const fixture = truncate(read_fixture(sample_dir(sample)), cap);
+                const { secrets } = MQTT_MOVE;
+                const r = await golden({ a: fixture }, {
+                    a: { entry: before, secrets },
+                    b: { entry: after, secrets, driver: DRIVER },
+                });
+                show(`${name} after the move`, r);
+                expect(after.connType).toBe("Driver");
+                expect(r.comparison.values).toBeGreaterThan(0);
+                expect(explain(r)).toBe("");
+
+                const expected = [mqtt_session(before.MQTTConnDetails, secrets)];
                 expect(r.a.credentials).toEqual(expected);
                 expect(r.b.credentials).toEqual(expected);
             });

@@ -1,0 +1,10 @@
+{"t":154,"type":"mqtt","topic":"sample/topic_02","payload":"AAADNA==","encoding":"base64"}
+{"t":535,"type":"mqtt","topic":"sample/topic_01","payload":"AAACXcFBwUNAbe9ZZ/3MYqACAaVTRVRVUA==","encoding":"base64"}
+{"t":1154,"type":"mqtt","topic":"sample/topic_02","payload":"AAADNA==","encoding":"base64"}
+{"t":1535,"type":"mqtt","topic":"sample/topic_01","payload":"AAACXt88xkNAb5cyJLBXWpsCAaZTRVRVUA==","encoding":"base64"}
+{"t":2154,"type":"mqtt","topic":"sample/topic_02","payload":"AAADOA==","encoding":"base64"}
+{"t":2535,"type":"mqtt","topic":"sample/topic_01","payload":"AAACXhCBykNAcImf2ZljxJoCAalTRVRVUA==","encoding":"base64"}
+{"t":3154,"type":"mqtt","topic":"sample/topic_02","payload":"AAADOA==","encoding":"base64"}
+{"t":3535,"type":"mqtt","topic":"sample/topic_01","payload":"AAACY1BzzkNAcTQIzIOq8poCAalTRVRVUA==","encoding":"base64"}
+{"t":4154,"type":"mqtt","topic":"sample/topic_02","payload":"AAADOA==","encoding":"base64"}
+{"t":4535,"type":"mqtt","topic":"sample/topic_01","payload":"AAACY1CY0UNAccBFZ6saI5oCAalTRVRVUA==","encoding":"base64"}

@@ -1,0 +1,36 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-mqtt-xml",
+  "agent": "sample-agent",
+  "protocol": "MQTT",
+  "payloadFormat": "XML",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "many-metrics-per-address",
+    "mqtt:protocol:mqtt",
+    "multi-device",
+    "payload:XML",
+    "protocol:MQTT",
+    "type:Double",
+    "type:Float",
+    "type:String",
+    "type:UInt16",
+    "type:UInt32",
+    "xpath:descendant",
+    "xpath:text"
+  ],
+  "counts": {
+    "devices": 2,
+    "metrics": 10,
+    "read_metrics": 10,
+    "addresses": 2,
+    "events": 10,
+    "bytes": 4389
+  },
+  "findings": []
+}

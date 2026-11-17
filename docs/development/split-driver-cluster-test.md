@@ -292,7 +292,7 @@ after it (step 4).
    connections takes up to a minute to make its data.
 
 3. Keep a port open to each pod's control API in a spare terminal.
-   You need it for the offline check and the write check:
+   You need it for the offline, reconnect and write checks:
 
    ```sh
    kubectl -n acs-rig port-forward svc/rig-opcua 9001:9000 &
@@ -352,6 +352,23 @@ was edited by hand: make it again.
    That should print exactly one line, that agent with
    `{"default":{"tag":"<pin tag>"}}`.
 
+   Then restart any rig Edge Agent that started before its sealed
+   passwords reached the cluster. Such an agent logs
+   `Error reading secret ... ENOENT` once at startup, never tries
+   again, and never connects, so its mocks show `clients` of 0. The
+   loader seals the passwords and creates the agents in the same run,
+   and an agent can start first. To find and restart them:
+
+   ```sh
+   for p in $(kubectl get pods -n $EDGE_NS -l factory-plus.app=edge-agent -o name | grep edge-agent-rig-); do
+     kubectl logs -n $EDGE_NS $p | grep -q 'Error reading secret' && echo $p
+   done
+   kubectl delete -n $EDGE_NS <each pod printed>
+   ```
+
+   The new pods read the passwords. The first run on the dev cluster
+   needed this for 3 of the 29 agents.
+
 4. Check the mocks have clients:
 
    ```sh
@@ -383,7 +400,9 @@ crashes the whole Edge Agent on it (`BadNothingToDo`): those two agents
 crash-loop before the upgrade, which is the finding, so note it and
 carry on. An Edge Agent pod stuck in `Pending` doesn't fit: see "How to
 tell it doesn't fit". A mock with `refused` above 0 is being sent the wrong
-password: run `rig load --yes` again, which reseals it.
+password: run `rig load --yes` again, which reseals it. A mock with
+`clients` and `refused` both 0 has an agent that never connected: look
+for `Error reading secret` in that agent's log and restart it (step 4.3).
 
 ### 5. Record the before state
 
@@ -709,6 +728,61 @@ devices just go quiet and are born again when the broker returns. The
 split MQTT driver sends a DDEATH and a DBIRTH. So run this check after
 the upgrade, and expect the before state to differ.
 
+**A value that changes while the connection is down.** This is the
+check for the OPC UA driver's reconnect fix: after a short network drop
+in which the server stays up, the driver must report a value that
+changed during the drop, even though it does not change again. A server
+restart doesn't test this, because the driver then makes a new session
+and subscription and reads every value afresh. Run it after the
+upgrade on one OPC UA connection, then on one MQTT and one REST
+connection if you want the same for those drivers.
+
+The mocks' control API holds values still and cuts connections with
+the server left running:
+
+| Request | What it does |
+|---|---|
+| `POST /mocks/<id>/freeze` | Hold every value where it is. The replay carries on underneath, but nothing is applied. |
+| `POST /mocks/<id>/set` with `{"address": ..., "value": ...}` | Change one address once: an OPC UA node id (the value as the node's type), an MQTT topic (the payload, or a bare value on an array topic) or a REST path (the body, held until `thaw`). |
+| `POST /mocks/<id>/drop?seconds=<n>` | Cut every client's connection and reset any new one for `n` seconds (default 30). The server stays up, so the client sees a network drop, not a restart. |
+| `POST /mocks/<id>/thaw` | Go back to the replay. |
+
+Pick an OPC UA connection, one of its devices and one numeric metric,
+with its node id, from `rig.json`. Then, in two terminals:
+
+1. Start a recording that watches the metric, from the checker's shell:
+
+   ```sh
+   rig check record --rig /rig/rig.json --seconds 240 --label reconnect --out /rig/reconnect.json --watch <rig node>/<device id>/<metric name>
+   ```
+
+2. In the other terminal, freeze the mock, wait for the metric to
+   settle, drop the clients for 60 seconds, change the value 10
+   seconds into the drop, and leave it still:
+
+   ```sh
+   M=localhost:9001/mocks/<opcua id>
+   curl -s -X POST $M/freeze; sleep 30
+   curl -s -X POST "$M/drop?seconds=60"; sleep 10
+   curl -s -X POST $M/set -d '{"address": "<node id>", "value": 4321}'
+   ```
+
+3. When the recording ends, thaw the mock:
+
+   ```sh
+   curl -s -X POST $M/thaw
+   ```
+
+The `--watch` lines list every value the metric was published with,
+with the seconds since the recording started. **Pass:** after the drop
+ends (about 40 s plus the driver's reconnect time), a DDATA or DBIRTH
+has `4321`. **Fail:** the metric stays at the frozen value to the end
+of the recording. A DDEATH during the drop, then a DBIRTH, is expected.
+
+`curl -s localhost:9001/status` shows `frozen` and, during a drop,
+`dropped_until`. The same requests work on MQTT (`localhost:9002`) and
+REST (`localhost:9003`) mocks. UDP mocks have no clients to drop.
+
 ### Protocol checks
 
 These are the checks each protocol's PR or card asks for at the cluster
@@ -753,6 +827,9 @@ test, collected on 2026-11-17.
 - a DateTime metric shows a date, where the built-in published 0;
 - an OPC UA mock stopped mid-run marks its devices offline, and they
   rebirth when it starts again;
+- a value changed during a short network drop, and still after it, is
+  reported after the driver reconnects (step 9, "A value that changes
+  while the connection is down");
 - DDATA rate after the move (ACS-45): the comparison warns above 1.5
   times the built-in rate and fails above 3 times or below half. The
   golden harness measured about 2 times (2.1 DDATA/s against 1.0 for

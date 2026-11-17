@@ -365,12 +365,14 @@ describe("migrate_split_drivers", () => {
         assert.deepEqual(cdb.writes, []);
     });
 
-    test("never creates a Deployment", async () => {
+    test("moves back on an agent with no Deployment, and never creates one", async () => {
         const cdb = fixture();
-        cdb.app(Edge.App.Deployment).delete(AGENT);
         await run(cdb, { OPCUA: true });
+        cdb.app(Edge.App.Deployment).delete(AGENT);
+        const count = await run(cdb, { OPCUA: false });
+        assert.equal(count.moved, 1);
         assert.equal(cdb.get(Edge.App.Deployment, AGENT), undefined);
-        assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
+        assert.equal(conn_entry(cdb, C.opcua).connType, "OPC UA");
     });
 
     test("one failed connection does not stop the rest", async () => {
@@ -490,5 +492,116 @@ describe("driver ids", () => {
         await run(cdb, {});
         assert.deepEqual(drivers(cdb),
             { [PLC_ID]: { image: { repository: "edge-modbus" }, hostPaths: [] } });
+    });
+});
+
+/* Faults the code review found in the move. Each test failed before
+ * its fix. */
+describe("connections that share a name on one Edge Agent", () => {
+    const PUMP_REST = "cccccccc-0000-4000-8000-0000000000a1";
+    const PUMP_REST_2 = "cccccccc-0000-4000-8000-0000000000a2";
+
+    /* The fixture's agent with more connections named "pump". `split`
+     * gives a running Modbus split driver of that name and its
+     * sidecar; `rest` the number of built-in REST ones. */
+    function pumps ({ split, rest }) {
+        const cdb = fixture();
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        if (split) {
+            config.deviceConnections.find(c => c.uuid == C.modbus).name = "pump";
+            dep.values.drivers = { pump: { image: { repository: "edge-modbus" } } };
+        }
+        for (const uuid of [PUMP_REST, PUMP_REST_2].slice(0, rest)) {
+            cdb.set(App.ConnectionConfiguration, uuid,
+                cconf(Driver.REST, REST_DETAILS, "JSON", { pollInt: 1000 }));
+            config.deviceConnections.push(entry(uuid, "pump", "REST",
+                "RESTConnDetails", REST_DETAILS, "JSON", 1000));
+        }
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+        return cdb;
+    }
+
+    /* Every split driver entry of the agent has a sidecar under its
+     * driver id, and there are no others. */
+    function every_sidecar_keyed (cdb) {
+        const ids = cdb.get(App.EdgeAgentConfig, AGENT).deviceConnections
+            .filter(c => c.connType == "Driver")
+            .map(c => c.driverId ?? c.name);
+        assert.deepEqual(Object.keys(drivers(cdb)).sort(), ids.sort());
+    }
+
+    test("moving a REST connection keeps a split driver's sidecar of the same name", async () => {
+        const cdb = pumps({ split: true, rest: 1 });
+        await run(cdb, { REST: true });
+
+        const modbus = conn_entry(cdb, C.modbus);
+        const rest = conn_entry(cdb, PUMP_REST);
+        assert.notEqual(driver_of(modbus), driver_of(rest));
+        assert.deepEqual(drivers(cdb)[driver_of(modbus)],
+            { image: { repository: "edge-modbus" } });
+        assert.equal(drivers(cdb)[driver_of(rest)].image.repository, "edge-rest");
+        every_sidecar_keyed(cdb);
+
+        cdb.writes = [];
+        await run(cdb, { REST: true });
+        assert.deepEqual(cdb.writes, [], "a second run writes nothing");
+    });
+
+    test("moving two REST connections of the same name gives each a sidecar", async () => {
+        const cdb = pumps({ split: false, rest: 2 });
+        await run(cdb, { REST: true });
+        every_sidecar_keyed(cdb);
+
+        cdb.writes = [];
+        await run(cdb, { REST: true });
+        assert.deepEqual(cdb.writes, [], "a second run writes nothing");
+    });
+});
+
+const driver_of = e => e.driverId ?? e.name;
+
+describe("an Edge Agent with no Deployment", () => {
+    test("holds its connections and writes nothing", async () => {
+        const cdb = fixture();
+        cdb.app(Edge.App.Deployment).delete(AGENT);
+        const count = await run(cdb, { OPCUA: true, REST: true });
+
+        assert.deepEqual(cdb.writes, []);
+        assert.equal(count.moved, 0);
+        /* OPC, Printer and the REST connection with no devices. */
+        assert.equal(count.held, 3);
+        assert.equal(conn_entry(cdb, C.opcua).connType, "OPC UA");
+    });
+});
+
+describe("a Manager edit while the move runs", () => {
+    test("is kept, and the sidecar is built from it", async () => {
+        const cdb = fixture();
+        const edited = { baseURL: "http://printer-2/api", authMethod: "None" };
+        const mounts = [{ hostPath: "/dev/y", mountPath: "/dev/y" }];
+
+        /* The Manager saves the connection after the run has read every
+         * connection but before it writes this one. */
+        const put = cdb.put_config.bind(cdb);
+        let edit = true;
+        cdb.put_config = async (a, o, c, opts) => {
+            if (edit && a == App.EdgeAgentConfig) {
+                edit = false;
+                const cc = cdb.get(App.ConnectionConfiguration, C.rest);
+                cc.config = edited;
+                cc.deployment = { hostPaths: mounts };
+                cdb.set(App.ConnectionConfiguration, C.rest, cc);
+            }
+            return put(a, o, c, opts);
+        };
+        await run(cdb, { REST: true });
+
+        const cc = cdb.get(App.ConnectionConfiguration, C.rest);
+        assert.equal(cc.driver, Driver.RESTSplit);
+        assert.deepEqual(cc.config, edited);
+        assert.deepEqual(cc.deployment, { hostPaths: mounts });
+        assert.deepEqual(drivers(cdb).Printer.hostPaths, mounts);
     });
 });

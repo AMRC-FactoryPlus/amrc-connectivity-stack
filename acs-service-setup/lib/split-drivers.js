@@ -50,7 +50,16 @@
  * (`values.image.default` or `values.image.edgeAgent`), because a
  * sidecar takes its tag and registry from `image.default`, and no split
  * driver image exists at another release's tag or in a private
- * registry. The log names the setting. Moves back are never held.
+ * registry. The log names the setting. Nor is it moved when its Edge
+ * Agent has no Edge Agent Deployment config, because nothing would run
+ * the driver's container. Moves back are never held.
+ *
+ * Each connection is read again just before it is moved and written
+ * with If-Match, so a save in the Manager while the run works is moved
+ * as saved rather than overwritten. Giving a connection its driver id
+ * can change the ids of other split drivers on the same agent (two
+ * connections with one name both take tagged ids), and their sidecars
+ * move to their new ids in the same Deployment write.
  *
  * Before any move, and whether or not a move is asked for, every split
  * driver connection whose name can't be its driver id is given a
@@ -321,14 +330,36 @@ export class MigrateSplitDrivers {
 
     /* Move one connection. A connection already on the new driver is
      * still checked, which finishes a move a failed run left half
-     * done. Its payload format is left as it is. */
-    async move (conn, cconf, proto, to_split, to_def) {
+     * done. Its payload format is left as it is.
+     *
+     * The connection is read again here, not taken from the snapshot
+     * the run started with, and written with If-Match, so a save in the
+     * Manager while the run works is never overwritten: the move is
+     * worked out again from what the Manager saved. */
+    async move (conn, snapshot, proto, to_split, to_def) {
+        const ends = [proto.internal, proto.split];
+        for (let i = 1; ; i++) {
+            const [cconf, etag] = await this.cdb.get_config_with_etag(
+                App.ConnectionConfiguration, conn);
+            /* Deleted, or moved to another driver, since the snapshot. */
+            if (!cconf || !ends.includes(cconf.driver)) return "unchanged";
+
+            const how = await this.move_once(conn, cconf, etag, proto, to_split, to_def);
+            if (how != "stale") return how;
+            if (i >= ATTEMPTS)
+                throw new Error("the connection kept changing while it was moved");
+            this.log("Connection %s changed under us; moving it again", conn);
+        }
+    }
+
+    async move_once (conn, cconf, etag, proto, to_split, to_def) {
         const moving = cconf.driver != (to_split ? proto.split : proto.internal);
+        const agent = cconf.edgeAgent;
 
         /* A sidecar takes its tag and registry from the Deployment's
          * image.default, so a Deployment that pins its own would ask
          * for a split driver image that isn't there. */
-        const pin = moving && to_split && this.pinned(cconf.edgeAgent);
+        const pin = moving && to_split && this.pinned(agent);
         if (pin) {
             this.log("Connection %s: not moving to the split driver, because its "
                 + "Edge Agent's Deployment sets %s, so the driver's container would "
@@ -338,12 +369,26 @@ export class MigrateSplitDrivers {
             return "held";
         }
 
+        /* The driver runs as a sidecar the Deployment renders. With no
+         * Deployment nothing would run it, and the connection would
+         * wait for data that never comes. */
+        if (moving && to_split && agent) {
+            const [deployment] = await this.cdb.get_config_with_etag(
+                Edge.App.Deployment, agent);
+            if (!deployment) {
+                this.log("Connection %s: not moving to the split driver, because "
+                    + "its Edge Agent %s has no Edge Agent Deployment config, so "
+                    + "nothing would run the driver's container. It stays on the "
+                    + "built-in driver.", conn, agent);
+                return "held";
+            }
+        }
+
         const next = moving ? move_connection(cconf, proto, to_split) : cconf;
         /* Every connection the run moves off an agent whose Deployment
          * had no `values.drivers` says so, so whichever is moved back
          * last removes the empty map and the Deployment is as it was. */
-        if (moving && to_split && cconf.edgeAgent
-                && await this.lacks_drivers(cconf.edgeAgent))
+        if (moving && to_split && agent && await this.lacks_drivers(agent))
             next.splitMigration.addedDrivers = true;
         const drop_empty = !to_split && !!cconf.splitMigration?.addedDrivers;
 
@@ -372,7 +417,6 @@ export class MigrateSplitDrivers {
             ? f => move_payload_format(f, proto.payloadFormat, to_split, original)
             : f => f;
 
-        const agent = cconf.edgeAgent;
         let changed = false;
         if (agent) {
             const entry = await this.update_config(conn, agent, to_def, format, cconf.config);
@@ -385,15 +429,22 @@ export class MigrateSplitDrivers {
             }
         }
 
-        if (moving) {
-            this.log("Connection %s: driver %s to %s, payload format %o to %o",
-                conn, cconf.driver, next.driver,
-                cconf.source?.payloadFormat, next.source?.payloadFormat);
-            if (!this.dry_run)
-                await this.cdb.put_config(App.ConnectionConfiguration, conn, next);
-            return "moved";
+        if (!moving)
+            return changed ? "repaired" : "unchanged";
+
+        this.log("Connection %s: driver %s to %s, payload format %o to %o",
+            conn, cconf.driver, next.driver,
+            cconf.source?.payloadFormat, next.source?.payloadFormat);
+        if (this.dry_run) return "moved";
+        try {
+            await this.cdb.put_config(App.ConnectionConfiguration, conn, next,
+                etag ? { etag } : undefined);
         }
-        return changed ? "repaired" : "unchanged";
+        catch (e) {
+            if (e instanceof ServiceError && e.status == 412) return "stale";
+            throw e;
+        }
+        return "moved";
     }
 
     /* Read, change and write a config with If-Match, rebuilding if
@@ -418,10 +469,17 @@ export class MigrateSplitDrivers {
     }
 
     /* Rewrite the connection's Edge Agent config entry, and give it a
-     * driver id if it is now a split driver. Returns `{ name, id,
-     * changed }`, where `id` is the connection's driver id as a split
-     * driver, whichever way it moved, or undefined if the agent has no
-     * entry for the connection. */
+     * driver id if it is now a split driver. Giving it one can change
+     * the ids of the agent's other split drivers too: two connections
+     * of the same name both take a tagged id.
+     *
+     * Returns undefined if the agent has no entry for the connection,
+     * or else `{ name, id, own, renames, others, changed }`: `id` is the
+     * connection's driver id as a split driver, whichever way it moved;
+     * `own` its id before, if it was a split driver; `renames` the
+     * `[before, after]` ids of the other split drivers whose id changed;
+     * and `others` every id the other split drivers had or have, whose
+     * deployment values this move must not touch. */
     async update_config (conn, agent, to_def, format, fallback) {
         let result;
         const changed = await this.rewrite(App.EdgeAgentConfig, agent, config => {
@@ -439,14 +497,33 @@ export class MigrateSplitDrivers {
             const probe = structuredClone(out.deviceConnections);
             probe[i].connType = "Driver";
             set_driver_ids(probe);
-            result = { name: entry.name, id: driver_id(probe[i]) };
 
             set_driver_ids(out.deviceConnections);
+            const split = e => e?.connType == "Driver";
+            const renames = [];
+            const others = new Set();
+            conns.forEach((before, j) => {
+                if (j == i) return;
+                const after = out.deviceConnections[j];
+                if (split(before)) others.add(driver_id(before));
+                if (split(after)) others.add(driver_id(after));
+                if (split(before) && split(after)
+                        && driver_id(before) != driver_id(after))
+                    renames.push([driver_id(before), driver_id(after)]);
+            });
+            result = {
+                name:   entry.name,
+                id:     driver_id(probe[i]),
+                own:    split(conns[i]) ? driver_id(conns[i]) : undefined,
+                renames, others,
+            };
             if (same(out, config)) return;
 
             this.log("Agent %s, connection %s: connType %s to %s, payload formats %o to %o, driver id %s",
                 agent, entry.name, conns[i].connType, entry.connType,
                 formats(conns[i]), formats(entry), result.id);
+            for (const [from, to] of renames)
+                this.log("Agent %s: driver id %s is now %s", agent, from, to);
             return out;
         });
         if (result === undefined) return;
@@ -454,33 +531,56 @@ export class MigrateSplitDrivers {
     }
 
     /* Set or remove the connection's sidecar in the deployment, under
-     * its driver id. An entry under its name, from before it had a
-     * driver id, is removed. With `drop_empty`, a removal that leaves
+     * its driver id, and move the sidecars of the agent's other split
+     * drivers whose ids changed with it. A key under the connection's
+     * name, from before it had a driver id, is removed, unless it is
+     * another split driver's. With `drop_empty`, a removal that leaves
      * `values.drivers` empty removes that too. */
     async update_deployment (agent, entry, values, drop_empty) {
-        const { name, id } = entry;
+        const { name, id, own, renames, others } = entry;
         return await this.rewrite(Edge.App.Deployment, agent, deployment => {
             /* Never create a Deployment: the Manager does that when
              * someone asks it to. */
             if (!deployment) return;
 
             const drivers = deployment.values?.drivers ?? {};
-            const stale = name != id && name in drivers;
-            const empty = drop_empty && !values && deployment.values?.drivers
-                && Object.keys(drivers).every(k => k == id || (stale && k == name));
-            if (same(drivers[id], values) && !stale && !empty) return;
+            const next = structuredClone(drivers);
+            const say = (...args) => this.log(...args);
 
-            this.log("Agent %s: values.drivers.%s %s", agent, id,
-                values ? `set to image ${values.image?.repository}` : "removed");
-            if (stale)
-                this.log("Agent %s: values.drivers.%s removed: the driver id is %s",
-                    agent, name, id);
+            /* The other split drivers' sidecars move with their ids.
+             * Take every value first, so that ids that swap keep the
+             * right sidecar. */
+            const carried = renames
+                .filter(([from]) => from in drivers)
+                .map(([from, to]) => [from, to, drivers[from]]);
+            for (const [from] of carried) delete next[from];
+            for (const [from, to, v] of carried) {
+                say("Agent %s: values.drivers.%s moved to %s", agent, from, to);
+                next[to] ??= v;
+            }
 
-            const out = structuredClone(deployment);
-            const next = (out.values ??= {}).drivers ??= {};
-            if (stale) delete next[name];
+            /* The connection's own old keys. */
+            for (const old of new Set([own, name])) {
+                if (old === undefined || old == id || others.has(old)) continue;
+                if (!(old in next)) continue;
+                say("Agent %s: values.drivers.%s removed: the driver id is %s",
+                    agent, old, id);
+                delete next[old];
+            }
+
             if (values) next[id] = values;
             else delete next[id];
+
+            const empty = drop_empty && !values && deployment.values?.drivers
+                && !Object.keys(next).length;
+            if (same(next, drivers) && !empty) return;
+
+            if (!same(next[id], drivers[id]))
+                say("Agent %s: values.drivers.%s %s", agent, id,
+                    values ? `set to image ${values.image?.repository}` : "removed");
+
+            const out = structuredClone(deployment);
+            (out.values ??= {}).drivers = next;
             if (empty) delete out.values.drivers;
             return out;
         });

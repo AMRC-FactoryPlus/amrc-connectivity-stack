@@ -13,7 +13,7 @@ use tokio::task::{JoinHandle, JoinSet};
 
 use crate::config::{DriverConfig, DriverOptions, PUBLISH_QUEUE_OVERHEAD};
 use crate::error::{ConnectError, Error, WriteError};
-use crate::handler::{Handler, Poller};
+use crate::handler::{AddrGroup, Handler, Poller};
 use crate::redact::redact;
 use crate::status::State as Status;
 use crate::write::WriteValue;
@@ -287,6 +287,21 @@ impl<A> DriverHandle<A> {
 struct AddrConfig {
     version: u32,
     addrs: HashMap<String, String>,
+    /// Each device's poll interval and data topics. Older agents may
+    /// leave it out.
+    #[serde(default)]
+    groups: HashMap<String, GroupConfig>,
+}
+
+/// One entry of the address configuration's `groups`.
+#[derive(Deserialize)]
+struct GroupConfig {
+    /// The poll interval in milliseconds.
+    #[serde(default)]
+    poll: Option<f64>,
+    /// Data topics.
+    #[serde(default)]
+    addrs: Vec<String>,
 }
 
 /// Work done on a handler, one at a time and in order, by its own
@@ -296,7 +311,7 @@ enum Op<A> {
         seq: u64,
         raw: HashMap<String, String>,
     },
-    Subscribe(Vec<A>),
+    Subscribe(Vec<A>, Vec<AddrGroup<A>>),
     Cmd(String, Bytes),
     /// A typed write, with the data topic to report a failure on and
     /// the id to answer, if the agent is waiting for an answer.
@@ -380,6 +395,9 @@ pub struct Driver<H: Handler> {
     topics: HashMap<H::Addr, String>,
     /// address string → topic, for writes
     addr_topics: HashMap<String, String>,
+    /// The groups from the latest address configuration: name, poll
+    /// interval and data topics.
+    groups: Vec<(String, Duration, Vec<String>)>,
     addr_seq: u64,
     /// The address map being parsed, if any. Messages that depend on
     /// it wait in `deferred` until it is done.
@@ -417,6 +435,7 @@ impl<H: Handler + 'static> Driver<H> {
             addrs: HashMap::new(),
             topics: HashMap::new(),
             addr_topics: HashMap::new(),
+            groups: Vec::new(),
             addr_seq: 0,
             parsing: None,
             deferred: VecDeque::new(),
@@ -907,8 +926,8 @@ impl<H: Handler + 'static> Driver<H> {
                         addrs: parsed,
                     });
                 }
-                Op::Subscribe(specs) => {
-                    if !h.subscribe(&specs).await {
+                Op::Subscribe(specs, groups) => {
+                    if !h.subscribe_groups(&specs, &groups).await {
                         tracing::error!("handler subscription failed");
                     }
                 }
@@ -965,6 +984,21 @@ impl<H: Handler + 'static> Driver<H> {
         // parse_addr needs the handler, which may be busy (in connect,
         // say), so parse on the handler's own task and hold back
         // anything that depends on the result.
+        let mut groups: Vec<_> = pkt
+            .groups
+            .into_iter()
+            .map(|(name, g)| {
+                let poll = g
+                    .poll
+                    .filter(|p| p.is_finite() && *p >= 0.0)
+                    .map(|p| Duration::from_secs_f64(p / 1000.0))
+                    .unwrap_or_default();
+                (name, poll, g.addrs)
+            })
+            .collect();
+        groups.sort_by(|a, b| a.0.cmp(&b.0));
+        self.groups = groups;
+
         self.addr_seq += 1;
         let seq = self.addr_seq;
         if self.send_op(Op::Parse {
@@ -1136,7 +1170,19 @@ impl<H: Handler + 'static> Driver<H> {
             return;
         }
         let specs: Vec<H::Addr> = self.addrs.values().cloned().collect();
-        self.send_op(Op::Subscribe(specs));
+        let groups = self
+            .groups
+            .iter()
+            .map(|(name, poll, topics)| AddrGroup {
+                name: name.clone(),
+                poll: *poll,
+                addrs: topics
+                    .iter()
+                    .filter_map(|t| self.addrs.get(t).cloned())
+                    .collect(),
+            })
+            .collect();
+        self.send_op(Op::Subscribe(specs, groups));
     }
 
     /// Handle an event from a handler or a background task.
@@ -1247,6 +1293,7 @@ impl<H: Handler + 'static> Driver<H> {
         self.parsing = None;
         self.deferred.clear();
         self.clear_addrs();
+        self.groups.clear();
 
         let Some(handler) = self.handler.take() else {
             return;

@@ -8,11 +8,13 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { DumpLoader } from "../lib/dumps.js";
 import { MigrateSplitDrivers, SplitDrivers } from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
+
+import { FakeCDB } from "./fake-cdb.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;
@@ -31,45 +33,17 @@ function load_driverdefs () {
 }
 const DEFS = load_driverdefs();
 
-/* An in-memory ConfigDB with the calls the step makes. Every write is
- * recorded. `stale` lists [app, obj] writes to refuse once with 412. */
-class FakeCDB {
-    constructor () {
-        this.configs = new Map();
-        this.writes = [];
-        this.versions = new Map();
-        this.stale = [];
-    }
-
-    app (a) {
-        if (!this.configs.has(a)) this.configs.set(a, new Map());
-        return this.configs.get(a);
-    }
-    set (a, o, c) {
-        this.app(a).set(o, structuredClone(c));
-        const k = `${a}/${o}`;
-        this.versions.set(k, (this.versions.get(k) ?? 0) + 1);
-    }
-    get (a, o) { return structuredClone(this.app(a).get(o)); }
-
-    async get_all_configs (a) { return new Map(structuredClone([...this.app(a)])); }
-    async get_config_with_etag (a, o) {
-        if (!this.app(a).has(o)) return [];
-        return [this.get(a, o), String(this.versions.get(`${a}/${o}`))];
-    }
-    async put_config (a, o, c, opts) {
-        const i = this.stale.findIndex(([sa, so]) => sa == a && so == o);
-        if (i >= 0) {
-            this.stale.splice(i, 1);
-            /* Someone else saved it in between. */
-            this.set(a, o, this.get(a, o));
-            throw new ServiceError(UUIDs.Service.ConfigDB, "Stale", 412);
-        }
-        if (opts?.etag && opts.etag != String(this.versions.get(`${a}/${o}`)))
-            throw new ServiceError(UUIDs.Service.ConfigDB, "Stale", 412);
-        this.writes.push({ app: a, obj: o, config: structuredClone(c) });
-        this.set(a, o, c);
-    }
+/* The DriverDefs' names, from the objects section of edge.yaml. */
+function load_names () {
+    const loader = new DumpLoader({
+        dumps: [], acs_config: {}, local: s => s, log: () => {},
+    });
+    const docs = loader.parse_yaml(
+        fs.readFileSync(new URL("../dumps/edge.yaml", import.meta.url), "utf8"),
+        "edge.yaml");
+    const objs = docs.find(d => d.objects?.[UUIDs.Class.EdgeAgentDriver])
+        .objects[UUIDs.Class.EdgeAgentDriver];
+    return Object.fromEntries(Object.entries(objs).map(([u, o]) => [u, o.name]));
 }
 
 const AGENT = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -194,8 +168,29 @@ describe("the split DriverDefs", () => {
             assert.deepEqual(split.schema, internal.schema);
             assert.deepEqual(split.presentation, internal.presentation);
             assert.equal(split.polled, internal.polled);
-            assert.equal(split.hidden, true, "hidden until the image is published");
         }
+    });
+
+    /* The new-connection form offers DriverDefs that aren't hidden, and
+     * picks them by name. REST's split driver has replaced the
+     * built-in; MQTT's and OPC UA's images aren't published yet. */
+    test("offer REST's split driver as \"REST\" and hide the others", () => {
+        const { REST, MQTT, OPCUA } = SplitDrivers;
+        assert.equal(DEFS[REST.split].hidden, undefined);
+        assert.equal(DEFS[REST.internal].hidden, true);
+        for (const p of [MQTT, OPCUA]) {
+            assert.equal(DEFS[p.split].hidden, true);
+            assert.equal(DEFS[p.internal].hidden, undefined);
+        }
+
+        const names = load_names();
+        assert.equal(names[REST.split], "REST");
+        assert.equal(names[REST.internal], "REST (built-in)");
+        const offered = Object.entries(DEFS)
+            .filter(([, d]) => !d.hidden)
+            .map(([uuid]) => names[uuid]);
+        assert.equal(offered.filter(n => /^REST\b/.test(n)).length, 1);
+        assert.equal(new Set(offered).size, offered.length, "offered names are unique");
     });
 });
 

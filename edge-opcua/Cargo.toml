@@ -1,0 +1,38 @@
+[package]
+name = "edge-opcua"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "driver"
+path = "src/main.rs"
+
+[dependencies]
+rs-edge-driver = { path = "../lib/rs-edge-driver" }
+# The last release, 0.19.0 (July 2026), never publishes again after the
+# server restarts (upstream issue #270). The fix (7bed8169) and other
+# client fixes are only on master, so this pins master commit cabe0c61
+# (9 November 2026); Cargo.lock records the same commit. The git fetch
+# needs no credentials. When 0.20 or later is released, replace this
+# with `version = "0.20"`, run `cargo update -p async-opcua`, and run
+# the integration tests (EDGE_OPCUA_SERVER_TESTS=1 cargo test --test
+# opcua): reconnects_after_the_server_restarts fails on 0.19.0, so it
+# shows whether the release has the fix.
+async-opcua = { git = "https://github.com/freeopcua/async-opcua", rev = "cabe0c61c9fa92ea175c2cf1858e935be060027a", features = ["client"] }
+async-trait = "0.1"
+bytes = "1"
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tracing = "0.1"
+
+[dev-dependencies]
+# The driver-loop test borrows the fake Edge Agent from the library's
+# own tests, which needs these.
+rumqttc = "0.24"
+tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+strip = true

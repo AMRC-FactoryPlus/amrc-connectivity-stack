@@ -428,6 +428,18 @@ serviceSetup:
       admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707"
       editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
 
+    # Which Edge Agent connections run on split drivers (sidecar
+    # containers) instead of the driver built into the Edge Agent.
+    # Each protocol takes `true` (move its connections to the split
+    # driver), `false` (move them back to the built-in driver) or
+    # `null` (leave them where they are). Service-setup does the move
+    # on every install or upgrade, and each Edge Agent with a moved
+    # connection restarts once. `dryRun: true` logs what would move
+    # and changes nothing. See
+    # docs/architecture/edge-management/split-drivers.md.
+    splitDrivers:
+      REST: true
+
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.
     # Every client automatically gets the fp_principal_uuid and

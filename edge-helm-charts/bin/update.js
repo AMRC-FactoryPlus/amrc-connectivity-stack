@@ -71,6 +71,18 @@ if (!main || main == acs) {
     await set_branch("main", "acs");
     await push_ref("main");
 }
+else {
+    /* Edge clusters deploy from main, so they keep the charts, and
+     * the image tag, of whatever release was last merged into it. A
+     * connection moved to a split driver new in this release has no
+     * image at that tag, so it gets no data. */
+    log("WARNING: branch main of %s has commits of its own, so it has not "
+        + "been moved to this release's charts. Edge clusters will keep "
+        + "running the images main names, and Edge Agent connections moved "
+        + "to split drivers in this release will get no data. Merge branch "
+        + "acs into main and push it to give the edge clusters this release.",
+        path);
+}
 
 log("Done.");
 

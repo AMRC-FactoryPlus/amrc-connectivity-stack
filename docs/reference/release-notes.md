@@ -12,6 +12,91 @@ These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.
 
+### Before you upgrade: version 7 moves REST connections out of the Edge Agent
+
+The release with this change is a major release, ACS version 7. Read
+this section before upgrading a production installation, because a
+site with its own changes to its edge Helm charts must take one manual
+step during the upgrade, and a site that misses it loses data from
+some devices until it does.
+
+**What changes.** An Edge Agent reads devices either with code built
+into the Edge Agent or with a separate small program, a split driver,
+that runs in its own container beside it. In version 7, every Edge
+Agent connection that uses the built-in REST connection moves to a new
+REST split driver, `edge-rest`, by itself on upgrade. Each connection
+keeps its details, devices and addresses, and its devices publish the
+same data. Each Edge Agent with a REST connection restarts once or
+twice in the minutes after the upgrade, as the new container is added,
+so its REST devices have no data for that time. New REST connections in
+the Manager use the split driver, under the name "REST". MQTT, OPC UA
+and UDP connections stay built in for now and will move the same way in
+later releases.
+
+**Why some sites must act.** Edge clusters get their software from the
+edge Helm charts in the `shared/helm` git repository on the central
+cluster. Each upgrade writes the new charts to the `acs` branch, but
+edge clusters deploy from `main`, and the upgrade only moves `main` if
+nobody has committed to it. On a site that has committed its own
+changes to `main`, the edge clusters keep running the older release,
+which has no `edge-rest`. The REST connections move anyway, because the
+move happens on the central cluster, so on those edge clusters the new
+container can't start and the moved REST devices get no data.
+
+**Upgrade procedure.**
+
+1. **Find out whether your site has its own edge chart changes.**
+   Signing in as the ACS admin user when asked, run
+   `git ls-remote https://git.<your ACS domain>/git/shared/helm refs/heads/main refs/heads/acs`.
+   If both lines show the same commit hash, you have no changes of your
+   own and the upgrade handles everything: skip to step 3.
+2. **If the hashes differ, choose one of these.**
+   - Upgrade, then as soon as the `service-setup` Job has finished,
+     merge `acs` into `main` in `shared/helm` (keeping your own changes)
+     and push `main`. Your edge clusters pick it up within a few
+     minutes, and the REST devices' data resumes.
+   - Or, to upgrade now and merge later, set
+     `serviceSetup.config.splitDrivers.REST: null` in your values for
+     this upgrade. Your REST connections stay built in. Set it back to
+     `true` (or remove it) on a later upgrade, once you have merged.
+3. **Check every edge cluster is syncing** from the central cluster
+   before you upgrade. An edge cluster that can't fetch from the central
+   git server keeps its old software, and its moved REST devices have no
+   data until it can.
+4. **Run the upgrade, and wait for the `service-setup` Job to
+   complete.** The `edge-helm-charts` container's log has a line
+   starting `WARNING: branch main of shared/helm has commits of its own`
+   if your site needs step 2.
+5. **Check it worked.** Find the line starting `Split drivers:` in the
+   `service-setup` container's log, which says how many REST connections
+   moved and how many failed. Each Edge Agent pod with REST connections
+   has a running `driver-<name>` container, and the REST devices are
+   publishing again a few minutes after the upgrade.
+
+**If the REST devices have no data after the upgrade**, and their Edge
+Agent pod's `driver-<name>` container can't pull its image
+(`ImagePullBackOff`), your edge clusters didn't get the new charts.
+Merge `acs` into `main` in `shared/helm` and push it, as in step 2, and
+the data comes back within a few minutes with nothing else to do. Or
+set `serviceSetup.config.splitDrivers.REST: false` and upgrade again to
+move the connections back to the built-in connection.
+
+**What you may notice afterwards.** A failing REST endpoint is logged
+once until it recovers, rather than on every poll. One failing endpoint
+no longer takes the other devices on the connection offline: they go
+offline only when every endpoint has failed for a whole poll round, and
+come back as soon as one answers. A request gives up after 25 seconds,
+where the built-in connection waited for ever. Page counters in
+addresses (such as `${1:_}`) now work. A write posts the value alone as
+JSON, and shows as written only once the device accepts it.
+
+**To move back** at any time, set
+`serviceSetup.config.splitDrivers.REST: false` and upgrade again. Every
+connection's config returns to exactly what it was.
+
+See [Split Drivers](../architecture/edge-management/split-drivers.md)
+for the full detail.
+
 ### Upgrading: i3X implements version 1.0 of the specification
 
 The i3X service now reports `specVersion: "1.0"` and answers in the 1.0

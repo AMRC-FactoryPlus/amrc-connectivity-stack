@@ -466,6 +466,7 @@ jobs:
           - edge-mqtt
           - edge-rest
           - edge-udp
+          - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -515,6 +516,7 @@ jobs:
           - edge-mqtt
           - edge-rest
           - edge-udp
+          - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -564,6 +566,7 @@ jobs:
           - edge-mqtt
           - edge-rest
           - edge-udp
+          - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads

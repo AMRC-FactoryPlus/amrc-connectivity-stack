@@ -66,6 +66,9 @@ objects:
     !u ACS.Driver.ADS:              { name: "ADS" }
     !u ACS.Driver.RTDE:             { name: "RTDE" }
     !u ACS.Driver.Pathfindr:        { name: "Pathfindr" }
+    !u ACS.Driver.RESTSplit:        { name: "REST (split driver)" }
+    !u ACS.Driver.MQTTSplit:        { name: "MQTT (split driver)" }
+    !u ACS.Driver.OPCUASplit:       { name: "OPC-UA (split driver)" }
 
 configs:
   # Driver Definition Configuration
@@ -102,7 +105,7 @@ configs:
   !u Edge.App.DriverDef:
     !u ACS.Driver.REST:
       polled: true
-      presentation:
+      presentation: &rest_presentation
         address:
           title: "REST Endpoint"
           description: "The path following the domain in a REST call URL (e.g. /status)"
@@ -116,7 +119,7 @@ configs:
       internal:
         connType: REST
         details: RESTConnDetails
-      schema:
+      schema: &rest_schema
         properties:
           authMethod:
             default: None
@@ -263,7 +266,7 @@ configs:
         type: object
     !u ACS.Driver.OPCUA:
       polled: true
-      presentation:
+      presentation: &opcua_presentation
         address:
           title: "Node ID"
           description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
@@ -274,7 +277,7 @@ configs:
       internal:
         connType: OPC UA
         details: OPCUAConnDetails
-      schema:
+      schema: &opcua_schema
         properties:
           endpoint:
             minLength: 1
@@ -349,7 +352,7 @@ configs:
         type: object
     !u ACS.Driver.MQTT:
       polled: false
-      presentation:
+      presentation: &mqtt_presentation
         address:
           title: "Topic"
           description: "The MQTT topic to subscribe to (e.g. device/+/data or factory/area1/#)"
@@ -363,7 +366,7 @@ configs:
       internal:
         connType: MQTT
         details: MQTTConnDetails
-      schema:
+      schema: &mqtt_schema
         properties:
           host:
             minLength: 1
@@ -1269,6 +1272,34 @@ configs:
           - clientSecret
         title: "Pathfindr Connection Details"
         type: object
+
+    # Split drivers that replace the internal REST, MQTT and OPC UA
+    # drivers. They share the internal driver's form, so connection
+    # details keep their field names. Service-setup moves connections
+    # between the two when serviceSetup.config.splitDrivers says so
+    # (lib/split-drivers.js). They stay hidden from the new-connection
+    # form until their images are published.
+    !u ACS.Driver.RESTSplit:
+      hidden: true
+      polled: true
+      presentation: *rest_presentation
+      image:
+        repository: edge-rest
+      schema: *rest_schema
+    !u ACS.Driver.MQTTSplit:
+      hidden: true
+      polled: false
+      presentation: *mqtt_presentation
+      image:
+        repository: edge-mqtt
+      schema: *mqtt_schema
+    !u ACS.Driver.OPCUASplit:
+      hidden: true
+      polled: true
+      presentation: *opcua_presentation
+      image:
+        repository: edge-opcua
+      schema: *opcua_schema
 
     !u ACS.Driver.External:
       polled: false

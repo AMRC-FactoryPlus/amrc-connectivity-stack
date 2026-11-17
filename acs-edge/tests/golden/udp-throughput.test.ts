@@ -252,12 +252,14 @@ async function run (c: Case, rate: number, split: boolean): Promise<Result> {
         await translator.start();
         if (split) {
             const password = crypto.randomBytes(16).toString("hex");
-            fs.writeFileSync(path.join(pwdir, entry.name), password);
+            /* The id the chart gives the sidecar, as in harness.ts. */
+            const id = entry.driverId ?? entry.name;
+            fs.writeFileSync(path.join(pwdir, id), password);
             const { port: mport } = translator.broker.server!.address() as AddressInfo;
             const [cmd, ...args] = DRIVER!.split(/\s+/);
             driver = spawn(cmd, args, {
                 env: { ...process.env, EDGE_MQTT: `mqtt://127.0.0.1:${mport}`,
-                    EDGE_USERNAME: entry.name, EDGE_PASSWORD: password },
+                    EDGE_USERNAME: id, EDGE_PASSWORD: password },
                 stdio: ["ignore", "pipe", "pipe"],
             });
             const keep = (b: Buffer) => {

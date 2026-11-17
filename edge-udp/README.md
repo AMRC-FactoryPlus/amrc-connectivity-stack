@@ -79,11 +79,22 @@ the defaults are what runs.
 ## Network
 
 A split driver runs as a sidecar in the Edge Agent's pod and shares its
-network, so it receives datagrams sent to the pod's IP on the port, as
-the agent container did. The chart gives the pod no `hostNetwork`, no
-UDP `containerPort` and a Service for MQTT (1883) only, so a device
-outside the cluster cannot reach the port without one of those, for
-the built-in connection or this driver.
+network. This driver's DriverDef declares that it listens on the UDP
+port in its `port` field (`hostPorts` in `ACS.Driver.UDPSplit`), so
+the Deployment values the Manager writes carry the port, and the
+edge-agent chart opens it on the node as a `hostPort` on this
+container only. A device outside the cluster sends to the node's
+address on the connection's port, and the driver sees the device's own
+address as the source. The built-in connection gets no host port.
+
+[Connecting a UDP device](../docs/services/udp-devices.md) says what to
+send to, what the network must allow and how to raise
+`net.core.rmem_max` on the node.
+
+`test-hostport/run.sh` checks the arrangement without a cluster: it
+builds a pod network namespace behind the same DNAT rule the CNI
+`portmap` plugin adds for a `hostPort`, runs this driver in it, and
+sends datagrams from a separate network to the node's address.
 
 ## Building and testing
 

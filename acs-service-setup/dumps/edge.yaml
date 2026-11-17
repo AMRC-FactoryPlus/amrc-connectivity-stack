@@ -52,7 +52,7 @@ objects:
         - !u MetaDB.Class.ConfigEntry
 
   !u Edge.Class.Driver:
-    !u ACS.Driver.REST:             { name: "REST" }
+    !u ACS.Driver.REST:             { name: "REST (built-in)" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
     !u ACS.Driver.UDP:              { name: "UDP" }
@@ -65,7 +65,7 @@ objects:
     !u ACS.Driver.ADS:              { name: "ADS" }
     !u ACS.Driver.RTDE:             { name: "RTDE" }
     !u ACS.Driver.Pathfindr:        { name: "Pathfindr" }
-    !u ACS.Driver.RESTSplit:        { name: "REST (split driver)" }
+    !u ACS.Driver.RESTSplit:        { name: "REST" }
     !u ACS.Driver.MQTTSplit:        { name: "MQTT (split driver)" }
     !u ACS.Driver.OPCUASplit:       { name: "OPC-UA (split driver)" }
 
@@ -102,7 +102,11 @@ configs:
   #       placeholder: "e.g. temperature"
   #       hidden: false
   !u Edge.App.DriverDef:
+    # The built-in REST driver. New REST connections use the split
+    # driver below, so this one is hidden from the new-connection form,
+    # but a connection a site has moved back to it still shows it.
     !u ACS.Driver.REST:
+      hidden: true
       polled: true
       presentation: &rest_presentation
         address:
@@ -1175,10 +1179,11 @@ configs:
     # drivers. They share the internal driver's form, so connection
     # details keep their field names. Service-setup moves connections
     # between the two when serviceSetup.config.splitDrivers says so
-    # (lib/split-drivers.js). They stay hidden from the new-connection
-    # form until their images are published.
+    # (lib/split-drivers.js). MQTT and OPC UA stay hidden from the
+    # new-connection form until their images are published. REST has
+    # replaced the built-in: it is offered as "REST", and the chart
+    # moves REST connections to it by default.
     !u ACS.Driver.RESTSplit:
-      hidden: true
       polled: true
       presentation: *rest_presentation
       image:

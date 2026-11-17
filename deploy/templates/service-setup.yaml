@@ -113,6 +113,34 @@ spec:
               value: ALL,!token,!service
             - name: GIT_REPO_PATH
               value: {{ .Values.edgeHelm.repoPath }}
+        # Moves connections between internal and split drivers. It runs
+        # after edge-helm-charts because it only moves a connection to a
+        # split driver once the edge charts that edge clusters deploy
+        # carry this release's images.
+        - name: split-drivers
+{{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
+          command: ["node", "bin/split-drivers.js"]
+          env:
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+            - name: VERBOSE
+              value: ALL,!token,!service
+            - name: SS_CONFIG
+              value: {{ .Values.serviceSetup.config | toRawJson | quote }}
+            - name: GIT_REPO_PATH
+              value: {{ .Values.edgeHelm.repoPath }}
+            - name: GIT_CHECKOUTS
+              value: /data
+          volumeMounts:
+            - mountPath: /data
+              name: git-checkouts
 {{ if .Values.acs.schemas.load }}
         - name: load-schemas
 {{ include "amrc-connectivity-stack.image" (list . .Values.acs.schemas) | indent 10 }}

@@ -21,6 +21,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import util from "node:util";
 
 import yaml from "yaml";
 
@@ -31,6 +32,7 @@ import { MigrateSplitDrivers } from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
 import { FakeCDB } from "./fake-cdb.js";
+import { FakeCharts, chart_values, ready_charts } from "./fake-charts.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;
@@ -89,8 +91,8 @@ function state (cdb) {
 }
 const text = s => JSON.stringify(s, null, 2) + "\n";
 
-const run = (cdb, settings) => new MigrateSplitDrivers({
-    fplus: { ConfigDB: cdb }, settings, log: () => {},
+const run = (cdb, settings, edge_charts = ready_charts()) => new MigrateSplitDrivers({
+    fplus: { ConfigDB: cdb }, settings, edge_charts, log: () => {},
 }).run();
 
 const entry = (cdb, agent, conn) => cdb.get(App.EdgeAgentConfig, agent)
@@ -208,5 +210,170 @@ describe("moving a site's REST connections with the chart's defaults", () => {
         await run(cdb, { ...defaults, REST: false });
         await run(cdb, defaults);
         assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+    });
+});
+
+/* A run that keeps what it logs. */
+async function run_logged (cdb, settings, edge_charts) {
+    const lines = [];
+    const count = await new MigrateSplitDrivers({
+        fplus: { ConfigDB: cdb }, settings, edge_charts,
+        log: (fmt, ...args) => lines.push(util.format(fmt, ...args)),
+    }).run();
+    return { count, lines };
+}
+
+const NEW = chart_values("v9.0.0");
+const OLD = chart_values("v8.5.0");
+const held_line = lines => lines.filter(l => l.startsWith("Not moving"));
+
+describe("moving to a split driver only when the edge clusters can run it", () => {
+    const defaults = chart_defaults();
+
+    test("a customised main branch moves nothing and writes nothing", async () => {
+        const cdb = site();
+        const { count, lines } = await run_logged(cdb, defaults,
+            new FakeCharts({ main: OLD, acs: NEW }));
+        assert.deepEqual(cdb.writes, []);
+        assert.equal(count.moved, 0);
+        assert.equal(text(state(cdb)), text(SITE.configs));
+
+        const held = held_line(lines);
+        assert.equal(held.length, 1, "one line says why");
+        assert.match(held[0], /^Not moving REST connections to split drivers/);
+        assert.match(held[0], /main deploys ghcr.io\/amrc-factoryplus tag v8.5.0 but this release is ghcr.io\/amrc-factoryplus tag v9.0.0/);
+        assert.match(held[0], /merge branch acs into main in the edge Helm chart repo shared\/helm/);
+    });
+
+    test("identical branches move", async () => {
+        const cdb = site();
+        const { count } = await run_logged(cdb, defaults,
+            new FakeCharts({ main: NEW, acs: NEW }));
+        assert.equal(count.moved, 2);
+        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+    });
+
+    test("a customised main that has merged acs moves", async () => {
+        /* A merge adds a commit acs lacks; what counts is the images
+         * main deploys. Other customisation is kept. */
+        const cdb = site();
+        const merged = NEW + "# a site's own change\nverbosity: ALL\n";
+        const { count } = await run_logged(cdb, defaults,
+            new FakeCharts({ main: merged, acs: NEW }));
+        assert.equal(count.moved, 2);
+    });
+
+    test("the next run after the site merges does the move by itself", async () => {
+        const cdb = site();
+        const charts = new FakeCharts({ main: OLD, acs: NEW });
+        await run_logged(cdb, defaults, charts);
+        assert.deepEqual(cdb.writes, []);
+
+        charts.branches.main = NEW;
+        const { count } = await run_logged(cdb, defaults, charts);
+        assert.equal(count.moved, 2);
+        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+    });
+
+    test("a registry that differs holds the move back", async () => {
+        const cdb = site();
+        await run_logged(cdb, defaults, new FakeCharts({
+            main: chart_values("v9.0.0", "registry.example.org/mirror"), acs: NEW,
+        }));
+        assert.deepEqual(cdb.writes, []);
+    });
+
+    for (const [why, branches] of [
+        ["the repo can't be read", { main: new Error("connection refused"), acs: NEW }],
+        ["main is missing", { acs: NEW }],
+        ["acs is missing", { main: NEW }],
+        ["main has no image tag", { main: "image: {}\n", acs: NEW }],
+    ]) {
+        test(`nothing moves when ${why}`, async () => {
+            const cdb = site();
+            const { count, lines } = await run_logged(cdb, defaults, new FakeCharts(branches));
+            assert.deepEqual(cdb.writes, []);
+            assert.equal(count.moved, 0);
+            assert.equal(held_line(lines).length, 1);
+        });
+    }
+
+    test("nothing moves without a chart check", async () => {
+        const cdb = site();
+        const { lines } = await run_logged(cdb, defaults, undefined);
+        assert.deepEqual(cdb.writes, []);
+        assert.match(held_line(lines)[0], /no edge chart check was given/);
+    });
+
+    test("every protocol is held back together", async () => {
+        const cdb = site();
+        const { lines } = await run_logged(cdb, { REST: true, MQTT: true },
+            new FakeCharts({ main: OLD, acs: NEW }));
+        assert.deepEqual(cdb.writes, []);
+        assert.match(held_line(lines)[0], /^Not moving REST, MQTT connections/);
+    });
+
+    test("moving back still runs while main is customised", async () => {
+        const cdb = site();
+        await run(cdb, defaults);
+        const { count, lines } = await run_logged(cdb, { ...defaults, REST: false },
+            new FakeCharts({ main: OLD, acs: NEW }));
+        assert.equal(count.moved, 2);
+        assert.equal(held_line(lines).length, 0, "a move back needs no check");
+        assert.equal(text(state(cdb)), text(SITE.configs));
+    });
+
+    test("driver ids are still repaired while main is customised", async () => {
+        const cdb = site();
+        /* A split driver from before driver ids, with a dotted name. */
+        const ea = cdb.get(App.EdgeAgentConfig, AGENT);
+        ea.deviceConnections.find(c => c.uuid == C.plc).name = "plc.example";
+        cdb.set(App.EdgeAgentConfig, AGENT, ea);
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.drivers = { "plc.example": dep.values.drivers["PLC-1"] };
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+
+        const { count } = await run_logged(cdb, defaults, new FakeCharts({ main: OLD, acs: NEW }));
+        assert.equal(count.ids, 1);
+        assert.equal(count.moved, 0);
+        assert.match(entry(cdb, AGENT, C.plc).driverId, /^plc-example-/);
+    });
+
+    for (const [where, image] of [
+        ["the default tag", { default: { tag: "v8.5.0" } }],
+        ["the default registry", { default: { registry: "registry.example.org" } }],
+        ["the Edge Agent's tag", { edgeAgent: { tag: "v8.5.0" } }],
+    ]) {
+        test(`a Deployment that pins ${where} holds back its agent's connections`, async () => {
+            const cdb = site();
+            const dep = cdb.get(Edge.App.Deployment, AGENT);
+            dep.values.image = image;
+            cdb.set(Edge.App.Deployment, AGENT, dep);
+
+            const { count, lines } = await run_logged(cdb, defaults, ready_charts());
+            assert.equal(count.moved, 0);
+            assert.equal(count.held, 2);
+            assert.deepEqual(cdb.writes, []);
+            const held = lines.filter(l => /not moving to the split driver/.test(l));
+            assert.equal(held.length, 2);
+            assert.match(held[0], /Deployment sets image\./);
+
+            /* Removing the pin lets the next run move them. */
+            delete dep.values.image;
+            cdb.set(Edge.App.Deployment, AGENT, dep);
+            const again = await run_logged(cdb, defaults, ready_charts());
+            assert.equal(again.count.moved, 2);
+        });
+    }
+
+    test("a pinned Deployment still moves back", async () => {
+        const cdb = site();
+        await run(cdb, defaults);
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.image = { default: { tag: "v8.5.0" } };
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+
+        const { count } = await run_logged(cdb, { ...defaults, REST: false }, ready_charts());
+        assert.equal(count.moved, 2);
     });
 });

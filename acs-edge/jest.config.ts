@@ -3,6 +3,12 @@
  *  Copyright 2023 AMRC
  */
 
+// Run every suite in UTC. A DateTime read from a date string with no
+// zone (" 7 ", "2026-07-01T12:00:00") is parsed in local time, so
+// without this the golden snapshots depend on the machine. Jest loads
+// this file before it starts the test workers, which inherit it.
+process.env.TZ = 'UTC';
+
 /** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
 export default {
   preset: 'ts-jest',

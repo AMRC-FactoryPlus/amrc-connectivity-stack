@@ -357,6 +357,11 @@ impl OpcuaHandler {
                 let Some(v) = dv.value else {
                     return;
                 };
+                // async-opcua calls this for each value of a
+                // notification in one synchronous loop, and `publish`
+                // only queues, so a notification's values reach the
+                // agent back to back and it can put them in one DDATA.
+                // Don't add an await here (publish_wait would).
                 if let Some(p) = value::packet(&v, now_ms()) {
                     handle.publish(addr.clone(), p.into());
                 }

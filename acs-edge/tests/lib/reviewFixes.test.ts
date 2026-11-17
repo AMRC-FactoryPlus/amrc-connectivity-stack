@@ -173,3 +173,61 @@ describe("several split-driver connections on one agent", () => {
         expect(broker.listeners).toHaveLength(0);
     });
 });
+
+/* Finding 5 */
+describe("addresses and names that are Object property names", () => {
+    const NAMES = ["__proto__", "constructor", "toString", "hasOwnProperty", "valueOf"];
+
+    it.each(NAMES)("%s works as an address, a path and a metric name", (n) => {
+        const metrics = new Metrics([
+            { name: n, type: T.double, value: null, properties: {
+                method: { type: T.string, value: "GET" },
+                address: { type: T.string, value: n },
+                path: { type: T.string, value: n },
+            } } as sparkplugMetric,
+            { name: "plain", type: T.double, value: null, properties: {
+                method: { type: T.string, value: "GET" },
+                address: { type: T.string, value: "plain" },
+                path: { type: T.string, value: "" },
+            } } as sparkplugMetric,
+        ]);
+        expect(metrics.addresses.sort()).toEqual([n, "plain"].sort());
+        expect(metrics.getPathsForAddr(n)).toEqual([n]);
+        expect(metrics.getByAddrPath(n, n).name).toBe(n);
+        expect(metrics.getByAddress(n).map(m => m.name)).toEqual([n]);
+        expect(metrics.getByName(n).name).toBe(n);
+        expect(metrics.getPathsForAddr("toLocaleString")).toEqual([]);
+    });
+
+    it.each(NAMES)("a device with address %s publishes its data", (n) => {
+        const conf = reHashConf({ deviceConnections: [{
+            name: "c", connType: "MQTT", payloadFormat: "JSON",
+            devices: [{ deviceId: "D", pubInterval: 0, payloadFormat: "JSON",
+                templates: [], tags: [
+                    { Name: n, type: "Double", method: "GET", address: n,
+                        path: "$.v", value: null, recordToDB: true },
+                    { Name: "plain", type: "Double", method: "GET",
+                        address: "plain", path: "$.v", value: null, recordToDB: true },
+                ] }],
+        }] });
+        const published: any[] = [];
+        jest.useFakeTimers("modern");
+        try {
+            const dev = new Device({} as any, idle_conn(), {
+                deviceId: "D", pollInt: 1e9, pubInterval: 0, templates: [],
+                metrics: conf.deviceConnections[0].devices[0].metrics,
+                payloadFormat: "JSON",
+            } as any);
+            (dev as any)._publishDData = (ms: any[]) =>
+                published.push(...ms.map(m => [m.name, m.value]));
+            dev._handleData({ [n]: Buffer.from('{"v": 1}') }, true);
+            dev._handleData({ plain: Buffer.from('{"v": 2}') }, true);
+            dev.stop();
+        }
+        finally {
+            jest.clearAllTimers();
+            jest.useRealTimers();
+        }
+        expect(published).toEqual([[n, 1], ["plain", 2]]);
+    });
+});

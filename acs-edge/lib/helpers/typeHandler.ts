@@ -257,10 +257,12 @@ export class Metrics {
 
     constructor(metricArr: sparkplugMetric[]) {
         this.#array = metricArr;
-        this.#nameIndex = {};
-        this.#aliasIndex = {};
-        this.#addrPathIndex = {};
-        this.#addrIndex = {};
+        /* Null-prototype objects, because a name, address or path can
+         * be any string, "__proto__" and "constructor" included. */
+        this.#nameIndex = Object.create(null);
+        this.#aliasIndex = Object.create(null);
+        this.#addrPathIndex = Object.create(null);
+        this.#addrIndex = Object.create(null);
         this.#buildIndices();
     }
 
@@ -279,7 +281,7 @@ export class Metrics {
                 }
                 this.#addrIndex[addr].push(i);
                 if (!this.#addrPathIndex[addr]) {
-                    this.#addrPathIndex[addr] = {};
+                    this.#addrPathIndex[addr] = Object.create(null);
                 }
                 this.#addrPathIndex[addr][path] = i;
             }

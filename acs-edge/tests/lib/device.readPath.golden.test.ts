@@ -20,6 +20,8 @@ import { Device } from "../../lib/device";
 import { serialisationType } from "../../lib/helpers/typeHandler";
 import { event_address, event_payload, read_fixture } from "../fixtures/drivers/fixture";
 
+/* jest.config.ts runs the tests in UTC, because a DateTime read from a
+ * date string with no zone is parsed in local time. */
 /* Every timestamp the agent makes up itself comes from Date.now(), which
  * the fake timers pin to this. */
 const NOW = 1_763_380_800_000;
@@ -255,6 +257,18 @@ const MIXED_STEPS: Step[] = [
         hf: j([{ value: 15, timestamp: 1763380000050 }]) },
 ];
 
+/* Date strings a DateTime metric may be sent. The first five have no
+ * zone. */
+const ZONELESS_DATES = [
+    " 7 ", "12", "2026-07-01T12:00:00", "2026-01-15T12:00:00",
+    "July 1, 2026 12:00",
+];
+const ZONED_DATES = [
+    "2026-07-01T12:00:00Z", "2026-07-01T12:00:00+02:00", "2026-07-01",
+    "Wed, 01 Jul 2026 12:00:00 GMT",
+];
+const DATE_STRINGS = [...ZONELESS_DATES, ...ZONED_DATES];
+
 const CASES: { [name: string]: Case } = {
     "JSON: every type through a nested path": {
         format: "JSON",
@@ -262,6 +276,14 @@ const CASES: { [name: string]: Case } = {
             address: "a", path: `$.m.${type}` })),
         steps: JSON_VALUES.map(v => ({ a: j({ m: Object.fromEntries(
             JSON_TYPES.map(t => [t, v])) }) })),
+    },
+    /* A DateTime read from a string with no zone depends on the agent's
+     * time zone (Date.parse reads it as local time). This records it in
+     * UTC; the "zoneless" test checks the dependence. */
+    "JSON: DateTime from strings with and without a zone": {
+        format: "JSON",
+        tags: [{ Name: "dt", type: "DateTime", address: "a", path: "$.d" }],
+        steps: DATE_STRINGS.map(d => ({ a: j({ d }) })),
     },
     "JSON: the same types with BE and LE suffixes": {
         format: "JSON",
@@ -727,6 +749,20 @@ describe("Device._handleData golden output", () => {
         const out = run({ format: "JSON", tags, steps: [
             { hf: j([{ value: 10, timestamp: 1763380000000 }]) }] });
         expect(out).toEqual([[]]);
+    });
+
+    /* A DateTime from a string with no zone is read in the agent's
+     * time zone, which is UTC here. Existing behaviour, which split
+     * drivers must match. */
+    test("zoneless DateTime strings are read in the agent's time zone", () => {
+        expect(new Date(2026, 6, 1).getTimezoneOffset()).toBe(0);
+        const out = run(CASES["JSON: DateTime from strings with and without a zone"])
+            .map(o => (o as any[])[0]?.value);
+        expect(out.slice(0, ZONELESS_DATES.length)).toEqual([
+            Date.UTC(2001, 6, 1), Date.UTC(2001, 11, 1),
+            Date.UTC(2026, 6, 1, 12), Date.UTC(2026, 0, 15, 12),
+            Date.UTC(2026, 6, 1, 12),
+        ]);
     });
 
     for (const fx of ["mqtt-json", "mqtt-delimited", "rest-json",

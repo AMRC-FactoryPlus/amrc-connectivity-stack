@@ -986,6 +986,92 @@ Array [
 ]
 `;
 
+exports[`Device._handleData golden output JSON: DateTime from strings with and without a zone 1`] = `
+Array [
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 993945600000,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1007164800000,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1782907200000,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1768478400000,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1782907200000,
+    },
+  ],
+  Array [],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1782900000000,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1782864000000,
+    },
+  ],
+  Array [
+    Object {
+      "isNull": false,
+      "name": "dt",
+      "timestamp": "<now>",
+      "timestampNs": "<now_ns>",
+      "type": "DateTime",
+      "value": 1782907200000,
+    },
+  ],
+]
+`;
+
 exports[`Device._handleData golden output JSON: every type through a nested path 1`] = `
 Array [
   Array [
@@ -4031,7 +4117,7 @@ Array [
       "timestamp": "<now>",
       "timestampNs": "<now_ns>",
       "type": "DateTime",
-      "value": 993942000000,
+      "value": 993945600000,
     },
     Object {
       "isNull": false,

@@ -231,3 +231,24 @@ describe("addresses and names that are Object property names", () => {
         expect(published).toEqual([[n, 1], ["plain", 2]]);
     });
 });
+
+/* Finding 6 */
+describe("a device that never connects", () => {
+    it("stops its ready timer on stop()", () => {
+        const set = jest.spyOn(global, "setInterval");
+        const clear = jest.spyOn(global, "clearInterval");
+        jest.spyOn(console, "log").mockImplementation(() => {});
+        const dev = new Device({} as any, idle_conn(), {
+            deviceId: "D", pollInt: 1e9, pubInterval: 0, templates: [],
+            metrics: [], payloadFormat: "JSON",
+        } as any);
+        const timers = set.mock.results.map(r => r.value);
+        expect(timers.length).toBeGreaterThan(0);
+
+        dev.stop();
+
+        const cleared = clear.mock.calls.map(c => c[0]);
+        for (const t of timers)
+            expect(cleared).toContain(t);
+    });
+});

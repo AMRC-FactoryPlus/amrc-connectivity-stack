@@ -217,6 +217,10 @@ export class Device {
     #pubInterval: number                            // Batch interval for DATA packets
     #pubTimer: Timer                                // Batch timer
     #pubBuffer: sparkplugMetric[]                   // Batch buffer
+    /* Checks every 100 ms for the connection to come up. Cleared when
+     * it does, or by stop(), so a device whose driver never comes up
+     * doesn't keep its old device graph alive across reloads. */
+    #readyTimer: ReturnType<typeof setInterval> | null = null
     /* Payload failures already logged, by address and message, so a
      * device sent the same bad payload on every poll logs it once. */
     #failures = new Set<string>()
@@ -349,14 +353,13 @@ export class Device {
 
         //What to do when the device is ready
         //We Just need to sub to metric changes
-        let readyInterval = setInterval(() => {
+        this.#readyTimer = setInterval(() => {
             // Keep checking if the device is ready
             // If so...
             if (this._isConnected) {
-
-                this.#subscribeToMetricChanges();
                 // Stop checking if device is ready
-                clearInterval(readyInterval);
+                this.#stopReadyTimer();
+                this.#subscribeToMetricChanges();
             }
         }, 100);
 
@@ -534,6 +537,12 @@ export class Device {
 
         // Kick the watchdog timer to prevent the device dying
         this._refreshDeathTimer();
+    }
+
+    #stopReadyTimer() {
+        if (this.#readyTimer === null) return;
+        clearInterval(this.#readyTimer);
+        this.#readyTimer = null;
     }
 
     /* A payload that made a reader throw. Its address is skipped and the
@@ -766,6 +775,7 @@ export class Device {
      */
     stop() {
 
+        this.#stopReadyTimer();
         this._stopMetricSubscription();
 
         // Stop the watchdog timer so that we can instantly stop

@@ -1,0 +1,98 @@
+name: Split driver golden output
+# Builds each Rust split driver that replaces a built-in connection and
+# runs the golden-output harness (acs-edge/tests/golden) against it: the
+# real Edge Agent runs every committed sample of the driver's protocol
+# once with the built-in connection and once with the driver, and the
+# Sparkplug output must match. It also runs the driver's tests with the
+# system packages they need, which rust.yaml does not install.
+#
+# To add a driver, add an entry to the matrix below.
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'edge-mqtt/**'
+      - 'lib/rs-edge-driver/**'
+      # The agent and the harness are half of every comparison.
+      - 'acs-edge/**'
+      - 'lib/js-edge-driver/**'
+      - 'lib/js-service-client/**'
+      - 'acs-service-setup/lib/split-drivers.js'
+      - '.github/workflows/split-driver-golden.yaml'
+
+env:
+  # Keep this in step with rust.yaml and the driver Dockerfiles.
+  RUSTUP_TOOLCHAIN: '1.99'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  golden:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: edge-mqtt
+            protocol: MQTT
+            packages: mosquitto
+            test_env: EDGE_MQTT_MOSQUITTO=1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # libkrb5-dev is for the service client's optional GSSAPI module,
+      # which the agent's install builds.
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev ${{ matrix.packages }}
+
+      - name: Set up Rust
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.driver }}/target
+          key: ${{ runner.os }}-golden-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.driver }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.driver)) }}
+          restore-keys: |
+            ${{ runner.os }}-golden-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.driver }}-
+
+      - name: Driver tests
+        working-directory: ${{ matrix.driver }}
+        run: env ${{ matrix.test_env }} cargo test --locked
+
+      - name: Build the driver
+        working-directory: ${{ matrix.driver }}
+        run: cargo build --release --locked
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # As acs-edge-tests.yaml: the npm shipped with Node 22 crashes on
+      # file: dependencies.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install agent dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      - name: Install driver library dependencies
+        working-directory: lib/js-edge-driver
+        run: npm ci
+
+      - name: Golden output
+        working-directory: acs-edge
+        env:
+          GOLDEN_DRIVER: ../${{ matrix.driver }}/target/release/driver
+          GOLDEN_PROTOCOL: ${{ matrix.protocol }}
+        run: npx jest --ci tests/golden -t "split driver"

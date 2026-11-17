@@ -3,189 +3,194 @@
  *  Copyright 2023 AMRC
  */
 
-import {MQTTConnection, MQTTDevice} from "../../../lib/devices/MQTT";
+/* The built-in MQTT connection, with the mqtt library mocked. These
+ * tests were written for an older connection that connected in open()
+ * and emitted asyncData. It now connects in the constructor and emits
+ * data keyed by topic. They pin the behaviour the MQTT split driver has
+ * to match. */
+
+import {MQTTConnection} from "../../../lib/devices/MQTT";
 import mqttConnDetails from "../../../lib/devices/MQTT";
-jest.mock('mqtt'); 
+jest.mock('mqtt');
 import * as mqtt from "mqtt";
 import { EventEmitter } from "events";
-import * as log from '../../../lib/helpers/log'; 
-import {Metrics, sparkplugDataType, sparkplugMetric} from "../../../lib/helpers/typeHandler";
+import * as log from '../../../lib/helpers/log';
+import {Metrics, serialisationType, sparkplugDataType} from "../../../lib/helpers/typeHandler";
 
-class Client extends EventEmitter {}; 
+class Client extends EventEmitter {
+    subscribeAsync = jest.fn(async (topics: string[]) =>
+        topics.map(topic => ({ topic, qos: 0 })));
+    unsubscribeAsync = jest.fn(async () => {});
+    publish = jest.fn();
+    end = jest.fn();
+}
 
-describe("MQTTConnection", () =>{
+const type = "MQTT";
+const connectionDetails: mqttConnDetails = {
+    clientId: "id",
+    protocol: "mqtt",
+    host: "host",
+    port: 1883,
+    cleanSession: true,
+    keepAlive: 12
+};
 
-    let type = "MQTT";
-    let connectionDetails = {
-        clientId: "id",
-        protocol: "MQTT",
-        host: "host",
-        port: 80,
-        cleanSession: true,
-        keepAlive: 12
-    }
+function setup (details: Partial<mqttConnDetails> = {}) {
+    const client = new Client();
+    const connect = mqtt.connect as jest.Mock;
+    connect.mockImplementation(() => client);
+    const conn = new MQTTConnection(type, { ...connectionDetails, ...details });
+    return { client, conn, connect };
+}
 
-    let connectionString = `${connectionDetails.protocol}://${connectionDetails.host}:${connectionDetails.port}`
-    let options = {
-        clientId: connectionDetails.clientId
+function metric (name: string, address: string, value: any) {
+    return {
+        name, type: sparkplugDataType.int32, value,
+        properties: {
+            method: { type: sparkplugDataType.string, value: "GET" },
+            address: { type: sparkplugDataType.string, value: address },
+            path: { type: sparkplugDataType.string, value: "$.v" },
+        },
     };
+}
 
-    afterEach(() => {
-        jest.clearAllMocks();
-      });
+afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+});
 
-    describe('open()', () => {
-        it("Should emit open", async () => {
-            const logSpy = jest.spyOn(log, 'log'); 
-            const mockedClient = new Client();
-            //mock mqtt connect function that returns the event emitter that we can call
-            const mockConnect = mqtt.connect as jest.Mock;
-            mockConnect.mockImplementation(()=> {
-                return mockedClient;
-            })
-            let mqttConnection = new MQTTConnection(type, connectionDetails);
+describe("MQTTConnection", () => {
+
+    describe("constructor", () => {
+        it("connects to protocol://host:port with the connection's options", () => {
+            const { connect } = setup({ username: "u", password: "p" });
+            expect(connect).toHaveBeenCalledTimes(1);
+            const [url, opts] = connect.mock.calls[0];
+            expect(url).toBe("mqtt://host:1883");
+            expect(opts).toMatchObject({
+                clientId: "id", username: "u", password: "p",
+                clean: true, keepalive: 12,
+                connectTimeout: 5000, reconnectPeriod: 10000,
+            });
+        });
+
+        it("sends no credentials without a username", () => {
+            const { connect } = setup({ password: "p" });
+            const [, opts] = connect.mock.calls[0];
+            expect(opts.username).toBeUndefined();
+            expect(opts.password).toBeUndefined();
+        });
+
+        it("makes up a client ID when there is none", () => {
+            const { connect } = setup({ clientId: "" });
+            expect(connect.mock.calls[0][1].clientId).toMatch(/^NO-ID-/);
+        });
+    });
+
+    describe("events", () => {
+        it("Should emit open when the client connects", () => {
+            const logSpy = jest.spyOn(log, 'log');
+            const { client, conn } = setup();
             const callback = jest.fn();
-            mqttConnection.on("open", callback);
-            mqttConnection.open(); 
-            //wait for emitter to emit connect
-            mockedClient.emit("connect");
-            new Promise(resolve => setTimeout(resolve, 500)); 
-
+            conn.on("open", callback);
+            client.emit("connect");
             expect(callback).toBeCalledTimes( 1 );
-            expect(logSpy).toBeCalledTimes( 1 );
-        })
+            expect(logSpy).toBeCalledWith(expect.stringContaining("connected (mqtt://host:1883)"));
+        });
 
+        it("should emit data keyed by topic for each message", () => {
+            const { client, conn } = setup();
+            const data = jest.fn();
+            conn.on("data", data);
+            const msg = Buffer.alloc(10);
+            client.emit("message", "test", msg);
+            expect(data).toHaveBeenCalledWith({ test: msg });
+        });
 
-        it('should emit asyncData', async () => {
-            //test values to emit
-            let topic = "test";
-            let msg = Buffer.alloc(10);
+        it("should log an error, not throw", () => {
+            const logSpy = jest.spyOn(log, 'log');
+            const { client } = setup();
+            client.emit("error", new Error("test"));
+            expect(logSpy).toBeCalledWith(expect.stringContaining("test"));
+        });
+    });
 
-            const mockedClient = new Client();
-            //mock mqtt connect function that returns the event emitter that we can call
-            const mockConnect = mqtt.connect as jest.Mock;
-            mockConnect.mockImplementation(()=> {
-                return mockedClient;
-            });
+    describe("readMetrics()", () => {
+        it("emits empty data to keep the devices alive", () => {
+            const { conn } = setup();
+            const data = jest.fn();
+            conn.on("data", data);
+            conn.readMetrics(new Metrics([]));
+            expect(data).toHaveBeenCalledWith({});
+        });
+    });
 
-            //declare emitted values to compair against
-            let emittedTopic: string;
-            let emittedMsg: Buffer;
-            let mqttConnection = new MQTTConnection(type, connectionDetails);
+    describe("subscribe()", () => {
+        it("subscribes to the non-empty topics and returns them", async () => {
+            const { client, conn } = setup();
+            expect(await conn.subscribe(["a", "", "b/#"])).toEqual(["a", "b/#"]);
+            expect(client.subscribeAsync).toHaveBeenCalledWith(["a", "b/#"]);
+        });
 
-            mqttConnection.on("asyncData", (topic, msg) => {
-                emittedTopic = topic;
-                emittedMsg = msg; 
-            });
+        it("leaves out and logs topics the broker refused", async () => {
+            const logSpy = jest.spyOn(log, 'log');
+            const { client, conn } = setup();
+            client.subscribeAsync.mockResolvedValueOnce([
+                { topic: "a", qos: 0 }, { topic: "b", qos: 128 },
+            ]);
+            expect(await conn.subscribe(["a", "b"])).toEqual(["a"]);
+            expect(logSpy).toBeCalledWith(expect.stringContaining("b"));
+        });
 
-            mqttConnection.open();
-            mockedClient.emit("message", topic, msg);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            expect(emittedTopic).toBe(topic);
-            expect(emittedMsg).toBe(msg); 
-        })
+        it("unsubscribe takes what subscribe returned", async () => {
+            const { client, conn } = setup();
+            const handle = await conn.subscribe(["a"]);
+            await conn.unsubscribe(handle);
+            expect(client.unsubscribeAsync).toHaveBeenCalledWith(["a"]);
+        });
+    });
 
-        it('should log error', async () => {
-            const mockedClient = new Client();
-            //mock mqtt connect function that returns the event emitter that we can call
-            const mockConnect = mqtt.connect as jest.Mock;
-            mockConnect.mockImplementation(()=> {
-                return mockedClient;
-            });
+    describe("writeMetrics()", () => {
+        it("publishes one payload per address and calls back with no error", () => {
+            const { client, conn } = setup();
+            const done = jest.fn();
+            conn.writeMetrics(new Metrics([
+                metric("a", "t/a", 1), metric("b", "t/b", 2),
+            ] as any), done, serialisationType.JSON);
 
-            const consoleSpy = jest.spyOn(console, 'log'); 
+            expect(client.publish.mock.calls).toEqual([
+                ["t/a", JSON.stringify({ v: 1 })],
+                ["t/b", JSON.stringify({ v: 2 })],
+            ]);
+            expect(done).toHaveBeenCalledWith(null);
+        });
 
-            let err = ("test"); 
+        it("calls back with an error when a value can't be written", () => {
+            jest.spyOn(console, "log").mockImplementation(() => {});
+            const { client, conn } = setup();
+            const done = jest.fn();
+            conn.writeMetrics(new Metrics([metric("a", "t/a", 1)] as any),
+                done, serialisationType.XML);
+            expect(client.publish).not.toHaveBeenCalled();
+            expect(done.mock.calls[0][0]).toBeInstanceOf(Error);
+        });
+    });
 
-            let mqttConnection = new MQTTConnection(type, connectionDetails);
-            mqttConnection.open();
-            mockedClient.emit('error', err);
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-            expect(consoleSpy).toHaveBeenCalledWith(err); 
-        })
-    })
-
-    describe('subscribe()', () => {
-        
-        it('Should call subscribe', async () => { 
-            //mock mqtt client for connect to resturn 
-            const mockClient = new mqtt.MqttClient(null, {});
-            mockClient.subscribe = jest.fn(); 
-            const mockConnect = mqtt.connect as jest.Mock;
-            mockConnect.mockImplementation(()=> {
-                return mockClient;
-            });
-
-            const mqttConnection = new MQTTConnection(type, connectionDetails);
-            mqttConnection.open(); 
-            await mqttConnection.subscribe("test");
-            expect(mockClient.subscribe).toBeCalledTimes( 1 );
-        })
-
-        it('Should console.log error', async () => {
-            //mock mqtt client for connect to resturn
-            const err = "test";
-            const mockClient = new mqtt.MqttClient(null, {});
-            const consoleSpy = jest.spyOn(console, 'log'); 
-
-            //mock implimentation of subscribe function which calls the error callback
-            mockClient.subscribe = jest.fn().mockImplementation((topic: string, callback: Function)=>{ callback(err)});
-
-            const mockConnect = mqtt.connect as jest.Mock;
-            mockConnect.mockImplementation(()=> {
-                return mockClient;
-            });
-
-            const mqttConnection = new MQTTConnection(type, connectionDetails);
-            //create instance of the mqtt client
-            mqttConnection.open(); 
-            await mqttConnection.subscribe("test");
-            expect(consoleSpy).toBeCalledWith( err );
-        })
-
-    })
-
-    describe('writeMetrics()', () => {
-        const metricsArray: sparkplugMetric[] = [
-            {
-                name: "metric",
-                value: "value",
-                type: sparkplugDataType.string,
-                alias: 1,
-                isHistorical: true,
-                isTransient: true,
-                isNull: false,
-            }
-        ]
-        const metrics = new Metrics(metricsArray);
-
-    })
+    describe("scoutAddresses()", () => {
+        it.each([
+            [{ topic: "#", duration: 0 }, /duration/],
+            [{ topic: " ", duration: 10 }, /topic/],
+        ])("rejects invalid details %o", async (details, msg) => {
+            const { conn } = setup();
+            await expect(conn.scoutAddresses(details as any)).rejects.toThrow(msg);
+        });
+    });
 
     describe('close()', () => {
-        
-        it('Should call client.end and null the client', () => {
-            const mockClient = new mqtt.MqttClient(null, {});
-            mockClient.end =jest.fn();
-
-            const mockConnect = mqtt.connect as jest.Mock;
-            mockConnect.mockImplementation(() => {
-                return mockClient
-            })
-
-            const mqttConnection = new MQTTConnection(type, connectionDetails);
-            mqttConnection.open();
-            mqttConnection.close();
-            expect(mockClient.end).toBeCalledTimes( 1 );
-        })
-
-    })
-    
-})
-
-
-
-
-describe("MQTTDevice", () =>{
-
-    
-})
+        it('Should call client.end', async () => {
+            const { client, conn } = setup();
+            await conn.close();
+            expect(client.end).toBeCalledTimes( 1 );
+        });
+    });
+});

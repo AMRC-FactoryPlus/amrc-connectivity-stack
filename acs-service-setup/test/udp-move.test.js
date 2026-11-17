@@ -67,7 +67,10 @@ const UDP = [[C.json, A.arm], [C.buffer, A.cell], [C.delim, A.gauge]];
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));
-    return values.serviceSetup.config.splitDrivers;
+    /* UDP only: the site has an MQTT connection it expects to stay
+     * put, and mqtt-move.test.js moves MQTT. */
+    const { REST, UDP } = values.serviceSetup.config.splitDrivers;
+    return { REST, UDP };
 }
 
 /* The DriverDefs as edge.yaml loads them on upgrade. */
@@ -270,17 +273,16 @@ describe("moving a site's UDP connections with the chart's defaults", () => {
         assert.deepEqual(cdb.writes, [], "a second run back writes nothing");
     });
 
-    test("a Deployment with no drivers map gets an empty one back", async () => {
+    test("a Deployment with no drivers map gets none back", async () => {
         /* One the Manager has not saved since it learned about split
-         * drivers. The chart renders the two the same. */
+         * drivers. The move adds the map and moving back removes it. */
         const cdb = site(configs => {
             delete configs[Edge.App.Deployment][A.gauge].values.drivers;
         });
+        const before = text(state(cdb));
         await run(cdb, defaults);
         await run(cdb, { ...defaults, UDP: false });
-        const expected = structuredClone(SITE.configs);
-        expected[Edge.App.Deployment][A.gauge].values.drivers = {};
-        assert.equal(text(state(cdb)), text(expected));
+        assert.equal(text(state(cdb)), before);
     });
 
     test("moving again after moving back gives the same configs", async () => {

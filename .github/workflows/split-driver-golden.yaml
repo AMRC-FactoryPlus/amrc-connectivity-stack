@@ -36,6 +36,7 @@ on:
       - 'acs-service-setup/lib/split-drivers.js'
       # The sites the move tests move, which the harness replays.
       - 'acs-service-setup/test/rest-move/**'
+      - 'acs-service-setup/test/mqtt-move/**'
       - 'acs-service-setup/test/udp-move/**'
       - 'lib/js-service-client/**'
       - '.github/workflows/split-driver-golden.yaml'
@@ -124,5 +125,7 @@ jobs:
         run: |
           npx jest --ci tests/golden -t "split driver" 2>&1 | tee golden.log
           grep -q "matches built-in" golden.log
-          # REST and UDP also replay what service-setup's move leaves.
-          if [ "$GOLDEN_PROTOCOL" = REST ] || [ "$GOLDEN_PROTOCOL" = UDP ]; then grep -q "after the move" golden.log; fi
+          # REST, MQTT and UDP also replay what service-setup's move leaves.
+          case "$GOLDEN_PROTOCOL" in
+            REST|MQTT|UDP) grep -q "after the move" golden.log ;;
+          esac

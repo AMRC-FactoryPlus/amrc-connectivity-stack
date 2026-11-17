@@ -171,11 +171,13 @@ function payload_events (
             }
             for (const { u, s } of shared) vals.set(u.i, values[s.slot]);
             const body = doc.render(values, types);
+            /* A Buffer payload is rendered as base64. */
+            const encoding = (doc as PayloadDoc).binary
+                ? { encoding: "base64" as const } : {};
             const ev: FixtureEvent = protocol == "MQTT"
-                ? { t, type: "mqtt", topic: addr, payload: body }
+                ? { t, type: "mqtt", topic: addr, payload: body, ...encoding }
                 : protocol == "UDP"
-                ? { t, type: "udp", payload: body,
-                    ...((doc as PayloadDoc).binary ? { encoding: "base64" as const } : {}) }
+                ? { t, type: "udp", payload: body, ...encoding }
                 : {
                     t, type: "http", path: addr, status: 200,
                     content_type: doc.content_type, body,

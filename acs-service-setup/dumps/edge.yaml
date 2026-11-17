@@ -68,6 +68,7 @@ objects:
     !u ACS.Driver.RESTSplit:        { name: "REST (split driver)" }
     !u ACS.Driver.MQTTSplit:        { name: "MQTT (split driver)" }
     !u ACS.Driver.OPCUASplit:       { name: "OPC-UA (split driver)" }
+    !u ACS.Driver.UDPSplit:         { name: "UDP (split driver)" }
 
 configs:
   # Driver Definition Configuration
@@ -328,7 +329,7 @@ configs:
         type: object
     !u ACS.Driver.UDP:
       polled: false
-      presentation:
+      presentation: &udp_presentation
         address:
           title: "Port"
           description: "The UDP port to listen on (e.g. 50205)"
@@ -342,7 +343,7 @@ configs:
       internal:
         connType: UDP
         details: UDPConnDetails
-      schema:
+      schema: &udp_schema
         properties:
           port:
             enum:
@@ -1198,6 +1199,14 @@ configs:
       image:
         repository: edge-opcua
       schema: *opcua_schema
+    # Not moved by lib/split-drivers.js yet: that is ACS-38.
+    !u ACS.Driver.UDPSplit:
+      hidden: true
+      polled: false
+      presentation: *udp_presentation
+      image:
+        repository: edge-udp
+      schema: *udp_schema
 
     !u ACS.Driver.External:
       polled: false

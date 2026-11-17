@@ -10,9 +10,9 @@ upgrade. The runbook that uses them is
 |---|---|
 | `rig.ts` | The rig file and `rig_entry()`, the one place a connection is pointed at its mock. |
 | `make-rig.ts` | Makes a rig, its Kubernetes manifests and a coverage report from connection configs. |
-| `run-mocks.ts`, `mocks/` | The mocks: OPC UA server, HTTP server, MQTT broker and publisher, UDP sender. Each replays a synthetic fixture from `../fixtures/drivers` in a loop. |
+| `run-mocks.ts`, `mocks/` | The mocks: OPC UA server, HTTP server, MQTT broker and publisher, UDP sender. Each replays a synthetic fixture from `../fixtures/drivers` in a loop. A control API stops and starts mocks, and freezes, sets and drops the OPC UA, MQTT and REST ones. |
 | `load.ts`, `remove.ts`, `acs.ts` | Create and delete the rig's Edge Agents, connections and devices through ConfigDB. Dry run unless `--yes`. |
-| `check.ts` | Records the rig's Sparkplug output and compares two recordings, using the golden harness's decoder. |
+| `check.ts` | Records the rig's Sparkplug output and compares two recordings, using the golden harness's decoder. `--watch` prints one metric's values as they were published. |
 | `write.ts` | Sends one metric write through the Command Escalation service. |
 | `batched.ts` | Makes the ACS-35 change on one rig connection: payload format `JSON (Batched)` and the image pin removed together. |
 | `local.ts` | Runs part of a rig on one machine with the real `Translator` and the split drivers. Every connection needs its driver: the Edge Agent has no built-in connections since ACS 7. |

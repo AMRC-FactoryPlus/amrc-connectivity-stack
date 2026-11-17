@@ -10,7 +10,7 @@ import Aedes from "aedes";
 
 import type { Fixture, MqttEvent } from "../../fixtures/drivers/fixture.js";
 import type { RigConnection } from "../rig.js";
-import { Looper, Mock, MockStatus, record_write } from "./mock.js";
+import { Looper, Mock, MockStatus, Sockets, record_write } from "./mock.js";
 
 /* A synthetic `{"value": v}` payload as a source that batches sends
  * it: a JSON array of `{value, timestamp}` items, here one item with
@@ -40,7 +40,8 @@ export class MqttMock implements Mock {
     looper:     Looper<MqttEvent>
     broker?:    Aedes
     server?:    net.Server
-    sockets:    Set<net.Socket> = new Set()
+    sockets = new Sockets()
+    frozen = false
     delivered = 0
     refused = 0
     writes:     NonNullable<MockStatus["writes"]> = []
@@ -71,29 +72,30 @@ export class MqttMock implements Mock {
                 packet.payload.toString());
         });
         const srv = net.createServer(broker.handle as any);
-        srv.on("connection", sock => {
-            this.sockets.add(sock);
-            sock.once("close", () => this.sockets.delete(sock));
-        });
+        this.sockets.watch(srv);
         await new Promise<void>((resolve, reject) => {
             srv.once("error", reject);
             srv.listen(this.conn.port, () => resolve());
         });
         this.broker = broker;
         this.server = srv;
-        this.looper.start(ev => this.publish(ev));
+        this.looper.start(ev => this.frozen ? undefined : this.publish(ev));
     }
 
     publish (ev: MqttEvent) {
-        const broker = this.broker;
-        if (!broker) return;
         const payload = this.arrays.has(ev.topic)
             ? as_array(ev.payload)
             : Buffer.from(ev.payload, ev.encoding == "base64" ? "base64" : "utf8");
+        return this.send(ev.topic, payload);
+    }
+
+    send (topic: string, payload: Buffer) {
+        const broker = this.broker;
+        if (!broker) return Promise.resolve();
         return new Promise<void>((resolve, reject) =>
             broker.publish({
                 cmd: "publish", qos: 0, dup: false, retain: false,
-                topic: ev.topic, payload,
+                topic, payload,
             }, err => {
                 if (err) return reject(err);
                 this.delivered++;
@@ -101,12 +103,29 @@ export class MqttMock implements Mock {
             }));
     }
 
+    freeze (on: boolean) {
+        this.frozen = on;
+    }
+
+    /* Publish one payload on a topic. A topic sent as arrays takes a
+     * bare value and wraps it as the source would. */
+    async set (topic: string, value: any) {
+        const payload = this.arrays.has(topic)
+            ? as_array(JSON.stringify({ value }))
+            : Buffer.from(typeof value == "string" ? value : JSON.stringify(value));
+        await this.send(topic, payload);
+    }
+
+    drop (ms: number) {
+        this.sockets.drop(ms);
+    }
+
     async stop () {
         await this.looper.stop();
         const { broker, server } = this;
         this.broker = undefined;
         this.server = undefined;
-        for (const s of this.sockets) s.destroy();
+        this.sockets.destroy();
         if (broker) await new Promise<void>(r => broker.close(() => r()));
         if (server) await new Promise<void>(r => server.close(() => r()));
     }
@@ -117,7 +136,8 @@ export class MqttMock implements Mock {
             name: this.conn.name, port: this.conn.port,
             running: !!this.server, delivered: this.delivered,
             clients: this.sockets.size, refused: this.refused,
-            writes: this.writes,
+            writes: this.writes, frozen: this.frozen,
+            ...this.sockets.status(),
         };
     }
 }

@@ -6,6 +6,7 @@
 
 import fs from "fs";
 import http from "http";
+import net from "net";
 import path from "path";
 
 import mqtt from "mqtt";
@@ -16,10 +17,11 @@ import * as sparkplug from "sparkplug-payload";
 
 import type { Captured } from "../golden/capture";
 import { make_rig, manifests, requests, value_topics } from "./make-rig";
-import { make_mock } from "./mocks";
+import { control, make_mock } from "./mocks";
+import { sleep } from "./mocks/mock";
 import { as_array } from "./mocks/mqtt";
 import { Rig, RigConnection, rig_entry } from "./rig";
-import { compare_summaries, summarise } from "./summary";
+import { compare_summaries, summarise, watch } from "./summary";
 
 const SpB = sparkplug.get("spBv1.0")!;
 const EXAMPLES = path.join(__dirname, "examples");
@@ -46,6 +48,25 @@ function none_with_login (c: RigConnection, port: number): RigConnection {
     const details = { ...c.connection.OPCUAConnDetails,
         securityMode: "None", securityPolicy: "None", useCredentials: true };
     return { ...c, port, connection: { ...c.connection, OPCUAConnDetails: details } };
+}
+
+function get (url: string) {
+    return new Promise<string>((resolve, reject) =>
+        http.get(url, { agent: false }, r => {
+            let body = "";
+            r.on("data", d => body += d);
+            r.on("end", () => resolve(body));
+        }).on("error", reject));
+}
+
+/* Whether a new connection to the port is cut straight away. */
+function cut (port: number) {
+    return new Promise<boolean>(resolve => {
+        const sock = net.connect(port, "127.0.0.1");
+        const timer = setTimeout(() => { sock.destroy(); resolve(false); }, 1000);
+        sock.on("error", () => {});
+        sock.once("close", () => { clearTimeout(timer); resolve(true); });
+    });
 }
 
 describe("make_rig", () => {
@@ -250,6 +271,12 @@ describe("mocks", () => {
             await mock.stop();
         }
     }, 60_000);
+});
+
+describe("mock controls", () => {
+    const rig = example_rig();
+    beforeEach(() => { jest.spyOn(console, "log").mockImplementation(() => {}); });
+    afterEach(() => jest.restoreAllMocks());
 
     test("OPC UA with security None and a login lets the client log in", async () => {
         const c = none_with_login(by_proto(rig, "OPC UA"), 14841);
@@ -277,6 +304,115 @@ describe("mocks", () => {
             await mock.stop();
         }
     }, 60_000);
+
+    test("OPC UA holds a set value through a drop, with the server up", async () => {
+        const c = none_with_login(by_proto(rig, "OPC UA"), 14842);
+        const node = "ns=2;s=Sample/Node_01";
+        const mock = make_mock(rig, c, { advertise: "127.0.0.1" });
+        await mock.start();
+        const client = OPCUAClient.create({
+            endpointMustExist: false,
+            connectionStrategy: { initialDelay: 100, maxDelay: 300, maxRetry: 100 },
+        });
+        const read = async (session: any) =>
+            (await session.read({ nodeId: node, attributeId: AttributeIds.Value })).value.value;
+        try {
+            await client.connect("opc.tcp://127.0.0.1:14842");
+            const session = await client.createSession({
+                type: UserTokenType.UserName, userName: c.username!, password: c.password!,
+            });
+
+            await control(mock, "freeze", new URLSearchParams(), "");
+            const held = await read(session);
+            await sleep(1500);
+            expect(await read(session)).toBe(held);
+
+            mock.drop!(2000);
+            expect(mock.status().running).toBe(true);
+            expect(mock.status().dropped_until).toBeDefined();
+            expect(await cut(14842)).toBe(true);
+            await control(mock, "set", new URLSearchParams(),
+                JSON.stringify({ address: node, value: 1234.5 }));
+            await sleep(2000);
+
+            let got;
+            for (let i = 0; i < 50 && got === undefined; i++) {
+                try { got = await read(session); }
+                catch { await sleep(200); }
+            }
+            expect(got).toBe(1234.5);
+            expect(mock.status().writes).toEqual([]);
+            await session.close();
+        }
+        finally {
+            await client.disconnect();
+            await mock.stop();
+        }
+    }, 60_000);
+
+    test("MQTT stops publishing when frozen, sends a set payload, and drops clients", async () => {
+        const c = on_port(by_proto(rig, "MQTT"), 11884);
+        const mock = make_mock(rig, c);
+        await mock.start();
+        mock.freeze!(true);
+        const client = mqtt.connect("mqtt://127.0.0.1:11884", { reconnectPeriod: 0 });
+        try {
+            const got: [string, string][] = [];
+            client.on("message", (t, p) => got.push([t, p.toString()]));
+            await client.subscribeAsync("#");
+            await sleep(1000);
+            expect(got).toEqual([]);
+
+            const topic = c.connection.devices[0].tags.find((t: any) => t.address).address;
+            await mock.set!(topic, '{"x": 1}');
+            await sleep(200);
+            expect(got.length).toBe(1);
+            expect(got[0][0]).toBe(topic);
+
+            const closed = new Promise<void>(r => client.once("close", () => r()));
+            mock.drop!(1000);
+            await closed;
+            expect(await cut(11884)).toBe(true);
+            expect(mock.status()).toMatchObject({ running: true, frozen: true });
+        }
+        finally {
+            await client.endAsync(true);
+            await mock.stop();
+        }
+    });
+
+    test("REST holds its bodies when frozen and serves a set body until thawed", async () => {
+        const c = on_port(by_proto(rig, "REST"), 18081);
+        const mock = make_mock(rig, c);
+        await mock.start();
+        try {
+            const addr = c.connection.devices[0].tags.find((t: any) => t.address).address;
+            const url = `http://127.0.0.1:18081${addr}`;
+            await control(mock, "freeze", new URLSearchParams(), "");
+            const before = await get(url);
+            await control(mock, "set", new URLSearchParams(),
+                JSON.stringify({ address: addr, value: "<x>1</x>" }));
+            expect(await get(url)).toBe("<x>1</x>");
+            await control(mock, "thaw", new URLSearchParams(), "");
+            expect(await get(url)).not.toBe("<x>1</x>");
+            expect(mock.status().frozen).toBe(false);
+
+            await control(mock, "drop", new URLSearchParams("seconds=1"), "");
+            expect(await cut(18081)).toBe(true);
+            await sleep(1100);
+            expect(await get(url)).toBeTruthy();
+            expect(before).toBeTruthy();
+        }
+        finally {
+            await mock.stop();
+        }
+    });
+
+    test("a mock that can't take a control says so", async () => {
+        const udp = make_mock(rig, by_proto(rig, "UDP"));
+        await expect(control(udp, "freeze", new URLSearchParams(), ""))
+            .rejects.toThrow(/can't freeze/);
+    });
 });
 
 describe("summaries", () => {
@@ -325,5 +461,24 @@ describe("summaries", () => {
         expect(rate.some(p => p.level == "FAIL" && /DDATA rate/.test(p.what))).toBe(true);
         const more = compare_summaries(recording("Float", 1000), recording("Float", 500));
         expect(more.map(p => p.level)).toEqual(["WARN"]);
+    });
+
+    test("a watched metric shows each value, death and birth in order", () => {
+        const d = dev.deviceId;
+        const msgs = [
+            msg("DBIRTH", 0, [{ name: read.Name, alias: 1, type: "Float", value: 1 },
+                { name: "Other", alias: 2, type: "Float", value: 0 }], d),
+            msg("DDATA", 1000, [{ alias: 2, type: "Float", value: 5 }], d),
+            msg("DDATA", 2000, [{ alias: 1, type: "Float", value: 2 }], d),
+            msg("DDEATH", 3000, [], d),
+            msg("DBIRTH", 9000, [{ name: read.Name, alias: 1, type: "Float", value: 7 }], d),
+            msg("DDATA", 9500, [{ alias: 1, type: "Float", value: 8 }], "another"),
+        ];
+        expect(watch(msgs, d, read.Name, 0)).toEqual([
+            { at: 0, kind: "DBIRTH", value: "1" },
+            { at: 2, kind: "DDATA", value: "2" },
+            { at: 3, kind: "DDEATH" },
+            { at: 9, kind: "DBIRTH", value: "7" },
+        ]);
     });
 });

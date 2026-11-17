@@ -237,3 +237,44 @@ export function print_comparison (a: Summary, b: Summary, problems: Problem[]) {
     }
     for (const p of problems) console.log("%s %s: %s", p.level, p.device, p.what);
 }
+
+/* One metric's history in a recording, for the reconnect checks: each
+ * DBIRTH, DDATA carrying the metric, and DDEATH of its device, with
+ * the seconds since `started`. DDATA names the metric only by alias,
+ * so each message is decoded with the device's latest DBIRTH. */
+export interface WatchLine {
+    at:     number,
+    kind:   string,
+    value?: string,
+}
+
+export function watch (messages: Captured[], device: string, metric: string,
+    started: number): WatchLine[]
+{
+    const lines: WatchLine[] = [];
+    let birth: Captured | undefined;
+    for (const msg of messages) {
+        if (msg.device != device) continue;
+        const at = Math.round((msg.at - started) / 100) / 10;
+        if (msg.kind == "DDEATH") {
+            lines.push({ at, kind: msg.kind });
+            continue;
+        }
+        if (msg.kind == "DBIRTH") birth = msg;
+        if (msg.kind != "DBIRTH" && msg.kind != "DDATA") continue;
+        const out = decode(msg.kind == "DBIRTH" || !birth ? [msg] : [birth, msg]);
+        const m = msg.kind == "DBIRTH"
+            ? out.births.get(`DBIRTH ${device}`)?.at(-1)?.find(x => x.name == metric)
+            : out.data.get(`${device}/${metric}`)?.at(-1);
+        if (m) lines.push({ at, kind: msg.kind, value: m.value });
+    }
+    return lines;
+}
+
+export function print_watch (device: string, metric: string, lines: WatchLine[]) {
+    console.log("\n%s / %s:", device, metric);
+    if (!lines.length) console.log("  (nothing for this metric)");
+    for (const l of lines)
+        console.log("  %s s  %s  %s", l.at.toFixed(1).padStart(7), l.kind.padEnd(6),
+            l.value ?? "");
+}

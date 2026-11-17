@@ -8,7 +8,7 @@ import http from "http";
 
 import type { Fixture, HttpEvent } from "../../fixtures/drivers/fixture.js";
 import type { RigConnection } from "../rig.js";
-import { Mock, MockStatus, record_write } from "./mock.js";
+import { Mock, MockStatus, Sockets, record_write } from "./mock.js";
 
 /* An HTTP server answering every address the connection reads with a
  * body of the same shape (JSON or XML) and content type.
@@ -22,7 +22,10 @@ import { Mock, MockStatus, record_write } from "./mock.js";
  * Requests must carry the source's base URL path in front of the
  * address. A connection with Basic auth must send the rig's
  * credentials or gets 401. Any other method is a write: the mock
- * records it and answers 200. */
+ * records it and answers 200.
+ *
+ * `freeze` keeps serving the events current when it was called, and
+ * `set` replaces one path's body until the mock is thawed. */
 export class HttpMock implements Mock {
     conn:       RigConnection
     fixture:    Fixture
@@ -32,7 +35,11 @@ export class HttpMock implements Mock {
     started = 0
     delivered = 0
     refused = 0
-    clients:    Set<any> = new Set()
+    sockets = new Sockets()
+    /* The fixture time held by `freeze`. */
+    frozen_at?: number
+    /* Bodies given by `set`. */
+    bodies:     Map<string, string> = new Map()
     writes:     NonNullable<MockStatus["writes"]> = []
 
     constructor (conn: RigConnection, fixture: Fixture) {
@@ -52,10 +59,7 @@ export class HttpMock implements Mock {
     async start () {
         if (this.server) return;
         const srv = http.createServer((req, res) => this.request(req, res));
-        srv.on("connection", sock => {
-            this.clients.add(sock);
-            sock.once("close", () => this.clients.delete(sock));
-        });
+        this.sockets.watch(srv);
         await new Promise<void>((resolve, reject) => {
             srv.once("error", reject);
             srv.listen(this.conn.port, () => resolve());
@@ -105,7 +109,7 @@ export class HttpMock implements Mock {
             res.writeHead(404).end();
             return;
         }
-        const now = (Date.now() - this.started) % this.duration;
+        const now = this.frozen_at ?? this.now();
         const events = this.paths.get(path)!;
         let ev = events[0];
         for (const e of events) {
@@ -114,14 +118,33 @@ export class HttpMock implements Mock {
         }
         this.delivered++;
         res.writeHead(ev.status, { "Content-Type": ev.content_type });
-        res.end(ev.body);
+        res.end(this.bodies.get(path) ?? ev.body);
+    }
+
+    now () {
+        return (Date.now() - this.started) % this.duration;
+    }
+
+    freeze (on: boolean) {
+        this.frozen_at = on ? this.now() : undefined;
+        if (!on) this.bodies.clear();
+    }
+
+    async set (address: string, value: any) {
+        const path = this.path(address);
+        if (path == undefined) throw new Error(`No path ${address}`);
+        this.bodies.set(path, typeof value == "string" ? value : JSON.stringify(value));
+    }
+
+    drop (ms: number) {
+        this.sockets.drop(ms);
     }
 
     async stop () {
         const srv = this.server;
         if (!srv) return;
         this.server = undefined;
-        for (const s of this.clients) s.destroy();
+        this.sockets.destroy();
         await new Promise<void>(r => srv.close(() => r()));
     }
 
@@ -130,8 +153,9 @@ export class HttpMock implements Mock {
             id: this.conn.id, protocol: this.conn.protocol,
             name: this.conn.name, port: this.conn.port,
             running: !!this.server, delivered: this.delivered,
-            clients: this.clients.size, refused: this.refused,
-            writes: this.writes,
+            clients: this.sockets.size, refused: this.refused,
+            writes: this.writes, frozen: this.frozen_at != undefined,
+            ...this.sockets.status(),
         };
     }
 }

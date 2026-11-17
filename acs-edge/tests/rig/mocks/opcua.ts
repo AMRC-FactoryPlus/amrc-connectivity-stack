@@ -16,7 +16,7 @@ import {
 import type { Fixture, OpcuaEvent } from "../../fixtures/drivers/fixture.js";
 import { variant } from "../../golden/devices/opcua.js";
 import type { RigConnection } from "../rig.js";
-import { Looper, Mock, MockStatus, record_write } from "./mock.js";
+import { Looper, Mock, MockStatus, Sockets, record_write } from "./mock.js";
 
 /* A connection's security mode and policy as node-opcua's, by the
  * names the connection form uses. The built-in OPC UA connection had
@@ -56,6 +56,10 @@ export class OpcuaMock implements Mock {
     server?:    OPCUAServer
     pki:        string
     vars:       Map<string, UAVariable> = new Map()
+    /* Each node's data type, for `set`. */
+    types:      Map<string, string> = new Map()
+    sockets = new Sockets()
+    frozen = false
     delivered = 0
     refused = 0
     writes:     NonNullable<MockStatus["writes"]> = []
@@ -102,6 +106,8 @@ export class OpcuaMock implements Mock {
         await server.initialize();
         this.build(server);
         await server.start();
+        for (const ep of server.endpoints as any[])
+            if (ep._server) this.sockets.watch(ep._server);
         this.server = server;
         this.looper.start(ev => this.apply(ev));
     }
@@ -110,6 +116,7 @@ export class OpcuaMock implements Mock {
         const space = server.engine.addressSpace!;
         const first = this.looper.events[0]?.values ?? {};
         this.vars.clear();
+        this.types.clear();
         for (const [id, v] of Object.entries(first)) {
             const node = resolveNodeId(id);
             while (space.getNamespaceArray().length <= node.namespace)
@@ -130,10 +137,12 @@ export class OpcuaMock implements Mock {
                     record_write(this.writes, id, dv.value?.value);
             });
             this.vars.set(id, uav);
+            this.types.set(id, v.dataType);
         }
     }
 
     apply (ev: OpcuaEvent) {
+        if (this.frozen) return;
         this.#applying = true;
         try {
             for (const [id, v] of Object.entries(ev.values))
@@ -143,6 +152,24 @@ export class OpcuaMock implements Mock {
             this.#applying = false;
         }
         this.delivered++;
+    }
+
+    freeze (on: boolean) {
+        this.frozen = on;
+    }
+
+    async set (address: string, value: any) {
+        const uav = this.vars.get(address);
+        const dataType = this.types.get(address);
+        if (!uav || !dataType) throw new Error(`No node ${address}`);
+        this.#applying = true;
+        try { uav.setValueFromSource(variant({ dataType, value } as any)); }
+        finally { this.#applying = false; }
+        this.delivered++;
+    }
+
+    drop (ms: number) {
+        this.sockets.drop(ms);
     }
 
     async stop () {
@@ -159,7 +186,8 @@ export class OpcuaMock implements Mock {
             running: !!this.server, delivered: this.delivered,
             clients: this.server?.currentSessionCount ?? 0,
             refused: this.refused,
-            writes: this.writes,
+            writes: this.writes, frozen: this.frozen,
+            ...this.sockets.status(),
         };
     }
 }

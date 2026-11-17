@@ -1,0 +1,33 @@
+name: Edge Agent chart
+
+# Renders the edge-agent chart for each case in
+# edge-helm-charts/test/edge-agent/cases and compares it with the
+# expected output, so a change that alters the pod spec of an Edge
+# Agent shows up as a diff.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'edge-helm-charts/charts/edge-agent/**'
+      - 'edge-helm-charts/test/edge-agent/**'
+      - '.github/workflows/edge-agent-chart.yaml'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.17.3'
+
+      - name: Render the chart
+        run: edge-helm-charts/test/edge-agent/run.sh

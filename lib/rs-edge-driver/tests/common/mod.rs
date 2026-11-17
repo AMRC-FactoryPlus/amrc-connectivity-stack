@@ -55,6 +55,9 @@ pub struct Stats {
     pub expired: AtomicUsize,
     /// Every topic filter the driver has subscribed to, in order.
     pub subscriptions: Mutex<Vec<String>>,
+    /// Milliseconds to wait before each read from the driver, to play
+    /// an agent that is slower than the driver.
+    pub read_delay_ms: std::sync::atomic::AtomicU64,
 }
 
 impl Stats {
@@ -254,8 +257,16 @@ async fn serve(
             }
         };
 
+        let delay = stats.read_delay_ms.load(Ordering::SeqCst);
+        let read = async {
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+            rd.read_buf(&mut buf).await
+        };
+
         tokio::select! {
-            n = rd.read_buf(&mut buf) => {
+            n = read => {
                 match n {
                     Ok(0) | Err(_) => break 'conn,
                     Ok(_) => last_rx = Instant::now(),

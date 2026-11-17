@@ -6,17 +6,8 @@
 
 import dgram from "dgram";
 
-import type { Fixture } from "../../fixtures/drivers/fixture.js";
+import type { Fixture, UdpEvent } from "../../fixtures/drivers/fixture.js";
 import { DeviceOpts, FakeDevice, free_udp_port, sleep } from "./device.js";
-
-/* A datagram sent at t. The fixture format (v1) has no UDP events yet;
- * this is the shape to add, following the MQTT event. */
-export interface UdpEvent {
-    t: number,
-    type: "udp",
-    payload: string,
-    encoding?: "utf8" | "base64",
-}
 
 /* Is something bound to this UDP port on localhost? */
 function bound (port: number): Promise<boolean> {

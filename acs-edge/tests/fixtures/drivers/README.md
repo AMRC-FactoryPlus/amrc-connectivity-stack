@@ -23,7 +23,7 @@ One directory per fixture:
 |---|---|
 | `format`, `version` | Always `"acs-driver-fixture"` and `1`. |
 | `name`, `agent` | The connection name and the Edge Agent it came from. |
-| `protocol` | The connection type: `"OPC UA"`, `"MQTT"` or `"REST"`. |
+| `protocol` | The connection type: `"OPC UA"`, `"MQTT"`, `"REST"` or `"UDP"`. |
 | `payloadFormat`, `delimiter` | How the Edge Agent parses each payload, as the agent resolves them (`delimiter` is `""` when the config has none). |
 | `source` | `"synthetic"` (made by the generator) or `"recorded"` (real responses). |
 | `seed` | The generator seed. The same config and seed give the same fixture. |
@@ -57,6 +57,14 @@ Each line is one event. `t` is milliseconds from the start of the fixture. Repla
 
 `path` is the metric address exactly as configured, so the request URL is `baseURL + path`. A stub server answers each request with the latest event for that path at or before the current fixture time. The built-in connection hands the agent the body as axios gives it: a parsed object for a JSON content type and a string otherwise. `event_payload()` does the same.
 
+**UDP**: a datagram sent to the connection's port at `t`.
+
+```json
+{"t": 49, "type": "udp", "payload": "AAAC/xiAUUND...", "encoding": "base64"}
+```
+
+`payload` is UTF-8 text unless `"encoding": "base64"` is set, as for MQTT. The built-in connection hands the agent every datagram as `{"": Buffer}`, so only metrics whose address is the empty string read it, and a datagram has no address of its own.
+
 **OPC UA**: node values that change at `t`.
 
 ```json
@@ -72,6 +80,8 @@ The generator reads a connection config and writes a fixture. For every metric t
 - **JSON**: `$`, `.key`, `['key']`, `[n]` and `[?(@.field == 'value')]` are turned back into the objects and arrays they select. A metric with no path gets `{"value": ...}`, which is what the agent reads in that case.
 - **XML**: absolute and `//` steps, `*`, `[@attr='v']`, `[Name='v']`, `[Name[contains(text(),'v')]]` and a final `text()`, `node()` or `@attr` are turned back into elements. An element only selected by `*` is named after its id attribute (`componentId` gives `<Component>`).
 - **Delimited string**: the payload is the value itself, or the fields joined by the delimiter when paths are field indexes.
+- **Buffer**: each path is a byte offset and the value is written there with the metric's endianness (`FloatBE`, `Int16LE`). A Boolean is `offset:bit`, and a String runs from its offset to the end, so it must come last. 64-bit integers are not synthesised, because the agent reads them as BigInt.
+- **UDP**: one datagram per `--mqtt-interval`, built for the metrics with the empty address. A metric with any other address is a finding, because the built-in connection never gives it a value.
 - **OPC UA**: one node per node id, with the data type the agent maps the metric's type to.
 
 Values change over time: analogue values follow a sine wave with noise inside the metric's engineering range (if it has one), counts step up and down, booleans and strings change now and then. `Float` values are exact 32-bit floats so they survive Sparkplug encoding. MQTT topics publish every second by default, REST and OPC UA values change at the connection's poll interval.
@@ -94,7 +104,7 @@ node --no-warnings --es-module-specifier-resolution=node \
 | Command | Does |
 |---|---|
 | `synth` | Synthesise a fixture for a real config. |
-| `sample` | Pick up to `--max-metrics` metrics that resolve, covering each kind of path and type, rename every host, device, topic, node id and metric, and synthesise a fixture for that. Needs `--kind`. This is how the samples here were made. |
+| `sample` | Pick up to `--max-metrics` metrics that resolve, covering each kind of path and type, rename every host, device, topic, node id and metric, and synthesise a fixture for that. Needs `--kind`. This is how the samples here were made, apart from the UDP ones (see below). |
 | `record` | Poll each address of a REST connection `--polls` times at its poll interval and save the real responses. It refuses connections that need credentials, so only use it on public APIs. |
 
 | Option | Default | |
@@ -106,6 +116,12 @@ node --no-warnings --es-module-specifier-resolution=node \
 | `--max-metrics <n>` | 12 | Size of a sample. |
 | `--kind <name>` | | Sample name: `opcua` and `mqtt-*` pick the address style. |
 | `--polls <n>` | 3 | Polls for `record`. |
+
+No UDP connection was configured anywhere to sample from, so the three `udp-*` samples were made with `synth` from made-up configs, which are their `connection.json` files. To make them again:
+
+```sh
+synth tests/fixtures/drivers/samples/udp-json/connection.json <out-dir> --duration 5000 --mqtt-interval 100
+```
 
 ### Findings
 

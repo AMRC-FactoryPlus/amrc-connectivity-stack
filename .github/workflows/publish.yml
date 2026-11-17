@@ -463,7 +463,9 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-test-rs
+          - edge-mqtt
           - edge-rest
+          - edge-udp
           - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug
@@ -511,7 +513,9 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-test-rs
+          - edge-mqtt
           - edge-rest
+          - edge-udp
           - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug
@@ -559,7 +563,9 @@ jobs:
           - edge-modbus
           - edge-test
           - edge-test-rs
+          - edge-mqtt
           - edge-rest
+          - edge-udp
           - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug

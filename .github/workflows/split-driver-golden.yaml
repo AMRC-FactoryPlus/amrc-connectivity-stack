@@ -18,6 +18,7 @@ on:
       - 'feature/**'
     paths:
       - 'edge-rest/**'
+      - 'edge-udp/**'
       - 'lib/rs-edge-driver/**'
       - 'acs-edge/lib/**'
       - 'acs-edge/tests/golden/**'
@@ -42,6 +43,8 @@ jobs:
         include:
           - driver: edge-rest
             protocol: REST
+          - driver: edge-udp
+            protocol: UDP
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

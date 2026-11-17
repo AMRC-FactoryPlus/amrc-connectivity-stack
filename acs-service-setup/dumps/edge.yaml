@@ -329,7 +329,7 @@ configs:
         type: object
     !u ACS.Driver.UDP:
       polled: false
-      presentation: &udp_presentation
+      presentation:
         address:
           title: "Port"
           description: "The UDP port to listen on (e.g. 50205)"
@@ -1200,10 +1200,23 @@ configs:
         repository: edge-opcua
       schema: *opcua_schema
     # Not moved by lib/split-drivers.js yet: that is ACS-38.
+    # The address field can't be hidden (the Admin UI only hides the
+    # path), and every datagram goes to the empty address, so the form
+    # says to leave it empty.
     !u ACS.Driver.UDPSplit:
       hidden: true
       polled: false
-      presentation: *udp_presentation
+      presentation:
+        address:
+          title: "Address (leave empty)"
+          description: "Leave this empty. Every datagram arrives on the empty address, so a metric with anything here never gets a value. The port is set on the connection."
+          icon: "network-wired"
+          placeholder: "Leave empty"
+        path:
+          title: "Data Selector"
+          description: "Where the value is in each datagram, in the device's payload format: a JSONPath for JSON (e.g. $.x), a byte offset for Buffer (e.g. 4), or a field number for Delimited String (e.g. 2)"
+          icon: "filter"
+          placeholder: "e.g. $.x or 4"
       image:
         repository: edge-udp
       schema: *udp_schema

@@ -608,7 +608,11 @@ export class Device {
      */
     #writeMetrics(metrics: Metrics) {
         // Write metrics to physical device
-        this.#devConn.writeMetrics(metrics, (err: Error) => {
+        this.#devConn.writeMetrics(metrics, (err: Error, written?: sparkplugMetric[]) => {
+            /* A connection that waits for the driver to confirm each
+             * write says which metrics were written. */
+            if (written)
+                return this.#reportWritten(err, written);
             if (!err) {
                 metrics.array.forEach((metric, i) => {
                     if (typeof metric.name !== "undefined") {
@@ -627,6 +631,29 @@ export class Device {
             }
         }, this._payloadFormat);
 
+    }
+
+    /**
+     * Report metrics the driver has confirmed it wrote. The value is
+     * set and published now, so it carries the time of the
+     * confirmation. A failed write reports nothing and leaves the old
+     * value in place.
+     * @param err Why a write failed, if it did
+     * @param written The metrics written, with their new values
+     */
+    #reportWritten(err: Error | undefined, written: sparkplugMetric[]) {
+        if (err)
+            console.log(`${this._name}: ${err.message}`);
+        const named = written.filter(m => typeof m.name !== "undefined");
+        if (!named.length) return;
+
+        const metrics = named.map(m => {
+            this._metrics.setValueByName(m.name!, m.value);
+            return this._metrics.getByName(m.name!);
+        });
+        this._publishDData(metrics);
+        log(`Metric values written to ${this._name}`);
+        this._refreshDeathTimer();
     }
 
     /**

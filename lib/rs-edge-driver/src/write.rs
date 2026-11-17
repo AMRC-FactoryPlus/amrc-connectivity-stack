@@ -74,6 +74,18 @@ impl WriteValue {
         Self::from_parts(&w.ty, &w.value).ok_or_else(|| format!("bad {} value {}", w.ty, w.value))
     }
 
+    /// The id of a write the edge agent is waiting for an answer to,
+    /// from the `id` key of the payload. `None` if there is none or it
+    /// can't be a topic level (letters, digits and `_` only), so the
+    /// agent isn't waiting. See "Write results" in
+    /// `acs-edge/docs/edge-split.md`.
+    pub(crate) fn id_of(payload: &[u8]) -> Option<String> {
+        let w: serde_json::Map<String, Value> = serde_json::from_slice(payload).ok()?;
+        let id = w.get("id")?.as_str()?;
+        let ok = !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+        ok.then(|| id.to_owned())
+    }
+
     fn from_parts(ty: &str, v: &Value) -> Option<Self> {
         fn int<T: TryFrom<i64>>(v: &Value) -> Option<T> {
             v.as_i64().and_then(|n| T::try_from(n).ok())

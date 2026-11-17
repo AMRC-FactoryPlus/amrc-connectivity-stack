@@ -33,6 +33,7 @@ Part|Driver must|Notes
 `cmd`|Optional. Write the payload bytes to the address.|The address is everything after `cmd/`. Subscribe to `cmd` or `write`, not both.
 `write`|Optional. Write the typed value to the address.|Needs an Edge Agent from November 2026 or later. See [Typed writes](#typed-writes).
 `err`|Optional. Report a failed write or an address problem.|The Edge Agent logs it and takes no other action.
+`result`|Required for a driver that subscribes to `write`. Answer a write.|The Edge Agent reports the written value only when the answer says it was written. See [Write results](#write-results).
 `req`/`rsp`|Optional.|Only for the request kinds the agent serves.
 
 ## Definitions
@@ -199,7 +200,7 @@ underscore:
 
 Direction|Topics allowed
 ---|---
-Driver publishes|`status`, `data/\w+`, `err/\w+`, `req/\w+`
+Driver publishes|`status`, `data/\w+`, `err/\w+`, `req/\w+`, `result/\w+`
 Driver subscribes|`active`, `conf`, `addr`, `cmd/#`, `write/#`, `poll`, `rsp/\w+`
 
 The broker drops a driver's whole connection if it subscribes to
@@ -346,8 +347,10 @@ name, so the address is the contract:
 * Every write is also published as a [typed write](#typed-writes) on
   `write/<address>`. A driver that subscribes only to `cmd/#` never sees
   it, and gets exactly the `cmd` messages it always has.
-* The Edge Agent does not wait for the driver. It reports the new value
-  in DDATA as soon as the write is published.
+* The Edge Agent does not wait for a driver that only takes `cmd`. It
+  reports the new value in DDATA as soon as the write is published. It
+  waits only for a driver that takes [typed writes](#typed-writes),
+  which answers each one.
 
 The JS and Python libraries before November 2026 took only the first
 level after `cmd/`, so drivers built on them cannot write to an address
@@ -393,8 +396,52 @@ not sent. The byte order in a metric's `endianness` doesn't apply to a
 typed write. A driver MUST ignore keys it does not recognise, so the
 Edge Agent can add some later.
 
-If the write fails or the driver can't use the value, the driver
-SHOULD report it on `err` as described below.
+The payload may also have an `id`, a string of letters, digits and
+`_`, for example `{"type": "Int16", "value": -2, "id": "9f3a1c02_7"}`.
+An `id` means the Edge Agent is waiting for the answer, and the driver
+MUST answer the write as described in [Write results](#write-results).
+Without an `id` the driver doesn't answer, and if the write fails or
+the driver can't use the value, it SHOULD report it on `err` as
+described below.
+
+    fpEdge1/Conn/result/Id
+
+#### Write results
+
+A driver that subscribes to `write/#` MUST answer every write that has
+an `id` by publishing to `result/<id>`, with:
+
+* an empty payload once the value has been written, or
+* an error code (`RO`, `CMD` or `ERR`, as for `err` below), optionally
+  followed by a newline and a message, if it was not.
+
+A driver answers each write once. It answers a write it can't use
+(an address not in its address map, a bad payload) with `CMD` straight
+away, and doesn't also report it on `err`.
+
+**Implementation.** The Edge Agent's broker notes each driver that
+subscribes to its own `write/#`, and forgets it when the driver
+unsubscribes or disconnects. For such a driver the Edge Agent puts an
+`id` in every typed write and reports a written metric's new value in
+DDATA only when the answer says it was written, so the value carries
+the time of the answer. A refusal, or no answer within 10 seconds
+(`DRIVER_WRITE_TIMEOUT`, in milliseconds), leaves the old value in
+place, publishes nothing, and logs the device, metric, address and
+reason to the console. Each write has its own `id`, so several may be
+in flight at once, to the same address or different ones, and each
+value is reported when its own answer arrives. An answer to an `id`
+the Edge Agent isn't waiting for, such as one after the timeout, is
+logged and ignored. The `id` starts with a random part chosen when the
+connection starts, so an answer meant for an earlier run of the Edge
+Agent can't match.
+
+A driver that only subscribes to `cmd/#` can't answer. The Edge Agent
+sends it no `id` and reports the value straight away, exactly as it
+always has, and so do the built-in connections.
+
+An Edge Agent from before this was added never sends an `id`, so a
+driver that answers writes still works with it: it reports failures on
+`err` as before.
 
 The JS and Rust driver libraries support both forms, and the Python
 library only `cmd`. In `lib/js-edge-driver` a
@@ -402,8 +449,10 @@ handler class that sets `static typedWrites = true` gets typed writes
 through its `write(addr, type, value)` method, and any other handler
 gets `cmd` as before. In
 `lib/rs-edge-driver` a handler sets `TYPED_WRITES` to `true` and
-implements `Handler::write`. In both, a write that fails is reported on
-`err` for the handler.
+implements `Handler::write`. In both, the library answers a write with
+an `id` on `result` when the handler's `write` returns or fails, so a
+handler needs no code for it, and a write without an `id` that fails is
+reported on `err` for the handler.
 
     fpEdge1/Conn/err/Data
 
@@ -423,7 +472,8 @@ by a newline and a message for the log, for example `RO` or
 data topic for that address. A write error reports that one write
 only: the driver does not clear it, and it does not stop data for the
 address. The Edge Agent has already reported the new value in DDATA
-by then (see `cmd` above), so for now the error only reaches the log.
+by then (see `cmd` above), so the error only reaches the log. A typed
+write with an `id` is answered on [`result`](#write-results) instead.
 When a typed write handler fails, the driver libraries publish the
 code the handler gives (`ERR` if it gives none) with its message, and
 they publish `CMD` for a typed write they can't use.

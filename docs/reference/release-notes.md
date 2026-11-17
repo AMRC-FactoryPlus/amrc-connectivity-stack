@@ -177,6 +177,8 @@ historian queries that read those devices. Other changes you may see:
   The built-in connection never read these paths, and some hold a
   unit typed into the wrong field. The Manager keeps them in the
   device's origin map, and the form hides the path field for OPC UA.
+  Two metrics that read the same node keep getting its value after
+  their paths are removed (see the next paragraph).
 - A device with no addressed metrics no longer stops the Edge Agent.
   The built-in connection crashed the whole agent on one. The split
   driver births it and carries on.
@@ -187,6 +189,14 @@ historian queries that read those devices. Other changes you may see:
 - A secured server already accepts a new client certificate from every
   new Edge Agent pod, because the built-in connection made one each
   time, and it accepts the split driver's in the same way.
+
+**Metrics that read the same address and path all get its value.** On
+any connection, the Edge Agent used to update only the last of several
+metrics on one device with the same address and path, so the others
+never published a value. Each of them now publishes the value it reads.
+Such metrics start publishing after the upgrade, typically duplicates
+of another metric under a second name, so a dashboard or historian
+query that reads one of them may see data for the first time.
 
 **What a site with a UDP device must know.** A moved UDP connection's
 port now opens on the edge host its Edge Agent runs on, so a device on

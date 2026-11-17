@@ -10,10 +10,10 @@ import util from "util";
 import Aedes from "aedes";
 
 const prefix = "fpEdge1";
-/* The data part is a data topic for data, err, req and rsp, but a
- * whole device address for cmd and write, which may contain any
- * character MQTT allows in a topic, including "/". The ACLs keep
- * drivers to \w+. */
+/* The data part is a data topic for data, err, req and rsp and a write
+ * id for result, but a whole device address for cmd and write, which
+ * may contain any character MQTT allows in a topic, including "/". The
+ * ACLs keep drivers to \w+. */
 const topicrx = new RegExp(`^${prefix}/([\\w-]+)/(\\w+)(?:/(.+))?$`);
 
 function log (f, ...a) {
@@ -35,6 +35,11 @@ export class DriverBroker extends EventEmitter {
     port:       number
     server?:    net.Server
     sockets:    Set<net.Socket> = new Set()
+    /* Drivers that subscribed to their own write/#, by client id, with
+     * the client that did it. Such a driver answers each write on
+     * result/<id>, so the agent waits for the answer before it
+     * reports the value. See "Write results" in docs/edge-split.md. */
+    #typed:     Map<string, any> = new Map()
 
     constructor (env) {
         super();
@@ -59,6 +64,16 @@ export class DriverBroker extends EventEmitter {
         br.authenticate = this.auth.bind(this);
         br.authorizePublish = this.authPub.bind(this);
         br.authorizeSubscribe = this.authSub.bind(this);
+
+        br.on("subscribe", (subs, client) => {
+            if (client && subs.some(s => s.topic == this.#write_topic(client)))
+                this.#typed.set(client.id, client);
+        });
+        br.on("unsubscribe", (topics, client) => {
+            if (client && topics.includes(this.#write_topic(client)))
+                this.#forget(client);
+        });
+        br.on("clientDisconnect", client => this.#forget(client));
 
         /* Never call back from inside a callback. The callback
          * releases this message's slot in Aedes' mqemitter, and when
@@ -87,6 +102,25 @@ export class DriverBroker extends EventEmitter {
                 releasing = false;
             }
         }, () => {});
+    }
+
+    /* The write/# topic of the connection a client may drive. Only a
+     * client whose id is the connection name counts, so the debug user
+     * watching a driver's writes doesn't make the agent wait. */
+    #write_topic (client): string {
+        return `${prefix}/${client.id}/write/#`;
+    }
+
+    /* A driver that reconnects under the same id replaces the old
+     * client, which may disconnect after the new one subscribed. */
+    #forget (client) {
+        if (client && this.#typed.get(client.id) === client)
+            this.#typed.delete(client.id);
+    }
+
+    /* Whether the driver for this connection answers writes. */
+    confirms_writes (id: string): boolean {
+        return this.#typed.has(id);
     }
 
     start () {
@@ -152,7 +186,7 @@ export class DriverBroker extends EventEmitter {
 
         this.acl.set(id, {
             publish: new RegExp(
-                `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+|req/\\w+)$`),
+                `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+|req/\\w+|result/\\w+)$`),
             subscribe: new RegExp(
                 `^${prefix}/${id}/(?:active|conf|addr|cmd/#|write/#|poll|rsp/\\w+)$`),
         });

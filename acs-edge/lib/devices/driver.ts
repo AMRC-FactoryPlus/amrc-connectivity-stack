@@ -2,6 +2,8 @@
  * Copyright (c) University of Sheffield AMRC 2025.
  */
 
+import crypto from "crypto";
+
 import {Metrics, serialisationType, sparkplugMetric, writeValToBuffer, writeValToJSON} from "../helpers/typeHandler.js";
 import {log} from "../helpers/log.js";
 
@@ -19,6 +21,24 @@ interface addrGroup {
     addrs:  Set<string>,
 }
 
+/* A write the agent is waiting for the driver to answer. */
+interface pendingWrite {
+    addr:       string,
+    metric:     sparkplugMetric,
+    timer:      NodeJS.Timeout,
+    callback:   Function,
+}
+
+/* How long the agent waits for a driver to answer a write before it
+ * gives up and doesn't report the value. DRIVER_WRITE_TIMEOUT
+ * overrides it, in milliseconds. */
+const WRITE_TIMEOUT = 10_000;
+
+function write_timeout () {
+    const ms = Number.parseInt(process.env.DRIVER_WRITE_TIMEOUT ?? "", 10);
+    return ms > 0 ? ms : WRITE_TIMEOUT;
+}
+
 export class DriverConnection extends DeviceConnection {
     id:         string
     conf:       any
@@ -28,6 +48,12 @@ export class DriverConnection extends DeviceConnection {
     topics:     Map<string, string>
     groups:     Map<string, addrGroup>
     #addrsPending: NodeJS.Immediate | null = null
+    /* Writes waiting for an answer, by write id. The random prefix
+     * means an answer meant for an earlier agent can't match. */
+    #pending:   Map<string, pendingWrite> = new Map()
+    #writeBase  = crypto.randomBytes(4).toString("hex")
+    #writeSeq   = 0
+    #writeTimeout = write_timeout()
 
     constructor(type: string, details: any, name: string, broker: DriverBroker) {
         // Call constructor of parent class
@@ -56,6 +82,10 @@ export class DriverConnection extends DeviceConnection {
 
     close () {
         this.#cancel_addrs();
+        /* The device is stopping, so nothing is waiting for these. */
+        for (const w of this.#pending.values())
+            clearTimeout(w.timer);
+        this.#pending.clear();
         this.broker.publish({
             id:         this.id,
             msg:        "active",
@@ -86,6 +116,13 @@ export class DriverConnection extends DeviceConnection {
 
     writeMetrics(metrics: Metrics, writeCallback: Function, payloadFormat: serialisationType, delimiter?: string) {
         this.#flush_addrs();
+
+        /* A driver that subscribed to write/# answers each write, so
+         * report each value only when its answer says it was written.
+         * Any other driver gets the writes exactly as it always has. */
+        if (this.broker.confirms_writes?.(this.id))
+            return this.#write_confirmed(metrics, writeCallback);
+
         let err;
 
         metrics.array.forEach(m => {
@@ -114,15 +151,62 @@ export class DriverConnection extends DeviceConnection {
         writeCallback(err);
     }
 
+    /* Write each metric to a driver that answers writes. The callback
+     * gets (err, written) once per metric: written is the metric when
+     * the driver says it was written, and empty, with an error, when
+     * the write failed, was refused or got no answer in time. The
+     * device then reports only the written values. */
+    #write_confirmed (metrics: Metrics, callback: Function) {
+        for (const m of metrics.array) {
+            const addr = m.properties?.address?.value as string | undefined;
+            const fail = (why: string) => callback(
+                new Error(`Write of ${m.name} to ${addr} failed: ${why}. The value was not reported.`),
+                []);
+
+            if (!addr || !this.topics.has(addr)) {
+                fail("the address is not in the address map");
+                continue;
+            }
+            if (!cmd_addressable(addr)) {
+                fail("the address contains + # or NUL");
+                continue;
+            }
+
+            const id = `${this.#writeBase}_${++this.#writeSeq}`;
+            const e = this.#write_metric(addr, m, id);
+            if (e) {
+                fail(e.message);
+                continue;
+            }
+
+            const timer = setTimeout(() => {
+                this.#pending.delete(id);
+                fail(`the driver didn't answer within ${this.#writeTimeout} ms`);
+            }, this.#writeTimeout);
+            const answer = (err?: string) => err === undefined
+                ? callback(undefined, [m])
+                : fail(`the driver refused it: ${err || "no reason given"}`);
+            this.#pending.set(id, { addr, metric: m, timer, callback: answer });
+        }
+    }
+
     /* Send one write in both forms. A driver subscribes to the form it
      * understands, so the agent doesn't need to know which: cmd/ is
      * the value as raw bytes, as drivers have always had it, and
      * write/ is JSON with the Sparkplug type. A form that can't carry
-     * this value is left out. Returns an error only if neither can. */
-    #write_metric (addr: string, m: sparkplugMetric): Error | undefined {
+     * this value is left out. Returns an error only if neither can, or
+     * if the write expects an answer (it has an id) and the typed form
+     * can't carry the value, because only a typed-write driver answers.
+     * The id goes in the typed form for the driver to answer with. */
+    #write_metric (addr: string, m: sparkplugMetric, id?: string): Error | undefined {
+        const typed = id === undefined
+            ? writeValToJSON
+            : (m: sparkplugMetric) => Buffer.from(JSON.stringify({
+                ...JSON.parse(writeValToJSON(m).toString()), id,
+            }));
         const forms: Array<[string, (m: sparkplugMetric) => Buffer]> = [
             ["cmd", writeValToBuffer],
-            ["write", writeValToJSON],
+            ["write", typed],
         ];
         const errs: string[] = [];
 
@@ -140,6 +224,8 @@ export class DriverConnection extends DeviceConnection {
 
         if (errs.length == 0) return;
         const why = `Can't write ${m.name} to ${addr}: ${errs.join(", ")}`;
+        if (id !== undefined && errs.some(e => e.startsWith("write:")))
+            return new Error(`it can't be sent as a typed write: ${errs.join(", ")}`);
         if (errs.length < forms.length) {
             log(`DRIVER [${this.id}]: ${why}`);
             return;
@@ -210,6 +296,7 @@ export class DriverConnection extends DeviceConnection {
         case "status":  return this.#msg_status(payload.toString());
         case "data":    return this.#msg_data(data, payload);
         case "err":     return this.#msg_err(data, payload.toString());
+        case "result":  return this.#msg_result(data, payload.toString());
 
         /* Our messages are looped */
         case "active":
@@ -308,6 +395,20 @@ export class DriverConnection extends DeviceConnection {
         //log(`Driver [${this.id}]: data ${data} ${addr}`);
         if (addr)
             this.emit("data", { [addr]: payload });
+    }
+
+    /* A driver's answer to a write: empty if it was written, otherwise
+     * an error code, optionally followed by a newline and a message. */
+    #msg_result (id: string, result: string) {
+        const w = this.#pending.get(id);
+        if (!w) {
+            console.log(`DRIVER [${this.id}]: answer to unknown write ${id} ignored`
+                + (result ? `: ${result.replace(/\n/, " ")}` : ""));
+            return;
+        }
+        this.#pending.delete(id);
+        clearTimeout(w.timer);
+        w.callback(result == "" ? undefined : result.replace(/\n/, " ").trim());
     }
 
     /* A driver reports a problem with an address, such as a failed

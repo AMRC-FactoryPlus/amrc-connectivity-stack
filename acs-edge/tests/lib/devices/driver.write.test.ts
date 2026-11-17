@@ -298,6 +298,8 @@ describe("DriverBroker typed writes", () => {
         conn.writeMetrics(new Metrics([metric(T.uInt16, 7, "plant/line1/speed")]),
             () => {}, "JSON" as any);
         await conn.stopSubscription("dev", () => {});
+        /* A write/# driver is expected to answer. Stop waiting. */
+        conn.close();
 
         /* Both publishes are queued before this one, so once it
          * arrives the writes have too. */
@@ -320,7 +322,9 @@ describe("DriverBroker typed writes", () => {
     it("gives a write/# driver only the typed write", async () => {
         const got = await deliver("write/#");
         expect(got.map(([t]) => t)).toEqual([`fpEdge1/${ID}/write/plant/line1/speed`]);
-        expect(JSON.parse(got[0][1].toString())).toEqual({ type: "UInt16", value: 7 });
+        /* The id asks the driver to answer; see driver.confirm.test.ts. */
+        expect(JSON.parse(got[0][1].toString()))
+            .toEqual({ type: "UInt16", value: 7, id: expect.stringMatching(/^\w+$/) });
     });
 
     it("lets a driver subscribe to write/# but not publish there", async () => {

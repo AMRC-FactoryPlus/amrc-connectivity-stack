@@ -109,6 +109,13 @@ kept outside this repository, is a real async-mode driver: it
 subscribes to a southbound MQTT broker and pushes data via
 `DriverHandle::publish` as it arrives.
 
+An async handler that subscribes at a rate can override
+`subscribe_groups` instead of `subscribe`. It gets the same addresses
+plus the Edge Agent's groups from the `addr` message: one per device,
+with the device's poll interval and its addresses (`AddrGroup`). The
+default calls `subscribe`. `edge-opcua` uses it to sample and publish
+each device's nodes at the device's interval.
+
 ### A device that sends faster than the Edge Agent can take
 
 `DriverHandle::publish` queues without limit. That suits a device that

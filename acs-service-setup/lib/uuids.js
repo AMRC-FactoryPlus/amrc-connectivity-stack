@@ -123,6 +123,7 @@ export const ACS = {
         REST:                   "c9f5c6ac-de4d-11ef-befa-ef66bbfc8926",
         OPCUA:                  "f32fed40-de4d-11ef-a011-1711bd498427",
         MQTT:                   "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
 
         /* Internal drivers removed from the Edge Agent. Kept so
          * retired-drivers.js can find connections still using them. */
@@ -130,7 +131,6 @@ export const ACS = {
         EtherNetIP:             "eefce570-de4d-11ef-95e6-379190194ffa",
         S7:                     "f171a296-de4d-11ef-aef4-cf4e4ac2bfc6",
         Websocket:              "f5fa94ee-de4d-11ef-882f-a7f7c2ad5273",
-        UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
 
         /* Split drivers replacing internal drivers */
         RESTSplit:              "5ede3d8d-7a45-47e4-9ee3-c4be844e40b2",

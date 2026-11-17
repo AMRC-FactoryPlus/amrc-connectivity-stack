@@ -24,12 +24,7 @@ import * as UUIDs from "./uuids.js";
 import { log } from "./helpers/log.js";
 import { serialisationType, sparkplugConfig, } from "./helpers/typeHandler.js";
 
-import { RestConnection } from "./devices/REST.js";
-import { OPCUAConnection } from "./devices/OPCUA.js";
-import { MQTTConnection } from "./devices/MQTT.js";
-import { UDPConnection } from "./devices/UDP.js";
 import { DriverConnection } from "./devices/driver.js";
-import { Scout, ScoutResult } from "./scout.js";
 
 /* The default for DRIVER_FILE_LIMIT. The agent holds a fetched file in
  * memory several times over while it encodes and sends it, so raising
@@ -43,6 +38,14 @@ export const RETIRED_CONN_TYPES = [
     "MTConnect", "S7", "EtherNet/IP", "Websocket",
 ];
 
+/* Connection types the Edge Agent ran itself until ACS 7, each now
+ * served by a split driver. Service-setup moves these connections to
+ * their split drivers when ACS is upgraded, so a config still naming
+ * one is a connection the move left alone. */
+export const MOVED_CONN_TYPES = [
+    "REST", "MQTT", "OPC UA", "UDP",
+];
+
 /* The error for a connection whose type the agent cannot run. It goes
  * to stderr, not through log(), which prints only with DEBUG set: the
  * devices on this connection publish nothing, and a site must be able
@@ -54,12 +57,27 @@ export function unknownConnTypeMessage (connection: any): string {
         .map((d: any) => d?.deviceId)
         .filter((d: any) => d != null);
     const devs = devices.length ? devices.join(", ") : "none";
-    const why = RETIRED_CONN_TYPES.includes(cType)
+    const why = MOVED_CONN_TYPES.includes(cType)
+        ? `The Edge Agent no longer runs ${cType} connections itself: `
+            + `since ACS 7 they run on the ${cType} split driver. `
+            + `Service-setup moves them when ACS is upgraded, and left `
+            + `this one alone. Its log says why. Fix that and upgrade `
+            + `again, or edit the connection in the Manager and pick the `
+            + `${cType} driver.`
+        : RETIRED_CONN_TYPES.includes(cType)
         ? `The ${cType} connection type has been removed from the Edge `
             + `Agent. Move this connection to a split driver for ${cType}.`
         : `The Edge Agent does not know the connection type '${cType}'.`;
     return `ERROR: Connection '${name}' was not started and its devices `
         + `will publish no data (devices: ${devs}). ${why}`;
+}
+
+/* The name of the Node alert for a connection that was not started:
+ * Alerts/Connection/<name> in the Edge Agent schema, whose names may
+ * only hold letters, digits and underscores. */
+export function connectionAlertName (connection: any): string {
+    return String(connection?.name ?? "unnamed").replace(/[^A-Za-z0-9_]/g, "_")
+        || "unnamed";
 }
 
 /* Does this parsed config contain a secret placeholder anywhere, in a
@@ -251,8 +269,17 @@ export class Translator extends EventEmitter {
             // Fetch our config
             const ids = await this.fetchIdentities();
             const conf = await this.fetchConfig(ids.uuid!);
+            /* A connection the agent cannot run raises an alert on the
+             * Node, so it shows without anyone reading the log. */
+            const notStarted = (conf.deviceConnections ?? [])
+                .filter(c => !this.chooseDeviceInfo(c?.connType))
+                .map(c => connectionAlertName(c));
             const spConf = {
                 ...conf.sparkplug!, address: ids.sparkplug!, uuid: ids.uuid!,
+                alerts: {
+                    ...conf.sparkplug!.alerts!,
+                    connections: [...new Set(notStarted)],
+                },
             };
 
             // Create sparkplug node
@@ -373,20 +400,21 @@ export class Translator extends EventEmitter {
 
         this.checkPayloadFormats(connection);
 
-        if (connection.scout?.scoutDetails?.isEnabled) {
-            this.runScout(connection, newConn);
-        }
-        else {
-            this.runDevices(connection, newConn);
-        }
+        /* Edge Scout (address browsing) went with the built-in OPC UA
+         * and MQTT connections, the only ones that had it. A config
+         * asking for it runs its devices as usual. */
+        if (connection.scout?.scoutDetails?.isEnabled)
+            log(`Edge Scout is not available, so connection ${connection.name} `
+                + `runs its devices instead of scouting.`);
+        this.runDevices(connection, newConn);
     }
 
     /* Warn about a configuration that cannot ever produce data.
      *
      * An external driver publishes a payload for the Edge Agent to decode, so
      * its devices must name a format. "Defined by Protocol" means the
-     * opposite: the connection has already decoded the value itself, which is
-     * true of the internal connections and never of a driver. Left on that
+     * opposite: the connection has already decoded the value itself, which
+     * was true of the built-in connections and is never true of a driver. Left on that
      * setting the payload arrives, finds no parser, and is dropped, leaving
      * every metric on the device empty with nothing logged.
      *
@@ -404,31 +432,6 @@ export class Translator extends EventEmitter {
                 + `payload for the Edge Agent to decode, so this device will `
                 + `produce no data. Set the device's payload format to the `
                 + `format the driver publishes, usually JSON.`);
-        }
-    }
-
-    runScout(connection: any, newConn: DeviceConnection){
-        try{
-            log(`Edge-Agent to be run in Scout Mode for ${connection.name}`);
-            const newScout = new Scout(newConn, connection.scout);
-            newScout.on('scoutResults', async (scoutResult: ScoutResult) => {
-                try {
-                    if (scoutResult.success) {
-                        await this.fplus.ConfigDB.put_config(UUIDs.App.EdgeScoutResults, connection.uuid, scoutResult);
-                        log(`Putting to ConfigDB for ${connection.name} should be done.`);
-                    }else{
-                        log(`Scouting for ${connection.name} was not successful.`);
-                    }
-                }
-                catch (err) {
-                    log(`Error when trying to put to config in scout mode ${(err as Error).message}`);
-                }
-            });
-
-            newScout.performScouting();
-        }
-        catch(err){
-            log(`Error when trying to run in scout mode ${(err as Error).message}`)
         }
     }
 
@@ -518,35 +521,15 @@ export class Translator extends EventEmitter {
         return routes;
     }
 
-    /* There is a better way to do this. At minimum this should be in a
-     * factory class, not the main Translator class. */
+    /* Every connection is a split driver now. Anything else is a
+     * connection type this agent cannot run. */
     chooseDeviceInfo(connType: string): deviceInfo | undefined {
-        // Initialise the connection parameters
-        switch (connType) {
-            case "REST":
-                return {
-                    connection: RestConnection, connectionDetails: 'RESTConnDetails'
-                }
-            case "OPC UA":
-                return {
-                    connection: OPCUAConnection, connectionDetails: 'OPCUAConnDetails'
-                }
-            case "MQTT":
-                return {
-                    connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
-                }
-            case "UDP":
-                return {
-                    connection: UDPConnection, connectionDetails: 'UDPConnDetails'
-                }
-            case "Driver":
-                return {
-                    connection: DriverConnection,
-                    connectionDetails: "DriverDetails",
-                };
-            default:
-                return;
-        }
+        if (connType == "Driver")
+            return {
+                connection: DriverConnection,
+                connectionDetails: "DriverDetails",
+            };
+        return;
     }
 
     /* Fetch our identities (UUID, Sparkplug) from the Auth service. */

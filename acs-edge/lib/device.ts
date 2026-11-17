@@ -21,8 +21,6 @@ import {
 } from "./helpers/typeHandler.js";
 import { EventEmitter } from "events";
 import Long from "long";
-import { ScoutDriverDetails } from "./scout.js";
-// import { ScoutDetails } from "./scout.js";
 // import { UniqueDictionary } from "./helpers/uniquedictionary.js";
 
 /**
@@ -125,15 +123,6 @@ export abstract class DeviceConnection extends EventEmitter {
         writeCallback(err);
     }
 
-
-    /**
-     * Request devices to return a list of available addresses (tags, topics, etc.)
-     */
-    public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
-
-        // should be implmented by subclasses for each type of connection depending on the specific protocol (OPC UA, MQTT, etc.)
-        throw new Error('Scouting not supported for this device connection type.');
-    }
 
     /**
      * Perform any setup needed to read from certain addresses, e.g. set

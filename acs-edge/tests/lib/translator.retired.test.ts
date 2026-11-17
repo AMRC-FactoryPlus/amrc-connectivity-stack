@@ -4,16 +4,27 @@
 
 /* A connection whose type the Edge Agent no longer has must not stop
  * the agent or its other connections, and must say why its devices
- * publish nothing, whether or not DEBUG is set. */
+ * publish nothing, whether or not DEBUG is set. Since ACS 7 that
+ * includes the four types that moved to split drivers. */
 
-import { RestConnection } from "../../lib/devices/REST";
-import { UDPConnection } from "../../lib/devices/UDP";
-import { RETIRED_CONN_TYPES, Translator } from "../../lib/translator";
+import { EventEmitter } from "events";
+
+import { DriverConnection } from "../../lib/devices/driver";
+import {
+    connectionAlertName, MOVED_CONN_TYPES, RETIRED_CONN_TYPES, Translator,
+} from "../../lib/translator";
+import * as UUIDs from "../../lib/uuids";
+
+class FakeBroker extends EventEmitter {
+    async start () {}
+    async stop () {}
+    async publish () {}
+}
 
 function setup () {
     const errors: string[] = [];
     jest.spyOn(console, "error").mockImplementation((m: any) => { errors.push(String(m)); });
-    const translator = new Translator({} as any, 1000, {} as any);
+    const translator = new Translator({} as any, 1000, new FakeBroker() as any);
     return { translator, errors };
 }
 
@@ -40,19 +51,27 @@ test("the four retired types are the ones named in the release note", () => {
         .toEqual(["EtherNet/IP", "MTConnect", "S7", "Websocket"]);
 });
 
-/* UDP was retired with the others, then put back because it is needed
- * for robot data. It must start like any other built-in type. */
-test("a UDP connection is started, with no error", async () => {
+/* Service-setup moves these to their split drivers on upgrade, so one
+ * left in the config is a connection the move skipped. */
+test.each(MOVED_CONN_TYPES)("a built-in %s connection says to look at service-setup", async (type) => {
     const { translator, errors } = setup();
-    expect(RETIRED_CONN_TYPES).not.toContain("UDP");
 
     await translator.setupConnection({
-        connType: "UDP", name: "robot", UDPConnDetails: { port: 0 },
+        connType: type, name: "cell 2",
+        devices: [{ deviceId: "robot" }],
     });
 
-    expect(errors).toEqual([]);
-    expect(translator.connections.UDP).toBeInstanceOf(UDPConnection);
-    await translator.connections.UDP.close();
+    expect(translator.connections[type]).toBeUndefined();
+    expect(translator.devices).toEqual({});
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/^ERROR: Connection 'cell 2' was not started/);
+    expect(errors[0]).toContain("devices: robot");
+    expect(errors[0]).toContain(`since ACS 7 they run on the ${type} split driver`);
+    expect(errors[0]).toContain("Service-setup moves them when ACS is upgraded");
+});
+
+test("the four moved types are REST, MQTT, OPC UA and UDP", () => {
+    expect([...MOVED_CONN_TYPES].sort()).toEqual(["MQTT", "OPC UA", "REST", "UDP"]);
 });
 
 test("an unknown type gets an error naming the type", async () => {
@@ -79,18 +98,68 @@ test("the error is printed with DEBUG unset", async () => {
     }
 });
 
-test("connections after a retired one are still set up", async () => {
+test("connections after one that can't start are still set up", async () => {
     const { translator, errors } = setup();
     const conns = [
         { connType: "MTConnect", name: "mill", devices: [{ deviceId: "m1" }] },
-        { connType: "REST", name: "api", RESTConnDetails: { baseURL: "http://localhost" } },
+        { connType: "UDP", name: "robot", UDPConnDetails: { port: 5000 } },
+        { connType: "Driver", name: "api", DriverDetails: {} },
     ];
 
     /* The same loop Translator.start runs. */
     conns.forEach(c => translator.setupConnection(c));
     await new Promise(r => setImmediate(r));
 
-    expect(errors).toHaveLength(1);
+    expect(errors).toHaveLength(2);
     expect(translator.connections.MTConnect).toBeUndefined();
-    expect(translator.connections.REST).toBeInstanceOf(RestConnection);
+    expect(translator.connections.UDP).toBeUndefined();
+    expect(translator.connections.Driver).toBeInstanceOf(DriverConnection);
+});
+
+test("alert names keep only letters, digits and underscores", () => {
+    expect(connectionAlertName({ name: "Robot cell 2 (UDP)" })).toBe("Robot_cell_2__UDP_");
+    expect(connectionAlertName({ name: "api.example.org" })).toBe("api_example_org");
+    expect(connectionAlertName({})).toBe("unnamed");
+});
+
+/* The Node raises Alerts/Connection/<name> for each connection it could
+ * not start, so the problem shows in the Node's metrics. */
+test("a connection that can't start raises a Connection alert on the Node", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const births: any[] = [];
+    const client = Object.assign(new EventEmitter(), {
+        connect () { setImmediate(() => client.emit("birth")); },
+        stop () {},
+        publishNodeBirth (p: any) { births.push(p); },
+        publishDeviceBirth () {},
+        publishDeviceData () {},
+        publishDeviceDeath () {},
+    });
+    const config = {
+        deviceConnections: [
+            { connType: "OPC UA", name: "press line", devices: [] },
+            { connType: "Driver", name: "api", DriverDetails: {}, devices: [] },
+        ],
+    };
+    const fplus: any = {
+        Auth: {
+            find_principal: async () => ({
+                uuid: "11111111-2222-4333-8444-555555555555",
+                sparkplug: { group: "G", node: "N" },
+            }),
+        },
+        ConfigDB: { get_config_with_etag: async () => [config, "etag"] },
+        MQTT: { basic_sparkplug_node: async () => client },
+    };
+    const translator = new Translator(fplus, 1, new FakeBroker() as any);
+
+    await translator.start();
+    await new Promise(r => setImmediate(r));
+    await translator.stop();
+
+    const metrics = Object.fromEntries(births[0].metrics.map((m: any) => [m.name, m]));
+    expect(metrics["Alerts/Connection/press_line/Active"].value).toBe(true);
+    expect(metrics["Alerts/Connection/press_line/Type"].value).toBe(UUIDs.Alert.Connection);
+    expect(metrics["Alerts/Connection/api/Active"]).toBeUndefined();
+    expect(metrics["Alerts/Config_Invalid/Active"].value).toBe(false);
 });

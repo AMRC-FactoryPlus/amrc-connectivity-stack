@@ -6,9 +6,7 @@
 /* utils/CentralConfig.ts once held a CentralConfig class, which these
  * tests were written for. It is now a set of functions. Importing the
  * module parses and compiles schema/schema.json, so these tests also
- * catch a schema that is not valid JSON or not a valid JSON Schema.
- * ConfigPOST and fetchConfig talk to a config server and are not
- * tested here. */
+ * catch a schema that is not valid JSON or not a valid JSON Schema. */
 
 import { validateConfig, wait } from "../../utils/CentralConfig";
 

@@ -9,7 +9,7 @@
 
 import { EventEmitter } from "events";
 
-import { RestConnection } from "../../lib/devices/REST";
+import { DriverConnection } from "../../lib/devices/driver";
 import { Translator } from "../../lib/translator";
 
 const UUID = "11111111-2222-4333-8444-555555555555";
@@ -34,8 +34,8 @@ function setup (opts: { config?: any, mqtt?: () => Promise<any> } = {}) {
     const config = opts.config ?? {
         sparkplug: {},
         deviceConnections: [{
-            name: "api", connType: "REST",
-            RESTConnDetails: { baseURL: "http://localhost" },
+            name: "api", connType: "Driver",
+            DriverDetails: { baseURL: "http://localhost" },
         }],
     };
     const fplus: any = {
@@ -65,7 +65,7 @@ describe("start()", () => {
 
         expect(translator.sparkplugNode).toBeDefined();
         expect(broker.started).toBe(1);
-        expect(translator.connections.REST).toBeInstanceOf(RestConnection);
+        expect(translator.connections.Driver).toBeInstanceOf(DriverConnection);
         expect(stop).not.toHaveBeenCalled();
     });
 
@@ -96,7 +96,7 @@ describe("stop()", () => {
     test("closes connections, stops the broker and the Sparkplug node, and says so", async () => {
         const { translator, broker, client } = setup();
         await translator.start();
-        const close = jest.spyOn(translator.connections.REST, "close");
+        const close = jest.spyOn(translator.connections.Driver, "close");
         const stopped = jest.fn();
         translator.on("stopped", stopped);
 

@@ -8,7 +8,6 @@ import * as xpath from "xpath";
 import { DOMParser } from "@xmldom/xmldom";
 import * as jsonpointer from 'jsonpointer';
 import * as Long from "long";
-import { MessageSecurityMode, SecurityPolicy } from "node-opcua";
 import { Address } from "@amrc-factoryplus/utilities";
 import { log } from "./log.js";
 
@@ -44,17 +43,6 @@ export enum sparkplugDataType {
     template = "Template",
     propertySet = "PropertySet",
     propertySetList = "PropertySetList",
-}
-
-export enum restAuthMethod {
-    None = "None", Basic = "Basic"
-}
-
-export interface restConnDetails {
-    baseURL: string,
-    authMethod: restAuthMethod,
-    username?: string,
-    password?: string
 }
 
 export enum OPCUADataType {
@@ -114,6 +102,8 @@ export interface sparkplugConfig {
     uuid: string,
     alerts?: {
         configFetchFailed: boolean, configInvalid: boolean,
+        /* Alert names of the connections the agent could not start. */
+        connections?: string[],
     },
     configRevision?: string,
     nodeControl?: nodeControl,
@@ -539,7 +529,7 @@ function decode_json (msg: any): { value: any, err?: any } {
  *
  * Nothing in the read path changes the decoded payload: values are read
  * out of it, and a metric whose value is an object holds a reference
- * into it, as REST payloads (already parsed by axios) always have.
+ * into it, as the built-in REST connection's parsed payloads did.
  */
 export class DecodedPayload {
     readonly raw: any;
@@ -1239,58 +1229,4 @@ export function writeValToJSON(metric: sparkplugMetric): Buffer {
     }
 
     return Buffer.from(JSON.stringify({ type, value: out }));
-}
-
-/**
- * Converting OPC Security Policy to correct class type
- * @param type Security policy type as string (e.g. "Basic256Sha256", "None", etc.)
- * @returns OPC Security Policy type
- */
-export function getOpcSecurityPolicy(type: string): SecurityPolicy {
-    switch (type) {
-        case ("None"):
-            return SecurityPolicy.None;
-        case ("Basic128"):
-            return SecurityPolicy.Basic128;
-        case ("Basic192"):
-            return SecurityPolicy.Basic192;
-        case ("Basic192Rsa15"):
-            return SecurityPolicy.Basic192Rsa15;
-        case ("Basic256Rsa15"):
-            return SecurityPolicy.Basic256Rsa15;
-        case ("Basic256Sha256"):
-            return SecurityPolicy.Basic256Sha256;
-        case ("Aes128_Sha256"):
-            return SecurityPolicy.Aes128_Sha256_RsaOaep;
-        case ("Aes128_Sha256_RsaOaep"):
-            return SecurityPolicy.Aes128_Sha256_RsaOaep;
-        case ("PubSub_Aes128_CTR"):
-            return SecurityPolicy.PubSub_Aes128_CTR;
-        case ("PubSub_Aes256_CTR"):
-            return SecurityPolicy.PubSub_Aes256_CTR;
-        case ("Basic128Rsa15"):
-            return SecurityPolicy.Basic128Rsa15;
-        case ("Basic256"):
-            return SecurityPolicy.Basic256;
-        default:
-            return SecurityPolicy.Invalid;
-    }
-}
-
-/**
- * Converting OPC Security Mode to correct class type
- * @param type Security mode type as string (e.g. "Sign", "None", "SignAndEncrypt".)
- * @returns OPC Security Mode type
- */
-export function getOpcSecurityMode(type: string): MessageSecurityMode {
-    switch (type) {
-        case ("None"):
-            return MessageSecurityMode.None;
-        case ("Sign"):
-            return MessageSecurityMode.Sign;
-        case ("SignAndEncrypt"):
-            return MessageSecurityMode.SignAndEncrypt;
-        default:
-            return MessageSecurityMode.Invalid;
-    }
 }

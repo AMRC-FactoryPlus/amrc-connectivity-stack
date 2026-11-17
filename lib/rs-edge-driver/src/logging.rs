@@ -1,5 +1,11 @@
 use tracing_subscriber::EnvFilter;
 
+/// Dependencies of this library that stay at `info` when `VERBOSE`
+/// turns `debug` on for everything, unless `VERBOSE` names them.
+/// rumqttc logs a line at `debug` for every MQTT packet, which is
+/// every data message the driver sends.
+const QUIET: &[&str] = &["rumqttc"];
+
 /// Work out the `tracing` filter for a driver from the `VERBOSE` and
 /// `RUST_LOG` environment variables.
 ///
@@ -7,7 +13,8 @@ use tracing_subscriber::EnvFilter;
 /// `VERBOSE` works as it does for the JS edge drivers:
 ///
 /// - unset, empty or `0`: `info`
-/// - `1` or `ALL`: `debug` for everything
+/// - `1` or `ALL`: `debug` for everything except rumqttc, which logs
+///   every MQTT packet at `debug` and stays at `info`
 /// - a comma-separated list of names: `debug` for each named target
 ///   (for example `rs_edge_driver`), and a name starting with `!`
 ///   turns that target off. Entries containing `=` are passed through
@@ -28,6 +35,13 @@ pub fn log_filter(verbose: Option<&str>, rust_log: Option<&str>) -> String {
                 Some(off) => directives.push(format!("{off}=off")),
                 None => directives.push(format!("{d}=debug")),
             },
+        }
+    }
+    if directives[0] == "debug" {
+        for q in QUIET {
+            if !verbose.contains(q) {
+                directives.push(format!("{q}=info"));
+            }
         }
     }
     directives.join(",")
@@ -62,8 +76,23 @@ mod tests {
 
     #[test]
     fn verbose_one_or_all_is_debug() {
-        assert_eq!(log_filter(Some("1"), None), "debug");
-        assert_eq!(log_filter(Some("ALL"), None), "debug");
+        assert_eq!(log_filter(Some("1"), None), "debug,rumqttc=info");
+        assert_eq!(log_filter(Some("ALL"), None), "debug,rumqttc=info");
+        // The edge-agent chart's default.
+        assert_eq!(
+            log_filter(Some("ALL,!token,!service,!sparkplug"), None),
+            "debug,token=off,service=off,sparkplug=off,rumqttc=info"
+        );
+    }
+
+    #[test]
+    fn verbose_can_name_rumqttc() {
+        assert_eq!(log_filter(Some("ALL,rumqttc"), None), "debug,rumqttc=debug");
+        assert_eq!(
+            log_filter(Some("1,rumqttc=trace"), None),
+            "debug,rumqttc=trace"
+        );
+        assert_eq!(log_filter(Some("rumqttc"), None), "info,rumqttc=debug");
     }
 
     #[test]
@@ -74,14 +103,14 @@ mod tests {
         );
         assert_eq!(
             log_filter(Some("1,rs_edge_driver=trace"), None),
-            "debug,rs_edge_driver=trace"
+            "debug,rs_edge_driver=trace,rumqttc=info"
         );
     }
 
     #[test]
     fn rust_log_wins() {
         assert_eq!(log_filter(Some("1"), Some("warn")), "warn");
-        assert_eq!(log_filter(Some("1"), Some(" ")), "debug");
+        assert_eq!(log_filter(Some("1"), Some(" ")), "debug,rumqttc=info");
     }
 
     #[test]

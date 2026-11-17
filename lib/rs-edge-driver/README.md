@@ -228,6 +228,13 @@ Name|Meaning
 `RUST_LOG` overrides `VERBOSE` when set. Call `init_logging()` at the
 start of `main` to use them.
 
+`1` or `ALL` leaves rumqttc at `info`, because it logs every MQTT packet
+at `debug` and the edge-agent chart sets `VERBOSE=ALL` by default.
+`VERBOSE=ALL,rumqttc` turns it on. A driver whose own dependencies log
+every message at `debug` can do the same for them: build its filter
+from `log_filter` and add `<crate>=info`, as `edge-opcua` does for
+async-opcua (`edge-opcua/src/logging.rs`).
+
 `DriverConfig::from_env()` (or `DriverConfig::new(url, username,
 password)`) sets `reconnect_delay` to 5 seconds and `serial_poll` to
 `false`. Change the fields on the returned value if you need different

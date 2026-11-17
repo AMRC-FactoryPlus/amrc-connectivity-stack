@@ -3,6 +3,7 @@
  */
 
 import { JSONPath } from "jsonpath-plus";
+import * as vm from "vm";
 import * as xpath from "xpath";
 import { DOMParser } from "@xmldom/xmldom";
 import * as jsonpointer from 'jsonpointer';
@@ -378,6 +379,54 @@ export class Metrics {
 
 
 
+/* jsonpath-plus 5 runs each filter script, such as the
+ * "@.name=='ActLoad'" in $.set.datapoints[?(@.name=='ActLoad')].value,
+ * with vm.runInNewContext: a new V8 context for every JSONPath call and
+ * a fresh compile for every array element it tests. That cost 170 to
+ * 290 us per metric for a filter over 10 to 100 elements, far more
+ * than parsing the payload.
+ *
+ * So each path string gets one JSONPath object, made once and reused,
+ * whose vm compiles each script once and runs it in one shared
+ * context. jsonpath-plus sets every variable a script reads (_$_v,
+ * _$_root and so on) on that context before it runs the script, so a
+ * script sees what it saw in its own context. Only a script that sets
+ * a global of its own would now see it again next time, which no
+ * metric path does. */
+const jsonpath_context = vm.createContext({});
+const jsonpath_scripts = new Map<string, vm.Script>();
+const jsonpath_vm = {
+    runInNewContext (code: string, sandbox: any) {
+        let script = jsonpath_scripts.get(code);
+        if (!script) {
+            script = new vm.Script(code);
+            jsonpath_scripts.set(code, script);
+        }
+        return script.runInContext(vm.isContext(sandbox)
+            ? sandbox : vm.createContext(sandbox));
+    },
+};
+const jsonpath_cache = new Map<string, any>();
+
+/* JSONPath({ path, json }), with the path compiled once. */
+function query_json (path: string, json: any): any {
+    let jp = jsonpath_cache.get(path);
+    if (!jp) {
+        jp = new (JSONPath as any)({
+            autostart: false, path, sandbox: jsonpath_context });
+        jp.vm = jsonpath_vm;
+        jsonpath_cache.set(path, jp);
+    }
+    /* @root reads the json the object was made with */
+    jp.json = json;
+    try {
+        return jp.evaluate(path, json);
+    }
+    finally {
+        jp.json = undefined;
+    }
+}
+
 /**
  * Processes a JSON batched payload and returns an array of values and timestamps
  * This function expects an array of objects and uses the metric's path to extract values
@@ -410,10 +459,7 @@ export function processJSONBatchedPayload(payload: any[], metric: sparkplugMetri
             /* Work around a bug in the JSONPath library */
             let newVal = path === "$" && item === false
                 ? [false]
-                : JSONPath({
-                    path: path,
-                    json: item
-                });
+                : query_json(path, item);
 
             if (item === 0 || !Array.isArray(newVal)) {
                 value = 0;
@@ -614,10 +660,7 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                 /* Work around a bug in the JSONPath library */
                 let newVal = path === "$" && payload === false
                     ? [false]
-                    : JSONPath({
-                        path: path,
-                        json: payload
-                    });
+                    : query_json(path, payload);
                 if (payload === 0 || !Array.isArray(newVal)) {
                     return 0;
                 } else {

@@ -12,6 +12,18 @@ use crate::error::Error;
 /// both. rumqttc's own default of 10 KiB is far too small.
 pub const DEFAULT_MAX_PACKET_SIZE: usize = 16 * 1024 * 1024;
 
+/// The default for [`DriverOptions::publish_queue_bytes`] (16 MiB).
+///
+/// At 100 bytes a message this holds about 70,000 messages, a few
+/// seconds of a fast device, so a short stall in the edge agent loses
+/// nothing while a long one can't use up the container's memory.
+pub const DEFAULT_PUBLISH_QUEUE_BYTES: usize = 16 * 1024 * 1024;
+
+/// What each queued message counts for in
+/// [`DriverOptions::publish_queue_bytes`] on top of its payload: its
+/// topic and the bookkeeping that goes with it.
+pub const PUBLISH_QUEUE_OVERHEAD: usize = 128;
+
 /// Configuration for the driver runtime, specifying how to connect
 /// to the edge agent's MQTT broker.
 ///
@@ -87,6 +99,13 @@ pub struct DriverOptions {
     /// The largest MQTT packet, in bytes, the driver will send or
     /// accept. Defaults to [`DEFAULT_MAX_PACKET_SIZE`].
     pub max_packet_size: usize,
+    /// The most data, in bytes, that may wait to go to the edge agent
+    /// before [`DriverHandle::try_publish`](crate::DriverHandle::try_publish)
+    /// refuses more. Each message counts its payload plus
+    /// [`PUBLISH_QUEUE_OVERHEAD`]. [`publish`](crate::DriverHandle::publish)
+    /// is never refused, but what it queues counts towards this.
+    /// Defaults to [`DEFAULT_PUBLISH_QUEUE_BYTES`].
+    pub publish_queue_bytes: usize,
 }
 
 impl Default for DriverOptions {
@@ -95,6 +114,7 @@ impl Default for DriverOptions {
             poll_timeout: Duration::from_secs(30),
             keep_alive: Duration::from_secs(30),
             max_packet_size: DEFAULT_MAX_PACKET_SIZE,
+            publish_queue_bytes: DEFAULT_PUBLISH_QUEUE_BYTES,
         }
     }
 }

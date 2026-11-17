@@ -43,9 +43,10 @@ impl Protocol {
     }
 }
 
-/// The WebSocket path the npm `mqtt` package uses when the URL has
-/// none, which the built-in's URL never has.
-pub const WS_PATH: &str = "/mqtt";
+/// The WebSocket path the built-in connects to. Its URL is
+/// `ws://host:port` with no path, and mqtt.js 5 then uses `/`
+/// (`setDefaultOpts` in `lib/connect/ws.ts`).
+pub const WS_PATH: &str = "/";
 
 /// mqtt.js's keep-alive when none is given.
 const DEFAULT_KEEP_ALIVE: u64 = 60;
@@ -57,8 +58,8 @@ pub struct Conf {
     pub protocol: Protocol,
     pub host: String,
     pub port: u16,
-    /// The client id, or `None` to make one up (`NO-ID-<uuid>`) for
-    /// each connection, as the built-in does.
+    /// The client id, or `None` to make one up (`NO-ID-<uuid>`), as
+    /// the built-in does.
     pub client_id: Option<String>,
     /// Username and password. The built-in sends them only when the
     /// username is set, and then the password only if it is set.
@@ -127,7 +128,9 @@ impl Conf {
         })
     }
 
-    /// The client id for one connection.
+    /// The client id. A made-up one is new on each call, so call this
+    /// once and keep the result: the built-in makes one when the
+    /// connection is set up and keeps it across reconnects.
     pub fn client_id(&self) -> String {
         match &self.client_id {
             Some(id) => id.clone(),
@@ -246,7 +249,7 @@ mod tests {
         let a = c.client_id();
         let b = c.client_id();
         assert!(a.starts_with("NO-ID-") && a.len() == 42, "{a}");
-        assert_ne!(a, b, "a made-up id is new for each connection");
+        assert_ne!(a, b, "a made-up id is new on each call");
     }
 
     #[test]

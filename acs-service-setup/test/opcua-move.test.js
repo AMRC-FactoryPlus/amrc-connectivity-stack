@@ -1,6 +1,6 @@
 /*
  * ACS service setup
- * A whole site's OPC UA connections moved by the chart's defaults, 
+ * A whole site's OPC UA connections moved by the chart's defaults
  * Copyright 2026 University of Sheffield AMRC
  *
  * opcua-move/site.json is a site before an upgrade: one Edge Agent with
@@ -12,8 +12,11 @@
  *    is the golden-output sample `opcua` from
  *    acs-edge/tests/fixtures/drivers/samples, with Metric_06 writable.
  *  - `Furnace` has security None, no credentials and, as some real
- *    connections have, no payload format of its own. It has two
- *    devices, which share the same sample's metrics between them.
+ *    connections have, no payload format of its own. Two of its
+ *    devices share the same sample's metrics between them. Two more
+ *    have nothing to read, as two real connections have: one has only
+ *    a metric with no address, and one has no metrics at all. The
+ *    built-in connection crashed the Edge Agent on such a device.
  *
  * Both have a metric with a path the built-in connection never read
  * (`mm`, a unit, and `null`). acs-edge/tests/golden replays
@@ -128,10 +131,15 @@ describe("moving a site's OPC UA connections with the chart's defaults", () => {
                 `../../acs-edge/tests/fixtures/drivers/samples/${sample}/connection.json`,
                 import.meta.url), "utf8"));
             const strip = t => ({ ...bare(t), method: undefined });
-            assert.deepEqual(tags(ours).map(strip), tags(theirs).map(strip), conn);
+            const read = e => tags(e).filter(t => t.address);
+            assert.deepEqual(read(ours).map(strip), read(theirs).map(strip), conn);
             assert.equal(ours.pollInt, theirs.pollInt, conn);
         }
-        assert.equal(site_entry(AGENT, C.furnace).devices.length, 2);
+        const furnace = site_entry(AGENT, C.furnace).devices;
+        assert.equal(furnace.length, 4);
+        assert.deepEqual(furnace.map(d => d.tags.filter(t => t.address).length),
+            [3, 4, 0, 0]);
+        assert.deepEqual(furnace[3].tags, []);
         assert.equal(site_entry(AGENT, C.furnace).payloadFormat, undefined);
     });
 

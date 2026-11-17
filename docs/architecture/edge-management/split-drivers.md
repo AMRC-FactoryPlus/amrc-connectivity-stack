@@ -348,6 +348,11 @@ You may notice these differences:
   device its own values. So after the move, devices that published
   nothing start publishing, and the last device on such a connection
   stops publishing values that were never its own.
+- **A device with nothing to read is harmless.** A device with no
+  addressed metrics made the built-in connection ask the server to
+  monitor nothing, and the server's refusal stopped the whole Edge
+  Agent. The driver subscribes only to addresses it has, so such a
+  device just births and the others carry on.
 - **DateTime metrics publish the date.** The built-in connection
   published every DateTime value as 0.
 - **An unreachable server shows.** The devices go offline while their
@@ -356,7 +361,7 @@ You may notice these differences:
 - **A few more DDATA messages.** The Edge Agent groups the values the
   driver sends together into one DDATA per device, but some of a
   notification's values reach it a little late and go out in a second
-  message, so a device sends about two DDATA messages for each
+  message, so a device sends up to two DDATA messages for each
   notification where the built-in connection sent one. The values and
   timestamps are the same.
 - **Writes are confirmed.** A write shows as written only once the

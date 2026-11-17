@@ -274,6 +274,11 @@ describe("Golden-output harness", () => {
                 expect(explain(r)).toBe("");
                 const reference: RunResult = r.a, split: RunResult = r.b;
 
+                /* Every device births, including one with nothing to
+                 * read, which crashed the built-in connection's agent. */
+                for (const d of c.after.devices)
+                    expect(split.output.births.has(`DBIRTH ${d.deviceId}`)).toBe(true);
+
                 /* The driver logs in as the built-in did, with the same
                  * security and the secret filled in. */
                 const logins = [

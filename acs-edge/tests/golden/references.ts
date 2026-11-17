@@ -158,16 +158,22 @@ export function references (): Reference[] {
 
     /* The built-in OPC UA connection gives several devices' values to
      * the wrong device, so with several devices the reference is the
-     * built-in run with one device at a time. */
+     * built-in run with one device at a time. Devices with nothing to
+     * read go with the first: the built-in makes them no subscription,
+     * so they don't upset it, and the fake server only starts once
+     * some device has subscribed. */
     const { secrets } = OPCUA_MOVE;
     for (const c of OPCUA_MOVE.cases) {
         const { commands } = opcua_writes(c.before);
         const devices = c.before.devices;
+        const empty = devices.filter((d: any) => !d.tags.some((t: any) => t.address));
+        const reading = devices.filter((d: any) => !empty.includes(d));
         const opts = (entry: any): RunOpts => ({ entry, secrets, secure: true, commands });
         refs.push({ key: move_key("opcua-move", c.name),
             fixture: () => read_sample(c.sample),
             runs: devices.length == 1 ? [opts(c.before)]
-                : devices.map((d: any) => opts({ ...c.before, devices: [d] })),
+                : reading.map((d: any, i: number) =>
+                    opts({ ...c.before, devices: i ? [d] : [d, ...empty] })),
             merged: devices.length == 1 ? undefined : "built-in, one device at a time" });
         if (devices.length > 1)
             refs.push({ key: several_key(c.name),

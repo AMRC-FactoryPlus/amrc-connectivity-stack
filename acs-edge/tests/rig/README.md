@@ -14,6 +14,7 @@ upgrade. The runbook that uses them is
 | `load.ts`, `remove.ts`, `acs.ts` | Create and delete the rig's Edge Agents, connections and devices through ConfigDB. Dry run unless `--yes`. |
 | `check.ts` | Records the rig's Sparkplug output and compares two recordings, using the golden harness's decoder. |
 | `write.ts` | Sends one metric write through the Command Escalation service. |
+| `batched.ts` | Makes the ACS-35 change on one rig connection: payload format `JSON (Batched)` and the image pin removed together. |
 | `local.ts` | Runs part of a rig on one machine with the real `Translator` and the split drivers. Every connection needs its driver: the Edge Agent has no built-in connections since ACS 7. |
 | `examples/` | Made-up connection configs, one per protocol, in the export form `make-rig` reads. |
 | `Dockerfile` | The `acs-rig-mocks` image with every command above. Build it from the repository root. |

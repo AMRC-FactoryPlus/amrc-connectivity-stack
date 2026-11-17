@@ -70,8 +70,8 @@ const C = {
 };
 const MQTT = [C.json, C.delimited, C.batched, C.xml, C.buffer];
 
-/* serviceSetup.config.splitDrivers as the chart ships it. The site has
- * no connection of any other protocol the chart moves. */
+/* serviceSetup.config.splitDrivers as the chart ships it. Every built-in
+ * connection moves, so the site's OPC UA connection does too. */
 function chart_defaults () {
     const values = yaml.parse(fs.readFileSync(
         new URL("../../deploy/values.yaml", import.meta.url), "utf8"));

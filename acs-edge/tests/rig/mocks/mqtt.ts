@@ -12,6 +12,14 @@ import type { Fixture, MqttEvent } from "../../fixtures/drivers/fixture.js";
 import type { RigConnection } from "../rig.js";
 import { Looper, Mock, MockStatus, record_write } from "./mock.js";
 
+/* A synthetic `{"value": v}` payload as a source that batches sends
+ * it: a JSON array of `{value, timestamp}` items, here one item with
+ * the time it was sent. */
+export function as_array (payload: string): Buffer {
+    const { value } = JSON.parse(payload);
+    return Buffer.from(JSON.stringify([{ value, timestamp: Date.now() }]));
+}
+
 /* A broker of its own for one connection, with a publisher sending
  * the fixture's messages on their topics at their times, in a loop.
  *
@@ -20,6 +28,9 @@ import { Looper, Mock, MockStatus, record_write } from "./mock.js";
  * another gets both, at the rates the fixture was made with. Like a
  * real broker it publishes whether or not anyone is subscribed, so a
  * connection that is down misses messages. Messages are not retained.
+ *
+ * A connection made with `--batched` has topics whose metrics read
+ * `$.value`; those are sent as arrays (`as_array`).
  *
  * A connection with a username must log in with the rig's credentials.
  * A publish from a client (a write) is recorded. */
@@ -33,10 +44,13 @@ export class MqttMock implements Mock {
     delivered = 0
     refused = 0
     writes:     NonNullable<MockStatus["writes"]> = []
+    /* Topics sent as arrays. */
+    arrays:     Set<string>
 
     constructor (conn: RigConnection, fixture: Fixture) {
         this.conn = conn;
         this.fixture = fixture;
+        this.arrays = new Set(conn.array_topics ?? []);
         this.looper = new Looper(fixture, fixture.events
             .filter((e): e is MqttEvent => e.type == "mqtt"));
     }
@@ -73,8 +87,9 @@ export class MqttMock implements Mock {
     publish (ev: MqttEvent) {
         const broker = this.broker;
         if (!broker) return;
-        const payload = Buffer.from(ev.payload,
-            ev.encoding == "base64" ? "base64" : "utf8");
+        const payload = this.arrays.has(ev.topic)
+            ? as_array(ev.payload)
+            : Buffer.from(ev.payload, ev.encoding == "base64" ? "base64" : "utf8");
         return new Promise<void>((resolve, reject) =>
             broker.publish({
                 cmd: "publish", qos: 0, dup: false, retain: false,

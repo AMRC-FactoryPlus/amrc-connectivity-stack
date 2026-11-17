@@ -28,6 +28,25 @@
  *   --seed <n>           synthetic data seed (default 1)
  *   --duration <ms>      length of the data loop (default 600000)
  *   --mqtt-interval <ms> MQTT and UDP send interval (default 1000)
+ *   --agent-cpu <q>      CPU each rig Edge Agent requests (default 50m)
+ *   --agent-memory <q>   memory limit of each rig Edge Agent (default
+ *                        200Mi, the Edge Agent chart's)
+ *   --big-agent-memory <q>  the same for an agent with 1,000 metrics
+ *                        or more (default 512Mi)
+ *   --batched <name,...> configs (file names without .json) whose
+ *                        `$.value` topics carry JSON arrays of
+ *                        {value, timestamp}, as a batching source sends,
+ *                        and whose Edge Agent pins its image tag, as
+ *                        the busiest production agent does (ACS-35)
+ *   --pin-tag <tag>      the tag a --batched agent pins (default the
+ *                        cluster's current release, v6.24.0)
+ *
+ * The resource values go in each rig Edge Agent's own Deployment
+ * values, never the chart's. Rig Edge Agents read mocks and sit mostly
+ * idle, so they ask for half the chart's CPU, which lets the full rig
+ * fit on a small dev cluster with room for an upgrade. Requests are
+ * not limits: an agent that needs more CPU still gets it if the node
+ * has it.
  *
  * A rig made from real configs names real things: never write it into
  * the repository.
@@ -47,6 +66,11 @@ import {
 
 interface Opts {
     subset?:    string,
+    agent_cpu:  string,
+    agent_memory: string,
+    big_agent_memory: string,
+    batched:    string[],
+    pin_tag:    string,
     prefix:     string,
     namespace:  string,
     image:      string,
@@ -67,10 +91,13 @@ function parse_args (argv: string[]) {
     const opts: Opts = {
         prefix: "Rig", namespace: "acs-rig", image: "acs-rig-mocks:dev",
         seed: 1, duration_ms: 600_000, mqtt_interval_ms: 1000,
+        ...RESOURCES, batched: [], pin_tag: "v6.24.0",
     };
     const str: { [k: string]: keyof Opts } = {
         "--subset": "subset", "--prefix": "prefix",
         "--namespace": "namespace", "--image": "image",
+        "--agent-cpu": "agent_cpu", "--agent-memory": "agent_memory",
+        "--big-agent-memory": "big_agent_memory", "--pin-tag": "pin_tag",
     };
     const num: { [k: string]: keyof Opts } = {
         "--seed": "seed", "--duration": "duration_ms",
@@ -78,12 +105,42 @@ function parse_args (argv: string[]) {
     };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
-        if (a in str) (opts as any)[str[a]] = argv[++i];
+        if (a == "--batched") opts.batched.push(...argv[++i].split(","));
+        else if (a in str) (opts as any)[str[a]] = argv[++i];
         else if (a in num) (opts as any)[num[a]] = Number(argv[++i]);
         else if (a.startsWith("--")) throw new Error(`Unknown option ${a}`);
         else pos.push(a);
     }
     return { pos, opts };
+}
+
+/* What a rig Edge Agent asks for, unless told otherwise. */
+export const RESOURCES = {
+    agent_cpu:          "50m",
+    agent_memory:       "200Mi",
+    big_agent_memory:   "512Mi",
+};
+
+/* An agent this big gets the bigger memory limit. A built-in Edge
+ * Agent with about 3,000 metrics used around 300 MiB locally. */
+const BIG_AGENT_METRICS = 1000;
+
+const metric_count = (conn: any) => (conn.devices ?? [])
+    .reduce((n: number, d: any) => n + (d.tags?.length ?? 0), 0);
+
+/* MQTT topics every read metric of which has the path `$.value`, which
+ * a batching source sends as arrays. */
+export function value_topics (conn: any): string[] {
+    const paths = new Map<string, Set<string>>();
+    for (const d of conn.devices ?? [])
+        for (const t of d.tags ?? []) {
+            if (t.address == undefined) continue;
+            const s = paths.get(t.address) ?? new Set();
+            s.add(t.path ?? "");
+            paths.set(t.address, s);
+        }
+    return [...paths].filter(([, s]) => s.size == 1 && s.has("$.value"))
+        .map(([a]) => a).sort();
 }
 
 function json_files (p: string): string[] {
@@ -147,6 +204,9 @@ export function odd_cases (conn: any): string[] {
     if (conn.RESTConnDetails?.authMethod && conn.RESTConnDetails.authMethod != "None")
         out.push(`rest:auth:${conn.RESTConnDetails.authMethod}`);
     if (conn.OPCUAConnDetails?.useCredentials) out.push("opcua:credentials");
+    if (conn.connType == "OPC UA" && (conn.devices ?? []).some((d: any) =>
+            !(d.tags ?? []).some((t: any) => t.address)))
+        out.push("opcua:device-without-addresses");
     return out;
 }
 
@@ -180,7 +240,10 @@ function features (src: Source, opts: Opts): { features: string[], findings: num
     }
 }
 
-export function make_rig (sources: Source[], opts: Opts): Rig {
+export function make_rig (sources: Source[], opts: Omit<Opts, keyof typeof RESOURCES | "batched" | "pin_tag">
+    & Partial<Pick<Opts, keyof typeof RESOURCES | "batched" | "pin_tag">>): Rig {
+    const res = { ...RESOURCES, ...opts };
+    const batched = new Set(opts.batched ?? []);
     const nodes = new Map<string, RigNode>();
     const node_names = new Set<string>();
     const counters: { [p: string]: number } = {};
@@ -203,9 +266,12 @@ export function make_rig (sources: Source[], opts: Opts): Rig {
             let name = base;
             for (let i = 2; node_names.has(name); i++) name = `${base}_${i}`;
             node_names.add(name);
-            node = { name, agent: src.agent, sparkplug: src.sparkplug };
+            node = { name, agent: src.agent, sparkplug: src.sparkplug,
+                values: { limits: { cpu: res.agent_cpu, memory: res.agent_memory } } };
             nodes.set(key, node);
         }
+        if (metric_count(conn) >= BIG_AGENT_METRICS)
+            node.values.limits.memory = res.big_agent_memory;
 
         const n = counters[proto] = (counters[proto] ?? 0) + 1;
         const id = `${proto.toLowerCase().replace(/[^a-z]/g, "")}-${n}`;
@@ -231,6 +297,12 @@ export function make_rig (sources: Source[], opts: Opts): Rig {
             c.secret = made_up_secret();
         }
         if (proto == "REST") c.base_path = base_path(rs?.baseURL ?? "");
+        if (batched.has(path.basename(src.file, ".json"))) {
+            if (proto != "MQTT")
+                throw new Error(`--batched ${src.file}: only MQTT connections can be batched`);
+            c.array_topics = value_topics(conn);
+            node.values.image = { default: { tag: opts.pin_tag ?? "v6.24.0" } };
+        }
         connections.push(c);
     }
 
@@ -323,6 +395,38 @@ export function manifests (rig: Rig, image: string, gz: Buffer) {
     return JSON.stringify({ apiVersion: "v1", kind: "List", items }, null, 1) + "\n";
 }
 
+/* CPU in millicores and memory in MiB from a Kubernetes quantity. */
+export function millicores (q: string): number {
+    return q.endsWith("m") ? Number(q.slice(0, -1)) : Number(q) * 1000;
+}
+export function mebibytes (q: string): number {
+    const m = q.match(/^([\d.]+)(Mi|Gi)$/);
+    if (!m) throw new Error(`Can't read memory quantity ${q}`);
+    return Number(m[1]) * (m[2] == "Gi" ? 1024 : 1);
+}
+
+/* What the rig asks the cluster for: its Edge Agents (the chart sets
+ * each one's CPU request from `limits.cpu`, and its memory request and
+ * limit from `limits.memory`) and its mock pods. Driver sidecars ask
+ * for nothing. */
+export function requests (rig: Rig) {
+    const agents = rig.nodes.map(n => n.values?.limits ?? { cpu: "100m", memory: "200Mi" });
+    const protos = new Set(rig.connections.map(c => c.protocol).filter(p => p != "UDP"));
+    const mocks = [...protos].map(p => ({ cpu: "20m", memory: MOCK_MEMORY[p] }));
+    const sum = (l: { cpu: string, memory: string }[]) => ({
+        cpu: l.reduce((n, x) => n + millicores(x.cpu), 0),
+        memory: l.reduce((n, x) => n + mebibytes(x.memory), 0),
+    });
+    return { agents: sum(agents), mocks: sum(mocks), total: sum([...agents, ...mocks]) };
+}
+
+function requests_line (rig: Rig): string {
+    const r = requests(rig);
+    return `Requests: ${r.total.cpu}m CPU and ${r.total.memory} MiB memory in all `
+        + `(Edge Agents ${r.agents.cpu}m and ${r.agents.memory} MiB, `
+        + `mock pods ${r.mocks.cpu}m and ${r.mocks.memory} MiB).`;
+}
+
 function coverage (rig: Rig, sources: Source[], opts: Opts): string {
     const by_file = new Map(sources.map(s => [path.basename(s.file), s]));
     const total = new Map<string, string[]>();
@@ -330,6 +434,9 @@ function coverage (rig: Rig, sources: Source[], opts: Opts): string {
     for (const c of rig.connections) {
         const src = by_file.get(c.source)!;
         const f = features(src, opts);
+        if (c.array_topics?.length) f.features.push("mqtt:array-topics");
+        if (rig.nodes.find(n => n.name == c.node)?.values?.image)
+            f.features.push("image:pinned");
         for (const x of f.features) total.set(x, [...total.get(x) ?? [], c.id]);
         const devs = c.connection.devices ?? [];
         const metrics = devs.reduce((n: number, d: any) => n + (d.tags?.length ?? 0), 0);
@@ -340,6 +447,7 @@ function coverage (rig: Rig, sources: Source[], opts: Opts): string {
         `${rig.nodes.length} Edge Agents, ${rig.connections.length} connections: `
             + PROTOCOLS.map(p => `${rig.connections.filter(c => c.protocol == p).length} ${p}`).join(", ")
             + ".", "",
+        requests_line(rig), "",
         "Findings are metrics the synthetic data cannot drive (see the driver fixtures README).", "",
         "| Id | Edge Agent | Connection | Devices | Metrics | Findings | Features | Changed for the rig |",
         "|---|---|---|---|---|---|---|---|",
@@ -385,6 +493,7 @@ function main () {
         PROTOCOLS.map(p => `${rig.connections.filter(c => c.protocol == p).length} ${p}`).join(", "),
         out);
     console.log("rig.json.gz is %d kB", Math.round(gz.length / 1024));
+    console.log(requests_line(rig));
     for (const c of rig.connections)
         for (const ch of c.changes) console.log("  %s %s: %s", c.id, c.name, ch);
 }

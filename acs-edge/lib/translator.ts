@@ -133,9 +133,14 @@ export class Translator extends EventEmitter {
     broker: DriverBroker
     pollInt: number
 
+    /* The last connection set up of each type, for lookups. Several
+     * connections can share a type (every split driver is "Driver"),
+     * so stop() closes the full list below, not these. */
     connections: {
         [index: string]: any
     }
+    /* Every connection set up, so stop() closes each one. */
+    allConnections: DeviceConnection[] = []
     devices: {
         [index: string]: any
     }
@@ -324,7 +329,7 @@ export class Translator extends EventEmitter {
             dev.stop();
         }));
         log('Waiting for connections to close...');
-        await Promise.all(Object.values(this.connections)?.map((connection) => {
+        await Promise.all(this.allConnections.splice(0).map((connection) => {
             log(`Closing connection ${connection._type}`);
             connection.close();
         }));
@@ -388,7 +393,7 @@ export class Translator extends EventEmitter {
         }
 
         // Instantiate device connection
-        const newConn = this.connections[cType] = new deviceInfo.connection(
+        const newConn: DeviceConnection = this.connections[cType] = new deviceInfo.connection(
             connection.connType,
             connection[deviceInfo.connectionDetails],
             /* XXX These additional parameters are a hack for now to
@@ -397,6 +402,8 @@ export class Translator extends EventEmitter {
              * gives it a driverId, because the name can't be an id. */
             connection.driverId ?? connection.name,
             this.broker);
+
+        this.allConnections.push(newConn);
 
         this.checkPayloadFormats(connection);
 
@@ -483,8 +490,18 @@ export class Translator extends EventEmitter {
                 }
                 if (union) owners = [...union].sort((a, b) => a - b);
                 if (!owners) return;
-                for (const i of owners)
-                    this.devices[confs[i].deviceId]?._handleData(obj, parseVals, group);
+                /* One device failing must not stop the others. Device
+                 * catches a payload it can't read; this catches the
+                 * rest, which on a split driver would otherwise be
+                 * uncaught and end the process. */
+                for (const i of owners) {
+                    try {
+                        this.devices[confs[i].deviceId]?._handleData(obj, parseVals, group);
+                    }
+                    catch (e) {
+                        console.error(`Device ${confs[i].deviceId} failed to handle data: ${(e as Error)?.message ?? e}`);
+                    }
+                }
             })
 
             // What to do when device connection dies. Every device is told,

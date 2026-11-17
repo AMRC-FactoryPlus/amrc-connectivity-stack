@@ -267,6 +267,33 @@
                     "engUnit": "mm"
                   }
                 ]
+              },
+              {
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Defined by Protocol",
+                "templates": [],
+                "deviceId": "Device_Info",
+                "tags": [
+                  {
+                    "Name": "Schema_UUID",
+                    "type": "UUID",
+                    "method": "GET",
+                    "value": "00000000-0000-4000-8000-000000000001",
+                    "docs": "A reference to the schema used for this object.",
+                    "recordToDB": true
+                  }
+                ]
+              },
+              {
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Defined by Protocol",
+                "templates": [],
+                "deviceId": "Device_Empty",
+                "tags": []
               }
             ],
             "OPCUAConnDetails": {

@@ -177,6 +177,16 @@ pub trait Handler: Send + Sized {
     /// the data topic name the edge agent assigned, so the handler
     /// never needs to track topic names itself.
     ///
+    /// Each call replaces the previous set. If the address map becomes
+    /// empty after the handler has subscribed to some addresses, this
+    /// is called with an empty slice, so drop every subscription then.
+    /// It is never called empty before the first non-empty call.
+    ///
+    /// If the device connection can fail after `connect` returns and
+    /// before this is called, report it with
+    /// [`DriverHandle::disconnected`] from wherever the handler finds
+    /// out, or check the connection here and return `false`.
+    ///
     /// Return `true` if all subscriptions were set up successfully.
     ///
     /// The default implementation returns `true` (no-op). Override

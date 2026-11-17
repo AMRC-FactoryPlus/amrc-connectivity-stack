@@ -5,8 +5,9 @@
  *
  *   local --rig <rig.json> --only <id,...> --seconds <n> --out <file>
  *       [--label <name>] [--split <PROTO>=<driver>,...]
- *       [--outage <id>:<from s>:<length s>] [--broker-port <n>]
+ *       [--outage <id>:<from s>:<length s>] [--broker-port <n, default 11884>]
  *       [--write <id>:<device>:<metric>:<value>:<at s>]
+ *       [--batched <id,...>]
  *
  * Runs the mocks of the chosen connections, one real Edge Agent
  * (`Translator`) per rig node they belong to, and a local MQTT broker
@@ -26,6 +27,9 @@
  *
  * --outage stops one mock for a while during the recording, to check
  * the device goes offline and comes back.
+ *
+ * --batched runs the named connections with payload format
+ * `JSON (Batched)`, as the ACS-35 change leaves them.
  *
  * --write sends one DCMD for a metric to the agent, as the Command
  * Escalation service would, and the mock's status at the end shows
@@ -146,10 +150,14 @@ interface Agent {
 }
 
 async function start_agent (rig: Rig, node: string, conns: RigConnection[],
-    broker_url: string, split: Map<Protocol, string>): Promise<Agent>
+    broker_url: string, split: Map<Protocol, string>, batched: string[]): Promise<Agent>
 {
     let entries = conns.map(c => {
         const e = rig_entry(c, { host: "127.0.0.1", password: c => c.password });
+        if (batched.includes(c.id)) {
+            e.payloadFormat = "JSON (Batched)";
+            for (const d of e.devices ?? []) d.payloadFormat = "JSON (Batched)";
+        }
         const s = Object.values(Split).find(s => s.proto == c.protocol)!;
         return split.has(c.protocol) ? moved(e, s.map) : e;
     });
@@ -236,7 +244,7 @@ async function main () {
         connections: conns,
     };
 
-    const port = Number(args["broker-port"] ?? 1884);
+    const port = Number(args["broker-port"] ?? 11884);
     const aedes = new Aedes();
     const server = net.createServer(aedes.handle as any);
     await new Promise<void>(r => server.listen(port, "127.0.0.1", () => r()));
@@ -259,7 +267,8 @@ async function main () {
     const agents: Agent[] = [];
     for (const node of nodes)
         agents.push(await start_agent(rig, node,
-            conns.filter(c => c.node == node), url, split));
+            conns.filter(c => c.node == node), url, split,
+            args.batched?.split(",") ?? []));
 
     if (args.outage) {
         const [id, from, len] = args.outage.split(":");

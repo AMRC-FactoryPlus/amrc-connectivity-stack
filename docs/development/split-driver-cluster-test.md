@@ -28,8 +28,9 @@ From the epic's cluster test card (ACS-47):
 2. After the upgrade each connection has moved to its split driver, its
    sidecar is running, and its devices publish the same metrics as
    before, with no gap longer than one restart.
-3. Each protocol can be moved back with its chart value and returns to
-   what it was.
+3. There is no move back (decided 2026-11-17): a version 6
+   `splitDrivers.<PROTO>: false` or `null` is refused with an `ERROR`
+   line in the service-setup log, and the connections still move.
 4. Connections with dotted names work. A UDP sender outside the
    cluster reaches the driver on the host port. OPC UA writes work. A
    device goes offline when its server or broker is stopped and comes
@@ -143,7 +144,7 @@ build.
 | 7 | Upgrade | 20 min, with a recording running across it |
 | 8 | Record the after state and compare | 20 min |
 | 9 | The specific checks | 45 min |
-| 10 | Move each protocol back and forward | 30 min per protocol |
+| 10 | Check a version 6 `false` is refused | 15 min |
 | 11 | Clean up | 10 min |
 
 ### 1. Check the cluster
@@ -450,8 +451,9 @@ tag.
 
 **If it fails.** `ImagePullBackOff` on a `driver-` container means the
 edge cluster has the old charts (step 1.1) or the image is missing
-from the test build (step 6). Either merge the charts, or move that
-protocol back (step 10) to restore data. A `failed` count above 0 in
+from the test build (step 6). Merge the charts or publish the image:
+there is no move back, so the connection's data returns when its
+sidecar starts. A `failed` count above 0 in
 the summary line names the connection on the line above it.
 
 ### 8. Record the after state and compare
@@ -630,7 +632,7 @@ test, collected on 2026-11-17.
   times the built-in rate and fails above 3 times or below half. The
   golden harness measured about 2 times (2.1 DDATA/s against 1.0 for
   113 metrics at 1 s), so expect the warning, not a failure;
-- `OPCUA: false` moves every connection back and data carries on;
+- `OPCUA: false` is refused (step 10) and data carries on;
 - whether each real server trusts the driver's certificate. The mocks
   can't show this. The built-in connection already presented a new
   self-signed certificate from every new pod (it is kept in an
@@ -649,12 +651,13 @@ test, collected on 2026-11-17.
    logs no drops at that rate. Restart the agent pod mid-stream and
    check data resumes.
 4. With two Edge Agents pinned to one host, each with a built-in UDP
-   connection on the same port, one moves and one is held, with the
-   log line, and both keep their data. The rig has one UDP connection,
-   so this needs a second one made by hand.
-5. `UDP: false` moves it back: the sidecar and the host port go, the
-   configs match what they were, and the built-in connection gets data
-   from a sender inside the cluster.
+   connection on the same port, both move: the first keeps the port and
+   its data, the second has no `driver-` container and an `ERROR` line
+   naming both connections and the port, and both Edge Agent pods start
+   with their other connections working. Change the second's port in
+   the Manager and save it: its sidecar starts and it gets data. The rig
+   has one UDP connection, so this needs a second one made by hand.
+5. `UDP: false` is refused (step 10) and data carries on.
 6. The sidecar's CPU and memory at the device's rate.
 7. Change the port and check it moves, and check any firewall or
    NetworkPolicy, and the receive buffer after raising
@@ -666,28 +669,28 @@ step 8. PR 908 lists no cluster checks of its own. Its
 OPC UA gap needs a driver fix (no `TCP_NODELAY` in the Rust drivers'
 MQTT client), so expect OPC UA warnings, not failures.
 
-### 10. Move each protocol back and forward
+### 10. Check a version 6 `false` is refused
 
-For each protocol in turn (`REST`, `MQTT`, `OPCUA`, `UDP`):
+Version 7 has no built-in connections, so there is nothing to move
+back to.
 
 1. Record a baseline with everything moved:
    `rig check record --rig /rig/rig.json --seconds 600 --label moved --rebirth --out /rig/moved.json`.
-2. Move that protocol back:
+2. Upgrade with a version 6 setting that asked for a move back:
 
    ```sh
-   helm upgrade acs amrc-connectivity-stack/amrc-connectivity-stack -n factory-plus --version 7.0.0-dev.N --reuse-values --set serviceSetup.config.splitDrivers.<PROTOCOL>=false
+   helm upgrade acs amrc-connectivity-stack/amrc-connectivity-stack -n factory-plus --version 7.0.0-dev.N --reuse-values --set serviceSetup.config.splitDrivers.OPCUA=false
    ```
 
-3. In the service-setup log, its connections move to the internal
-   driver. In the edge namespace, its `driver-` containers go.
-4. Record (`--label back-<protocol>`) and compare with `before.json`:
-   the protocol's devices should match the before state, including the
-   built-in connection's own bugs.
-5. Move it forward again with `=true`, record (`--label forward-<protocol>`)
-   and compare with `moved.json`: they should match.
-
-`--reuse-values` keeps the other protocols' settings from the last
-upgrade.
+3. The service-setup log has `ERROR: serviceSetup.config.splitDrivers.OPCUA is false`,
+   and the summary line counts every connection as already right. No
+   `driver-` container goes.
+4. Record (`--label refused`) and compare with `moved.json`: they should
+   match.
+5. Upgrade again with `--set serviceSetup.config.splitDrivers.OPCUA=null`.
+   Helm may drop a null key before service-setup sees it, so the
+   `ERROR` line may or may not appear. Either way the connections stay
+   moved and the comparison with `moved.json` matches.
 
 ### 11. Clean up
 
@@ -723,13 +726,17 @@ upgrade.
 
 ## Trying the rig on one machine
 
-`rig local` runs a few rig connections, real Edge Agents and,
-optionally, the split drivers, all in one process with a local MQTT
-broker, and records the output as `rig check record` would. Build the
+`rig local` runs a few rig connections, real Edge Agents and the split
+drivers, all in one process with a local MQTT broker, and records the
+output as `rig check record` would. Every chosen connection needs its
+driver in `--split`, because the Edge Agent has no built-in connections
+since version 7. For a built-in run to compare with, build the rig
+image from a tree that still has them (the commit before ACS-30, or a
+version 6 tag) under another name, say `acs-rig-mocks:v6`. Build the
 drivers as the golden harness README describes, then:
 
 ```sh
-docker run --rm -v <private folder>:/p acs-rig-mocks:dev local --rig /p/rig/full/rig.json --only <id,...> --seconds 120 --label built-in --out /p/rig/local/before.json
+docker run --rm -v <private folder>:/p acs-rig-mocks:v6 local --rig /p/rig/full/rig.json --only <id,...> --seconds 120 --label built-in --out /p/rig/local/before.json
 docker run --rm -v <private folder>:/p -v "$PWD/edge-rest/target/release/driver:/drv/rest:ro" acs-rig-mocks:dev local --rig /p/rig/full/rig.json --only <id,...> --seconds 120 --label split --split REST=/drv/rest --out /p/rig/local/after.json
 docker run --rm -v <private folder>:/p acs-rig-mocks:dev check compare /p/rig/local/before.json /p/rig/local/after.json
 ```

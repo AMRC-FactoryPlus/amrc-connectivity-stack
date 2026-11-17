@@ -40,17 +40,14 @@ spec:
       annotations:
         # The following annotations help disable back-offs for edge
         # agent pods:
-
         # This annotation tells the cluster autoscaler that it's safe to
         # evict this pod. This prevents back-offs that might occur during
         # cluster scaling operations
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
-
         # This annotation disables AppArmor restrictions for the
         # edge-agent container. This prevents security-related back-offs
         # that might occur due to AppArmor policies
         container.apparmor.security.beta.kubernetes.io/edge-agent: "unconfined"
-
         # Add AppArmor annotations for all driver containers
         container.apparmor.security.beta.kubernetes.io/driver-rest-api: "unconfined"
         container.apparmor.security.beta.kubernetes.io/driver-robot-udp: "unconfined"
@@ -60,13 +57,11 @@ spec:
       # back-offs, it works with other settings to ensure the pod is
       # restarted as quickly as possible
       restartPolicy: Always
-
       nodeSelector:
         kubernetes.io/hostname: "node-a"
       tolerations: 
         - key: factoryplus.app.amrc.co.uk/specialised
           operator: Exists
-
       containers:
         - name: edge-agent
           image: "%%REGISTRY%%/acs-edge:%%TAG%%"
@@ -142,7 +137,6 @@ spec:
           image: "%%REGISTRY%%/edge-rest:%%TAG%%"
           imagePullPolicy: "%%PULLPOLICY%%"
           # Add startup probe to prevent back-offs for driver containers
-          
           # This startup probe is a key mechanism for preventing back-offs
           #
           # How it works:
@@ -184,7 +178,6 @@ spec:
           image: "%%REGISTRY%%/edge-udp:%%TAG%%"
           imagePullPolicy: "%%PULLPOLICY%%"
           # Add startup probe to prevent back-offs for driver containers
-          
           # This startup probe is a key mechanism for preventing back-offs
           #
           # How it works:
@@ -254,7 +247,6 @@ spec:
       - 00000000-0000-4000-8000-0000000000aa
     sparkplug:
       node: Agent-Four
-
 ---
 # Source: edge-agent/templates/local-secrets.yaml
 apiVersion: factoryplus.app.amrc.co.uk/v1
@@ -277,7 +269,6 @@ spec:
   format: Password
   secret: "driver-passwords.agent-four"
   key: "robot-udp"
-
 ---
 # Source: edge-agent/templates/edge-agent.yaml
 apiVersion: factoryplus.app.amrc.co.uk/v1

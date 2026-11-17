@@ -25,8 +25,10 @@ for values in "$here"/cases/*.yaml; do
     want="$here/cases/$name.out.yaml"
     error="$here/cases/$name.error"
 
-    if helm template t "$chart" -n edge -f "$values" \
-        >"$tmp/out" 2>"$tmp/err"
+    # Blank lines are dropped: Helm 3 and 4 place them differently.
+    if helm template t "$chart" -n edge -f "$values" 2>"$tmp/err" \
+        | grep -v '^[[:space:]]*$' >"$tmp/out"
+        [ -s "$tmp/out" ] && [ ! -s "$tmp/err" ]
     then
         if [ -f "$error" ]; then
             echo "FAIL $name: rendered, but should have failed with: $(cat "$error")"

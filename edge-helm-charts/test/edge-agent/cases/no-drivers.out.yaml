@@ -40,17 +40,14 @@ spec:
       annotations:
         # The following annotations help disable back-offs for edge
         # agent pods:
-
         # This annotation tells the cluster autoscaler that it's safe to
         # evict this pod. This prevents back-offs that might occur during
         # cluster scaling operations
         cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
-
         # This annotation disables AppArmor restrictions for the
         # edge-agent container. This prevents security-related back-offs
         # that might occur due to AppArmor policies
         container.apparmor.security.beta.kubernetes.io/edge-agent: "unconfined"
-
         # Add AppArmor annotations for all driver containers
     spec:
       # Setting restartPolicy to Always ensures the pod will be
@@ -58,10 +55,8 @@ spec:
       # back-offs, it works with other settings to ensure the pod is
       # restarted as quickly as possible
       restartPolicy: Always
-
       tolerations: 
         []
-
       containers:
         - name: edge-agent
           image: "%%REGISTRY%%/acs-edge:%%TAG%%"
@@ -161,7 +156,6 @@ spec:
       - 00000000-0000-4000-8000-0000000000aa
     sparkplug:
       node: Agent-One
-
 ---
 # Source: edge-agent/templates/edge-agent.yaml
 apiVersion: factoryplus.app.amrc.co.uk/v1

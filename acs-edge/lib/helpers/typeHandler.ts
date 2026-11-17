@@ -277,7 +277,6 @@ export class Metrics {
                     this.#addrIndex[addr] = [];
                 }
                 this.#addrIndex[addr].push(i);
-                this.#addrIndex[addr].push(i);
                 if (!this.#addrPathIndex[addr]) {
                     this.#addrPathIndex[addr] = {};
                 }

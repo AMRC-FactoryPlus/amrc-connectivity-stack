@@ -132,6 +132,12 @@ impl FakeAgent {
         c
     }
 
+    /// Close the driver's MQTT connection from the broker's side, as
+    /// a broker restart or a network drop would.
+    pub fn kick(&self) {
+        self.conn.lock().unwrap().take();
+    }
+
     /// Publish `payload` to the driver on `fpEdge1/<id>/<msg>`.
     pub fn send(&self, msg: &str, payload: impl Into<Vec<u8>>) {
         let topic = format!("fpEdge1/{}/{}", self.id, msg);
@@ -324,7 +330,9 @@ async fn serve(
                     }
                 }
             }
-            Some(p) = outgoing.recv() => {
+            p = outgoing.recv() => {
+                // The test dropped the sender: end the session.
+                let Some(p) = p else { break 'conn };
                 let mut out = BytesMut::new();
                 p.write(&mut out).unwrap();
                 if wr.write_all(&out).await.is_err() {

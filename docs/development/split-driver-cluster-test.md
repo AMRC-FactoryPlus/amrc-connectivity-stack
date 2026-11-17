@@ -633,8 +633,13 @@ the summary line names the connection on the line above it.
    - a metric it was born with before is missing after, or a new one
      appears, or a type changed;
    - a read metric that got values before gets none after;
-   - its DDATA rate rose above 3 times or fell below half (a split
-     driver must not multiply the broker's load, ACS-45).
+   - its DDATA rate rose above 3 times (a split driver must not
+     multiply the broker's load, ACS-45);
+   - its metric values per second fell below half. This counts values,
+     not DDATA messages, because the Edge Agent groups values that
+     arrive together: a REST device whose 8 addresses each sent a DDATA
+     every poll before may send its values in fewer, fuller DDATA
+     after, which is not a slowdown.
 
    These are the differences the move is meant to make, and it reports
    them as `EXPECTED`, not as failures:
@@ -646,7 +651,12 @@ the summary line names the connection on the line above it.
    - the UDP device publishing, because before the upgrade nothing
      outside the cluster could reach the built-in UDP connection;
    - ISA-95 hierarchy metrics added to a device that had none. The
-     upgrade places such a device at the organisation.
+     upgrade places such a device at the organisation;
+   - fewer values on the one device of a connection that got values
+     before, when the built-in starved the connection's other devices
+     and the connection's total values per second held up. The
+     built-in OPC UA connection put every device's values into that one
+     device, so before the move it sent the whole connection's values.
 
    It warns when the DDATA rate rose above 1.5 times (or above 3 times
    while metrics are newly getting values, which add messages of their
@@ -659,7 +669,18 @@ the summary line names the connection on the line above it.
    device's first DBIRTH in the same recording. Any it can't name are
    left out and counted in a warning, so record with `--rebirth`.
    Summaries recorded before this change still hold `(alias N)`
-   metrics, and the comparison skips and counts those too.
+   metrics, and the comparison skips and counts those too. Their
+   values per second count the alias values, so the rate checks are
+   fair, but a named metric's own count misses its values from before
+   the device's DBIRTH.
+
+   Watch, but don't fail on, how long a device's DBIRTH takes after
+   `--rebirth`. On the first dev cluster run one device's DBIRTH came
+   about 200 s after the rebirth request in the 15-minute "after"
+   recording, where a later 5-minute run saw it after 1.6 s. Its
+   values still count from the start of the recording, because the
+   recorder names them from that DBIRTH, but a delay that long is
+   worth noting on the card.
 
    What the local runs showed, so you know what to expect: REST, MQTT
    and UDP devices matched exactly, with the same metrics and the same

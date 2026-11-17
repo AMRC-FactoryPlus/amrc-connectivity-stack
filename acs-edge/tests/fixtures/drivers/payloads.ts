@@ -10,12 +10,17 @@
  * Copyright 2026 University of Sheffield
  */
 
+import type { ReadMetric } from "./metrics.js";
+
 export interface PayloadDoc {
     content_type: string,
     /* Reserve a slot for this path. Returns the slot number, or a
-     * string saying why the path cannot be satisfied. */
-    place (path: string): number | string,
+     * string saying why the path cannot be satisfied. The metric is
+     * given for formats whose layout depends on its type. */
+    place (path: string, m?: ReadMetric): number | string,
+    /* The payload as text, or as base64 if `binary` is set. */
     render (values: any[], types: string[]): string,
+    binary?: boolean,
 }
 
 /* A value as text, the way a device would print it. */
@@ -424,5 +429,106 @@ export class DelimitedDoc implements PayloadDoc {
             return as_text(values[this.whole], types[this.whole]);
         return Array.from(this.fields, (s, i) => s === undefined
             ? `f${i}` : as_text(values[s], types[s])).join(this.delimiter);
+    }
+}
+
+/* ---------------------------------------------------------------- */
+/* Buffer                                                            */
+
+/* Bytes taken by each fixed-size type the Buffer format reads. 64-bit
+ * integers are left out: the agent reads them as BigInt, which the
+ * generator's numbers can't be compared with. */
+const BUFFER_SIZES: { [type: string]: number } = {
+    Int8: 1, UInt8: 1, Int16: 2, UInt16: 2, Int32: 4, UInt32: 4,
+    Float: 4, Double: 8,
+};
+
+interface BufferField {
+    slot: number,
+    offset: number,
+    /* Boolean only: the bit in the byte at offset. */
+    bit?: number,
+    size: number,
+    type: string,
+    big_endian: boolean,
+}
+
+/* A binary payload read with the Buffer format. A path is a byte
+ * offset; a Boolean is `offset:bit`; a String runs from its offset to
+ * the end of the payload, so it must come after every other field.
+ * Endianness comes from the metric's type (FloatBE, Int16LE), little
+ * by default, as the agent reads it. Rendered as base64. */
+export class BufferDoc implements PayloadDoc {
+    content_type = "application/octet-stream";
+    binary = true;
+    private fields: BufferField[] = [];
+    private string?: BufferField;
+    private n = 0;
+
+    place (path: string, m?: ReadMetric): number | string {
+        if (!m) return "the Buffer format needs the metric's type";
+        const parts = /^(\d+)(?::(\d+))?$/.exec(path ?? "");
+        if (!parts) return `path "${path}" is not a byte offset`;
+        const offset = parseInt(parts[1]);
+        const second = parts[2] === undefined ? undefined : parseInt(parts[2]);
+        const big_endian = Number(m.metric.properties?.endianness?.value) == 4321;
+
+        let f: BufferField;
+        if (m.type == "Boolean") {
+            if (second === undefined || second > 7)
+                return `a Boolean in a Buffer needs a bit, as "offset:bit"`;
+            f = { slot: -1, offset, bit: second, size: 1, type: m.type, big_endian };
+        }
+        else if (m.type == "String") {
+            if (second !== undefined)
+                return "a String with an end offset is not synthesised";
+            if (this.string) return "two Strings both run to the end of the payload";
+            f = { slot: -1, offset, size: 0, type: m.type, big_endian };
+        }
+        else {
+            const size = BUFFER_SIZES[m.type];
+            if (!size) return `type ${m.type} is not synthesised in a Buffer`;
+            if (second !== undefined)
+                return `path "${path}" has a bit, which only a Boolean reads`;
+            f = { slot: -1, offset, size, type: m.type, big_endian };
+        }
+
+        const clash = this.fields.find(g => g.offset < f.offset + Math.max(f.size, 1)
+            && f.offset < g.offset + g.size
+            && !(f.bit !== undefined && g.bit !== undefined && f.bit != g.bit));
+        if (clash) return `bytes at offset ${f.offset} overlap another metric`;
+        const end = Math.max(f.offset + f.size, ...this.fields.map(g => g.offset + g.size));
+        const s = f.type == "String" ? f : this.string;
+        if (s && end > s.offset)
+            return `the String at offset ${s.offset} runs to the end, `
+                + "so nothing can come after it";
+
+        f.slot = this.n++;
+        if (f.type == "String") this.string = f;
+        else this.fields.push(f);
+        return f.slot;
+    }
+
+    render (values: any[], _types: string[]): string {
+        const fixed = Math.max(0, ...this.fields.map(f => f.offset + f.size));
+        const text = this.string
+            ? Buffer.from(String(values[this.string.slot]), "utf8") : undefined;
+        const buf = Buffer.alloc(this.string
+            ? Math.max(fixed, this.string.offset) + text!.length : fixed);
+        if (text) text.copy(buf, this.string!.offset);
+        for (const f of this.fields) {
+            const v = values[f.slot];
+            const e = f.big_endian ? "BE" : "LE";
+            switch (f.type) {
+                case "Boolean":
+                    if (v) buf[f.offset] |= 1 << f.bit!;
+                    break;
+                case "Int8": buf.writeInt8(v, f.offset); break;
+                case "UInt8": buf.writeUInt8(v, f.offset); break;
+                default:
+                    (buf as any)[`write${f.type}${e}`](v, f.offset);
+            }
+        }
+        return buf.toString("base64");
     }
 }

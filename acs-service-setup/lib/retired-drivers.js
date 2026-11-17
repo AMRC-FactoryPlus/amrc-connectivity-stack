@@ -15,10 +15,18 @@
  *  - every connection still using a removed driver, found from its
  *    ConnectionConfiguration or from an Edge Agent config entry, is
  *    logged as a warning on every run;
- *  - a removed driver that no ConnectionConfiguration uses has its
- *    DriverDef deleted and is taken out of the Edge Agent driver
- *    class, so the admin UI stops offering it. One still in use is
- *    left alone, so its connections can still be opened and moved.
+ *  - every removed driver's DriverDef is marked `hidden`, so the admin
+ *    UI stops offering it for new connections. A connection that still
+ *    uses one still shows it, so it can be opened and moved.
+ *
+ * A removed driver is hidden, not deleted. Its object was created by a
+ * dump with the Edge Agent driver class as its primary class, and the
+ * ConfigDB refuses to take an object out of its primary class (409).
+ * Deleting the object would work, but object UUIDs are meant to stay
+ * registered, and a class member with no DriverDef would be offered in
+ * the admin UI as a driver with no form. So the DriverDef stays, with
+ * `hidden: true`, and one that an earlier version of this step deleted
+ * comes back as `{ hidden: true }`. Every run gives the same result.
  *
  * Nothing is moved or deleted from a connection. A site keeps its
  * config, and can move it to a split driver when one exists.
@@ -26,13 +34,15 @@
  * Since ACS 7 the Edge Agent has no built-in REST, MQTT, OPC UA or UDP
  * connection either, and split-drivers.js moves those connections to
  * their split drivers. Their built-in DriverDefs are no longer loaded,
- * and are deleted here the same way once no ConnectionConfiguration
- * uses them. One a connection still uses (an Edge Agent that pins its
- * own version 6 image keeps its built-in connections) stays, so the
- * Manager can still open that connection.
+ * and are hidden here the same way. A connection that still uses one
+ * (an Edge Agent that pins its own version 6 image keeps its built-in
+ * connections) still shows it in the Manager.
+ *
+ * Nothing here may stop service-setup: a failure is logged as an ERROR
+ * and the step goes on to the next driver.
  */
 
-import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
+import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ACS } from "./uuids.js";
 
@@ -72,12 +82,10 @@ export class RetiredDriverCheck {
 
         /* Connections the admin UI knows about, by driver. */
         const cconfs = await cdb.get_all_configs(App.ConnectionConfiguration);
-        const in_use = new Set();
         const warned = new Set();
         for (const [conn, cconf] of cconfs) {
             const type = names.get(cconf?.driver);
             if (!type) continue;
-            in_use.add(cconf.driver);
             warned.add(conn);
             this.warn(type, conn, cconf.name, cconf.edgeAgent);
         }
@@ -94,25 +102,24 @@ export class RetiredDriverCheck {
             }
         }
 
-        for (const [, cconf] of cconfs)
-            if (Object.values(MovedDrivers).includes(cconf?.driver))
-                in_use.add(cconf.driver);
-
-        const removed = [];
+        const hidden = [];
+        const failed = [];
         const all = { ...RetiredDrivers, ...MovedDrivers };
         for (const [type, driver] of Object.entries(all)) {
-            if (in_use.has(driver)) {
-                this.log("Keeping the %s DriverDef while connections use it", type);
-                continue;
+            try {
+                if (await this.hide_driver(type, driver))
+                    hidden.push(type);
             }
-            if (await this.remove_driver(driver))
-                removed.push(type);
+            catch (e) {
+                this.log("ERROR: can't hide the %s DriverDef %s: %s", type, driver, e);
+                failed.push(type);
+            }
         }
 
         if (warned.size)
             this.log("WARNING: %d connections use removed drivers and publish no data",
                 warned.size);
-        return { warned: [...warned], removed };
+        return { warned: [...warned], hidden, failed };
     }
 
     warn (type, conn, name, agent) {
@@ -122,30 +129,35 @@ export class RetiredDriverCheck {
             name ?? "(unnamed)", conn, agent ?? "(none)", type);
     }
 
-    /* Delete the DriverDef and the class membership. Returns true if
-     * either was there. */
-    async remove_driver (driver) {
+    /* Mark a removed driver's DriverDef hidden, writing a bare one if
+     * it has none. A driver that is not in the Edge Agent driver class
+     * has no object to hide (EtherNet/IP and Websocket never had one).
+     * Returns true if it wrote anything. */
+    async hide_driver (type, driver) {
         const { cdb } = this;
-        let done = false;
-
-        const def = await cdb.get_config(App.DriverDefinition, driver);
-        if (def !== undefined) {
-            this.log("Deleting DriverDef for removed driver %s", driver);
-            await cdb.delete_config(App.DriverDefinition, driver)
-                .catch(ServiceError.check(404));
-            done = true;
-        }
 
         const klass = UUIDs.Class.EdgeAgentDriver;
-        if (await cdb.class_has_direct_member(klass, driver)) {
-            this.log("Removing %s from the Edge Agent driver class", driver);
-            await cdb.class_remove_member(klass, driver);
-            done = true;
-        }
-        return done;
+        if (!await cdb.class_has_direct_member(klass, driver))
+            return false;
+
+        const def = await cdb.get_config(App.DriverDefinition, driver);
+        if (def?.hidden === true) return false;
+
+        this.log("Hiding the DriverDef of removed driver %s (%s)%s", type, driver,
+            def === undefined ? ", which had none" : "");
+        await cdb.put_config(App.DriverDefinition, driver,
+            { ...(def ?? {}), hidden: true });
+        return true;
     }
 }
 
-export function check_retired_drivers (ss) {
-    return new RetiredDriverCheck({ fplus: ss.fplus }).run();
+/* Never throws: this is clean-up, and must not stop service-setup. */
+export async function check_retired_drivers (ss) {
+    const log = ss.fplus.debug.bound("retired");
+    try {
+        return await new RetiredDriverCheck({ fplus: ss.fplus, log }).run();
+    }
+    catch (e) {
+        log("ERROR: the removed-driver check failed, carrying on: %s", e);
+    }
 }

@@ -519,11 +519,11 @@ tag.
 
    ```sh
    kubectl -n factory-plus get jobs
-   kubectl -n factory-plus logs job/<service-setup job> -c service-setup -f | grep -i "split\|connection"
+   kubectl -n factory-plus logs job/<service-setup job> -c split-drivers -f | grep -i "split\|connection"
    ```
 
    You should see a line per connection moved, then
-   `Split drivers: <n> connections moved, 0 repaired, 0 already right, 0 failed`,
+   `Split drivers: <n> connections moved, 0 repaired, 0 already right, ...`,
    where `<n>` is the number of rig connections plus any others on the
    cluster.
 

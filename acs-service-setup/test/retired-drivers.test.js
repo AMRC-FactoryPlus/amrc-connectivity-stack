@@ -8,23 +8,29 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-import { UUIDs } from "@amrc-factoryplus/service-client";
+import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 
 import { DumpLoader } from "../lib/dumps.js";
-import { MovedDrivers, RetiredDriverCheck, RetiredDrivers } from "../lib/retired-drivers.js";
+import {
+    check_retired_drivers, MovedDrivers, RetiredDriverCheck, RetiredDrivers,
+} from "../lib/retired-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;
 const DriverClass = UUIDs.Class.EdgeAgentDriver;
 
-/* An in-memory ConfigDB with the calls the step makes. */
+/* An in-memory ConfigDB with the calls the step makes. Every driver
+ * object here has the Edge Agent driver class as its primary class, as
+ * the dumps create them, and like the real ConfigDB this refuses to
+ * take an object out of its primary class with a 409
+ * (acs-configdb/lib/model.js, class_remove_member). */
 class FakeCDB {
     constructor () {
         this.configs = new Map();
         this.members = new Set();
+        this.writes = [];
         this.deleted = [];
-        this.unclassed = [];
     }
 
     app (a) {
@@ -35,6 +41,11 @@ class FakeCDB {
 
     async get_all_configs (a) { return new Map(structuredClone([...this.app(a)])); }
     async get_config (a, o) { return structuredClone(this.app(a).get(o)); }
+    get_config_sync (a, o) { return structuredClone(this.app(a).get(o)); }
+    async put_config (a, o, c) {
+        this.writes.push([a, o, structuredClone(c)]);
+        this.set(a, o, c);
+    }
     async delete_config (a, o) {
         this.deleted.push([a, o]);
         this.app(a).delete(o);
@@ -45,8 +56,11 @@ class FakeCDB {
     }
     async class_remove_member (k, o) {
         assert.equal(k, DriverClass);
-        this.unclassed.push(o);
-        this.members.delete(o);
+        throw new ServiceError(UUIDs.Service.ConfigDB,
+            `Removing member ${o} from ${k} failed`, 409);
+    }
+    async delete_object (o) {
+        this.deleted.push(["object", o]);
     }
 }
 
@@ -103,7 +117,7 @@ describe("check_retired_drivers", () => {
             assert.equal(def.internal, undefined, `${d} is built in`);
     });
 
-    test("a connection on a removed driver is warned about and keeps its DriverDef", async () => {
+    test("a connection on a removed driver is warned about", async () => {
         const cdb = site();
         cdb.set(App.ConnectionConfiguration, C.s7,
             { driver: Driver.S7, name: "plc", edgeAgent: AGENT });
@@ -116,26 +130,51 @@ describe("check_retired_drivers", () => {
         assert.equal(warns.length, 1);
         assert.deepEqual(warns[0].slice(1), ["plc", C.s7, AGENT, "S7"]);
         assert.deepEqual(res.warned, [C.s7]);
-
-        assert.ok(cdb.app(App.DriverDefinition).has(Driver.S7));
-        assert.ok(cdb.members.has(Driver.S7));
-        assert.ok(!res.removed.includes("S7"));
     });
 
-    test("an unused removed driver loses its DriverDef and class membership", async () => {
+    /* Hidden, not deleted: the ConfigDB won't take a dump-created
+     * object out of its primary class, and a class member with no
+     * DriverDef would be offered as a driver with no form. */
+    test("every removed driver's DriverDef is kept and hidden, used or not", async () => {
         const cdb = site();
         cdb.set(App.ConnectionConfiguration, C.s7,
             { driver: Driver.S7, name: "plc", edgeAgent: AGENT });
+        cdb.set(App.ConnectionConfiguration, C.udp,
+            { driver: Driver.UDP, name: "robot", edgeAgent: AGENT });
 
         const { res } = await run(cdb);
 
-        assert.deepEqual(res.removed, ["MTConnect", "REST", "UDP"]);
-        assert.ok(!cdb.app(App.DriverDefinition).has(Driver.MTConnect));
-        assert.ok(!cdb.members.has(Driver.MTConnect));
+        for (const d of [Driver.MTConnect, Driver.S7, Driver.UDP, Driver.REST]) {
+            const def = cdb.get_config_sync(App.DriverDefinition, d);
+            assert.deepEqual(def, { internal: { connType: "x" }, hidden: true });
+            assert.ok(cdb.members.has(d));
+        }
+        assert.deepEqual(res.hidden.sort(), ["MTConnect", "REST", "S7", "UDP"]);
+        assert.deepEqual(res.failed, []);
+        assert.deepEqual(cdb.deleted, [], "nothing is deleted");
     });
 
-    /* ACS 7 moved REST, MQTT, OPC UA and UDP connections to split
-     * drivers. Their built-in DriverDefs go once nothing uses them. */
+    /* An earlier run of this step deleted the DriverDef, then failed
+     * to take the object out of the class: the state the first real
+     * upgrade left. */
+    test("a DriverDef an earlier run deleted comes back hidden", async () => {
+        const cdb = site();
+        cdb.app(App.DriverDefinition).delete(Driver.MTConnect);
+
+        const { res } = await run(cdb);
+
+        assert.deepEqual(cdb.get_config_sync(App.DriverDefinition, Driver.MTConnect),
+            { hidden: true });
+        assert.ok(res.hidden.includes("MTConnect"));
+    });
+
+    test("a driver with no object, such as EtherNet/IP, is left alone", async () => {
+        const cdb = site();
+        await run(cdb);
+        assert.equal(cdb.get_config_sync(App.DriverDefinition, Driver.EtherNetIP), undefined);
+        assert.equal(cdb.get_config_sync(App.DriverDefinition, Driver.Websocket), undefined);
+    });
+
     test("the four moved built-in drivers are the ones split-drivers.js moves", () => {
         assert.deepEqual(MovedDrivers, {
             "REST": Driver.REST, "MQTT": Driver.MQTT,
@@ -143,20 +182,7 @@ describe("check_retired_drivers", () => {
         });
     });
 
-    test("an unused moved built-in driver loses its DriverDef and class membership", async () => {
-        const cdb = site();
-        const { res } = await run(cdb);
-        for (const d of [Driver.REST, Driver.UDP]) {
-            assert.ok(!cdb.app(App.DriverDefinition).has(d));
-            assert.ok(!cdb.members.has(d));
-        }
-        assert.ok(res.removed.includes("REST"));
-        assert.ok(res.removed.includes("UDP"));
-    });
-
-    /* A connection held on its pinned version 6 Edge Agent keeps its
-     * built-in driver, so the Manager can still open it. */
-    test("a moved built-in driver a connection still uses is kept, with no warning", async () => {
+    test("a moved built-in driver a connection still uses gets no warning", async () => {
         const cdb = site();
         cdb.set(App.ConnectionConfiguration, C.udp,
             { driver: Driver.UDP, name: "robot", edgeAgent: AGENT });
@@ -168,10 +194,6 @@ describe("check_retired_drivers", () => {
 
         assert.deepEqual(warnings(lines), []);
         assert.deepEqual(res.warned, []);
-        assert.ok(!res.removed.includes("UDP"));
-        assert.ok(cdb.app(App.DriverDefinition).has(Driver.UDP));
-        assert.ok(cdb.members.has(Driver.UDP));
-        assert.ok(res.removed.includes("REST"));
     });
 
     test("a hand-written agent config naming a removed type is warned about", async () => {
@@ -191,16 +213,38 @@ describe("check_retired_drivers", () => {
         assert.deepEqual(res.warned, [C.mtc, C.ws]);
     });
 
-    test("a second run after the moves finds nothing to do", async () => {
+    test("a second run writes nothing", async () => {
         const cdb = site();
         await run(cdb);
-        cdb.deleted = [];
-        cdb.unclassed = [];
+        cdb.writes = [];
 
         const { res, lines } = await run(cdb);
-        assert.deepEqual(res, { warned: [], removed: [] });
+        assert.deepEqual(res, { warned: [], hidden: [], failed: [] });
         assert.deepEqual(warnings(lines), []);
-        assert.deepEqual(cdb.deleted, []);
-        assert.deepEqual(cdb.unclassed, []);
+        assert.deepEqual(cdb.writes, []);
+    });
+
+    /* One driver failing must not stop the others, nor service-setup. */
+    test("a failure is logged and the step carries on", async () => {
+        const cdb = site();
+        const put = cdb.put_config.bind(cdb);
+        cdb.put_config = async (a, o, c) => {
+            if (o == Driver.S7) throw new ServiceError(UUIDs.Service.ConfigDB, "boom", 500);
+            return put(a, o, c);
+        };
+        const { res, lines } = await run(cdb);
+        assert.deepEqual(res.failed, ["S7"]);
+        assert.ok(res.hidden.includes("REST"));
+        assert.equal(lines.filter(l => /^ERROR: can't hide the %s DriverDef/.test(l[0])).length, 1);
+    });
+
+    test("check_retired_drivers never throws", async () => {
+        const lines = [];
+        const fplus = {
+            ConfigDB: { get_all_configs: async () => { throw new Error("ConfigDB down"); } },
+            debug: { bound: () => (...args) => lines.push(args) },
+        };
+        assert.equal(await check_retired_drivers({ fplus }), undefined);
+        assert.match(lines[0][0], /^ERROR: the removed-driver check failed/);
     });
 });

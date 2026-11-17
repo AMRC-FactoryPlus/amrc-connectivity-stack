@@ -1,0 +1,70 @@
+name: ConfigDB tests
+
+# Runs acs-configdb's tests against a real, migrated Postgres. Several
+# of them (class-scope, retire-driver) skip without one. retire-driver
+# checks what service-setup's retired-drivers step relies on the real
+# ConfigDB to refuse and allow, which its own tests only fake.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'acs-configdb/**'
+      - 'lib/js-pg-client/**'
+      - 'acs-service-setup/lib/retired-drivers.js'
+      - '.github/workflows/acs-configdb-tests.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: pw
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Migrate the database
+        working-directory: acs-configdb/sql
+        env:
+          SRV_DATABASE: configdb
+          SRV_USER: configdb
+        run: psql -d postgres -q -f migrate.sql
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      # The npm shipped with Node 22 crashes on file: dependencies.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install dependencies
+        working-directory: acs-configdb
+        run: npm install --no-audit --no-fund --install-links
+
+      - name: Run the tests
+        working-directory: acs-configdb
+        env:
+          PGDATABASE: configdb
+        run: node --test 'test/*.test.js'

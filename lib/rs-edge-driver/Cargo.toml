@@ -22,3 +22,7 @@ url = "2"
 [[example]]
 name = "test_driver"
 path = "examples/test_driver.rs"
+
+[[example]]
+name = "rate_stub"
+path = "examples/rate_stub.rs"

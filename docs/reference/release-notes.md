@@ -119,10 +119,9 @@ historian queries that read those devices. Other changes you may see:
   The built-in connection never read these paths, and some hold a
   unit typed into the wrong field. The Manager keeps them in the
   device's origin map, and the form hides the path field for OPC UA.
-- The Edge Agent sends one data message per changed value, rather than
-  one per batch of values from the server, so there are more, smaller
-  messages with the same values and timestamps. A later release groups
-  them again.
+- A device sends about two data messages for each batch of values from
+  its server, where the built-in connection sent one, with the same
+  values and timestamps.
 - A write shows as written only once the server accepts it.
 - A secured server already accepts a new client certificate from every
   new Edge Agent pod, because the built-in connection made one each

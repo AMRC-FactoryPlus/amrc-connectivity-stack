@@ -104,10 +104,13 @@ of range) `CMD`, anything else `ERR`.
   keeps its last value). Int64 and UInt64 are sent with every digit and
   the agent reads them exactly up to 2^53; the built-in passed
   node-opcua's `[high, low]` pair. See `src/value.rs`.
-- **More, smaller DDATA messages.** The driver protocol carries one
-  address per data message, so the agent publishes a DDATA per changed
-  address where the built-in published one per notification. The
-  values and timestamps are the same.
+- **A few more DDATA messages.** The driver protocol carries one
+  address per data message. The agent gathers the values that arrive
+  together into one DDATA per device, but the driver's MQTT client
+  doesn't set `TCP_NODELAY`, so a notification's later values can
+  arrive about 40 ms after its first and go out in a second DDATA:
+  about two per notification where the built-in sent one. The values
+  and timestamps are the same.
 
 ## The async-opcua version
 

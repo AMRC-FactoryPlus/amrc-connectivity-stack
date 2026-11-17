@@ -284,11 +284,12 @@ You may notice these differences:
 - **An unreachable server shows.** The devices go offline while their
   server can't be reached, and send a new DBIRTH when it is back. The
   built-in connection left them online with their last values.
-- **More DDATA messages, for now.** The Edge Agent publishes one DDATA
-  message for each value the driver sends, where the built-in
-  connection published one for each subscription notification. The
-  values and timestamps are the same. A later change to the Edge Agent
-  groups them again.
+- **A few more DDATA messages.** The Edge Agent groups the values the
+  driver sends together into one DDATA per device, but some of a
+  notification's values reach it a little late and go out in a second
+  message, so a device sends about two DDATA messages for each
+  notification where the built-in connection sent one. The values and
+  timestamps are the same.
 - **Writes are confirmed.** A write shows as written only once the
   server accepts it, and one the server refuses is answered as failed.
 - **Certificates.** Like the built-in connection, the driver makes a

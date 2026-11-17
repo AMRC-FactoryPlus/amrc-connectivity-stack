@@ -363,7 +363,7 @@ You may notice these differences:
 - **A few more DDATA messages.** The Edge Agent groups the values the
   driver sends together into one DDATA per device, but some of a
   notification's values reach it a little late and go out in a second
-  message, so a device sends about two DDATA messages for each
+  message, so a device sends up to two DDATA messages for each
   notification where the built-in connection sent one. The values and
   timestamps are the same.
 - **Writes are confirmed.** A write shows as written only once the

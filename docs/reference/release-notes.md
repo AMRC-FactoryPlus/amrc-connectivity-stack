@@ -145,7 +145,7 @@ historian queries that read those devices. Other changes you may see:
   The built-in connection never read these paths, and some hold a
   unit typed into the wrong field. The Manager keeps them in the
   device's origin map, and the form hides the path field for OPC UA.
-- A device sends about two data messages for each batch of values from
+- A device sends up to two data messages for each batch of values from
   its server, where the built-in connection sent one, with the same
   values and timestamps.
 - A write shows as written only once the server accepts it.

@@ -177,3 +177,12 @@ Field|Default|Meaning
 `poll_timeout`|30 s|Longest a single poll may run
 `keep_alive`|30 s|MQTT keep-alive to the Edge Agent
 `max_packet_size`|16 MiB|Largest MQTT packet sent or accepted. rumqttc's own default is 10 KiB, too small for a large `addr` map or data payload
+
+## Using this library in a driver
+
+Drivers in this repository depend on this library by path
+(`rs-edge-driver = { path = "../lib/rs-edge-driver" }`). Drivers
+elsewhere pin a release tag, `rs/edge-driver/vX.Y.Z`, by git. The
+Dockerfile for a driver is in [`driver-template/`](./driver-template/Dockerfile),
+and [Adding a Rust Driver](../../docs/development/rust-drivers.md)
+covers the whole process, from code to a published image.

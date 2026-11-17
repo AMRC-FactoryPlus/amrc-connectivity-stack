@@ -16,6 +16,7 @@
 - Development
   - [Contributor Guidelines](./development/contributor-guidelines.md)
   - [Making a Release](./development/releasing.md)
+  - [Adding a Rust Driver](./development/rust-drivers.md)
 - Concepts
   - Dynamic Deployment
   - [Index](concepts/dyn-deploy/index.md)

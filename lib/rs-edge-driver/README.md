@@ -122,6 +122,12 @@ default, each message counting its payload plus
 what it refuses, so the loss is visible. Data from both calls goes out
 in the order it was accepted. [`edge-udp`](../../edge-udp) does this.
 
+When the device side can hold data back, as an MQTT broker does for a
+slow subscriber, call `DriverHandle::publish_wait` instead. It meets the
+same limit by waiting rather than dropping: the handler stops reading
+from its device until the agent has taken enough, and nothing is lost
+in the driver. [`edge-mqtt`](../../edge-mqtt) does this.
+
 ## Connection status
 
 The driver reports its status to the Edge Agent on

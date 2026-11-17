@@ -53,6 +53,9 @@ pub struct DriverHandle<A> {
 pub(crate) struct PublishQueue {
     bytes: AtomicUsize,
     limit: usize,
+    /// Woken whenever bytes are given back, for
+    /// [`DriverHandle::publish_wait`].
+    freed: tokio::sync::Notify,
 }
 
 impl PublishQueue {
@@ -60,7 +63,25 @@ impl PublishQueue {
         Arc::new(Self {
             bytes: AtomicUsize::new(0),
             limit,
+            freed: tokio::sync::Notify::new(),
         })
+    }
+
+    /// Count `size` bytes in, waiting while that would take the queue
+    /// over its limit. The same limit as [`reserve`](Self::reserve):
+    /// one limit, which a handler meets by dropping or by waiting.
+    async fn wait(self: &Arc<Self>, size: usize) -> Queued {
+        loop {
+            // Register for the wake-up before looking, so bytes given
+            // back in between are not missed.
+            let freed = self.freed.notified();
+            tokio::pin!(freed);
+            freed.as_mut().enable();
+            if let Some(queued) = self.reserve(size) {
+                return queued;
+            }
+            freed.await;
+        }
     }
 
     /// Count `size` bytes in, unless that would take the queue over
@@ -109,6 +130,7 @@ impl Queued {
 impl Drop for Queued {
     fn drop(&mut self) {
         self.queue.bytes.fetch_sub(self.size, Ordering::Relaxed);
+        self.queue.freed.notify_waiters();
     }
 }
 
@@ -205,6 +227,31 @@ impl<A> DriverHandle<A> {
             queued,
         });
         true
+    }
+
+    /// As [`try_publish`](DriverHandle::try_publish), but wait for room
+    /// instead of dropping the data.
+    ///
+    /// Both calls meet the same limit,
+    /// [`DriverOptions::publish_queue_bytes`]. `try_publish` drops what
+    /// doesn't fit. `publish_wait` waits until the edge agent has taken
+    /// enough data, so a handler that awaits it stops reading from its
+    /// device meanwhile, and the device or its server holds the data
+    /// back, as it would for any slow client. Use it where the device
+    /// side can hold data back, such as a subscription to an MQTT
+    /// broker, and `try_publish` where it can't, such as UDP.
+    ///
+    /// Data is published in the order it is accepted, whichever call
+    /// accepted it. Data the driver throws away (see
+    /// [`publish`](DriverHandle::publish)) gives its room back at once.
+    pub async fn publish_wait(&self, addr: A, data: Bytes) {
+        let queued = self.queue.wait(data.len() + PUBLISH_QUEUE_OVERHEAD).await;
+        let _ = self.tx.send(DriverEvent::Data {
+            generation: self.generation,
+            addr,
+            payload: data,
+            queued,
+        });
     }
 
     /// Tell the driver the southbound connection has gone, after
@@ -1285,6 +1332,26 @@ mod tests {
             "forced bytes count towards the limit"
         );
         drop(forced);
+        assert_eq!(bytes(&q), 0);
+    }
+
+    #[tokio::test]
+    async fn wait_takes_room_as_it_is_given_back() {
+        let q = PublishQueue::new(100);
+        let a = q.reserve(80).unwrap();
+        let waiter = tokio::spawn({
+            let q = q.clone();
+            async move { q.wait(50).await }
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(!waiter.is_finished(), "80 + 50 is over 100");
+        drop(a);
+        let b = tokio::time::timeout(std::time::Duration::from_secs(1), waiter)
+            .await
+            .expect("woken when room was given back")
+            .unwrap();
+        assert_eq!(bytes(&q), 50);
+        drop(b);
         assert_eq!(bytes(&q), 0);
     }
 }

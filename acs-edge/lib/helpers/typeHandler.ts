@@ -689,8 +689,15 @@ export function parseValueFromPayload(msg: any, metric: sparkplugMetric, payload
                     newVal.rows = dataSet;
                     return newVal;
                 } else if (typeof payload === 'object' && payload.hasOwnProperty('value')) {
-                    // If no path is provided but the object has a 'value' property, use that
-                    return parseTypeFromString(metric.type, payload.value);
+                    // If no path is provided but the object has a 'value' property, use that.
+                    // A Buffer sent as JSON ({"type": "Buffer", "data": [...]}, how
+                    // JSON.stringify writes one and how edge-opcua sends a ByteString)
+                    // becomes a Buffer again, as the path branch above does.
+                    let val = payload.value;
+                    if (val?.type === "Buffer") {
+                        val = Buffer.from(val.data);
+                    }
+                    return parseTypeFromString(metric.type, val);
                 }
             }
             break;

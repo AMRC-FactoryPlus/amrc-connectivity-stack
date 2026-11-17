@@ -53,7 +53,7 @@ objects:
 
   !u Edge.Class.Driver:
     !u ACS.Driver.REST:             { name: "REST (built-in)" }
-    !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
+    !u ACS.Driver.OPCUA:            { name: "OPC-UA (built-in)" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
     !u ACS.Driver.UDP:              { name: "UDP" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
@@ -67,7 +67,7 @@ objects:
     !u ACS.Driver.Pathfindr:        { name: "Pathfindr" }
     !u ACS.Driver.RESTSplit:        { name: "REST" }
     !u ACS.Driver.MQTTSplit:        { name: "MQTT (split driver)" }
-    !u ACS.Driver.OPCUASplit:       { name: "OPC-UA (split driver)" }
+    !u ACS.Driver.OPCUASplit:       { name: "OPC-UA" }
     !u ACS.Driver.UDPSplit:         { name: "UDP (split driver)" }
 
 configs:
@@ -157,7 +157,10 @@ configs:
           - authMethod
         title: REST Connection Details
         type: object
+    # The built-in OPC UA driver. New OPC UA connections use the split
+    # driver below, so this one is hidden like the built-in REST one.
     !u ACS.Driver.OPCUA:
+      hidden: true
       polled: true
       presentation: &opcua_presentation
         address:
@@ -1180,10 +1183,10 @@ configs:
     # drivers. They share the internal driver's form, so connection
     # details keep their field names. Service-setup moves connections
     # between the two when serviceSetup.config.splitDrivers says so
-    # (lib/split-drivers.js). MQTT and OPC UA stay hidden from the
-    # new-connection form until their images are published. REST has
-    # replaced the built-in: it is offered as "REST", and the chart
-    # moves REST connections to it by default.
+    # (lib/split-drivers.js). MQTT stays hidden from the new-connection
+    # form until its image is published. REST and OPC UA have replaced
+    # their built-ins: each is offered under the plain name, and the
+    # chart moves their connections by default.
     !u ACS.Driver.RESTSplit:
       polled: true
       presentation: *rest_presentation
@@ -1197,9 +1200,13 @@ configs:
       image:
         repository: edge-mqtt
       schema: *mqtt_schema
+    # OPC UA's split driver sends each value as `{"value", "timestamp"}`,
+    # with nothing for a metric path to select, so its metrics take no
+    # path: the admin UI leaves it out and a move here clears it
+    # (`metricPaths`, takes_metric_paths in lib/js-service-client).
     !u ACS.Driver.OPCUASplit:
-      hidden: true
       polled: true
+      metricPaths: false
       presentation: *opcua_presentation
       image:
         repository: edge-opcua

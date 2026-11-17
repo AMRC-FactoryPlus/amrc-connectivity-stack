@@ -439,6 +439,7 @@ serviceSetup:
     # docs/architecture/edge-management/split-drivers.md.
     splitDrivers:
       REST: true
+      OPCUA: true
 
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.

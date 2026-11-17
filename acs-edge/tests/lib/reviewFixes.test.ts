@@ -88,3 +88,31 @@ describe("a write a cmd-only driver can't read", () => {
         conn.close();
     });
 });
+
+/* Finding 3 */
+describe("a null command value", () => {
+    const TYPES = [T.boolean, T.int8, T.int16, T.int32, T.int64, T.uInt8,
+        T.uInt16, T.uInt32, T.uInt64, T.float, T.double, T.string, T.text,
+        T.uuid, T.dateTime];
+
+    it.each(TYPES)("is refused for %s, not written as 0, false or empty", (type) => {
+        for (const v of [null, undefined]) {
+            expect(() => writeValToJSON(metric(type, v))).toThrow(/no value/);
+            if (type != T.dateTime)
+                expect(() => writeValToBuffer(metric(type, v))).toThrow(/no value/);
+        }
+    });
+
+    it("reaches the device as an error, and nothing is sent to the driver", async () => {
+        const broker = new FakeBroker();
+        const conn = await open_driver(broker, ["a"]);
+        let err: Error | undefined;
+        conn.writeMetrics(new Metrics([metric(T.int32, null)]),
+            (e: Error) => err = e, "JSON" as any);
+        expect(err?.message).toMatch(/no value/);
+        expect(broker.of("cmd")).toEqual([]);
+        expect(broker.of("write")).toEqual([]);
+        await conn.stopSubscription("dev", () => {});
+        conn.close();
+    });
+});

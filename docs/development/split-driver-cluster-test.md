@@ -475,20 +475,21 @@ the summary line names the connection on the line above it.
    - a metric it was born with before is missing after, or a new one
      appears, or a type changed;
    - a read metric that got values before gets none after;
-   - its DDATA rate rose above 1.5 times or fell below half (a split
+   - its DDATA rate rose above 3 times or fell below half (a split
      driver must not multiply the broker's load, ACS-45).
 
-   It warns when no birth was seen, when metrics get values only after
-   (expected for multi-device OPC UA connections, and for the UDP
-   device), and when there are more DDEATHs after.
+   It warns when the DDATA rate rose above 1.5 times, when no birth was
+   seen, when metrics get values only after (expected for multi-device
+   OPC UA connections, and for the UDP device), and when there are more
+   DDEATHs after.
 
    What the local runs showed, so you know what to expect: REST, MQTT
    and UDP devices matched exactly, with the same metrics and the same
-   DDATA rates. OPC UA devices sent about twice as many DDATA messages
-   after the move, which is the problem ACS-45 fixes, so they fail the
-   rate check until ACS-45 is in the test build. On a multi-device OPC
-   UA connection the devices the built-in connection starved get values
-   after the move, which shows as a warning.
+   DDATA rates. OPC UA devices send the same values in more DDATA
+   messages after the move: from 1.2 to 2.4 times as many with ACS-45's
+   grouping in, which ACS-45 expects and reports as a warning. On a
+   multi-device OPC UA connection the devices the built-in connection
+   starved get values after the move, which also shows as a warning.
 
 3. Read the upgrade recording's gaps:
 
@@ -585,7 +586,7 @@ the upgrade, and expect the before state to differ.
 These are the checks each protocol's PR or card asks for at the cluster
 test, collected on 2026-11-17.
 
-**REST (ACS-23, PR 903):**
+**REST (ACS-23, PR 903 merged):**
 
 - every REST connection's data continues with no gap longer than one
   restart (steps 7 and 8);
@@ -596,17 +597,21 @@ test, collected on 2026-11-17.
 - the Manager offers one REST driver, called "REST", for new
   connections, and shows moved connections with it.
 
-**MQTT (ACS-25, PR not open yet):**
+**MQTT (ACS-25, PR 909 open):**
 
-- a connection with wildcard topics and TLS. The rig has no TLS (see
-  above), so TLS needs a real broker;
+- the upgrade itself, data continuity, and `kubectl top` of a moved
+  agent (steps 7 and 8);
+- a connection with wildcard topics and TLS, and `ws` or `wss`
+  brokers. The rig has no TLS or WebSockets (see above), so those need
+  a real broker;
+- the Manager offers one MQTT driver for new connections;
 - the heaviest MQTT connection: compare the Edge Agent's and sidecar's
   CPU before and after (step 8.4), and check no messages are lost at
   its peak rate (its DDATA rate in step 8.2);
 - an Edge Agent whose Deployment sets `values.image.default` must
   have that removed before the upgrade, or its sidecar can't pull.
 
-**OPC UA (ACS-26 PR 905, ACS-27 card, no PR yet):**
+**OPC UA (ACS-26 PR 905 merged, ACS-27 card, no PR yet):**
 
 - each security policy: the rig has None, Basic256, Basic256Sha256 and
   Aes128_Sha256, with and without a login;
@@ -615,13 +620,13 @@ test, collected on 2026-11-17.
   after the move (step 8);
 - multi-device connections: after the move every device gets values,
   where the built-in connection gave them only to the last device;
-- DDATA rate after the move (ACS-45): the comparison fails a device
-  whose rate more than halves or rises 1.5 times;
+- DDATA rate after the move (ACS-45): the comparison warns above 1.5
+  times the built-in rate and fails above 3 times or below half;
 - whether each real server trusts the driver's certificate. The mocks
   can't show this: check it on each real server when its connection
   moves.
 
-**UDP (ACS-38 PR 907, ACS-43 PR 904):**
+**UDP (ACS-38 PR 907 and ACS-43 PR 904, both merged):**
 
 1. The `split-drivers` summary line counts the UDP connection as moved,
    the Manager shows its driver as "UDP", and the Edge Agent pod has a
@@ -644,9 +649,11 @@ test, collected on 2026-11-17.
    NetworkPolicy, and the receive buffer after raising
    `net.core.rmem_max` on the node.
 
-**Grouped DDATA (ACS-45, in progress, no PR yet):** the DDATA rate
-check in step 8. Its own cluster checks were not written down when
-this was collected.
+**Grouped DDATA (ACS-45, PR 908 merged):** the DDATA rate check in
+step 8. PR 908 lists no cluster checks of its own. Its
+`DRIVER_DATA_WAIT_MS` setting is off by default, and the remaining
+OPC UA gap needs a driver fix (no `TCP_NODELAY` in the Rust drivers'
+MQTT client), so expect OPC UA warnings, not failures.
 
 ### 10. Move each protocol back and forward
 

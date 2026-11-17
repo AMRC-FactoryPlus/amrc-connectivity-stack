@@ -240,5 +240,7 @@ describe("summaries", () => {
         expect(types.some(p => p.level == "FAIL" && /type Float/.test(p.what))).toBe(true);
         const rate = compare_summaries(recording("Float", 1000), recording("Float", 250));
         expect(rate.some(p => p.level == "FAIL" && /DDATA rate/.test(p.what))).toBe(true);
+        const more = compare_summaries(recording("Float", 1000), recording("Float", 500));
+        expect(more.map(p => p.level)).toEqual(["WARN"]);
     });
 });

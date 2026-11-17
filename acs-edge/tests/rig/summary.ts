@@ -15,9 +15,15 @@ import type { Rig } from "./rig.js";
 
 /* The limits `compare` applies. */
 export const Limits = {
-    /* DDATA per second after / before. Above this it fails, because a
-     * split driver must not multiply the broker's load (ACS-45). */
-    rate_up:    1.5,
+    /* DDATA per second after / before. Above `rate_warn` it warns and
+     * above `rate_fail` it fails. A split driver must not multiply the
+     * broker's load (ACS-45), but the Edge Agent can only group what
+     * arrives together, and ACS-45 measured split OPC UA sending a
+     * little more DDATA than the built-in connection with every value
+     * the same, which it reports as a warning. Ungrouped values were
+     * hundreds of times more. */
+    rate_warn:  1.5,
+    rate_fail:  3,
     /* Below this it fails: data has slowed down. */
     rate_down:  0.5,
 };
@@ -195,8 +201,11 @@ export function compare_summaries (a: Summary, b: Summary): Problem[] {
 
         if (x.ddata_per_s > 0) {
             const ratio = y.ddata_per_s / x.ddata_per_s;
-            if (ratio > Limits.rate_up)
-                p("FAIL", `DDATA rate ${ratio.toFixed(2)}x (${x.ddata_per_s.toFixed(2)}/s to ${y.ddata_per_s.toFixed(2)}/s)`);
+            const rates = `${ratio.toFixed(2)}x (${x.ddata_per_s.toFixed(2)}/s to ${y.ddata_per_s.toFixed(2)}/s)`;
+            if (ratio > Limits.rate_fail)
+                p("FAIL", `DDATA rate ${rates}`);
+            else if (ratio > Limits.rate_warn)
+                p("WARN", `DDATA rate ${rates}`);
             else if (ratio < Limits.rate_down)
                 p("FAIL", `DDATA rate fell to ${ratio.toFixed(2)}x (${x.ddata_per_s.toFixed(2)}/s to ${y.ddata_per_s.toFixed(2)}/s)`);
         }

@@ -462,6 +462,7 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-test-rs
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -507,6 +508,7 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-test-rs
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -552,6 +554,7 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-test-rs
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads

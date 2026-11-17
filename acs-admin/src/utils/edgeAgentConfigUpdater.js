@@ -3,9 +3,9 @@
  */
 
 import {
-  DEFAULT_PAYLOAD_FORMAT, UUIDs, driver_id, driver_values, is_isa95_tag,
-  isa95_vocabulary, merge_isa95_tags, render_isa95, set_connection_type,
-  set_driver_ids,
+  DEFAULT_PAYLOAD_FORMAT, UUIDs, driver_id, driver_values, drop_metric_paths,
+  is_isa95_tag, isa95_vocabulary, merge_isa95_tags, render_isa95,
+  set_connection_type, set_driver_ids, takes_metric_paths,
 } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@/store/useDeviceStore'
 import { useConnectionStore } from '@/store/useConnectionStore'
@@ -86,6 +86,25 @@ export function applyConnection (existing, connection) {
   if (connectionConfiguration.source?.payloadFormat) {
     entry.payloadFormat = connectionConfiguration.source.payloadFormat
   }
+  return entry
+}
+
+/**
+ * Removes the metric paths of a connection's devices if its driver
+ * takes none. The OPC UA split driver is one: the Edge Agent would read
+ * its `{"value", "timestamp"}` packets through the path, and a path
+ * from the built-in connection, which never read paths (some hold a
+ * unit, such as `mm`), would find nothing. The origin map keeps its
+ * paths, so a connection moved back gets them again on its next save.
+ * Service-setup clears the same paths when it moves a connection.
+ *
+ * @param {Object} entry - The connection's entry, changed in place
+ * @param {Object} connection - The connection store entry, with its configuration and bound driver definition
+ * @returns {Object} - The entry
+ */
+export function applyMetricPaths (entry, connection) {
+  if (!takes_metric_paths(connection.configuration?.driver))
+    drop_metric_paths(entry)
   return entry
 }
 
@@ -560,6 +579,8 @@ async function buildEdgeAgentConfig({
           connectionConfig.devices.push(deviceConfig)
         }
       }
+
+      applyMetricPaths(connectionConfig, connection)
     }
 
     // Clean up any connections that no longer have devices

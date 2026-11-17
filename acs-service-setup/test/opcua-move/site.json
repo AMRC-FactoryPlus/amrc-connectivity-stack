@@ -1,0 +1,392 @@
+{
+  "samples": {
+    "cccccccc-0000-4000-8000-000000000001": "opcua",
+    "cccccccc-0000-4000-8000-000000000002": "opcua"
+  },
+  "secrets": {
+    "__FPSI__5ec2e7a0-0000-4000-8000-000000000001": "cell-secret"
+  },
+  "configs": {
+    "fa8b429c-de3e-11ef-87fd-6382f0eac944": {
+      "cccccccc-0000-4000-8000-000000000001": {
+        "driver": "f32fed40-de4d-11ef-a011-1711bd498427",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+        "config": {
+          "endpoint": "opc.tcp://cell-server.local:4840",
+          "securityMode": "SignAndEncrypt",
+          "securityPolicy": "Basic256Sha256",
+          "useCredentials": true,
+          "username": "cell-reader",
+          "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000001"
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "Defined by Protocol"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-1"
+        },
+        "pollInt": 1000
+      },
+      "cccccccc-0000-4000-8000-000000000002": {
+        "driver": "f32fed40-de4d-11ef-a011-1711bd498427",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+        "config": {
+          "endpoint": "opc.tcp://furnace.local:4840",
+          "securityMode": "None",
+          "securityPolicy": "None",
+          "useCredentials": false
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {},
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-1"
+        },
+        "pollInt": 1000
+      },
+      "cccccccc-0000-4000-8000-000000000003": {
+        "driver": "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000a",
+        "config": {
+          "host": "plc.local",
+          "port": 502,
+          "protocol": "tcp"
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "Buffer"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-1"
+        },
+        "pollInt": 1000
+      },
+      "cccccccc-0000-4000-8000-000000000004": {
+        "driver": "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
+        "edgeAgent": "aaaaaaaa-0000-4000-8000-00000000000b",
+        "config": {
+          "host": "plc-2.local",
+          "port": 502,
+          "protocol": "tcp"
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "deployment": {},
+        "source": {
+          "payloadFormat": "Buffer"
+        },
+        "topology": {
+          "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+          "hostname": "edge-2"
+        },
+        "pollInt": 1000
+      }
+    },
+    "aac6f843-cfee-4683-b121-6943bfdf9173": {
+      "aaaaaaaa-0000-4000-8000-00000000000a": {
+        "sparkplug": {
+          "asyncPubMode": true
+        },
+        "deviceConnections": [
+          {
+            "name": "cell.opcua",
+            "uuid": "cccccccc-0000-4000-8000-000000000001",
+            "connType": "OPC UA",
+            "payloadFormat": "Defined by Protocol",
+            "pollInt": 1000,
+            "devices": [
+              {
+                "deviceId": "Device_1",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Defined by Protocol",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_01",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_01",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "degrees"
+                  },
+                  {
+                    "Name": "Metric_02",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_02",
+                    "path": "mm",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_03",
+                    "type": "String",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_03",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_04",
+                    "type": "UInt8",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_04",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_05",
+                    "type": "UInt32BE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_05",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "units"
+                  },
+                  {
+                    "Name": "Metric_06",
+                    "type": "DoubleBE",
+                    "method": "GET/SET",
+                    "address": "ns=2;s=Sample/Node_06",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "m/min"
+                  },
+                  {
+                    "Name": "Metric_07",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_02",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "mm"
+                  }
+                ]
+              }
+            ],
+            "OPCUAConnDetails": {
+              "endpoint": "opc.tcp://cell-server.local:4840",
+              "securityMode": "SignAndEncrypt",
+              "securityPolicy": "Basic256Sha256",
+              "useCredentials": true,
+              "username": "cell-reader",
+              "password": "__FPSI__5ec2e7a0-0000-4000-8000-000000000001"
+            }
+          },
+          {
+            "name": "Furnace",
+            "uuid": "cccccccc-0000-4000-8000-000000000002",
+            "connType": "OPC UA",
+            "pollInt": 1000,
+            "devices": [
+              {
+                "deviceId": "Device_A",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Defined by Protocol",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_01",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_01",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "degrees"
+                  },
+                  {
+                    "Name": "Metric_02",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_02",
+                    "path": "null",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_03",
+                    "type": "String",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_03",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              },
+              {
+                "deviceId": "Device_B",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Defined by Protocol",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Metric_04",
+                    "type": "UInt8",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_04",
+                    "value": null,
+                    "recordToDB": true
+                  },
+                  {
+                    "Name": "Metric_05",
+                    "type": "UInt32BE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_05",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "units"
+                  },
+                  {
+                    "Name": "Metric_06",
+                    "type": "DoubleBE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_06",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "m/min"
+                  },
+                  {
+                    "Name": "Metric_07",
+                    "type": "DoubleLE",
+                    "method": "GET",
+                    "address": "ns=2;s=Sample/Node_02",
+                    "value": null,
+                    "recordToDB": true,
+                    "engUnit": "mm"
+                  }
+                ]
+              }
+            ],
+            "OPCUAConnDetails": {
+              "endpoint": "opc.tcp://furnace.local:4840",
+              "securityMode": "None",
+              "securityPolicy": "None",
+              "useCredentials": false
+            }
+          },
+          {
+            "name": "PLC-1",
+            "uuid": "cccccccc-0000-4000-8000-000000000003",
+            "connType": "Driver",
+            "payloadFormat": "Buffer",
+            "pollInt": 1000,
+            "devices": [
+              {
+                "deviceId": "Plc_1",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Buffer",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Count",
+                    "type": "UInt16BE",
+                    "method": "GET",
+                    "address": "holding,1,0,1",
+                    "path": "0",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              }
+            ],
+            "DriverDetails": {
+              "host": "plc.local",
+              "port": 502,
+              "protocol": "tcp"
+            }
+          }
+        ]
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000b": {
+        "sparkplug": {
+          "asyncPubMode": true
+        },
+        "deviceConnections": [
+          {
+            "name": "PLC-2",
+            "uuid": "cccccccc-0000-4000-8000-000000000004",
+            "connType": "Driver",
+            "payloadFormat": "Buffer",
+            "pollInt": 1000,
+            "devices": [
+              {
+                "deviceId": "Plc_2",
+                "deviceType": "00000000-0000-4000-8000-000000000001",
+                "pollInt": 1000,
+                "pubInterval": 0,
+                "payloadFormat": "Buffer",
+                "templates": [],
+                "tags": [
+                  {
+                    "Name": "Count",
+                    "type": "UInt16BE",
+                    "method": "GET",
+                    "address": "holding,1,0,1",
+                    "path": "0",
+                    "value": null,
+                    "recordToDB": true
+                  }
+                ]
+              }
+            ],
+            "DriverDetails": {
+              "host": "plc-2.local",
+              "port": 502,
+              "protocol": "tcp"
+            }
+          }
+        ]
+      }
+    },
+    "f2b9417a-ef7f-421f-b387-bb8183a48cdb": {
+      "aaaaaaaa-0000-4000-8000-00000000000a": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-1",
+        "chart": "dddddddd-0000-4000-8000-000000000001",
+        "name": "cell-agent",
+        "values": {
+          "name": "cell-agent",
+          "uuid": "aaaaaaaa-0000-4000-8000-00000000000a",
+          "drivers": {
+            "PLC-1": {
+              "image": {
+                "repository": "edge-modbus"
+              }
+            }
+          }
+        }
+      },
+      "aaaaaaaa-0000-4000-8000-00000000000b": {
+        "cluster": "bbbbbbbb-0000-4000-8000-000000000001",
+        "hostname": "edge-2",
+        "chart": "dddddddd-0000-4000-8000-000000000001",
+        "name": "line-agent",
+        "values": {
+          "name": "line-agent",
+          "uuid": "aaaaaaaa-0000-4000-8000-00000000000b",
+          "drivers": {
+            "PLC-2": {
+              "image": {
+                "repository": "edge-modbus"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

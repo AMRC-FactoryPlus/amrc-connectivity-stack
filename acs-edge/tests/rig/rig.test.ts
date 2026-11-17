@@ -15,8 +15,9 @@ import {
 import * as sparkplug from "sparkplug-payload";
 
 import type { Captured } from "../golden/capture";
-import { make_rig, manifests } from "./make-rig";
+import { make_rig, manifests, requests, value_topics } from "./make-rig";
 import { make_mock } from "./mocks";
+import { as_array } from "./mocks/mqtt";
 import { Rig, RigConnection, rig_entry } from "./rig";
 import { compare_summaries, summarise } from "./summary";
 
@@ -65,6 +66,34 @@ describe("make_rig", () => {
         expect(by_proto(rig, "MQTT").password).toBeUndefined();
     });
 
+    test("each Edge Agent asks for its own resources, not the chart's", () => {
+        for (const n of rig.nodes)
+            expect(n.values).toEqual({ limits: { cpu: "50m", memory: "200Mi" } });
+        expect(requests(rig).agents).toEqual({ cpu: 200, memory: 800 });
+        expect(requests(rig).mocks).toEqual({ cpu: 60, memory: 896 });
+    });
+
+    test("a batched connection gets array topics and its agent a pinned image", () => {
+        const sources = fs.readdirSync(EXAMPLES).sort().map(f => ({
+            file: path.join(EXAMPLES, f),
+            ...JSON.parse(fs.readFileSync(path.join(EXAMPLES, f), "utf8")),
+        }));
+        const mq = sources.find(s => s.connection.connType == "MQTT")!;
+        mq.connection.devices[0].tags.push({ Name: "Batched", type: "Float",
+            method: "GET", address: "batched/topic", path: "$.value" });
+        const r = make_rig(sources, {
+            prefix: "Rig", namespace: "acs-rig", image: "i", seed: 1,
+            duration_ms: 10_000, mqtt_interval_ms: 1000,
+            batched: ["mqtt-json"], pin_tag: "v1.2.3",
+        });
+        const c = r.connections.find(c => c.protocol == "MQTT")!;
+        expect(c.array_topics).toContain("batched/topic");
+        expect(c.array_topics).toEqual(value_topics(c.connection));
+        expect(r.nodes.find(n => n.name == c.node)!.values.image)
+            .toEqual({ default: { tag: "v1.2.3" } });
+        expect(r.nodes.filter(n => n.values.image).length).toBe(1);
+    });
+
     test("manifests run a pod per protocol except UDP", () => {
         const list = JSON.parse(manifests(rig, "img:1", Buffer.from("x")));
         const deps = list.items.filter((i: any) => i.kind == "Deployment");
@@ -76,6 +105,26 @@ describe("make_rig", () => {
         expect(ctr.args).toEqual(["run-mocks", "--rig", "/rig/rig.json.gz",
             "--protocol", "OPC UA", "--advertise", "rig-opcua.acs-rig.svc.cluster.local"]);
         expect(ctr.ports.map((p: any) => p.containerPort)).toEqual([4840, 9000]);
+    });
+});
+
+describe("batched payloads", () => {
+    test("value topics are those whose every metric reads $.value", () => {
+        const conn = { devices: [
+            { tags: [
+                { address: "a", path: "$.value" },
+                { address: "b", path: "$.value" },
+                { address: "b", path: "$.other" },
+                { Name: "static" },
+            ] },
+            { tags: [{ address: "c", path: "$.value" }] },
+        ] };
+        expect(value_topics(conn)).toEqual(["a", "c"]);
+    });
+
+    test("an object payload becomes an array of {value, timestamp}", () => {
+        const out = JSON.parse(as_array(JSON.stringify({ value: 4.5 })).toString());
+        expect(out).toEqual([{ value: 4.5, timestamp: expect.any(Number) }]);
     });
 });
 

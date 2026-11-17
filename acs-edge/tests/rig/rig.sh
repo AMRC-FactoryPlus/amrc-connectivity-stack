@@ -5,15 +5,16 @@
 #
 #   rig <command> [args...]
 #
-# Commands: run-mocks, make-rig, load, remove, check, local, write. See
+# Commands: run-mocks, make-rig, load, remove, check, local, write,
+# batched. See
 # docs/development/split-driver-cluster-test.md.
 
 set -e
 cmd="$1"
 case "$cmd" in
-    run-mocks|make-rig|load|remove|check|local|write) shift ;;
+    run-mocks|make-rig|load|remove|check|local|write|batched) shift ;;
     *)
-        echo "Usage: rig run-mocks|make-rig|load|remove|check|local|write [args...]" >&2
+        echo "Usage: rig run-mocks|make-rig|load|remove|check|local|write|batched [args...]" >&2
         exit 2
         ;;
 esac

@@ -23,13 +23,16 @@
 import { driver_ports, port_clashes } from '@amrc-factoryplus/service-client'
 
 /** Where a node (Edge Agent) runs: its cluster and the host it is
- * pinned to. Both are on its Edge deployment config.
+ * pinned to. Both are on its Edge deployment config. A hostname in the
+ * deployment's values wins, because edge-sync merges the values over
+ * the chart's last.
  * @param {Object} node - A node store entry
  */
 export function nodePlace (node) {
+  const deployment = node?.deployment
   return {
-    cluster: node?.deployment?.cluster,
-    hostname: pinnedHost(node?.deployment?.hostname),
+    cluster: deployment?.cluster,
+    hostname: pinnedHost(deployment?.values?.hostname ?? deployment?.hostname),
   }
 }
 

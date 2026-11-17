@@ -208,13 +208,27 @@ spec:
                   key: "{{ $name }}"
             - name: VERBOSE
               value: "{{ $.Values.verbosity }}"
+    {{- /* A driver that keeps state, such as the OPC UA driver's client
+         certificate, gets a directory that lasts as long as the pod,
+         as the agent's own .config does. */}}
+    {{- with $driver.stateDir }}
+      {{- if not (hasPrefix "/" .) }}
+        {{- fail (printf "Edge Agent %s, driver %s: stateDir %q is not an absolute path" $.Values.name $name .) }}
+      {{- end }}
+            - name: DRIVER_STATE_DIR
+              value: {{ . | quote }}
+    {{- end }}
     {{- $hp := get $driverMounts.mounts $name }}
-    {{- if $hp }}
+    {{- if or $hp $driver.stateDir }}
           volumeMounts:
     {{- end }}
     {{- range $n, $m := $hp }}
             - mountPath: "{{ $m }}"
               name: "{{ $n }}"
+    {{- end }}
+    {{- with $driver.stateDir }}
+            - mountPath: {{ . | quote }}
+              name: "state-{{ include "edge-agent.k8sname" $name }}"
     {{- end }}
   {{- end }}
 {{- end }}
@@ -233,6 +247,12 @@ spec:
         - name: "{{ $n }}"
           hostPath:
             path: "{{ $p }}"
+{{- end }}
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- if and (not $driver.external) $driver.stateDir }}
+        - name: "state-{{ include "edge-agent.k8sname" $name }}"
+          emptyDir: {}
+  {{- end }}
 {{- end }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1

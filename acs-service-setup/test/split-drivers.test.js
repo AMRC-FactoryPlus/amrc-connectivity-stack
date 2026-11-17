@@ -144,6 +144,8 @@ const CASES = [
         name: "OPCUA", conn: C.opcua, entry_name: "OPC",
         key: "OPCUAConnDetails", details: OPCUA_DETAILS, image: "edge-opcua",
         format: ["Defined by Protocol", "JSON"],
+        /* From the DriverDef: where its client certificate lives. */
+        values: { stateDir: "/var/lib/edge-driver" },
     },
     {
         name: "MQTT", conn: C.mqtt, entry_name: "Broker",
@@ -273,7 +275,7 @@ describe("migrate_split_drivers", () => {
             assert.equal(e.name, c.entry_name);
 
             assert.deepEqual(drivers(cdb)[c.entry_name],
-                { ...(c.deployment ?? {}), image: { repository: c.image } });
+                { ...(c.deployment ?? {}), image: { repository: c.image }, ...(c.values ?? {}) });
             /* Other connections are untouched. */
             assert.deepEqual(drivers(cdb).PLC, { image: { repository: "edge-modbus" } });
         });
@@ -385,14 +387,6 @@ describe("migrate_split_drivers", () => {
         assert.equal(lines.filter(l => /^ERROR: %s: split DriverDef/.test(l[0])).length, 2);
     });
 
-    test("never creates a Deployment", async () => {
-        const cdb = fixture();
-        cdb.app(Edge.App.Deployment).delete(AGENT);
-        await run(cdb);
-        assert.equal(cdb.get(Edge.App.Deployment, AGENT), undefined);
-        assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
-    });
-
     test("one failed connection does not stop the rest", async () => {
         const cdb = fixture();
         const put = cdb.put_config.bind(cdb);
@@ -499,5 +493,171 @@ describe("driver ids", () => {
         assert.deepEqual(drivers(cdb)[PLC_ID],
             { image: { repository: "edge-modbus" }, hostPaths: [] });
         assert.equal(drivers(cdb)["plc.example.org"], undefined);
+    });
+});
+
+/* Faults the code review found in the move. Each test failed before
+ * its fix. */
+describe("connections that share a name on one Edge Agent", () => {
+    const PUMP_REST = "cccccccc-0000-4000-8000-0000000000a1";
+    const PUMP_REST_2 = "cccccccc-0000-4000-8000-0000000000a2";
+
+    /* The fixture's agent with more connections named "pump". `split`
+     * gives a running Modbus split driver of that name and its
+     * sidecar; `rest` the number of built-in REST ones. */
+    function pumps ({ split, rest }) {
+        const cdb = fixture();
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        if (split) {
+            config.deviceConnections.find(c => c.uuid == C.modbus).name = "pump";
+            dep.values.drivers = { pump: { image: { repository: "edge-modbus" } } };
+        }
+        for (const uuid of [PUMP_REST, PUMP_REST_2].slice(0, rest)) {
+            cdb.set(App.ConnectionConfiguration, uuid,
+                cconf(Driver.REST, REST_DETAILS, "JSON", { pollInt: 1000 }));
+            config.deviceConnections.push(entry(uuid, "pump", "REST",
+                "RESTConnDetails", REST_DETAILS, "JSON", 1000));
+        }
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+        return cdb;
+    }
+
+    /* Every split driver entry of the agent has a sidecar under its
+     * driver id, and there are no others. */
+    function every_sidecar_keyed (cdb) {
+        const ids = cdb.get(App.EdgeAgentConfig, AGENT).deviceConnections
+            .filter(c => c.connType == "Driver")
+            .map(c => c.driverId ?? c.name);
+        assert.deepEqual(Object.keys(drivers(cdb)).sort(), ids.sort());
+    }
+
+    test("moving a REST connection keeps a split driver's sidecar of the same name", async () => {
+        const cdb = pumps({ split: true, rest: 1 });
+        await run(cdb);
+
+        const modbus = conn_entry(cdb, C.modbus);
+        const rest = conn_entry(cdb, PUMP_REST);
+        assert.notEqual(driver_of(modbus), driver_of(rest));
+        assert.deepEqual(drivers(cdb)[driver_of(modbus)],
+            { image: { repository: "edge-modbus" } });
+        assert.equal(drivers(cdb)[driver_of(rest)].image.repository, "edge-rest");
+        every_sidecar_keyed(cdb);
+
+        cdb.writes = [];
+        await run(cdb);
+        assert.deepEqual(cdb.writes, [], "a second run writes nothing");
+    });
+
+    test("moving two REST connections of the same name gives each a sidecar", async () => {
+        const cdb = pumps({ split: false, rest: 2 });
+        await run(cdb);
+        every_sidecar_keyed(cdb);
+
+        cdb.writes = [];
+        await run(cdb);
+        assert.deepEqual(cdb.writes, [], "a second run writes nothing");
+    });
+});
+
+const driver_of = e => e.driverId ?? e.name;
+
+describe("an Edge Agent with no Deployment", () => {
+    /* Nothing would run a sidecar, so its connections stay on their
+     * built-in drivers, with an ERROR line each: on version 7 they get
+     * no data until the agent is deployed from the Manager. */
+    test("holds its connections, writes nothing and says how to fix it", async () => {
+        const cdb = fixture();
+        cdb.app(Edge.App.Deployment).delete(AGENT);
+        const lines = [];
+        const count = await new MigrateSplitDrivers({
+            fplus: { ConfigDB: cdb }, settings: {},
+            log: (...args) => lines.push(args),
+        }).run();
+
+        assert.deepEqual(cdb.writes, []);
+        assert.equal(count.moved, 0);
+        /* OPC, Broker, Printer and the REST connection with no devices. */
+        assert.equal(count.no_deployment, 4);
+        assert.equal(conn_entry(cdb, C.opcua).connType, "OPC UA");
+        const errors = lines.filter(l => /no Edge Agent Deployment config/.test(l[0]));
+        assert.equal(errors.length, 4);
+        assert.match(errors[0][0], /^ERROR: /);
+        assert.match(errors[0][0], /Deploy the Edge Agent from the Manager/);
+    });
+});
+
+describe("a Manager edit while the move runs", () => {
+    test("is kept, and the sidecar is built from it", async () => {
+        const cdb = fixture();
+        const edited = { baseURL: "http://printer-2/api", authMethod: "None" };
+        const mounts = [{ hostPath: "/dev/y", mountPath: "/dev/y" }];
+
+        /* The Manager saves the connection after the run has read every
+         * connection but before it writes this one. */
+        const put = cdb.put_config.bind(cdb);
+        let edit = true;
+        cdb.put_config = async (a, o, c, opts) => {
+            if (edit && a == App.EdgeAgentConfig) {
+                edit = false;
+                const cc = cdb.get(App.ConnectionConfiguration, C.rest);
+                cc.config = edited;
+                cc.deployment = { hostPaths: mounts };
+                cdb.set(App.ConnectionConfiguration, C.rest, cc);
+            }
+            return put(a, o, c, opts);
+        };
+        await run(cdb);
+
+        const cc = cdb.get(App.ConnectionConfiguration, C.rest);
+        assert.equal(cc.driver, Driver.RESTSplit);
+        assert.deepEqual(cc.config, edited);
+        assert.deepEqual(cc.deployment, { hostPaths: mounts });
+        assert.deepEqual(drivers(cdb).Printer.hostPaths, mounts);
+    });
+});
+
+describe("the host a port clash is checked on", () => {
+    const UDP_A = "cccccccc-0000-4000-8000-0000000000b1";
+    const UDP_B = "cccccccc-0000-4000-8000-0000000000b2";
+    const AGENT_B = "aaaaaaaa-0000-4000-8000-000000000002";
+
+    /* Two agents, each with a built-in UDP connection on port 50205.
+     * The first Deployment names edge-1, but its values pin it to
+     * edge-2, and edge-sync merges the values last, so both run on
+     * edge-2. */
+    function two_agents () {
+        const cdb = fixture();
+        const udp = agent => cconf(Driver.UDP, { port: 50205 }, "JSON",
+            { edgeAgent: agent });
+        cdb.set(App.ConnectionConfiguration, UDP_A, udp(AGENT));
+        cdb.set(App.ConnectionConfiguration, UDP_B, udp(AGENT_B));
+
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.push(entry(UDP_A, "Robot", "UDP",
+            "UDPConnDetails", { port: 50205 }, "JSON", 1000));
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        cdb.set(App.EdgeAgentConfig, AGENT_B, {
+            deviceConnections: [entry(UDP_B, "Arm", "UDP",
+                "UDPConnDetails", { port: 50205 }, "JSON", 1000)],
+        });
+
+        const dep = cdb.get(Edge.App.Deployment, AGENT);
+        dep.values.hostname = "edge-2";
+        cdb.set(Edge.App.Deployment, AGENT, dep);
+        cdb.set(Edge.App.Deployment, AGENT_B, {
+            cluster: "cluster-uuid", hostname: "edge-2", chart: "chart-uuid",
+            name: "agent-b", values: { name: "agent-b", uuid: AGENT_B },
+        });
+        return cdb;
+    }
+
+    test("is the host the Deployment's values pin it to", async () => {
+        const count = await run(two_agents());
+        /* The other built-in connections, and one of the two UDP ones;
+         * the other moves without its sidecar. */
+        assert.equal(count.moved, 5);
+        assert.equal(count.no_sidecar, 1);
     });
 });

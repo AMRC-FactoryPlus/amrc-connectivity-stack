@@ -8,24 +8,23 @@
 //! subscriptions with monitored items sampled and published at each
 //! device's poll interval, and writes with the OPC UA Write service.
 //! async-opcua keeps the session up: it reconnects with a back-off of
-//! 1 to 20 seconds, as node-opcua did for the built-in, and moves or
-//! recreates the subscriptions on the new session.
+//! 1 to 20 seconds, as node-opcua did for the built-in. After every
+//! reconnect the driver makes its subscriptions again once the driver
+//! is `UP`, so the server's first notification, with every item's
+//! current value, reaches the agent: values that changed while the
+//! connection was down are not left stale.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use opcua::client::{
-    Client, ClientBuilder, DataChangeCallback, IdentityToken, Password, Session, SessionPollResult,
-};
+use opcua::client::{Client, ClientBuilder, IdentityToken, Password, Session, SessionPollResult};
 use opcua::crypto::SecurityPolicy;
-use opcua::types::{
-    AttributeId, DataValue, MonitoredItemCreateRequest, MonitoringMode, MonitoringParameters,
-    ReadValueId, StatusCode, TimestampsToReturn, WriteValue as UaWriteValue,
-};
+use opcua::types::{AttributeId, DataValue, StatusCode, WriteValue as UaWriteValue};
 use rs_edge_driver::{
     AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, WriteError, WriteValue,
 };
@@ -34,13 +33,9 @@ use tokio::task::JoinHandle;
 
 use crate::addr::Addr;
 use crate::config::Config;
+use crate::subs::{self, Dropped, Plan, Sink, Subs};
 use crate::value::{self, WriteFailure};
 
-/// The subscription settings the built-in connection used.
-const LIFETIME_COUNT: u32 = 100;
-const MAX_KEEP_ALIVE_COUNT: u32 = 10;
-const MAX_NOTIFICATIONS_PER_PUBLISH: u32 = 1000;
-const QUEUE_SIZE: u32 = 1000;
 /// The publishing interval node-opcua requests when it is given none.
 const DEFAULT_INTERVAL_MS: u64 = 1000;
 
@@ -48,21 +43,17 @@ const DEFAULT_INTERVAL_MS: u64 = 1000;
 /// session the server can't hand back after a dropped connection (see
 /// README) stays on the server.
 const SESSION_TIMEOUT_MS: u32 = 60_000;
-/// The secure channel token lifetime to ask for. The client renews the
-/// token at 75% of its lifetime measured against the server's clock
-/// (upstream issue #289), so a server clock that is out by more than a
-/// quarter of the lifetime makes the channel drop and reconnect once
-/// per lifetime. An hour tolerates a server clock 15 minutes out.
-const CHANNEL_LIFETIME_MS: u32 = 3_600_000;
+/// The secure channel token lifetime to ask for: node-opcua's default.
+/// The client allows for a server clock that is out
+/// (`ignore_clock_skew`), so the token is renewed in time however far
+/// out it is. `EDGE_OPCUA_CHANNEL_LIFETIME_MS` overrides it, for the
+/// tests.
+const CHANNEL_LIFETIME_MS: u32 = 600_000;
 /// How long `connect` waits for the session before reporting failure.
 /// async-opcua keeps trying after that.
 const CONNECT_WAIT: Duration = Duration::from_secs(30);
-/// How long a single request (GetEndpoints, Write, CreateSubscription)
-/// may take.
+/// How long a single request (GetEndpoints, Write) may take.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-/// How many monitored items to create per request. node-opcua servers
-/// accept 1,000 by default.
-const ITEMS_PER_REQUEST: usize = 1000;
 
 /// The state of the session, as the event loop sees it.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,27 +68,33 @@ struct Conn {
     session: Arc<Session>,
     state: watch::Receiver<State>,
     task: JoinHandle<()>,
+    /// Set by the event loop each time the session reconnects, so the
+    /// next `subscribe_groups` makes the subscriptions again.
+    reconnected: Arc<AtomicBool>,
 }
-
-/// One OPC UA subscription per poll interval, with the addresses it
-/// monitors.
-type Plan = Vec<(u64, Vec<Addr>)>;
 
 pub struct OpcuaHandler {
     handle: DriverHandle<Addr>,
     config: Config,
     conn: Option<Conn>,
-    /// What the session's subscriptions monitor, once they are made.
-    subscribed: Option<Plan>,
+    /// The session's subscriptions, once they are made.
+    subs: Option<Subs>,
+    dropped: Arc<Dropped>,
 }
 
 /// Where the client keeps its certificate and the server certificates
 /// it has seen. The built-in connection kept node-opcua's in the
-/// agent's `emptyDir`, so it lasted as long as the pod. This lasts as
-/// long as the container.
+/// agent's `emptyDir`, so it lasted as long as the pod. The edge-agent
+/// chart gives this driver a directory that lasts as long as the pod
+/// too, in `DRIVER_STATE_DIR` (the DriverDef's `stateDir`).
+/// `OPCUA_PKI_DIR` overrides it. Without either it lasts as long as the
+/// container.
 fn pki_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("OPCUA_PKI_DIR") {
         return dir.into();
+    }
+    if let Some(dir) = std::env::var_os("DRIVER_STATE_DIR") {
+        return PathBuf::from(dir).join("pki");
     }
     match std::env::var_os("HOME") {
         Some(home) => PathBuf::from(home).join("pki"),
@@ -105,11 +102,12 @@ fn pki_dir() -> PathBuf {
     }
 }
 
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
+fn channel_lifetime() -> u32 {
+    std::env::var("EDGE_OPCUA_CHANNEL_LIFETIME_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|ms| *ms > 0)
+        .unwrap_or(CHANNEL_LIFETIME_MS)
 }
 
 /// Whether a failed connection is the server refusing who we are,
@@ -190,7 +188,12 @@ impl OpcuaHandler {
             .session_retry_max(Duration::from_secs(20))
             .recreate_subscriptions(true)
             .session_timeout(SESSION_TIMEOUT_MS)
-            .channel_lifetime(CHANNEL_LIFETIME_MS)
+            .channel_lifetime(channel_lifetime())
+            // Time the secure channel token's renewal on our clock, not
+            // the server's (upstream issue #289). It also moves every
+            // DateTime it decodes onto our clock; subs.rs puts values
+            // back as the server sent them.
+            .ignore_clock_skew(true)
             .request_timeout(REQUEST_TIMEOUT)
             .client()
             .map_err(|e| {
@@ -251,6 +254,8 @@ impl OpcuaHandler {
 
         let (tx, state) = watch::channel(State::Connecting);
         let handle = self.handle.clone();
+        let reconnected = Arc::new(AtomicBool::new(false));
+        let flag = reconnected.clone();
         let task = tokio::spawn(async move {
             let mut events = std::pin::pin!(event_loop.enter());
             let mut up = false;
@@ -259,6 +264,11 @@ impl OpcuaHandler {
                     Ok(SessionPollResult::Reconnected(mode)) => {
                         tracing::info!("OPC UA session up ({mode:?})");
                         up = true;
+                        // async-opcua has moved or remade the
+                        // subscriptions, and the server's first values
+                        // went while the driver was not UP, so the
+                        // agent never saw them. Make them again.
+                        flag.store(true, Ordering::SeqCst);
                         let _ = tx.send(State::Up);
                     }
                     Ok(SessionPollResult::ConnectionLost(status)) => {
@@ -291,6 +301,7 @@ impl OpcuaHandler {
             session,
             state,
             task,
+            reconnected,
         })
     }
 
@@ -315,140 +326,6 @@ impl OpcuaHandler {
         tokio::time::timeout(CONNECT_WAIT, wait)
             .await
             .unwrap_or(Err(ConnectError::ConnectionFailed))
-    }
-
-    /// Delete every subscription the session has. After a reconnect
-    /// async-opcua may have recreated them with new ids, so ask the
-    /// session rather than remembering ids.
-    async fn unsubscribe(session: &Session) {
-        let ids = session
-            .subscription_state()
-            .lock()
-            .subscription_ids()
-            .unwrap_or_default();
-        if !ids.is_empty() {
-            match tokio::time::timeout(REQUEST_TIMEOUT, session.delete_subscriptions(&ids)).await {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => tracing::warn!("deleting subscriptions failed: {e}"),
-                Err(_) => tracing::warn!("deleting subscriptions timed out"),
-            }
-        }
-    }
-
-    /// Make one subscription per poll interval. Returns false if the
-    /// session refused one; monitored items the server refuses are
-    /// logged and left out.
-    async fn make_subscriptions(&self, session: &Session, plan: &Plan) -> bool {
-        for (interval, addrs) in plan {
-            // Client handles count from 1 in each subscription. They
-            // survive async-opcua recreating the subscription.
-            let by_handle: HashMap<u32, Addr> = addrs
-                .iter()
-                .enumerate()
-                .map(|(i, a)| (i as u32 + 1, a.clone()))
-                .collect();
-            let handle = self.handle.clone();
-            let callback = DataChangeCallback::new(move |dv: DataValue, item| {
-                let Some(addr) = by_handle.get(&item.client_handle()) else {
-                    return;
-                };
-                // The built-in passed on the value whatever its status,
-                // and nothing when there was no value.
-                let Some(v) = dv.value else {
-                    return;
-                };
-                // async-opcua calls this for each value of a
-                // notification in one synchronous loop, and `publish`
-                // only queues, so a notification's values reach the
-                // agent back to back and it can put them in one DDATA.
-                // Don't add an await here (publish_wait would).
-                if let Some(p) = value::packet(&v, now_ms()) {
-                    handle.publish(addr.clone(), p.into());
-                }
-            });
-
-            let sub = tokio::time::timeout(
-                REQUEST_TIMEOUT,
-                session.create_subscription(
-                    Duration::from_millis(*interval),
-                    LIFETIME_COUNT,
-                    MAX_KEEP_ALIVE_COUNT,
-                    MAX_NOTIFICATIONS_PER_PUBLISH,
-                    0,
-                    true,
-                    callback,
-                ),
-            )
-            .await;
-            let sub = match sub {
-                Ok(Ok(id)) => id,
-                Ok(Err(e)) => {
-                    tracing::error!("CreateSubscription at {interval} ms failed: {e}");
-                    return false;
-                }
-                Err(_) => {
-                    tracing::error!("CreateSubscription at {interval} ms timed out");
-                    return false;
-                }
-            };
-
-            let items: Vec<(u32, &Addr)> = addrs
-                .iter()
-                .enumerate()
-                .map(|(i, a)| (i as u32 + 1, a))
-                .collect();
-            let mut created = 0;
-            for chunk in items.chunks(ITEMS_PER_REQUEST) {
-                let requests = chunk
-                    .iter()
-                    .map(|(h, a)| MonitoredItemCreateRequest {
-                        item_to_monitor: ReadValueId {
-                            node_id: a.node.clone().expect("planned addresses have a node"),
-                            attribute_id: AttributeId::Value as u32,
-                            ..Default::default()
-                        },
-                        monitoring_mode: MonitoringMode::Reporting,
-                        requested_parameters: MonitoringParameters {
-                            client_handle: *h,
-                            sampling_interval: *interval as f64,
-                            filter: Default::default(),
-                            queue_size: QUEUE_SIZE,
-                            discard_oldest: false,
-                        },
-                    })
-                    .collect();
-                let result = tokio::time::timeout(
-                    REQUEST_TIMEOUT,
-                    session.create_monitored_items(sub, TimestampsToReturn::Both, requests),
-                )
-                .await;
-                match result {
-                    Ok(Ok(results)) => {
-                        for ((_, addr), r) in chunk.iter().zip(results.iter()) {
-                            let status = r.result.status_code;
-                            if status.is_good() {
-                                created += 1;
-                            } else {
-                                tracing::error!(addr = %addr.raw, "can't monitor: {status}");
-                            }
-                        }
-                    }
-                    Ok(Err(e)) => {
-                        tracing::error!("CreateMonitoredItems failed: {e}");
-                        return false;
-                    }
-                    Err(_) => {
-                        tracing::error!("CreateMonitoredItems timed out");
-                        return false;
-                    }
-                }
-            }
-            tracing::info!(
-                "subscribed to {created} of {} addresses every {interval} ms",
-                addrs.len()
-            );
-        }
-        true
     }
 }
 
@@ -476,7 +353,8 @@ impl Handler for OpcuaHandler {
             handle,
             config,
             conn: None,
-            subscribed: None,
+            subs: None,
+            dropped: Arc::default(),
         })
     }
 
@@ -505,7 +383,7 @@ impl Handler for OpcuaHandler {
     }
 
     async fn close(&mut self) {
-        self.subscribed = None;
+        self.subs = None;
         if let Some(conn) = self.conn.take() {
             conn.session.disable_reconnects();
             let _ = tokio::time::timeout(REQUEST_TIMEOUT, conn.session.disconnect()).await;
@@ -513,28 +391,37 @@ impl Handler for OpcuaHandler {
         }
     }
 
+    /// Make the subscriptions for the address map. They are kept when
+    /// the map is the same, unless the session has reconnected since
+    /// or no longer holds every item made: then they are made again,
+    /// so the server sends every item's current value. A request the
+    /// server refuses doesn't take the connection down: what it refused
+    /// is retried (see `subs.rs`).
     async fn subscribe_groups(&mut self, addrs: &[Addr], groups: &[AddrGroup<Addr>]) -> bool {
         let plan = plan(addrs, groups);
-        if self.subscribed.as_ref() == Some(&plan) {
-            // async-opcua carries the subscriptions over a reconnect.
-            return true;
-        }
-        let Some(session) = self.conn.as_ref().map(|c| c.session.clone()) else {
+        let Some(conn) = self.conn.as_ref() else {
             return false;
         };
-
-        Self::unsubscribe(&session).await;
-        self.subscribed = None;
-        if self.make_subscriptions(&session, &plan).await {
-            self.subscribed = Some(plan);
-            true
-        } else {
-            // Leave nothing half made, and have the library connect
-            // and subscribe again.
-            Self::unsubscribe(&session).await;
-            self.handle.error();
-            false
+        let session = conn.session.clone();
+        let reconnected = conn.reconnected.swap(false, Ordering::SeqCst);
+        if let Some(subs) = &self.subs
+            && subs.plan == plan
+            && !reconnected
+        {
+            if subs.intact(&session) {
+                return true;
+            }
+            tracing::warn!("the session has lost monitored items; making the subscriptions again");
         }
+
+        self.subs = None;
+        subs::delete_all(&session).await;
+        let sink = Sink {
+            handle: self.handle.clone(),
+            dropped: self.dropped.clone(),
+        };
+        self.subs = Some(subs::make(session, plan, sink).await);
+        true
     }
 
     async fn write(&mut self, addr: &Addr, value: WriteValue) -> Result<(), WriteError> {

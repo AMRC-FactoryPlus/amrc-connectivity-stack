@@ -34,7 +34,7 @@ import { DumpLoader } from "../lib/dumps.js";
 import { MigrateSplitDrivers } from "../lib/split-drivers.js";
 import { ACS, Edge } from "../lib/uuids.js";
 
-import { FakeCDB } from "./fake-cdb.js";
+import { FakeCDB, jsonb } from "./fake-cdb.js";
 
 const { App } = UUIDs;
 const { Driver } = ACS;

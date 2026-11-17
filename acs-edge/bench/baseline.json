@@ -1,0 +1,1192 @@
+{
+  "version": 1,
+  "date": "2026-11-17T10:56:36.537Z",
+  "git": {
+    "commit": "e5672d2c",
+    "branch": "acs-14-edge-agent-benchmark-ba7fa0"
+  },
+  "machine": {
+    "cpu": "Apple M3 Max",
+    "cores": 14,
+    "platform": "darwin 27.2.0 arm64",
+    "node": "v18.20.8"
+  },
+  "settings": {
+    "rounds": 7,
+    "round_ms": 500,
+    "warmup_ms": 500,
+    "gc_between_rounds": true
+  },
+  "results": [
+    {
+      "case": "json-value-1",
+      "description": "JSON {value, timestamp}, 1 metric, no path",
+      "payloadFormat": "JSON",
+      "metrics": 1,
+      "payload_bytes": 40,
+      "mode": "inproc",
+      "cpu_us_per_metric": 6.0418400000000005,
+      "msgs_per_round": 50000,
+      "cpu_us_per_msg": 6.0418400000000005,
+      "msgs_per_s": 187117.78269169867,
+      "ddata_bytes_per_msg": 39.4999,
+      "spread_pct": 33.325609416998795,
+      "rounds": [
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 5.553439999999999,
+          "msgs_per_s": 204613.34925399796,
+          "wall_us_per_msg": 4.88726666,
+          "ddata_bytes_per_msg": 39.49926
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 5.87728,
+          "msgs_per_s": 193702.06781799946,
+          "wall_us_per_msg": 5.162567500000001,
+          "ddata_bytes_per_msg": 39.5008
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 7.56692,
+          "msgs_per_s": 138809.66789792507,
+          "wall_us_per_msg": 7.20410916,
+          "ddata_bytes_per_msg": 39.49946
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 7.0276000000000005,
+          "msgs_per_s": 127854.19826354105,
+          "wall_us_per_msg": 7.821409179999999,
+          "ddata_bytes_per_msg": 39.4999
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 6.018700000000001,
+          "msgs_per_s": 188567.08344706285,
+          "wall_us_per_msg": 5.3031525,
+          "ddata_bytes_per_msg": 39.50074
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 6.072100000000001,
+          "msgs_per_s": 187090.7971133252,
+          "wall_us_per_msg": 5.34499834,
+          "ddata_bytes_per_msg": 39.4992
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 6.0418400000000005,
+          "msgs_per_s": 187117.78269169867,
+          "wall_us_per_msg": 5.3442275,
+          "ddata_bytes_per_msg": 39.50054
+        }
+      ]
+    },
+    {
+      "case": "json-value-1",
+      "description": "JSON {value, timestamp}, 1 metric, no path",
+      "payloadFormat": "JSON",
+      "metrics": 1,
+      "payload_bytes": 40,
+      "mode": "driver",
+      "cpu_us_per_metric": 9.788680000000001,
+      "msgs_per_round": 50000,
+      "cpu_us_per_msg": 9.788680000000001,
+      "msgs_per_s": 98455.70590916753,
+      "ddata_bytes_per_msg": 39.49978,
+      "spread_pct": 27.235745779819148,
+      "rounds": [
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 8.84784,
+          "msgs_per_s": 105714.05616376376,
+          "wall_us_per_msg": 9.45948,
+          "ddata_bytes_per_msg": 39.49978
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 9.46256,
+          "msgs_per_s": 100313.42085714078,
+          "wall_us_per_msg": 9.96875584,
+          "ddata_bytes_per_msg": 39.49958
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 10.3903,
+          "msgs_per_s": 86689.28640970099,
+          "wall_us_per_msg": 11.53545082,
+          "ddata_bytes_per_msg": 39.5008
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 11.513860000000001,
+          "msgs_per_s": 76693.99785103419,
+          "wall_us_per_msg": 13.038829999999999,
+          "ddata_bytes_per_msg": 39.4992
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 9.788680000000001,
+          "msgs_per_s": 98779.08224599657,
+          "wall_us_per_msg": 10.12360084,
+          "ddata_bytes_per_msg": 39.50022
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 9.749319999999999,
+          "msgs_per_s": 98455.70590916753,
+          "wall_us_per_msg": 10.15685166,
+          "ddata_bytes_per_msg": 39.50042
+        },
+        {
+          "count": 50000,
+          "cpu_us_per_msg": 9.90416,
+          "msgs_per_s": 94710.11646563637,
+          "wall_us_per_msg": 10.558534159999999,
+          "ddata_bytes_per_msg": 39.4992
+        }
+      ]
+    },
+    {
+      "case": "json-10",
+      "description": "JSON, 10 metrics on one address",
+      "payloadFormat": "JSON",
+      "metrics": 10,
+      "payload_bytes": 186,
+      "mode": "inproc",
+      "cpu_us_per_metric": 8.332319836281245,
+      "msgs_per_round": 6841,
+      "cpu_us_per_msg": 83.32319836281245,
+      "msgs_per_s": 13345.055133492748,
+      "ddata_bytes_per_msg": 258.87633386931736,
+      "spread_pct": 22.475412884595816,
+      "rounds": [
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 76.0400526238854,
+          "msgs_per_s": 14723.366548532293,
+          "wall_us_per_msg": 67.91924908639088,
+          "ddata_bytes_per_msg": 258.86975588364277
+        },
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 80.98801344832627,
+          "msgs_per_s": 13741.958473468769,
+          "wall_us_per_msg": 72.76983131121182,
+          "ddata_bytes_per_msg": 258.87721093407396
+        },
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 82.02938166934658,
+          "msgs_per_s": 13539.14284448612,
+          "wall_us_per_msg": 73.85991945621984,
+          "ddata_bytes_per_msg": 258.87633386931736
+        },
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 94.76728548457828,
+          "msgs_per_s": 11470.87025485113,
+          "wall_us_per_msg": 87.1773438093846,
+          "ddata_bytes_per_msg": 258.87019441602104
+        },
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 83.3462944014033,
+          "msgs_per_s": 12982.197869399488,
+          "wall_us_per_msg": 77.02855942113727,
+          "ddata_bytes_per_msg": 258.87969595088435
+        },
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 83.32319836281245,
+          "msgs_per_s": 13345.055133492748,
+          "wall_us_per_msg": 74.93412278906591,
+          "ddata_bytes_per_msg": 258.87019441602104
+        },
+        {
+          "count": 6841,
+          "cpu_us_per_msg": 85.3540418067534,
+          "msgs_per_s": 12688.265618752806,
+          "wall_us_per_msg": 78.81297807338107,
+          "ddata_bytes_per_msg": 258.87721093407396
+        }
+      ]
+    },
+    {
+      "case": "json-10",
+      "description": "JSON, 10 metrics on one address",
+      "payloadFormat": "JSON",
+      "metrics": 10,
+      "payload_bytes": 186,
+      "mode": "driver",
+      "cpu_us_per_metric": 9.3532722513089,
+      "msgs_per_round": 6112,
+      "cpu_us_per_msg": 93.532722513089,
+      "msgs_per_s": 12375.213776654904,
+      "ddata_bytes_per_msg": 258.87663612565444,
+      "spread_pct": 12.252655368812897,
+      "rounds": [
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 89.80677356020944,
+          "msgs_per_s": 12801.112557426457,
+          "wall_us_per_msg": 78.11821007853403,
+          "ddata_bytes_per_msg": 258.8723821989529
+        },
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 92.63301701570681,
+          "msgs_per_s": 12596.46377938982,
+          "wall_us_per_msg": 79.38735962041885,
+          "ddata_bytes_per_msg": 258.8776178010471
+        },
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 88.94911649214659,
+          "msgs_per_s": 13003.1601763991,
+          "wall_us_per_msg": 76.90438219895289,
+          "ddata_bytes_per_msg": 258.8723821989529
+        },
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 100.40935863874346,
+          "msgs_per_s": 11626.615762177498,
+          "wall_us_per_msg": 86.00955088350786,
+          "ddata_bytes_per_msg": 258.8774541884817
+        },
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 95.89479712041886,
+          "msgs_per_s": 12360.86463536242,
+          "wall_us_per_msg": 80.90048952879582,
+          "ddata_bytes_per_msg": 258.87663612565444
+        },
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 93.532722513089,
+          "msgs_per_s": 12375.213776654904,
+          "wall_us_per_msg": 80.80668488219895,
+          "ddata_bytes_per_msg": 258.8723821989529
+        },
+        {
+          "count": 6112,
+          "cpu_us_per_msg": 94.21956806282722,
+          "msgs_per_s": 12328.340913319882,
+          "wall_us_per_msg": 81.1139152486911,
+          "ddata_bytes_per_msg": 258.8776178010471
+        }
+      ]
+    },
+    {
+      "case": "json-100",
+      "description": "JSON, 100 metrics on one address",
+      "payloadFormat": "JSON",
+      "metrics": 100,
+      "payload_bytes": 1914,
+      "mode": "inproc",
+      "cpu_us_per_metric": 47.40207692307692,
+      "msgs_per_round": 130,
+      "cpu_us_per_msg": 4740.207692307692,
+      "msgs_per_s": 228.70625648905622,
+      "ddata_bytes_per_msg": 2503.653846153846,
+      "spread_pct": 38.857920863577874,
+      "rounds": [
+        {
+          "count": 130,
+          "cpu_us_per_msg": 4368.723076923077,
+          "msgs_per_s": 253.06931714598159,
+          "wall_us_per_msg": 3951.486538461538,
+          "ddata_bytes_per_msg": 2503.8230769230768
+        },
+        {
+          "count": 130,
+          "cpu_us_per_msg": 6190.323076923077,
+          "msgs_per_s": 117.73865256942533,
+          "wall_us_per_msg": 8493.3875,
+          "ddata_bytes_per_msg": 2503.7384615384617
+        },
+        {
+          "count": 130,
+          "cpu_us_per_msg": 4348.376923076923,
+          "msgs_per_s": 250.45392751464925,
+          "wall_us_per_msg": 3992.7503230769225,
+          "ddata_bytes_per_msg": 2503.653846153846
+        },
+        {
+          "count": 130,
+          "cpu_us_per_msg": 4746.830769230769,
+          "msgs_per_s": 228.70625648905622,
+          "wall_us_per_msg": 4372.4208307692315,
+          "ddata_bytes_per_msg": 2503.646153846154
+        },
+        {
+          "count": 130,
+          "cpu_us_per_msg": 4753.707692307692,
+          "msgs_per_s": 213.26128382882746,
+          "wall_us_per_msg": 4689.083653846154,
+          "ddata_bytes_per_msg": 2503.6384615384613
+        },
+        {
+          "count": 130,
+          "cpu_us_per_msg": 4740.207692307692,
+          "msgs_per_s": 220.21209646762196,
+          "wall_us_per_msg": 4541.076607692307,
+          "ddata_bytes_per_msg": 2503.630769230769
+        },
+        {
+          "count": 130,
+          "cpu_us_per_msg": 4474.015384615384,
+          "msgs_per_s": 242.73885959853467,
+          "wall_us_per_msg": 4119.653530769231,
+          "ddata_bytes_per_msg": 2503.7
+        }
+      ]
+    },
+    {
+      "case": "json-100",
+      "description": "JSON, 100 metrics on one address",
+      "payloadFormat": "JSON",
+      "metrics": 100,
+      "payload_bytes": 1914,
+      "mode": "driver",
+      "cpu_us_per_metric": 44.94992,
+      "msgs_per_round": 125,
+      "cpu_us_per_msg": 4494.992,
+      "msgs_per_s": 243.60992885859247,
+      "ddata_bytes_per_msg": 2597.816,
+      "spread_pct": 13.239089190815012,
+      "rounds": [
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4364.088,
+          "msgs_per_s": 253.40097917746783,
+          "wall_us_per_msg": 3946.314664,
+          "ddata_bytes_per_msg": 2597.608
+        },
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4494.992,
+          "msgs_per_s": 243.60992885859247,
+          "wall_us_per_msg": 4104.923,
+          "ddata_bytes_per_msg": 2597.856
+        },
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4457.936,
+          "msgs_per_s": 249.04716646108187,
+          "wall_us_per_msg": 4015.3036640000005,
+          "ddata_bytes_per_msg": 2597.864
+        },
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4959.183999999999,
+          "msgs_per_s": 210.61996407665893,
+          "wall_us_per_msg": 4747.888,
+          "ddata_bytes_per_msg": 2597.872
+        },
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4588.136,
+          "msgs_per_s": 242.18442618012642,
+          "wall_us_per_msg": 4129.084664,
+          "ddata_bytes_per_msg": 2597.72
+        },
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4591.424,
+          "msgs_per_s": 234.36042571102612,
+          "wall_us_per_msg": 4266.931999999999,
+          "ddata_bytes_per_msg": 2597.648
+        },
+        {
+          "count": 125,
+          "cpu_us_per_msg": 4487.344,
+          "msgs_per_s": 244.17808249014638,
+          "wall_us_per_msg": 4095.3716640000002,
+          "ddata_bytes_per_msg": 2597.816
+        }
+      ]
+    },
+    {
+      "case": "json-1000",
+      "description": "JSON, 1000 metrics on one address",
+      "payloadFormat": "JSON",
+      "metrics": 1000,
+      "payload_bytes": 20994,
+      "mode": "inproc",
+      "cpu_us_per_metric": 413.276,
+      "msgs_per_round": 3,
+      "cpu_us_per_msg": 413276,
+      "msgs_per_s": 2.505359469152009,
+      "ddata_bytes_per_msg": 25890,
+      "spread_pct": 20.034956461702773,
+      "rounds": [
+        {
+          "count": 3,
+          "cpu_us_per_msg": 398318,
+          "msgs_per_s": 2.592325210889177,
+          "wall_us_per_msg": 385754.0696666666,
+          "ddata_bytes_per_msg": 25890
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 481117.66666666674,
+          "msgs_per_s": 1.9281902314227026,
+          "wall_us_per_msg": 518621.028,
+          "ddata_bytes_per_msg": 25890
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 402551.00000000006,
+          "msgs_per_s": 2.577355198972221,
+          "wall_us_per_msg": 387994.63899999997,
+          "ddata_bytes_per_msg": 25956.666666666668
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 413276,
+          "msgs_per_s": 2.505359469152009,
+          "wall_us_per_msg": 399144.31933333335,
+          "ddata_bytes_per_msg": 25990
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 423860.6666666667,
+          "msgs_per_s": 2.181407218976428,
+          "wall_us_per_msg": 458419.6803333334,
+          "ddata_bytes_per_msg": 25923.333333333332
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 409778.3333333334,
+          "msgs_per_s": 2.5255341138027325,
+          "wall_us_per_msg": 395955.84733333334,
+          "ddata_bytes_per_msg": 25890
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 413599.6666666666,
+          "msgs_per_s": 2.4753836851519293,
+          "wall_us_per_msg": 403977.77766666666,
+          "ddata_bytes_per_msg": 25890
+        }
+      ]
+    },
+    {
+      "case": "json-1000",
+      "description": "JSON, 1000 metrics on one address",
+      "payloadFormat": "JSON",
+      "metrics": 1000,
+      "payload_bytes": 20994,
+      "mode": "driver",
+      "cpu_us_per_metric": 402.8453333333333,
+      "msgs_per_round": 3,
+      "cpu_us_per_msg": 402845.3333333333,
+      "msgs_per_s": 2.566814631922491,
+      "ddata_bytes_per_msg": 25999,
+      "spread_pct": 5.129098347091036,
+      "rounds": [
+        {
+          "count": 3,
+          "cpu_us_per_msg": 401944.6666666667,
+          "msgs_per_s": 2.567531882575347,
+          "wall_us_per_msg": 389479.0973333333,
+          "ddata_bytes_per_msg": 25999
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 408086,
+          "msgs_per_s": 2.5245561302690755,
+          "wall_us_per_msg": 396109.23600000003,
+          "ddata_bytes_per_msg": 25999
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 391720,
+          "msgs_per_s": 2.6397466290937097,
+          "wall_us_per_msg": 378824.23600000003,
+          "ddata_bytes_per_msg": 26065.666666666668
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 412382.3333333334,
+          "msgs_per_s": 2.476439685268884,
+          "wall_us_per_msg": 403805.514,
+          "ddata_bytes_per_msg": 26099
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 402845.3333333333,
+          "msgs_per_s": 2.566814631922491,
+          "wall_us_per_msg": 389587.9303333333,
+          "ddata_bytes_per_msg": 26032.333333333332
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 405597.99999999994,
+          "msgs_per_s": 2.543043932461415,
+          "wall_us_per_msg": 393229.5416666667,
+          "ddata_bytes_per_msg": 25999
+        },
+        {
+          "count": 3,
+          "cpu_us_per_msg": 395362.99999999994,
+          "msgs_per_s": 2.596760995091797,
+          "wall_us_per_msg": 385095.12500000006,
+          "ddata_bytes_per_msg": 25999
+        }
+      ]
+    },
+    {
+      "case": "json-ts-100",
+      "description": "JSON, 100 metrics on one address, payload timestamps",
+      "payloadFormat": "JSON",
+      "metrics": 100,
+      "payload_bytes": 1976,
+      "mode": "inproc",
+      "cpu_us_per_metric": 46.265806451612896,
+      "msgs_per_round": 124,
+      "cpu_us_per_msg": 4626.58064516129,
+      "msgs_per_s": 238.0172399188403,
+      "ddata_bytes_per_msg": 2503.6048387096776,
+      "spread_pct": 10.084086345381516,
+      "rounds": [
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4608.2338709677415,
+          "msgs_per_s": 239.9887553655752,
+          "wall_us_per_msg": 4166.861895161291,
+          "ddata_bytes_per_msg": 2503.6048387096776
+        },
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4521.66935483871,
+          "msgs_per_s": 242.4232945325727,
+          "wall_us_per_msg": 4125.0161290322585,
+          "ddata_bytes_per_msg": 2503.798387096774
+        },
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4637.669354838709,
+          "msgs_per_s": 237.4476675154661,
+          "wall_us_per_msg": 4211.454298387097,
+          "ddata_bytes_per_msg": 2503.75
+        },
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4626.58064516129,
+          "msgs_per_s": 238.0172399188403,
+          "wall_us_per_msg": 4201.376338709677,
+          "ddata_bytes_per_msg": 2503.4596774193546
+        },
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4964.604838709677,
+          "msgs_per_s": 202.26860289135007,
+          "wall_us_per_msg": 4943.921032258065,
+          "ddata_bytes_per_msg": 2503.4112903225805
+        },
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4681.112903225807,
+          "msgs_per_s": 233.88130635739054,
+          "wall_us_per_msg": 4275.673056451612,
+          "ddata_bytes_per_msg": 2503.6048387096776
+        },
+        {
+          "count": 124,
+          "cpu_us_per_msg": 4498.056451612903,
+          "msgs_per_s": 244.1711117755016,
+          "wall_us_per_msg": 4095.4885806451607,
+          "ddata_bytes_per_msg": 2503.5564516129034
+        }
+      ]
+    },
+    {
+      "case": "json-ts-100",
+      "description": "JSON, 100 metrics on one address, payload timestamps",
+      "payloadFormat": "JSON",
+      "metrics": 100,
+      "payload_bytes": 1976,
+      "mode": "driver",
+      "cpu_us_per_metric": 45.85484126984127,
+      "msgs_per_round": 126,
+      "cpu_us_per_msg": 4585.484126984127,
+      "msgs_per_s": 242.28948145751292,
+      "ddata_bytes_per_msg": 2598.0079365079364,
+      "spread_pct": 21.425270565673955,
+      "rounds": [
+        {
+          "count": 126,
+          "cpu_us_per_msg": 4447.642857142857,
+          "msgs_per_s": 249.1608948232282,
+          "wall_us_per_msg": 4013.4708968253967,
+          "ddata_bytes_per_msg": 2597.7063492063494
+        },
+        {
+          "count": 126,
+          "cpu_us_per_msg": 5430.0952380952385,
+          "msgs_per_s": 138.3602390008414,
+          "wall_us_per_msg": 7227.5099206349205,
+          "ddata_bytes_per_msg": 2597.8333333333335
+        },
+        {
+          "count": 126,
+          "cpu_us_per_msg": 4510.150793650793,
+          "msgs_per_s": 245.6810423171868,
+          "wall_us_per_msg": 4070.318126984127,
+          "ddata_bytes_per_msg": 2597.9603174603176
+        },
+        {
+          "count": 126,
+          "cpu_us_per_msg": 4630.3650793650795,
+          "msgs_per_s": 239.73980650649688,
+          "wall_us_per_msg": 4171.188817460317,
+          "ddata_bytes_per_msg": 2598.0079365079364
+        },
+        {
+          "count": 126,
+          "cpu_us_per_msg": 4585.484126984127,
+          "msgs_per_s": 242.28948145751292,
+          "wall_us_per_msg": 4127.294317460318,
+          "ddata_bytes_per_msg": 2598.0555555555557
+        },
+        {
+          "count": 126,
+          "cpu_us_per_msg": 4594.103174603174,
+          "msgs_per_s": 238.99906826023556,
+          "wall_us_per_msg": 4184.11673015873,
+          "ddata_bytes_per_msg": 2598.1031746031745
+        },
+        {
+          "count": 126,
+          "cpu_us_per_msg": 4536.642857142857,
+          "msgs_per_s": 242.46840502939975,
+          "wall_us_per_msg": 4124.248682539683,
+          "ddata_bytes_per_msg": 2598.0714285714284
+        }
+      ]
+    },
+    {
+      "case": "json-batched-100x10",
+      "description": "JSON (Batched), 100 metrics x 10 rows",
+      "payloadFormat": "JSON (Batched)",
+      "metrics": 100,
+      "payload_bytes": 13841,
+      "mode": "inproc",
+      "cpu_us_per_metric": 81.49370370370372,
+      "msgs_per_round": 81,
+      "cpu_us_per_msg": 8149.370370370371,
+      "msgs_per_s": 152.05444791200964,
+      "ddata_bytes_per_msg": 23025.83950617284,
+      "spread_pct": 30.00701409940025,
+      "rounds": [
+        {
+          "count": 81,
+          "cpu_us_per_msg": 7779.913580246914,
+          "msgs_per_s": 159.17062280173212,
+          "wall_us_per_msg": 6282.566358024691,
+          "ddata_bytes_per_msg": 23027.14814814815
+        },
+        {
+          "count": 81,
+          "cpu_us_per_msg": 10225.296296296297,
+          "msgs_per_s": 80.40572466603378,
+          "wall_us_per_msg": 12436.925407407407,
+          "ddata_bytes_per_msg": 23026.938271604937
+        },
+        {
+          "count": 81,
+          "cpu_us_per_msg": 8025.3209876543215,
+          "msgs_per_s": 155.55045055620087,
+          "wall_us_per_msg": 6428.782407407407,
+          "ddata_bytes_per_msg": 23026.320987654322
+        },
+        {
+          "count": 81,
+          "cpu_us_per_msg": 7923.938271604939,
+          "msgs_per_s": 158.28614546499114,
+          "wall_us_per_msg": 6317.672320987654,
+          "ddata_bytes_per_msg": 23024.604938271605
+        },
+        {
+          "count": 81,
+          "cpu_us_per_msg": 8592.493827160495,
+          "msgs_per_s": 142.65336290562203,
+          "wall_us_per_msg": 7009.999481481482,
+          "ddata_bytes_per_msg": 23025.20987654321
+        },
+        {
+          "count": 81,
+          "cpu_us_per_msg": 8149.370370370371,
+          "msgs_per_s": 152.05444791200964,
+          "wall_us_per_msg": 6576.591567901234,
+          "ddata_bytes_per_msg": 23025.024691358023
+        },
+        {
+          "count": 81,
+          "cpu_us_per_msg": 8163.777777777778,
+          "msgs_per_s": 151.01878249496545,
+          "wall_us_per_msg": 6621.692901234568,
+          "ddata_bytes_per_msg": 23025.83950617284
+        }
+      ]
+    },
+    {
+      "case": "json-batched-100x10",
+      "description": "JSON (Batched), 100 metrics x 10 rows",
+      "payloadFormat": "JSON (Batched)",
+      "metrics": 100,
+      "payload_bytes": 13841,
+      "mode": "driver",
+      "cpu_us_per_metric": 70.28096385542167,
+      "msgs_per_round": 83,
+      "cpu_us_per_msg": 7028.096385542168,
+      "msgs_per_s": 161.0821875536308,
+      "ddata_bytes_per_msg": 23874.506024096387,
+      "spread_pct": 9.555621841421344,
+      "rounds": [
+        {
+          "count": 83,
+          "cpu_us_per_msg": 6763.590361445784,
+          "msgs_per_s": 167.866818689015,
+          "wall_us_per_msg": 5957.103421686747,
+          "ddata_bytes_per_msg": 23878.14457831325
+        },
+        {
+          "count": 83,
+          "cpu_us_per_msg": 7435.168674698795,
+          "msgs_per_s": 153.1522729888855,
+          "wall_us_per_msg": 6529.449289156626,
+          "ddata_bytes_per_msg": 23873.5421686747
+        },
+        {
+          "count": 83,
+          "cpu_us_per_msg": 6927.108433734939,
+          "msgs_per_s": 163.4139873765412,
+          "wall_us_per_msg": 6119.427204819276,
+          "ddata_bytes_per_msg": 23874.32530120482
+        },
+        {
+          "count": 83,
+          "cpu_us_per_msg": 7144.0722891566265,
+          "msgs_per_s": 158.2936705179231,
+          "wall_us_per_msg": 6317.371987951807,
+          "ddata_bytes_per_msg": 23874.506024096387
+        },
+        {
+          "count": 83,
+          "cpu_us_per_msg": 7028.096385542168,
+          "msgs_per_s": 161.13936511913312,
+          "wall_us_per_msg": 6205.8082409638555,
+          "ddata_bytes_per_msg": 23877.939759036144
+        },
+        {
+          "count": 83,
+          "cpu_us_per_msg": 7000.518072289156,
+          "msgs_per_s": 161.0821875536308,
+          "wall_us_per_msg": 6208.011048192771,
+          "ddata_bytes_per_msg": 23878.397590361445
+        },
+        {
+          "count": 83,
+          "cpu_us_per_msg": 7115.626506024097,
+          "msgs_per_s": 160.28467578060912,
+          "wall_us_per_msg": 6238.899602409638,
+          "ddata_bytes_per_msg": 23874.36144578313
+        }
+      ]
+    },
+    {
+      "case": "xml-100",
+      "description": "XML, 100 metrics on one address (XPath)",
+      "payloadFormat": "XML",
+      "metrics": 100,
+      "payload_bytes": 2148,
+      "mode": "inproc",
+      "cpu_us_per_metric": 194.1928125,
+      "msgs_per_round": 32,
+      "cpu_us_per_msg": 19419.28125,
+      "msgs_per_s": 63.018063127383705,
+      "ddata_bytes_per_msg": 2503.75,
+      "spread_pct": 4.532222324139829,
+      "rounds": [
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19246.875,
+          "msgs_per_s": 65.2366863838979,
+          "wall_us_per_msg": 15328.798187499999,
+          "ddata_bytes_per_msg": 2502.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19419.28125,
+          "msgs_per_s": 63.02818939907099,
+          "wall_us_per_msg": 15865.91665625,
+          "ddata_bytes_per_msg": 2503.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19759.75,
+          "msgs_per_s": 60.72605586751216,
+          "wall_us_per_msg": 16467.39584375,
+          "ddata_bytes_per_msg": 2503.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19021.1875,
+          "msgs_per_s": 63.02334300922184,
+          "wall_us_per_msg": 15867.136718750002,
+          "ddata_bytes_per_msg": 2502.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19578.6875,
+          "msgs_per_s": 61.356466930198835,
+          "wall_us_per_msg": 16298.200499999999,
+          "ddata_bytes_per_msg": 2502.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19420.8125,
+          "msgs_per_s": 61.859028107679165,
+          "wall_us_per_msg": 16165.789062500002,
+          "ddata_bytes_per_msg": 2503.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 18879.625,
+          "msgs_per_s": 63.018063127383705,
+          "wall_us_per_msg": 15868.466125,
+          "ddata_bytes_per_msg": 2503.75
+        }
+      ]
+    },
+    {
+      "case": "xml-100",
+      "description": "XML, 100 metrics on one address (XPath)",
+      "payloadFormat": "XML",
+      "metrics": 100,
+      "payload_bytes": 2148,
+      "mode": "driver",
+      "cpu_us_per_metric": 186.1621875,
+      "msgs_per_round": 32,
+      "cpu_us_per_msg": 18616.21875,
+      "msgs_per_s": 64.0641335790999,
+      "ddata_bytes_per_msg": 2598.65625,
+      "spread_pct": 7.615839011345954,
+      "rounds": [
+        {
+          "count": 32,
+          "cpu_us_per_msg": 17853.03125,
+          "msgs_per_s": 66.93882640761888,
+          "wall_us_per_msg": 14939.01303125,
+          "ddata_bytes_per_msg": 2598.65625
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 18232.25,
+          "msgs_per_s": 65.33676859361826,
+          "wall_us_per_msg": 15305.3176875,
+          "ddata_bytes_per_msg": 2598.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 19270.8125,
+          "msgs_per_s": 57.051027910209704,
+          "wall_us_per_msg": 17528.16796875,
+          "ddata_bytes_per_msg": 2597.84375
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 18616.21875,
+          "msgs_per_s": 64.89758223550369,
+          "wall_us_per_msg": 15408.89453125,
+          "ddata_bytes_per_msg": 2597.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 18760.03125,
+          "msgs_per_s": 63.650864315882174,
+          "wall_us_per_msg": 15710.705750000001,
+          "ddata_bytes_per_msg": 2598.65625
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 18515.3125,
+          "msgs_per_s": 64.0641335790999,
+          "wall_us_per_msg": 15609.3580625,
+          "ddata_bytes_per_msg": 2598.75
+        },
+        {
+          "count": 32,
+          "cpu_us_per_msg": 18923.875,
+          "msgs_per_s": 63.50238477153439,
+          "wall_us_per_msg": 15747.44009375,
+          "ddata_bytes_per_msg": 2597.84375
+        }
+      ]
+    },
+    {
+      "case": "delimited-100",
+      "description": "Delimited String, 100 fields",
+      "payloadFormat": "Delimited String",
+      "metrics": 100,
+      "payload_bytes": 540,
+      "mode": "inproc",
+      "cpu_us_per_metric": 4.996881959910913,
+      "msgs_per_round": 1347,
+      "cpu_us_per_msg": 499.6881959910913,
+      "msgs_per_s": 2457.057919394546,
+      "ddata_bytes_per_msg": 2503.244246473645,
+      "spread_pct": 53.4281214714447,
+      "rounds": [
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 481.913140311804,
+          "msgs_per_s": 2504.0805172497126,
+          "wall_us_per_msg": 399.34818114328135,
+          "ddata_bytes_per_msg": 2503.2412769116554
+        },
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 742.4743875278397,
+          "msgs_per_s": 1196.828094215093,
+          "wall_us_per_msg": 835.541883444692,
+          "ddata_bytes_per_msg": 2503.2242019302153
+        },
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 558.8812175204157,
+          "msgs_per_s": 1992.7466418857157,
+          "wall_us_per_msg": 501.8199398663697,
+          "ddata_bytes_per_msg": 2503.2665181885673
+        },
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 475.50037119524876,
+          "msgs_per_s": 2519.2528663556946,
+          "wall_us_per_msg": 396.94308314773576,
+          "ddata_bytes_per_msg": 2503.244246473645
+        },
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 499.6881959910913,
+          "msgs_per_s": 2388.7782412443034,
+          "wall_us_per_msg": 418.6240408314774,
+          "ddata_bytes_per_msg": 2503.2316258351893
+        },
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 480.66740905716404,
+          "msgs_per_s": 2472.8994998882954,
+          "wall_us_per_msg": 404.3835991091314,
+          "ddata_bytes_per_msg": 2503.2761692650333
+        },
+        {
+          "count": 1347,
+          "cpu_us_per_msg": 504.61692650334066,
+          "msgs_per_s": 2457.057919394546,
+          "wall_us_per_msg": 406.99081291759467,
+          "ddata_bytes_per_msg": 2503.2739420935413
+        }
+      ]
+    },
+    {
+      "case": "delimited-100",
+      "description": "Delimited String, 100 fields",
+      "payloadFormat": "Delimited String",
+      "metrics": 100,
+      "payload_bytes": 540,
+      "mode": "driver",
+      "cpu_us_per_metric": 4.927233877233877,
+      "msgs_per_round": 1287,
+      "cpu_us_per_msg": 492.7233877233877,
+      "msgs_per_s": 2558.077675267348,
+      "ddata_bytes_per_msg": 2598.2501942501945,
+      "spread_pct": 24.822632404771866,
+      "rounds": [
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 485.3356643356644,
+          "msgs_per_s": 2636.5245198572857,
+          "wall_us_per_msg": 379.2871989121989,
+          "ddata_bytes_per_msg": 2598.2501942501945
+        },
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 586.1002331002331,
+          "msgs_per_s": 1805.2024748689132,
+          "wall_us_per_msg": 553.9544809634809,
+          "ddata_bytes_per_msg": 2598.2400932400933
+        },
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 511.988344988345,
+          "msgs_per_s": 2412.7700573968564,
+          "wall_us_per_msg": 414.46137684537683,
+          "ddata_bytes_per_msg": 2598.271173271173
+        },
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 463.7933177933178,
+          "msgs_per_s": 2667.2561682749574,
+          "wall_us_per_msg": 374.9171196581197,
+          "ddata_bytes_per_msg": 2598.226884226884
+        },
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 494.9401709401709,
+          "msgs_per_s": 2567.9872735100075,
+          "wall_us_per_msg": 389.41002952602946,
+          "ddata_bytes_per_msg": 2598.2735042735044
+        },
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 492.7233877233877,
+          "msgs_per_s": 2558.077675267348,
+          "wall_us_per_msg": 390.91854390054385,
+          "ddata_bytes_per_msg": 2598.2323232323233
+        },
+        {
+          "count": 1287,
+          "cpu_us_per_msg": 490.3574203574204,
+          "msgs_per_s": 2557.3537598563707,
+          "wall_us_per_msg": 391.02920202020204,
+          "ddata_bytes_per_msg": 2598.261072261072
+        }
+      ]
+    },
+    {
+      "case": "buffer-100",
+      "description": "Buffer, 100 metrics in 400 bytes",
+      "payloadFormat": "Buffer",
+      "metrics": 100,
+      "payload_bytes": 400,
+      "mode": "inproc",
+      "cpu_us_per_metric": 2.18990792990793,
+      "msgs_per_round": 3367,
+      "cpu_us_per_msg": 218.990792990793,
+      "msgs_per_s": 5845.410415075892,
+      "ddata_bytes_per_msg": 2131.4950994950996,
+      "spread_pct": 26.57532054324857,
+      "rounds": [
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 212.5785565785566,
+          "msgs_per_s": 6025.1909996731165,
+          "wall_us_per_msg": 165.9698422928423,
+          "ddata_bytes_per_msg": 2131.4950994950996
+        },
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 269.06444906444904,
+          "msgs_per_s": 4297.062925712175,
+          "wall_us_per_msg": 232.71709474309475,
+          "ddata_bytes_per_msg": 2131.4942084942086
+        },
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 253.18770418770418,
+          "msgs_per_s": 4002.4751487007484,
+          "wall_us_per_msg": 249.84539887139886,
+          "ddata_bytes_per_msg": 2131.5057915057914
+        },
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 210.86694386694387,
+          "msgs_per_s": 6037.494959601727,
+          "wall_us_per_msg": 165.63160825660825,
+          "ddata_bytes_per_msg": 2131.5057915057914
+        },
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 219.23789723789724,
+          "msgs_per_s": 5908.472634817742,
+          "wall_us_per_msg": 169.24847787347787,
+          "ddata_bytes_per_msg": 2131.4942084942086
+        },
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 218.990792990793,
+          "msgs_per_s": 5845.410415075892,
+          "wall_us_per_msg": 171.07438639738643,
+          "ddata_bytes_per_msg": 2131.4948024948026
+        },
+        {
+          "count": 3367,
+          "cpu_us_per_msg": 218.3008613008613,
+          "msgs_per_s": 5811.03938944619,
+          "wall_us_per_msg": 172.08625393525392,
+          "ddata_bytes_per_msg": 2131.5057915057914
+        }
+      ]
+    },
+    {
+      "case": "buffer-100",
+      "description": "Buffer, 100 metrics in 400 bytes",
+      "payloadFormat": "Buffer",
+      "metrics": 100,
+      "payload_bytes": 400,
+      "mode": "driver",
+      "cpu_us_per_metric": 2.2811938076808573,
+      "msgs_per_round": 3359,
+      "cpu_us_per_msg": 228.11938076808573,
+      "msgs_per_s": 6128.464679568097,
+      "ddata_bytes_per_msg": 2226.498362607919,
+      "spread_pct": 17.951120582888432,
+      "rounds": [
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 219.2363798749628,
+          "msgs_per_s": 6293.972457261735,
+          "wall_us_per_msg": 158.8821696933611,
+          "ddata_bytes_per_msg": 2226.4953855314084
+        },
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 260.1863649895803,
+          "msgs_per_s": 5529.540467827504,
+          "wall_us_per_msg": 180.84685442095864,
+          "ddata_bytes_per_msg": 2226.4980649002678
+        },
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 234.82822268532303,
+          "msgs_per_s": 5749.673518166377,
+          "wall_us_per_msg": 173.92291872581123,
+          "ddata_bytes_per_msg": 2226.5046144685916
+        },
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 228.11938076808573,
+          "msgs_per_s": 6161.522128926044,
+          "wall_us_per_msg": 162.29755879726108,
+          "ddata_bytes_per_msg": 2226.498362607919
+        },
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 223.56623995236677,
+          "msgs_per_s": 6241.073293371774,
+          "wall_us_per_msg": 160.22885055075915,
+          "ddata_bytes_per_msg": 2226.4953855314084
+        },
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 225.4965763620125,
+          "msgs_per_s": 6128.464679568097,
+          "wall_us_per_msg": 163.17300535873773,
+          "ddata_bytes_per_msg": 2226.5046144685916
+        },
+        {
+          "count": 3359,
+          "cpu_us_per_msg": 237.05448050014886,
+          "msgs_per_s": 5477.407762295936,
+          "wall_us_per_msg": 182.5681131289074,
+          "ddata_bytes_per_msg": 2226.5046144685916
+        }
+      ]
+    }
+  ]
+}

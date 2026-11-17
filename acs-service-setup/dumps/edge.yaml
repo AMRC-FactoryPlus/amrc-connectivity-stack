@@ -55,6 +55,7 @@ objects:
     !u ACS.Driver.REST:             { name: "REST" }
     !u ACS.Driver.OPCUA:            { name: "OPC-UA" }
     !u ACS.Driver.MQTT:             { name: "MQTT" }
+    !u ACS.Driver.UDP:              { name: "UDP" }
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
     !u ACS.Driver.Modbus:           { name: "Modbus" }
     !u ACS.Driver.Test:             { name: "Test" }
@@ -323,6 +324,33 @@ configs:
           - port
           - protocol
         title: MQTT Server Details
+        type: object
+    !u ACS.Driver.UDP:
+      polled: false
+      presentation:
+        address:
+          title: "Port"
+          description: "The UDP port to listen on (e.g. 50205)"
+          icon: "network-wired"
+          placeholder: "e.g. 50205"
+        path:
+          title: "Data Selector"
+          description: "Selector to extract specific values from the UDP message (e.g. data[0] for first byte)"
+          icon: "filter"
+          placeholder: "e.g. data[0]"
+      internal:
+        connType: UDP
+        details: UDPConnDetails
+      schema:
+        properties:
+          port:
+            enum:
+              - 50205
+            title: Port
+            type: number
+            options:
+              order: 1
+        title: UDP Server Details
         type: object
     !u ACS.Driver.Bacnet:
       polled: true

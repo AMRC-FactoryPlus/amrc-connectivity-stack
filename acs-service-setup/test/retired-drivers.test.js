@@ -55,6 +55,7 @@ const C = {
     s7:     "cccccccc-0000-4000-8000-000000000001",
     rest:   "cccccccc-0000-4000-8000-000000000002",
     udp:    "cccccccc-0000-4000-8000-000000000003",
+    mtc:    "cccccccc-0000-4000-8000-000000000005",
     ws:     "cccccccc-0000-4000-8000-000000000004",
 };
 
@@ -97,8 +98,11 @@ describe("check_retired_drivers", () => {
             assert.equal(defs[d], undefined);
             assert.equal(members[d], undefined);
         }
-        assert.ok(defs[Driver.REST], "REST must stay");
-        assert.ok(members[Driver.REST], "REST must stay a driver");
+        for (const d of [Driver.REST, Driver.UDP]) {
+            assert.ok(defs[d], `${d} must stay`);
+            assert.ok(members[d], `${d} must stay a driver`);
+        }
+        assert.equal(defs[Driver.UDP].internal.connType, "UDP");
     });
 
     test("a connection on a removed driver is warned about and keeps its DriverDef", async () => {
@@ -127,37 +131,55 @@ describe("check_retired_drivers", () => {
 
         const { res } = await run(cdb);
 
-        assert.deepEqual(res.removed.sort(), ["MTConnect", "UDP"]);
+        assert.deepEqual(res.removed, ["MTConnect"]);
         assert.ok(!cdb.app(App.DriverDefinition).has(Driver.MTConnect));
-        assert.ok(!cdb.app(App.DriverDefinition).has(Driver.UDP));
         assert.ok(!cdb.members.has(Driver.MTConnect));
-        assert.ok(!cdb.members.has(Driver.UDP));
     });
 
-    test("REST and the other kept drivers are never touched", async () => {
+    test("REST, UDP and the other kept drivers are never touched", async () => {
         const cdb = site();
         await run(cdb);
-        assert.ok(cdb.app(App.DriverDefinition).has(Driver.REST));
-        assert.ok(cdb.members.has(Driver.REST));
-        assert.ok(cdb.deleted.every(([, o]) => o != Driver.REST));
-        assert.ok(cdb.unclassed.every(o => o != Driver.REST));
+        for (const d of [Driver.REST, Driver.UDP]) {
+            assert.ok(cdb.app(App.DriverDefinition).has(d));
+            assert.ok(cdb.members.has(d));
+            assert.ok(cdb.deleted.every(([, o]) => o != d));
+            assert.ok(cdb.unclassed.every(o => o != d));
+        }
+    });
+
+    test("UDP is not retired: its connections get no warning", async () => {
+        assert.equal(Object.values(RetiredDrivers).includes(Driver.UDP), false);
+        assert.equal("UDP" in RetiredDrivers, false);
+
+        const cdb = site();
+        cdb.set(App.ConnectionConfiguration, C.udp,
+            { driver: Driver.UDP, name: "robot", edgeAgent: AGENT });
+        cdb.set(App.EdgeAgentConfig, AGENT, { deviceConnections: [
+            { uuid: C.udp, name: "robot", connType: "UDP" },
+        ] });
+
+        const { res, lines } = await run(cdb);
+
+        assert.deepEqual(warnings(lines), []);
+        assert.deepEqual(res.warned, []);
+        assert.ok(!res.removed.includes("UDP"));
     });
 
     test("a hand-written agent config naming a removed type is warned about", async () => {
         const cdb = site();
-        cdb.set(App.ConnectionConfiguration, C.udp,
-            { driver: Driver.UDP, name: "udp", edgeAgent: AGENT });
+        cdb.set(App.ConnectionConfiguration, C.mtc,
+            { driver: Driver.MTConnect, name: "mill", edgeAgent: AGENT });
         cdb.set(App.EdgeAgentConfig, AGENT, { deviceConnections: [
-            { uuid: C.udp, name: "udp", connType: "UDP" },
+            { uuid: C.mtc, name: "mill", connType: "MTConnect" },
             { uuid: C.ws, name: "socket", connType: "Websocket" },
             { uuid: C.rest, name: "api", connType: "REST" },
         ] });
 
         const { res, lines } = await run(cdb);
 
-        /* The UDP connection is warned about once, not twice. */
-        assert.deepEqual(warnings(lines).map(l => l[2]), [C.udp, C.ws]);
-        assert.deepEqual(res.warned, [C.udp, C.ws]);
+        /* The MTConnect connection is warned about once, not twice. */
+        assert.deepEqual(warnings(lines).map(l => l[2]), [C.mtc, C.ws]);
+        assert.deepEqual(res.warned, [C.mtc, C.ws]);
     });
 
     test("a second run after the moves finds nothing to do", async () => {

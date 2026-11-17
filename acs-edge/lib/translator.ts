@@ -27,6 +27,7 @@ import { serialisationType, sparkplugConfig, } from "./helpers/typeHandler.js";
 import { RestConnection } from "./devices/REST.js";
 import { OPCUAConnection } from "./devices/OPCUA.js";
 import { MQTTConnection } from "./devices/MQTT.js";
+import { UDPConnection } from "./devices/UDP.js";
 import { DriverConnection } from "./devices/driver.js";
 import { Scout, ScoutResult } from "./scout.js";
 
@@ -39,7 +40,7 @@ const DEFAULT_FILE_LIMIT = 10 * 1024 * 1024;
  * does. A config naming one of these is from before the upgrade, so it
  * gets a message saying what happened rather than a generic one. */
 export const RETIRED_CONN_TYPES = [
-    "MTConnect", "S7", "UDP", "EtherNet/IP", "Websocket",
+    "MTConnect", "S7", "EtherNet/IP", "Websocket",
 ];
 
 /* The error for a connection whose type the agent cannot run. It goes
@@ -499,7 +500,8 @@ export class Translator extends EventEmitter {
 
     /* Map each address to the indices (into confs) of the devices that
      * read it, in ascending order. Addresses come from the devices as
-     * currently registered in this.devices. */
+     * currently registered in this.devices. UDP data uses the
+     * address "". */
     buildRoutes (confs: deviceOptions[]): Map<string, number[]> {
         const routes = new Map<string, number[]>();
         confs.forEach((conf, i) => {
@@ -529,6 +531,10 @@ export class Translator extends EventEmitter {
             case "MQTT":
                 return {
                     connection: MQTTConnection, connectionDetails: 'MQTTConnDetails'
+                }
+            case "UDP":
+                return {
+                    connection: UDPConnection, connectionDetails: 'UDPConnDetails'
                 }
             case "Driver":
                 return {

@@ -1,0 +1,19 @@
+# A UDP driver opens its port on the node; the REST driver beside it
+# is rendered as it was before host ports.
+name: Agent-Four
+uuid: 44444444-4444-4444-8444-444444444444
+cluster: example-cluster
+directory_url: http://directory.example
+hostname: node-a
+drivers:
+  robot-udp:
+    image:
+      repository: edge-udp
+    hostPorts:
+      - protocol: UDP
+        port: 5000
+  rest-api:
+    image:
+      repository: edge-rest
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

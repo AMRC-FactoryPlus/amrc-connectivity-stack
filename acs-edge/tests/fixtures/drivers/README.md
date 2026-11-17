@@ -127,7 +127,6 @@ synth tests/fixtures/drivers/samples/udp-json/connection.json <out-dir> --durati
 
 A finding is a metric the fixture cannot drive. Each one names the device, metric, address, path and the problem. Most are problems with the real config, which no device input can fix:
 
-- **Shadowed**: two metrics on one device have the same address and path. The agent's `Metrics` index keeps one per pair, so the other never gets a value.
 - **Path the parser cannot satisfy**: for example a delimited-string path on a connection with no delimiter, which the agent uses to index into the payload text.
 - **Value read back wrong**: for example an XPath ending in `/@attr`, which makes the agent publish the attribute's markup (` attr="value"`) instead of its value.
 - **OPC UA node id that does not round-trip**: the agent keys values by `nodeId.toString()`, so a node id written differently in the config is never matched.

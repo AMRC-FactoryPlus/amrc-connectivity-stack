@@ -208,11 +208,11 @@ export interface sparkplugDataSet {
     rows: sparkplugValue[][]
 }
 
-export interface metricPathGroup { // { Path : Index}
-    [index: string]: number
+export interface metricPathGroup { // { Path : Indices}
+    [index: string]: number[]
 }
 
-export interface metricAddrPathGroup { // {Address : { Path : Index}}
+export interface metricAddrPathGroup { // {Address : { Path : Indices}}
     [index: string]: metricPathGroup
 }
 
@@ -257,6 +257,10 @@ export class Metrics {
     }
 
     #buildIndices() {
+        /* Rebuilt from scratch, because add() calls this again. */
+        this.#nameIndex = Object.create(null);
+        this.#addrPathIndex = Object.create(null);
+        this.#addrIndex = Object.create(null);
         for (let i = 0; i < this.#array.length; i++) {
             const metric = this.#array[i];
             this.#nameIndex[metric.name || ""] = i;
@@ -273,7 +277,12 @@ export class Metrics {
                 if (!this.#addrPathIndex[addr]) {
                     this.#addrPathIndex[addr] = Object.create(null);
                 }
-                this.#addrPathIndex[addr][path] = i;
+                /* Every metric on an address and path gets its
+                 * value, not only the last: two metrics can read one
+                 * address with the same path, which every OPC UA
+                 * metric has once its path is removed on the move to
+                 * the split driver (ACS-27). */
+                (this.#addrPathIndex[addr][path] ??= []).push(i);
             }
         }
     }
@@ -350,16 +359,14 @@ export class Metrics {
         return Object.keys(this.#addrPathIndex[addr] || {});
     }
 
-    getByAddrPath(addr: string, path: string) {
-        return this.#array[this.#addrPathIndex[addr][path]];
+    /** The indices of every metric read from an address and path. */
+    getIndicesByAddrPath(addr: string, path: string): number[] {
+        return this.#addrPathIndex[addr]?.[path] ?? [];
     }
 
-    setValueByAddrPath(addr: string, path: string, value: sparkplugValue, timestamp?: number, timestampNs?: bigint) {
-        this.#array[this.#addrPathIndex[addr][path]].value = value;
-        this.#array[this.#addrPathIndex[addr][path]].timestamp = timestamp || Date.now();
-        this.#array[this.#addrPathIndex[addr][path]].timestampNs = timestampNs ?? (timestamp ? undefined : now_ns());
-        this.#array[this.#addrPathIndex[addr][path]].isNull = (value === null)
-        return this.#array[this.#addrPathIndex[addr][path]];
+    /** The first metric read from an address and path. */
+    getByAddrPath(addr: string, path: string) {
+        return this.#array[this.#addrPathIndex[addr][path]?.[0]];
     }
 
     // removeByAddrPath(addr: string, path: string) {

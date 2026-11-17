@@ -365,8 +365,9 @@ export class Device {
         // Iterate through each key in obj
         for (let addr in obj) {
             try {
-                // Get all payload paths registered for this address
-                const paths = this._metrics.getPathsForAddr(addr);
+                // Every metric read from this address, whatever its path
+                const indices = this._metrics.getPathsForAddr(addr)
+                    .flatMap(path => this._metrics.getIndicesByAddrPath(addr, path));
                 // Decode the payload at most once, for every metric on it
                 const decoded = new DecodedPayload(obj[addr]);
                 // JSON (Batched) reads a JSON object exactly as plain JSON
@@ -376,16 +377,15 @@ export class Device {
                 // boolean) is neither, so it is logged and dropped as it
                 // always was, as is a payload that is not valid JSON.
                 let format = this._payloadFormat;
-                if (parseVals && format === serialisationType.JSONBatched && paths.length) {
+                if (parseVals && format === serialisationType.JSONBatched && indices.length) {
                     const { value, err } = decoded.json_result();
                     if (!err && typeof value === "object" && value !== null
                         && !Array.isArray(value))
                         format = serialisationType.JSON;
                 }
-                // Iterate through each path
-                paths.forEach((path) => {
-                    // Get the complete metric according to its address and path
-                    const metric = this._metrics.getByAddrPath(addr, path);
+                // Iterate through each metric
+                indices.forEach((index) => {
+                    const metric = this._metrics.array[index];
                     // If the metric can be read i.e. GET method
                     if (typeof metric.properties !== "undefined" && (metric.properties.method.value as string).search(
                         /^GET/g) > -1) {
@@ -423,7 +423,7 @@ export class Device {
                                         // timestampNs takes precedence for sub-ms precision, same as
                                         // the non-batched JSON path.
                                         const updatedMetric = {
-                                            ...this._metrics.setValueByAddrPath(addr, path, processedValue,
+                                            ...this._metrics.setValueByIndex(index, processedValue,
                                                 timestamp || group?.received[addr]?.ms || Date.now(), timestampNs)
                                         };
 
@@ -480,8 +480,7 @@ export class Device {
 
                                     // Update the metric value and push it to the array of changed metrics
                                     const updated = {
-                                        ...(this._metrics.setValueByAddrPath(addr,
-                                            path,
+                                        ...(this._metrics.setValueByIndex(index,
                                             newVal,
                                             timestamp || at?.ms,
                                             timestampNs ?? at?.ns))

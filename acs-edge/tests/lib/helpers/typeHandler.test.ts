@@ -243,21 +243,34 @@ describe('typeHandler', () => {
             })
         })
         
-        describe('setByAddrPath()', () => {
-            const address = "%QD1026";
-            const path = "status.errors.code";
-            const newValue = "newValue"; 
-
-            it("Should set the metric value when given an address and path", () => {
-                metrics.setValueByAddrPath(address, path, newValue);
-                expect(metrics.array[0].value).toEqual(newValue) 
+        describe('getIndicesByAddrPath()', () => {
+            it("Should return the index of each metric on the address and path", () => {
+                expect(metrics.getIndicesByAddrPath("%QD1026", "status.errors.code")).toEqual([0]);
             })
 
-            it("Should set the metric value and the timestamp when given a path", () => {
-                const timestamp = Date.now(); 
-                metrics.setValueByAddrPath(address, path, newValue, timestamp);
-                expect(metrics.array[0].value).toEqual(newValue);
-                expect(metrics.array[0].timestamp).toEqual(timestamp); 
+            it("Should return an empty array for an unknown address or path", () => {
+                expect(metrics.getIndicesByAddrPath("address", "")).toEqual([]);
+                expect(metrics.getIndicesByAddrPath("%QD1026", "path")).toEqual([]);
+            })
+
+            /* ACS-27: an OPC UA node read by two metrics, one with a
+             * path, kept both after the move to the split driver
+             * removed the path, but only the last was updated. */
+            it("Should keep every metric with the same address and path", () => {
+                const m = (name: string): typeHandler.sparkplugMetric => ({
+                    name, type: typeHandler.sparkplugDataType.double, value: 0,
+                    properties: {
+                        address: { type: typeHandler.sparkplugDataType.string, value: "ns=2;s=A" },
+                        method: { type: typeHandler.sparkplugDataType.string, value: "GET" },
+                    },
+                } as typeHandler.sparkplugMetric);
+                const two = new typeHandler.Metrics([m("a"), m("b")]);
+                expect(two.getPathsForAddr("ns=2;s=A")).toEqual([""]);
+                expect(two.getIndicesByAddrPath("ns=2;s=A", "")).toEqual([0, 1]);
+                expect(two.getByAddrPath("ns=2;s=A", "").name).toBe("a");
+                two.add([m("c")]);
+                expect(two.getIndicesByAddrPath("ns=2;s=A", "")).toEqual([0, 1, 2]);
+                expect(two.getByAddress("ns=2;s=A")).toHaveLength(3);
             })
         })
     })

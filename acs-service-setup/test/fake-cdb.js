@@ -21,14 +21,20 @@ export function jsonb (value) {
         .map(k => [k, jsonb(value[k])]));
 }
 
-/* An in-memory ConfigDB with the calls the step makes. Every write is
- * recorded. `stale` lists [app, obj] writes to refuse once with 412. */
+/* An in-memory ConfigDB with the calls the split-drivers and
+ * retired-drivers steps make. Every write and delete is recorded.
+ * `stale` lists [app, obj] writes to refuse once with 412. `members`
+ * holds the direct members of the Edge Agent driver class; as the dumps
+ * create them it is their primary class, so, like the real ConfigDB,
+ * this refuses to take one out of it with 409. */
 export class FakeCDB {
     constructor () {
         this.configs = new Map();
         this.writes = [];
+        this.deletes = [];
         this.versions = new Map();
         this.stale = [];
+        this.members = new Set();
     }
 
     app (a) {
@@ -43,6 +49,7 @@ export class FakeCDB {
     get (a, o) { return structuredClone(this.app(a).get(o)); }
 
     async get_all_configs (a) { return new Map(structuredClone([...this.app(a)])); }
+    async get_config (a, o) { return this.get(a, o); }
     async get_config_with_etag (a, o) {
         if (!this.app(a).has(o)) return [];
         return [this.get(a, o), String(this.versions.get(`${a}/${o}`))];
@@ -59,5 +66,19 @@ export class FakeCDB {
             throw new ServiceError(UUIDs.Service.ConfigDB, "Stale", 412);
         this.writes.push({ app: a, obj: o, config: structuredClone(c) });
         this.set(a, o, c);
+    }
+
+    async delete_config (a, o) {
+        this.deletes.push({ app: a, obj: o });
+        this.app(a).delete(o);
+    }
+
+    async class_has_direct_member (k, o) {
+        if (k != UUIDs.Class.EdgeAgentDriver) throw new Error(`class ${k}`);
+        return this.members.has(o);
+    }
+    async class_remove_member (k, o) {
+        throw new ServiceError(UUIDs.Service.ConfigDB,
+            `Removing member ${o} from ${k} failed`, 409);
     }
 }

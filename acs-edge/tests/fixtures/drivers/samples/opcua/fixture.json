@@ -1,0 +1,33 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-opcua",
+  "agent": "sample-agent",
+  "protocol": "OPC UA",
+  "payloadFormat": "Defined by Protocol",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "many-metrics-per-address",
+    "opcua:credentials",
+    "opcua:security:SignAndEncrypt/Basic256",
+    "payload:Defined by Protocol",
+    "protocol:OPC UA",
+    "type:Double",
+    "type:String",
+    "type:UInt32",
+    "type:UInt8"
+  ],
+  "counts": {
+    "devices": 1,
+    "metrics": 7,
+    "read_metrics": 7,
+    "addresses": 6,
+    "events": 5,
+    "bytes": 1439
+  },
+  "findings": []
+}

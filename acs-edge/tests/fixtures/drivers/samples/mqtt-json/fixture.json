@@ -1,0 +1,35 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-mqtt-json",
+  "agent": "sample-agent",
+  "protocol": "MQTT",
+  "payloadFormat": "JSON",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "jsonpath:filter",
+    "many-metrics-per-address",
+    "mqtt:protocol:mqtt",
+    "multi-device",
+    "payload:JSON",
+    "protocol:MQTT",
+    "type:Double",
+    "type:Float",
+    "type:String",
+    "type:UInt32",
+    "type:UInt8"
+  ],
+  "counts": {
+    "devices": 3,
+    "metrics": 12,
+    "read_metrics": 12,
+    "addresses": 7,
+    "events": 35,
+    "bytes": 3023
+  },
+  "findings": []
+}

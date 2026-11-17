@@ -464,6 +464,7 @@ jobs:
           - edge-test
           - edge-test-rs
           - edge-mqtt
+          - edge-rest
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -511,6 +512,7 @@ jobs:
           - edge-test
           - edge-test-rs
           - edge-mqtt
+          - edge-rest
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -558,6 +560,7 @@ jobs:
           - edge-test
           - edge-test-rs
           - edge-mqtt
+          - edge-rest
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads

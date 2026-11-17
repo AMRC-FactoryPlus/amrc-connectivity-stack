@@ -166,24 +166,25 @@ describe("DriverConnection writes", () => {
         return err;
     }
 
-    it("sends every scalar type in both forms", async () => {
-        const addrs = SCALARS.map((s, i) => `plant/${i}`);
+    /* This broker doesn't say the driver answers writes, so the driver
+     * may read only cmd/, and every type with a cmd form goes. DateTime
+     * has none (see below). */
+    it("sends every scalar type with a cmd form in both forms", async () => {
+        const sendable = SCALARS.filter(s => s.bytes);
+        const addrs = sendable.map((s, i) => `plant/${i}`);
         const conn = await open(addrs);
-        const err = write(conn, SCALARS.map((s, i) => metric(s.type, s.value, addrs[i])));
+        const err = write(conn, sendable.map((s, i) => metric(s.type, s.value, addrs[i])));
         expect(err).toBeUndefined();
 
         const cmds = broker.of("cmd");
         const writes = broker.of("write");
         expect(writes.map(w => w.data)).toEqual(addrs);
         expect(writes.map(w => JSON.parse(w.payload.toString())))
-            .toEqual(SCALARS.map(s => ({ type: s.type, value: s.json })));
+            .toEqual(sendable.map(s => ({ type: s.type, value: s.json })));
 
-        /* The cmd form is unchanged for drivers that only read bytes.
-         * DateTime has none, as before typed writes. */
-        const withBytes = SCALARS.map((s, i) => [s, addrs[i]] as const)
-            .filter(([s]) => s.bytes);
-        expect(cmds.map(c => c.data)).toEqual(withBytes.map(([, a]) => a));
-        expect(cmds.map(c => c.payload)).toEqual(withBytes.map(([s]) => s.bytes));
+        /* The cmd form is unchanged for drivers that only read bytes. */
+        expect(cmds.map(c => c.data)).toEqual(addrs);
+        expect(cmds.map(c => c.payload)).toEqual(sendable.map(s => s.bytes));
     });
 
     it("sends cmd before write for each metric", async () => {
@@ -194,18 +195,16 @@ describe("DriverConnection writes", () => {
             .toEqual(["cmd a", "write a", "cmd b", "write b"]);
     });
 
-    it("fails only when neither form can carry the value", async () => {
+    /* A driver that doesn't answer writes may read only cmd/, so a
+     * value cmd/ can't carry is an error, not a write nobody reads
+     * reported as done (ACS-51). Nothing is sent. */
+    it("fails when the cmd form can't carry the value", async () => {
         const conn = await open(["a", "b"]);
-        const spy = jest.spyOn(console, "log").mockImplementation(() => {});
-        try {
-            expect(write(conn, [metric(T.dateTime, 5, "a")])).toBeUndefined();
-            expect(write(conn, [metric(T.int16, 99999, "b")])?.message)
-                .toMatch(/Can't write .* to b/);
-        }
-        finally {
-            spy.mockRestore();
-        }
-        expect(broker.of("write").map(w => w.data)).toEqual(["a"]);
+        expect(write(conn, [metric(T.dateTime, 5, "a")])?.message)
+            .toMatch(/Can't write .* to a: cmd: .*reads cmd/);
+        expect(write(conn, [metric(T.int16, 99999, "b")])?.message)
+            .toMatch(/Can't write .* to b/);
+        expect(broker.of("write")).toEqual([]);
         expect(broker.of("cmd")).toEqual([]);
     });
 

@@ -51,6 +51,8 @@ struct Shared {
     connack: Option<ConnectReturnCode>,
     /// Filters containing this are refused in the SUBACK.
     refuse: Option<String>,
+    /// Close this many more connections straight after their CONNACK.
+    drop_after_connack: usize,
 }
 
 pub struct FakeBroker {
@@ -96,6 +98,11 @@ impl FakeBroker {
     /// Answer future CONNECTs with this code.
     pub fn refuse_connect(&self, code: ConnectReturnCode) {
         self.shared.lock().unwrap().connack = Some(code);
+    }
+
+    /// Close the next `n` connections straight after accepting them.
+    pub fn drop_after_connack(&self, n: usize) {
+        self.shared.lock().unwrap().drop_after_connack = n;
     }
 
     /// Refuse subscriptions to filters containing `part`.
@@ -181,7 +188,7 @@ async fn accept(
                             break 'conn;
                         }
                         loop {
-                            let pkt = match rumqttc::mqttbytes::v4::read(&mut buf, 1 << 28) {
+                            let pkt = match Packet::read(&mut buf, 1 << 28) {
                                 Ok(p) => p,
                                 Err(rumqttc::mqttbytes::Error::InsufficientBytes(_)) => break,
                                 Err(e) => panic!("fake broker could not parse a packet: {e:?}"),
@@ -200,6 +207,11 @@ async fn accept(
                                         .unwrap_or(ConnectReturnCode::Success);
                                     ConnAck::new(code, false).write(&mut out).unwrap();
                                     close = code != ConnectReturnCode::Success;
+                                    let mut sh = shared.lock().unwrap();
+                                    if sh.drop_after_connack > 0 {
+                                        sh.drop_after_connack -= 1;
+                                        close = true;
+                                    }
                                 }
                                 Packet::Subscribe(s) => {
                                     let refuse = shared.lock().unwrap().refuse.clone();

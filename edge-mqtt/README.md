@@ -17,9 +17,9 @@ build, CI and publishing steps.
 
 Field|Meaning
 ---|---
-`protocol`|`mqtt` or `tcp` for plain TCP, `mqtts` or `tls` for TLS, `ws` or `wss` for a WebSocket on the path `/mqtt`
+`protocol`|`mqtt` or `tcp` for plain TCP, `mqtts` or `tls` for TLS, `ws` or `wss` for a WebSocket on the path `/`, as the built-in uses
 `host`, `port`|the broker
-`clientId`|the MQTT client id. Blank makes one up, `NO-ID-<uuid>`, for each connection
+`clientId`|the MQTT client id. Blank makes one up, `NO-ID-<uuid>`, once, and keeps it across reconnects as the built-in does
 `username`, `password`|sent only when the username is set
 `cleanSession`|default true
 `keepAlive`|seconds, default 60, 0 for none

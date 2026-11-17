@@ -159,3 +159,17 @@ agent: over how many synchronous runs and event-loop turns, and how many
 milliseconds from its first message to its last. Results go to
 `bench/results-rate.json`. CPU varies by a few points between runs, so
 run it three times and compare medians.
+
+The stub is Node (mqtt.js), which sends everything one tick writes in
+one go. To measure the Rust driver library's link instead, build its
+`rate_stub` example and pass it with `--stub`. It is a Linux binary
+when built with Docker, so run the benchmark in a Linux container too,
+as the golden harness README describes. Build it from the repository
+root, then run the benchmark from `acs-edge`:
+
+```sh
+docker run --rm -v "$PWD":/w -w /w/lib/rs-edge-driver rust:1.99 \
+    cargo build --release --example rate_stub
+npm run bench:rate -- --modes split \
+    --stub ../lib/rs-edge-driver/target/release/examples/rate_stub
+```

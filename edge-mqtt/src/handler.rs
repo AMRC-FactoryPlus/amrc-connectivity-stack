@@ -59,6 +59,11 @@ const CA_FILES: [&str; 3] = [
 pub struct MqttHandler {
     handle: DriverHandle<String>,
     conf: Conf,
+    /// The client id for every connection this handler makes. With a
+    /// blank `clientId` it is made up once, as the built-in does, so a
+    /// reconnect with `cleanSession: false` resumes the same session
+    /// on the broker instead of leaving one behind each time.
+    client_id: String,
     session: Option<Session>,
 }
 
@@ -81,9 +86,9 @@ impl MqttHandler {
     fn options(&self) -> Result<MqttOptions, String> {
         let c = &self.conf;
         let mut opts = match c.protocol {
-            Protocol::Tcp | Protocol::Tls => MqttOptions::new(c.client_id(), &c.host, c.port),
+            Protocol::Tcp | Protocol::Tls => MqttOptions::new(&self.client_id, &c.host, c.port),
             Protocol::Ws | Protocol::Wss => {
-                MqttOptions::new(c.client_id(), format!("{}{WS_PATH}", c.url()), c.port)
+                MqttOptions::new(&self.client_id, format!("{}{WS_PATH}", c.url()), c.port)
             }
         };
         let transport = match c.protocol {
@@ -211,9 +216,11 @@ impl Handler for MqttHandler {
     ) -> Result<Self, HandlerError> {
         let conf = Conf::from_json(&config).map_err(HandlerError::new)?;
         tracing::info!(url = %conf.url(), "MQTT server configured");
+        let client_id = conf.client_id();
         Ok(Self {
             handle,
             conf,
+            client_id,
             session: None,
         })
     }
@@ -287,6 +294,18 @@ impl Handler for MqttHandler {
         let Some(s) = self.session.as_mut() else {
             return false;
         };
+        // The read loop reports a lost connection, but the driver
+        // ignores that report while `connect` is still in progress, as
+        // a duplicate from the old connection. A broker that closes
+        // straight after CONNACK can therefore end the read loop
+        // unheard, leaving the status UP with nothing connected. The
+        // driver calls this as soon as the connection is up, so report
+        // it again here, where it is heard.
+        if s.task.is_finished() && !s.stopping.load(Ordering::SeqCst) {
+            tracing::warn!(url = %self.conf.url(), "the MQTT server closed the connection");
+            self.handle.disconnected(ConnectError::ConnectionFailed);
+            return false;
+        }
         let plan = topics::plan(&s.subscribed, addrs.iter().map(String::as_str));
         for a in &plan.invalid {
             tracing::warn!(address = %a, "not a valid MQTT topic, not subscribed");

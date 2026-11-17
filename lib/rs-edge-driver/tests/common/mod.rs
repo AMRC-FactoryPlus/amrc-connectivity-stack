@@ -58,6 +58,8 @@ pub struct Stats {
     /// Milliseconds to wait before each read from the driver, to play
     /// an agent that is slower than the driver.
     pub read_delay_ms: std::sync::atomic::AtomicU64,
+    /// When each data message was read off the socket, in order.
+    pub data_arrivals: Mutex<Vec<Instant>>,
 }
 
 impl Stats {
@@ -278,7 +280,7 @@ async fn serve(
                     Ok(_) => last_rx = Instant::now(),
                 }
                 loop {
-                    let pkt = match rumqttc::mqttbytes::v4::read(&mut buf, BROKER_MAX_PACKET) {
+                    let pkt = match Packet::read(&mut buf, BROKER_MAX_PACKET) {
                         Ok(p) => p,
                         Err(MqttError::InsufficientBytes(_)) => break,
                         Err(e) => panic!("fake broker could not parse a packet: {e:?}"),
@@ -316,6 +318,7 @@ async fn serve(
                             let ev = if suffix == "status" {
                                 FromDriver::Status(String::from_utf8_lossy(&p.payload).into_owned())
                             } else if let Some(t) = suffix.strip_prefix("data/") {
+                                stats.data_arrivals.lock().unwrap().push(last_rx);
                                 FromDriver::Data { topic: t.to_owned(), payload: p.payload }
                             } else {
                                 FromDriver::Other { topic: p.topic.clone(), payload: p.payload }

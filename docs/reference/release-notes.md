@@ -182,9 +182,11 @@ historian queries that read those devices. Other changes you may see:
 - A device with no addressed metrics no longer stops the Edge Agent.
   The built-in connection crashed the whole agent on one. The split
   driver births it and carries on.
-- A device sends up to two data messages for each batch of values from
-  its server, where the built-in connection sent one, with the same
-  values and timestamps.
+- A device sends one data message for each batch of values from its
+  server, as the built-in connection did, but each value reaches the
+  broker about 12 ms later (16 ms at worst in testing), because the
+  Edge Agent waits 10 ms to gather the batch. Timestamps don't change.
+  `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment sets the wait.
 - A write shows as written only once the server accepts it.
 - A secured server already accepts a new client certificate from every
   new Edge Agent pod, because the built-in connection made one each

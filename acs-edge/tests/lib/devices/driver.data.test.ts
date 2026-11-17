@@ -27,6 +27,8 @@ class FakeBroker {
 /* The end of this turn of the event loop. */
 const turn = () => new Promise(r => setImmediate(r));
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+/* Past the default 10 ms gathering wait. */
+const gathered = () => sleep(30);
 
 /* A data event as plain values, for comparing. */
 const plain = (obj: any) => Object.fromEntries(
@@ -68,19 +70,19 @@ describe("DriverConnection data", () => {
 
     it("delivers data for the empty address", async () => {
         broker.send("data", "17", "datagram");
-        await turn();
+        await gathered();
         expect(got).toEqual([{ "": "datagram" }]);
     });
 
     it("delivers data for other addresses", async () => {
         broker.send("data", "18", "x");
-        await turn();
+        await gathered();
         expect(got).toEqual([{ "a/b": "x" }]);
     });
 
     it("drops data for a topic not in the map", async () => {
         broker.send("data", "99", "x");
-        await turn();
+        await gathered();
         expect(got).toEqual([]);
     });
 
@@ -89,7 +91,7 @@ describe("DriverConnection data", () => {
         broker.send("data", "17", "2");
         broker.send("data", "18", "3");
         expect(got).toEqual([]);
-        await turn();
+        await gathered();
         expect(got).toEqual([{ "c": "1", "": "2", "a/b": "3" }]);
         expect(Object.keys(got[0])).toEqual(["c", "", "a/b"]);
     });
@@ -97,19 +99,19 @@ describe("DriverConnection data", () => {
     it("says when each message of a group arrived", async () => {
         const before = Date.now();
         broker.send("data", "19", "1");
-        await sleep(15);
+        await sleep(20);
         broker.send("data", "20", "2");
         const after = Date.now();
-        await turn();
+        await gathered();
 
-        /* Nothing waited past the turn, so 15 ms apart is two groups. */
+        /* 20 ms apart is past the 10 ms wait, so two groups. */
         expect(got).toEqual([{ c: "1" }, { d: "2" }]);
         const [c] = Object.values(groups[0].received) as any[];
         const [d] = Object.values(groups[1].received) as any[];
         expect(c.ms).toBeGreaterThanOrEqual(before);
         expect(d.ms).toBeLessThanOrEqual(after);
-        expect(d.ms - c.ms).toBeGreaterThanOrEqual(14);
-        expect(Number(d.ns - c.ns) / 1e6).toBeGreaterThanOrEqual(14);
+        expect(d.ms - c.ms).toBeGreaterThanOrEqual(19);
+        expect(Number(d.ns - c.ns) / 1e6).toBeGreaterThanOrEqual(19);
     });
 
     it("sends the group first when an address comes again, so no value is lost", async () => {
@@ -120,7 +122,7 @@ describe("DriverConnection data", () => {
         expect(got).toEqual([{ c: "1", d: "1" }]);
         broker.send("data", "19", "3");
         expect(got).toEqual([{ c: "1", d: "1" }, { c: "2" }]);
-        await turn();
+        await gathered();
         expect(got).toEqual([{ c: "1", d: "1" }, { c: "2" }, { c: "3" }]);
     });
 
@@ -154,7 +156,19 @@ describe("DriverConnection data", () => {
         expect(events).toEqual(["data", "written"]);
     });
 
-    it("hands a lone value on at the end of the turn by default", async () => {
+    it("waits 10 ms by default, so values written one by one form one group", async () => {
+        broker.send("data", "19", "1");
+        await sleep(3);
+        broker.send("data", "20", "2");
+        await turn();
+        expect(got).toEqual([]);
+        await sleep(30);
+        expect(got).toEqual([{ c: "1", d: "2" }]);
+    });
+
+    it("hands a lone value on at the end of the turn with DRIVER_DATA_WAIT_MS=0", async () => {
+        process.env.DRIVER_DATA_WAIT_MS = "0";
+        connect();
         const t0 = process.hrtime.bigint();
         let at = 0n;
         conn.on("data", () => at = process.hrtime.bigint());

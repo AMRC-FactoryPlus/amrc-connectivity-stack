@@ -41,12 +41,15 @@ function write_timeout () {
 
 /* How long, in milliseconds, the agent may hold a driver's data to
  * gather values that arrive together, so that each device publishes
- * one DDATA for them rather than one per value. 0 holds nothing past
- * the current turn of the event loop: whatever the agent reads from
- * the driver's socket in one go is handled together, straight after.
- * DRIVER_DATA_WAIT_MS overrides it, up to MAX_DATA_WAIT. See
- * "Gathering data" in docs/edge-split.md. */
-const DATA_WAIT = 0;
+ * one DDATA for them rather than one per value. A driver writes each
+ * value to its socket on its own, and an idle agent wakes for the
+ * first, so without a wait one OPC UA notification went out as up to
+ * 4 DDATA. 10 ms brings a notification of 66 or 1,000 values back to
+ * one DDATA (1.00 to 1.10) on one CPU or half of one, and holds a lone
+ * value about 12 ms (15 ms at p99). 0 holds nothing past the current
+ * turn of the event loop. DRIVER_DATA_WAIT_MS overrides it, up to MAX_DATA_WAIT.
+ * See "Gathering data" in docs/edge-split.md. */
+const DATA_WAIT = 10;
 const MAX_DATA_WAIT = 100;
 
 function data_wait () {

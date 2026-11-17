@@ -621,15 +621,34 @@ Agent gathers the data packets that arrive together and hands them to
 the devices as one group. Each device publishes one DDATA for the
 values in the group that belong to it.
 
-* Packets that arrive in the same turn of the agent's event loop form a
-  group: in practice, whatever the agent reads from the driver's socket
-  in one go. The group is handed on at the end of that turn, so a
-  packet on its own is not held back.
+* Packets that arrive within 10 milliseconds of the first packet of a
+  group join it, and the group is handed on 10 milliseconds after that
+  first packet. So every value reaches Sparkplug up to 10 ms later than
+  it arrived, a lone one included. Its timestamp doesn't change: a
+  value without one is still stamped with when its packet arrived.
 
-* `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment makes it wait
-  that many milliseconds after the first packet of a group instead,
-  up to 100. The default is 0. Every packet waits up to that long, a
-  lone one included.
+* The wait is there because a driver writes each data packet to its
+  socket on its own, and an agent with nothing else to do wakes for
+  the first packet and would hand it on before the rest had arrived.
+  Measured with the OPC UA driver and the real agent, DDATA per
+  notification:
+
+  Wait | 66 values | 1,000 values | A lone value is held
+  ---|---|---|---
+  0 | 1.13 to 1.37 | 1.47 to 1.70 | 0.1 ms
+  5 ms | 1.03 to 1.10 | 1.27 to 1.40 | 6.6 ms (p99 9 to 11 ms)
+  10 ms | 1.00 to 1.07 | 1.00 to 1.10 | 12 ms (p99 15 to 16 ms)
+  20 ms | 1.00 | 1.00 to 1.03 | 23 ms (p99 30 ms)
+
+  The ranges cover an idle machine, one CPU and half a CPU. On a
+  loaded cluster node with no wait, a 66-value notification went out
+  as about 4 DDATA. If 10 ms still splits notifications on a busy
+  node, raise `DRIVER_DATA_WAIT_MS` to 20.
+
+* `DRIVER_DATA_WAIT_MS` in the Edge Agent's environment sets the wait,
+  up to 100. `0` waits for nothing past the current turn of the event
+  loop: whatever the agent reads from the driver's
+  socket in one go forms a group.
 
 * A second packet for an address already in the group hands the group
   on first, so every value is published, in the order the driver sent

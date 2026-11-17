@@ -1,0 +1,10 @@
+{
+    "extends": "../../../tsconfig.json",
+    "compilerOptions": {
+        "module": "ES2022",
+        "rootDir": "../../..",
+        "outDir": "../../../build/driver-fixtures"
+    },
+    "include": [],
+    "files": ["generate.ts"]
+}

@@ -39,7 +39,9 @@ describe("validateConfig", () => {
         expect(validateConfig(config({ name: "api" }))).toBe(false);
     });
 
-    test.each(["S7", "UDP", "MTConnect", "EtherNet/IP", "Fieldbus"])(
+    /* UDP is left out: it was retired with these, but ACS-36 puts it
+     * back. */
+    test.each(["S7", "MTConnect", "EtherNet/IP", "Fieldbus"])(
         "rejects the removed connection type %s", connType => {
             expect(validateConfig(config({ name: "old", connType }))).toBe(false);
         });

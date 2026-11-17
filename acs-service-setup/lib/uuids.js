@@ -129,6 +129,11 @@ export const ACS = {
         Websocket:              "f5fa94ee-de4d-11ef-882f-a7f7c2ad5273",
         UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
 
+        /* Split drivers replacing internal drivers */
+        RESTSplit:              "5ede3d8d-7a45-47e4-9ee3-c4be844e40b2",
+        MQTTSplit:              "540ae6a1-16c5-43d2-be9e-0bf0a628641e",
+        OPCUASplit:             "d4d50f58-8af7-4690-8eac-9817b991eecf",
+
         /* Stock in-cluster drivers */
         Bacnet:                 "bdc64178-de4c-11ef-b15e-3711aef7cf9b",
         Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",

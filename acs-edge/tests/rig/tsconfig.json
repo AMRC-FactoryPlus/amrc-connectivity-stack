@@ -8,6 +8,7 @@
     },
     "include": [],
     "files": [
-        "run-mocks.ts", "make-rig.ts"
+        "run-mocks.ts", "make-rig.ts", "load.ts", "remove.ts",
+        "write.ts"
     ]
 }

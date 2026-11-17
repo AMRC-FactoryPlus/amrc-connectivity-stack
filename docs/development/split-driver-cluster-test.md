@@ -29,8 +29,11 @@ From the epic's cluster test card (ACS-47):
    sidecar is running, and its devices publish the same metrics as
    before, with no gap longer than one restart.
 3. There is no move back (decided 2026-11-17): a version 6
-   `splitDrivers.<PROTO>: false` or `null` is refused with an `ERROR`
-   line in the service-setup log, and the connections still move.
+   `splitDrivers.<PROTO>: false` is refused with an `ERROR` line in the
+   service-setup log, and the connections still move. `null` holds a
+   protocol's not-yet-moved connections on the built-in drivers, with
+   an `ERROR` line counting them, for a site whose edge still runs
+   version 6. It moves nothing back.
    An Edge Agent with no Edge Agent Deployment config keeps its
    built-in connections, with an `ERROR: Connection` line each in the
    service-setup log, and they keep publishing while that agent runs a
@@ -810,9 +813,10 @@ back to.
 4. Record (`--label refused`) and compare with `moved.json`: they should
    match.
 5. Upgrade again with `--set serviceSetup.config.splitDrivers.OPCUA=null`.
-   Helm may drop a null key before service-setup sees it, so the
-   `ERROR` line may or may not appear. Either way the connections stay
-   moved and the comparison with `moved.json` matches.
+   The log has `ERROR: serviceSetup.config.splitDrivers.OPCUA is null,
+   so 0 OPCUA connection(s) stay on the built-in`: every one has
+   already moved, and `null` moves none back. The comparison with
+   `moved.json` matches. Upgrade once more without it.
 
 ### 11. Clean up
 

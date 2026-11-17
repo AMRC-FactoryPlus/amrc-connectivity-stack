@@ -11,14 +11,24 @@
  * ends up with every connection on a split driver. There is no move
  * back, because there is nothing to move back to.
  *
- * `serviceSetup.config.splitDrivers` in the chart values only has
- * `dryRun: true`, which logs what would change and writes nothing. A
- * connection a dry run leaves on its built-in driver gets no data,
- * since the Edge Agent can't run it. Version 6 also took `<PROTO>:
- * true`, `false` (move back) and `null` (leave alone). `true` is what
- * happens anyway. `false` and `null` would leave connections the Edge
- * Agent can't run, so they are refused: the log says so, and the
- * connections move.
+ * `serviceSetup.config.splitDrivers` in the chart values takes, per
+ * protocol (REST, MQTT, OPCUA, UDP):
+ *
+ *  - unset or `true`: move its connections, as above;
+ *  - `null`: leave them on the built-in driver, with an ERROR line on
+ *    every run that counts them. A version 7 Edge Agent can't run
+ *    them, so this is only for a site whose Edge Agents still run
+ *    version 6, for example because its edge Helm charts have
+ *    diverged and it hasn't merged them yet. The next run without it
+ *    moves them;
+ *  - `false` (version 6's move back): refused with an ERROR line,
+ *    because there is nothing to move back to, and treated as unset.
+ *
+ * The chart's default is `splitDrivers: {}`, with no protocol named,
+ * so that a site's `null` survives Helm's merge of its values over the
+ * chart's: Helm deletes a key a site sets to null only where the
+ * chart's defaults have it. `dryRun: true` logs what would change and
+ * writes nothing.
  *
  * For each connection on a built-in driver this rewrites:
  *
@@ -156,10 +166,14 @@ export class MigrateSplitDrivers {
 
         const settings = opts.settings ?? {};
         this.dry_run = !!settings.dryRun;
-        /* Version 6 settings that would leave a connection on a
-         * built-in driver. */
+        /* Protocols a site holds on their built-in drivers, while its
+         * Edge Agents still run version 6. */
+        this.left = new Set(Object.keys(SplitDrivers)
+            .filter(p => p in settings && settings[p] === null));
+        /* Any other value but true, such as version 6's false (move
+         * back), is refused and treated as unset. */
         this.refused = Object.keys(SplitDrivers)
-            .filter(p => p in settings && settings[p] !== true)
+            .filter(p => p in settings && settings[p] !== true && settings[p] !== null)
             .map(p => [p, settings[p]]);
     }
 
@@ -169,10 +183,10 @@ export class MigrateSplitDrivers {
 
         for (const [name, value] of this.refused)
             this.log("ERROR: serviceSetup.config.splitDrivers.%s is %o. Since ACS 7 "
-                + "the Edge Agent has no built-in %s connection, so a %s connection "
-                + "left on the built-in driver gets no data. Moving %s connections "
-                + "to the split driver anyway. Remove the setting from the chart values.",
-                name, value, name, name, name);
+                + "the Edge Agent has no built-in %s connection, so there is no move "
+                + "back. Moving %s connections to the split driver as if it were "
+                + "unset. Remove the setting from the chart values.",
+                name, value, name, name);
         if (this.dry_run)
             this.log("Dry run: logging what would change, writing nothing. A "
                 + "connection left on a built-in driver gets no data in ACS 7.");
@@ -187,6 +201,19 @@ export class MigrateSplitDrivers {
         this.host_ports = this.open_ports();
 
         for (const [name, proto] of Object.entries(SplitDrivers)) {
+            if (this.left.has(name)) {
+                const n = [...this.cconfs.values()]
+                    .filter(c => c.driver == proto.internal).length;
+                this.log("ERROR: serviceSetup.config.splitDrivers.%s is null, so %d "
+                    + "%s connection(s) stay on the built-in %s connection, which a "
+                    + "version 7 Edge Agent can't run: on one, their devices get no "
+                    + "data. Use this only while the site's Edge Agents still run "
+                    + "version 6 (for example until its edge Helm charts are merged). "
+                    + "The next run without the setting moves them.",
+                    name, n, name, name);
+                count.held += n;
+                continue;
+            }
             const to_def = this.drivers.get(proto.split);
             if (!to_def?.image) {
                 this.log("ERROR: %s: split DriverDef %s %s; not moving. Its "
@@ -210,7 +237,7 @@ export class MigrateSplitDrivers {
         }
 
         this.log("Split drivers: %d connections %s, %d repaired, %d already right, "
-            + "%d held back (pinned image), %d held back (no Deployment), "
+            + "%d held back (pinned image or set to null), %d held back (no Deployment), "
             + "%d without a sidecar (port in use), %d failed",
             count.moved, this.dry_run ? "would move" : "moved",
             count.repaired, count.unchanged, count.held, count.no_deployment,

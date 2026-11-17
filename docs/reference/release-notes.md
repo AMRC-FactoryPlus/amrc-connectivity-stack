@@ -44,11 +44,21 @@ Manager offers one driver per protocol for new connections: "REST",
    `git ls-remote https://git.<your ACS domain>/git/shared/helm refs/heads/main refs/heads/acs`.
    If both lines show the same commit hash, the upgrade moves your edge
    clusters to the new charts by itself. If they differ, your site has
-   committed its own changes to `main`, so as soon as the
-   `service-setup` Job has finished you must merge `acs` into `main`
-   (keeping your own changes) and push `main`. Until you do, your edge
-   clusters run the old release, which has no split driver images, and
-   every moved connection's devices have no data.
+   committed its own changes to `main`, and your edge clusters keep
+   running version 6 after the upgrade until you merge `acs` into
+   `main` (keeping your own changes) and push it. Choose one:
+   - Merge as soon as the `service-setup` Job has finished. Until you
+     do, every moved connection's devices have no data, because the
+     version 6 charts can't start their split drivers.
+   - Or set `serviceSetup.config.splitDrivers.REST: null` (and `MQTT`,
+     `OPCUA`, `UDP`) for this upgrade. Those connections stay on the
+     built-in connections, which your version 6 Edge Agents still run,
+     and the `service-setup` log has an `ERROR:` line each run counting
+     them. When you merge, your Edge Agents start version 7, which can't
+     run them, so straight after merging remove the `null` settings and
+     run the upgrade again: that run moves them. Leave the protocols
+     out of any other values: Helm drops a `null` for a key the chart's
+     defaults name, and the chart's default is `splitDrivers: {}`.
 2. **Check every edge cluster is fetching from the central cluster's git
    server.** One that can't keeps its old software, and its moved
    devices have no data until it can.
@@ -84,10 +94,10 @@ Manager offers one driver per protocol for new connections: "REST",
    data until it has another port.
 6. **Take a backup of the ConfigDB.** A rollback to version 6 does not
    undo the move: see "Rolling back" below.
-7. **Remove `serviceSetup.config.splitDrivers.REST`, `MQTT`, `OPCUA` and
-   `UDP` from your values**, if you set them for a version 7 test build.
-   `false` and `null` are refused: service-setup logs an `ERROR:` line
-   and moves the connections anyway.
+7. **Check `serviceSetup.config.splitDrivers` in your values.** Unset
+   or `true` moves a protocol. `null` holds it, as in step 1, and is
+   only for Edge Agents still on version 6. `false` (version 6's move
+   back) is refused with an `ERROR:` line and treated as unset.
 
 **Check it worked.** Find the line starting `Split drivers:` in the
 `service-setup` container's log. It says how many connections moved,
@@ -108,6 +118,10 @@ running.
   (`ImagePullBackOff`): your edge clusters didn't get the new charts.
   Merge `acs` into `main` in `shared/helm` and push it, as in step 1,
   and the data comes back within a few minutes with nothing else to do.
+  A `null` set now doesn't help: it holds connections that haven't
+  moved, and moves none back.
+- The `service-setup` log says a protocol `is null` and your Edge Agents
+  run version 7: remove the setting and run the upgrade again.
 - A UDP connection has no `driver-<name>` container, and the
   `service-setup` log has a line for it starting `ERROR: Connection`
   that names the connection with its port: give it another port in the

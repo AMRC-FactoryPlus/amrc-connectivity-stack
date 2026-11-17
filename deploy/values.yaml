@@ -432,11 +432,16 @@ serviceSetup:
     # UDP connection. On every install or upgrade service-setup moves
     # each connection still on one of those built-in drivers to its
     # split driver (a sidecar container), and each Edge Agent with a
-    # moved connection restarts once. There is no move back. The only
-    # setting is `dryRun: true`, which logs what would move and changes
-    # nothing; a connection it leaves on a built-in driver gets no data.
-    # The version 6 per-protocol settings (`REST: false` and so on) are
-    # refused with an error in service-setup's log. See
+    # moved connection restarts once. There is no move back.
+    #
+    # A site whose Edge Agents still run version 6 (its edge Helm charts
+    # not yet merged) can hold a protocol on the built-in drivers with
+    # `<PROTO>: null` (REST, MQTT, OPCUA or UDP). Service-setup then logs
+    # an error each run counting those connections, which a version 7
+    # Edge Agent can't run. `false` (version 6's move back) is refused
+    # and treated as unset. `dryRun: true` logs what would move and
+    # changes nothing. Leave the protocols out of this default: Helm
+    # drops a site's `null` for any key the chart's defaults have. See
     # docs/architecture/edge-management/split-drivers.md.
     splitDrivers: {}
 

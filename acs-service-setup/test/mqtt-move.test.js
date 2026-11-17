@@ -224,17 +224,31 @@ describe("moving a site's MQTT connections with the chart's defaults", () => {
         assert.equal(count.moved, 0);
     });
 
-    /* Version 6 took null to leave MQTT where it was, and false to move
-     * it back. Neither leaves anything the Edge Agent can run. */
-    for (const value of [null, false])
-        test(`${value} is refused and MQTT connections still move`, async () => {
-            const cdb = site();
-            const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: value });
-            assert.equal(count.moved, 6);
-            assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
-            assert.equal(lines.filter(l =>
-                l.startsWith(`ERROR: serviceSetup.config.splitDrivers.MQTT is ${value}.`)).length, 1);
-        });
+    test("false is refused and MQTT connections still move", async () => {
+        const cdb = site();
+        const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: false });
+        assert.equal(count.moved, 6);
+        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+        assert.equal(lines.filter(l =>
+            l.startsWith("ERROR: serviceSetup.config.splitDrivers.MQTT is false.")).length, 1);
+    });
+
+    /* A site whose Edge Agents still run version 6 holds MQTT with null. */
+    test("null holds every MQTT connection where it is, and says how many", async () => {
+        const cdb = site();
+        const { count, lines } = await run_logged(cdb, { ...defaults, MQTT: null });
+        assert.equal(count.held, 5);
+        /* Only the oven's OPC UA connection moves. */
+        assert.equal(count.moved, 1);
+        for (const conn of MQTT)
+            assert.deepEqual(entry(cdb, conn), site_entry(conn));
+        assert.equal(lines.filter(l => l.startsWith(
+            "ERROR: serviceSetup.config.splitDrivers.MQTT is null, so 5 MQTT")).length, 1);
+
+        const again = await run_logged(cdb, defaults);
+        assert.equal(again.count.moved, 5);
+        assert.equal(text(state(cdb)), fs.readFileSync(MOVED_FILE, "utf8"));
+    });
 });
 
 /* A run that keeps what it logs. */

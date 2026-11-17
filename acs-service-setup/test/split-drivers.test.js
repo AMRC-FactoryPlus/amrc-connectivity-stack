@@ -221,7 +221,7 @@ describe("the split DriverDefs", () => {
 describe("migrate_split_drivers", () => {
     /* Every built-in connection moves: there is nothing else for it
      * to run on. */
-    test("moves every built-in connection, whatever the settings", async () => {
+    test("moves every built-in connection when the protocols are unset or true", async () => {
         for (const settings of [undefined, {}, { REST: "yes" },
                                 { REST: true, MQTT: true, OPCUA: true, UDP: true }]) {
             const cdb = fixture();
@@ -232,20 +232,61 @@ describe("migrate_split_drivers", () => {
         }
     });
 
-    /* Version 6 took false (move back) and null (leave alone). Either
-     * would leave connections the Edge Agent can't run. */
-    test("refuses false and null with an ERROR line, and still moves", async () => {
+    /* false was version 6's move back, which version 7 can't do: it
+     * is refused and treated as unset. */
+    test("refuses false with an ERROR line, and moves as if unset", async () => {
         const cdb = fixture();
         const lines = [];
         const count = await new MigrateSplitDrivers({
-            fplus: { ConfigDB: cdb }, settings: { OPCUA: false, MQTT: null },
+            fplus: { ConfigDB: cdb }, settings: { OPCUA: false },
             log: (...args) => lines.push(args),
         }).run();
 
         assert.equal(count.moved, 4);
         const refused = lines.filter(l => /^ERROR: serviceSetup.config.splitDrivers/.test(l[0]));
-        assert.deepEqual(refused.map(l => [l[1], l[2]]), [["MQTT", null], ["OPCUA", false]]);
+        assert.deepEqual(refused.map(l => [l[1], l[2]]), [["OPCUA", false]]);
+        assert.match(refused[0][0], /there is no move back/);
         assert.equal(conn_entry(cdb, C.opcua).connType, "Driver");
+    });
+
+    /* null holds a protocol on its built-in drivers, for a site whose
+     * Edge Agents still run version 6. It says so on every run. */
+    test("null leaves that protocol's connections alone, counts them and says so", async () => {
+        const cdb = fixture();
+        const lines = [];
+        const run_null = () => new MigrateSplitDrivers({
+            fplus: { ConfigDB: cdb }, settings: { REST: null, MQTT: null },
+            log: (...args) => lines.push(args),
+        }).run();
+        const count = await run_null();
+
+        /* OPC moves. Printer, the REST connection with no devices and
+         * Broker are held. */
+        assert.equal(count.moved, 1);
+        assert.equal(count.held, 3);
+        assert.equal(conn_entry(cdb, C.rest).connType, "REST");
+        assert.equal(conn_entry(cdb, C.mqtt).connType, "MQTT");
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.rest).driver, Driver.REST);
+        assert.equal(cdb.get(App.ConnectionConfiguration, C.empty).driver, Driver.REST);
+        assert.deepEqual(Object.keys(drivers(cdb)).sort(), ["OPC", "PLC"]);
+
+        const held = lines.filter(l => /is null, so %d/.test(l[0]));
+        assert.deepEqual(held.map(l => [l[1], l[2]]), [["REST", 2], ["MQTT", 1]]);
+        assert.match(held[0][0], /^ERROR: /);
+        assert.match(held[0][0], /version 7 Edge Agent can't run/);
+        assert.match(held[0][0], /still run version 6/);
+
+        /* The next run says so again and writes nothing. */
+        cdb.writes = [];
+        lines.length = 0;
+        await run_null();
+        assert.deepEqual(cdb.writes, []);
+        assert.equal(lines.filter(l => /is null, so %d/.test(l[0])).length, 2);
+
+        /* The next run without it moves them. */
+        const after = await run(cdb, {});
+        assert.equal(after.moved, 3);
+        assert.equal(conn_entry(cdb, C.rest).connType, "Driver");
         assert.equal(conn_entry(cdb, C.mqtt).connType, "Driver");
     });
 
@@ -297,7 +338,7 @@ describe("migrate_split_drivers", () => {
     });
 
     test("a second run changes nothing", async () => {
-        for (const settings of [{}, { OPCUA: false, MQTT: null }]) {
+        for (const settings of [{}, { OPCUA: false }]) {
             const cdb = fixture();
             await run(cdb);
             const writes = cdb.writes.length;

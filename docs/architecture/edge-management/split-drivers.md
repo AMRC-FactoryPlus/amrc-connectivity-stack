@@ -31,9 +31,36 @@ you can't afford to lose data from.
 
    If both lines show the same commit hash, nobody has changed `main`
    and the upgrade moves it for you. If they differ, your site has its
-   own changes, and you must merge `acs` into `main` straight after the
-   upgrade, as [Edge charts](#edge-charts) explains. Until you do, every
-   moved connection's devices have no data.
+   own changes, and its edge clusters keep running version 6 after the
+   central upgrade until you merge `acs` into `main`, as [Edge
+   charts](#edge-charts) explains. Choose one of these:
+
+   - Merge straight after the upgrade. Once the service-setup Job has
+     finished, merge `acs` into `main` and push it. Until you do, the
+     moved connections' devices have no data, because the version 6
+     charts can't start their sidecars.
+   - Or hold the move until the edge is on version 7. Set each protocol
+     your site uses to `null` for this upgrade:
+
+     ```yaml
+     serviceSetup:
+       config:
+         splitDrivers:
+           REST: null
+           MQTT: null
+           OPCUA: null
+           UDP: null
+     ```
+
+     Service-setup leaves those connections on their built-in drivers,
+     which the version 6 Edge Agents still run, so nothing stops. It
+     logs a line each run starting `ERROR:
+     serviceSetup.config.splitDrivers.REST is null` that counts them.
+     Merge `acs` into `main` when you can. Your Edge Agents then start
+     version 7, which can't run built-in connections, so the held
+     connections have no data until the next step: remove the `null`
+     settings and run the upgrade again (or re-run the service-setup
+     Job), which moves them. Do the two close together.
 2. **Check every edge cluster is fetching from the central git server.**
    An edge cluster that can't fetch keeps the old charts, so its moved
    connections have no data until it can.
@@ -147,28 +174,24 @@ definitions, as it did for the drivers ACS 6 retired.
 
 ### The setting
 
-`serviceSetup.config.splitDrivers` in the chart's values has one
-setting:
+`serviceSetup.config.splitDrivers` in the chart's values takes a value
+for each protocol, `REST`, `MQTT`, `OPCUA` and `UDP`:
 
-```yaml
-serviceSetup:
-  config:
-    splitDrivers:
-      dryRun: true    # log what would move and change nothing
-```
+| Value | What service-setup does on every install or upgrade |
+|---|---|
+| not set, or `true` | Moves the protocol's connections to its split driver. |
+| `null` | Leaves them on the built-in driver, and logs an `ERROR:` line counting them. Only for a site whose Edge Agents still run version 6, as in step 1 of [Before you upgrade](#before-you-upgrade): a version 7 Edge Agent can't run them. |
+| `false` | Refused, because there is no move back: it logs an `ERROR:` line and moves the connections as if it were not set. |
 
-With `dryRun: true` service-setup logs each change it would make and
-writes nothing. Use it only on a test cluster: on a site, a connection a
-dry run leaves on its built-in driver has no data, because the version 7
-Edge Agent can't run it.
+The chart's default is `splitDrivers: {}`, with no protocol named. Keep
+it that way in any values you change: Helm drops a site's `null` for a
+key the chart's defaults name, so the hold would not reach
+service-setup.
 
-Version 6 also took `REST`, `MQTT`, `OPCUA` and `UDP`, each `true`,
-`false` (move back) or `null` (leave alone). `true` is what happens
-anyway. `false` and `null` would leave connections the Edge Agent can't
-run, so service-setup refuses them: it logs a line starting
-`ERROR: serviceSetup.config.splitDrivers.<PROTOCOL> is false` (or
-`null`) and moves the connections anyway. Remove the setting from your
-values.
+`dryRun: true` logs each change service-setup would make and writes
+nothing. Use it only on a test cluster: on a site, a connection a dry
+run leaves on its built-in driver has no data once its Edge Agent runs
+version 7.
 
 ### New connections
 
@@ -420,7 +443,12 @@ in this order:
 
 - **A `driver-<name>` container can't pull its image.** The edge cluster
   has the old charts: merge `acs` into `main` as in [Edge
-  charts](#edge-charts).
+  charts](#edge-charts). Setting the protocol to `null` now doesn't
+  help: it holds connections that haven't moved yet, and doesn't move
+  any back.
+- **The service-setup log has `ERROR: serviceSetup.config.splitDrivers.<PROTOCOL>
+  is null`, and the Edge Agent runs version 7.** The held connections
+  can't run on it. Remove the setting and run the upgrade again.
 - **The connection has no `driver-<name>` container.** Look in the
   service-setup log for an `ERROR: Connection` line naming it. A UDP
   connection whose port another connection has needs another port, as

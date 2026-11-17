@@ -18,7 +18,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use bytes::{Bytes, BytesMut};
-use rs_edge_driver::{Driver, DriverConfig, Handler};
+use rs_edge_driver::{Driver, DriverConfig, DriverOptions, Handler};
 use rumqttc::mqttbytes::v4::{
     ConnAck, ConnectReturnCode, Packet, PingResp, PubAck, Publish, SubAck, SubscribeReasonCode,
 };
@@ -336,6 +336,17 @@ impl Drop for RunningDriver {
 pub fn spawn_driver<H: Handler + 'static>(config: DriverConfig) -> RunningDriver {
     RunningDriver(tokio::spawn(async move {
         let mut driver = Driver::<H>::new(config);
+        let _ = driver.run().await;
+    }))
+}
+
+/// Start a driver built with [`Driver::with_options`].
+pub fn spawn_driver_with<H: Handler + 'static>(
+    config: DriverConfig,
+    options: DriverOptions,
+) -> RunningDriver {
+    RunningDriver(tokio::spawn(async move {
+        let mut driver = Driver::<H>::with_options(config, options);
         let _ = driver.run().await;
     }))
 }

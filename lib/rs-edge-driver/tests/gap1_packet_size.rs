@@ -5,7 +5,8 @@ mod common;
 
 use bytes::Bytes;
 use common::handler::{Ctl, FakeHandler};
-use common::{FakeAgent, FromDriver, secs, spawn_driver};
+use common::{FakeAgent, FromDriver, secs, spawn_driver, spawn_driver_with};
+use rs_edge_driver::DriverOptions;
 
 /// About 1 MiB of addresses: 20,000 entries of 40-odd bytes each.
 fn big_addr_map() -> Vec<(String, String)> {
@@ -64,9 +65,9 @@ async fn one_mib_data_payload_is_sent() {
 #[tokio::test]
 async fn limit_is_configurable() {
     let mut agent = FakeAgent::start("Conn").await;
-    let mut config = agent.config();
-    config.max_packet_size = 64 * 1024;
-    let _driver = spawn_driver::<FakeHandler>(config);
+    let mut options = DriverOptions::default();
+    options.max_packet_size = 64 * 1024;
+    let _driver = spawn_driver_with::<FakeHandler>(agent.config(), options);
     let ctl = Ctl::new();
 
     let addrs = big_addr_map();

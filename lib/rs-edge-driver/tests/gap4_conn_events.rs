@@ -1,6 +1,6 @@
 //! Gap 4: a handler had no way to report losing its device after
-//! `UP`. `DriverHandle::disconnected` now moves the status to CONN,
-//! AUTH or ERR and starts a reconnect.
+//! `UP`. `DriverHandle::disconnected` now moves the status to CONN or
+//! AUTH, and `DriverHandle::error` to ERR, and both start a reconnect.
 
 mod common;
 
@@ -9,7 +9,7 @@ use common::handler::{Ctl, FakeHandler};
 use common::{FakeAgent, FromDriver, ms, secs, spawn_driver};
 use rs_edge_driver::ConnectError;
 
-async fn lost_after_up(reason: ConnectError, status: &str) {
+async fn lost_after_up(report: impl Fn(&rs_edge_driver::DriverHandle<String>), status: &str) {
     let mut agent = FakeAgent::start("Conn").await;
     let _driver = spawn_driver::<FakeHandler>(agent.config());
     let ctl = Ctl::new();
@@ -18,7 +18,7 @@ async fn lost_after_up(reason: ConnectError, status: &str) {
     agent.wait_status("UP", secs(5)).await;
     assert_eq!(Ctl::count(&ctl.connects), 1);
 
-    ctl.handle().disconnected(reason);
+    report(&ctl.handle());
     agent.wait_status(status, secs(2)).await;
 
     // The spec forbids data while the status isn't UP.
@@ -34,17 +34,17 @@ async fn lost_after_up(reason: ConnectError, status: &str) {
 
 #[tokio::test]
 async fn connection_lost_after_up() {
-    lost_after_up(ConnectError::ConnectionFailed, "CONN").await;
+    lost_after_up(|h| h.disconnected(ConnectError::ConnectionFailed), "CONN").await;
 }
 
 #[tokio::test]
 async fn auth_failed_after_up() {
-    lost_after_up(ConnectError::AuthFailed, "AUTH").await;
+    lost_after_up(|h| h.disconnected(ConnectError::AuthFailed), "AUTH").await;
 }
 
 #[tokio::test]
 async fn other_error_after_up() {
-    lost_after_up(ConnectError::Other, "ERR").await;
+    lost_after_up(|h| h.error(), "ERR").await;
 }
 
 /// Reports from a handler that has since been replaced are ignored.

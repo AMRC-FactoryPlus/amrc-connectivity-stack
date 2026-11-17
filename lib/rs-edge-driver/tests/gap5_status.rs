@@ -1,5 +1,5 @@
-//! Gap 5: the ERR status, `active OFFLINE` and the README link.
-//! (VERBOSE is covered by unit tests in `src/logging.rs`.)
+//! Gap 5: `active OFFLINE` and the README link. ERR is covered in
+//! `gap4_conn_events.rs` and VERBOSE by unit tests in `src/logging.rs`.
 
 mod common;
 
@@ -7,23 +7,6 @@ use std::path::Path;
 
 use common::handler::{Ctl, FakeHandler};
 use common::{FakeAgent, FromDriver, ms, secs, spawn_driver};
-use rs_edge_driver::{ConnectError, Status};
-
-#[test]
-fn err_status_is_published_as_err() {
-    assert_eq!(Status::Err.to_string(), "ERR");
-}
-
-#[tokio::test]
-async fn connect_error_other_reports_err() {
-    let mut agent = FakeAgent::start("Conn").await;
-    let _driver = spawn_driver::<FakeHandler>(agent.config());
-    let ctl = Ctl::new();
-    *ctl.connect_error.lock().unwrap() = Some(ConnectError::Other);
-
-    agent.handshake(ctl.conf(), &[("1", "a")]).await;
-    agent.wait_status("ERR", secs(5)).await;
-}
 
 /// OFFLINE: drop the configuration, close the handler and go back to
 /// READY. ONLINE afterwards publishes READY so the agent sends conf.

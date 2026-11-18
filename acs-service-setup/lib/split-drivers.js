@@ -94,18 +94,22 @@
  *    adds the sidecar. The built-in UDP connection only allowed port
  *    50205, so two on one host is the likely case.
  *
- * Before any move, every split driver connection whose name can't be
- * its driver id is given a `driverId` in its Edge Agent config, and its
- * `values.drivers` entry is moved from its name to that id. A name with
- * a dot never worked as a split driver, and one with an underscore or
- * a space never deployed, so this changes nothing that was running. An
- * agent whose names all work as ids is not written.
+ * Before any move, every split driver connection that runs as a
+ * container and whose name can't be its driver id is given a
+ * `driverId` in its Edge Agent config, and its `values.drivers` entry
+ * is moved from its name to that id. A name with a dot never worked as
+ * a split driver, and one with an underscore or a space never deployed
+ * as a sidecar, so this changes nothing that was running. A driver
+ * with no container (the External DriverDef) logs in under its name,
+ * so it is never given an id. An agent whose names all work as ids is
+ * not written.
  */
 
 import {
     ServiceError, UUIDs,
-    driver_id, driver_ports, driver_values, move_connection, move_entry,
-    move_payload_format, port_clashes, set_driver_ids,
+    connection_place, driver_id, driver_ports, driver_values,
+    move_connection, move_entry, move_payload_format, port_clashes,
+    set_driver_ids,
 } from "@amrc-factoryplus/service-client";
 
 import { ACS, Edge } from "./uuids.js";
@@ -195,11 +199,12 @@ export class MigrateSplitDrivers {
             this.log("Dry run: logging what would change, writing nothing. A "
                 + "connection left on a built-in driver gets no data in ACS 7.");
 
-        count.ids = await this.repair_driver_ids();
-
         const { cdb } = this;
         this.cconfs = await cdb.get_all_configs(App.ConnectionConfiguration);
         this.drivers = await cdb.get_all_configs(App.DriverDefinition);
+
+        count.ids = await this.repair_driver_ids();
+
         this.deployments = await cdb.get_all_configs(Edge.App.Deployment);
         this.agents = await cdb.get_all_configs(App.EdgeAgentConfig);
         this.host_ports = this.open_ports();
@@ -285,26 +290,21 @@ export class MigrateSplitDrivers {
     }
 
     /* A connection's host ports as `port_clashes` takes them, with
-     * where it runs: its Edge Agent's cluster and the host the agent is
-     * pinned to, from the agent's Deployment, as the Manager reads them
-     * (acs-admin/src/utils/hostPorts.js): `values.hostname` if it is
-     * set, else `hostname`. A connection's own `topology`
-     * copy was written empty for a long time, so it is used only for an
-     * agent with no Deployment. */
+     * where it runs, by the rule the Manager uses too
+     * (`connection_place`). */
     placed (conn, cconf, ports) {
-        const deployment = this.deployments.get(cconf.edgeAgent);
-        const where = deployment ?? cconf.topology ?? {};
-        /* edge-sync merges the Deployment's values over the chart's
-         * last, so a hostname there decides the host. */
-        const host = deployment
-            ? deployment.values?.hostname ?? deployment.hostname
-            : where.hostname;
         return {
-            name:       conn,
-            cluster:    where.cluster,
-            hostname:   host && host != "Floating" ? host : undefined,
+            name:   conn,
+            ...connection_place(this.deployments.get(cconf.edgeAgent), cconf.topology),
             ports,
         };
+    }
+
+    /* The DriverDef of a connection entry, from the run's snapshot of
+     * the ConnectionConfigs, as `set_driver_ids` takes it. A connection
+     * moved earlier in the run is in the snapshot as moved. */
+    driverdef_of (entry) {
+        return this.drivers.get(this.cconfs.get(entry.uuid)?.driver);
     }
 
     /* A connection whose host ports another connection that can run on
@@ -350,7 +350,7 @@ export class MigrateSplitDrivers {
             if (!Array.isArray(conns)) return;
 
             const out = structuredClone(config);
-            set_driver_ids(out.deviceConnections);
+            set_driver_ids(out.deviceConnections, e => this.driverdef_of(e));
             const split = out.deviceConnections.filter(e => e.connType == "Driver");
             ids = new Set(split.map(driver_id));
             renames = split
@@ -453,34 +453,46 @@ export class MigrateSplitDrivers {
          * port first. */
         const ports = driver_ports(next, to_def);
         const holds = this.host_ports.has(conn);
-        const clash = ports.length && !holds
-            ? this.port_clash(conn, next, ports) : undefined;
-        if (clash) {
-            this.log("ERROR: Connection %s: moved to the split driver without its "
-                + "container, because connection %s, which can run on the same "
-                + "host, already opens %s port %s there. Its devices get no data "
-                + "until it has another port: change the port in the Manager and "
-                + "save the connection.",
-                conn, clash.names[1], clash.protocol, clash.port);
-        }
-        else if (ports.length)
-            this.host_ports.set(conn, this.placed(conn, next, ports));
 
         const format = moving
             ? f => move_payload_format(f, proto.payloadFormat, true)
             : f => f;
 
         let changed = false;
+        let clash;
+        /* Whether the Deployment renders the connection's sidecar after
+         * this. Only then does it open its ports. */
+        let sidecar = false;
         if (agent) {
             const entry = await this.update_config(conn, agent, to_def, format, cconf.config);
             /* A connection with no entry has no devices. The admin UI
-             * gives it no driver values either. */
+             * gives it no driver values either, so it has no sidecar to
+             * hold back. */
             if (entry) {
+                clash = ports.length && !holds
+                    ? this.port_clash(conn, next, ports) : undefined;
+                if (clash) {
+                    this.log("ERROR: Connection %s: moved to the split driver without its "
+                        + "container, because connection %s, which can run on the same "
+                        + "host, already opens %s port %s there. Its devices get no data "
+                        + "until it has another port: change the port in the Manager and "
+                        + "save the connection.",
+                        conn, clash.names[1], clash.protocol, clash.port);
+                }
                 const values = driver_values(next, to_def);
                 const dep = await this.update_deployment(agent, entry, values, !!clash);
-                changed = entry.changed || dep;
+                changed = entry.changed || dep.changed;
+                sidecar = dep.sidecar;
             }
         }
+
+        /* A connection with no agent, no entry or no sidecar opens no
+         * port, so it must not keep the next connection from having
+         * one. */
+        if (ports.length && sidecar)
+            this.host_ports.set(conn, this.placed(conn, next, ports));
+        else
+            this.host_ports.delete(conn);
 
         if (moving) {
             this.log("Connection %s: driver %s to %s, payload format %o to %o",
@@ -496,6 +508,9 @@ export class MigrateSplitDrivers {
                     throw e;
                 }
             }
+            /* The connections moved later in the run read this
+             * connection's driver from the snapshot. */
+            this.cconfs.set(conn, next);
         }
         if (clash) return "no_sidecar";
         return moving ? "moved" : changed ? "repaired" : "unchanged";
@@ -544,7 +559,8 @@ export class MigrateSplitDrivers {
 
             const out = structuredClone(config);
             out.deviceConnections[i] = move_entry(conns[i], to_def, format, fallback);
-            set_driver_ids(out.deviceConnections);
+            set_driver_ids(out.deviceConnections,
+                e => e.uuid == conn ? to_def : this.driverdef_of(e));
             const entry = out.deviceConnections[i];
 
             const split = e => e?.connType == "Driver";
@@ -583,10 +599,15 @@ export class MigrateSplitDrivers {
      * ids changed with it. A key under the connection's name or old id
      * is removed, unless it is another split driver's. With `no_add`, a
      * sidecar the deployment doesn't have is not added (its port is in
-     * use), and one it has is left alone. */
+     * use), and one it has is left alone.
+     *
+     * Returns `{ changed, sidecar }`: whether the deployment was
+     * written, and whether it has the connection's sidecar after. */
     async update_deployment (agent, entry, values, no_add) {
         const { name, id, own, renames, others } = entry;
-        return await this.rewrite(Edge.App.Deployment, agent, deployment => {
+        let sidecar = false;
+        const changed = await this.rewrite(Edge.App.Deployment, agent, deployment => {
+            sidecar = false;
             /* Never create a Deployment: the Manager does that when
              * someone asks it to. */
             if (!deployment) return;
@@ -618,6 +639,7 @@ export class MigrateSplitDrivers {
             }
 
             if (!no_add) next[id] = values;
+            sidecar = id in next;
             if (same(next, drivers)) return;
 
             if (!same(next[id], drivers[id]))
@@ -628,6 +650,7 @@ export class MigrateSplitDrivers {
             (out.values ??= {}).drivers = next;
             return out;
         });
+        return { changed, sidecar };
     }
 }
 

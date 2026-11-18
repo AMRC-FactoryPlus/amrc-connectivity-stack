@@ -128,13 +128,14 @@ impl Health {
         }
     }
 
-    /// A poll of `addr` is starting.
+    /// A poll of `addr` is starting. An address not in the table has
+    /// left the map since the poll was asked for, so it is not put
+    /// back: it would never leave again, and would hold the connection
+    /// up or down for an address nobody polls.
     pub fn polled(&mut self, addr: &str, now: Instant) {
-        let e = self.addrs.entry(addr.to_owned()).or_insert(Entry {
-            last_poll: None,
-            gap: None,
-            state: None,
-        });
+        let Some(e) = self.addrs.get_mut(addr) else {
+            return;
+        };
         if let Some(last) = e.last_poll {
             e.gap = Some(now.saturating_duration_since(last));
         }
@@ -232,6 +233,7 @@ mod tests {
     fn one_failing_address_leaves_the_connection_up() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         let got = run(
             &mut h,
             &c,
@@ -246,6 +248,7 @@ mod tests {
     fn an_error_status_counts_as_a_reply() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         let got = run(
             &mut h,
             &c,
@@ -259,6 +262,7 @@ mod tests {
     fn every_address_failing_loses_the_connection_after_a_round() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         let got = run(&mut h, &c, (0, 60_000, 250), &[("/a", CONN), ("/b", CONN)]);
         // The round is 250 ms plus a second of slack.
         let (t, why) = got.unwrap();
@@ -270,10 +274,12 @@ mod tests {
     fn all_auth_failures_give_auth_and_a_mix_gives_conn() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         let got = run(&mut h, &c, (0, 10_000, 250), &[("/a", AUTH), ("/b", AUTH)]);
         assert_eq!(got.unwrap().1, ConnectError::AuthFailed);
 
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         let got = run(&mut h, &c, (0, 10_000, 250), &[("/a", AUTH), ("/b", CONN)]);
         assert_eq!(got.unwrap().1, ConnectError::ConnectionFailed);
     }
@@ -284,6 +290,7 @@ mod tests {
     fn a_failure_at_the_start_waits_for_a_round() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         h.polled("/a", c.at(0));
         assert_eq!(h.read("/a", CONN, c.at(1)).lost, None);
         h.polled("/b", c.at(10));
@@ -296,6 +303,7 @@ mod tests {
     fn a_slow_working_address_keeps_the_connection_up() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/slow", "/fast"]);
         let mut t = 0;
         while t < 120_000 {
             if t % 20_000 == 0 {
@@ -312,6 +320,7 @@ mod tests {
     fn failures_are_logged_once_until_they_recover() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a", "/b"]);
         let mut logs = Vec::new();
         for (i, r) in [
             CONN,
@@ -352,6 +361,7 @@ mod tests {
     fn the_loss_is_reported_once_until_reset() {
         let c = Clock(Instant::now());
         let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a"]);
         assert!(run(&mut h, &c, (0, 5_000, 250), &[("/a", CONN)]).is_some());
         assert_eq!(run(&mut h, &c, (5_000, 10_000, 250), &[("/a", CONN)]), None);
         h.reset(c.at(10_000));
@@ -375,6 +385,19 @@ mod tests {
         assert_eq!(run(&mut h, &c, (2_000, 10_000, 250), &[("/a", CONN)]), None);
         h.set_addrs(["/a"]);
         let got = run(&mut h, &c, (10_000, 20_000, 250), &[("/a", CONN)]);
+        assert_eq!(got.unwrap().1, ConnectError::ConnectionFailed);
+    }
+
+    /// A poll that starts after its address left the map doesn't put
+    /// the address back, so the addresses still in the map decide.
+    #[test]
+    fn a_poll_after_its_address_left_does_not_bring_it_back() {
+        let c = Clock(Instant::now());
+        let mut h = Health::new(c.at(0));
+        h.set_addrs(["/a"]);
+        h.polled("/old", c.at(0));
+        h.read("/old", Read::Data, c.at(5));
+        let got = run(&mut h, &c, (0, 10_000, 250), &[("/a", CONN)]);
         assert_eq!(got.unwrap().1, ConnectError::ConnectionFailed);
     }
 

@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest'
 
 import { set_driver_ids } from '@amrc-factoryplus/service-client'
 
-import { applyConnection, deploymentDrivers } from '../src/utils/edgeAgentConfigUpdater.js'
+import { applyConnection, deploymentDrivers, entryDriverDef } from '../src/utils/edgeAgentConfigUpdater.js'
 import { hostCount, hostPortClash, moveHostClash, nodePlace, pinnedHost } from '../src/utils/hostPorts.js'
 
 /* As acs-service-setup/dumps/edge.yaml has them. */
@@ -224,5 +224,73 @@ describe('moveHostClash: moving an Edge Agent', () => {
       conn('u4', 'robot-2', UDP, { port: 5000 }, 'agent-a'),
     ]
     expect(moveHostClash(move('agent-a', 'host-b'), stores(own))).toBeUndefined()
+  })
+})
+
+/* Service-setup moves a connection without its sidecar when another
+ * connection that can run on the same host has its port. A later save
+ * in the Manager must not add it back: the edge-agent chart refuses a
+ * Deployment with two sidecars on one port. */
+describe('deploymentDrivers leaves out a sidecar whose port is in use', () => {
+  const opts = (current, more) => ({ agent: 'agent-a', current, nodes, ...more })
+
+  it('on the same Edge Agent, keeping the one the Deployment has', () => {
+    const connections = [
+      conn('u1', 'robot', UDP, { port: 5000 }),
+      conn('u2', 'arm', UDP, { port: 5000 }),
+    ]
+    const current = { arm: { image: UDP.image } }
+    expect(Object.keys(deploymentDrivers(entries(connections), connections, opts(current))))
+      .toEqual(['arm'])
+  })
+
+  it('of two new ones on the same Edge Agent, keeping the first', () => {
+    const connections = [
+      conn('u1', 'robot', UDP, { port: 5000 }),
+      conn('u2', 'arm', UDP, { port: 5000 }),
+      conn('r1', 'web', REST, {}),
+    ]
+    expect(Object.keys(deploymentDrivers(entries(connections), connections, opts({}))))
+      .toEqual(['robot', 'web'])
+  })
+
+  it('used by another Edge Agent on the same host', () => {
+    const here = [conn('u1', 'robot', UDP, { port: 5000 })]
+    const there = conn('u2', 'arm', UDP, { port: 5000 }, 'agent-float')
+    const all = [...here, there]
+    expect(deploymentDrivers(entries(here), all, opts({}))).toEqual({})
+    /* One it has already keeps its port. */
+    expect(Object.keys(deploymentDrivers(entries(here), all, opts({ robot: {} }))))
+      .toEqual(['robot'])
+  })
+
+  it('but not one on another host, or on a free port', () => {
+    const here = [conn('u1', 'robot', UDP, { port: 5000 })]
+    const all = [...here,
+      conn('u2', 'arm', UDP, { port: 5000 }, 'agent-b'),
+      conn('u3', 'arm-2', UDP, { port: 5001 }, 'agent-float')]
+    expect(Object.keys(deploymentDrivers(entries(here), all, opts({}))))
+      .toEqual(['robot'])
+  })
+})
+
+/* A driver with no container (the External DriverDef) logs in to the
+ * Edge Agent's broker under its connection name, so a Manager save
+ * gives it no driverId, as service-setup gives it none. */
+describe('driver ids for a driver with no container', () => {
+  const EXTERNAL = {}
+
+  it('keeps its name as its id', () => {
+    const connections = [
+      conn('1a2b3c4d-0000-4000-8000-000000000001', 'line_1_scanner', EXTERNAL, {}),
+      conn('2a2b3c4d-0000-4000-8000-000000000002', 'web.example.org', REST, {}),
+    ]
+    const saved = set_driver_ids(connections.map(c => ({
+      ...applyConnection(null, c), devices: [{ deviceId: 'd' }],
+    })), entryDriverDef(connections))
+    expect(saved.map(e => e.driverId)).toEqual([undefined, 'web-example-org-2a2b3c4d'])
+    expect(deploymentDrivers(saved, connections)).toEqual({
+      'web-example-org-2a2b3c4d': { image: REST.image },
+    })
   })
 })

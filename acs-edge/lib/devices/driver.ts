@@ -81,6 +81,7 @@ export class DriverConnection extends DeviceConnection {
     #dataTimer: NodeJS.Immediate | NodeJS.Timeout | null = null
     #dataWait   = data_wait()
     #onMessage  = this.#message.bind(this)
+    #nextTopic  = Math.floor(Math.random() * 100000)
 
     constructor(type: string, details: any, name: string, broker: DriverBroker) {
         // Call constructor of parent class
@@ -318,12 +319,16 @@ export class DriverConnection extends DeviceConnection {
     //async stopSubscription(deviceId: string, stopSubCallback: Function) {
     //}
 
+    /* A new data topic name: a decimal integer, counting up from a
+     * random start below 100000. Names are never reused within one
+     * connection (addresses stay in `addrs`), so the count always
+     * finds a free one, and a new connection after a reload starts
+     * somewhere else, so data a driver sent under the old names is
+     * unlikely to match a new one. */
     #newTopic () {
-        while (true) {
-            const dt = Math.floor(Math.random() * 100000).toString();
-            if (!this.addrs.has(dt))
-                return dt;
-        }
+        while (this.addrs.has(this.#nextTopic.toString()))
+            this.#nextTopic++;
+        return (this.#nextTopic++).toString();
     }
 
     #message (message) {

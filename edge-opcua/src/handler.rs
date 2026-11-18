@@ -24,7 +24,9 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use opcua::client::{Client, ClientBuilder, IdentityToken, Password, Session, SessionPollResult};
 use opcua::crypto::SecurityPolicy;
-use opcua::types::{AttributeId, DataValue, StatusCode, WriteValue as UaWriteValue};
+use opcua::types::{
+    AttributeId, DataValue, MessageSecurityMode, StatusCode, WriteValue as UaWriteValue,
+};
 use rs_edge_driver::{
     AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, WriteError, WriteValue,
 };
@@ -80,6 +82,9 @@ pub struct OpcuaHandler {
     /// The session's subscriptions, once they are made.
     subs: Option<Subs>,
     dropped: Arc<Dropped>,
+    /// The SHA-1 thumbprint of the client certificate, once it has been
+    /// logged. Only connections with security use it.
+    thumbprint: Option<String>,
 }
 
 /// Where the client keeps its certificate and the server certificates
@@ -112,25 +117,79 @@ fn channel_lifetime() -> u32 {
 
 /// Whether a failed connection is the server refusing who we are,
 /// reported as `AUTH`, rather than not reaching it, reported as `CONN`.
-fn is_auth_failure(status: StatusCode) -> bool {
-    [
-        StatusCode::BadUserAccessDenied,
-        StatusCode::BadIdentityTokenInvalid,
-        StatusCode::BadIdentityTokenRejected,
-        StatusCode::BadSecurityChecksFailed,
-        StatusCode::BadCertificateUntrusted,
-        StatusCode::BadCertificateInvalid,
-        StatusCode::BadCertificateRevoked,
-        StatusCode::BadCertificateUseNotAllowed,
-        StatusCode::BadCertificateTimeInvalid,
-        StatusCode::BadSecurityPolicyRejected,
-        StatusCode::BadSecurityModeRejected,
-    ]
-    .contains(&status)
+/// A Good status only means a refusal on a secure connection (see
+/// `is_refusal`).
+fn is_auth_failure(status: StatusCode, secure: bool) -> bool {
+    if status.is_good() {
+        return secure;
+    }
+    is_refusal(status)
+        || [
+            StatusCode::BadUserAccessDenied,
+            StatusCode::BadIdentityTokenInvalid,
+            StatusCode::BadIdentityTokenRejected,
+        ]
+        .contains(&status)
 }
 
-fn connect_error(status: StatusCode) -> ConnectError {
-    if is_auth_failure(status) {
+/// Whether a failed attempt to connect is the server refusing the
+/// secure channel, which it does when it doesn't trust the client's
+/// certificate.
+///
+/// Some servers, node-opcua among them, send that refusal as a
+/// secure-channel message (channel id, security policy, then a
+/// ServiceFault with the real status) in a TCP error frame. async-opcua
+/// reads the frame as a plain error message, so the channel id becomes
+/// the status code and the policy URI the reason: a "Good" status that
+/// differs each time, such as `Good, Partial`. A failure is never Good,
+/// so a Good status here is that refusal.
+fn is_refusal(status: StatusCode) -> bool {
+    status.is_good()
+        || [
+            StatusCode::BadSecurityChecksFailed,
+            StatusCode::BadCertificateUntrusted,
+            StatusCode::BadCertificateInvalid,
+            StatusCode::BadCertificateRevoked,
+            StatusCode::BadCertificateUseNotAllowed,
+            StatusCode::BadCertificateTimeInvalid,
+            StatusCode::BadCertificateHostNameInvalid,
+            StatusCode::BadCertificateUriInvalid,
+            StatusCode::BadCertificateRevocationUnknown,
+            StatusCode::BadCertificateIssuerRevocationUnknown,
+            StatusCode::BadCertificateChainIncomplete,
+            StatusCode::BadSecurityPolicyRejected,
+            StatusCode::BadSecurityModeRejected,
+        ]
+        .contains(&status)
+}
+
+/// The log line for a failed attempt to connect. A secure connection
+/// the server refused says that the server may not trust the driver's
+/// certificate, which is what a person needs to act on, rather than a
+/// status that may be nonsense (see `is_refusal`).
+fn failure_message(status: StatusCode, thumbprint: Option<&str>) -> String {
+    match thumbprint {
+        Some(thumbprint) if is_refusal(status) => {
+            let why = if status.is_good() {
+                String::new()
+            } else {
+                format!(" ({status})")
+            };
+            format!(
+                "the OPC UA server refused the secure connection{why}: it may not trust \
+                 this driver's certificate, SHA-1 thumbprint {thumbprint}. Look for it in \
+                 the server's rejected certificates and trust it there"
+            )
+        }
+        _ if status.is_good() => {
+            "OPC UA connection failed: the server closed it without a readable status".into()
+        }
+        _ => format!("OPC UA connection failed: {status}"),
+    }
+}
+
+fn connect_error(status: StatusCode, secure: bool) -> ConnectError {
+    if is_auth_failure(status, secure) {
         ConnectError::AuthFailed
     } else {
         ConnectError::ConnectionFailed
@@ -202,13 +261,43 @@ impl OpcuaHandler {
             })
     }
 
+    fn secure(&self) -> bool {
+        self.config.mode != MessageSecurityMode::None
+    }
+
+    /// Log the client certificate's file and SHA-1 thumbprint, once, for
+    /// a connection with security, so a person can find the certificate
+    /// in the server's rejected list and trust it. The certificate is
+    /// made when the first client is, and lasts as long as `pki_dir`.
+    fn log_certificate(&mut self, client: &Client) {
+        if !self.secure() || self.thumbprint.is_some() {
+            return;
+        }
+        let store = client.certificate_store().read();
+        let path = store.own_certificate_path();
+        match store.read_own_cert() {
+            Ok(cert) => {
+                let thumbprint = cert.thumbprint().as_hex_string();
+                tracing::info!(
+                    "OPC UA client certificate {}, SHA-1 thumbprint {thumbprint}: the server \
+                     must trust it for a {:?} connection",
+                    path.display(),
+                    self.config.mode,
+                );
+                self.thumbprint = Some(thumbprint);
+            }
+            Err(e) => tracing::warn!("can't read the OPC UA client certificate: {e}"),
+        }
+    }
+
     /// Start a session: ask the server for its endpoints, take the one
     /// with the configured security, and connect to it at the
     /// configured URL. A server can advertise an address the edge
     /// can't reach (behind NAT, say), and node-opcua used the
     /// configured URL too.
-    async fn start(&self) -> Result<Conn, ConnectError> {
+    async fn start(&mut self) -> Result<Conn, ConnectError> {
         let mut client = self.client()?;
+        self.log_certificate(&client);
         let c = &self.config;
 
         let endpoints = tokio::time::timeout(
@@ -256,6 +345,7 @@ impl OpcuaHandler {
         let handle = self.handle.clone();
         let reconnected = Arc::new(AtomicBool::new(false));
         let flag = reconnected.clone();
+        let thumbprint = self.thumbprint.clone();
         let task = tokio::spawn(async move {
             let mut events = std::pin::pin!(event_loop.enter());
             let mut up = false;
@@ -281,7 +371,7 @@ impl OpcuaHandler {
                         }
                     }
                     Ok(SessionPollResult::ReconnectFailed(status)) => {
-                        tracing::warn!("OPC UA connection failed: {status}");
+                        tracing::warn!("{}", failure_message(status, thumbprint.as_deref()));
                         let _ = tx.send(State::Failed(status));
                     }
                     Ok(_) => {}
@@ -306,7 +396,7 @@ impl OpcuaHandler {
     }
 
     /// Wait for the session to be up, or for an attempt to fail.
-    async fn wait_up(state: &mut watch::Receiver<State>) -> Result<(), ConnectError> {
+    async fn wait_up(state: &mut watch::Receiver<State>, secure: bool) -> Result<(), ConnectError> {
         state.mark_unchanged();
         if *state.borrow() == State::Up {
             return Ok(());
@@ -318,7 +408,7 @@ impl OpcuaHandler {
                 }
                 match &*state.borrow_and_update() {
                     State::Up => return Ok(()),
-                    State::Failed(s) => return Err(connect_error(*s)),
+                    State::Failed(s) => return Err(connect_error(*s, secure)),
                     State::Connecting => {}
                 }
             }
@@ -355,6 +445,7 @@ impl Handler for OpcuaHandler {
             conn: None,
             subs: None,
             dropped: Arc::default(),
+            thumbprint: None,
         })
     }
 
@@ -374,8 +465,9 @@ impl Handler for OpcuaHandler {
         if self.conn.is_none() {
             self.conn = Some(self.start().await?);
         }
+        let secure = self.secure();
         let conn = self.conn.as_mut().expect("just set");
-        let result = Self::wait_up(&mut conn.state).await;
+        let result = Self::wait_up(&mut conn.state, secure).await;
         if let Err(e) = result {
             tracing::warn!("OPC UA connection not up yet ({e:?}); still trying");
         }
@@ -503,6 +595,60 @@ mod tests {
                 (100, vec!["ns=2;s=B", "ns=2;s=C"]),
                 (1000, vec!["ns=2;s=A", "ns=2;s=D"]),
             ]
+        );
+    }
+
+    /// The statuses async-opcua gave for node-opcua's refusals: the
+    /// secure channel id read as a status, so Good with history bits.
+    fn garbled() -> [StatusCode; 3] {
+        [
+            StatusCode::from(2u32),
+            StatusCode::from(4u32),
+            StatusCode::from(10u32),
+        ]
+    }
+
+    #[test]
+    fn a_good_status_for_a_failure_is_a_refusal_on_a_secure_connection() {
+        for s in garbled() {
+            assert!(s.is_good(), "{s}");
+            assert!(is_refusal(s), "{s}");
+            assert!(matches!(connect_error(s, true), ConnectError::AuthFailed));
+            assert!(matches!(
+                connect_error(s, false),
+                ConnectError::ConnectionFailed
+            ));
+        }
+        assert!(matches!(
+            connect_error(StatusCode::BadCertificateUntrusted, false),
+            ConnectError::AuthFailed
+        ));
+        assert!(matches!(
+            connect_error(StatusCode::BadConnectionClosed, true),
+            ConnectError::ConnectionFailed
+        ));
+        assert!(!is_refusal(StatusCode::BadTimeout));
+    }
+
+    #[test]
+    fn a_refusal_says_the_server_may_not_trust_the_certificate() {
+        let t = "0123456789abcdef0123456789abcdef01234567";
+        for s in garbled() {
+            let m = failure_message(s, Some(t));
+            assert!(m.contains("may not trust") && m.contains(t), "{m}");
+            assert!(!m.contains("Good"), "{m}");
+            let m = failure_message(s, None);
+            assert!(!m.contains("Good") && !m.contains("may not trust"), "{m}");
+        }
+        let m = failure_message(StatusCode::BadSecurityChecksFailed, Some(t));
+        assert!(
+            m.contains("may not trust") && m.contains("BadSecurityChecksFailed"),
+            "{m}"
+        );
+        let m = failure_message(StatusCode::BadTimeout, Some(t));
+        assert!(
+            !m.contains("may not trust") && m.contains("BadTimeout"),
+            "{m}"
         );
     }
 

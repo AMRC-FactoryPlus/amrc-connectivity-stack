@@ -28,6 +28,9 @@
  *   BULK_BYTES          make them Strings this long instead
  *   ITEMS_PER_CALL      MaxMonitoredItemsPerCall
  *   SUBS_PER_SESSION    MaxSubscriptionsPerSession
+ *   REJECT_CLIENTS      don't trust a client certificate it hasn't seen,
+ *                       but put it in <pki dir>/server/rejected, as a
+ *                       server set up by hand does
  *
  * It prints READY once it is listening. */
 
@@ -73,7 +76,7 @@ const Types = {
 (async () => {
     const certs = new OPCUACertificateManager({
         rootFolder: path.join(pki, "server"),
-        automaticallyAcceptUnknownCertificate: true,
+        automaticallyAcceptUnknownCertificate: !process.env.REJECT_CLIENTS,
     });
     await certs.initialize();
 

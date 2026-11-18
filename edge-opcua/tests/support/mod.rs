@@ -125,6 +125,25 @@ impl Server {
     pub fn url(&self) -> String {
         format!("opc.tcp://127.0.0.1:{}", self.port)
     }
+
+    /// Where the server keeps its certificates.
+    pub fn pki(&self) -> &std::path::Path {
+        &self.pki
+    }
+
+    /// Stop the server and start a new one on the same port with a new
+    /// certificate, as a reinstalled or replaced server comes back.
+    pub async fn reinstall(&mut self) {
+        self.stop().await;
+        let _ = std::fs::remove_dir_all(&self.pki);
+        self.run().await;
+    }
+
+    /// The server's own certificate file, as node-opcua writes it.
+    pub fn certificate(&self) -> Vec<u8> {
+        std::fs::read(self.pki.join("server/own/certs/certificate.pem"))
+            .expect("the server has no certificate")
+    }
 }
 
 impl Drop for Server {
@@ -247,6 +266,78 @@ pub fn rand_id() -> u64 {
     use std::sync::atomic::{AtomicU64, Ordering};
     static N: AtomicU64 = AtomicU64::new(0);
     N.fetch_add(1, Ordering::Relaxed)
+}
+
+/// The driver binary as a child process, logging at its default level,
+/// with every line it prints kept for the test to read.
+pub struct ChildDriver {
+    pub state_dir: PathBuf,
+    lines: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    _child: Child,
+}
+
+impl ChildDriver {
+    pub fn start(agent: &FakeAgent) -> Self {
+        let config = agent.config();
+        let state_dir = std::env::temp_dir().join(format!("edge-opcua-state-{}", free_port()));
+        let mut child = Command::new(env!("CARGO_BIN_EXE_driver"))
+            .env("EDGE_MQTT", &config.mqtt_url)
+            .env("EDGE_USERNAME", &config.username)
+            .env("EDGE_PASSWORD", &config.password)
+            .env("DRIVER_STATE_DIR", &state_dir)
+            .env_remove("VERBOSE")
+            .env_remove("RUST_LOG")
+            .env_remove("OPCUA_PKI_DIR")
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .expect("can't run the driver");
+        let lines: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+        let keep = lines.clone();
+        let mut out = BufReader::new(child.stdout.take().unwrap()).lines();
+        tokio::spawn(async move {
+            while let Ok(Some(line)) = out.next_line().await {
+                keep.lock().unwrap().push(line);
+            }
+        });
+        Self {
+            state_dir,
+            lines,
+            _child: child,
+        }
+    }
+
+    /// Wait for a line containing every one of `parts`, and return it.
+    pub async fn wait_line(&self, parts: &[&str], within: Duration) -> String {
+        let deadline = tokio::time::Instant::now() + within;
+        loop {
+            if let Some(l) = self
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|l| parts.iter().all(|p| l.contains(p)))
+            {
+                return l.clone();
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the driver logged no line with {parts:?}; it logged:\n{}",
+                self.lines.lock().unwrap().join("\n")
+            );
+            tokio::time::sleep(ms(100)).await;
+        }
+    }
+
+    pub fn log(&self) -> Vec<String> {
+        self.lines.lock().unwrap().clone()
+    }
+}
+
+impl Drop for ChildDriver {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.state_dir);
+    }
 }
 
 /// A TCP proxy in front of a server that can drop every connection

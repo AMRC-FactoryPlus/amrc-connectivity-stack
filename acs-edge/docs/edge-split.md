@@ -129,9 +129,9 @@ are potentially long strings containing arbitrary characters, the Edge
 Agent assigns a data topic name to each address it is currently using.
 These MUST be short strings of numbers, letters and underscores.
 
-**Implementation.** The Edge Agent uses random integers below 100000,
-written in decimal. They are not stable across restarts, so a driver
-MUST NOT store them.
+**Implementation.** The Edge Agent uses integers written in decimal,
+counting up from a random start below 100000 for each connection. They
+are not stable across restarts, so a driver MUST NOT store them.
 
 The Edge Agent MUST manage data topic names in such a way as to avoid
 problems with synchronisation, and MUST NOT assume a driver will react

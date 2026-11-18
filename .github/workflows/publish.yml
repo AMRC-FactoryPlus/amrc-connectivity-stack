@@ -361,6 +361,7 @@ jobs:
           - acs-monitor
           - acs-placement-watcher
           - acs-service-setup
+          - acs-user-admin
           - acs-visualiser
           - edge-helm-charts
           - acs-opcua-server-edge

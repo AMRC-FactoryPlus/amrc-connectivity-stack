@@ -1,0 +1,79 @@
+# User Admin service: creates Factory+ human-user principals
+# direct-to-KDC, replacing the three manual, disconnected steps
+# (kadmin, ConfigDB object, ACL/group wiring) with a single "Create
+# User" action in acs-admin.
+#-REQUIRE: auth
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u UUIDs.Class.Service:
+    !u ACS.Service.UserAdmin:
+        name: "User administration"
+        iri: service/UserAdmin
+
+  # The PermGroup itself must be registered as a class (a member of
+  # ServicePerms) before ManageUsers can be declared a member of it
+  # below - mirrors how Auth/CmdEsc/ConfigDB/MQTT's PermGroups are
+  # registered in dumps/auth.yaml:54-74.
+  !u Auth.Class.ServicePerms:
+    !u ACS.PermGroup.UserAdmin:
+      name: "User admin permission"
+      iri: user-admin/perm/All
+      subclassOf:
+        - !u UUIDs.Class.Permission
+
+  !u ACS.PermGroup.UserAdmin:
+    !u UserAdmin.Perm.ManageUsers: { name: "Create and manage human users" }
+
+  # op1useradmin's account is created dynamically by krb-keys-operator
+  # (deploy/templates/user-admin/krbkeys.yaml, account.class:
+  # CentralService) rather than being a fixed UUID, so its own
+  # ConfigDB/Auth permissions - below - are granted to this ServiceRole
+  # group instead of to the account itself. account.groups on that
+  # KerberosKey places the account in this group at creation time.
+  # Modeled on Clusters.Requirement.ServiceAccount in dumps/clusters.yaml.
+  !u Auth.Class.ServiceRole:
+    !u UserAdmin.Requirement.ServiceAccount:
+      name: "User admin service account"
+      iri: service/UserAdminServiceAccount
+      subclassOf:
+        - !u Auth.Class.CentralService
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  # ManageUsers is granted to ACS.Group.Administrator in dumps/admin.yaml,
+  # not here. Auth's dump loader is fully authoritative per-principal -
+  # it deletes every existing grant for a principal that isn't
+  # re-declared in the same dump (acs-auth/lib/queries.js's
+  # dump_load_aces) - so a second, separate grants document for the
+  # same principal would wipe out everything admin.yaml granted it (or
+  # vice versa, depending on load order) on every service-setup run.
+
+  # The permissions acs-user-admin's routes.py needs to create a
+  # HumanUser object, name it, and link its Kerberos identity. Scoped
+  # to exactly that, not op1krbkeys's broader permission set
+  # (ManageACL, ManageGroup, Clusters.Perm.Secrets, ...), since this
+  # service never touches those. It has no permission to change group
+  # membership: a caller with ManageUsers must not be able to put a
+  # new user into a role through this account.
+  !u UserAdmin.Requirement.ServiceAccount:
+    # check_acl's own HTTP call (GET v2/acl/:principal) requires the
+    # caller - us - to hold ReadACL, scoped to our own permission
+    # group, or the Auth service itself 403s it (acs-auth/lib/
+    # api_v2.js's _get_acl). Mirrors sv1configdb/sv1directory/etc.'s own
+    # grants in this same file.
+    !u Auth.Perm.ReadACL:
+      !u ACS.PermGroup.UserAdmin: true
+    # find_principal (the pre-flight duplicate check in routes.py, and
+    # resolving an inbound caller's own Kerberos identity in lib/auth.py)
+    # requires this - it's only ever grantable on Wildcard.
+    !u Auth.Perm.ReadKerberos: null
+    !u Auth.Perm.ManageKerberos: null
+    !u ConfigDB.Perm.CreateObject:
+      !u Auth.Class.PrincipalType: true
+    !u ConfigDB.Perm.CreateSpecificObject:
+      !u Auth.Class.PrincipalType: true
+    !u ConfigDB.Perm.WriteConfig:
+      !u UUIDs.App.Info: false

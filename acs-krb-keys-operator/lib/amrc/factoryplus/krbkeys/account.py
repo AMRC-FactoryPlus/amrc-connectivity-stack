@@ -8,7 +8,8 @@ from    uuid        import UUID
 
 from    optional    import Optional
 
-from    amrc.factoryplus    import ServiceError, uuids
+from    amrc.factoryplus                    import uuids
+from    amrc.factoryplus.service_client     import ServiceError
 
 from    .context    import kk_ctx
 from    .util       import fields, immutable, log

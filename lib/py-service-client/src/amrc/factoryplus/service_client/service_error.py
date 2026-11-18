@@ -10,7 +10,7 @@ for name, uuid in uuids.Service.__dict__.items():
 
 class ServiceError (Exception):
     def __init__ (self, *args, **kw):
-        self.service = kw.pop("service") 
+        self.service = kw.pop("service")
         self.status = kw.get("status")
         super().__init__(*args)
 

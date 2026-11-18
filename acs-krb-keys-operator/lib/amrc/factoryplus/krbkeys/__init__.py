@@ -12,7 +12,8 @@ import  secrets
 import  kopf
 from    optional            import Optional
 
-from    amrc.factoryplus    import ServiceClient, uuids
+from    amrc.factoryplus                    import uuids
+from    amrc.factoryplus.service_client     import ServiceClient
 
 from .              import event
 from .context       import Context

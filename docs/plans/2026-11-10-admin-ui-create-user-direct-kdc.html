@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create Users from the Admin UI — direct-to-KDC plan</title>
+<style>
+  :root {
+    --bg: #0f1216;
+    --panel: #171b21;
+    --panel-2: #1d222a;
+    --border: #2a303a;
+    --text: #e6e9ee;
+    --muted: #9aa4b2;
+    --accent: #5b9dff;
+    --accent-2: #7ad6b0;
+    --warn: #e0a85b;
+    --danger: #e07a7a;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2.5rem 1.5rem 5rem;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  header { margin-bottom: 2.5rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 0.4rem; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); font-size: 0.95rem; }
+  .pill {
+    display: inline-block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-right: 0.4rem;
+  }
+  section { margin-bottom: 2.75rem; }
+  h2 {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.2rem;
+  }
+  p { color: var(--text); }
+  .lede { max-width: 72ch; }
+
+  /* trade-off table */
+  table.tradeoff {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  table.tradeoff th, table.tradeoff td {
+    padding: 0.7rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.tradeoff th {
+    background: var(--panel-2);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  table.tradeoff tr:last-child td { border-bottom: none; }
+  table.tradeoff td.dim { color: var(--muted); white-space: nowrap; }
+  td.old { color: var(--warn); }
+  td.new { color: var(--accent-2); }
+
+  /* flow diagram */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: stretch;
+  }
+  .step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem 0.95rem;
+    flex: 1 1 150px;
+    min-width: 150px;
+    position: relative;
+  }
+  .step .n {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .step .t { font-size: 0.86rem; }
+  .step .d { font-size: 0.76rem; color: var(--muted); margin-top: 0.25rem; }
+  .arrow {
+    align-self: center;
+    color: var(--border);
+    font-size: 1.2rem;
+    padding: 0 0.1rem;
+  }
+  .step.sync { border-color: rgba(122,214,176,0.35); }
+  .step.terminal { border-color: rgba(91,157,255,0.45); }
+
+  /* component cards */
+  .components { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1.2rem;
+  }
+  .card h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+  .card h3 .idx { color: var(--accent); font-family: var(--mono); margin-right: 0.4rem; }
+  .card ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+  .card li { font-size: 0.86rem; color: var(--muted); margin-bottom: 0.3rem; }
+  .card li b { color: var(--text); font-weight: 500; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
+    color: var(--accent-2);
+  }
+
+  /* callout */
+  .callout {
+    border: 1px solid rgba(224,168,91,0.4);
+    background: rgba(224,168,91,0.08);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    font-size: 0.88rem;
+  }
+  .callout .label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--warn);
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    display: block;
+  }
+
+  /* files */
+  .files { font-size: 0.85rem; }
+  .files .row { display: flex; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+  .files .row:last-child { border-bottom: none; }
+  .files .tag {
+    flex: 0 0 60px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    padding-top: 0.1rem;
+  }
+  .files .tag.new { color: var(--accent-2); }
+  .files .tag.edit { color: var(--accent); }
+  .files .tag.ref { color: var(--muted); }
+  .files .paths { color: var(--text); }
+  .files .paths code { display: inline-block; margin: 0.1rem 0.2rem 0.1rem 0; }
+
+  footer { color: var(--muted); font-size: 0.78rem; margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="pill">Plan</span><span class="pill">Alternative architecture</span><span class="pill">Not yet implemented</span>
+    <h1>Create Users from the Admin UI — direct-to-KDC alternative</h1>
+    <p class="subtitle">Companion to <code>docs/plans/2026-11-09-admin-ui-create-user.md</code> (left unmodified). Full text: <code>docs/plans/2026-11-10-admin-ui-create-user-direct-kdc.md</code>.</p>
+  </header>
+
+  <section>
+    <h2>Why reconsider</h2>
+    <p class="lede">The original plan creates users by submitting a <code>KerberosKey</code> CR for
+    <code>acs-krb-keys-operator</code> to reconcile. That operator never raises
+    <code>kopf.PermanentError</code> — every failure, even a permanent one, retries forever —
+    so the calling service can't tell "slow" from "will never finish" and is forced into a
+    bounded poll with a "still provisioning" UI state. This plan has the new service talk to the
+    KDC directly via kadmin instead, trading a second kadmin-credential holder for a genuinely
+    synchronous request.</p>
+
+    <table class="tradeoff">
+      <thead><tr><th>Dimension</th><th>Original — via KerberosKey CR</th><th>This plan — direct KDC</th></tr></thead>
+      <tbody>
+        <tr><td class="dim">Response model</td><td class="old">Submit CR → bounded poll (~20s) → 201 or 202 "still provisioning"</td><td class="new">Single synchronous HTTP call → 201</td></tr>
+        <tr><td class="dim">Kadmin credential holders</td><td class="old">One — <code>acs-krb-keys-operator</code> only</td><td class="new">Two — operator + new <code>op1useradmin</code> (explicit trade-off)</td></tr>
+        <tr><td class="dim">Native build (python-kadmV)</td><td class="old">One image</td><td class="new">Two images (operator + new service)</td></tr>
+        <tr><td class="dim">Kubernetes RBAC</td><td class="old">New Role: create/get/watch on <code>kerberos-keys</code>, Secret create</td><td class="new">None — service only talks HTTP + KDC, no K8s API access</td></tr>
+        <tr><td class="dim">Password handling</td><td class="old">Briefly written to a one-off K8s Secret for the operator to read</td><td class="new">Stays in request body / process memory only, never persisted</td></tr>
+        <tr><td class="dim">Duplicate-principal failure</td><td class="old">Spins operator into infinite retry if not pre-checked</td><td class="new">Immediate 409, same pre-flight check, no retry risk either way</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Request flow — <code>POST v1/user</code></h2>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><span class="t">ACL check</span><span class="d"><code>check_acl(caller, ManageUsers)</code></span></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">2</span><span class="t">Duplicate check</span><span class="d"><code>find_principal("kerberos", upn)</code> → 409 if found</span></div>
+      <div class="arrow">→</div>
+      <div class="step sync"><span class="n">3</span><span class="t">Create + set KDC principal</span><span class="d"><code>Kadm.set_password()</code> — one blocking kadmin call</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">4</span><span class="t">ConfigDB object</span><span class="d"><code>create_object(HumanUser)</code></span></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">5</span><span class="t">Identity mapping</span><span class="d"><code>add_identity(uuid, "kerberos", upn)</code></span></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">6</span><span class="t">Info name + groups</span><span class="d"><code>put_config(Info)</code>, <code>class_add_member()</code> ×N</span></div>
+      <div class="arrow">→</div>
+      <div class="step terminal"><span class="n">7</span><span class="t">201 { uuid }</span><span class="d">No polling, no 202 case</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Components</h2>
+    <div class="components">
+      <div class="card">
+        <h3><span class="idx">01</span>lib/py-service-client <span style="color:var(--accent-2); font-size:0.7rem;">(new shared lib)</span></h3>
+        <ul>
+          <li>Extracted from <code>acs-krb-keys-operator</code>'s internal <code>service_client/</code>, mirrors <code>lib/js-service-client</code>'s role</li>
+          <li>Adds <b>new</b> <code>check_acl</code>/<code>fetch_acl</code> to <code>auth.py</code> — the operator never needed ACL checks before</li>
+          <li>Both the operator and the new service depend on it via a local path dependency</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="idx">02</span>acs-user-admin <span style="color:var(--accent-2); font-size:0.7rem;">(new pure-Python service)</span></h3>
+        <ul>
+          <li>Flask app, <code>POST v1/user</code></li>
+          <li><code>lib/kadmin.py</code> — the <code>Kadm</code> wrapper lifted near-verbatim from the operator</li>
+          <li><code>lib/auth.py</code> — new inbound SPNEGO/Bearer auth, modeled on <code>js-service-api</code>'s <code>FplusHttpAuth</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="idx">03</span>New KDC identity + ACL scoping</h3>
+        <ul>
+          <li>Dedicated principal <code>op1useradmin</code>, <b>not</b> a reuse of <code>op1krbkeys</code></li>
+          <li>kadmind ACL grants only <code>ac</code> (add principal, change password) — no delete/modify rights</li>
+          <li>Flagged as the main security-sensitive piece of this plan</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="idx">04</span>acs-service-setup bootstrap</h3>
+        <ul>
+          <li>Unchanged in shape from the original plan</li>
+          <li><code>ACS.Service.UserAdmin</code>, <code>UserAdmin.Perm.ManageUsers</code>, granted to <code>Administrator</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="idx">05</span>Helm deploy</h3>
+        <ul>
+          <li>Three containers, mirroring the operator's own Deployment: app + <code>tgt-creds</code> + <code>kadmin-creds</code> <code>k5start</code> sidecars</li>
+          <li><b>No ClusterRole/RBAC at all</b> — simpler than the CR-based plan's Secret + CRD permissions</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="idx">06</span>lib/js-service-client + acs-admin UI</h3>
+        <ul>
+          <li>Same shape as the original plan: <code>UserAdmin</code> interface, <code>CreateUserDialog.vue</code></li>
+          <li>UI drops the 202 "still provisioning" branch — only success/error toasts now</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Risk callout</h2>
+    <div class="callout">
+      <span class="label">Trade-off accepted, not eliminated</span>
+      This plan deliberately gives up the original design's "only one thing holds kadmin
+      credentials" property. The mitigations are a dedicated, least-privileged KDC principal
+      (<code>op1useradmin</code>, <code>ac</code> only) and zero Kubernetes RBAC for the new
+      service — but a second kadmin-capable credential and a second native
+      <code>python-kadmV</code> build now exist in the cluster. Verify the restricted ACL line
+      actually holds (step 4 of the plan's Verification section) before relying on it.
+    </div>
+  </section>
+
+  <section>
+    <h2>Files of note</h2>
+    <div class="files">
+      <div class="row"><div class="tag new">New</div><div class="paths"><code>lib/py-service-client/</code></div></div>
+      <div class="row"><div class="tag edit">Edit</div><div class="paths"><code>acs-krb-keys-operator/requirements.txt</code> <code>acs-krb-keys-operator/Dockerfile</code> + import paths</div></div>
+      <div class="row"><div class="tag new">New</div><div class="paths"><code>acs-user-admin/pyproject.toml</code> <code>acs-user-admin/src/.../app.py</code> <code>lib/{auth.py,kadmin.py,routes.py}</code></div></div>
+      <div class="row"><div class="tag new">New</div><div class="paths"><code>deploy/templates/user-admin/*.yaml</code></div></div>
+      <div class="row"><div class="tag edit">Edit</div><div class="paths"><code>deploy/templates/identity/kdc.yaml</code> (new <code>op1useradmin</code> ACL line)</div></div>
+      <div class="row"><div class="tag new">New</div><div class="paths"><code>acs-service-setup/dumps/user-admin.yaml</code></div></div>
+      <div class="row"><div class="tag edit">Edit</div><div class="paths"><code>acs-service-setup/lib/uuids.js</code> <code>acs-service-setup/dumps/service-accounts.yaml</code> <code>deploy/templates/service-setup.yaml</code></div></div>
+      <div class="row"><div class="tag new">New</div><div class="paths"><code>lib/js-service-client/lib/service/user-admin.js</code></div></div>
+      <div class="row"><div class="tag edit">Edit</div><div class="paths"><code>lib/js-service-client/lib/uuids.js</code> <code>lib/interfaces.js</code> <code>lib/service-client.js</code></div></div>
+      <div class="row"><div class="tag new">New</div><div class="paths"><code>acs-admin/src/pages/AccessControl/Principals/CreateUserDialog.vue</code></div></div>
+      <div class="row"><div class="tag edit">Edit</div><div class="paths"><code>acs-admin/src/pages/AccessControl/AccessControl.vue</code></div></div>
+      <div class="row"><div class="tag ref">Ref</div><div class="paths"><code>acs-krb-keys-operator/lib/amrc/factoryplus/krbkeys/{account.py,kadmin.py,event.py}</code> <code>acs-cluster-manager/lib/actions.js</code> <code>lib/js-service-api/lib/auth.js</code> <code>LinkUserDialog.vue</code></div></div>
+    </div>
+  </section>
+
+  <footer>
+    Generated as a visual companion to the written plan. Not implemented yet — no code has been written for this design.
+  </footer>
+
+</div>
+</body>
+</html>

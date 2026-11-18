@@ -18,6 +18,7 @@ App = SimpleNamespace(
 Class = SimpleNamespace(
     Class=UUID("04a1c90d-2295-4cbe-b33a-74eded62cbf1"),
     Device=UUID("18773d6d-a70d-443a-b29a-3f1583195290"),
+    HumanUser=UUID("8b3e8f35-78e5-4f93-bf21-7238bcb2ba9d"),
     Schema=UUID("83ee28d4-023e-4c2c-ab86-12c24e86372c"),
     App=UUID("d319bd87-f42b-4b66-be4f-f82ff48b93f0"),
     Service=UUID("265d481f-87a7-4f93-8fc6-53fa64dc11bb"),

@@ -1,5 +1,5 @@
 # Grant appropriate permissions to the Administrator group
-#-REQUIRE: auth sparkplug uns data-access i3x
+#-REQUIRE: auth sparkplug uns data-access i3x user-admin
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -109,3 +109,4 @@ grants:
     !u I3X.Perm.All: null
     # Cluster admins land as Grafana org Admin by default.
     !u Grafana.Perm.Admin: null
+    !u UserAdmin.Perm.ManageUsers: null

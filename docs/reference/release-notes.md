@@ -221,7 +221,7 @@ minute or more of CPU before it could answer. On a busy node that ran
 past the liveness probe, so Kubernetes killed it and it started again,
 sometimes more than once. The `acs-keycloak` image now does that build
 when the image is made, and the chart starts it with `start --optimized`.
-The chart also gives Keycloak a startup probe that allows 5 minutes to
+The chart also gives Keycloak a startup probe that allows 15 minutes to
 start before the liveness probe counts.
 
 Nothing changes for a site using the `acs-keycloak` image. A site that

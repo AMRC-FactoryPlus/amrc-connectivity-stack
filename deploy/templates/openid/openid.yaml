@@ -143,15 +143,16 @@ spec:
               containerPort: 8080
             - name: management
               containerPort: 9000
-          # Gives Keycloak up to 5 minutes to start before the liveness
+          # Gives Keycloak up to 15 minutes to start before the liveness
           # probe counts, so a slow start on a busy node is not killed
-          # and restarted in a loop.
+          # and restarted in a loop. On a node at full CPU during an
+          # upgrade it has taken four and a half minutes.
           startupProbe:
             httpGet:
               path: /health/started
               port: 9000
             periodSeconds: 5
-            failureThreshold: 60
+            failureThreshold: 180
           readinessProbe:
             httpGet:
               path: /health/ready

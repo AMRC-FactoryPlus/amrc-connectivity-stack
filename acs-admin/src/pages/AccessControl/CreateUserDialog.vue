@@ -26,12 +26,13 @@
         />
       </div>
       <div class="flex flex-col gap-1">
-        <label class="text-sm font-medium">Kerberos Principal</label>
+        <label class="text-sm font-medium">Username</label>
         <Input
-            placeholder="e.g. jane.smith@MY-REALM.COM"
+            placeholder="e.g. jane.smith"
             v-model="v$.principal.$model"
             :v="v$.principal"
         />
+        <p class="text-xs text-gray-500">The Kerberos realm is added for you</p>
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-sm font-medium">Password</label>
@@ -134,14 +135,13 @@ export default {
       this.lastGeneratedPassword = this.password
     },
 
-    // "Jane Smith" -> "jane.smith@REALM"
+    // "Jane Smith" -> "jane.smith". The realm is not guessed here: the
+    // service knows the KDC's realm and adds it.
     derivePrincipal (name) {
       const parts = (name || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
       if (!parts.length) return null
 
-      const username = parts.join('.')
-      const realm = this.s.baseUrl ? this.s.baseUrl.toUpperCase() : 'REALM.EXAMPLE.COM'
-      return `${username}@${realm}`
+      return parts.join('.')
     },
 
     async formSubmit () {
@@ -155,19 +155,30 @@ export default {
           principal: this.principal,
           password: this.password,
         })
-        toast.success(`${this.name} has been created`)
-        this.dialogOpen = false
-        this.close()
-        this.s.client.Fetch.cache = "reload"
-        await this.p.fetch()
-        this.s.client.Fetch.cache = "default"
       } catch (err) {
-        const description = err.status === 409
-          ? `${this.principal} already exists`
-          : err.message || 'An unexpected error occurred'
+        // The service explains what was wrong (a name it won't accept,
+        // a principal that already exists, a half-finished creation).
+        const description = err.body?.error
+          || err.message || 'An unexpected error occurred'
         toast.error(`Unable to create ${this.name}`, { description })
         console.error(err)
+        this.submitting = false
+        return
+      }
+
+      toast.success(`${this.name} has been created`)
+      this.dialogOpen = false
+      this.close()
+
+      // The user exists by now, so a failed refresh of the list is not
+      // a failed creation and must not be reported as one.
+      this.s.client.Fetch.cache = "reload"
+      try {
+        await this.p.fetch()
+      } catch (err) {
+        console.error(err)
       } finally {
+        this.s.client.Fetch.cache = "default"
         this.submitting = false
       }
     }

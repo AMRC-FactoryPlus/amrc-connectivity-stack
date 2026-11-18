@@ -51,13 +51,13 @@ grants:
   # same principal would wipe out everything admin.yaml granted it (or
   # vice versa, depending on load order) on every service-setup run.
 
-  # The permissions acs-user-admin's own routes.js needs to create a
-  # HumanUser object, name it, add it to the groups the caller picked,
-  # and link its Kerberos identity - see
-  # acs-user-admin/.../lib/routes.py. Scoped to exactly that, not
-  # op1krbkeys's broader permission set (ManageACL, ManageGroup,
-  # Clusters.Perm.Secrets, ...), since this service never touches
-  # those.
+  # The permissions acs-user-admin's routes.py needs to create a
+  # HumanUser object, name it, and link its Kerberos identity. Scoped
+  # to exactly that, not op1krbkeys's broader permission set
+  # (ManageACL, ManageGroup, Clusters.Perm.Secrets, ...), since this
+  # service never touches those. It has no permission to change group
+  # membership: a caller with ManageUsers must not be able to put a
+  # new user into a role through this account.
   !u UserAdmin.Requirement.ServiceAccount:
     # check_acl's own HTTP call (GET v2/acl/:principal) requires the
     # caller - us - to hold ReadACL, scoped to our own permission
@@ -77,7 +77,3 @@ grants:
       !u Auth.Class.PrincipalType: true
     !u ConfigDB.Perm.WriteConfig:
       !u UUIDs.App.Info: false
-    !u ConfigDB.Perm.WriteMemberships:
-      !u UUIDs.Special.Mine: true
-    !u ConfigDB.Perm.WriteMembers:
-      !u Auth.Class.Role: true

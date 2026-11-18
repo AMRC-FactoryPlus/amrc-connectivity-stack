@@ -206,6 +206,50 @@ The method is passed the name of the command and the data object, which
 is a buffer. It is the responsibility of the southbound driver to parse
 the buffer depending on the command.
 
+Only one of `cmd` and `write` is called. If the handler class sets
+`typedWrites`, the driver subscribes to typed writes and `cmd` is never
+called.
+
+### `typedWrites`
+
+    class MyHandler {
+        static typedWrites = true;
+        ...
+    }
+
+This property is optional, and needs an Edge Agent from November 2026
+or later.
+
+If a handler class sets this static property to `true`, the driver
+subscribes to typed writes and calls `write` instead of `cmd`. Without
+it the driver behaves as before, even if the handler has a method
+called `write` for its own use.
+
+### `write`
+
+    await handler.write(spec, type, value);
+
+This method is called only when the handler class sets `typedWrites`.
+It receives each typed write instead of `cmd`. The method is passed the address spec as returned from
+`parseAddr`, the metric's Sparkplug type as a string (`"Int16"`,
+`"Float"`, `"String"` and so on) and the value as a JS value:
+
+Type|Value
+---|---
+Boolean|boolean
+Int8, Int16, Int32, UInt8, UInt16, UInt32|number
+Int64, UInt64|BigInt
+Float, Double|number, which may be NaN or infinite
+String, Text, UUID|string
+DateTime|number of milliseconds since the epoch
+
+If the write fails, throw (or return a rejected Promise). The driver
+reports it to the Edge Agent on the address's `err` topic. An error
+whose `code` property is `RO`, `CMD` or another code from the protocol
+is reported with that code, and any other error as `ERR`. A typed write
+that doesn't fit its type, or that names an address not in the current
+address configuration, is reported as `CMD` without calling the method.
+
 ### `close`
 
     await handler.close();

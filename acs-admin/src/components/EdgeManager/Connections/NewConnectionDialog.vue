@@ -23,18 +23,21 @@
         <!-- Driver Selection -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium" for="host">Driver <span class="text-red-500">*</span></label>
-          <Select :disabled="existingConnection" name="host" v-model="v$.selectedDriverName.$model">
-            <SelectTrigger :class="{'border-red-500': v$.selectedDriverName.$error}">
+          <!-- Chosen by UUID: a retired built-in driver has the same
+             - name as the split driver that replaces it. -->
+          <Select :disabled="existingConnection" name="host" v-model="v$.selectedDriverId.$model">
+            <SelectTrigger :class="{'border-red-500': v$.selectedDriverId.$error}">
               <SelectValue>
-                {{v$.selectedDriverName.$model ?? 'Select a Driver...'}}
+                {{selectedDriver?.name ?? 'Select a Driver...'}}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="driver in sortedDrivers" :value="driver.name" :key="driver.uuid">
+                <SelectItem v-for="driver in sortedDrivers" :value="driver.uuid" :key="driver.uuid">
                   <div class="flex items-center justify-between gap-2">
                     <div class="font-medium">{{driver.name}}</div>
-                    <div v-if="driver.image" class="flex items-center justify-center gap-1.5 text-gray-400">
+                    <div v-if="driver.definition?.hidden" class="text-gray-400">Retired</div>
+                    <div v-else-if="driver.definition?.image" class="flex items-center justify-center gap-1.5 text-gray-400">
                       <i class="fa-solid fa-cube text-sm"></i>
                       <div>Split</div>
                     </div>
@@ -43,7 +46,7 @@
               </SelectGroup>
             </SelectContent>
           </Select>
-          <div v-if="v$.selectedDriverName.$error" class="text-sm text-red-500 mt-1">
+          <div v-if="v$.selectedDriverId.$error" class="text-sm text-red-500 mt-1">
             Please select a driver
           </div>
         </div>
@@ -65,7 +68,7 @@
         />
 
         <!-- Payload Format (only shown after driver selection) -->
-        <div v-if="selectedDriverName" class="flex flex-col gap-1">
+        <div v-if="selectedDriverId" class="flex flex-col gap-1">
           <label class="text-sm font-medium" for="payloadFormat">Payload Format</label>
           <Select name="payloadFormat" v-model="formData.payloadFormat">
             <SelectTrigger>
@@ -183,8 +186,11 @@ import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
+import { useNodeStore } from '@store/useNodeStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
+import { hostPortClash } from '@utils/hostPorts.js'
+import { driverByUuid, driverChoices } from '@utils/driverChoices.js'
 
 const PAYLOAD_FORMATS = [
   "Defined by Protocol",
@@ -205,6 +211,7 @@ export default {
       c: useEdgeClusterStore(),
       dr: useDriverStore(),
       cn: useConnectionStore(),
+      n: useNodeStore(),
       d: useDeviceStore(),
     }
   },
@@ -232,7 +239,7 @@ export default {
   },
 
   watch: {
-    selectedDriverName(newVal, oldVal) {
+    selectedDriverId(newVal, oldVal) {
       // Reset form when driver changes
       if (newVal !== oldVal && !this.existingConnection) {
         if (newVal) {
@@ -257,7 +264,7 @@ export default {
         // If editing an existing connection, populate the form
         this.existingConnection = existingConnection
         const existingConfig    = existingConnection.configuration
-        this.v$.selectedDriverName.$model = this.dr.data.find(d => d.uuid === existingConfig.driver_uuid)?.name
+        this.v$.selectedDriverId.$model = existingConfig.driver_uuid
         this.v$.name.$model = existingConnection.name
         this.pollInt = existingConfig.pollInt || 1000 // Load existing poll interval or default to 1000ms
         this.formData = {
@@ -274,10 +281,14 @@ export default {
 
   computed: {
     sortedDrivers() {
-      return [...this.dr.data].sort((a, b) => a.name.localeCompare(b.name))
+      /* A hidden driver is not offered for new connections, but a
+       * connection that already uses one still shows it: since ACS 7
+       * that is a built-in driver kept for a connection on an Edge
+       * Agent that pins its own version 6 image. */
+      return driverChoices(this.dr.data, this.existingConnection?.configuration?.driver_uuid)
     },
     selectedDriver () {
-      return this.dr.data.find(d => d.name === this.selectedDriverName)
+      return driverByUuid(this.dr.data, this.selectedDriverId)
     },
     /* Drop any rows the user started and left blank. */
     cleanHostPaths () {
@@ -288,7 +299,7 @@ export default {
       const baseSchema = this.selectedDriver?.definition?.schema || {};
 
       // Only include payloadFormat in schema if driver is selected
-      return this.selectedDriverName ? {
+      return this.selectedDriverId ? {
         ...baseSchema,
         properties: {
           ...baseSchema.properties
@@ -316,7 +327,7 @@ export default {
   validations() {
     // Create a validation rules object
     const rules = {
-      selectedDriverName: { required },
+      selectedDriverId: { required },
       name: {
         required,
         // Only allow characters that are valid for Kubernetes resource names
@@ -577,7 +588,7 @@ export default {
       this.v$.$reset()
 
       // Reset all form fields
-      this.v$.selectedDriverName.$model = null
+      this.v$.selectedDriverId.$model = null
       this.v$.name.$model = null
       this.pollInt = 1000 // Reset to default 1000ms
       this.formData = {
@@ -593,6 +604,21 @@ export default {
 
       const isFormCorrect = await this.v$.$validate()
       if (!isFormCorrect) return
+
+      /* A driver that listens opens its port on the host, so its Edge
+       * Agent must be pinned to a host in a cluster with several, and
+       * a host can open each port once. */
+      const clash = hostPortClash({
+        uuid: this.existingConnection?.uuid,
+        name: this.name,
+        config: _.omit(this.formData, 'payloadFormat'),
+        driverdef: this.selectedDriver?.definition,
+        node: this.node,
+      }, { connections: this.cn.data, nodes: this.n.data, clusters: this.c.data })
+      if (clash) {
+        toast.error('Unable to save this connection', { description: clash })
+        return
+      }
 
       this.isSubmitting = true
 
@@ -632,8 +658,8 @@ export default {
                 payloadFormat: payloadFormat,
               },
               topology: {
-                cluster: this.node.cluster,
-                hostname: this.node.hostname,
+                cluster: this.node.deployment?.cluster,
+                hostname: this.node.deployment?.hostname ?? null,
               },
             })
           ])
@@ -674,8 +700,8 @@ export default {
               payloadFormat: payloadFormat,
             },
             topology: {
-              cluster: this.node.cluster,
-              hostname: this.node.hostname,
+              cluster: this.node.deployment?.cluster,
+              hostname: this.node.deployment?.hostname ?? null,
             },
           }
 
@@ -774,7 +800,7 @@ export default {
     return {
       node: null,
       name: null,
-      selectedDriverName: null,
+      selectedDriverId: null,
       hostPaths: [],
       pollInt: 1000, // Default to 1000ms (1 second)
       formData: {

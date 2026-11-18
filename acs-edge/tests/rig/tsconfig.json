@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "module": "ES2022",
+        "target": "ES2022",
+        "rootDir": "../..",
+        "outDir": "../../build/rig"
+    },
+    "include": [],
+    "files": [
+        "run-mocks.ts", "make-rig.ts", "load.ts", "remove.ts",
+        "check.ts", "local.ts", "write.ts", "batched.ts"
+    ]
+}

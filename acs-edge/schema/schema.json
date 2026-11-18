@@ -88,36 +88,12 @@
                         "type": "string",
                         "enum": [
                             "",
-                            "Fieldbus",
                             "MQTT",
                             "OPC UA",
                             "REST",
-                            "S7",
-                            "UDP",
-                            "MTConnect",
-                            "EtherNet/IP"
+                            "UDP"
                         ],
                         "minLength": 1
-                    },
-                    "EtherNetIPConnDetails": {
-                        "type": "object",
-                        "title": "EtherNet/IP Connection Details",
-                        "options": {
-                            "dependencies": {
-                                "connType": "EtherNet/IP"
-                            },
-                            "collapsed": false
-                        },
-                        "required": [
-                            "host"
-                        ],
-                        "properties": {
-                            "host": {
-                                "type": "string",
-                                "title": "Hostname/IP",
-                                "minLength": 1
-                            }
-                        }
                     },
                     "UDPConnDetails": {
                         "type": "object",
@@ -273,7 +249,7 @@
                             },
                             "useCredentials": {
                                 "title": "Use credentials",
-                                "type": "boolean",
+                                "type": "boolean"
                             },
                             "username": {
                                 "title": "Username",
@@ -294,60 +270,6 @@
                                         "useCredentials": true
                                     }
                                 },
-                                "minLength": 1
-                            }
-                        }
-                    },
-                    "fieldbusConnDetails": {
-                        "type": "object",
-                        "title": "Fieldbus Gateway Details",
-                        "options": {
-                            "dependencies": {
-                                "connType": "Fieldbus"
-                            }
-                        },
-                        "required": [
-                            "protocol"
-                        ],
-                        "properties": {
-                            "protocol": {
-                                "type": "string",
-                                "title": "Protocol",
-                                "enum": [
-                                    "",
-                                    "DMX",
-                                    "CANOpen",
-                                    "DeviceNet",
-                                    "EtherCAT",
-                                    "Ethernet/IP",
-                                    "ModbusRTU Gateway",
-                                    "ModbusTCP Gateway",
-                                    "Virtual Device 32 Byte",
-                                    "Virtual Device 32 Byte (Ext.)",
-                                    "Virtual ModbusTCP Slave",
-                                    "Virtual ModbusTCP Slave (512)",
-                                    "Virtual ModbusRTU Slave",
-                                    "Virtual ModbusRTU Slave (512)",
-                                    "Virtual ModbusTCP Master",
-                                    "Virtual ModbusRTU Master",
-                                    "Virtual ModbusRTU Master 150",
-                                    "Virtual ModbusTCP Master 150",
-                                    "Virtual RevPi7",
-                                    "Virtual RevPiTimer",
-                                    "Powerlink",
-                                    "Profibus",
-                                    "Profinet",
-                                    "SercosIII",
-                                    "Serial",
-                                    "CANopen Master",
-                                    "Can",
-                                    "M-Bus",
-                                    "DIO",
-                                    "DI",
-                                    "DO",
-                                    "AIO"
-                                ],
-                                "default": "",
                                 "minLength": 1
                             }
                         }
@@ -400,104 +322,6 @@
                                         "authMethod": "Basic"
                                     }
                                 },
-                                "minLength": 1
-                            }
-                        }
-                    },
-                    "MTConnectConnDetails": {
-                        "type": "object",
-                        "title": "MTConnect Connection Details",
-                        "options": {
-                            "dependencies": {
-                                "connType": "MTConnect"
-                            },
-                            "collapsed": false
-                        },
-                        "required": [
-                            "baseURL",
-                            "authMethod"
-                        ],
-                        "properties": {
-                            "baseURL": {
-                                "type": "string",
-                                "title": "Base URL",
-                                "minLength": 1
-                            },
-                            "authMethod": {
-                                "type": "string",
-                                "title": "Authentication Method",
-                                "enum": [
-                                    "None",
-                                    "Basic"
-                                ],
-                                "default": "None",
-                                "minLength": 1
-                            },
-                            "username": {
-                                "type": "string",
-                                "title": "Username",
-                                "options": {
-                                    "dependencies": {
-                                        "authMethod": "Basic"
-                                    }
-                                },
-                                "minLength": 1
-                            },
-                            "password": {
-                                "type": "string",
-                                "format": "password",
-                                "title": "Password",
-                                "options": {
-                                    "dependencies": {
-                                        "authMethod": "Basic"
-                                    }
-                                },
-                                "minLength": 1
-                            }
-                        }
-                    },
-                    "s7ConnDetails": {
-                        "type": "object",
-                        "title": "S7 Connection Details",
-                        "options": {
-                            "dependencies": {
-                                "connType": "S7"
-                            },
-                            "collapsed": false
-                        },
-                        "required": [
-                            "hostname",
-                            "port",
-                            "rack",
-                            "slot",
-                            "timeout"
-                        ],
-                        "properties": {
-                            "hostname": {
-                                "type": "string",
-                                "title": "Hostname/IP Address",
-                                "minLength": 1
-                            },
-                            "port": {
-                                "type": "number",
-                                "title": "Port",
-                                "minLength": 1,
-                                "default": 102
-                            },
-                            "rack": {
-                                "type": "number",
-                                "title": "Rack",
-                                "minLength": 1
-                            },
-                            "slot": {
-                                "type": "number",
-                                "title": "Slot",
-                                "minLength": 1
-                            },
-                            "timeout": {
-                                "type": "number",
-                                "title": "Timeout",
-                                "default": 5000,
                                 "minLength": 1
                             }
                         }

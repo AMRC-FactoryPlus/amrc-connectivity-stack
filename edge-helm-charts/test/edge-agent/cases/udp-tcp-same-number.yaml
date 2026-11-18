@@ -1,0 +1,14 @@
+# The same number on UDP and TCP is two different ports.
+name: Agent-Seven
+uuid: 77777777-7777-4777-8777-777777777777
+cluster: example-cluster
+directory_url: http://directory.example
+drivers:
+  robot-udp:
+    image: { repository: edge-udp }
+    hostPorts: [{ protocol: UDP, port: 5000 }]
+  other-tcp:
+    image: { repository: edge-test }
+    hostPorts: [{ protocol: TCP, port: 5000 }]
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

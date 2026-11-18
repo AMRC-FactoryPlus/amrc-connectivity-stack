@@ -1,0 +1,580 @@
+{
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it",
+ "label": "built-in",
+ "fixture": "sample-rest-xml-contains",
+ "duration_ms": 3000,
+ "speed": 1.25,
+ "delivered": 7,
+ "ddata": 6,
+ "agent_us_per_input": 11045,
+ "credentials": [],
+ "writes": [],
+ "births": {
+  "DBIRTH Device_1": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "400",
+     "t": -630,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -630,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_01",
+     "type": "String",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$KR_SERIALNO')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_02",
+     "type": "String",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$MODE_OP')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_03",
+     "type": "String",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$ROBRUNTIME')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_04",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$AXIS_ACT_MEAS_A1')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_05",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$VEL_AXIS_ACT[1]')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_06",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$ACC_AXIS[1]')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_07",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$AXIS_ACT_MEAS_A2')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_08",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$VEL_AXIS_ACT[2]')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_09",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$ACC_AXIS[2]')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_10",
+     "type": "Double",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$AXIS_ACT_MEAS_A3')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_11",
+     "type": "UInt8",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$ACT_TOOL')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_12",
+     "type": "Float",
+     "value": "null",
+     "t": -627.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"/KUKA_System_Variables/Variable[Name[contains(text(),'$TOOL_X')]]/Value/node()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "NBIRTH": [
+   [
+    {
+     "name": "Schema_UUID",
+     "type": "UUID",
+     "value": "\"15360868-2f35-4b52-990b-49329fb246fe\"",
+     "t": -630
+    },
+    {
+     "name": "Instance_UUID",
+     "type": "UUID",
+     "value": "\"00000000-0000-4000-8000-00000000a6e7\"",
+     "t": -630
+    },
+    {
+     "name": "Config_Revision",
+     "type": "UUID",
+     "value": "\"\\\"golden-config\\\"\"",
+     "t": -630
+    },
+    {
+     "name": "Node Properties/Type",
+     "type": "String",
+     "value": "\"ACS Edge Agent\"",
+     "t": -630
+    },
+    {
+     "name": "Node Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630
+    },
+    {
+     "name": "Node Control/Reload Edge Agent Config",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630
+    },
+    {
+     "name": "Node Control/Payload Compression",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Instance_UUID",
+     "type": "UUID",
+     "value": "\"b09a2fed-eec9-52cf-b824-1a553f8113c8\"",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Type",
+     "type": "UUID",
+     "value": "\"c414c68b-5014-4e46-a0b4-d5f7f8df1d9f\"",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Invalid/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Invalid/Instance_UUID",
+     "type": "UUID",
+     "value": "\"59982376-d40f-582b-a4d0-1f5683014f7c\"",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Invalid/Type",
+     "type": "UUID",
+     "value": "\"99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6\"",
+     "t": -630
+    },
+    {
+     "name": "Alerts/Config_Invalid/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -630
+    }
+   ]
+  ]
+ },
+ "repeated": {},
+ "data": {
+  "Device_1/Metric_01": [
+   {
+    "name": "Metric_01",
+    "type": "String",
+    "value": "\"SETUP\"",
+    "t": 4.43
+   }
+  ],
+  "Device_1/Metric_02": [
+   {
+    "name": "Metric_02",
+    "type": "String",
+    "value": "\"SETUP\"",
+    "t": 5.2
+   }
+  ],
+  "Device_1/Metric_03": [
+   {
+    "name": "Metric_03",
+    "type": "String",
+    "value": "\"ALARM\"",
+    "t": 5.73
+   }
+  ],
+  "Device_1/Metric_04": [
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "394.37954798388597",
+    "t": 6.46
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "396.8310859341825",
+    "t": 502.59
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "400.830881408607",
+    "t": 1007.33
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "403.952944626175",
+    "t": 1508.77
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "406.5869090296616",
+    "t": 2018.63
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "408.5883231221616",
+    "t": 2518.26
+   }
+  ],
+  "Device_1/Metric_05": [
+   {
+    "name": "Metric_05",
+    "type": "Double",
+    "value": "429.916367853051",
+    "t": 7.08
+   },
+   {
+    "name": "Metric_05",
+    "type": "Double",
+    "value": "434.1836094083796",
+    "t": 504
+   },
+   {
+    "name": "Metric_05",
+    "type": "Double",
+    "value": "437.3589279938256",
+    "t": 1007.65
+   },
+   {
+    "name": "Metric_05",
+    "type": "Double",
+    "value": "442.1654820774433",
+    "t": 1509.09
+   },
+   {
+    "name": "Metric_05",
+    "type": "Double",
+    "value": "445.59134184025845",
+    "t": 2019.66
+   },
+   {
+    "name": "Metric_05",
+    "type": "Double",
+    "value": "447.954095809069",
+    "t": 2518.73
+   }
+  ],
+  "Device_1/Metric_06": [
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "203.34814048538357",
+    "t": 8.15
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "210.6256311320456",
+    "t": 504.34
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "217.0367680337091",
+    "t": 1007.94
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "226.17695347193305",
+    "t": 1509.37
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "230.63386065932335",
+    "t": 2020.43
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "239.50649395612828",
+    "t": 2519.09
+   }
+  ],
+  "Device_1/Metric_07": [
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "379.18279234080507",
+    "t": 8.77
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "391.7211433906034",
+    "t": 504.61
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "405.4542526715697",
+    "t": 1008.23
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "417.9972740331985",
+    "t": 1509.65
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "428.1805765240588",
+    "t": 2021.39
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "434.4317860727097",
+    "t": 2519.61
+   }
+  ],
+  "Device_1/Metric_08": [
+   {
+    "name": "Metric_08",
+    "type": "Double",
+    "value": "261.2658259435709",
+    "t": 9.31
+   },
+   {
+    "name": "Metric_08",
+    "type": "Double",
+    "value": "263.70396023925844",
+    "t": 504.97
+   },
+   {
+    "name": "Metric_08",
+    "type": "Double",
+    "value": "266.9485280166957",
+    "t": 1008.51
+   },
+   {
+    "name": "Metric_08",
+    "type": "Double",
+    "value": "269.25620998802464",
+    "t": 1509.97
+   },
+   {
+    "name": "Metric_08",
+    "type": "Double",
+    "value": "272.9271039862521",
+    "t": 2022.03
+   },
+   {
+    "name": "Metric_08",
+    "type": "Double",
+    "value": "276.449509985011",
+    "t": 2519.96
+   }
+  ],
+  "Device_1/Metric_09": [
+   {
+    "name": "Metric_09",
+    "type": "Double",
+    "value": "154.39603099173448",
+    "t": 9.83
+   },
+   {
+    "name": "Metric_09",
+    "type": "Double",
+    "value": "159.8312732511512",
+    "t": 505.28
+   },
+   {
+    "name": "Metric_09",
+    "type": "Double",
+    "value": "163.66422046463506",
+    "t": 1008.78
+   },
+   {
+    "name": "Metric_09",
+    "type": "Double",
+    "value": "168.9251369339186",
+    "t": 1514.16
+   },
+   {
+    "name": "Metric_09",
+    "type": "Double",
+    "value": "173.3479956187158",
+    "t": 2022.52
+   },
+   {
+    "name": "Metric_09",
+    "type": "Double",
+    "value": "176.17725641683",
+    "t": 2520.75
+   }
+  ],
+  "Device_1/Metric_10": [
+   {
+    "name": "Metric_10",
+    "type": "Double",
+    "value": "322.12262289131775",
+    "t": 10.4
+   },
+   {
+    "name": "Metric_10",
+    "type": "Double",
+    "value": "331.61211207967017",
+    "t": 505.61
+   },
+   {
+    "name": "Metric_10",
+    "type": "Double",
+    "value": "337.53565693603497",
+    "t": 1009.07
+   },
+   {
+    "name": "Metric_10",
+    "type": "Double",
+    "value": "346.7728475827494",
+    "t": 1514.48
+   },
+   {
+    "name": "Metric_10",
+    "type": "Double",
+    "value": "355.5060370517184",
+    "t": 2023.04
+   },
+   {
+    "name": "Metric_10",
+    "type": "Double",
+    "value": "363.45073826384805",
+    "t": 2524.86
+   }
+  ],
+  "Device_1/Metric_11": [
+   {
+    "name": "Metric_11",
+    "type": "UInt8",
+    "value": "24",
+    "t": 10.89
+   },
+   {
+    "name": "Metric_11",
+    "type": "UInt8",
+    "value": "23",
+    "t": 1009.34
+   },
+   {
+    "name": "Metric_11",
+    "type": "UInt8",
+    "value": "28",
+    "t": 2023.59
+   }
+  ],
+  "Device_1/Metric_12": [
+   {
+    "name": "Metric_12",
+    "type": "Float",
+    "value": "337.4827880859375",
+    "t": 11.46
+   },
+   {
+    "name": "Metric_12",
+    "type": "Float",
+    "value": "349.29278564453125",
+    "t": 506.5
+   },
+   {
+    "name": "Metric_12",
+    "type": "Float",
+    "value": "363.7498474121094",
+    "t": 1009.61
+   },
+   {
+    "name": "Metric_12",
+    "type": "Float",
+    "value": "378.8854675292969",
+    "t": 1515.08
+   },
+   {
+    "name": "Metric_12",
+    "type": "Float",
+    "value": "386.70550537109375",
+    "t": 2024.07
+   },
+   {
+    "name": "Metric_12",
+    "type": "Float",
+    "value": "398.0162048339844",
+    "t": 2525.78
+   }
+  ]
+ },
+ "counts": {
+  "DBIRTH Device_1": 1,
+  "DDATA Device_1": 6,
+  "NBIRTH": 1
+ }
+}

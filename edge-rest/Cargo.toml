@@ -1,0 +1,33 @@
+[package]
+name = "edge-rest"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "driver"
+path = "src/main.rs"
+
+[dependencies]
+rs-edge-driver = { path = "../lib/rs-edge-driver" }
+async-trait = "0.1"
+base64 = "0.22"
+bytes = "1"
+# rustls with the webpki (Mozilla) roots trusts the same CAs as Node's
+# bundled list, which the built-in connection used. gzip and deflate
+# are decoded as axios did.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "deflate"] }
+# raw_value lets paging join pages without re-printing their numbers.
+serde_json = { version = "1", features = ["raw_value"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+
+[dev-dependencies]
+# The driver-loop test borrows the fake Edge Agent from the library's
+# own tests, which needs these.
+rumqttc = { version = "0.25.1", default-features = false }
+# test-util lets tests run timeouts on a paused clock.
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[profile.release]
+strip = true

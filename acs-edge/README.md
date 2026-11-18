@@ -40,6 +40,10 @@ npm run clean && npm run build && node --es-module-specifier-resolution=node bui
 
 ## Contributing
 
-To extend this application, copy `/lib/templates/templateDevice.js` to `lib/devices/` and `/lib/templates/templateDeviceConnection.js` to `/lib/channels/` then rename and customize these two files to your application. Overload any class methods where appropriate. The `deviceConnection` class will require the most custom code in order to abstract the device protocol specific transactions. The `device` class should be able to be reused largely as-is because it only uses the abstracted methods from the `deviceConnection` and `Sparkplug` classes. You will most likely need to add a new constructor method to prepare your device connection for your specific instance.
-
-To trigger your classes to be instantiated, you will need to add a new case for them in the `Translator` class where the config file is being handled.
+The Edge Agent has no built-in device connections since ACS 7. Every
+protocol runs as a split driver, a separate container that talks to the
+device and passes what it reads to the Edge Agent. To add a protocol,
+write a split driver: the protocol between the Edge Agent and a driver
+is in [`docs/edge-split.md`](docs/edge-split.md), and the driver
+libraries are `lib/js-edge-driver`, `lib/rs-edge-driver` and
+`lib/py-edge-driver`.

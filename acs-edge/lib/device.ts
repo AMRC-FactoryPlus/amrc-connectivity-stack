@@ -8,6 +8,7 @@ import {
     Metrics,
     parseNsTimestampFromPayload,
     parseSimTagsFromPayload,
+    DecodedPayload,
     parseTimeStampFromPayload,
     sparkplugMetricProperties,
     parseValueFromPayload,
@@ -20,8 +21,6 @@ import {
 } from "./helpers/typeHandler.js";
 import { EventEmitter } from "events";
 import Long from "long";
-import { ScoutDriverDetails } from "./scout.js";
-// import { ScoutDetails } from "./scout.js";
 // import { UniqueDictionary } from "./helpers/uniquedictionary.js";
 
 /**
@@ -39,6 +38,23 @@ export interface deviceOptions {
 }
 
 type Timer = ReturnType<typeof setTimeout> | null | undefined;
+
+/* When a connection's message for an address arrived: Date.now() and
+ * the agent's nanosecond clock, read together. */
+export interface Received {
+    ms: number,
+    ns: bigint,
+}
+
+/* A connection that gathers several messages, each carrying one
+ * address, into one data event passes this with it. Each address is
+ * then read as if it had come alone, as it did: a metric with no path
+ * reads the whole payload, which it only does for a message with one
+ * address. A metric whose payload has no timestamp is stamped with
+ * when its message arrived, not when the group is handled. */
+export interface DataGroup {
+    received: { [addr: string]: Received },
+}
 
 /**
  * DeviceConnection is a superclass which is to be extended to provide  metric access
@@ -109,15 +125,6 @@ export abstract class DeviceConnection extends EventEmitter {
 
 
     /**
-     * Request devices to return a list of available addresses (tags, topics, etc.)
-     */
-    public async scoutAddresses(driverDetails: ScoutDriverDetails): Promise<object> {
-
-        // should be implmented by subclasses for each type of connection depending on the specific protocol (OPC UA, MQTT, etc.)
-        throw new Error('Scouting not supported for this device connection type.');
-    }
-
-    /**
      * Perform any setup needed to read from certain addresses, e.g. set
      * up MQTT subscriptions. This does not attempt to detect duplicate
      * requests.
@@ -147,10 +154,15 @@ export abstract class DeviceConnection extends EventEmitter {
     async startSubscription(metrics: Metrics, payloadFormat: serialisationType, delimiter: string, interval: number, deviceId: string, subscriptionStartCallback: Function) {
         this.#subHandles.set(deviceId,
             await this.subscribe(metrics.addresses));
-        this.#intHandles[deviceId] = setInterval(() => {
-            this.readMetrics(metrics, payloadFormat, delimiter);
-
-        }, interval);
+        /* Only a positive interval polls. A connection with no poll
+         * interval (every MQTT and UDP connection) passes undefined,
+         * which setInterval takes as 1 ms, so it read every
+         * millisecond: nothing for a built-in push connection, but a
+         * poll message to a split driver each time. */
+        if (interval > 0)
+            this.#intHandles[deviceId] = setInterval(() => {
+                this.readMetrics(metrics, payloadFormat, delimiter);
+            }, interval);
         subscriptionStartCallback();
     }
 
@@ -194,6 +206,13 @@ export class Device {
     #pubInterval: number                            // Batch interval for DATA packets
     #pubTimer: Timer                                // Batch timer
     #pubBuffer: sparkplugMetric[]                   // Batch buffer
+    /* Checks every 100 ms for the connection to come up. Cleared when
+     * it does, or by stop(), so a device whose driver never comes up
+     * doesn't keep its old device graph alive across reloads. */
+    #readyTimer: ReturnType<typeof setInterval> | null = null
+    /* Payload failures already logged, by address and message, so a
+     * device sent the same bad payload on every poll logs it once. */
+    #failures = new Set<string>()
     //#deathTimer: ReturnType<typeof setTimeout>      // A "dead mans handle" or "watchdog" timer which triggers a DDEATH
     // if allowed to time out
     _payloadFormat: serialisationType               // The format of the payloads produced by this device
@@ -323,156 +342,180 @@ export class Device {
 
         //What to do when the device is ready
         //We Just need to sub to metric changes
-        let readyInterval = setInterval(() => {
+        this.#readyTimer = setInterval(() => {
             // Keep checking if the device is ready
             // If so...
             if (this._isConnected) {
-
-                this.#subscribeToMetricChanges();
                 // Stop checking if device is ready
-                clearInterval(readyInterval);
+                this.#stopReadyTimer();
+                this.#subscribeToMetricChanges();
             }
         }, 100);
 
     }
 
-    _handleData(obj: { [p: string]: any }, parseVals: boolean) {
+    _handleData(obj: { [p: string]: any }, parseVals: boolean, group?: DataGroup) {
         // Array to keep track of values that changed
         let changedMetrics: sparkplugMetric[] = [];
+        // A metric with no path reads the whole payload, which only makes
+        // sense for a message carrying one address. A group is many such
+        // messages, so each of its addresses counts as one. Counted once
+        // here, not per metric: a group can hold thousands of addresses.
+        const alone = group !== undefined || Object.keys(obj).length == 1;
         // Iterate through each key in obj
         for (let addr in obj) {
-            // Get all payload paths registered for this address
-            const paths = this._metrics.getPathsForAddr(addr);
-            // Iterate through each path
-            paths.forEach((path) => {
-                // Get the complete metric according to its address and path
-                const metric = this._metrics.getByAddrPath(addr, path);
-                // If the metric can be read i.e. GET method
-                if (typeof metric.properties !== "undefined" && (metric.properties.method.value as string).search(
-                    /^GET/g) > -1) {
-                    // If the value is not to be parsed, or if so a path to the value is provided or there is only one
-                    // value
-                    if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || Object.keys(
-                        obj).length == 1))) {
-                        // Handle JSON (Batched) format explicitly
-                        if (parseVals && this._payloadFormat === serialisationType.JSONBatched) {
-                            // Parse the payload as JSON
-                            let payload: any;
-                            try {
-                                if (typeof obj[addr] === "string") {
-                                    payload = JSON.parse(obj[addr]);
-                                } else if (Buffer.isBuffer(obj[addr])) {
-                                    payload = JSON.parse(obj[addr].toString());
-                                } else {
-                                    payload = obj[addr];
-                                }
-                            } catch (e) {
-                                log(`Failed to parse JSON (Batched) payload: ${e}`);
-                                return;
-                            }
-
-                            // Process the batched payload
-                            const batchResults = processJSONBatchedPayload(payload, metric);
-
-                            // Create a metric for each item in the batch
-                            batchResults.forEach(result => {
-                                const { value, timestamp, timestampNs } = result;
-
-                                // Test if the value is a bigint and convert it to a Long
-                                let processedValue = value;
-                                if (typeof processedValue === "bigint") {
-                                    processedValue = Long.fromString(processedValue.toString());
+            try {
+                // Every metric read from this address, whatever its path
+                const indices = this._metrics.getPathsForAddr(addr)
+                    .flatMap(path => this._metrics.getIndicesByAddrPath(addr, path));
+                // Decode the payload at most once, for every metric on it
+                const decoded = new DecodedPayload(obj[addr]);
+                // JSON (Batched) reads a JSON object exactly as plain JSON
+                // does, so one device can take topics that carry single
+                // objects and topics that carry arrays of items. Anything
+                // else that is not an array (null, a number, a string, a
+                // boolean) is neither, so it is logged and dropped as it
+                // always was, as is a payload that is not valid JSON.
+                let format = this._payloadFormat;
+                if (parseVals && format === serialisationType.JSONBatched && indices.length) {
+                    const { value, err } = decoded.json_result();
+                    if (!err && typeof value === "object" && value !== null
+                        && !Array.isArray(value))
+                        format = serialisationType.JSON;
+                }
+                // Iterate through each metric
+                indices.forEach((index) => {
+                    const metric = this._metrics.array[index];
+                    // If the metric can be read i.e. GET method
+                    if (typeof metric.properties !== "undefined" && (metric.properties.method.value as string).search(
+                        /^GET/g) > -1) {
+                        // If the value is not to be parsed, or if so a path to the value is provided or there is only one
+                        // value
+                        if (!parseVals || (parseVals && ((typeof metric.properties.path !== "undefined" && metric.properties.path.value) || alone))) {
+                            // Handle JSON (Batched) format explicitly
+                            if (parseVals && format === serialisationType.JSONBatched) {
+                                // The payload as JSON, parsed once per message
+                                const { value: payload, err } = decoded.json_result();
+                                if (err) {
+                                    log(`Failed to parse JSON (Batched) payload: ${err}`);
+                                    return;
                                 }
 
-                                // If it has a sensible value and is different from the current value
-                                if ((processedValue || processedValue === 0) && (metric.value !== processedValue)) {
-                                    // Create a copy of the metric with the new value and timestamp.
-                                    // timestampNs takes precedence for sub-ms precision, same as
-                                    // the non-batched JSON path.
-                                    const updatedMetric = {
-                                        ...this._metrics.setValueByAddrPath(addr, path, processedValue, timestamp || Date.now(), timestampNs)
-                                    };
+                                // Process the batched payload
+                                const batchResults = processJSONBatchedPayload(payload, metric);
 
-                                    // Add to the list of changed metrics
-                                    changedMetrics.push(updatedMetric);
-                                }
-                            });
-                        } else {
-                            // Standard processing for all other payload formats
-                            let newVal = parseVals ? parseValueFromPayload(obj[addr],
-                                metric,
-                                this._payloadFormat,
-                                this._delimiter
-                            ) : obj[addr];
+                                // Create a metric for each item in the batch
+                                batchResults.forEach(result => {
+                                    const { value, timestamp, timestampNs } = result;
 
-                            // Detect misconfiguration: String metric received an object
-                            if (metric.type === sparkplugDataType.string && typeof newVal === 'object' && newVal !== null && !Buffer.isBuffer(newVal)) {
-                                log(`⚠️ ERROR - Misconfiguration: Metric '${metric.name}' expects String but received object. Check payloadFormat and path config.`);
-                                log(`   Object received: ${JSON.stringify(newVal).substring(0, 100)}...`);
-                                newVal = null; // Publish null to indicate error
-                            }
+                                    // Test if the value is a bigint and convert it to a Long
+                                    let processedValue = value;
+                                    if (typeof processedValue === "bigint") {
+                                        processedValue = Long.fromString(processedValue.toString());
+                                    }
 
-                            // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
-                            // Tahu library works - it only accepts Longs, not bigints.
-                            if (typeof newVal === "bigint") {
-                                newVal = Long.fromString(newVal.toString());
-                            }
+                                    // If it has a sensible value and is different from the current value.
+                                    // false is a value: without it a Boolean metric never published false,
+                                    // and so never published again after its first true.
+                                    if ((processedValue || processedValue === 0 || processedValue === false)
+                                        && (metric.value !== processedValue)) {
+                                        // Create a copy of the metric with the new value and timestamp.
+                                        // timestampNs takes precedence for sub-ms precision, same as
+                                        // the non-batched JSON path.
+                                        const updatedMetric = {
+                                            ...this._metrics.setValueByIndex(index, processedValue,
+                                                timestamp || group?.received[addr]?.ms || Date.now(), timestampNs)
+                                        };
 
-                            // If it has a sensible value...
-                            // + Use the deadband here
-
-                            if (
-                                (newVal || newVal == 0)
-                                && (metric.value !== newVal)
-                            ) {
-                                // Extract timestamps from the payload if provided.
-                                // timestampNs takes precedence for sub-ms precision;
-                                // timestamp is the ms fallback.
-                                const timestamp = parseTimeStampFromPayload(obj[addr],
+                                        // Add to the list of changed metrics
+                                        changedMetrics.push(updatedMetric);
+                                    }
+                                });
+                            } else {
+                                // Standard processing for all other payload formats
+                                let newVal = parseVals ? parseValueFromPayload(decoded,
                                     metric,
-                                    this._payloadFormat,
+                                    format,
                                     this._delimiter
-                                );
-                                const timestampNs = parseNsTimestampFromPayload(obj[addr],
-                                    metric,
-                                    this._payloadFormat
-                                );
+                                ) : obj[addr];
 
-                                // Update the metric value and push it to the array of changed metrics
-                                const updated = {
-                                    ...(this._metrics.setValueByAddrPath(addr,
-                                        path,
-                                        newVal,
-                                        timestamp,
-                                        timestampNs))
-                                };
-                                // Simulated-data markers ride each
-                                // payload and go out as metric
-                                // properties so the historians can
-                                // tag the points.
-                                const simTags = parseSimTagsFromPayload(
-                                    obj[addr], this._payloadFormat);
-                                if (simTags.simulated) {
-                                    updated.properties = {
-                                        ...(updated.properties ?? {}),
-                                        simulated: {
-                                            type: sparkplugDataType.boolean,
-                                            value: true,
-                                        },
-                                        ...(simTags.run_id ? {
-                                            run_id: {
-                                                type: sparkplugDataType.string,
-                                                value: simTags.run_id,
-                                            },
-                                        } : {}),
-                                    } as sparkplugMetricProperties;
+                                // Detect misconfiguration: String metric received an object
+                                if (metric.type === sparkplugDataType.string && typeof newVal === 'object' && newVal !== null && !Buffer.isBuffer(newVal)) {
+                                    log(`⚠️ ERROR - Misconfiguration: Metric '${metric.name}' expects String but received object. Check payloadFormat and path config.`);
+                                    log(`   Object received: ${JSON.stringify(newVal).substring(0, 100)}...`);
+                                    newVal = null; // Publish null to indicate error
                                 }
-                                changedMetrics.push(updated);
+
+                                // Test if the value is a bigint and convert it to a Long. This is a hack to ensure that the
+                                // Tahu library works - it only accepts Longs, not bigints.
+                                if (typeof newVal === "bigint") {
+                                    newVal = Long.fromString(newVal.toString());
+                                }
+
+                                // If it has a sensible value...
+                                // + Use the deadband here
+
+                                if (
+                                    (newVal || newVal == 0)
+                                    && (metric.value !== newVal)
+                                ) {
+                                    // Extract timestamps from the payload if provided.
+                                    // timestampNs takes precedence for sub-ms precision;
+                                    // timestamp is the ms fallback.
+                                    const timestamp = parseTimeStampFromPayload(decoded,
+                                        metric,
+                                        format,
+                                        this._delimiter
+                                    );
+                                    const timestampNs = parseNsTimestampFromPayload(decoded,
+                                        metric,
+                                        format
+                                    );
+
+                                    // With no timestamp in the payload the metric is
+                                    // stamped now, or, in a group, when its message
+                                    // arrived, which is when it would have been
+                                    // handled had it come alone.
+                                    const at = timestamp ? undefined : group?.received[addr];
+
+                                    // Update the metric value and push it to the array of changed metrics
+                                    const updated = {
+                                        ...(this._metrics.setValueByIndex(index,
+                                            newVal,
+                                            timestamp || at?.ms,
+                                            timestampNs ?? at?.ns))
+                                    };
+                                    // Simulated-data markers ride each
+                                    // payload and go out as metric
+                                    // properties so the historians can
+                                    // tag the points.
+                                    const simTags = parseSimTagsFromPayload(
+                                        decoded, format);
+                                    if (simTags.simulated) {
+                                        updated.properties = {
+                                            ...(updated.properties ?? {}),
+                                            simulated: {
+                                                type: sparkplugDataType.boolean,
+                                                value: true,
+                                            },
+                                            ...(simTags.run_id ? {
+                                                run_id: {
+                                                    type: sparkplugDataType.string,
+                                                    value: simTags.run_id,
+                                                },
+                                            } : {}),
+                                        } as sparkplugMetricProperties;
+                                    }
+                                    changedMetrics.push(updated);
+                                }
                             }
                         }
                     }
-                }
-            })
+                })
+            }
+            catch (e) {
+                this.#payloadFailed(addr, e);
+            }
         }
         // If any metrics have changed
         if (changedMetrics.length) {
@@ -482,6 +525,29 @@ export class Device {
 
         // Kick the watchdog timer to prevent the device dying
         this._refreshDeathTimer();
+    }
+
+    #stopReadyTimer() {
+        if (this.#readyTimer === null) return;
+        clearInterval(this.#readyTimer);
+        this.#readyTimer = null;
+    }
+
+    /* A payload that made a reader throw. Its address is skipped and the
+     * rest of the message is handled, so one bad payload can't stop the
+     * device's other addresses or the other devices, or, on a split
+     * driver, where data is handed over from a setImmediate, end the
+     * process. Each distinct failure is logged once per device. */
+    #payloadFailed(addr: string, e: unknown) {
+        const why = e instanceof Error ? e.message : String(e);
+        const key = `${addr}\n${why}`;
+        if (this.#failures.has(key)) return;
+        this.#failures.add(key);
+        /* The console, not the debug log: an operator needs to see
+         * that a device's data is being dropped. */
+        console.log(`Device ${this._name}: skipped a payload on address ${addr} `
+            + `that could not be read: ${why}. Later payloads that fail `
+            + `the same way are not logged.`);
     }
 
     // Kick the watchdog timer to prevent the device dying
@@ -601,7 +667,11 @@ export class Device {
      */
     #writeMetrics(metrics: Metrics) {
         // Write metrics to physical device
-        this.#devConn.writeMetrics(metrics, (err: Error) => {
+        this.#devConn.writeMetrics(metrics, (err: Error, written?: sparkplugMetric[]) => {
+            /* A connection that waits for the driver to confirm each
+             * write says which metrics were written. */
+            if (written)
+                return this.#reportWritten(err, written);
             if (!err) {
                 metrics.array.forEach((metric, i) => {
                     if (typeof metric.name !== "undefined") {
@@ -620,6 +690,29 @@ export class Device {
             }
         }, this._payloadFormat);
 
+    }
+
+    /**
+     * Report metrics the driver has confirmed it wrote. The value is
+     * set and published now, so it carries the time of the
+     * confirmation. A failed write reports nothing and leaves the old
+     * value in place.
+     * @param err Why a write failed, if it did
+     * @param written The metrics written, with their new values
+     */
+    #reportWritten(err: Error | undefined, written: sparkplugMetric[]) {
+        if (err)
+            console.log(`${this._name}: ${err.message}`);
+        const named = written.filter(m => typeof m.name !== "undefined");
+        if (!named.length) return;
+
+        const metrics = named.map(m => {
+            this._metrics.setValueByName(m.name!, m.value);
+            return this._metrics.getByName(m.name!);
+        });
+        this._publishDData(metrics);
+        log(`Metric values written to ${this._name}`);
+        this._refreshDeathTimer();
     }
 
     /**
@@ -670,6 +763,7 @@ export class Device {
      */
     stop() {
 
+        this.#stopReadyTimer();
         this._stopMetricSubscription();
 
         // Stop the watchdog timer so that we can instantly stop

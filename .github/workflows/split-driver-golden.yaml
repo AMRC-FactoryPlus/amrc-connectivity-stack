@@ -1,0 +1,132 @@
+name: Split driver golden output
+
+# Builds each Rust split driver that replaces a built-in Edge Agent
+# connection and runs the golden-output harness (acs-edge/tests/golden)
+# against it: every committed sample for its protocol goes through the
+# driver, and the Sparkplug output must match the built-in connection's,
+# recorded in acs-edge/tests/golden/recorded before ACS 7 removed it. rust.yaml lints and unit-tests the drivers; this proves
+# they behave as the connections they replace.
+#
+# To add a driver, add its directory and the protocol of the fixtures
+# it replaces (GOLDEN_PROTOCOL) to the matrix below. A driver whose
+# tests need system packages (edge-mqtt needs mosquitto) also lists
+# them in `packages`, and `test_env` turns those tests on: rust.yaml
+# runs the same tests without the packages, where they skip. edge-opcua's
+# integration tests need a node-opcua server from acs-edge's
+# node_modules, which this job installs after the driver tests, so they
+# run in edge-opcua.yaml instead.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'edge-mqtt/**'
+      - 'edge-opcua/**'
+      - 'edge-rest/**'
+      - 'edge-udp/**'
+      - 'lib/rs-edge-driver/**'
+      - 'acs-edge/lib/**'
+      - 'acs-edge/tests/golden/**'
+      - 'acs-edge/tests/fixtures/drivers/**'
+      - 'acs-edge/package.json'
+      - 'acs-edge/package-lock.json'
+      - 'acs-service-setup/lib/split-drivers.js'
+      # The sites the move tests move, which the harness replays.
+      - 'acs-service-setup/test/rest-move/**'
+      - 'acs-service-setup/test/mqtt-move/**'
+      - 'acs-service-setup/test/udp-move/**'
+      - 'acs-service-setup/test/opcua-move/**'
+      - 'lib/js-service-client/**'
+      - '.github/workflows/split-driver-golden.yaml'
+
+env:
+  # The same toolchain as rust.yaml and the driver Dockerfiles.
+  RUSTUP_TOOLCHAIN: '1.99'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  golden:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: edge-mqtt
+            protocol: MQTT
+            packages: mosquitto
+            test_env: EDGE_MQTT_MOSQUITTO=1
+          - driver: edge-opcua
+            protocol: OPC UA
+          - driver: edge-rest
+            protocol: REST
+          - driver: edge-udp
+            protocol: UDP
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.driver }}/target
+          key: ${{ runner.os }}-golden-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.driver }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.driver)) }}
+          restore-keys: |
+            ${{ runner.os }}-golden-${{ env.RUSTUP_TOOLCHAIN }}-${{ matrix.driver }}-
+
+      - name: Install the driver's test packages
+        if: matrix.packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Driver tests with their packages
+        if: matrix.test_env
+        working-directory: ${{ matrix.driver }}
+        run: env ${{ matrix.test_env }} cargo test --locked
+
+      - name: Build the driver
+        working-directory: ${{ matrix.driver }}
+        run: cargo build --release --locked
+
+      # The rest is as acs-edge-tests.yaml sets the agent up.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      - name: Install driver library dependencies
+        working-directory: lib/js-edge-driver
+        run: npm ci
+
+      # jest passes when no test matches, so also check that at least
+      # one sample went through the driver.
+      - name: Run the harness against the driver
+        working-directory: acs-edge
+        shell: bash
+        env:
+          GOLDEN_DRIVER: ../${{ matrix.driver }}/target/release/driver
+          GOLDEN_PROTOCOL: ${{ matrix.protocol }}
+        run: |
+          npx jest --ci tests/golden -t "split driver" 2>&1 | tee golden.log
+          grep -q "matches recorded built-in" golden.log
+          # Every protocol also replays what service-setup's move leaves.
+          case "$GOLDEN_PROTOCOL" in
+            REST|MQTT|UDP|"OPC UA") grep -q "after the move" golden.log ;;
+          esac

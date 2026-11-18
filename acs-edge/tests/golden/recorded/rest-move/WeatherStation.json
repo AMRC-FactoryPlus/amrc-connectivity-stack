@@ -1,0 +1,514 @@
+{
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it",
+ "label": "built-in",
+ "fixture": "sample-rest-xml",
+ "duration_ms": 5000,
+ "speed": 2.5,
+ "delivered": 6,
+ "ddata": 5,
+ "agent_us_per_input": 13585,
+ "credentials": [],
+ "writes": [],
+ "births": {
+  "DBIRTH Weather_1": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "400",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_01",
+     "type": "Double",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm/s\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1VelAct']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_02",
+     "type": "Double",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm/s\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1VelCom']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_03",
+     "type": "Double",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1Act']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_04",
+     "type": "Double",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1Com']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_05",
+     "type": "Float",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"A\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1Current']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_06",
+     "type": "Float",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm/s\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1VelError']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_07",
+     "type": "Float",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='x1']//*[@dataItemId='x1Follow']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_08",
+     "type": "String",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='path']//*[@dataItemId='currentJobGuid']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_09",
+     "type": "UInt16",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='path']//*[@dataItemId='layers']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_10",
+     "type": "UInt32",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='path']//*[@dataItemId='elaTime']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_11",
+     "type": "UInt64",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='path']//*[@dataItemId='submissionTime']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_12",
+     "type": "DateTime",
+     "value": "null",
+     "t": -1267.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"/resource_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":\"//*[@componentId='modelBay1']//*[@dataItemId='mb1MfgDate']/text()\"},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "NBIRTH": [
+   [
+    {
+     "name": "Schema_UUID",
+     "type": "UUID",
+     "value": "\"15360868-2f35-4b52-990b-49329fb246fe\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Instance_UUID",
+     "type": "UUID",
+     "value": "\"00000000-0000-4000-8000-00000000a6e7\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Config_Revision",
+     "type": "UUID",
+     "value": "\"\\\"golden-config\\\"\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Node Properties/Type",
+     "type": "String",
+     "value": "\"ACS Edge Agent\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Node Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5
+    },
+    {
+     "name": "Node Control/Reload Edge Agent Config",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5
+    },
+    {
+     "name": "Node Control/Payload Compression",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Instance_UUID",
+     "type": "UUID",
+     "value": "\"b09a2fed-eec9-52cf-b824-1a553f8113c8\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Type",
+     "type": "UUID",
+     "value": "\"c414c68b-5014-4e46-a0b4-d5f7f8df1d9f\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Invalid/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Invalid/Instance_UUID",
+     "type": "UUID",
+     "value": "\"59982376-d40f-582b-a4d0-1f5683014f7c\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Invalid/Type",
+     "type": "UUID",
+     "value": "\"99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6\"",
+     "t": -1267.5
+    },
+    {
+     "name": "Alerts/Config_Invalid/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1267.5
+    }
+   ]
+  ]
+ },
+ "repeated": {},
+ "data": {
+  "Weather_1/Metric_01": [
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "350.1318830074467",
+    "t": 10.74
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "368.2731629154459",
+    "t": 1011.31
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "380.3728664547348",
+    "t": 2024.53
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "394.24002119309654",
+    "t": 3035.73
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "407.1170338153267",
+    "t": 4033.43
+   }
+  ],
+  "Weather_1/Metric_02": [
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "114.2129784045662",
+    "t": 11.75
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "116.79547874845501",
+    "t": 1012.24
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "119.61167587068658",
+    "t": 2030.64
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "120.84091008459261",
+    "t": 3038.53
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "123.86703908623082",
+    "t": 4035.64
+   }
+  ],
+  "Weather_1/Metric_03": [
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "428.30775938112635",
+    "t": 12.75
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "433.8848384449343",
+    "t": 1013.36
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "440.14986853901416",
+    "t": 2031.47
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "444.36803715854666",
+    "t": 3040.69
+   },
+   {
+    "name": "Metric_03",
+    "type": "Double",
+    "value": "449.0073735661525",
+    "t": 4037.48
+   }
+  ],
+  "Weather_1/Metric_04": [
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "361.5177993467372",
+    "t": 13.58
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "373.11694373777465",
+    "t": 1014.43
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "382.1502683030914",
+    "t": 2032.37
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "392.29223068355947",
+    "t": 3046.59
+   },
+   {
+    "name": "Metric_04",
+    "type": "Double",
+    "value": "400.1340604224632",
+    "t": 4039.61
+   }
+  ],
+  "Weather_1/Metric_05": [
+   {
+    "name": "Metric_05",
+    "type": "Float",
+    "value": "428.0562438964844",
+    "t": 14.77
+   },
+   {
+    "name": "Metric_05",
+    "type": "Float",
+    "value": "433.43408203125",
+    "t": 1020.41
+   },
+   {
+    "name": "Metric_05",
+    "type": "Float",
+    "value": "439.8053894042969",
+    "t": 2033.15
+   },
+   {
+    "name": "Metric_05",
+    "type": "Float",
+    "value": "445.3412170410156",
+    "t": 3047.28
+   },
+   {
+    "name": "Metric_05",
+    "type": "Float",
+    "value": "452.2642517089844",
+    "t": 4041.48
+   }
+  ],
+  "Weather_1/Metric_06": [
+   {
+    "name": "Metric_06",
+    "type": "Float",
+    "value": "64.73013305664062",
+    "t": 15.97
+   },
+   {
+    "name": "Metric_06",
+    "type": "Float",
+    "value": "66.57491302490234",
+    "t": 1021.88
+   },
+   {
+    "name": "Metric_06",
+    "type": "Float",
+    "value": "68.0356216430664",
+    "t": 2034.08
+   },
+   {
+    "name": "Metric_06",
+    "type": "Float",
+    "value": "70.65686798095703",
+    "t": 3047.96
+   },
+   {
+    "name": "Metric_06",
+    "type": "Float",
+    "value": "72.65180969238281",
+    "t": 4043.17
+   }
+  ],
+  "Weather_1/Metric_07": [
+   {
+    "name": "Metric_07",
+    "type": "Float",
+    "value": "231.77232360839844",
+    "t": 16.95
+   },
+   {
+    "name": "Metric_07",
+    "type": "Float",
+    "value": "236.08522033691406",
+    "t": 1022.94
+   },
+   {
+    "name": "Metric_07",
+    "type": "Float",
+    "value": "245.451171875",
+    "t": 2034.86
+   },
+   {
+    "name": "Metric_07",
+    "type": "Float",
+    "value": "251.7180938720703",
+    "t": 3048.63
+   },
+   {
+    "name": "Metric_07",
+    "type": "Float",
+    "value": "258.82916259765625",
+    "t": 4044.72
+   }
+  ],
+  "Weather_1/Metric_08": [
+   {
+    "name": "Metric_08",
+    "type": "String",
+    "value": "\"ALARM\"",
+    "t": 17.72
+   }
+  ],
+  "Weather_1/Metric_09": [
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "97",
+    "t": 21.27
+   },
+   {
+    "name": "Metric_09",
+    "type": "UInt16",
+    "value": "98",
+    "t": 4051.89
+   }
+  ],
+  "Weather_1/Metric_10": [
+   {
+    "name": "Metric_10",
+    "type": "UInt32",
+    "value": "72",
+    "t": 22.28
+   }
+  ],
+  "Weather_1/Metric_11": [
+   {
+    "name": "Metric_11",
+    "type": "UInt64",
+    "value": "519",
+    "t": 23.02
+   },
+   {
+    "name": "Metric_11",
+    "type": "UInt64",
+    "value": "520",
+    "t": 4053.09
+   }
+  ],
+  "Weather_1/Metric_12": [
+   {
+    "name": "Metric_12",
+    "type": "DateTime",
+    "value": "1767225600000",
+    "t": 23.66
+   },
+   {
+    "name": "Metric_12",
+    "type": "DateTime",
+    "value": "1767225601000",
+    "t": 1027.95
+   }
+  ]
+ },
+ "counts": {
+  "DBIRTH Weather_1": 1,
+  "DDATA Weather_1": 5,
+  "NBIRTH": 1
+ }
+}

@@ -85,6 +85,12 @@
           <span class="text-sm font-semibold font-mono">{{targetLabel}}</span>
         </div>
 
+        <div v-if="hostPortProblem"
+            class="flex gap-2.5 rounded-md bg-red-50 ring-1 ring-inset ring-red-200 p-3">
+          <i class="fa-solid fa-circle-xmark text-xs text-red-700 mt-0.5"></i>
+          <div class="text-xs leading-relaxed text-red-800">{{hostPortProblem}}</div>
+        </div>
+
         <div v-if="valuesOverrideHostname"
             class="flex gap-2.5 rounded-md bg-amber-50 ring-1 ring-inset ring-amber-200 p-3">
           <i class="fa-solid fa-triangle-exclamation text-xs text-amber-700 mt-0.5"></i>
@@ -157,7 +163,8 @@
             >
               Next<i class="fa-solid fa-arrow-right text-[11px]"></i>
             </Button>
-            <Button v-else class="gap-2" :disabled="moving" @click="move">
+            <Button v-else class="gap-2" :disabled="moving || !!hostPortProblem"
+                :title="hostPortProblem ?? undefined" @click="move">
               <i :class="['fa-solid', moving ? 'fa-circle-notch animate-spin' : 'fa-right-left', 'text-[11px]']"></i>
               {{moving ? 'Moving...' : `Move to ${targetLabel}`}}
             </Button>
@@ -179,6 +186,7 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { hostIsKnown } from '@utils/hosts.js'
+import { moveHostClash } from '@utils/hostPorts.js'
 import { moveHost } from '@utils/moveHost.js'
 import { toast } from 'vue-sonner'
 
@@ -289,6 +297,21 @@ export default {
       return n === 1 ? '1 device is unaffected' : `${n} devices are unaffected`
     },
 
+    /* A connection that opens a port on the host goes with the node, so
+     * the move gets the same checks as saving the connection. */
+    hostPortProblem () {
+      if (!this.isNode || !this.hasTarget) return undefined
+      return moveHostClash({
+        agent: this.target.uuid,
+        cluster: this.cluster?.uuid,
+        hostname: this.selected,
+      }, {
+        connections: Array.isArray(this.cn.data) ? this.cn.data : [],
+        nodes: Array.isArray(this.n.data) ? this.n.data : [],
+        clusters: this.c.data,
+      })
+    },
+
     anyHostPaths () {
       return Object.values(this.hostPaths).some(p => p?.length)
     },
@@ -352,6 +375,10 @@ export default {
     },
 
     async move () {
+      if (this.hostPortProblem) {
+        toast.error(`Unable to move ${this.target.name}`, { description: this.hostPortProblem })
+        return
+      }
       this.moving = true
       const name = this.target.name
       const to = this.targetLabel

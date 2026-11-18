@@ -10,6 +10,26 @@
   {{- end }}
 {{- end -}}
 
+{{- /* Host ports: a driver that listens (the UDP driver) has its port
+     opened on the node. Kubernetes refuses a pod that opens one
+     port twice, so say which drivers clash. */}}
+{{- $hostPorts := dict }}
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- if not $driver.external }}
+    {{- range $hp := coalesce $driver.hostPorts list }}
+      {{- $port := int $hp.port }}
+      {{- if or (lt $port 1) (gt $port 65535) (not (has $hp.protocol (list "UDP" "TCP"))) }}
+        {{- fail (printf "Edge Agent %s, driver %s: host port %v/%v is not a port from 1 to 65535 with protocol UDP or TCP" $.Values.name $name $hp.port $hp.protocol) }}
+      {{- end }}
+      {{- $key := printf "%d/%s" $port $hp.protocol }}
+      {{- if hasKey $hostPorts $key }}
+        {{- fail (printf "Edge Agent %s: drivers %s and %s both listen on %s. Give one of the connections another port." $.Values.name (get $hostPorts $key) $name $key) }}
+      {{- end }}
+      {{- $_ := set $hostPorts $key $name }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
 # This deployment is configured to completely disable Kubernetes
 # back-offs for edge agents. This ensures that when an edge agent fails,
 # it will be restarted immediately without any exponential back-off
@@ -168,6 +188,14 @@ spec:
           securityContext:
             privileged: true
     {{- end }}
+    {{- with $driver.hostPorts }}
+          ports:
+      {{- range . }}
+            - containerPort: {{ int .port }}
+              hostPort: {{ int .port }}
+              protocol: {{ .protocol }}
+      {{- end }}
+    {{- end }}
           env:
             - name: EDGE_MQTT
               value: "mqtt://localhost"
@@ -180,13 +208,27 @@ spec:
                   key: "{{ $name }}"
             - name: VERBOSE
               value: "{{ $.Values.verbosity }}"
+    {{- /* A driver that keeps state, such as the OPC UA driver's client
+         certificate, gets a directory that lasts as long as the pod,
+         as the agent's own .config does. */}}
+    {{- with $driver.stateDir }}
+      {{- if not (hasPrefix "/" .) }}
+        {{- fail (printf "Edge Agent %s, driver %s: stateDir %q is not an absolute path" $.Values.name $name .) }}
+      {{- end }}
+            - name: DRIVER_STATE_DIR
+              value: {{ . | quote }}
+    {{- end }}
     {{- $hp := get $driverMounts.mounts $name }}
-    {{- if $hp }}
+    {{- if or $hp $driver.stateDir }}
           volumeMounts:
     {{- end }}
     {{- range $n, $m := $hp }}
             - mountPath: "{{ $m }}"
               name: "{{ $n }}"
+    {{- end }}
+    {{- with $driver.stateDir }}
+            - mountPath: {{ . | quote }}
+              name: "state-{{ include "edge-agent.k8sname" $name }}"
     {{- end }}
   {{- end }}
 {{- end }}
@@ -205,6 +247,12 @@ spec:
         - name: "{{ $n }}"
           hostPath:
             path: "{{ $p }}"
+{{- end }}
+{{- range $name, $driver := coalesce .Values.drivers dict }}
+  {{- if and (not $driver.external) $driver.stateDir }}
+        - name: "state-{{ include "edge-agent.k8sname" $name }}"
+          emptyDir: {}
+  {{- end }}
 {{- end }}
 ---
 apiVersion: factoryplus.app.amrc.co.uk/v1

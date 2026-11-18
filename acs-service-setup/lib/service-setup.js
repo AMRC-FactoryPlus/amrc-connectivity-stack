@@ -15,6 +15,8 @@ import { setup_local_uuids }    from "./local-uuids.js";
 import {migrate_edge_agent_config} from "./manager-devices.js";
 import {migrate_deployment_charts} from "./deployment-charts.js";
 import { setup_openid }         from "./openid.js";
+import { migrate_split_drivers } from "./split-drivers.js";
+import { check_retired_drivers } from "./retired-drivers.js";
 import { setup_grafana_permissions } from "./grafana-permissions.js";
 
 export class ServiceSetup {
@@ -98,5 +100,23 @@ export class ServiceSetup {
         }
 
         this.log("Finished setup");
+    }
+
+    /* The split-driver move, run as its own step (SS_STEP=split-drivers)
+     * in an init container after edge-helm-charts. It rewrites Edge
+     * Agent connections for this release's split driver images, so it
+     * must only run once this release's edge charts are published: init
+     * containers run in order, each only after the last succeeded. */
+    async run_split_drivers () {
+        const { fplus } = this;
+        await this.wait_for(fplus.ConfigDB, "2.0.0");
+
+        this.log("Moving connections from built-in to split drivers");
+        await migrate_split_drivers(this);
+
+        this.log("Checking for connections on removed drivers");
+        await check_retired_drivers(this);
+
+        this.log("Finished the split-driver move");
     }
 }

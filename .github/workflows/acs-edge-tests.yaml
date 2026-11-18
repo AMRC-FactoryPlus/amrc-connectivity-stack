@@ -1,0 +1,71 @@
+name: Edge Agent tests
+
+# Runs every jest suite in acs-edge. ts-jest type-checks each suite
+# before it runs it, and jest exits non-zero when a suite fails to
+# compile, so a test that no longer compiles fails this job instead of
+# going unnoticed.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'acs-edge/**'
+      - 'lib/js-service-client/**'
+      # The golden-output harness (acs-edge/tests/golden) runs the
+      # reference REST driver on lib/js-edge-driver and reads
+      # service-setup's split driver payload format maps.
+      - 'lib/js-edge-driver/**'
+      - 'acs-service-setup/lib/split-drivers.js'
+      # The sites the move tests move, which the harness reads.
+      - 'acs-service-setup/test/rest-move/**'
+      - 'acs-service-setup/test/mqtt-move/**'
+      - 'acs-service-setup/test/udp-move/**'
+      - 'acs-service-setup/test/opcua-move/**'
+      - '.github/workflows/acs-edge-tests.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # The same major version as the JS base image the agent runs on.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # The npm shipped with Node 22 crashes on file: dependencies.
+      # Pin to the same npm as the JS base image.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      # The service client's optional GSSAPI module is native and needs
+      # the Kerberos headers.
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      # The golden-output harness's reference REST driver runs on
+      # lib/js-edge-driver.
+      - name: Install driver library dependencies
+        working-directory: lib/js-edge-driver
+        run: npm ci
+
+      - name: Run the tests
+        working-directory: acs-edge
+        run: npx jest --ci
+
+      # The split-driver cluster rig's commands run outside jest, so
+      # type-check all of them here.
+      - name: Compile the cluster rig
+        working-directory: acs-edge
+        run: npx tsc -p tests/rig --noEmit

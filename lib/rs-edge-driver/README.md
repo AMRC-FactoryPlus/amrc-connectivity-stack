@@ -95,7 +95,7 @@ impl Handler for ModbusHandler {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt::init();
+    init_logging();
 
     let config = DriverConfig::from_env()?;
     let mut driver = Driver::<ModbusHandler>::new(config);
@@ -104,10 +104,104 @@ async fn main() -> Result<(), Error> {
 ```
 
 See [`examples/test_driver.rs`](./examples/test_driver.rs) for a
-complete, runnable polled-mode driver, and
-[`edge-compass-daq`](../../edge-compass-daq) in the main repo for a
-real async-mode driver (subscribes to a southbound MQTT broker and
-pushes data via `DriverHandle::publish` as it arrives).
+complete, runnable polled-mode driver. `edge-compass-daq`, which is
+kept outside this repository, is a real async-mode driver: it
+subscribes to a southbound MQTT broker and pushes data via
+`DriverHandle::publish` as it arrives.
+
+An async handler that subscribes at a rate can override
+`subscribe_groups` instead of `subscribe`. It gets the same addresses
+plus the Edge Agent's groups from the `addr` message: one per device,
+with the device's poll interval and its addresses (`AddrGroup`). The
+default calls `subscribe`. `edge-opcua` uses it to sample and publish
+each device's nodes at the device's interval.
+
+Each call to `subscribe` replaces the previous set of addresses. If the
+address map becomes empty after a handler has subscribed to some
+addresses, `subscribe` is called with an empty list, so drop every
+subscription then. It is never called empty before the first
+non-empty call.
+
+### A device that sends faster than the Edge Agent can take
+
+`DriverHandle::publish` queues without limit. That suits a device that
+sends at the rate it was asked for, but a device that pushes data on its
+own, such as a UDP sender, can outrun the Edge Agent, and the queue then
+grows until the container runs out of memory. Such a driver should call
+`DriverHandle::try_publish` instead. It returns `false`, and drops the
+data, while more than `DriverOptions::publish_queue_bytes` (16 MiB by
+default, each message counting its payload plus
+`PUBLISH_QUEUE_OVERHEAD`) is waiting to go to the agent. Count and log
+what it refuses, so the loss is visible. Data from both calls goes out
+in the order it was accepted. [`edge-udp`](../../edge-udp) does this.
+
+When the device side can hold data back, as an MQTT broker does for a
+slow subscriber, call `DriverHandle::publish_wait` instead. It meets the
+same limit by waiting rather than dropping: the handler stops reading
+from its device until the agent has taken enough, and nothing is lost
+in the driver. [`edge-mqtt`](../../edge-mqtt) does this.
+
+## Connection status
+
+The driver reports its status to the Edge Agent on
+`fpEdge1/{id}/status`. A handler drives it like this:
+
+- `Handler::connect` returning `Ok(())` sets `UP`. Returning
+  `ConnectError::ConnectionFailed` or `AuthFailed` sets `CONN` or
+  `AUTH`, and the driver calls `connect` again after
+  `reconnect_delay` until it succeeds.
+- If the device goes away after `UP`, call
+  `DriverHandle::disconnected(reason)` from anywhere in the handler.
+  The status changes in the same way and the driver reconnects. For
+  any other error, such as a protocol error, call
+  `DriverHandle::error()`, which sets `ERR` and reconnects.
+- Each report belongs to the latest `connect` call made before it.
+  Reports from an earlier attempt are ignored, so a burst of reports
+  about one lost connection causes one reconnect. A report made while
+  `connect` is still running, such as from a device that drops the
+  connection straight after accepting it, is acted on when `connect`
+  returns, rather than reporting `UP`.
+- A rejected address map is reported as `ADDR`, and stays `ADDR` when
+  the handler connects again, until a good map arrives.
+- No data is published unless the status is `UP`. A message over
+  `max_packet_size` is dropped with a warning, because the MQTT client
+  would otherwise end the whole session for it.
+
+The driver calls `connect`, `subscribe`, `cmd`, `write` and `close` on its own
+tasks, so a slow or unreachable device never holds up the MQTT
+connection to the Edge Agent and its keep-alive pings.
+
+When the Edge Agent sends `active OFFLINE`, the driver closes the
+handler and forgets its configuration until the agent sends `ONLINE`.
+
+## Writes
+
+The Edge Agent sends each write in two forms, and a handler takes one
+of them:
+
+- By default the driver subscribes to `cmd/#` and calls
+  `Handler::cmd` with the address and the value as raw bytes, as it
+  always has.
+- A handler that sets `const TYPED_WRITES: bool = true` gets typed
+  writes instead. The driver subscribes to `write/#` and calls
+  `Handler::write` with the parsed address and a `WriteValue`, which
+  carries the Sparkplug type and the value (`WriteValue::Int16(-2)`,
+  `WriteValue::Double(0.5)` and so on). Return `WriteError::ReadOnly`,
+  `BadValue` or `Failed` if the write fails, and the driver reports it
+  to the Edge Agent as `RO`, `CMD` or `ERR`. This needs an Edge Agent
+  from November 2026 or later.
+
+See "Typed writes" in `acs-edge/docs/edge-split.md` for the protocol.
+
+## Polling in parallel
+
+`Handler::poll` takes `&mut self`, so polls through it run one at a
+time. If your device client can serve several reads at once, return a
+`Poller` from `Handler::poller` and the driver will call it without
+taking the handler's lock, for every address in a poll request at
+once. Set `serial_poll` in `DriverConfig` to force one poll at a time
+either way. A poll's `poll_timeout` (in `DriverOptions`) starts when the poll starts, not
+while it waits for the lock.
 
 ## API reference
 
@@ -129,8 +223,40 @@ Name|Meaning
 `EDGE_MQTT`|URL of the Edge Agent MQTT broker
 `EDGE_USERNAME`|Driver connection name
 `EDGE_PASSWORD`|MQTT password
+`VERBOSE`|Log level, as for the JS drivers: `1` or `ALL` for debug, or a comma-separated list of targets (see `init_logging`)
 
-`DriverConfig` also has `reconnect_delay` and `serial_poll` fields, but
-`from_env()` currently hardcodes these (5 seconds, parallel polling)
-rather than reading them from the environment — construct
-`DriverConfig` directly if you need different values.
+`RUST_LOG` overrides `VERBOSE` when set. Call `init_logging()` at the
+start of `main` to use them.
+
+With `VERBOSE`, `debug` and `trace` lines from crates cargo downloaded
+(from crates.io or git, such as rumqttc or an OPC UA client) only come
+through for targets `VERBOSE` names. So `VERBOSE=ALL`, the edge-agent
+chart's default, means `debug` for the driver and this library, and
+`VERBOSE=ALL,rumqttc` adds rumqttc's, which logs every MQTT packet.
+`init_logging` tells the crates apart by where their source is:
+anything under cargo's `registry/src` or `git/checkouts` counts as
+downloaded. `RUST_LOG` is used as it is.
+
+`DriverConfig::from_env()` (or `DriverConfig::new(url, username,
+password)`) sets `reconnect_delay` to 5 seconds and `serial_poll` to
+`false`. Change the fields on the returned value if you need different
+ones, or build the struct yourself.
+
+Further settings are in `DriverOptions`. `Driver::new(config)` uses
+their defaults. To change them, start from `DriverOptions::default()`
+and pass it to `Driver::with_options(config, options)`:
+
+Field|Default|Meaning
+---|---|---
+`poll_timeout`|30 s|Longest a single poll may run
+`keep_alive`|30 s|MQTT keep-alive to the Edge Agent
+`max_packet_size`|16 MiB|Largest MQTT packet sent or accepted. rumqttc's own default is 10 KiB, too small for a large `addr` map or data payload
+
+## Using this library in a driver
+
+Drivers in this repository depend on this library by path
+(`rs-edge-driver = { path = "../lib/rs-edge-driver" }`). Drivers
+elsewhere pin a release tag, `rs/edge-driver/vX.Y.Z`, by git. The
+Dockerfile for a driver is in [`driver-template/`](./driver-template/Dockerfile),
+and [Adding a Rust Driver](../../docs/development/rust-drivers.md)
+covers the whole process, from code to a published image.

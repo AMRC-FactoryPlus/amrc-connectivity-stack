@@ -3,14 +3,18 @@
  */
 
 import {
-  UUIDs, is_isa95_tag, isa95_vocabulary, merge_isa95_tags, render_isa95,
+  DEFAULT_PAYLOAD_FORMAT, UUIDs, driver_id, driver_values, drop_metric_paths,
+  is_isa95_tag, isa95_vocabulary, merge_isa95_tags, render_isa95,
+  set_connection_type, set_driver_ids, takes_metric_paths,
 } from '@amrc-factoryplus/service-client'
 import { useDeviceStore } from '@/store/useDeviceStore'
 import { useConnectionStore } from '@/store/useConnectionStore'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useDriverStore } from '@/store/useDriverStore.js'
 import { useISA95Store } from '@/store/useISA95Store.js'
+import { useNodeStore } from '@/store/useNodeStore.js'
 import { storeReady } from '@/store/useStoreReady.js'
+import { sidecarsLeftOut } from '@/utils/hostPorts.js'
 
 /**
  * Puts a device's ISA-95 placement into its tags.
@@ -42,6 +46,77 @@ export function applyPlacement (tags, device, vocab, existing) {
     ]
   }
   return merge_isa95_tags(tags, rendered)
+}
+
+/**
+ * Builds a connection's entry in the Edge Agent config, without its
+ * devices. The connection type and details key come from the driver,
+ * through the same helper service-setup uses when it moves a connection
+ * between an internal driver and a split driver, so a save here gives
+ * the same entry as the move.
+ *
+ * @param {Object|null} existing - The connection's current entry, which is changed in place, or null for a new one
+ * @param {Object} connection - The connection store entry, with its configuration and bound driver definition
+ * @returns {Object} - The entry
+ */
+export function applyConnection (existing, connection) {
+  const connectionConfiguration = connection.configuration
+  const connDetails = connectionConfiguration.config || undefined
+  const driver = connectionConfiguration.driver
+
+  if (existing) {
+    const update = (key, val) => {
+      if (existing[key] != val) {
+        console.debug('Updating %s from %o to %o', key, existing[key], val)
+        existing[key] = val
+      }
+    }
+    update('pollInt', connectionConfiguration.pollInt)
+    update('payloadFormat', connectionConfiguration.source?.payloadFormat)
+    /* This also removes details held under another driver's key. */
+    return set_connection_type(existing, driver, connDetails)
+  }
+
+  const entry = {
+    uuid: connection.uuid,
+    name: connection.name || 'Connection',
+    pollInt: connectionConfiguration.pollInt || 1000,
+    devices: []
+  }
+  set_connection_type(entry, driver, connDetails)
+
+  if (connectionConfiguration.source?.payloadFormat) {
+    entry.payloadFormat = connectionConfiguration.source.payloadFormat
+  }
+  return entry
+}
+
+/**
+ * Removes the metric paths of a connection's devices if its driver
+ * takes none. The OPC UA split driver is one: the Edge Agent would read
+ * its `{"value", "timestamp"}` packets through the path, and a path
+ * from the built-in connection, which never read paths (some hold a
+ * unit, such as `mm`), would find nothing. The origin map keeps its
+ * paths, so a connection moved back gets them again on its next save.
+ * Service-setup clears the same paths when it moves a connection.
+ *
+ * @param {Object} entry - The connection's entry, changed in place
+ * @param {Object} connection - The connection store entry, with its configuration and bound driver definition
+ * @returns {Object} - The entry
+ */
+export function applyMetricPaths (entry, connection) {
+  if (!takes_metric_paths(connection.configuration?.driver))
+    drop_metric_paths(entry)
+  return entry
+}
+
+/**
+ * The payload format a device takes from its connection.
+ * @param {Object} connectionConfiguration - The connection's configuration
+ * @returns {string}
+ */
+export function devicePayloadFormat (connectionConfiguration) {
+  return connectionConfiguration.source?.payloadFormat || DEFAULT_PAYLOAD_FORMAT
 }
 
 /* How many times to rebuild when someone else saved the config first. */
@@ -180,6 +255,69 @@ function processOriginMapObject(obj, path, tags) {
 }
 
 /**
+ * The `values.drivers` of an Edge Agent Deployment: one entry for each
+ * split driver connection, keyed by its driver id, which is what the
+ * chart names the sidecar, its MQTT username and its password after.
+ *
+ * A sidecar that would open a host port another sidecar that can run on
+ * the same host has open is left out, as service-setup leaves it out
+ * when it moves the connection (sidecarsLeftOut). The connection gets
+ * its sidecar once it is saved with a free port.
+ *
+ * @param {Array} deviceConnections - The connections of the Edge Agent config, with their driver ids set
+ * @param {Array} connections - The connection store entries
+ * @param {Object} [opts]
+ * @param {string} [opts.agent] - The Edge Agent's (node's) UUID
+ * @param {Object} [opts.current] - The Deployment's `values.drivers` now
+ * @param {Array} [opts.nodes] - The node store entries
+ * @returns {Object} - The driver map
+ */
+export function deploymentDrivers (deviceConnections, connections, { agent, current = {}, nodes = [] } = {}) {
+  const sidecars = []
+  for (const deviceConn of deviceConnections) {
+    // The s-s migration will have given every deviceConnection a uuid
+    const connection = connections.find(conn => conn.uuid === deviceConn.uuid)
+    if (!connection) {
+      console.debug('No matching connection found for device connection:', deviceConn.name)
+      continue
+    }
+
+    // Split drivers get a sidecar; internal drivers get nothing
+    const values = driver_values(connection.configuration, connection.configuration?.driver)
+    if (!values) continue
+
+    const id = driver_id(deviceConn)
+    sidecars.push({
+      id, values,
+      uuid: deviceConn.uuid,
+      name: deviceConn.name,
+      ports: values.hostPorts ?? [],
+      /* Keyed by its name if its id changed since the last save. */
+      has: Object.hasOwn(current, id) || Object.hasOwn(current, deviceConn.name),
+    })
+  }
+
+  const left = sidecarsLeftOut(sidecars, { agent, connections, nodes })
+  const driverMap = {}
+  for (const { id, name, values } of sidecars) {
+    const clash = left.get(id)
+    if (clash) {
+      console.warn('Connection %s gets no sidecar: %s port %s is already used by connection %s, which can run on the same host',
+        name, clash.protocol, clash.port, clash.names[1])
+      continue
+    }
+    driverMap[id] = values
+  }
+  return driverMap
+}
+
+/* The DriverDef of an Edge Agent config entry, from the connection
+ * store, for set_driver_ids. */
+export function entryDriverDef (connections) {
+  return entry => connections.find(c => c.uuid === entry.uuid)?.configuration?.driver
+}
+
+/**
  * Updates the Edge Agent Deployment configuration for a node to include external drivers
  *
  * @param {string} nodeUuid - UUID of the node
@@ -190,6 +328,7 @@ function processOriginMapObject(obj, path, tags) {
 async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
   // Get the stores
   const connectionStore = useConnectionStore()
+  const nodeStore = useNodeStore()
   const serviceClientStore = useServiceClientStore()
   const serviceClient = serviceClientStore.client
 
@@ -219,40 +358,12 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
       deployment.values.drivers = {}
     }
 
-    // Create a map of connection names to driver image references
-    const driverMap = {}
-
     console.debug('Updating edge agent deployment for node:', nodeUuid)
-    console.debug('Connections:', connectionStore.data)
-    console.debug('Device connections:', deviceConnections)
-
-    // Process each device connection to find external drivers
-    for (const deviceConn of deviceConnections) {
-      // Find the corresponding connection in the connection store
-      console.debug('Looking for connection matching device connection:', deviceConn.name, 'with uuid:', deviceConn.uuid)
-
-      // The s-s migration will have given every deviceConnection a uuid
-      const connection = connectionStore.data.find(conn => conn.uuid === deviceConn.uuid)
-      if (!connection) {
-        console.debug('No matching connection found for device connection:', deviceConn.name);
-        continue;
-      }
-      console.debug('Found matching connection:', connection.name)
-
-      // Check if we have a driver image definition
-      const image = connection.configuration?.driver?.image;
-      if (!image) {
-        console.debug('Driver image not found in connection store');
-        console.debug('Connection', connection);
-        continue;
-      }
-      console.debug('Found driver image from driver store', image);
-
-      driverMap[deviceConn.name] = {
-        ...(connection.configuration.deployment ?? {}),
-        image,
-      };
-    }
+    const driverMap = deploymentDrivers(deviceConnections, connectionStore.data, {
+      agent: nodeUuid,
+      current: deployment.values.drivers,
+      nodes: nodeStore.data ?? [],
+    })
 
     /* XXX bmz: Here we need a source for EA-level values. */
 
@@ -400,11 +511,6 @@ async function buildEdgeAgentConfig({
       console.debug('Processing connection:', connection.name)
       console.debug('Connection configuration:', connectionConfiguration)
 
-      // Find if this connection already exists in the config
-      const connType = connectionConfiguration.driver?.internal?.connType || 'Driver'
-      const connDetailsKey = connectionConfiguration.driver?.internal?.details || 'DriverDetails'
-      const connDetails = connectionConfiguration.config
-
       // Find the connection in the config
       let connectionIndex = -1
       let connectionConfig = null
@@ -418,38 +524,12 @@ async function buildEdgeAgentConfig({
 
       if (connectionIndex >= 0) {
         console.debug('Found existing connection in edge agent config at index:', connectionIndex)
-        connectionConfig = config.deviceConnections[connectionIndex]
-        const update = (key, val) => {
-          if (connectionConfig[key] != val) {
-            console.debug('Updating %s from %o to %o', key, connectionConfig[key], val)
-            connectionConfig[key] = val
-          }
-        }
-        update("pollInt", connectionConfiguration.pollInt)
-        update("payloadFormat", connectionConfiguration.source?.payloadFormat)
-        update("connType", connType)
-        update(connDetailsKey, connDetails)
+        connectionConfig = applyConnection(config.deviceConnections[connectionIndex], connection)
       }
 
       // If connection doesn't exist, create it
       if (connectionIndex < 0) {
-        connectionConfig = {
-          uuid: connection.uuid,
-          name: connection.name || 'Connection',
-          connType: connType,
-          pollInt: connectionConfiguration.pollInt || 1000,
-          devices: []
-        }
-
-        // Add the connection details with the appropriate key
-        if (connDetails) {
-          connectionConfig[connDetailsKey || 'DriverDetails'] = connDetails
-        }
-
-        // Add payloadFormat if it exists
-        if (connectionConfiguration.source?.payloadFormat) {
-          connectionConfig.payloadFormat = connectionConfiguration.source.payloadFormat
-        }
+        connectionConfig = applyConnection(null, connection)
 
         // Add the new connection to the config
         if (!config.deviceConnections) {
@@ -524,7 +604,7 @@ async function buildEdgeAgentConfig({
           templates: [],
           tags: tags,
           pubInterval: device.pub_interval || 0,
-          payloadFormat: connectionConfiguration.source?.payloadFormat || 'Defined by Protocol',
+          payloadFormat: devicePayloadFormat(connectionConfiguration),
           /* Device-level historian override: false suppresses
            * recording for every metric on this device. */
           recordToHistorian: device.deviceInformation.recordToHistorian !== false,
@@ -541,6 +621,8 @@ async function buildEdgeAgentConfig({
           connectionConfig.devices.push(deviceConfig)
         }
       }
+
+      applyMetricPaths(connectionConfig, connection)
     }
 
     // Clean up any connections that no longer have devices
@@ -550,6 +632,11 @@ async function buildEdgeAgentConfig({
         return conn.devices && conn.devices.length > 0
       })
     }
+
+    /* A split driver that runs as a sidecar and whose connection name
+     * can't be its id (it has a dot, say) gets a driverId, the same one
+     * every time. One with no container keeps its name. */
+    set_driver_ids(config.deviceConnections, entryDriverDef(connectionStore.data))
 
     // Log the final config before saving
     console.debug('Final edge agent config to be saved:', JSON.stringify(config, null, 2))

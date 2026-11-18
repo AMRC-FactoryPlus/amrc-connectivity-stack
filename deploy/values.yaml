@@ -428,6 +428,24 @@ serviceSetup:
       admin:  "7b553965-0987-4ffb-bf9a-afac8bc13707"
       editor: "e5f9fe18-da63-49d3-bee5-7950eeb3e053"
 
+    # Since ACS 7 the Edge Agent has no built-in REST, MQTT, OPC UA or
+    # UDP connection. On every install or upgrade service-setup moves
+    # each connection still on one of those built-in drivers to its
+    # split driver (a sidecar container), and each Edge Agent with a
+    # moved connection restarts once. There is no move back.
+    #
+    # A site whose Edge Agents still run version 6 (its edge Helm charts
+    # not yet merged) can hold a protocol on the built-in drivers with
+    # `<PROTO>: hold` (REST, MQTT, OPCUA or UDP). Use `hold`, not null:
+    # Helm 4.0 drops a null from a site's values before service-setup
+    # sees it (deploy/test/split-drivers-values.sh checks this). Service-
+    # setup then logs an error each run counting those connections,
+    # which a version 7 Edge Agent can't run. `false` (version 6's move
+    # back) is refused and treated as unset. `dryRun: true` logs what
+    # would move and changes nothing. See
+    # docs/architecture/edge-management/split-drivers.md.
+    splitDrivers: {}
+
     # OIDC clients to provision in Keycloak. Each entry generates a
     # LocalSecret holding the client_secret in keycloak-clients/<key>.
     # Every client automatically gets the fp_principal_uuid and

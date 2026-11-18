@@ -1,0 +1,160 @@
+{
+  "agent": "Example_MQTT",
+  "sparkplug": {
+    "asyncPubMode": true
+  },
+  "connection": {
+    "name": "sample-mqtt-json",
+    "uuid": "00000000-0000-4000-8000-000000000002",
+    "connType": "MQTT",
+    "payloadFormat": "JSON",
+    "devices": [
+      {
+        "deviceId": "Device_1",
+        "deviceType": "00000000-0000-4000-8000-000000000001",
+        "pubInterval": 0,
+        "payloadFormat": "JSON",
+        "templates": [],
+        "tags": [
+          {
+            "Name": "Metric_01",
+            "type": "DoubleLE",
+            "method": "GET",
+            "address": "sample/topic_01",
+            "path": "$.value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_02",
+            "type": "FloatLE",
+            "method": "GET",
+            "address": "sample/topic_02",
+            "path": "$.value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_03",
+            "type": "FloatLE",
+            "method": "GET",
+            "address": "sample/topic_03",
+            "path": "$.set.datapoints[?(@.name=='ActLoad')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_04",
+            "type": "FloatLE",
+            "method": "GET",
+            "address": "sample/topic_03",
+            "path": "$.set.datapoints[?(@.name=='ActPower')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_05",
+            "type": "DoubleLE",
+            "method": "GET",
+            "address": "sample/topic_03",
+            "path": "$.set.datapoints[?(@.name=='ActSpeed')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_06",
+            "type": "DoubleLE",
+            "method": "GET",
+            "address": "sample/topic_03",
+            "path": "$.set.datapoints[?(@.name=='ActTorque')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_07",
+            "type": "DoubleLE",
+            "method": "GET",
+            "address": "sample/topic_03",
+            "path": "$.set.datapoints[?(@.name=='ActFeedRate')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_08",
+            "type": "DoubleLE",
+            "method": "GET",
+            "address": "sample/topic_03",
+            "path": "$.set.datapoints[?(@.name=='CmdFeedRate')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_09",
+            "type": "String",
+            "method": "GET",
+            "address": "sample/topic_04",
+            "path": "$.set.datapoints[?(@.name=='ActPartProgram')].value",
+            "value": null,
+            "recordToDB": true
+          },
+          {
+            "Name": "Metric_10",
+            "type": "UInt8",
+            "method": "GET",
+            "address": "sample/topic_05",
+            "path": "$.set.datapoints[?(@.name=='Status')].value",
+            "value": null,
+            "recordToDB": true
+          }
+        ]
+      },
+      {
+        "deviceId": "Device_2",
+        "deviceType": "00000000-0000-4000-8000-000000000001",
+        "pubInterval": 0,
+        "payloadFormat": "JSON",
+        "templates": [],
+        "tags": [
+          {
+            "Name": "Metric_11",
+            "type": "UInt32LE",
+            "method": "GET",
+            "address": "sample/topic_06",
+            "path": "$.set.datapoints[?(@.name=='prgnum')].value",
+            "value": null,
+            "recordToDB": true
+          }
+        ]
+      },
+      {
+        "deviceId": "Device_3",
+        "deviceType": "00000000-0000-4000-8000-000000000001",
+        "pubInterval": 0,
+        "payloadFormat": "JSON",
+        "templates": [],
+        "tags": [
+          {
+            "Name": "Metric_12",
+            "type": "FloatBE",
+            "method": "GET",
+            "address": "sample/topic_07",
+            "path": "$.set.datapoints[?(@.name=='ActLoad')].value",
+            "value": null,
+            "recordToDB": true
+          }
+        ]
+      }
+    ],
+    "MQTTConnDetails": {
+      "host": "mqtt.example",
+      "port": 1883,
+      "useSSL": false,
+      "protocol": "mqtt",
+      "clientId": "sample-client",
+      "username": "",
+      "password": "REDACTED",
+      "keepAlive": 60,
+      "cleanSession": true
+    }
+  }
+}

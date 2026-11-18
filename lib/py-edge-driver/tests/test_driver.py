@@ -94,3 +94,21 @@ async def test_conf_logged_without_secrets(caplog):
     assert "password" in caplog.text
     assert "not-a-real-password" not in caplog.text
     assert seen == [conf]
+
+def test_driver_cmd_whole_address(basic_driver_instance):
+    """
+    The agent sends a write to cmd/<address>, and an address may contain
+    "/". The handler must get the whole address, not its first segment.
+    """
+    driver = basic_driver_instance
+    driver.handler = MagicMock()
+
+    for topic in ("fpEdge1/test_user/cmd/40001",
+                  "fpEdge1/test_user/cmd/plant/line1/speed"):
+        message = MagicMock()
+        message.topic = topic
+        message.payload = b"x"
+        driver.handle_message(None, None, message)
+
+    names = [c.args[0] for c in driver.handler.cmd.call_args_list]
+    assert names == ["40001", "plant/line1/speed"]

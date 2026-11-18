@@ -123,18 +123,28 @@ export const ACS = {
     Driver: {
         /* Edge Agent internal drivers */
         REST:                   "c9f5c6ac-de4d-11ef-befa-ef66bbfc8926",
+        OPCUA:                  "f32fed40-de4d-11ef-a011-1711bd498427",
+        MQTT:                   "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
+        UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
+
+        /* Internal drivers removed from the Edge Agent. Kept so
+         * retired-drivers.js can find connections still using them. */
         MTConnect:              "e8c74c90-de4d-11ef-ad96-6b885f1e8b5d",
         EtherNetIP:             "eefce570-de4d-11ef-95e6-379190194ffa",
         S7:                     "f171a296-de4d-11ef-aef4-cf4e4ac2bfc6",
-        OPCUA:                  "f32fed40-de4d-11ef-a011-1711bd498427",
-        MQTT:                   "f4789ae4-de4d-11ef-9de4-ab74010e5ff5",
         Websocket:              "f5fa94ee-de4d-11ef-882f-a7f7c2ad5273",
-        UDP:                    "f76120f0-de4d-11ef-baeb-4b617561ae1d",
+
+        /* Split drivers replacing internal drivers */
+        RESTSplit:              "5ede3d8d-7a45-47e4-9ee3-c4be844e40b2",
+        MQTTSplit:              "540ae6a1-16c5-43d2-be9e-0bf0a628641e",
+        OPCUASplit:             "d4d50f58-8af7-4690-8eac-9817b991eecf",
+        UDPSplit:               "877577c1-19db-4701-b5be-9a4ff21d6661",
 
         /* Stock in-cluster drivers */
         Bacnet:                 "bdc64178-de4c-11ef-b15e-3711aef7cf9b",
         Modbus:                 "c355a44e-de4c-11ef-8a5a-e31f3872ed79",
         Test:                   "c8798cba-de4c-11ef-8a43-8766e8683af8",
+        TestRust:               "e5d8a95c-caf9-4cc6-beff-ad114dc3116b",
         TPlinkSmartPlug:        "d46e1374-de4c-11ef-b469-c388a038fd5c",
         ADS:                    "6764f1e5-fbe7-494c-8dbe-b80039c30c97",
         RTDE:                   "9f4e8f3a-0b1f-11f0-8c5e-3f2c5d3c5e8f",

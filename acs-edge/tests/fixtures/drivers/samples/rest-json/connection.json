@@ -1,0 +1,141 @@
+{
+  "name": "sample-rest-json",
+  "uuid": "00000000-0000-4000-8000-000000000002",
+  "connType": "REST",
+  "payloadFormat": "JSON",
+  "pollInt": 20000,
+  "devices": [
+    {
+      "deviceId": "Device_1",
+      "deviceType": "00000000-0000-4000-8000-000000000001",
+      "pollInt": 20000,
+      "pubInterval": 0,
+      "payloadFormat": "JSON",
+      "templates": [],
+      "tags": [
+        {
+          "Name": "Metric_01",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_01",
+          "path": "$.data[0].intensity.actual",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "gCO2/kWh"
+        },
+        {
+          "Name": "Metric_02",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_01",
+          "path": "$.data[0].intensity.forecast",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "gCO2/kWh"
+        },
+        {
+          "Name": "Metric_03",
+          "type": "String",
+          "method": "GET",
+          "address": "resource_01",
+          "path": "$.data[0].intensity.index",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_04",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_02",
+          "path": "$.data.generationmix[?(@.fuel == \"gas\")].perc",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "%"
+        },
+        {
+          "Name": "Metric_05",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_02",
+          "path": "$.data.generationmix[?(@.fuel == \"coal\")].perc",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "%"
+        },
+        {
+          "Name": "Metric_06",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_02",
+          "path": "$.data.generationmix[?(@.fuel == \"biomass\")].perc",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "%"
+        },
+        {
+          "Name": "Metric_07",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_02",
+          "path": "$.data.generationmix[?(@.fuel == \"nuclear\")].perc",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "%"
+        },
+        {
+          "Name": "Metric_08",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_02",
+          "path": "$.data.generationmix[?(@.fuel == \"hydro\")].perc",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "%"
+        },
+        {
+          "Name": "Metric_09",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_03",
+          "path": "$.data[0].data[0].intensity.actual",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "gCO2/kWh"
+        },
+        {
+          "Name": "Metric_10",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_03",
+          "path": "$.data[0].data[0].intensity.forecast",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "gCO2/kWh"
+        },
+        {
+          "Name": "Metric_11",
+          "type": "String",
+          "method": "GET",
+          "address": "resource_03",
+          "path": "$.data[0].data[0].intensity.index",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_12",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "resource_03",
+          "path": "$.data[0].data[0].generationmix[?(@.fuel == \"biomass\")].perc",
+          "value": null,
+          "recordToDB": true,
+          "engUnit": "%"
+        }
+      ]
+    }
+  ],
+  "RESTConnDetails": {
+    "baseURL": "http://device.example:8080",
+    "authMethod": "None"
+  }
+}

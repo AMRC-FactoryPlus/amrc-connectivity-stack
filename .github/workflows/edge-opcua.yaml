@@ -1,0 +1,86 @@
+name: OPC UA driver
+
+# The OPC UA split driver's (edge-opcua) integration tests against a
+# node-opcua server: every security mode and policy, credentials, the
+# values of every OPC UA type, typed writes of every type, reconnecting
+# after the server restarts (the async-opcua 0.19.0 bug the pinned
+# commit fixes) or comes back with a new certificate, a server that
+# refuses the driver's certificate, and several devices on one
+# connection.
+#
+# They need acs-edge's node_modules for the server, which the shared
+# split-driver-golden.yaml matrix installs only after its driver tests.
+# That workflow runs the golden-output harness for this driver;
+# rust.yaml does the formatting, lint and unit tests.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'edge-opcua/**'
+      - 'lib/rs-edge-driver/**'
+      - 'acs-edge/package.json'
+      - 'acs-edge/package-lock.json'
+      - '.github/workflows/edge-opcua.yaml'
+
+env:
+  # The same as rust.yaml and the driver's Dockerfile.
+  RUSTUP_TOOLCHAIN: '1.99'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            edge-opcua/target
+          key: ${{ runner.os }}-cargo-${{ env.RUSTUP_TOOLCHAIN }}-edge-opcua-it-${{ hashFiles('edge-opcua/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ env.RUSTUP_TOOLCHAIN }}-edge-opcua-it-
+
+      # The same major version as the JS base image the agent runs on.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # As acs-edge-tests.yaml: the npm shipped with Node 22 crashes on
+      # file: dependencies, and the service client's optional GSSAPI
+      # module needs the Kerberos headers.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install Kerberos headers
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      # node-opcua for the test server comes from here.
+      - name: Install Edge Agent dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      # Only the integration tests, and check they ran rather than
+      # skipped.
+      - name: Integration tests against node-opcua
+        working-directory: edge-opcua
+        shell: bash
+        env:
+          EDGE_OPCUA_SERVER_TESTS: '1'
+        run: |
+          cargo test --locked --test opcua --test clock --test refused -- --nocapture 2>&1 | tee opcua.log
+          ! grep -q "skipped: set EDGE_OPCUA_SERVER_TESTS" opcua.log
+          grep -q "test result: ok. [1-9]" opcua.log

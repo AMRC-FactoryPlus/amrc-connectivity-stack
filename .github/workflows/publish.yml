@@ -443,6 +443,16 @@ jobs:
           version: ${{ steps.prepare.outputs.version }}
           service-name: ${{ steps.prepare.outputs.service-name }}
           digest: ${{ steps.build-and-push.outputs.digest }}
+  # The Edge Agent and the split drivers, JS and Rust alike. Each one
+  # is built natively on an amd64 and an arm64 runner, then the merge
+  # job joins the two into one multi-arch tag. To add a driver, put its
+  # directory name in all three service lists below
+  # (build-arm-js-amd64, build-arm-js-arm64 and build-arm-js-merge):
+  # a directory missing from the arm64 or merge list gets no plain
+  # version tag. The build context is the driver's directory, with lib/
+  # passed as the extra context `lib`, which is how a Rust driver's
+  # Dockerfile reaches lib/rs-edge-driver (see
+  # docs/development/rust-drivers.md).
   build-arm-js-amd64:
     needs: [build-base-js-merge]
     runs-on: ubuntu-latest
@@ -453,6 +463,11 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-test-rs
+          - edge-mqtt
+          - edge-rest
+          - edge-udp
+          - edge-opcua
           - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
@@ -498,6 +513,12 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-test-rs
+          - edge-mqtt
+          - edge-rest
+          - edge-udp
+          - edge-opcua
+          - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
           - edge-rtde
@@ -542,6 +563,12 @@ jobs:
           - edge-bacnet
           - edge-modbus
           - edge-test
+          - edge-test-rs
+          - edge-mqtt
+          - edge-rest
+          - edge-udp
+          - edge-opcua
+          - edge-openprotocol
           - edge-tplink-smartplug
           - edge-ads
           - edge-rtde

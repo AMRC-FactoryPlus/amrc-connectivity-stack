@@ -8,6 +8,8 @@
 #
 #   vSEMVER               Publish a release of ACS itself
 #   js/some-lib/vSEMVER   Publish an in-tree JS library to NPM
+#   rs/some-lib/vSEMVER   Tag an in-tree Rust library. Nothing is published:
+#                         Rust drivers outside the repo pin the tag with git.
 
 name: Choose release type
 

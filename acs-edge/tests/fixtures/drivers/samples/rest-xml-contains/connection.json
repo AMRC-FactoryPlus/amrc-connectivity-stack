@@ -1,0 +1,131 @@
+{
+  "name": "sample-rest-xml-contains",
+  "uuid": "00000000-0000-4000-8000-000000000002",
+  "connType": "REST",
+  "payloadFormat": "XML",
+  "pollInt": 500,
+  "devices": [
+    {
+      "deviceId": "Device_1",
+      "deviceType": "00000000-0000-4000-8000-000000000001",
+      "pollInt": 500,
+      "pubInterval": 0,
+      "payloadFormat": "XML",
+      "templates": [],
+      "tags": [
+        {
+          "Name": "Metric_01",
+          "type": "String",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$KR_SERIALNO')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_02",
+          "type": "String",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$MODE_OP')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_03",
+          "type": "String",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$ROBRUNTIME')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_04",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$AXIS_ACT_MEAS_A1')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_05",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$VEL_AXIS_ACT[1]')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_06",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$ACC_AXIS[1]')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_07",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$AXIS_ACT_MEAS_A2')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_08",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$VEL_AXIS_ACT[2]')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_09",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$ACC_AXIS[2]')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_10",
+          "type": "DoubleLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$AXIS_ACT_MEAS_A3')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_11",
+          "type": "UInt8",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$ACT_TOOL')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        },
+        {
+          "Name": "Metric_12",
+          "type": "FloatLE",
+          "method": "GET",
+          "address": "/resource_01",
+          "path": "/KUKA_System_Variables/Variable[Name[contains(text(),'$TOOL_X')]]/Value/node()",
+          "value": null,
+          "recordToDB": true
+        }
+      ]
+    }
+  ],
+  "RESTConnDetails": {
+    "baseURL": "http://device.example:8080",
+    "authMethod": "None"
+  }
+}

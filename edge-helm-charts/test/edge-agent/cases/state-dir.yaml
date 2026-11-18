@@ -1,0 +1,19 @@
+# A driver with a stateDir (the OPC UA driver keeps its client
+# certificate there) gets an emptyDir that lasts as long as the pod,
+# mounted there, and DRIVER_STATE_DIR. The driver beside it is
+# rendered as before.
+name: Agent-Five
+uuid: 55555555-5555-4555-8555-555555555555
+cluster: example-cluster
+directory_url: http://directory.example
+hostname: node-a
+drivers:
+  Press-OPC:
+    image:
+      repository: edge-opcua
+    stateDir: /var/lib/edge-driver
+  rest-api:
+    image:
+      repository: edge-rest
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

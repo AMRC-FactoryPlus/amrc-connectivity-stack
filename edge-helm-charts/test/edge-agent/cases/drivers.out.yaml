@@ -1,0 +1,298 @@
+---
+# Source: edge-agent/templates/edge-agent.yaml
+# This deployment is configured to completely disable Kubernetes
+# back-offs for edge agents. This ensures that when an edge agent fails,
+# it will be restarted immediately without any exponential back-off
+# delay.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-agent-agent-two
+  namespace: edge
+  annotations:
+    # Custom annotation to document that this deployment has back-offs
+    # disabled This can be used by operators or scripts to identify
+    # deployments with this configuration
+    factory-plus.app/disable-backoff: "true"
+  labels:
+    factory-plus.app: edge-agent
+    factory-plus.service: edge-agent-agent-two
+    factory-plus.nodeUuid: 22222222-2222-4222-8222-222222222222
+    factory-plus.name: Agent-Two
+spec:
+  # Only one replica is needed per edge agent
+  replicas: 1
+  # The Recreate strategy ensures that the old pod is fully terminated
+  # before a new one is created This prevents multiple instances of the
+  # same edge agent from running simultaneously
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      factory-plus.app: edge-agent
+      factory-plus.nodeUuid: 22222222-2222-4222-8222-222222222222
+  template:
+    metadata:
+      labels:
+        factory-plus.app: edge-agent
+        factory-plus.nodeUuid: 22222222-2222-4222-8222-222222222222
+        factory-plus.name: Agent-Two
+      annotations:
+        # The following annotations help disable back-offs for edge
+        # agent pods:
+        # This annotation tells the cluster autoscaler that it's safe to
+        # evict this pod. This prevents back-offs that might occur during
+        # cluster scaling operations
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+        # This annotation disables AppArmor restrictions for the
+        # edge-agent container. This prevents security-related back-offs
+        # that might occur due to AppArmor policies
+        container.apparmor.security.beta.kubernetes.io/edge-agent: "unconfined"
+        # Add AppArmor annotations for all driver containers
+        container.apparmor.security.beta.kubernetes.io/driver-serial-rig: "unconfined"
+        container.apparmor.security.beta.kubernetes.io/driver-rest-api: "unconfined"
+    spec:
+      # Setting restartPolicy to Always ensures the pod will be
+      # restarted if it exit.s While this doesn't directly disable
+      # back-offs, it works with other settings to ensure the pod is
+      # restarted as quickly as possible
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/hostname: "node-a"
+      tolerations: 
+        - key: factoryplus.app.amrc.co.uk/specialised
+          operator: Exists
+      containers:
+        - name: edge-agent
+          image: "%%REGISTRY%%/acs-edge:%%TAG%%"
+          imagePullPolicy: "%%PULLPOLICY%%"
+          # This startup probe is a key mechanism for preventing
+          # back-offs
+          #
+          # How it works:
+          # 1. The probe always succeeds (runs the 'true' command which
+          # always returns exit code 0)
+          # 2. When a container fails, Kubernetes will restart it and
+          # then immediately run the startup probe
+          # 3. With an extremely high failure threshold (9999999),
+          # Kubernetes will keep trying the probe without applying
+          # back-off delays even if the container keeps failing
+          # 4. This effectively bypasses Kubernetes' built-in back-off
+          # mechanism, which cannot be directly disabled through
+          # standard configuration
+          #
+          # This ensures that the container restarts immediately after a
+          # failure, rather than waiting for increasingly longer periods
+          # of time
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "true"
+            # Start checking almost immediately after container starts
+            initialDelaySeconds: 1
+            # Check frequently
+            periodSeconds: 1
+            # Set an extremely high threshold to prevent Kubernetes from
+            # giving up This is the key to preventing back-offs
+            failureThreshold: 9999999
+          env:
+            - name: DEBUG
+              value: "false"
+            - name: VERBOSE
+              value: "ALL,!token,!service,!sparkplug"
+            - name: POLL_INT
+              value: 
+            - name: DRIVER_FILE_LIMIT
+              value: "10485760"
+            - name: DIRECTORY_URL
+              value: "http://directory.example"
+            - name: SERVICE_USERNAME
+              value: "nd1/example-cluster/Agent-Two"
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-agent-secrets.agent-two
+                  key: keytab
+            - name: EDGE_MQTT
+              value: "mqtt://localhost"
+            - name: EDGE_PASSWORDS
+              value: "/usr/app/driver-passwords"
+          resources:
+            limits:
+              memory: "200Mi"
+            requests:
+              cpu: "100m"
+              memory: "200Mi"
+          volumeMounts:
+            - name: edge-agent-sensitive-information
+              mountPath: "/etc/secrets"
+              readOnly: true
+            - mountPath: /home/node/.config
+              name: local-config
+            - mountPath: /usr/app/driver-passwords
+              name: driver-passwords
+        - name: "driver-serial-rig"
+          image: "%%REGISTRY%%/edge-modbus:%%TAG%%"
+          imagePullPolicy: "%%PULLPOLICY%%"
+          # Add startup probe to prevent back-offs for driver containers
+          # This startup probe is a key mechanism for preventing back-offs
+          #
+          # How it works:
+          # 1. The probe always succeeds (runs the 'true' command which always returns exit code 0)
+          # 2. When a container fails, Kubernetes will restart it and then immediately run the startup probe
+          # 3. With an extremely high failure threshold (9999999), Kubernetes will keep trying the probe
+          #    without applying back-off delays even if the container keeps failing
+          # 4. This effectively bypasses Kubernetes' built-in back-off mechanism, which cannot be
+          #    directly disabled through standard configuration
+          #
+          # This ensures that the container restarts immediately after a failure, rather than
+          # waiting for increasingly longer periods of time
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "true"
+            # Start checking almost immediately after container starts
+            initialDelaySeconds: 1
+            # Check frequently
+            periodSeconds: 1
+            # Set an extremely high threshold to prevent Kubernetes from giving up
+            # This is the key to preventing back-offs
+            failureThreshold: 9999999
+          securityContext:
+            privileged: true
+          env:
+            - name: EDGE_MQTT
+              value: "mqtt://localhost"
+            - name: EDGE_USERNAME
+              value: "Serial-Rig"
+            - name: EDGE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "driver-passwords.agent-two"
+                  key: "Serial-Rig"
+            - name: VERBOSE
+              value: "ALL,!token,!service,!sparkplug"
+          volumeMounts:
+            - mountPath: "/dev/rig"
+              name: "hp-serial-rig-0"
+        - name: "driver-rest-api"
+          image: "%%REGISTRY%%/edge-rest:%%TAG%%"
+          imagePullPolicy: "%%PULLPOLICY%%"
+          # Add startup probe to prevent back-offs for driver containers
+          # This startup probe is a key mechanism for preventing back-offs
+          #
+          # How it works:
+          # 1. The probe always succeeds (runs the 'true' command which always returns exit code 0)
+          # 2. When a container fails, Kubernetes will restart it and then immediately run the startup probe
+          # 3. With an extremely high failure threshold (9999999), Kubernetes will keep trying the probe
+          #    without applying back-off delays even if the container keeps failing
+          # 4. This effectively bypasses Kubernetes' built-in back-off mechanism, which cannot be
+          #    directly disabled through standard configuration
+          #
+          # This ensures that the container restarts immediately after a failure, rather than
+          # waiting for increasingly longer periods of time
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "true"
+            # Start checking almost immediately after container starts
+            initialDelaySeconds: 1
+            # Check frequently
+            periodSeconds: 1
+            # Set an extremely high threshold to prevent Kubernetes from giving up
+            # This is the key to preventing back-offs
+            failureThreshold: 9999999
+          env:
+            - name: EDGE_MQTT
+              value: "mqtt://localhost"
+            - name: EDGE_USERNAME
+              value: "rest-api"
+            - name: EDGE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "driver-passwords.agent-two"
+                  key: "rest-api"
+            - name: VERBOSE
+              value: "ALL,!token,!service,!sparkplug"
+      volumes:
+        - name: edge-agent-sensitive-information
+          secret:
+            optional: true
+            secretName: edge-agent-sensitive-information-22222222-2222-4222-8222-222222222222
+        - name: local-config
+          emptyDir:
+        - name: driver-passwords
+          secret:
+            optional: true
+            secretName: driver-passwords.agent-two
+        - name: "hp-serial-rig-0"
+          hostPath:
+            path: "/dev/ttyUSB0"
+---
+# Source: edge-agent/templates/edge-agent-key.yaml
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  namespace: edge
+  name: edge-agent.agent-two
+spec:
+  type: Password
+  principal: nd1/example-cluster/Agent-Two@
+  secret: edge-agent-secrets.agent-two/keytab
+  account:
+    uuid: 22222222-2222-4222-8222-222222222222
+    groups:
+      - 00000000-0000-4000-8000-0000000000aa
+    sparkplug:
+      node: Agent-Two
+---
+# Source: edge-agent/templates/local-secrets.yaml
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: LocalSecret
+metadata:
+  namespace: edge
+  name: "driver-passwords.agent-two.serial-rig"
+spec:
+  format: Password
+  secret: "driver-passwords.agent-two"
+  key: "Serial-Rig"
+---
+# Source: edge-agent/templates/local-secrets.yaml
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: LocalSecret
+metadata:
+  namespace: edge
+  name: "driver-passwords.agent-two.ext-driver"
+spec:
+  format: Password
+  secret: "driver-passwords.agent-two"
+  key: "ext-driver"
+---
+# Source: edge-agent/templates/local-secrets.yaml
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: LocalSecret
+metadata:
+  namespace: edge
+  name: "driver-passwords.agent-two.rest-api"
+spec:
+  format: Password
+  secret: "driver-passwords.agent-two"
+  key: "rest-api"
+---
+# Source: edge-agent/templates/edge-agent.yaml
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: SparkplugNode
+metadata:
+  namespace: edge
+  name: edge-agent.agent-two
+spec:
+  uuid: 22222222-2222-4222-8222-222222222222
+  edgeAgent: true
+  secrets:
+    - edge-agent-sensitive-information-22222222-2222-4222-8222-222222222222

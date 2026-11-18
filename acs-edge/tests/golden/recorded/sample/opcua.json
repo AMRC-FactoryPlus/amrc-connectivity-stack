@@ -1,0 +1,367 @@
+{
+ "source": "built-in connection, recorded 2026-11-17 before ACS 7 removed it; Metric_02 added 2026-11-17 (ACS-27): the recording dropped its path, which hid its values",
+ "label": "built-in",
+ "fixture": "sample-opcua",
+ "duration_ms": 5000,
+ "speed": 2.5,
+ "delivered": 5,
+ "ddata": 5,
+ "agent_us_per_input": 11220,
+ "credentials": [],
+ "writes": [],
+ "births": {
+  "DBIRTH Device_1": [
+   [
+    {
+     "name": "Device Control/Polling Interval",
+     "type": "UInt16",
+     "value": "100",
+     "t": -1567.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Polling Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Polling interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Publish Interval",
+     "type": "UInt16",
+     "value": "0",
+     "t": -1567.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"engHigh\":{\"type\":\"Float\",\"value\":1},\"engLow\":{\"type\":\"Float\",\"value\":0},\"engUnit\":{\"type\":\"String\",\"value\":\"ms\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Device Publish Interval\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Publish interval for device metrics in ms.\"}}"
+    },
+    {
+     "name": "Device Control/Reboot",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1567.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Reboot Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Issue a reboot device command.\"}}"
+    },
+    {
+     "name": "Device Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1567.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"\"},\"friendlyName\":{\"type\":\"String\",\"value\":\"Rebirth Device\"},\"method\":{\"type\":\"String\",\"value\":\"\"},\"path\":{\"type\":\"String\",\"value\":\"\"},\"tooltip\":{\"type\":\"String\",\"value\":\"Request a new device birth certificate.\"}}"
+    },
+    {
+     "name": "Metric_01",
+     "type": "Double",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_01\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"degrees\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_02",
+     "type": "Double",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_02\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_03",
+     "type": "String",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_03\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_04",
+     "type": "UInt8",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_04\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":null},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":null},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_05",
+     "type": "UInt32",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_05\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"units\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_06",
+     "type": "Double",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_06\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":4321},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"m/min\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    },
+    {
+     "name": "Metric_07",
+     "type": "Double",
+     "value": "null",
+     "t": -1147.5,
+     "props": "{\"address\":{\"type\":\"String\",\"value\":\"ns=2;s=Sample/Node_02\"},\"deadband\":{\"type\":\"String\",\"value\":null},\"documentation\":{\"type\":\"String\",\"value\":null},\"endianness\":{\"type\":\"UInt16\",\"value\":1234},\"engHigh\":{\"type\":\"Float\",\"value\":null},\"engLow\":{\"type\":\"Float\",\"value\":null},\"engUnit\":{\"type\":\"String\",\"value\":\"mm\"},\"method\":{\"type\":\"String\",\"value\":\"GET\"},\"path\":{\"type\":\"String\",\"value\":null},\"tooltip\":{\"type\":\"String\",\"value\":null}}"
+    }
+   ]
+  ],
+  "NBIRTH": [
+   [
+    {
+     "name": "Schema_UUID",
+     "type": "UUID",
+     "value": "\"15360868-2f35-4b52-990b-49329fb246fe\"",
+     "t": -1565
+    },
+    {
+     "name": "Instance_UUID",
+     "type": "UUID",
+     "value": "\"00000000-0000-4000-8000-00000000a6e7\"",
+     "t": -1565
+    },
+    {
+     "name": "Config_Revision",
+     "type": "UUID",
+     "value": "\"\\\"golden-config\\\"\"",
+     "t": -1565
+    },
+    {
+     "name": "Node Properties/Type",
+     "type": "String",
+     "value": "\"ACS Edge Agent\"",
+     "t": -1565
+    },
+    {
+     "name": "Node Control/Rebirth",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1565
+    },
+    {
+     "name": "Node Control/Reload Edge Agent Config",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1565
+    },
+    {
+     "name": "Node Control/Payload Compression",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Instance_UUID",
+     "type": "UUID",
+     "value": "\"b09a2fed-eec9-52cf-b824-1a553f8113c8\"",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Type",
+     "type": "UUID",
+     "value": "\"c414c68b-5014-4e46-a0b4-d5f7f8df1d9f\"",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Unavailable/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Invalid/Schema_UUID",
+     "type": "UUID",
+     "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Invalid/Instance_UUID",
+     "type": "UUID",
+     "value": "\"59982376-d40f-582b-a4d0-1f5683014f7c\"",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Invalid/Type",
+     "type": "UUID",
+     "value": "\"99c54cb2-2bb9-45c8-88f9-c1a0f792cfd6\"",
+     "t": -1565
+    },
+    {
+     "name": "Alerts/Config_Invalid/Active",
+     "type": "Boolean",
+     "value": "false",
+     "t": -1565
+    }
+   ]
+  ]
+ },
+ "repeated": {},
+ "data": {
+  "Device_1/Metric_01": [
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "163.76778253073206",
+    "t": -790.74
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "187.3218366976177",
+    "t": 1225.51
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "212.38422314516387",
+    "t": 2242.45
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "228.25794894348903",
+    "t": 3259.99
+   },
+   {
+    "name": "Metric_01",
+    "type": "Double",
+    "value": "238.6583286141784",
+    "t": 4269.09
+   }
+  ],
+  "Device_1/Metric_02": [
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "412.0804040378561",
+    "t": -790.72
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "416.897946945624",
+    "t": 1225.53
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "426.44086158973494",
+    "t": 2242.48
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "431.79260761432766",
+    "t": 3260.08
+   },
+   {
+    "name": "Metric_02",
+    "type": "Double",
+    "value": "439.8433209504687",
+    "t": 4269.11
+   }
+  ],
+  "Device_1/Metric_03": [
+   {
+    "name": "Metric_03",
+    "type": "String",
+    "value": "\"IDLE\"",
+    "t": -790.71
+   }
+  ],
+  "Device_1/Metric_04": [
+   {
+    "name": "Metric_04",
+    "type": "UInt8",
+    "value": "85",
+    "t": -790.67
+   }
+  ],
+  "Device_1/Metric_05": [
+   {
+    "name": "Metric_05",
+    "type": "UInt32",
+    "value": "240",
+    "t": -790.66
+   },
+   {
+    "name": "Metric_05",
+    "type": "UInt32",
+    "value": "237",
+    "t": 2242.51
+   },
+   {
+    "name": "Metric_05",
+    "type": "UInt32",
+    "value": "239",
+    "t": 3260.1
+   },
+   {
+    "name": "Metric_05",
+    "type": "UInt32",
+    "value": "238",
+    "t": 4269.12
+   }
+  ],
+  "Device_1/Metric_06": [
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "263.53510178847733",
+    "t": -790.65
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "268.00417328474134",
+    "t": 1225.54
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "271.3200598038378",
+    "t": 2242.54
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "277.0647560426116",
+    "t": 3260.12
+   },
+   {
+    "name": "Metric_06",
+    "type": "Double",
+    "value": "283.3610498086032",
+    "t": 4269.14
+   }
+  ],
+  "Device_1/Metric_07": [
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "412.0804040378561",
+    "t": -790.72
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "416.897946945624",
+    "t": 1225.53
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "426.44086158973494",
+    "t": 2242.48
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "431.79260761432766",
+    "t": 3260.08
+   },
+   {
+    "name": "Metric_07",
+    "type": "Double",
+    "value": "439.8433209504687",
+    "t": 4269.11
+   }
+  ]
+ },
+ "counts": {
+  "DBIRTH Device_1": 1,
+  "DDATA Device_1": 5,
+  "NBIRTH": 1
+ }
+}

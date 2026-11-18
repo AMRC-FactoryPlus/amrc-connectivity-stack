@@ -1,0 +1,11 @@
+# A host port out of range.
+name: Agent-Six
+uuid: 66666666-6666-4666-8666-666666666666
+cluster: example-cluster
+directory_url: http://directory.example
+drivers:
+  robot:
+    image: { repository: edge-udp }
+    hostPorts: [{ protocol: UDP, port: 70000 }]
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

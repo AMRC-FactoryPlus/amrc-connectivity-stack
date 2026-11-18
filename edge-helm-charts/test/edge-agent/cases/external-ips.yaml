@@ -1,0 +1,12 @@
+# The driver interface exposed on external IPs, with a debug user.
+name: Agent-Three
+uuid: 33333333-3333-4333-8333-333333333333
+cluster: example-cluster
+directory_url: http://directory.example
+externalIPs: ["192.0.2.10"]
+driverDebugUser: admin
+drivers:
+  sim:
+    image: sim
+authGroup:
+  edgeAgent: 00000000-0000-4000-8000-0000000000aa

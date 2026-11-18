@@ -11,11 +11,13 @@
      - [Edge Bootstrap](./architecture/edge-management/edge-bootstrap.md)
      - [Edge Deployments](./architecture/edge-management/edge-deployments.md)
      - [Edge Scout](./architecture/edge-management/edge-scout.md)
+     - [Split Drivers](./architecture/edge-management/split-drivers.md)
 - ConfigDB
   - [Object Model](./configDB/object-model.md)
 - Development
   - [Contributor Guidelines](./development/contributor-guidelines.md)
   - [Making a Release](./development/releasing.md)
+  - [Adding a Rust Driver](./development/rust-drivers.md)
 - Concepts
   - Dynamic Deployment
   - [Index](concepts/dyn-deploy/index.md)
@@ -38,6 +40,7 @@
    - [ISA-95 Placement](./services/isa95-placement.md)
    - [Notify v2](./services/notify-v2.md)
    - [Schema Editor](./services/schema-editor.md)
+   - [Connecting a UDP Device](./services/udp-devices.md)
 - Authentication
    - [Overview](./auth/README.md)
    - [Connecting OAuth applications](./auth/oauth-clients.md)

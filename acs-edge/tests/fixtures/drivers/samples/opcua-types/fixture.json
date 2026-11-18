@@ -1,0 +1,36 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-opcua-types",
+  "agent": "sample-agent",
+  "protocol": "OPC UA",
+  "payloadFormat": "Defined by Protocol",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 5000,
+  "interval_ms": 1000,
+  "features": [
+    "opcua:security:None/None",
+    "payload:Defined by Protocol",
+    "protocol:OPC UA",
+    "type:Boolean",
+    "type:Double",
+    "type:Float",
+    "type:Int16",
+    "type:Int32",
+    "type:String",
+    "type:UInt16",
+    "type:UInt32",
+    "type:UInt8"
+  ],
+  "counts": {
+    "devices": 1,
+    "metrics": 14,
+    "read_metrics": 14,
+    "addresses": 14,
+    "events": 5,
+    "bytes": 2734
+  },
+  "findings": []
+}

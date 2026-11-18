@@ -113,6 +113,30 @@ spec:
               value: ALL,!token,!service
             - name: GIT_REPO_PATH
               value: {{ .Values.edgeHelm.repoPath }}
+        # The split-driver move, after edge-helm-charts: it moves Edge
+        # Agent connections to this release's split driver images, so it
+        # must only run once this release's edge charts are published.
+        # An init container runs only after the one before it succeeds.
+        - name: split-drivers
+{{ include "amrc-connectivity-stack.image" (list . .Values.serviceSetup) | indent 10 }}
+          env:
+            - name: SS_STEP
+              value: split-drivers
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            - name: SERVICE_USERNAME
+              value: admin
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: admin-password
+                  key: password
+            - name: VERBOSE
+              value: ALL,!token,!service
+            - name: SS_CONFIG
+              value: {{ .Values.serviceSetup.config | toRawJson | quote }}
+            - name: ACS_CONFIG
+              value: {{ dict "namespace" .Release.Namespace | toRawJson | quote }}
 {{ if .Values.acs.schemas.load }}
         - name: load-schemas
 {{ include "amrc-connectivity-stack.image" (list . .Values.acs.schemas) | indent 10 }}

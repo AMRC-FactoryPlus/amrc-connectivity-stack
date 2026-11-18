@@ -1,0 +1,32 @@
+[package]
+name = "edge-mqtt"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "driver"
+path = "src/main.rs"
+
+[dependencies]
+rs-edge-driver = { path = "../lib/rs-edge-driver" }
+async-trait = "0.1"
+bytes = "1"
+# The same rumqttc as the library. websocket is for the ws and wss
+# protocols, which the built-in's form offers. TLS uses rustls with
+# ring, as rumqttc 0.24 did: rumqttc 0.25's default TLS feature would
+# switch to aws-lc-rs.
+rumqttc = { version = "0.25.1", default-features = false, features = ["websocket", "use-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+# The driver-loop tests borrow the fake Edge Agent from the library's
+# own tests, which needs these.
+tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+strip = true

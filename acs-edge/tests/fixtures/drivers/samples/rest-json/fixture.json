@@ -1,0 +1,32 @@
+{
+  "format": "acs-driver-fixture",
+  "version": 1,
+  "name": "sample-rest-json",
+  "agent": "sample-agent",
+  "protocol": "REST",
+  "payloadFormat": "JSON",
+  "delimiter": "",
+  "source": "synthetic",
+  "seed": 1,
+  "duration_ms": 100000,
+  "interval_ms": 20000,
+  "features": [
+    "jsonpath:filter",
+    "jsonpath:index",
+    "many-metrics-per-address",
+    "payload:JSON",
+    "protocol:REST",
+    "rest:auth:None",
+    "type:Float",
+    "type:String"
+  ],
+  "counts": {
+    "devices": 1,
+    "metrics": 12,
+    "read_metrics": 12,
+    "addresses": 3,
+    "events": 15,
+    "bytes": 2567
+  },
+  "findings": []
+}

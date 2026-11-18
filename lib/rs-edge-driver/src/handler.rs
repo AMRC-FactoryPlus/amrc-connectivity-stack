@@ -1,10 +1,12 @@
 use std::hash::Hash;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 
 use crate::driver::DriverHandle;
-use crate::error::{ConnectError, HandlerError};
+use crate::error::{ConnectError, HandlerError, WriteError};
+use crate::write::WriteValue;
 
 /// The trait that driver authors implement to define how to communicate
 /// with a specific southbound device.
@@ -98,6 +100,23 @@ pub trait Handler: Send + Sized {
     /// Defaults to `true`.
     const SUPPORTS_POLL: bool = true;
 
+    /// Whether this handler takes typed writes through
+    /// [`write`](Handler::write) instead of raw bytes through
+    /// [`cmd`](Handler::cmd).
+    ///
+    /// The edge agent sends every write in both forms, so the driver
+    /// subscribes to only one: `cmd/#` when this is `false`, and
+    /// `write/#` when it is `true`. Only one of `cmd` and `write` is
+    /// ever called.
+    ///
+    /// Set it to `true` for a device that needs the value's type to
+    /// write it, such as OPC UA. The edge agent must be from November
+    /// 2026 or later: an older one refuses the `write/#` subscription
+    /// and drops the driver's connection.
+    ///
+    /// Defaults to `false`, which keeps `cmd` exactly as before.
+    const TYPED_WRITES: bool = false;
+
     /// Construct a new handler from the configuration object sent
     /// by the edge agent.
     ///
@@ -122,7 +141,14 @@ pub trait Handler: Send + Sized {
     /// Return `Ok(())` on success. The driver will set status `UP`.
     /// Return `Err(ConnectError::ConnectionFailed)` or
     /// `Err(ConnectError::AuthFailed)` on failure — the driver will
-    /// retry after the configured reconnect delay.
+    /// report `CONN` or `AUTH` and retry after the configured
+    /// reconnect delay.
+    ///
+    /// The driver calls this on its own task, so a slow connect
+    /// doesn't hold up the edge agent's MQTT connection. If the
+    /// connection is lost later, report it with
+    /// [`DriverHandle::disconnected`] and the driver will call
+    /// `connect` again.
     async fn connect(&mut self) -> Result<(), ConnectError>;
 
     /// Clean up resources and disconnect from the device.
@@ -151,6 +177,16 @@ pub trait Handler: Send + Sized {
     /// the data topic name the edge agent assigned, so the handler
     /// never needs to track topic names itself.
     ///
+    /// Each call replaces the previous set. If the address map becomes
+    /// empty after the handler has subscribed to some addresses, this
+    /// is called with an empty slice, so drop every subscription then.
+    /// It is never called empty before the first non-empty call.
+    ///
+    /// If the device connection can fail after `connect` returns and
+    /// before this is called, report it with
+    /// [`DriverHandle::disconnected`] from wherever the handler finds
+    /// out, or check the connection here and return `false`.
+    ///
     /// Return `true` if all subscriptions were set up successfully.
     ///
     /// The default implementation returns `true` (no-op). Override
@@ -159,9 +195,111 @@ pub trait Handler: Send + Sized {
         true
     }
 
+    /// **Async mode, optional**: as [`subscribe`](Handler::subscribe),
+    /// with the edge agent's address groups as well.
+    ///
+    /// The edge agent puts each device's addresses in a group with the
+    /// device's poll interval. A handler that subscribes at a rate,
+    /// such as OPC UA with its sampling and publishing intervals, can
+    /// override this to use them. `addrs` is every address in the map,
+    /// exactly as `subscribe` gets it. An address can be in more than
+    /// one group, and an address in no group is still in `addrs`.
+    ///
+    /// The default calls [`subscribe`](Handler::subscribe) with
+    /// `addrs`, so a handler that overrides only `subscribe` works as
+    /// before.
+    async fn subscribe_groups(
+        &mut self,
+        addrs: &[Self::Addr],
+        _groups: &[AddrGroup<Self::Addr>],
+    ) -> bool {
+        self.subscribe(addrs).await
+    }
+
     /// Handle a command sent from the edge agent.
     ///
     /// Commands arrive on `fpEdge1/{id}/cmd/{name}` and are
     /// forwarded here. Override this if the device supports commands.
     async fn cmd(&mut self, _command: &str, _payload: Bytes) {}
+
+    /// Handle a typed write from the edge agent. Only called when
+    /// [`TYPED_WRITES`](Handler::TYPED_WRITES) is `true`.
+    ///
+    /// Typed writes arrive on `fpEdge1/{id}/write/{address}`. The
+    /// driver looks the address up in the current address map and
+    /// passes its parsed form, so `parse_addr` has already accepted
+    /// it. `value` carries the metric's Sparkplug type and its value.
+    ///
+    /// Return `Err` if the write fails, and the driver reports it to
+    /// the edge agent on the address's `err` topic. A write the driver
+    /// can't use (bad JSON, a value that doesn't fit its type, or an
+    /// address not in the map) is reported as `CMD` without calling
+    /// this.
+    ///
+    /// The default refuses every write. It is never called unless
+    /// `TYPED_WRITES` is `true`, and a handler that leaves
+    /// `TYPED_WRITES` at `false` gets its writes through `cmd` as
+    /// before.
+    async fn write(&mut self, _addr: &Self::Addr, value: WriteValue) -> Result<(), WriteError> {
+        Err(WriteError::Failed(format!(
+            "typed writes are not implemented ({} write refused)",
+            value.type_name()
+        )))
+    }
+
+    /// **Polled mode, optional**: hand out a [`Poller`] so polls can
+    /// run at the same time as each other.
+    ///
+    /// [`poll`](Handler::poll) takes `&mut self`, so the driver holds
+    /// the handler's lock for each poll and polls run one at a time.
+    /// A handler whose device client can serve several reads at once
+    /// (an HTTP client, a connection pool, a client with its own
+    /// request queue) can return a `Poller` here instead. The driver
+    /// asks for it after each successful [`connect`](Handler::connect)
+    /// and then calls [`Poller::poll`] without taking the handler's
+    /// lock, for as many addresses at once as the edge agent asks for.
+    /// `serial_poll` in [`DriverConfig`](crate::DriverConfig) still
+    /// limits it to one poll at a time.
+    ///
+    /// The default returns `None`, which keeps the locked `poll`.
+    fn poller(&self) -> Option<Arc<dyn Poller<Self::Addr>>> {
+        None
+    }
+}
+
+/// One group from the edge agent's address configuration: the
+/// addresses of one device and how often the edge agent wants them.
+/// See [`Handler::subscribe_groups`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddrGroup<A> {
+    /// The group's name, which is the device's name.
+    pub name: String,
+    /// The poll interval, zero if the edge agent gave none.
+    pub poll: std::time::Duration,
+    /// The group's addresses that are in the current address map.
+    pub addrs: Vec<A>,
+}
+
+impl<A> AddrGroup<A> {
+    /// A group, for a handler's own tests.
+    pub fn new(name: impl Into<String>, poll: std::time::Duration, addrs: Vec<A>) -> Self {
+        Self {
+            name: name.into(),
+            poll,
+            addrs,
+        }
+    }
+}
+
+/// Reads addresses without needing the handler's lock. See
+/// [`Handler::poller`].
+///
+/// A `Poller` is usually a small struct holding a clone of the
+/// handler's device client.
+#[async_trait]
+pub trait Poller<A>: Send + Sync {
+    /// Read data for a single address, as [`Handler::poll`] does.
+    /// Return `None` if the read failed.
+    async fn poll(&self, addr: &A) -> Option<Bytes>;
 }

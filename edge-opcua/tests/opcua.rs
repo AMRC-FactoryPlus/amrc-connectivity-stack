@@ -263,6 +263,50 @@ async fn reconnects_after_the_server_restarts() {
     wait_value(&mut agent, "t1", &json!(7)).await;
 }
 
+/// A server that comes back with a new certificate (renewed,
+/// reinstalled or replaced) is connected to again without a driver
+/// restart. async-opcua reconnects with the endpoint the driver found
+/// at start, which holds the old certificate, so every attempt failed
+/// until the pod was restarted. The driver now asks the server for its
+/// endpoints again once reconnecting keeps failing.
+#[tokio::test(flavor = "multi_thread")]
+async fn reconnects_to_a_server_with_a_new_certificate() {
+    if !enabled() {
+        return;
+    }
+    let mut server = Server::start().await;
+    let nodes = [node("Counter"), node("Int32")];
+    let (mut agent, _driver) = driver(
+        conf(&server, "SignAndEncrypt", "Basic256Sha256", None),
+        &nodes,
+    )
+    .await;
+    values(&mut agent, &["t0"], secs(10)).await;
+
+    let old = server.certificate();
+    server.reinstall().await;
+    assert_ne!(server.certificate(), old, "the server kept its certificate");
+    agent.wait_status("CONN", secs(30)).await;
+
+    agent.wait_status("UP", secs(90)).await;
+    let deadline = tokio::time::Instant::now() + secs(20);
+    loop {
+        let v = values(&mut agent, &["t0"], secs(20)).await;
+        if v["t0"].as_u64().unwrap() < 300 {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "old counter values only"
+        );
+    }
+    assert_eq!(
+        write(&mut agent, &node("Int32"), "Int32", json!(7)).await,
+        ""
+    );
+    wait_value(&mut agent, "t1", &json!(7)).await;
+}
+
 /// Two devices with different poll intervals get a subscription each,
 /// and each device's values reach its own data topic. The built-in
 /// connection read every subscription's notifications through the last

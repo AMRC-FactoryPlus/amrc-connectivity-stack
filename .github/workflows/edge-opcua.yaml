@@ -4,7 +4,9 @@ name: OPC UA driver
 # node-opcua server: every security mode and policy, credentials, the
 # values of every OPC UA type, typed writes of every type, reconnecting
 # after the server restarts (the async-opcua 0.19.0 bug the pinned
-# commit fixes) and several devices on one connection.
+# commit fixes) or comes back with a new certificate, a server that
+# refuses the driver's certificate, and several devices on one
+# connection.
 #
 # They need acs-edge's node_modules for the server, which the shared
 # split-driver-golden.yaml matrix installs only after its driver tests.
@@ -79,6 +81,6 @@ jobs:
         env:
           EDGE_OPCUA_SERVER_TESTS: '1'
         run: |
-          cargo test --locked --test opcua --test clock -- --nocapture 2>&1 | tee opcua.log
+          cargo test --locked --test opcua --test clock --test refused -- --nocapture 2>&1 | tee opcua.log
           ! grep -q "skipped: set EDGE_OPCUA_SERVER_TESTS" opcua.log
           grep -q "test result: ok. [1-9]" opcua.log

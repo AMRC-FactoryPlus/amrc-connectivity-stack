@@ -214,6 +214,21 @@ to send to, the firewall rules and the host's receive buffer.
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.
 
+### Keycloak starts faster and is no longer restarted while it starts
+
+Keycloak used to rebuild itself every time its pod started, which took a
+minute or more of CPU before it could answer. On a busy node that ran
+past the liveness probe, so Kubernetes killed it and it started again,
+sometimes more than once. The `acs-keycloak` image now does that build
+when the image is made, and the chart starts it with `start --optimized`.
+The chart also gives Keycloak a startup probe that allows 5 minutes to
+start before the liveness probe counts.
+
+Nothing changes for a site using the `acs-keycloak` image. A site that
+sets `openid.image` to its own Keycloak image must build it `FROM` the
+`acs-keycloak` image, or run `kc.sh build --db=postgres
+--health-enabled=true` in its own Dockerfile, or Keycloak will not start.
+
 ### Upgrading: i3X implements version 1.0 of the specification
 
 The i3X service now reports `specVersion: "1.0"` and answers in the 1.0

@@ -128,7 +128,9 @@ A connection whose name can't be used as a container or MQTT name (for
 example one with a dot, an underscore or a space in it, such as a name
 taken from a web address) is given a driver id, such as
 `api-example-org-1a2b3c4d`, and its sidecar is named after that id. The
-connection keeps its name everywhere else.
+connection keeps its name everywhere else. A driver with no sidecar,
+such as one on the External DriverDef, keeps its name as its id,
+because it logs in to the Edge Agent under that name.
 
 The Edge Agent reloads its config as soon as service-setup writes it,
 and its pod restarts with the new sidecars once the edge cluster has

@@ -107,7 +107,10 @@ name, such as `api.example.org`, is given a `driverId` when its config
 is built: the name in lowercase with each run of other characters
 replaced by a hyphen, then a hyphen and the first 8 hex digits of the
 connection's UUID, here `api-example-org-1a2b3c4d`. The id is kept
-once given, and the connection keeps its name everywhere else. The
+once given, and the connection keeps its name everywhere else. Only a
+driver that runs as a sidecar (its DriverDef has an image) is given an
+id: one with no container, such as a driver on the External DriverDef,
+logs in under its connection name, so its name is always its id. The
 Admin UI and service-setup both use `driver_ids` in
 `lib/js-service-client/lib/edge-connection.js` for this, and
 service-setup gives existing connections their ids when it runs.

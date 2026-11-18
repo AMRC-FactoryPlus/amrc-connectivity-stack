@@ -712,6 +712,43 @@ describe("the host a port clash is checked on", () => {
     });
 });
 
+/* A driver with no container, such as one on the External DriverDef,
+ * logs in to the Edge Agent's broker under its connection name. */
+describe("a driver with no container", () => {
+    const EXT = "cccccccc-0000-4000-8000-0000000000d1";
+
+    function external (name) {
+        const cdb = fixture();
+        cdb.set(App.ConnectionConfiguration, EXT,
+            cconf(Driver.External, { anything: 1 }, "JSON"));
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.push(entry(EXT, name, "Driver",
+            "DriverDetails", { anything: 1 }, "JSON", 1000));
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        return cdb;
+    }
+
+    for (const name of ["line_1_scanner", "a_very_long_driver_name_" + "x".repeat(40)]) {
+        test(`keeps its name as its id: ${name.slice(0, 24)}`, async () => {
+            const cdb = external(name);
+            const count = await run(cdb);
+            assert.equal(count.ids, 0);
+            assert.equal("driverId" in conn_entry(cdb, EXT), false);
+            assert.equal(drivers(cdb)[name], undefined, "and gets no sidecar");
+        });
+    }
+
+    test("loses an id an earlier run gave it", async () => {
+        const cdb = external("line_1_scanner");
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.find(e => e.uuid == EXT).driverId = "line-1-scanner-cccccccc";
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+
+        await run(cdb);
+        assert.equal("driverId" in conn_entry(cdb, EXT), false);
+    });
+});
+
 /* The split-drivers init container runs migrate_split_drivers and then
  * check_retired_drivers on every upgrade, and again on every helm
  * upgrade after it. The first run does the move and hides the removed

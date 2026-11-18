@@ -94,12 +94,15 @@
  *    adds the sidecar. The built-in UDP connection only allowed port
  *    50205, so two on one host is the likely case.
  *
- * Before any move, every split driver connection whose name can't be
- * its driver id is given a `driverId` in its Edge Agent config, and its
- * `values.drivers` entry is moved from its name to that id. A name with
- * a dot never worked as a split driver, and one with an underscore or
- * a space never deployed, so this changes nothing that was running. An
- * agent whose names all work as ids is not written.
+ * Before any move, every split driver connection that runs as a
+ * container and whose name can't be its driver id is given a
+ * `driverId` in its Edge Agent config, and its `values.drivers` entry
+ * is moved from its name to that id. A name with a dot never worked as
+ * a split driver, and one with an underscore or a space never deployed
+ * as a sidecar, so this changes nothing that was running. A driver
+ * with no container (the External DriverDef) logs in under its name,
+ * so it is never given an id. An agent whose names all work as ids is
+ * not written.
  */
 
 import {
@@ -196,11 +199,12 @@ export class MigrateSplitDrivers {
             this.log("Dry run: logging what would change, writing nothing. A "
                 + "connection left on a built-in driver gets no data in ACS 7.");
 
-        count.ids = await this.repair_driver_ids();
-
         const { cdb } = this;
         this.cconfs = await cdb.get_all_configs(App.ConnectionConfiguration);
         this.drivers = await cdb.get_all_configs(App.DriverDefinition);
+
+        count.ids = await this.repair_driver_ids();
+
         this.deployments = await cdb.get_all_configs(Edge.App.Deployment);
         this.agents = await cdb.get_all_configs(App.EdgeAgentConfig);
         this.host_ports = this.open_ports();
@@ -296,6 +300,13 @@ export class MigrateSplitDrivers {
         };
     }
 
+    /* The DriverDef of a connection entry, from the run's snapshot of
+     * the ConnectionConfigs, as `set_driver_ids` takes it. A connection
+     * moved earlier in the run is in the snapshot as moved. */
+    driverdef_of (entry) {
+        return this.drivers.get(this.cconfs.get(entry.uuid)?.driver);
+    }
+
     /* A connection whose host ports another connection that can run on
      * the same host has open, as `{ protocol, port, names }`, or
      * undefined. */
@@ -339,7 +350,7 @@ export class MigrateSplitDrivers {
             if (!Array.isArray(conns)) return;
 
             const out = structuredClone(config);
-            set_driver_ids(out.deviceConnections);
+            set_driver_ids(out.deviceConnections, e => this.driverdef_of(e));
             const split = out.deviceConnections.filter(e => e.connType == "Driver");
             ids = new Set(split.map(driver_id));
             renames = split
@@ -485,6 +496,9 @@ export class MigrateSplitDrivers {
                     throw e;
                 }
             }
+            /* The connections moved later in the run read this
+             * connection's driver from the snapshot. */
+            this.cconfs.set(conn, next);
         }
         if (clash) return "no_sidecar";
         return moving ? "moved" : changed ? "repaired" : "unchanged";
@@ -533,7 +547,8 @@ export class MigrateSplitDrivers {
 
             const out = structuredClone(config);
             out.deviceConnections[i] = move_entry(conns[i], to_def, format, fallback);
-            set_driver_ids(out.deviceConnections);
+            set_driver_ids(out.deviceConnections,
+                e => e.uuid == conn ? to_def : this.driverdef_of(e));
             const entry = out.deviceConnections[i];
 
             const split = e => e?.connType == "Driver";

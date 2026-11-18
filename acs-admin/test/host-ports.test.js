@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest'
 
 import { set_driver_ids } from '@amrc-factoryplus/service-client'
 
-import { applyConnection, deploymentDrivers } from '../src/utils/edgeAgentConfigUpdater.js'
+import { applyConnection, deploymentDrivers, entryDriverDef } from '../src/utils/edgeAgentConfigUpdater.js'
 import { hostCount, hostPortClash, moveHostClash, nodePlace, pinnedHost } from '../src/utils/hostPorts.js'
 
 /* As acs-service-setup/dumps/edge.yaml has them. */
@@ -224,5 +224,26 @@ describe('moveHostClash: moving an Edge Agent', () => {
       conn('u4', 'robot-2', UDP, { port: 5000 }, 'agent-a'),
     ]
     expect(moveHostClash(move('agent-a', 'host-b'), stores(own))).toBeUndefined()
+  })
+})
+
+/* A driver with no container (the External DriverDef) logs in to the
+ * Edge Agent's broker under its connection name, so a Manager save
+ * gives it no driverId, as service-setup gives it none. */
+describe('driver ids for a driver with no container', () => {
+  const EXTERNAL = {}
+
+  it('keeps its name as its id', () => {
+    const connections = [
+      conn('1a2b3c4d-0000-4000-8000-000000000001', 'line_1_scanner', EXTERNAL, {}),
+      conn('2a2b3c4d-0000-4000-8000-000000000002', 'web.example.org', REST, {}),
+    ]
+    const saved = set_driver_ids(connections.map(c => ({
+      ...applyConnection(null, c), devices: [{ deviceId: 'd' }],
+    })), entryDriverDef(connections))
+    expect(saved.map(e => e.driverId)).toEqual([undefined, 'web-example-org-2a2b3c4d'])
+    expect(deploymentDrivers(saved, connections)).toEqual({
+      'web-example-org-2a2b3c4d': { image: REST.image },
+    })
   })
 })

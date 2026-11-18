@@ -280,6 +280,12 @@ export function deploymentDrivers (deviceConnections, connections) {
   return driverMap
 }
 
+/* The DriverDef of an Edge Agent config entry, from the connection
+ * store, for set_driver_ids. */
+export function entryDriverDef (connections) {
+  return entry => connections.find(c => c.uuid === entry.uuid)?.configuration?.driver
+}
+
 /**
  * Updates the Edge Agent Deployment configuration for a node to include external drivers
  *
@@ -591,9 +597,10 @@ async function buildEdgeAgentConfig({
       })
     }
 
-    /* A split driver whose connection name can't be its id (it has a
-     * dot, say) gets a driverId, the same one every time. */
-    set_driver_ids(config.deviceConnections)
+    /* A split driver that runs as a sidecar and whose connection name
+     * can't be its id (it has a dot, say) gets a driverId, the same one
+     * every time. One with no container keeps its name. */
+    set_driver_ids(config.deviceConnections, entryDriverDef(connectionStore.data))
 
     // Log the final config before saving
     console.debug('Final edge agent config to be saved:', JSON.stringify(config, null, 2))

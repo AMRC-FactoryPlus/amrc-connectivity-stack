@@ -712,6 +712,50 @@ describe("the host a port clash is checked on", () => {
     });
 });
 
+/* A connection that gets no sidecar opens no port, so it must not keep
+ * another connection from having its sidecar. */
+describe("a port held by a connection with no sidecar", () => {
+    const UDP_A = "cccccccc-0000-4000-8000-0000000000c1";
+    const UDP_B = "cccccccc-0000-4000-8000-0000000000c2";
+
+    /* Two built-in UDP connections on port 50205, A first. B is on the
+     * fixture's agent with devices; `a` changes A. */
+    function two_udp (a) {
+        const cdb = fixture();
+        const udp = extra => cconf(Driver.UDP, { port: 50205 }, "JSON", extra);
+        cdb.set(App.ConnectionConfiguration, UDP_A, udp(a));
+        cdb.set(App.ConnectionConfiguration, UDP_B, udp({}));
+
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.push(entry(UDP_B, "Arm", "UDP",
+            "UDPConnDetails", { port: 50205 }, "JSON", 1000));
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        return cdb;
+    }
+
+    test("one with no devices on the same agent", async () => {
+        const cdb = two_udp({});
+        const count = await run(cdb);
+        assert.equal(count.no_sidecar, 0);
+        assert.deepEqual(drivers(cdb).Arm.hostPorts, [{ protocol: "UDP", port: 50205 }]);
+    });
+
+    test("one with no Edge Agent", async () => {
+        const cdb = two_udp({ edgeAgent: undefined });
+        const count = await run(cdb);
+        assert.equal(count.no_sidecar, 0);
+        assert.ok(drivers(cdb).Arm);
+    });
+
+    test("a second run still gives the sidecar", async () => {
+        const cdb = two_udp({});
+        await run(cdb);
+        const count = await run(cdb);
+        assert.equal(count.no_sidecar, 0);
+        assert.ok(drivers(cdb).Arm);
+    });
+});
+
 /* A driver with no container, such as one on the External DriverDef,
  * logs in to the Edge Agent's broker under its connection name. */
 describe("a driver with no container", () => {

@@ -453,34 +453,46 @@ export class MigrateSplitDrivers {
          * port first. */
         const ports = driver_ports(next, to_def);
         const holds = this.host_ports.has(conn);
-        const clash = ports.length && !holds
-            ? this.port_clash(conn, next, ports) : undefined;
-        if (clash) {
-            this.log("ERROR: Connection %s: moved to the split driver without its "
-                + "container, because connection %s, which can run on the same "
-                + "host, already opens %s port %s there. Its devices get no data "
-                + "until it has another port: change the port in the Manager and "
-                + "save the connection.",
-                conn, clash.names[1], clash.protocol, clash.port);
-        }
-        else if (ports.length)
-            this.host_ports.set(conn, this.placed(conn, next, ports));
 
         const format = moving
             ? f => move_payload_format(f, proto.payloadFormat, true)
             : f => f;
 
         let changed = false;
+        let clash;
+        /* Whether the Deployment renders the connection's sidecar after
+         * this. Only then does it open its ports. */
+        let sidecar = false;
         if (agent) {
             const entry = await this.update_config(conn, agent, to_def, format, cconf.config);
             /* A connection with no entry has no devices. The admin UI
-             * gives it no driver values either. */
+             * gives it no driver values either, so it has no sidecar to
+             * hold back. */
             if (entry) {
+                clash = ports.length && !holds
+                    ? this.port_clash(conn, next, ports) : undefined;
+                if (clash) {
+                    this.log("ERROR: Connection %s: moved to the split driver without its "
+                        + "container, because connection %s, which can run on the same "
+                        + "host, already opens %s port %s there. Its devices get no data "
+                        + "until it has another port: change the port in the Manager and "
+                        + "save the connection.",
+                        conn, clash.names[1], clash.protocol, clash.port);
+                }
                 const values = driver_values(next, to_def);
                 const dep = await this.update_deployment(agent, entry, values, !!clash);
-                changed = entry.changed || dep;
+                changed = entry.changed || dep.changed;
+                sidecar = dep.sidecar;
             }
         }
+
+        /* A connection with no agent, no entry or no sidecar opens no
+         * port, so it must not keep the next connection from having
+         * one. */
+        if (ports.length && sidecar)
+            this.host_ports.set(conn, this.placed(conn, next, ports));
+        else
+            this.host_ports.delete(conn);
 
         if (moving) {
             this.log("Connection %s: driver %s to %s, payload format %o to %o",
@@ -587,10 +599,15 @@ export class MigrateSplitDrivers {
      * ids changed with it. A key under the connection's name or old id
      * is removed, unless it is another split driver's. With `no_add`, a
      * sidecar the deployment doesn't have is not added (its port is in
-     * use), and one it has is left alone. */
+     * use), and one it has is left alone.
+     *
+     * Returns `{ changed, sidecar }`: whether the deployment was
+     * written, and whether it has the connection's sidecar after. */
     async update_deployment (agent, entry, values, no_add) {
         const { name, id, own, renames, others } = entry;
-        return await this.rewrite(Edge.App.Deployment, agent, deployment => {
+        let sidecar = false;
+        const changed = await this.rewrite(Edge.App.Deployment, agent, deployment => {
+            sidecar = false;
             /* Never create a Deployment: the Manager does that when
              * someone asks it to. */
             if (!deployment) return;
@@ -622,6 +639,7 @@ export class MigrateSplitDrivers {
             }
 
             if (!no_add) next[id] = values;
+            sidecar = id in next;
             if (same(next, drivers)) return;
 
             if (!same(next[id], drivers[id]))
@@ -632,6 +650,7 @@ export class MigrateSplitDrivers {
             (out.values ??= {}).drivers = next;
             return out;
         });
+        return { changed, sidecar };
     }
 }
 

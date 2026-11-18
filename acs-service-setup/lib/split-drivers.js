@@ -104,8 +104,9 @@
 
 import {
     ServiceError, UUIDs,
-    driver_id, driver_ports, driver_values, move_connection, move_entry,
-    move_payload_format, port_clashes, set_driver_ids,
+    connection_place, driver_id, driver_ports, driver_values,
+    move_connection, move_entry, move_payload_format, port_clashes,
+    set_driver_ids,
 } from "@amrc-factoryplus/service-client";
 
 import { ACS, Edge } from "./uuids.js";
@@ -285,24 +286,12 @@ export class MigrateSplitDrivers {
     }
 
     /* A connection's host ports as `port_clashes` takes them, with
-     * where it runs: its Edge Agent's cluster and the host the agent is
-     * pinned to, from the agent's Deployment, as the Manager reads them
-     * (acs-admin/src/utils/hostPorts.js): `values.hostname` if it is
-     * set, else `hostname`. A connection's own `topology`
-     * copy was written empty for a long time, so it is used only for an
-     * agent with no Deployment. */
+     * where it runs, by the rule the Manager uses too
+     * (`connection_place`). */
     placed (conn, cconf, ports) {
-        const deployment = this.deployments.get(cconf.edgeAgent);
-        const where = deployment ?? cconf.topology ?? {};
-        /* edge-sync merges the Deployment's values over the chart's
-         * last, so a hostname there decides the host. */
-        const host = deployment
-            ? deployment.values?.hostname ?? deployment.hostname
-            : where.hostname;
         return {
-            name:       conn,
-            cluster:    where.cluster,
-            hostname:   host && host != "Floating" ? host : undefined,
+            name:   conn,
+            ...connection_place(this.deployments.get(cconf.edgeAgent), cconf.topology),
             ports,
         };
     }

@@ -14,41 +14,31 @@
  *  - in a cluster with more than one host, the Edge Agent must be
  *    pinned to a host, or the device cannot know where to send.
  *
- * These checks are in the Manager only, so a connection that already
- * breaks them still deploys. Service-setup's split driver move
+ * The save checks are in the Manager only, so a connection that
+ * already breaks them still deploys. Service-setup's split driver move
  * (acs-service-setup/lib/split-drivers.js) checks ports the same way
- * before it moves a connection, but not pinning.
+ * before it moves a connection, but not pinning. Where a connection
+ * runs is worked out by the same helper in both (connection_place).
  */
 
-import { driver_ports, port_clashes } from '@amrc-factoryplus/service-client'
+import {
+  connection_place, deployment_place, driver_ports, pinned_host, port_clashes,
+} from '@amrc-factoryplus/service-client'
 
 /** Where a node (Edge Agent) runs: its cluster and the host it is
- * pinned to. Both are on its Edge deployment config. A hostname in the
- * deployment's values wins, because edge-sync merges the values over
- * the chart's last.
+ * pinned to, from its Edge deployment config.
  * @param {Object} node - A node store entry
  */
 export function nodePlace (node) {
-  const deployment = node?.deployment
-  return {
-    cluster: deployment?.cluster,
-    hostname: pinnedHost(deployment?.values?.hostname ?? deployment?.hostname),
-  }
+  return deployment_place(node?.deployment)
 }
 
-/* Where a connection runs: where its Edge Agent runs, from the node
- * store. A connection whose agent is not in the store falls back on its
- * own `topology` copy. The store binds `topology.cluster` to the
- * cluster's config and keeps the UUID as `cluster_uuid`. */
+/* Where a connection runs: where its Edge Agent's Deployment says, from
+ * the node store, or else its own `topology` copy. */
 function connectionPlace (conn, nodes) {
   const agent = conn.configuration?.edgeAgent
   const node = agent && nodes.find(n => n.uuid === agent)
-  if (node) return nodePlace(node)
-  const topology = conn.configuration?.topology
-  return {
-    cluster: topology?.cluster_uuid ?? topology?.cluster,
-    hostname: pinnedHost(topology?.hostname),
-  }
+  return connection_place(node?.deployment, conn.configuration?.topology)
 }
 
 /** The hostname an Edge Agent is pinned to, or undefined if it floats.
@@ -56,7 +46,7 @@ function connectionPlace (conn, nodes) {
  * @param {string} [hostname]
  */
 export function pinnedHost (hostname) {
-  return hostname && hostname !== 'Floating' ? hostname : undefined
+  return pinned_host(hostname)
 }
 
 /**

@@ -190,7 +190,15 @@ historian queries that read those devices. Other changes you may see:
 - A write shows as written only once the server accepts it.
 - A secured server already accepts a new client certificate from every
   new Edge Agent pod, because the built-in connection made one each
-  time, and it accepts the split driver's in the same way.
+  time, and it accepts the split driver's in the same way. For a server
+  that has to be told to trust each client, the driver logs its
+  certificate's SHA-1 thumbprint and file when it starts, and logs that
+  the server may not trust its certificate when the server refuses the
+  connection, which the Edge Agent then reports as `AUTH` rather than
+  `CONN`.
+- A server that comes back with a new certificate (renewed,
+  reinstalled or replaced) is connected to again without restarting
+  the Edge Agent, within about a minute of it coming back.
 
 **Metrics that read the same address and path all get its value.** On
 any connection, the Edge Agent used to update only the last of several

@@ -63,13 +63,7 @@ As the built-in connection did:
 - the value is sent whatever its status code, and nothing is sent when
   there is no value;
 - any server certificate is accepted, and the client makes its own
-  self-signed certificate. The built-in kept node-opcua's in the
-  agent's `emptyDir`, so it lasted as long as the pod. This driver
-  keeps it in `$DRIVER_STATE_DIR/pki`, which the edge-agent chart
-  mounts as an `emptyDir` for drivers whose DriverDef sets `stateDir`
-  (the OPC UA split DriverDef does), so it lasts as long as the pod
-  too and a container restart keeps the same certificate.
-  `OPCUA_PKI_DIR` overrides it; without either it is `$HOME/pki`.
+  self-signed certificate (see "Certificates" below).
 
 Each value is published on its address's data topic as
 `{"value": v, "timestamp": ms}`, the decoded-value format in
@@ -117,6 +111,41 @@ of range) `CMD`, anything else `ERR`.
   per device, as the built-in sent (see "Gathering data" in
   `acs-edge/docs/edge-split.md`). Timestamps don't change.
 
+## Certificates
+
+For a connection with security mode `Sign` or `SignAndEncrypt` the
+driver makes its own self-signed client certificate and keeps it in
+`$DRIVER_STATE_DIR/pki/own/cert.der`. The edge-agent chart mounts
+`DRIVER_STATE_DIR` as an `emptyDir` for drivers whose DriverDef sets
+`stateDir` (the OPC UA split DriverDef does), so the certificate lasts
+as long as the pod: a container restart keeps it, and a new pod makes
+a new one, as the built-in connection did. `OPCUA_PKI_DIR` overrides
+the directory; without either it is `$HOME/pki`.
+
+A server set up to trust only the clients it is told to refuses each
+new pod's certificate until someone trusts it there. When the driver
+starts it logs the certificate's file and SHA-1 thumbprint, for
+example
+
+```
+OPC UA client certificate /state/pki/own/cert.der, SHA-1 thumbprint 349d76a3...c7b5: the server must trust it for a SignAndEncrypt connection
+```
+
+and each time the server refuses the connection it logs that the
+server may not trust the driver's certificate, with the thumbprint
+again, and reports `AUTH`. Most servers file a refused certificate
+under its thumbprint in a "rejected" list, so look for it there and
+trust it. These lines show at the default log level. (async-opcua
+also logs the refusal itself as `Received error Good, ... from server`
+with a status that differs each time. Some servers, node-opcua among
+them, send the refusal inside a secure-channel message that async-opcua
+reads as a plain error, so it takes the channel id for the status.
+Ignore that line.)
+
+The driver trusts any server certificate. A server that comes back
+with a new certificate (renewed, reinstalled or replaced) is picked up
+without a restart: see "Reconnects".
+
 ## Logging
 
 `VERBOSE` works as it does for every Rust driver (see
@@ -139,6 +168,18 @@ makes its subscriptions again once it is `UP`, and the server sends the
 current values again. The same happens if the session holds fewer
 monitored items than the driver made, which async-opcua's move can
 leave without saying.
+
+async-opcua reconnects with the endpoint the driver asked the server
+for when it started, which holds the server's certificate as it was
+then, so a server that comes back with a new certificate refuses every
+attempt. Once three attempts in a row have failed, the driver asks the
+server for its endpoints again, at most once every 30 seconds. If the
+server answers with a different certificate, the driver ends the
+session and starts a new one with the new endpoint, and then makes its
+subscriptions again as after any reconnect. A short network drop is
+over before three attempts fail, and a server that can't be reached or
+answers with the same certificate leaves the session as it is, so
+neither starts a new session.
 
 ## What the server refuses
 
@@ -214,6 +255,7 @@ src/handler.rs     the rs-edge-driver Handler: session, reconnects
                    and writes
 tests/opcua.rs     the driver end to end against a node-opcua server
 tests/clock.rs     a server whose clock is an hour fast
+tests/refused.rs   a server that refuses the driver's certificate
 tests/support/     that server, a TCP proxy and the fake Edge Agent
 tests/server/      the node-opcua server
 ```
@@ -226,17 +268,19 @@ node-opcua server, and run when `EDGE_OPCUA_SERVER_TESTS` is set:
 
 ```sh
 (cd ../acs-edge && npm install --save=false --install-links)
-EDGE_OPCUA_SERVER_TESTS=1 cargo test --test opcua --test clock
+EDGE_OPCUA_SERVER_TESTS=1 cargo test --test opcua --test clock --test refused
 ```
 
 They cover every security mode and policy with and without
 credentials, a wrong password (`AUTH`), the value of every OPC UA type,
 a typed write of every Sparkplug type with its answer and the value
 the subscription then reports, refused writes (`RO`, `CMD`, `ERR`),
-bad addresses, reconnecting after the server restarts, a value that
-changes during a short connection drop, a node that appears after the
-server starts, low server limits, a stalled agent, several devices on
-one connection, and a server clock an hour fast.
+bad addresses, reconnecting after the server restarts, a server that
+comes back with a new certificate, a value that changes during a short
+connection drop, a node that appears after the server starts, low
+server limits, a stalled agent, several devices on one connection, and
+a server clock an hour fast. `tests/refused.rs` runs the driver binary
+against a server that refuses its certificate and checks what it logs.
 
 The golden-output harness compares the Edge Agent's Sparkplug output
 with this driver against the built-in connection's, from runs recorded

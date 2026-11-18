@@ -13,19 +13,27 @@
 //! is `UP`, so the server's first notification, with every item's
 //! current value, reaches the agent: values that changed while the
 //! connection was down are not left stale.
+//!
+//! async-opcua reconnects with the endpoint the driver found at start,
+//! which holds the server's certificate as it was then. When
+//! reconnecting keeps failing, the driver asks the server for its
+//! endpoints again, and if the server now has a different certificate
+//! (renewed, reinstalled or replaced) it starts a new session with the
+//! new endpoint.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use futures::StreamExt;
 use opcua::client::{Client, ClientBuilder, IdentityToken, Password, Session, SessionPollResult};
 use opcua::crypto::SecurityPolicy;
 use opcua::types::{
-    AttributeId, DataValue, MessageSecurityMode, StatusCode, WriteValue as UaWriteValue,
+    AttributeId, DataValue, EndpointDescription, MessageSecurityMode, StatusCode,
+    WriteValue as UaWriteValue,
 };
 use rs_edge_driver::{
     AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, WriteError, WriteValue,
@@ -56,6 +64,13 @@ const CHANNEL_LIFETIME_MS: u32 = 600_000;
 const CONNECT_WAIT: Duration = Duration::from_secs(30);
 /// How long a single request (GetEndpoints, Write) may take.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// How many attempts in a row must fail to reconnect before the driver
+/// asks the server for its endpoints again, to see whether its
+/// certificate has changed. A short network drop is over before this.
+const RECHECK_AFTER_FAILURES: u32 = 3;
+/// The least time between two such checks, so a server that stays
+/// away isn't asked more often than this, whatever the back-off.
+const RECHECK_INTERVAL: Duration = Duration::from_secs(30);
 
 /// The state of the session, as the event loop sees it.
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +88,15 @@ struct Conn {
     /// Set by the event loop each time the session reconnects, so the
     /// next `subscribe_groups` makes the subscriptions again.
     reconnected: Arc<AtomicBool>,
+    /// The server certificate in the endpoint the session was made
+    /// with, which async-opcua keeps for every reconnect.
+    server_cert: opcua::types::ByteString,
+    /// Attempts to connect that have failed since the session was last
+    /// up, counted by the event loop.
+    failures: Arc<AtomicU32>,
+    /// When the driver last asked the server for its endpoints to see
+    /// whether its certificate has changed.
+    checked: Option<Instant>,
 }
 
 pub struct OpcuaHandler {
@@ -188,6 +212,15 @@ fn failure_message(status: StatusCode, thumbprint: Option<&str>) -> String {
     }
 }
 
+/// Whether to ask the server for its endpoints again, to see whether
+/// its certificate has changed: only once reconnecting has failed
+/// `RECHECK_AFTER_FAILURES` times in a row, and not within
+/// `RECHECK_INTERVAL` of the last check.
+fn time_to_recheck(failures: u32, checked: Option<Instant>, now: Instant) -> bool {
+    failures >= RECHECK_AFTER_FAILURES
+        && checked.is_none_or(|t| now.duration_since(t) >= RECHECK_INTERVAL)
+}
+
 fn connect_error(status: StatusCode, secure: bool) -> ConnectError {
     if is_auth_failure(status, secure) {
         ConnectError::AuthFailed
@@ -290,45 +323,44 @@ impl OpcuaHandler {
         }
     }
 
-    /// Start a session: ask the server for its endpoints, take the one
-    /// with the configured security, and connect to it at the
-    /// configured URL. A server can advertise an address the edge
-    /// can't reach (behind NAT, say), and node-opcua used the
-    /// configured URL too.
-    async fn start(&mut self) -> Result<Conn, ConnectError> {
-        let mut client = self.client()?;
-        self.log_certificate(&client);
+    /// Ask the server for its endpoints and take the one with the
+    /// configured security, with the configured URL in it. A server can
+    /// advertise an address the edge can't reach (behind NAT, say), and
+    /// node-opcua used the configured URL too.
+    async fn endpoint(&self, client: &Client) -> Result<EndpointDescription, String> {
         let c = &self.config;
-
         let endpoints = tokio::time::timeout(
             REQUEST_TIMEOUT,
             client.get_server_endpoints_from_url(c.endpoint.as_str()),
         )
         .await
-        .map_err(|_| {
-            tracing::warn!(endpoint = %c.endpoint, "no answer to GetEndpoints");
-            ConnectError::ConnectionFailed
-        })?
-        .map_err(|e| {
-            tracing::warn!(endpoint = %c.endpoint, "GetEndpoints failed: {e}");
-            ConnectError::ConnectionFailed
-        })?;
+        .map_err(|_| "no answer to GetEndpoints".to_string())?
+        .map_err(|e| format!("GetEndpoints failed: {e}"))?;
 
         let Some(mut endpoint) = endpoints.into_iter().find(|e| {
             e.security_mode == c.mode
                 && SecurityPolicy::from_uri(e.security_policy_uri.as_ref()) == c.policy
         }) else {
-            tracing::error!(
-                endpoint = %c.endpoint,
+            return Err(format!(
                 "the server has no endpoint with security mode {:?} and policy {}",
-                c.mode,
-                c.policy,
-            );
-            return Err(ConnectError::ConnectionFailed);
+                c.mode, c.policy,
+            ));
         };
         endpoint.endpoint_url = c.endpoint.as_str().into();
+        Ok(endpoint)
+    }
 
-        let identity = match &c.credentials {
+    /// Start a session with the endpoint the server offers now.
+    async fn start(&mut self) -> Result<Conn, ConnectError> {
+        let mut client = self.client()?;
+        self.log_certificate(&client);
+        let endpoint = self.endpoint(&client).await.map_err(|e| {
+            tracing::warn!(endpoint = %self.config.endpoint, "{e}");
+            ConnectError::ConnectionFailed
+        })?;
+        let server_cert = endpoint.server_certificate.clone();
+
+        let identity = match &self.config.credentials {
             Some((user, pass)) => {
                 IdentityToken::UserName(user.clone(), Password::new(pass.clone()))
             }
@@ -345,6 +377,8 @@ impl OpcuaHandler {
         let handle = self.handle.clone();
         let reconnected = Arc::new(AtomicBool::new(false));
         let flag = reconnected.clone();
+        let failures = Arc::new(AtomicU32::new(0));
+        let failed = failures.clone();
         let thumbprint = self.thumbprint.clone();
         let task = tokio::spawn(async move {
             let mut events = std::pin::pin!(event_loop.enter());
@@ -354,6 +388,7 @@ impl OpcuaHandler {
                     Ok(SessionPollResult::Reconnected(mode)) => {
                         tracing::info!("OPC UA session up ({mode:?})");
                         up = true;
+                        failed.store(0, Ordering::SeqCst);
                         // async-opcua has moved or remade the
                         // subscriptions, and the server's first values
                         // went while the driver was not UP, so the
@@ -372,6 +407,7 @@ impl OpcuaHandler {
                     }
                     Ok(SessionPollResult::ReconnectFailed(status)) => {
                         tracing::warn!("{}", failure_message(status, thumbprint.as_deref()));
+                        failed.fetch_add(1, Ordering::SeqCst);
                         let _ = tx.send(State::Failed(status));
                     }
                     Ok(_) => {}
@@ -392,7 +428,45 @@ impl OpcuaHandler {
             state,
             task,
             reconnected,
+            server_cert,
+            failures,
+            checked: None,
         })
+    }
+
+    /// Whether the server's certificate has changed since the session
+    /// was made, so async-opcua's reconnects, which use the old one,
+    /// can't succeed. It asks the server for its endpoints only when
+    /// `time_to_recheck` says so. A short network drop, or a server
+    /// that is away, never ends the session: only a server that
+    /// answers with a different certificate does.
+    async fn server_cert_changed(&mut self) -> bool {
+        let Some(conn) = self.conn.as_mut() else {
+            return false;
+        };
+        let now = Instant::now();
+        if !time_to_recheck(conn.failures.load(Ordering::SeqCst), conn.checked, now) {
+            return false;
+        }
+        conn.checked = Some(now);
+        let old = conn.server_cert.clone();
+        let Ok(client) = self.client() else {
+            return false;
+        };
+        match self.endpoint(&client).await {
+            Ok(endpoint) if endpoint.server_certificate != old => {
+                tracing::warn!(
+                    endpoint = %self.config.endpoint,
+                    "the OPC UA server has a new certificate; starting a new session with it"
+                );
+                true
+            }
+            Ok(_) => false,
+            Err(e) => {
+                tracing::debug!("checking the server certificate: {e}");
+                false
+            }
+        }
     }
 
     /// Wait for the session to be up, or for an attempt to fail.
@@ -467,7 +541,13 @@ impl Handler for OpcuaHandler {
         }
         let secure = self.secure();
         let conn = self.conn.as_mut().expect("just set");
-        let result = Self::wait_up(&mut conn.state, secure).await;
+        let mut result = Self::wait_up(&mut conn.state, secure).await;
+        if result.is_err() && self.server_cert_changed().await {
+            self.close().await;
+            let conn = self.start().await?;
+            let conn = self.conn.insert(conn);
+            result = Self::wait_up(&mut conn.state, secure).await;
+        }
         if let Err(e) = result {
             tracing::warn!("OPC UA connection not up yet ({e:?}); still trying");
         }
@@ -650,6 +730,25 @@ mod tests {
             !m.contains("may not trust") && m.contains("BadTimeout"),
             "{m}"
         );
+    }
+
+    /// A failed attempt or two, as in a short network drop, doesn't
+    /// make the driver ask for the endpoints again, and once it has
+    /// asked it waits `RECHECK_INTERVAL` before asking again, whatever
+    /// the back-off.
+    #[test]
+    fn the_server_certificate_is_rechecked_after_failures_and_not_often() {
+        let now = Instant::now();
+        assert!(!time_to_recheck(0, None, now));
+        assert!(!time_to_recheck(RECHECK_AFTER_FAILURES - 1, None, now));
+        assert!(time_to_recheck(RECHECK_AFTER_FAILURES, None, now));
+        assert!(!time_to_recheck(100, Some(now), now));
+        assert!(!time_to_recheck(
+            100,
+            Some(now),
+            now + RECHECK_INTERVAL - Duration::from_millis(1)
+        ));
+        assert!(time_to_recheck(100, Some(now), now + RECHECK_INTERVAL));
     }
 
     /// A device with nothing to read adds no subscription, so the

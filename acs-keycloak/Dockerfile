@@ -40,9 +40,8 @@ LABEL org.opencontainers.image.source="https://github.com/AMRC-FactoryPlus/amrc-
 LABEL org.opencontainers.image.title="ACS Keycloak (with Factory+ SPI)"
 LABEL org.opencontainers.image.revision="${revision}"
 
-# Drop the SPI jar into Keycloak's provider scan path. Keycloak's
-# `start --optimized=false` (set by the Helm chart) runs the build step
-# at startup and discovers the providers via META-INF/services.
+# Drop the SPI jar into Keycloak's provider scan path. The build step
+# below discovers it via META-INF/services.
 COPY --from=build /build/acs-keycloak-spi/target/acs-keycloak-spi-*.jar \
                   /opt/keycloak/providers/
 
@@ -50,3 +49,12 @@ COPY --from=build /build/acs-keycloak-spi/target/acs-keycloak-spi-*.jar \
 # loginTheme=factory-plus on the realm; if disabled, the directory just
 # sits unused.
 COPY themes/factory-plus /opt/keycloak/themes/factory-plus
+
+# Run Keycloak's build step here, once, so the Helm chart can start it
+# with `start --optimized`. Without this, every pod start rebuilds the
+# server first, which takes a minute or more of CPU and on a busy node
+# runs past the liveness probe. The options must match the build-time
+# options the chart would otherwise set: KC_DB=postgres and
+# KC_HEALTH_ENABLED=true. Everything else the chart sets is a runtime
+# option and still comes from the environment.
+RUN /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true

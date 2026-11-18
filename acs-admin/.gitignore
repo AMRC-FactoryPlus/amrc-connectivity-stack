@@ -30,3 +30,6 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# Vite writes these while it loads the config
+vite.config.js.timestamp-*

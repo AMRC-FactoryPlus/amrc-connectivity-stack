@@ -34,6 +34,39 @@ class Auth (ServiceInterface):
             return None
         self.error(f"Can't search for {kind} identity {name}", st)
 
+    def fetch_acl (self, type, principal):
+        """Fetch the ACL for a principal.
+
+        @param type The identity type, `kerberos` or `uuid`.
+        @param principal The principal identity.
+        @returns A list of {permission, target} dicts.
+        """
+        url = f"v2/acl/{principal}" if type == "uuid" \
+            else f"v2/acl/{type}/{urlquote(principal, safe='')}"
+        st, acl = self.fetch(url)
+        if st != 200:
+            self.error(f"Can't fetch ACL for {type} {principal}", st)
+        return [
+            {"permission": UUID(ace["permission"]), "target": UUID(ace["target"])}
+            for ace in acl
+        ]
+
+    def check_acl (self, principal, permission, target, wild):
+        """Check whether a principal has a given permission.
+
+        @param principal The principal UUID to check.
+        @param permission The permission UUID to check.
+        @param target The target UUID to check.
+        @param wild Whether to accept Wildcard targets.
+        @returns A boolean: permitted or not.
+        """
+        acl = self.fetch_acl("uuid", principal)
+        return any(
+            ace["permission"] == permission
+            and (ace["target"] == target
+                or (wild and ace["target"] == uuids.Null))
+            for ace in acl)
+
     def add_identity (self, uuid, kind, name):
         st, _ = self.fetch(
             method="PUT",

@@ -284,4 +284,8 @@ data:
       - service: !u Openmetadata.Service.Openmetadata
         url: !acs "http${secure}://openmetadata.${domain}"
 {{ end }}
+{{ if .Values.userAdmin.enabled }}
+      - service: !u ACS.Service.UserAdmin
+        url: !acs "http${secure}://user-admin.${domain}"
+{{ end }}
 {{ end }}

@@ -189,6 +189,16 @@ data:
     admin           x
     op1krbkeys/*    x     */*1
     op1krbkeys/*    x     */*1/*
+    {{- if .Values.userAdmin.enabled }}
+    # Add principal and inquire only - not op1krbkeys's full x (all),
+    # and no change-password, so this credential can create new
+    # principals but can never alter one that exists. Inquire ('i') is
+    # needed for Kadm.create_princ's principal_exists/getprinc calls.
+    # The target limits it to single-component names in our own realm:
+    # each component is matched separately, so this excludes krbtgt/*,
+    # HTTP/* and op1krbkeys/* (which would inherit the grants above).
+    op1useradmin    ai    *@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+    {{- end }}
     {{- range .Values.identity.kadminUsers }}
     {{ .principal }} {{ .permission }} {{ .restrictions }}
     {{- end }}

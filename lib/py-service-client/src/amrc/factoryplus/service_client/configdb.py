@@ -123,5 +123,4 @@ class ConfigDB (ServiceInterface):
     def class_add_subclass (self, klass, obj):
         return self._class_op("PUT", "subclass", klass, obj)
     def class_remove_subclass (self, klass, obj):
-        return self._class_op("DELETE", klass, obj)
-
+        return self._class_op("DELETE", "subclass", klass, obj)

@@ -24,7 +24,7 @@ class Discovery:
         for key, srv in presets:
             if key in fplus.opts:
                 self.set_service_url(srv, fplus.opts[key])
-        
+
     def set_service_url (self, service, url):
         log.info(f"Preset URL for {service}: {url}")
         self.urls[service] = url
@@ -39,4 +39,3 @@ class Discovery:
                 self.urls[service] = url
 
         return url
-

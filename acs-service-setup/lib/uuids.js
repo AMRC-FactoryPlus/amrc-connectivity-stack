@@ -64,6 +64,7 @@ export const ACS = {
         Directory:              "58b5da47-d098-44f7-8c1d-6e4bd800e718",
         Git:                    "c0c55c78-116e-4526-8ff4-e4595251f76c",
         MQTT:                   "a637134a-d06b-41e7-ad86-4bf62fde914a",
+        UserAdmin:              "8b56644a-bfa6-455f-b2bb-bd163e6b8366",
     },
     Schema: {
         ThreePhaseCircuitV1:    "0d3dbae6-3195-4249-9ca1-897221db016f",
@@ -79,6 +80,7 @@ export const ACS = {
         ConfigDB:               "af15f175-78a0-4e05-97c0-2a0bb82b9f3b",
         CmdEsc:                 "78ea7071-24ac-4916-8351-aa3e549d8ccd",
         Git:                    "7adf4db0-2e7b-4a68-ab9d-376f4c5ce14b",
+        UserAdmin:              "5989c266-ecb9-4285-bad2-e60f0b772d93",
     },
     Role: {
         EdgeNodeConsumer:       "17a64293-b82d-4db4-af4d-63359bb62934",
@@ -578,6 +580,23 @@ export const I3X = {
     Perm: {
         All:            "6e00fd2b-1d57-4b78-96e1-9f789bbe1c52",
         ReadObject:     "d24495fd-72a3-41cd-8b9f-f4ebabdade44",
+    },
+};
+
+/* User Admin service: creates Factory+ human-user principals
+ * direct-to-KDC. ManageUsers must match the value minted in
+ * acs-user-admin/src/amrc/factoryplus/user_admin/lib/uuids.py. */
+export const UserAdmin = {
+    Requirement: {
+        /* The ServiceRole group op1useradmin's account.groups (see
+         * deploy/templates/user-admin/krbkeys.yaml) places it in, so
+         * its ConfigDB/Auth permissions can be granted to this group
+         * rather than to a UUID that doesn't exist until deploy time.
+         * Modeled on Clusters.Requirement.ServiceAccount. */
+        ServiceAccount: "a42402a6-83be-411b-aa9b-bff95ac6c50b",
+    },
+    Perm: {
+        ManageUsers:    "d4a080f8-eca7-4063-b22a-a6f14a4721eb",
     },
 };
 

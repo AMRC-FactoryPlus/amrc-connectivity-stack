@@ -4,7 +4,7 @@
 
 from email.message  import Message
 
-from .service_error import ServiceError    
+from .service_error import ServiceError
 
 # Apparently this is the best way to do this...
 def content_type (res):

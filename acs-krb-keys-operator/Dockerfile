@@ -9,6 +9,7 @@ WORKDIR /root
 # the lib we need, or any change elsewhere in lib/ reruns the pip
 # install below, which compiles krb5 and gssapi from source.
 COPY --from=lib py-python-kadmv /acs-lib/py-python-kadmv
+COPY --from=lib py-service-client /acs-lib/py-service-client
 COPY requirements.txt .
 RUN /bin/sh <<SHELL
     set -e

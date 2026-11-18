@@ -128,7 +128,9 @@ A connection whose name can't be used as a container or MQTT name (for
 example one with a dot, an underscore or a space in it, such as a name
 taken from a web address) is given a driver id, such as
 `api-example-org-1a2b3c4d`, and its sidecar is named after that id. The
-connection keeps its name everywhere else.
+connection keeps its name everywhere else. A driver with no sidecar,
+such as one on the External DriverDef, keeps its name as its id,
+because it logs in to the Edge Agent under that name.
 
 The Edge Agent reloads its config as soon as service-setup writes it,
 and its pod restarts with the new sidecars once the edge cluster has
@@ -172,9 +174,11 @@ definitions, as it did for the drivers ACS 6 retired.
   second still starts, and its other connections work, but its devices
   have no data. The service-setup log has a line for it on every run,
   starting `ERROR: Connection` and naming both connections and the port.
-  Change the second connection's port in the Manager, save it and point
-  the device at the new port: the Manager adds the sidecar, and the data
-  comes back.
+  A Manager save of anything else on that Edge Agent leaves the sidecar
+  out too, because the edge-agent chart refuses two sidecars on one
+  port. Change the second connection's port in the Manager, save it and
+  point the device at the new port: the Manager adds the sidecar, and
+  the data comes back.
 
 ### The setting
 

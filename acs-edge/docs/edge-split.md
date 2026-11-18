@@ -107,7 +107,10 @@ name, such as `api.example.org`, is given a `driverId` when its config
 is built: the name in lowercase with each run of other characters
 replaced by a hyphen, then a hyphen and the first 8 hex digits of the
 connection's UUID, here `api-example-org-1a2b3c4d`. The id is kept
-once given, and the connection keeps its name everywhere else. The
+once given, and the connection keeps its name everywhere else. Only a
+driver that runs as a sidecar (its DriverDef has an image) is given an
+id: one with no container, such as a driver on the External DriverDef,
+logs in under its connection name, so its name is always its id. The
 Admin UI and service-setup both use `driver_ids` in
 `lib/js-service-client/lib/edge-connection.js` for this, and
 service-setup gives existing connections their ids when it runs.
@@ -129,9 +132,9 @@ are potentially long strings containing arbitrary characters, the Edge
 Agent assigns a data topic name to each address it is currently using.
 These MUST be short strings of numbers, letters and underscores.
 
-**Implementation.** The Edge Agent uses random integers below 100000,
-written in decimal. They are not stable across restarts, so a driver
-MUST NOT store them.
+**Implementation.** The Edge Agent uses integers written in decimal,
+counting up from a random start below 100000 for each connection. They
+are not stable across restarts, so a driver MUST NOT store them.
 
 The Edge Agent MUST manage data topic names in such a way as to avoid
 problems with synchronisation, and MUST NOT assume a driver will react

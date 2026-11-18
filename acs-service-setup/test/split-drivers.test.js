@@ -712,6 +712,87 @@ describe("the host a port clash is checked on", () => {
     });
 });
 
+/* A connection that gets no sidecar opens no port, so it must not keep
+ * another connection from having its sidecar. */
+describe("a port held by a connection with no sidecar", () => {
+    const UDP_A = "cccccccc-0000-4000-8000-0000000000c1";
+    const UDP_B = "cccccccc-0000-4000-8000-0000000000c2";
+
+    /* Two built-in UDP connections on port 50205, A first. B is on the
+     * fixture's agent with devices; `a` changes A. */
+    function two_udp (a) {
+        const cdb = fixture();
+        const udp = extra => cconf(Driver.UDP, { port: 50205 }, "JSON", extra);
+        cdb.set(App.ConnectionConfiguration, UDP_A, udp(a));
+        cdb.set(App.ConnectionConfiguration, UDP_B, udp({}));
+
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.push(entry(UDP_B, "Arm", "UDP",
+            "UDPConnDetails", { port: 50205 }, "JSON", 1000));
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        return cdb;
+    }
+
+    test("one with no devices on the same agent", async () => {
+        const cdb = two_udp({});
+        const count = await run(cdb);
+        assert.equal(count.no_sidecar, 0);
+        assert.deepEqual(drivers(cdb).Arm.hostPorts, [{ protocol: "UDP", port: 50205 }]);
+    });
+
+    test("one with no Edge Agent", async () => {
+        const cdb = two_udp({ edgeAgent: undefined });
+        const count = await run(cdb);
+        assert.equal(count.no_sidecar, 0);
+        assert.ok(drivers(cdb).Arm);
+    });
+
+    test("a second run still gives the sidecar", async () => {
+        const cdb = two_udp({});
+        await run(cdb);
+        const count = await run(cdb);
+        assert.equal(count.no_sidecar, 0);
+        assert.ok(drivers(cdb).Arm);
+    });
+});
+
+/* A driver with no container, such as one on the External DriverDef,
+ * logs in to the Edge Agent's broker under its connection name. */
+describe("a driver with no container", () => {
+    const EXT = "cccccccc-0000-4000-8000-0000000000d1";
+
+    function external (name) {
+        const cdb = fixture();
+        cdb.set(App.ConnectionConfiguration, EXT,
+            cconf(Driver.External, { anything: 1 }, "JSON"));
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.push(entry(EXT, name, "Driver",
+            "DriverDetails", { anything: 1 }, "JSON", 1000));
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+        return cdb;
+    }
+
+    for (const name of ["line_1_scanner", "a_very_long_driver_name_" + "x".repeat(40)]) {
+        test(`keeps its name as its id: ${name.slice(0, 24)}`, async () => {
+            const cdb = external(name);
+            const count = await run(cdb);
+            assert.equal(count.ids, 0);
+            assert.equal("driverId" in conn_entry(cdb, EXT), false);
+            assert.equal(drivers(cdb)[name], undefined, "and gets no sidecar");
+        });
+    }
+
+    test("loses an id an earlier run gave it", async () => {
+        const cdb = external("line_1_scanner");
+        const config = cdb.get(App.EdgeAgentConfig, AGENT);
+        config.deviceConnections.find(e => e.uuid == EXT).driverId = "line-1-scanner-cccccccc";
+        cdb.set(App.EdgeAgentConfig, AGENT, config);
+
+        await run(cdb);
+        assert.equal("driverId" in conn_entry(cdb, EXT), false);
+    });
+});
+
 /* The split-drivers init container runs migrate_split_drivers and then
  * check_retired_drivers on every upgrade, and again on every helm
  * upgrade after it. The first run does the move and hides the removed

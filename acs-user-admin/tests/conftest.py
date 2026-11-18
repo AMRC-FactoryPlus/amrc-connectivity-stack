@@ -11,7 +11,9 @@ from unittest.mock import MagicMock
 if "kadmin" not in sys.modules:
     fake_kadmin = types.ModuleType("kadmin")
     fake_kadmin.init_with_ccache = MagicMock()
-    fake_kadmin.DISALLOW_ALL_TIX = object()
+    fake_kadmin.KAdminError = type("KAdminError", (Exception,), {})
+    fake_kadmin.DuplicateError = type(
+        "DuplicateError", (fake_kadmin.KAdminError,), {})
     sys.modules["kadmin"] = fake_kadmin
 
 if "krb5" not in sys.modules:

@@ -54,7 +54,7 @@ spec:
             # use the TGT the tgt-creds sidecar keeps fresh.
             - name: KRB5CCNAME
               value: /ccache/krbkeys
-            # kadm.set_password needs a kadmin/admin service ticket,
+            # Kadm.create_princ needs a kadmin/admin service ticket,
             # distinct from the plain TGT above - the kadmin-creds
             # sidecar keeps this one fresh.
             - name: KADMIN_CCNAME

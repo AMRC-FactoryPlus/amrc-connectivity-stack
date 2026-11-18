@@ -1,8 +1,9 @@
 # Copyright (c) University of Sheffield AMRC 2026.
 
+import kadmin
 import pytest
 
-from amrc.factoryplus.user_admin.lib.kadmin import Kadm
+from amrc.factoryplus.user_admin.lib.kadmin import Kadm, PrincipalExists
 
 PRINC = "alice@EXAMPLE.COM"
 
@@ -14,34 +15,31 @@ def mock_kadm (mocker):
 def kadm (mock_kadm):
     return Kadm(kadm=mock_kadm)
 
-def test_find_princ_creates_if_absent (kadm, mock_kadm):
-    """find_princ creates the principal via addprinc if it doesn't exist yet."""
+def test_create_princ_creates_with_password (kadm, mock_kadm):
+    """create_princ creates the principal and its password in one kadmin
+    call, and returns the name the KDC recorded."""
     mock_kadm.principal_exists.return_value = False
+    mock_kadm.getprinc.return_value.principal = PRINC
 
-    kadm.find_princ(PRINC)
+    assert kadm.create_princ(PRINC, "hunter2") == PRINC
 
-    mock_kadm.addprinc.assert_called_once_with(PRINC, None)
-    mock_kadm.getprinc.assert_called_once_with(PRINC)
+    mock_kadm.addprinc.assert_called_once_with(PRINC, "hunter2")
 
-def test_find_princ_does_not_recreate_existing (kadm, mock_kadm):
-    """find_princ does not call addprinc for a principal that already exists."""
+def test_create_princ_refuses_existing (kadm, mock_kadm):
+    """create_princ never touches a principal that already exists."""
     mock_kadm.principal_exists.return_value = True
 
-    kadm.find_princ(PRINC)
+    with pytest.raises(PrincipalExists):
+        kadm.create_princ(PRINC, "hunter2")
 
     mock_kadm.addprinc.assert_not_called()
-    mock_kadm.getprinc.assert_called_once_with(PRINC)
+    mock_kadm.getprinc.assert_not_called()
 
-def test_set_password_creates_principal_and_sets_password (kadm, mock_kadm):
-    """set_password creates the principal (if absent) and sets its password
-    in one call, returning the resulting key info."""
+def test_create_princ_refuses_when_created_concurrently (kadm, mock_kadm):
+    """A principal created between the check and the create is reported
+    as existing, not as a kadmin failure."""
     mock_kadm.principal_exists.return_value = False
-    kpr = mock_kadm.getprinc.return_value
-    kpr.kvno = 1
-    kpr.keys = {1: [("aes256-cts-hmac-sha1-96", "normal")]}
+    mock_kadm.addprinc.side_effect = kadmin.DuplicateError()
 
-    info = kadm.set_password(PRINC, "hunter2")
-
-    mock_kadm.addprinc.assert_called_once_with(PRINC, None)
-    kpr.change_password.assert_called_once_with("hunter2")
-    assert info == {"kvno": 1, "etypes": ["aes256-cts-hmac-sha1-96:normal"]}
+    with pytest.raises(PrincipalExists):
+        kadm.create_princ(PRINC, "hunter2")

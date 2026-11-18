@@ -174,9 +174,11 @@ definitions, as it did for the drivers ACS 6 retired.
   second still starts, and its other connections work, but its devices
   have no data. The service-setup log has a line for it on every run,
   starting `ERROR: Connection` and naming both connections and the port.
-  Change the second connection's port in the Manager, save it and point
-  the device at the new port: the Manager adds the sidecar, and the data
-  comes back.
+  A Manager save of anything else on that Edge Agent leaves the sidecar
+  out too, because the edge-agent chart refuses two sidecars on one
+  port. Change the second connection's port in the Manager, save it and
+  point the device at the new port: the Manager adds the sidecar, and
+  the data comes back.
 
 ### The setting
 

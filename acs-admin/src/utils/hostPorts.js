@@ -17,8 +17,10 @@
  * The save checks are in the Manager only, so a connection that
  * already breaks them still deploys. Service-setup's split driver move
  * (acs-service-setup/lib/split-drivers.js) checks ports the same way
- * before it moves a connection, but not pinning. Where a connection
- * runs is worked out by the same helper in both (connection_place).
+ * before it moves a connection, but not pinning, and a connection it
+ * moves without its sidecar stays without one when the Manager saves
+ * the Edge Agent (sidecarsLeftOut). Where a connection runs is worked
+ * out by the same helper in both (connection_place).
  */
 
 import {
@@ -184,4 +186,49 @@ export function moveHostClash (move, { connections = [], nodes = [], clusters = 
         + `on that host. Change one of the ports, or pick another host.`
     }
   }
+}
+
+/**
+ * The sidecars an Edge Agent's Deployment must leave out, so that no
+ * two sidecars that can run on one host open the same port. This is
+ * the rule service-setup's split driver move uses: a sidecar the
+ * Deployment already has keeps its ports, and one it does not have yet
+ * is left out if a port it opens is open already, on this Edge Agent
+ * or by a connection of another that can run on the same host. Of two
+ * sidecars on this Edge Agent that clash, the first keeps the port.
+ *
+ * Service-setup moves a connection without its sidecar when another
+ * has its port, and the Manager must not add it back on a later save:
+ * the edge-agent chart refuses to render a Deployment with two
+ * sidecars on one port, so the whole Edge Agent would stop.
+ *
+ * @param {Array} sidecars - The Edge Agent's sidecars, as `{ id, uuid, name, ports, has }`: `uuid` the connection's, `ports` as from driver_ports, `has` true if the Deployment has it now
+ * @param {Object} stores
+ * @param {string} stores.agent - The Edge Agent's (node's) UUID
+ * @param {Array} stores.connections - The connection store entries
+ * @param {Array} stores.nodes - The node store entries
+ * @returns {Map} - The ids left out, each with its clash
+ */
+export function sidecarsLeftOut (sidecars, { agent, connections = [], nodes = [] }) {
+  const place = connectionPlace({ configuration: { edgeAgent: agent } }, nodes)
+  const mine = new Set(sidecars.map(s => s.uuid))
+  const others = connections
+    .filter(c => c.configuration?.edgeAgent !== agent && !mine.has(c.uuid))
+    .map(c => placed(c, nodes))
+    .filter(c => c.ports.length)
+
+  const left = new Map()
+  const open = []
+  const ordered = [...sidecars.filter(s => s.has), ...sidecars.filter(s => !s.has)]
+  for (const sidecar of ordered) {
+    if (!sidecar.ports?.length) continue
+    const me = { name: sidecar.name, ...place, ports: sidecar.ports }
+    const clash = firstClash(me, sidecar.has ? open : [...open, ...others])
+    if (clash) {
+      left.set(sidecar.id, clash)
+      continue
+    }
+    open.push(me)
+  }
+  return left
 }

@@ -227,6 +227,53 @@ describe('moveHostClash: moving an Edge Agent', () => {
   })
 })
 
+/* Service-setup moves a connection without its sidecar when another
+ * connection that can run on the same host has its port. A later save
+ * in the Manager must not add it back: the edge-agent chart refuses a
+ * Deployment with two sidecars on one port. */
+describe('deploymentDrivers leaves out a sidecar whose port is in use', () => {
+  const opts = (current, more) => ({ agent: 'agent-a', current, nodes, ...more })
+
+  it('on the same Edge Agent, keeping the one the Deployment has', () => {
+    const connections = [
+      conn('u1', 'robot', UDP, { port: 5000 }),
+      conn('u2', 'arm', UDP, { port: 5000 }),
+    ]
+    const current = { arm: { image: UDP.image } }
+    expect(Object.keys(deploymentDrivers(entries(connections), connections, opts(current))))
+      .toEqual(['arm'])
+  })
+
+  it('of two new ones on the same Edge Agent, keeping the first', () => {
+    const connections = [
+      conn('u1', 'robot', UDP, { port: 5000 }),
+      conn('u2', 'arm', UDP, { port: 5000 }),
+      conn('r1', 'web', REST, {}),
+    ]
+    expect(Object.keys(deploymentDrivers(entries(connections), connections, opts({}))))
+      .toEqual(['robot', 'web'])
+  })
+
+  it('used by another Edge Agent on the same host', () => {
+    const here = [conn('u1', 'robot', UDP, { port: 5000 })]
+    const there = conn('u2', 'arm', UDP, { port: 5000 }, 'agent-float')
+    const all = [...here, there]
+    expect(deploymentDrivers(entries(here), all, opts({}))).toEqual({})
+    /* One it has already keeps its port. */
+    expect(Object.keys(deploymentDrivers(entries(here), all, opts({ robot: {} }))))
+      .toEqual(['robot'])
+  })
+
+  it('but not one on another host, or on a free port', () => {
+    const here = [conn('u1', 'robot', UDP, { port: 5000 })]
+    const all = [...here,
+      conn('u2', 'arm', UDP, { port: 5000 }, 'agent-b'),
+      conn('u3', 'arm-2', UDP, { port: 5001 }, 'agent-float')]
+    expect(Object.keys(deploymentDrivers(entries(here), all, opts({}))))
+      .toEqual(['robot'])
+  })
+})
+
 /* A driver with no container (the External DriverDef) logs in to the
  * Edge Agent's broker under its connection name, so a Manager save
  * gives it no driverId, as service-setup gives it none. */

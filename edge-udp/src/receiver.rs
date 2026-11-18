@@ -182,7 +182,7 @@ async fn report(port: u16, stats: Arc<Stats>) {
         if let Some(msg) = drop_report(&last, &now) {
             tracing::warn!("{msg}");
         }
-        tracing::debug!(port, ?now, "datagram counts");
+        tracing::trace!(port, ?now, "datagram counts");
         last = now;
     }
 }

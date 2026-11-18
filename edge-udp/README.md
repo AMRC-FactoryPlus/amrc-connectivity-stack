@@ -66,7 +66,9 @@ A datagram can be lost in two places, and the driver counts both:
 
 Every 10 seconds in which either count went up, the driver logs a
 warning with the counts for that period and the totals. The kernel
-count comes from `/proc/net/udp`.
+count comes from `/proc/net/udp`. The running totals are also logged
+every 10 seconds at `trace`, so they only show when asked for, for
+example with `VERBOSE=ALL,edge_udp=trace`.
 
 Variable|Default|Meaning
 ---|---|---

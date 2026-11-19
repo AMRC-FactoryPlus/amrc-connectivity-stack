@@ -1,0 +1,91 @@
+# Gateway Depot: provisions cell gateways. A blank PC reports itself, a
+# person approves it from the Admin UI, it installs itself, and it is
+# onboarded as an edge cluster without an administrator's credentials.
+#-REQUIRE: auth clusters
+---
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u UUIDs.Class.Service:
+    !u GatewayDepot.Service.GatewayDepot:
+      name: "Gateway Depot"
+      iri: service/GatewayDepot
+
+  # sv1gatewaydepot's account is created by krb-keys-operator, so its
+  # permissions are granted to this ServiceRole group. account.groups on
+  # its KerberosKey places the account in the group.
+  !u Auth.Class.ServiceRole:
+    !u GatewayDepot.Requirement.ServiceAccount:
+      name: "Gateway Depot"
+      iri: service/GatewayDepotServiceAccount
+      subclassOf:
+        - !u Auth.Class.CentralService
+
+  !u Auth.Class.ServicePerms:
+    !u GatewayDepot.Perm.All:
+      name: "Gateway Depot permission"
+      iri: gateway-depot/perm/All
+      subclassOf:
+        - !u UUIDs.Class.Permission
+
+  !u GatewayDepot.Perm.All:
+    !u GatewayDepot.Perm.Provision: { name: "Provision gateways" }
+
+  # Every approved gateway is an object of this class.
+  !u ConfigDB.Class.R1Class:
+    !u GatewayDepot.Class.Gateway:
+      name: "Cell gateway"
+      iri: gateway-depot/Gateway
+
+  !u UUIDs.Class.App:
+    # The record of a gateway: hardware, settings, state and history.
+    !u GatewayDepot.App.Gateway:
+      name: "Cell gateway provisioning"
+      iri: app/GatewayProvisioning
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+    # Hashes of the gateway's secret and of its admin password.
+    !u GatewayDepot.App.Private:
+      name: "Cell gateway provisioning private state"
+      iri: app/GatewayProvisioningPrivate
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  # Provision gateways is granted to ACS.Group.Administrator in
+  # dumps/admin.yaml, not here. Auth's dump loader deletes every grant
+  # of a principal that the dump does not repeat, so each principal's
+  # grants must live in one dump.
+
+  # What the service needs: to keep its own records, to see who holds
+  # Provision gateways, and to create, name and enrol edge clusters.
+  !u GatewayDepot.Requirement.ServiceAccount:
+    !u Directory.Perm.AdvertiseService:
+      !u GatewayDepot.Service.GatewayDepot: false
+    !u Auth.Perm.ReadACL:
+      !u GatewayDepot.Perm.All: true
+    !u ConfigDB.Perm.ReadConfig:
+      !u GatewayDepot.App.Gateway: false
+      !u GatewayDepot.App.Private: false
+      # The edge clusters that exist, whether each has reported in, and
+      # the chart a new one uses.
+      !u Clusters.App.Cluster: false
+      !u Clusters.App.EdgeStatus: false
+      !u UUIDs.App.ServiceConfig: false
+      !u UUIDs.App.Info: false
+    !u ConfigDB.Perm.WriteConfig:
+      !u GatewayDepot.App.Gateway: false
+      !u GatewayDepot.App.Private: false
+      # To create edge clusters, and to name them and the gateways. The
+      # ConfigDB keeps names in the Info application.
+      !u Clusters.App.Cluster: false
+      !u UUIDs.App.Info: false
+    !u ConfigDB.Perm.CreateObject:
+      !u GatewayDepot.Class.Gateway: false
+      !u Clusters.Class.Cluster: false
+    !u ConfigDB.Perm.DeleteObject:
+      !u GatewayDepot.Class.Gateway: true
+    # To ask the Cluster Manager for enrolment tokens.
+    !u Clusters.Perm.Clusters: null

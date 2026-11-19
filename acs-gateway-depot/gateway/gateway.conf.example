@@ -1,0 +1,62 @@
+# Factory+ cell gateway settings.
+#
+# Copy this to gateway.conf, or let start.sh ask the questions and write
+# /etc/fplus-gw/gateway.conf for you. Every value has a default, so an
+# empty file gives a single-node gateway with automatic port detection.
+
+# gateway: a physical box with a northbound port and a southbound port.
+# server:  an IT-hosted VM. Network, hostname and password are left alone.
+ROLE=gateway
+
+# create: start a new single-node K3s cluster on this machine.
+# join:   join an existing cluster as an agent (needs K3S_URL and K3S_TOKEN).
+K3S_MODE=create
+K3S_URL=
+K3S_TOKEN=
+
+# yes: set everything up except K3s. The Gateway Depot uses this so the
+# cluster is only created once the gateway is at the edge.
+K3S_DEFER=no
+
+# yes: other machines will join this cluster, so the firewall also lets
+# cluster nodes reach each other on the northbound port. join implies yes.
+MULTI_NODE=no
+
+# The northbound port. auto picks the port that carries the default
+# route, or the port that can reach NORTH_PROBE_URL if you set one. A
+# probe is the safer choice if the machine network has its own DHCP
+# server. Or give an interface name or a MAC address.
+NORTH_IF=auto
+NORTH_PROBE_URL=
+
+# The southbound port. auto picks the only other wired
+# port. Or give an interface name, a MAC address, or none.
+SOUTH_IF=auto
+
+# The address for the southbound port, as address/prefix, for example
+# 192.168.1.200/24. Use dhcp if the machine network hands out addresses.
+# Either way the southbound port never gets a default route.
+SOUTH_ADDR=
+
+# The hostname is HOSTNAME_PREFIX-<serial number>. Set GW_HOSTNAME to
+# override the whole name.
+HOSTNAME_PREFIX=fpcgw
+GW_HOSTNAME=
+
+# Container images are pulled through this mirror. Leave empty to pull
+# straight from docker.io and ghcr.io.
+REGISTRY_MIRROR=
+
+# An apt mirror to use instead of the Ubuntu archive. Leave empty to keep
+# the Ubuntu sources. If set, APT_MIRROR_KEY_SHA256 must be the SHA-256 of
+# <APT_MIRROR>/keyring.gpg.
+APT_MIRROR=
+APT_MIRROR_KEY_SHA256=
+
+# The origin the apt mirror publishes with, if it is not Ubuntu's own.
+# Automatic updates only install from origins they are told about.
+APT_MIRROR_ORIGIN=
+
+# keep:   leave the admin password alone.
+# random: set a random password and show it once (interactive runs only).
+ADMIN_PASSWORD=keep

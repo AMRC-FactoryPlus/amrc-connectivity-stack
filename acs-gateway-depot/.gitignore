@@ -1,0 +1,5 @@
+node_modules/
+cache/
+out/
+k3s/
+__pycache__/

@@ -610,6 +610,34 @@ export const UserAdmin = {
     },
 };
 
+/* Gateway Depot: provisions cell gateways. These are duplicated in
+ * acs-gateway-depot/lib/constants.js and in
+ * acs-admin/src/lib/gateway-depot/constants.js and must match. */
+export const GatewayDepot = {
+    App: {
+        /* The record of a gateway. */
+        Gateway:            "a67ed556-80e0-43d2-bd6e-3d25122b9a80",
+        /* Hashes only the service needs. */
+        Private:            "90b6d8ce-d5e3-4c9e-afde-624f93d893b4",
+    },
+    Class: {
+        Gateway:            "e763cbcd-157c-40d5-8e54-87c0647d9e07",
+    },
+    Perm: {
+        All:                "eff45a46-11a4-4a99-8429-416ed2a56ce5",
+        Provision:          "f8a2ad0a-6a2f-4b1a-b8fe-958e7b01fd94",
+    },
+    Requirement: {
+        /* The ServiceRole group sv1gatewaydepot's account.groups (see
+         * deploy/templates/gateway-depot/gateway-depot.yaml) places it
+         * in. */
+        ServiceAccount:     "bf5b0af8-ecd7-40df-aa02-2441f9de9693",
+    },
+    Service: {
+        GatewayDepot:       "4e298f74-4ae9-4da6-ba80-7a08de4036a6",
+    },
+};
+
 /* Simulator edge driver (edge-sim): cassette playback. The App and
  * Class UUIDs are duplicated in edge-sim/lib/uuids.js and must match. */
 export const EdgeSim = {

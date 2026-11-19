@@ -1,0 +1,22 @@
+{
+    "name": "acs-gateway-depot",
+    "version": "1.0.0",
+    "description": "Provisions Factory+ cell gateways: scout, approve, install, onboard",
+    "type": "module",
+    "scripts": {
+        "test": "node --test 'test/*.test.js'"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",
+        "@amrc-factoryplus/service-api": "file:../lib/js-service-api",
+        "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
+        "express": "^5.0.1"
+    },
+    "optionalDependencies": {
+        "@amrc-factoryplus/gssapi": "file:../lib/js-gssapi"
+    },
+    "devDependencies": {
+        "eslint": "^9.23.0"
+    }
+}

@@ -272,6 +272,10 @@ data:
       - service: !u Files.Service.Files
         url: !acs "http://files.${namespace}.svc.${k8sdomain}"
 {{ end }}
+{{ if .Values.gatewayDepot.enabled }}
+      - service: !u GatewayDepot.Service.GatewayDepot
+        url: !acs "http://gateway-depot.${namespace}.svc.${k8sdomain}"
+{{ end }}
 {{ if .Values.git.enabled }}
       - service: !u ACS.Service.Git
         #The Git repository is configured with an external URL. We need

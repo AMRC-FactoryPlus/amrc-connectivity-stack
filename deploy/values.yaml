@@ -716,6 +716,41 @@ clusterManager:
     repository: acs-cluster-manager
   verbosity: "ALL,!service,!token"
 
+gatewayDepot:
+  # -- Whether or not to enable the Gateway Depot, which provisions cell
+  # gateways. See docs/services/gateway-depot.md. It adds the host
+  # gateway-depot.<acs.baseUrl>, which must resolve: with Let's Encrypt
+  # a host with no DNS record stops the whole certificate from renewing.
+  enabled: true
+  image:
+    # -- The repository of the Gateway Depot component
+    repository: acs-gateway-depot
+  verbosity: "ALL,!service,!token"
+  # Settings every gateway the depot provisions is given.
+  gateway:
+    # -- A container registry mirror for K3s on the gateways to pull
+    # through. Leave empty to pull straight from the public registries.
+    registryMirror: ""
+    # -- An apt mirror for the gateways to use instead of the Ubuntu
+    # archive. Leave empty to keep the Ubuntu package sources.
+    aptMirror: ""
+    # -- The SHA-256 of <aptMirror>/keyring.gpg. Required with aptMirror.
+    aptMirrorKeySha256: ""
+    # -- The origin the apt mirror publishes with, if it is not Ubuntu's
+    # own. Automatic updates only install from origins they know.
+    aptMirrorOrigin: ""
+    # -- The default name of the admin user created on each gateway
+    adminUser: fplus
+    # -- The locale of the gateways
+    locale: en_GB.UTF-8
+    # -- The keyboard layout of the gateways
+    keyboard: gb
+    # -- The timezone of the gateways
+    timezone: Europe/London
+    # -- Set true if the depot stick was built with a CA certificate
+    # (stick/build-stick.sh -C) because ACS uses a private CA.
+    privateCA: false
+
 userAdmin:
   # -- Whether or not to enable the User Admin component
   enabled: true

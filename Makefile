@@ -48,6 +48,7 @@ subdirs+= acs-directory
 subdirs+= acs-edge
 subdirs+= acs-edge-sync
 subdirs+= acs-files
+subdirs+= acs-gateway-depot
 subdirs+= acs-git
 subdirs+= acs-identity
 subdirs+= acs-i3x

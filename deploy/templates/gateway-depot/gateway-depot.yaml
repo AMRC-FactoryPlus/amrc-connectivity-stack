@@ -1,0 +1,139 @@
+{{ if .Values.gatewayDepot.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-depot
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: gateway-depot
+spec:
+  # Onboarding is a conversation with a gateway which is held in memory,
+  # so we must never run two.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      component: gateway-depot
+  template:
+    metadata:
+      labels:
+        component: gateway-depot
+        factory-plus.service: gateway-depot
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: krb5-conf
+          configMap:
+            name: krb5-conf
+        - name: krb5-keytabs
+          secret:
+            secretName: gateway-depot-secrets
+
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
+
+      containers:
+        - name: webapi
+{{ include "amrc-connectivity-stack.image" (list . .Values.gatewayDepot) | indent 10 }}
+          command: ["/usr/bin/k5start", "-Uf", "/keytabs/client"]
+          args: ["node", "bin/api.js"]
+          env:
+            - name: KRB5_CONFIG
+              value: /config/krb5-conf/krb5.conf
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
+            - name: SERVER_KEYTAB
+              value: /keytabs/server
+            # These two are used to verify Basic auth.
+            - name: HOSTNAME
+              value: gateway-depot.{{ .Release.Namespace }}.svc.cluster.local
+            - name: REALM
+              value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
+            - name: PORT
+              value: "8080"
+            - name: VERBOSE
+              value: {{ .Values.gatewayDepot.verbosity | quote }}
+{{ include "amrc-connectivity-stack.cache-max-age" (list . "gatewayDepot") | indent 12 }}
+            - name: ROOT_PRINCIPAL
+              value: admin@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+            - name: DIRECTORY_URL
+              value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+            # The address gateways call us on. They call from wherever
+            # they are imaged and from the shop floor, so it must be the
+            # external address.
+            - name: PUBLIC_URL
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "gateway-depot") | quote }}
+            # Settings every gateway gets.
+            - name: REGISTRY_MIRROR
+              value: {{ .Values.gatewayDepot.gateway.registryMirror | quote }}
+            - name: APT_MIRROR
+              value: {{ .Values.gatewayDepot.gateway.aptMirror | quote }}
+            - name: APT_MIRROR_KEY_SHA256
+              value: {{ .Values.gatewayDepot.gateway.aptMirrorKeySha256 | quote }}
+            - name: APT_MIRROR_ORIGIN
+              value: {{ .Values.gatewayDepot.gateway.aptMirrorOrigin | quote }}
+            - name: ADMIN_USER
+              value: {{ .Values.gatewayDepot.gateway.adminUser | quote }}
+            - name: GATEWAY_LOCALE
+              value: {{ .Values.gatewayDepot.gateway.locale | quote }}
+            - name: GATEWAY_KEYBOARD
+              value: {{ .Values.gatewayDepot.gateway.keyboard | quote }}
+            - name: GATEWAY_TIMEZONE
+              value: {{ .Values.gatewayDepot.gateway.timezone | quote }}
+            - name: GATEWAY_CA
+              value: {{ .Values.gatewayDepot.gateway.privateCA | quote }}
+          volumeMounts:
+            - mountPath: /config/krb5-conf
+              name: krb5-conf
+            - mountPath: /keytabs
+              name: krb5-keytabs
+
+{{ include "amrc-connectivity-stack.service-probes" (list . 8080) | indent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-depot
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: "web"
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: gateway-depot
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: http.gateway-depot
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  secret: gateway-depot-secrets/server
+  principal: HTTP/gateway-depot.{{ .Release.Namespace }}.svc.cluster.local@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  additionalPrincipals:
+    - HTTP/gateway-depot.{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+---
+apiVersion: factoryplus.app.amrc.co.uk/v1
+kind: KerberosKey
+metadata:
+  name: sv1gatewaydepot
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: Random
+  secret: gateway-depot-secrets/client
+  principal: sv1gatewaydepot@{{ .Values.identity.realm | required "values.identity.realm is required!" }}
+  account:
+    # Auth.Class.CentralService
+    class: e463b4ae-a322-46cc-8976-4ba76838e908
+    name: Gateway Depot
+    groups:
+      # GatewayDepot.Requirement.ServiceAccount
+      - bf5b0af8-ecd7-40df-aa02-2441f9de9693
+{{- end -}}

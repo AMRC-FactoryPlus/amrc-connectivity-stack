@@ -354,6 +354,7 @@ jobs:
           - acs-data-access
           - acs-edge-sync
           - acs-files
+          - acs-gateway-depot
           - acs-git
           - acs-identity
           - acs-krb-keys-operator

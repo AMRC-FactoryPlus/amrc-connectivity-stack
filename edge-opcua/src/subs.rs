@@ -11,10 +11,18 @@
 //! is retried on a timer with a back-off from 5 seconds to 5 minutes,
 //! with one log line when an address is refused and one when it
 //! recovers. A refusal for one interval leaves the others working.
+//!
+//! An address that ends in an array index (see `addr.rs`) is asked for
+//! as the node it names as written first. Only if the server answers
+//! `BadNodeIdUnknown` for that item is it asked for again at once as
+//! the node without the suffix with the index range. Which form the
+//! server took is kept in [`Forms`] for as long as these subscriptions
+//! last, which is until the session reconnects or is replaced, and
+//! writes use the same form.
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use opcua::client::{DataChangeCallback, Session};
@@ -91,6 +99,91 @@ impl Dropped {
     }
 }
 
+/// Which form of each address that could name an array element the
+/// server was last asked for: the node as written, or the node without
+/// the suffix with the index range. Addresses with no element form are
+/// not in it.
+#[derive(Default)]
+pub struct Forms(HashMap<Addr, Form>);
+
+#[derive(Default)]
+struct Form {
+    /// `UNKNOWN`, `EXACT` or `ELEMENT`.
+    asked: AtomicU8,
+    /// Whether the address has been logged as having no data because
+    /// its index is outside the array.
+    warned: AtomicBool,
+}
+
+const UNKNOWN: u8 = 0;
+const EXACT: u8 = 1;
+const ELEMENT: u8 = 2;
+
+impl Forms {
+    pub fn new<'a>(addrs: impl IntoIterator<Item = &'a Addr>) -> Self {
+        Self(
+            addrs
+                .into_iter()
+                .filter(|a| a.element.is_some())
+                .map(|a| (a.clone(), Form::default()))
+                .collect(),
+        )
+    }
+
+    /// Record which form is being asked for. It is recorded before the
+    /// request, so a value that arrives at once is read in that form.
+    pub fn set(&self, addr: &Addr, element: bool) {
+        if let Some(f) = self.0.get(addr) {
+            f.asked
+                .store(if element { ELEMENT } else { EXACT }, Ordering::SeqCst);
+        }
+    }
+
+    /// Whether the address was last asked for as an element (`true`),
+    /// as the node as written (`false`), or not yet (`None`).
+    pub fn element(&self, addr: &Addr) -> Option<bool> {
+        if addr.node.is_none() {
+            return Some(true);
+        }
+        match self.0.get(addr)?.asked.load(Ordering::SeqCst) {
+            UNKNOWN => None,
+            EXACT => Some(false),
+            _ => Some(true),
+        }
+    }
+
+    /// Note whether an element address's index is outside the array
+    /// (`outside` is the status that says so), and log it once when it
+    /// is and once when it has data again.
+    fn outside(&self, addr: &Addr, outside: Option<StatusCode>) {
+        let Some(f) = self.0.get(addr) else {
+            return;
+        };
+        match outside {
+            Some(s) => {
+                if !f.warned.swap(true, Ordering::SeqCst) {
+                    tracing::warn!(
+                        addr = %addr.raw,
+                        "the index is outside the array ({s}); this address gets no data until \
+                         the array is big enough"
+                    );
+                }
+            }
+            None => {
+                if f.warned.swap(false, Ordering::SeqCst) {
+                    tracing::info!(addr = %addr.raw, "the array element has data again");
+                }
+            }
+        }
+    }
+}
+
+/// The status, if it says an index range is outside the array.
+fn outside_status(status: Option<StatusCode>) -> Option<StatusCode> {
+    status
+        .filter(|s| *s == StatusCode::BadIndexRangeNoData || *s == StatusCode::BadIndexRangeInvalid)
+}
+
 /// What every subscription's callback needs.
 #[derive(Clone)]
 pub struct Sink {
@@ -112,6 +205,8 @@ struct Interval {
 /// server refused.
 pub struct Subs {
     pub plan: Plan,
+    /// Which form of each element address the server took.
+    pub forms: Arc<Forms>,
     /// How many monitored items the session should hold.
     expected: Arc<AtomicUsize>,
     retry: Option<tokio::task::JoinHandle<()>>,
@@ -192,6 +287,7 @@ pub async fn items_per_request(session: &Session) -> usize {
 
 fn callback(
     by_handle: Arc<HashMap<u32, Addr>>,
+    forms: Arc<Forms>,
     sink: Sink,
     session: &Session,
 ) -> DataChangeCallback {
@@ -202,8 +298,26 @@ fn callback(
         };
         // The built-in passed on the value whatever its status, and
         // nothing when there was no value.
+        let element = match &addr.element {
+            Some(e) if forms.element(addr) == Some(true) => Some(e),
+            _ => None,
+        };
+        // An index outside the array comes as a status, with no value
+        // or an empty array. Say so once rather than leave the metric
+        // silent, and don't publish the empty array.
+        if element.is_some() {
+            let outside = outside_status(dv.status);
+            forms.outside(addr, outside);
+            if outside.is_some() {
+                return;
+            }
+        }
         let Some(v) = dv.value else {
             return;
+        };
+        let v = match element {
+            Some(e) if e.single() => value::single_element(v),
+            _ => v,
         };
         // async-opcua moves every DateTime it decodes onto our clock
         // when it allows for a server clock that is out
@@ -229,6 +343,7 @@ fn callback(
 async fn create_subscription(
     session: &Session,
     iv: &Interval,
+    forms: &Arc<Forms>,
     sink: &Sink,
 ) -> Result<u32, StatusCode> {
     let made = tokio::time::timeout(
@@ -240,7 +355,7 @@ async fn create_subscription(
             MAX_NOTIFICATIONS_PER_PUBLISH,
             0,
             true,
-            callback(iv.by_handle.clone(), sink.clone(), session),
+            callback(iv.by_handle.clone(), forms.clone(), sink.clone(), session),
         ),
     )
     .await;
@@ -251,15 +366,36 @@ async fn create_subscription(
     }
 }
 
+/// The node and index range to ask for: the node as written, or for an
+/// element address asked for as one, the node without the suffix and
+/// the index range.
+pub fn read_value_id(a: &Addr, element: bool) -> ReadValueId {
+    let (node_id, index_range) = match (&a.node, &a.element) {
+        (Some(node), _) if !element => (node.clone(), Default::default()),
+        (_, Some(e)) => (e.node.clone(), e.range.clone()),
+        _ => unreachable!("planned addresses have a node"),
+    };
+    ReadValueId {
+        node_id,
+        attribute_id: AttributeId::Value as u32,
+        index_range,
+        ..Default::default()
+    }
+}
+
 /// Ask for monitored items, `per_request` at a time, halving a request
-/// the server says is too big. Returns the items it refused, with
-/// why, and how many it made.
+/// the server says is too big. `element` says to ask for element
+/// addresses as elements; addresses that are not a node id as written
+/// always are. Returns the items it refused, with why, and how many it
+/// made.
 async fn create_items(
     session: &Session,
     sub: u32,
     ms: u64,
     items: &[(u32, Addr)],
     per_request: usize,
+    forms: &Forms,
+    element: bool,
 ) -> (Vec<(u32, Addr, StatusCode)>, usize) {
     let mut refused = Vec::new();
     let mut made = 0;
@@ -267,12 +403,13 @@ async fn create_items(
     while let Some(chunk) = todo.pop() {
         let requests = chunk
             .iter()
-            .map(|(h, a)| MonitoredItemCreateRequest {
-                item_to_monitor: ReadValueId {
-                    node_id: a.node.clone().expect("planned addresses have a node"),
-                    attribute_id: AttributeId::Value as u32,
-                    ..Default::default()
-                },
+            .map(|(h, a)| {
+                let element = element || a.node.is_none();
+                forms.set(a, element);
+                (h, read_value_id(a, element))
+            })
+            .map(|(h, item_to_monitor)| MonitoredItemCreateRequest {
+                item_to_monitor,
                 monitoring_mode: MonitoringMode::Reporting,
                 requested_parameters: MonitoringParameters {
                     client_handle: *h,
@@ -322,12 +459,13 @@ async fn create_items(
 async fn make_interval(
     session: &Session,
     iv: &mut Interval,
+    forms: &Arc<Forms>,
     sink: &Sink,
     per_request: usize,
     first: bool,
 ) -> usize {
     if iv.sub.is_none() {
-        match create_subscription(session, iv, sink).await {
+        match create_subscription(session, iv, forms, sink).await {
             Ok(id) => {
                 if !first {
                     tracing::info!("subscription every {} ms made", iv.ms);
@@ -348,7 +486,20 @@ async fn make_interval(
         }
     }
     let sub = iv.sub.expect("just made");
-    let (refused, made) = create_items(session, sub, iv.ms, &iv.pending, per_request).await;
+    let (refused, mut made) =
+        create_items(session, sub, iv.ms, &iv.pending, per_request, forms, false).await;
+    // An address that ends in an array index and is not a node on this
+    // server as written is asked for again at once as the array node
+    // with the index range.
+    let (again, mut refused): (Vec<_>, Vec<_>) = refused.into_iter().partition(|(_, a, s)| {
+        *s == StatusCode::BadNodeIdUnknown && a.node.is_some() && a.element.is_some()
+    });
+    if !again.is_empty() {
+        let again: Vec<(u32, Addr)> = again.into_iter().map(|(h, a, _)| (h, a)).collect();
+        let (r, m) = create_items(session, sub, iv.ms, &again, per_request, forms, true).await;
+        refused.extend(r);
+        made += m;
+    }
     let still: HashMap<u32, StatusCode> = refused.iter().map(|(h, _, s)| (*h, *s)).collect();
     for (h, a) in &iv.pending {
         match (still.get(h), first) {
@@ -365,10 +516,40 @@ async fn make_interval(
     made
 }
 
+/// Read once each address the server now monitors as an array element,
+/// to log one whose index is outside the array. Some servers, node-opcua
+/// among them, monitor such an element without complaint and then never
+/// send a value or a status for it, so without this the metric would be
+/// silent with nothing in the log.
+async fn check_elements(session: &Session, forms: &Forms, refused: &[&Addr], per_request: usize) {
+    let addrs: Vec<&Addr> = forms
+        .0
+        .keys()
+        .filter(|a| forms.element(a) == Some(true) && !refused.contains(a))
+        .collect();
+    for chunk in addrs.chunks(per_request.max(1)) {
+        let ids: Vec<ReadValueId> = chunk.iter().map(|a| read_value_id(a, true)).collect();
+        let read = tokio::time::timeout(
+            REQUEST_TIMEOUT,
+            session.read(&ids, TimestampsToReturn::Neither, 0.0),
+        )
+        .await;
+        let Ok(Ok(values)) = read else {
+            return;
+        };
+        for (a, dv) in chunk.iter().zip(values) {
+            if let Some(s) = outside_status(dv.status) {
+                forms.outside(a, Some(s));
+            }
+        }
+    }
+}
+
 /// Make the subscriptions for a plan, and start retrying whatever the
 /// server refused.
 pub async fn make(session: Arc<Session>, plan: Plan, sink: Sink) -> Subs {
     let per_request = items_per_request(&session).await;
+    let forms = Arc::new(Forms::new(plan.iter().flat_map(|(_, addrs)| addrs)));
     let mut intervals: Vec<Interval> = plan
         .iter()
         .map(|(ms, addrs)| {
@@ -389,7 +570,7 @@ pub async fn make(session: Arc<Session>, plan: Plan, sink: Sink) -> Subs {
     let mut made = 0;
     for iv in &mut intervals {
         let total = iv.pending.len();
-        made += make_interval(&session, iv, &sink, per_request, true).await;
+        made += make_interval(&session, iv, &forms, &sink, per_request, true).await;
         tracing::info!(
             "subscribed to {} of {total} addresses every {} ms",
             total - iv.pending.len(),
@@ -397,17 +578,25 @@ pub async fn make(session: Arc<Session>, plan: Plan, sink: Sink) -> Subs {
         );
     }
 
+    // Those the server refused are logged already.
+    let refused: Vec<&Addr> = intervals
+        .iter()
+        .flat_map(|iv| iv.pending.iter().map(|(_, a)| a))
+        .collect();
+    check_elements(&session, &forms, &refused, per_request).await;
+
     let expected = Arc::new(AtomicUsize::new(made));
     intervals.retain(|iv| !iv.pending.is_empty());
     let retry = (!intervals.is_empty()).then(|| {
         let expected = expected.clone();
+        let forms = forms.clone();
         tokio::spawn(async move {
             let mut wait = RETRY_FIRST;
             while !intervals.is_empty() {
                 tokio::time::sleep(wait).await;
                 wait = (wait * 2).min(RETRY_MAX);
                 for iv in &mut intervals {
-                    let made = make_interval(&session, iv, &sink, per_request, false).await;
+                    let made = make_interval(&session, iv, &forms, &sink, per_request, false).await;
                     expected.fetch_add(made, Ordering::SeqCst);
                 }
                 intervals.retain(|iv| !iv.pending.is_empty());
@@ -417,6 +606,7 @@ pub async fn make(session: Arc<Session>, plan: Plan, sink: Sink) -> Subs {
 
     Subs {
         plan,
+        forms,
         expected,
         retry,
     }

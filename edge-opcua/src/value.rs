@@ -41,7 +41,7 @@
 
 use std::str::FromStr;
 
-use opcua::types::{DateTime, Guid, StatusCode, UAString, Variant};
+use opcua::types::{Array, DateTime, Guid, StatusCode, UAString, Variant};
 use rs_edge_driver::WriteValue;
 use serde_json::{Value, json};
 
@@ -155,6 +155,34 @@ pub fn packet(v: &Variant, received_ms: i64) -> Option<Vec<u8>> {
     )
 }
 
+/// The value of an address that selects one array element. The server
+/// sends the part of the array the index range selects, which for one
+/// element is an array of one (a 1x1 matrix for `[1,2]`), so that is
+/// published as the element itself and a scalar metric can use it.
+/// Anything else is left as it is.
+pub fn single_element(v: Variant) -> Variant {
+    match v {
+        Variant::Array(mut a) if a.values.len() == 1 => a.values.pop().expect("one value"),
+        v => v,
+    }
+}
+
+/// The variant to write to one element with an index range. OPC UA
+/// takes an array with the range's shape, so a scalar becomes an array
+/// of one, with `dimensions` dimensions of 1.
+pub fn element_write(v: Variant, dimensions: usize) -> Result<Variant, String> {
+    let ty = v
+        .scalar_type_id()
+        .ok_or_else(|| "only a single value can be written to an element".to_string())?;
+    let a = if dimensions > 1 {
+        Array::new_multi(ty, vec![v], vec![1u32; dimensions])
+    } else {
+        Array::new(ty, vec![v])
+    };
+    a.map(|a| Variant::Array(Box::new(a)))
+        .map_err(|e| format!("can't make the element value: {e:?}"))
+}
+
 /// The variant to write for a typed write, as the built-in wrote it.
 pub fn to_variant(value: &WriteValue) -> Result<Variant, String> {
     Ok(match value {
@@ -213,7 +241,7 @@ pub fn write_failure(status: StatusCode) -> WriteFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opcua::types::{Array, ByteString, LocalizedText, VariantScalarTypeId};
+    use opcua::types::{ByteString, LocalizedText, VariantScalarTypeId};
 
     fn j(v: Variant) -> Option<Value> {
         to_json(&v)
@@ -379,6 +407,50 @@ mod tests {
         assert!(to_variant(&W::Uuid("not a uuid".into())).is_err());
         match to_variant(&W::DateTime(1_763_380_800_456)).unwrap() {
             Variant::DateTime(d) => assert_eq!(date_ms(&d), 1_763_380_800_456),
+            v => panic!("{v:?}"),
+        }
+    }
+
+    #[test]
+    fn one_element_is_published_as_a_scalar() {
+        let one = Array::new(VariantScalarTypeId::Double, vec![Variant::Double(3.5)]).unwrap();
+        assert_eq!(
+            single_element(Variant::Array(Box::new(one))),
+            Variant::Double(3.5)
+        );
+        let matrix = Array::new_multi(
+            VariantScalarTypeId::Int32,
+            vec![Variant::Int32(7)],
+            vec![1u32, 1],
+        )
+        .unwrap();
+        assert_eq!(
+            single_element(Variant::Array(Box::new(matrix))),
+            Variant::Int32(7)
+        );
+        // A scalar, or more than one value, is left as it is.
+        assert_eq!(single_element(Variant::Double(1.0)), Variant::Double(1.0));
+        let two = Array::new(
+            VariantScalarTypeId::Double,
+            vec![Variant::Double(1.0), Variant::Double(2.0)],
+        )
+        .unwrap();
+        let two = Variant::Array(Box::new(two));
+        assert_eq!(single_element(two.clone()), two);
+    }
+
+    #[test]
+    fn an_element_write_is_an_array_of_one() {
+        match element_write(Variant::Int16(5), 1).unwrap() {
+            Variant::Array(a) => {
+                assert_eq!(a.value_type, VariantScalarTypeId::Int16);
+                assert_eq!(a.values, vec![Variant::Int16(5)]);
+                assert_eq!(a.dimensions, None);
+            }
+            v => panic!("{v:?}"),
+        }
+        match element_write(Variant::Double(5.0), 2).unwrap() {
+            Variant::Array(a) => assert_eq!(a.dimensions, Some(vec![1, 1])),
             v => panic!("{v:?}"),
         }
     }

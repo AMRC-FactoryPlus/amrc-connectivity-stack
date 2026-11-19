@@ -99,6 +99,14 @@ uninstall` doesn't delete it either. Passwords only disappear if the
 `openmetadata-dependencies.mysql.auth.existingSecret`, Airflow's
 `metadataSecretName`, `createUserJob.defaultUser.password`, etc.).
 
+## Cataloguing SMB shares
+
+OpenMetadata has no SMB/CIFS connector. `openmetadataSmb` in
+`values.yaml` mounts SMB shares read-only and serves them over SFTP
+inside the cluster, so OpenMetadata's SFTP Drive connector can catalogue
+them. See [smb-connection.md](smb-connection.md) for installation,
+creating the credentials Secret, and connecting OpenMetadata.
+
 ## Troubleshooting
 
 These are the encountered problems that were worked around by configuring `values.yaml` and `Dockerfile`s.

@@ -42,6 +42,9 @@ spec:
     {{- if .Values.files.enabled }}
     - files.{{ .Values.acs.baseUrl}}
     {{- end }}
+    {{- if .Values.gatewayDepot.enabled }}
+    - gateway-depot.{{ .Values.acs.baseUrl}}
+    {{- end }}
     {{- if .Values.influxdb2.enabled }}
     - influxdb.{{ .Values.acs.baseUrl}}
     {{- end }}

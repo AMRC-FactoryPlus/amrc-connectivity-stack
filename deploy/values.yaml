@@ -716,6 +716,61 @@ clusterManager:
     repository: acs-cluster-manager
   verbosity: "ALL,!service,!token"
 
+gatewayDepot:
+  # -- Whether or not to enable the Gateway Depot, which provisions cell
+  # gateways. See docs/services/gateway-depot.md. It adds the host
+  # gateway-depot.<acs.baseUrl>, which must resolve: with Let's Encrypt
+  # a host with no DNS record stops the whole certificate from renewing.
+  enabled: true
+  image:
+    # -- The repository of the Gateway Depot component
+    repository: acs-gateway-depot
+  verbosity: "ALL,!service,!token"
+  # Settings every gateway the depot provisions is given.
+  gateway:
+    # -- A container registry mirror for K3s on the gateways to pull
+    # through. Leave empty to pull straight from the public registries.
+    registryMirror: ""
+    # -- An apt mirror for the gateways to use instead of the Ubuntu
+    # archive. Leave empty to keep the Ubuntu package sources.
+    aptMirror: ""
+    # -- The SHA-256 of <aptMirror>/keyring.gpg. Required with aptMirror.
+    aptMirrorKeySha256: ""
+    # -- The origin the apt mirror publishes with, if it is not Ubuntu's
+    # own. Automatic updates only install from origins they know.
+    aptMirrorOrigin: ""
+    # -- The default name of the admin user created on each gateway
+    adminUser: fplus
+    # -- The locale of the gateways
+    locale: en_GB.UTF-8
+    # -- The keyboard layout of the gateways
+    keyboard: gb
+    # -- The timezone of the gateways
+    timezone: Europe/London
+    # -- Set true if the depot stick was built with a CA certificate
+    # (stick/build-stick.sh -C) because ACS uses a private CA.
+    privateCA: false
+    # -- The name of a Secret in the release namespace whose `ca.crt` is
+    # that CA certificate. With this set, the depot stick the chart
+    # builds carries the certificate, and privateCA is taken as true.
+    privateCASecret: ""
+  # The depot stick: the USB image a blank PC boots from. A Job builds
+  # it on every install and upgrade, and people download it from the
+  # Admin UI.
+  stick:
+    # -- Whether to build the depot stick for download. The Job
+    # downloads the Ubuntu Server image, so it needs internet access or
+    # ubuntuIsoUrl. Without this, build the stick by hand with
+    # acs-gateway-depot/stick/build-stick.sh.
+    enabled: true
+    # -- Space for the Ubuntu image and the stick built from it
+    storage: 10Gi
+    # -- The storage class for that volume. Empty means the default.
+    storageClass: ""
+    # -- Where to download the Ubuntu Server image from, if not from
+    # releases.ubuntu.com. It is checked against a pinned checksum.
+    ubuntuIsoUrl: ""
+
 userAdmin:
   # -- Whether or not to enable the User Admin component
   enabled: true

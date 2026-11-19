@@ -3,6 +3,9 @@
 FROM alpine AS build
 
 ARG kubeseal_ver=0.19.5
+# Set by buildx. The image is built for amd64 and arm64.
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /root
 # We can't use a bind mount here, pip does in-tree builds. Copy only
@@ -16,7 +19,7 @@ RUN /bin/sh <<SHELL
 
     apk add bison curl python3 py3-pip python3-dev gcc musl-dev krb5 krb5-dev
     pip install -t /usr/local/python -r requirements.txt
-    curl -L https://github.com/bitnami-labs/sealed-secrets/releases/download/v${kubeseal_ver}/kubeseal-${kubeseal_ver}-linux-amd64.tar.gz \
+    curl -L https://github.com/bitnami-labs/sealed-secrets/releases/download/v${kubeseal_ver}/kubeseal-${kubeseal_ver}-${TARGETOS}-${TARGETARCH}.tar.gz \
         | tar -xzvf - -C /usr/local/bin kubeseal
 SHELL
 

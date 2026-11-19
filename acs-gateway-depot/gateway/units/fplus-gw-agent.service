@@ -1,0 +1,15 @@
+# Keeps a Factory+ gateway in touch with the Gateway Depot service.
+[Unit]
+Description=Factory+ Gateway Depot agent
+Wants=network-online.target
+After=network-online.target fplus-gw-firstboot.service
+ConditionPathExists=/etc/fplus-gw/depot.json
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/fplus-gw/agent/agent.py agent
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

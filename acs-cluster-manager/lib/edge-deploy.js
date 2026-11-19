@@ -42,6 +42,9 @@ export class EdgeDeploy {
         app.get("/cluster/:cluster/bootstrap", this.wrap(this.bootstrap));
         app.post("/cluster/:cluster/bootstrap-url", 
             this.wrap(this.bootstrap_url));
+        app.route("/cluster/:cluster/enrol")
+            .post(this.wrap(this.enrol))
+            .delete(this.wrap(this.unenrol));
         app.get("/cluster/:cluster/status", this.wrap(this.cluster_status));
         app.route("/cluster/:cluster/secret/:namespace/:name/:key")
             .put(this.wrap(this.seal_secret))
@@ -73,6 +76,35 @@ export class EdgeDeploy {
         const url = new URL(`/v1/cluster/${cluster}/bootstrap`,
             this.external_url).toString();
         return res.status(200).json(url);
+    }
+
+    /* Issue a one-time token which lets an edge cluster join without
+     * an administrator's credentials. Run the bootstrap script with
+     * ACS_ENROL_TOKEN set to the token. */
+    async enrol (req, res) {
+        const { cluster } = req.params;
+
+        const ok = await this.fplus.Auth.check_acl(
+            req.auth, Edge.Perm.Clusters, cluster, true);
+        if (!ok) return res.status(403).end();
+
+        const rv = await this.clusters.enrol(cluster);
+        if (!rv) return res.status(404).end();
+
+        const bootstrap = new URL(`/v1/cluster/${cluster}/bootstrap`,
+            this.external_url).toString();
+        return res.status(200).json({ ...rv, bootstrap });
+    }
+
+    async unenrol (req, res) {
+        const { cluster } = req.params;
+
+        const ok = await this.fplus.Auth.check_acl(
+            req.auth, Edge.Perm.Clusters, cluster, true);
+        if (!ok) return res.status(403).end();
+
+        const found = await this.clusters.unenrol(cluster);
+        return res.status(found ? 204 : 404).end();
     }
 
     async cluster_status (req, res) {

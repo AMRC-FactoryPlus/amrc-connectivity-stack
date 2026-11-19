@@ -1,0 +1,17 @@
+# Configures a freshly installed Factory+ gateway on its first boot.
+# It runs again on the next boot if it did not finish.
+[Unit]
+Description=Factory+ gateway first-boot configuration
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=!/var/lib/fplus-gw/configured
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/fplus-gw/sh/configure.sh
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

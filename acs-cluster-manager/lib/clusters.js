@@ -24,6 +24,7 @@ import { Edge }                 from "./uuids.js";
 export class Clusters {
     constructor (opts) {
         this.fplus      = opts.fplus;
+        this.enrolment  = opts.enrolment;
         this.krbkeys    = opts.krbkeys;
         this.realm      = opts.realm;
         this.domain     = opts.external_domain;
@@ -71,6 +72,18 @@ export class Clusters {
         cdb.search_app(UUIDs.App.ServiceConfig)
             .pipe(rx.skip(1))
             .subscribe(() => process.exit(0));
+
+        /* We read the templates once, in init. An upgrade loads new
+         * templates after we have started, so restart to pick them up.
+         * Without this we go on serving the old bootstrap script. */
+        for (const app of [Edge.App.Flux, Edge.App.Bootstrap]) {
+            cdb.search_app(app)
+                .pipe(rx.skip(1))
+                .subscribe(() => {
+                    this.log("Template %s changed, restarting", app);
+                    process.exit(0);
+                });
+        }
 
         this.config = await cdb.get_config(
             UUIDs.App.ServiceConfig, Edge.Service.EdgeDeployment)
@@ -194,6 +207,25 @@ export class Clusters {
     async cluster_status (uuid) {
         const st = await rx.firstValueFrom(this.status);
         return st.get(uuid, {});
+    }
+
+    /* Issue an enrolment token for a cluster which is ready to be
+     * bootstrapped. Returns null if the cluster is not ready. */
+    async enrol (uuid) {
+        const status = await this.cluster_status(uuid);
+        if (!status.ready) return null;
+
+        return this.enrolment.issue(status.spec.name);
+    }
+
+    /* Revoke a cluster's enrolment token. Returns false if we don't
+     * know the cluster. */
+    async unenrol (uuid) {
+        const status = await this.cluster_status(uuid);
+        if (!status.spec?.name) return false;
+
+        await this.enrolment.revoke(status.spec.name);
+        return true;
     }
 
     async bootstrap (uuid) {

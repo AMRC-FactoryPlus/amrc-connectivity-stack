@@ -71,6 +71,12 @@ const sidebarNavItems: Item[] = [
     auth: true
   },
   {
+    title: 'Gateway Depot',
+    href: '/gateway-depot',
+    icon: 'warehouse',
+    auth: true
+  },
+  {
     title: 'ISA-95',
     href: '/isa95',
     icon: 'sitemap',

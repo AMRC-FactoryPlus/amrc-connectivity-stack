@@ -206,10 +206,18 @@ configs:
               echo "Maybe you need to set KUBECONFIG?" >&2
               exit 1
           fi
+          # With ACS_ENROL_TOKEN set to an enrolment token from the
+          # cluster manager we need no administrator and ask no
+          # questions.
+          TOKEN="${ACS_ENROL_TOKEN:-}"
+
           echo "Deploying to edge cluster:"
           kubectl get nodes
-          read -p "Press Return to continue or Ctrl-C to abort:" \
-              tmp </dev/tty
+          if [ -z "$TOKEN" ]
+          then
+              read -p "Press Return to continue or Ctrl-C to abort:" \
+                  tmp </dev/tty
+          fi
 
           want_flux=YES
           if kexist flux-system deploy/helm-controller
@@ -229,14 +237,34 @@ configs:
           kexist none namespace/"$N" || kubectl create namespace "$N"
 
           echo "Joining edge cluster to central cluster..."
-          kubectl create -f edge-bootstrap.yaml
-          wait_ready pod/edge-bootstrap
-          kubectl attach -ti -n $N -c bootstrap edge-bootstrap </dev/tty
+          # Clear up anything a failed earlier attempt left behind.
+          kubectl delete -f edge-bootstrap.yaml --ignore-not-found
+          if [ -n "$TOKEN" ]
+          then
+              kubectl delete -n $N secret/edge-enrol --ignore-not-found
+              kubectl create -n $N secret generic edge-enrol \
+                  --from-literal=token="$TOKEN"
+              kubectl create -f edge-bootstrap.yaml
+              # The Pod runs to completion by itself.
+              phase=Pending
+              while [ "$phase" != "Succeeded" ] && [ "$phase" != "Failed" ]
+              do
+                  sleep 2
+                  phase="$(kubectl get -n $N pod/edge-bootstrap \
+                      -o jsonpath='{.status.phase}')"
+              done
+              kubectl logs -n $N -c bootstrap edge-bootstrap
+              kubectl delete -n $N secret/edge-enrol
+          else
+              kubectl create -f edge-bootstrap.yaml
+              wait_ready pod/edge-bootstrap
+              kubectl attach -ti -n $N -c bootstrap edge-bootstrap </dev/tty
+          fi
           kubectl delete -f edge-bootstrap.yaml
 
           if ! kexist $N secret/flux-secrets
           then
-              echo "Cluster join failed! (wrong password?)" >&2
+              echo "Cluster join failed! (wrong password or expired token?)" >&2
               exit 1
           fi
 
@@ -325,6 +353,13 @@ configs:
                     value: {{realm}}
                   - name: NAMESPACE
                     value: {{namespace}}
+                  # Only present when bootstrapping with a token.
+                  - name: ENROL_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: edge-enrol
+                        key: token
+                        optional: true
                 volumeMounts:
                   - mountPath: /etc/krb5.conf
                     name: krb5-conf

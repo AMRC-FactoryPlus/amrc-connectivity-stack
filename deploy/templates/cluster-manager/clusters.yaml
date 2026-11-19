@@ -50,6 +50,8 @@ spec:
               value: /config/krb5-conf/krb5.conf
             - name: SERVER_KEYTAB
               value: /keytabs/server
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
             - name: HOSTNAME
               value: clusters.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM
@@ -89,6 +91,22 @@ apiVersion: v1
 kind: Service
 metadata:
   name: cluster-manager
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    factory-plus.service: cluster-manager
+---
+# The Directory, and our HTTP principal, give our address inside the
+# cluster as clusters.<namespace>.svc. Services which call us, such as
+# the Gateway Depot, find us by that name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: clusters
   namespace: {{ .Release.Namespace }}
 spec:
   ports:

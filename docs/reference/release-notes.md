@@ -1511,6 +1511,53 @@ Auth:
   an ACL, and so in the Effective permissions tab of the admin UI. The
   set of entries is the same.
 
+### Gateway Depot: provision a cell gateway from the Admin UI
+
+A new service, the Gateway Depot, turns a blank PC into a cell gateway
+without anyone typing on the gateway. Download the depot USB stick from
+the Gateway Depot page of the Admin UI, boot the PC from it, and the PC
+appears on that page. Approve it there,
+and it installs Ubuntu Server, sets up its network and firewall, and
+installs K3s. Onboard it from the same page and it joins Factory+ as an
+edge cluster. A gateway can also join the cluster of another gateway, or
+replace one whose hardware has died. See [the Gateway Depot
+documentation](../services/gateway-depot.md).
+
+**Before you upgrade:** the depot is on by default, and it adds a host,
+`gateway-depot.<acs.baseUrl>`, which the gateways call. If your DNS has
+no wildcard record for the ACS base URL, add a record for that host
+before you upgrade, or set `gatewayDepot.enabled` to `false`. With Let's
+Encrypt a host with no DNS record stops the whole certificate from
+renewing.
+
+The depot builds its USB stick in the cluster. This adds a 10Gi volume,
+and a Job that downloads the Ubuntu Server image from
+`releases.ubuntu.com`. On a cluster with no internet access, set
+`gatewayDepot.stick.ubuntuIsoUrl` to a mirror, or set
+`gatewayDepot.stick.enabled` to `false` and build the stick by hand.
+
+People need the new **Provision gateways** permission to use it.
+Administrators hold it.
+
+### Edge clusters can be bootstrapped without an administrator's password
+
+The cluster manager can now issue a one-time enrolment token for an edge
+cluster. Run the bootstrap script with `ACS_ENROL_TOKEN` set to the
+token and it asks no questions. A token is good for one cluster, expires
+after 30 minutes, and can do nothing except create that cluster's two
+accounts. See [Edge
+Bootstrap](../architecture/edge-management/edge-bootstrap.md#enrolment-tokens).
+The bootstrap script still works as before without a token.
+
+This adds three lines to the KDC's ACL. The KDC restarts during the
+upgrade to load them.
+
+### The edge management images are built for arm64
+
+`acs-krb-keys-operator`, `acs-edge-sync` and `acs-monitor` are now built
+for arm64 as well as amd64, so an edge cluster can run on arm64
+hardware.
+
 ## v6.6.0
 
 ### Upgrading: expect the Directory to be unavailable for several minutes

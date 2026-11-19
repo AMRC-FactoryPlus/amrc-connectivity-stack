@@ -68,3 +68,19 @@ jobs:
         env:
           PGDATABASE: configdb
         run: node --test 'test/*.test.js'
+
+      # The connection-recovery tests kill and time out real
+      # connections, so they need the server too.
+      - name: Install pg-client dependencies
+        working-directory: lib/js-pg-client
+        run: |
+          sudo apt-get install -y libpq-dev
+          # The lock file pins a libpq binding too old to build on
+          # this Node. Services install the library without its lock.
+          npm install --no-audit --no-fund --no-package-lock
+
+      - name: Run the pg-client tests
+        working-directory: lib/js-pg-client
+        env:
+          PGDATABASE: postgres
+        run: node --test 'test/*.test.js'

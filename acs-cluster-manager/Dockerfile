@@ -37,6 +37,9 @@ RUN <<'SHELL'
 SHELL
 
 FROM ${base_prefix}-js-run:${base_version} AS run
+# We need the kadmin client to issue enrolment tokens.
+USER root
+RUN apk add --no-cache krb5
 # Copy across from the build container.
 COPY --from=build /usr/local/bin/kubeseal /usr/local/bin/kubeseal
 WORKDIR /home/node/app

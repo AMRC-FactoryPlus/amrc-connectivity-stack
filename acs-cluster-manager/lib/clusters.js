@@ -24,6 +24,7 @@ import { Edge }                 from "./uuids.js";
 export class Clusters {
     constructor (opts) {
         this.fplus      = opts.fplus;
+        this.enrolment  = opts.enrolment;
         this.krbkeys    = opts.krbkeys;
         this.realm      = opts.realm;
         this.domain     = opts.external_domain;
@@ -194,6 +195,25 @@ export class Clusters {
     async cluster_status (uuid) {
         const st = await rx.firstValueFrom(this.status);
         return st.get(uuid, {});
+    }
+
+    /* Issue an enrolment token for a cluster which is ready to be
+     * bootstrapped. Returns null if the cluster is not ready. */
+    async enrol (uuid) {
+        const status = await this.cluster_status(uuid);
+        if (!status.ready) return null;
+
+        return this.enrolment.issue(status.spec.name);
+    }
+
+    /* Revoke a cluster's enrolment token. Returns false if we don't
+     * know the cluster. */
+    async unenrol (uuid) {
+        const status = await this.cluster_status(uuid);
+        if (!status.spec?.name) return false;
+
+        await this.enrolment.revoke(status.spec.name);
+        return true;
     }
 
     async bootstrap (uuid) {

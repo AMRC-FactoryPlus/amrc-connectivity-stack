@@ -13,11 +13,21 @@ cluster = os.environ["CLUSTER_NAME"]
 realm = os.environ["REALM"]
 namespace = os.environ["NAMESPACE"]
 
-input("Press Return to continue...")
+# An enrolment token from the cluster manager is the password of a
+# short-lived principal which is only allowed to create the two accounts
+# below. With a token we need no administrator and ask no questions.
+token = os.environ.get("ENROL_TOKEN")
 
-print(f"Enrolling cluster {cluster} in {realm}")
-user = input("ACS admin user: ")
-passwd = getpass.getpass(prompt="Password: ")
+if token:
+    print(f"Enrolling cluster {cluster} in {realm} with an enrolment token")
+    user = f"op1enrol/{cluster}@{realm}"
+    passwd = token
+else:
+    input("Press Return to continue...")
+
+    print(f"Enrolling cluster {cluster} in {realm}")
+    user = input("ACS admin user: ")
+    passwd = getpass.getpass(prompt="Password: ")
 kadm_h = kadmin.init_with_password(user, passwd)
 kadm = Kadm(kadm=kadm_h)
 

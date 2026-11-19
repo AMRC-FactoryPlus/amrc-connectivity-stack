@@ -50,6 +50,8 @@ spec:
               value: /config/krb5-conf/krb5.conf
             - name: SERVER_KEYTAB
               value: /keytabs/server
+            - name: CLIENT_KEYTAB
+              value: /keytabs/client
             - name: HOSTNAME
               value: clusters.{{ .Release.Namespace }}.svc.cluster.local
             - name: REALM

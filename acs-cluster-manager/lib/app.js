@@ -8,6 +8,7 @@ import { RxClient }     from "@amrc-factoryplus/rx-client";
 import { WebAPI }       from "@amrc-factoryplus/service-api";      
 
 import { Clusters }     from "./clusters.js";
+import { Enrolment }    from "./enrol.js";
 import { GIT_VERSION }  from "./git-version.js";
 import { EdgeDeploy }   from "./edge-deploy.js";
 import { Edge }         from "./uuids.js";
@@ -21,8 +22,15 @@ export class App {
             git_email:          env.GIT_EMAIL,
         });
 
-        const clusters = this.clusters = new Clusters({
+        const enrolment = new Enrolment({
             fplus,
+            realm:      env.REALM,
+            keytab:     env.CLIENT_KEYTAB,
+            principal:  `sv1clustermanager@${env.REALM}`,
+        });
+
+        const clusters = this.clusters = new Clusters({
+            fplus, enrolment,
             krbkeys:            env.KRBKEYS_IMAGE,
             realm:              env.REALM,
             external_domain:    env.EXTERNAL_DOMAIN,

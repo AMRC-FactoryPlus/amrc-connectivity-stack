@@ -19,6 +19,11 @@ spec:
 
   template:
     metadata:
+      annotations:
+        # kadmind reads its ACL when it starts. Change this number
+        # whenever the ACL below changes, so an upgrade restarts the KDC
+        # and the new ACL takes effect.
+        factoryplus.app.amrc.co.uk/kdc-acl-revision: "2"
       labels:
         component: kdc
     spec:
@@ -189,6 +194,15 @@ data:
     admin           x
     op1krbkeys/*    x     */*1
     op1krbkeys/*    x     */*1/*
+    # Enrolment tokens. The cluster manager creates op1enrol/CLUSTER
+    # with a short expiry and hands out its password as a one-time
+    # token. That principal can create and key the two accounts an edge
+    # cluster needs to join and nothing else. Add, change-password,
+    # inquire and modify are what Kadm.create_keytab, set_password and
+    # enable_princ need.
+    sv1clustermanager   adi   op1enrol/*
+    op1enrol/*          acim  op1krbkeys/*1
+    op1enrol/*          acim  op1flux/*1
     {{- if .Values.userAdmin.enabled }}
     # Add principal and inquire only - not op1krbkeys's full x (all),
     # and no change-password, so this credential can create new

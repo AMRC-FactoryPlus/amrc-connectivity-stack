@@ -87,21 +87,56 @@ the target cluster but it is not a requirement.
 
 If desired the script may be downloaded and viewed before running it.
 Make sure to use the URL provided by the Manager; currently this is in a
-fixed format containing the UUID of the cluster, but this may change in
-future to include some sort of temporary token. The bulk of the script
+fixed format containing the UUID of the cluster. The bulk of the script
 is a number of YAML files containing Kubernetes manifests which are
 unpacked to a temporary directory; then a small driver script is run
 which runs several `kubectl` commands.
 
 The first few commands run a single Pod which pulls the Kerberos Keys
 operator container and runs a bootstrap script. This will prompt for
-admin credentials; these credentials must have rights to edit principals
-in the KDC. The container uses these credentials to create principals
+admin credentials, unless it was given an [enrolment
+token](#enrolment-tokens); these credentials must have rights to edit
+principals in the KDC. The container uses these credentials to create principals
 for `krbkeys` itself and for Flux; these link up with the accounts already
 created for these principals by the cluster manager. The final step of
 creating the principal is performed on the edge as this means the
 passwords for the new accounts can be recorded directly to Secrets in
 the edge cluster.
+
+### Enrolment tokens
+
+The bootstrap script can run without an administrator. Set
+`ACS_ENROL_TOKEN` to an enrolment token and it asks no questions:
+
+```sh
+curl ... | ACS_ENROL_TOKEN=<token> sh -
+```
+
+A token comes from the cluster manager. `POST
+/v1/cluster/<uuid>/enrol` needs the 'Manage clusters' permission on the
+cluster and returns
+
+```json
+{ "principal": "op1enrol/<name>@<REALM>", "token": "...",
+  "expires": 1795084865618, "bootstrap": "https://clusters.../bootstrap" }
+```
+
+`DELETE` on the same path revokes the token.
+
+A token is the password of a Kerberos principal, `op1enrol/<name>`, which
+the cluster manager creates with a 30 minute expiry. The KDC enforces
+the expiry. The KDC's ACL allows that principal to create and key
+`op1krbkeys/<name>` and `op1flux/<name>`, the two accounts the bootstrap
+Pod creates, and nothing else. The principal has no account in the Auth
+service, so a token carries no Factory+ permissions. Asking for a new
+token for a cluster makes the previous one stop working.
+
+The script passes the token to the bootstrap Pod in a Secret, which it
+removes afterwards. The keys for the new accounts are still created at
+the edge and recorded directly to Secrets in the edge cluster.
+
+The [Gateway Depot](../../services/gateway-depot.md) uses enrolment
+tokens to onboard a gateway with nobody at its console.
 
 After that the script loads installs Flux on the cluster from manifests
 and creates the Flux resources which link to the cluster's git repo.

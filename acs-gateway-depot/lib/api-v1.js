@@ -4,7 +4,9 @@
  * Copyright 2026 University of Sheffield AMRC
  */
 
-import express from "express";
+import path     from "node:path";
+
+import express  from "express";
 
 import { Perm, Special }    from "./constants.js";
 import { DepotError }       from "./errors.js";
@@ -23,6 +25,7 @@ export class APIv1 {
         this.auth       = opts.fplus.Auth;
         this.depot      = opts.depot;
         this.payload    = opts.payload;
+        this.stick      = opts.stick;
 
         this.log = opts.fplus.debug.bound("api-v1");
         this.routes = express.Router();
@@ -65,10 +68,14 @@ export class APIv1 {
         api.post("/box/:id/checkin", this.wrap(this.checkin));
         api.get("/payload/gateway-:sha.tar.gz", this.wrap(this.archive));
         api.get("/payload/k3s-:arch", this.wrap(this.k3s));
+        /* The depot stick holds no settings and no secrets, and a
+         * browser downloads it without Factory+ credentials. */
+        api.get("/payload/:name.iso", this.wrap(this.stick_file));
 
         api.get("/gateway", this.person(this.gateway_list));
         api.get("/settings", this.person(this.settings));
         api.get("/cluster", this.person(this.cluster_list));
+        api.get("/stick", this.person(this.stick_status));
         api.post("/gateway/:id/approve", this.person(this.approve));
         api.post("/gateway/:id/onboard", this.person(this.onboard));
         api.delete("/gateway/:id", this.person(this.forget));
@@ -90,6 +97,15 @@ export class APIv1 {
     k3s (req, res) {
         res.type("application/octet-stream")
             .sendFile(this.payload.k3s_for(req.params.arch).file);
+    }
+
+    stick_file (req, res) {
+        const file = this.stick.path_for(`${req.params.name}.iso`);
+        res.download(file, path.basename(file));
+    }
+
+    stick_status () {
+        return this.stick.status();
     }
 
     gateway_list () {

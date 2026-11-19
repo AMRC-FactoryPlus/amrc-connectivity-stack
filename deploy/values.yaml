@@ -750,6 +750,26 @@ gatewayDepot:
     # -- Set true if the depot stick was built with a CA certificate
     # (stick/build-stick.sh -C) because ACS uses a private CA.
     privateCA: false
+    # -- The name of a Secret in the release namespace whose `ca.crt` is
+    # that CA certificate. With this set, the depot stick the chart
+    # builds carries the certificate, and privateCA is taken as true.
+    privateCASecret: ""
+  # The depot stick: the USB image a blank PC boots from. A Job builds
+  # it on every install and upgrade, and people download it from the
+  # Admin UI.
+  stick:
+    # -- Whether to build the depot stick for download. The Job
+    # downloads the Ubuntu Server image, so it needs internet access or
+    # ubuntuIsoUrl. Without this, build the stick by hand with
+    # acs-gateway-depot/stick/build-stick.sh.
+    enabled: true
+    # -- Space for the Ubuntu image and the stick built from it
+    storage: 10Gi
+    # -- The storage class for that volume. Empty means the default.
+    storageClass: ""
+    # -- Where to download the Ubuntu Server image from, if not from
+    # releases.ubuntu.com. It is checked against a pinned checksum.
+    ubuntuIsoUrl: ""
 
 userAdmin:
   # -- Whether or not to enable the User Admin component

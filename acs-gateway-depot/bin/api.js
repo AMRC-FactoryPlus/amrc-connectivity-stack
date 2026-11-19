@@ -18,6 +18,7 @@ import { Depot }            from "../lib/depot.js";
 import { GIT_VERSION }      from "../lib/git-version.js";
 import { Payload }          from "../lib/payload.js";
 import { PUBLIC, routes }   from "../lib/routes.js";
+import { Stick }            from "../lib/stick.js";
 import { Store }            from "../lib/store.js";
 
 const { env } = process;
@@ -33,13 +34,24 @@ const payload = new Payload({
     k3s_dir:        env.K3S_DIR ?? path.join(root, "k3s"),
 }).init();
 
+const public_url = env.PUBLIC_URL.replace(/\/+$/, "");
+
+/* The depot stick. A Job the Helm chart runs builds it in STICK_DIR. */
+const stick = new Stick({
+    fplus, public_url,
+    dir:            env.STICK_DIR,
+    gateway_dir:    payload.gateway_dir,
+    versions:       payload.versions,
+    ca_file:        env.GATEWAY_CA_FILE,
+});
+
 const store = await new Store({ fplus }).init();
 const clusters = new Clusters({ fplus });
 
 const depot = new Depot({
     fplus, store, clusters, payload,
     /* The address gateways call us on. */
-    public_url:     env.PUBLIC_URL.replace(/\/+$/, ""),
+    public_url,
     has_ca:         env.GATEWAY_CA == "true",
     /* Site settings every gateway gets. */
     defaults: {
@@ -74,7 +86,7 @@ const api = await new WebAPI({
     /* We check the caller's permission ourselves and then act with our
      * own rights, so don't pass a caller's JWT on to other services. */
     forward_jwt:    false,
-    routes:     routes({ fplus, depot, payload }),
+    routes:     routes({ fplus, depot, payload, stick }),
 }).init();
 
 api.run();

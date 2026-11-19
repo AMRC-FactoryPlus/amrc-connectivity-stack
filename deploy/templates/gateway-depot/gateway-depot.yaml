@@ -32,6 +32,16 @@ spec:
         - name: krb5-keytabs
           secret:
             secretName: gateway-depot-secrets
+        {{- if .Values.gatewayDepot.stick.enabled }}
+        - name: depot
+          persistentVolumeClaim:
+            claimName: gateway-depot-storage
+        {{- end }}
+        {{- with .Values.gatewayDepot.gateway.privateCASecret }}
+        - name: gateway-ca
+          secret:
+            secretName: {{ . }}
+        {{- end }}
 
       initContainers:
 {{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
@@ -86,12 +96,30 @@ spec:
             - name: GATEWAY_TIMEZONE
               value: {{ .Values.gatewayDepot.gateway.timezone | quote }}
             - name: GATEWAY_CA
-              value: {{ .Values.gatewayDepot.gateway.privateCA | quote }}
+              value: {{ or .Values.gatewayDepot.gateway.privateCA (not (empty .Values.gatewayDepot.gateway.privateCASecret)) | quote }}
+            {{- if .Values.gatewayDepot.gateway.privateCASecret }}
+            - name: GATEWAY_CA_FILE
+              value: /config/gateway-ca/ca.crt
+            {{- end }}
+            {{- if .Values.gatewayDepot.stick.enabled }}
+            # The Job below builds the depot stick here.
+            - name: STICK_DIR
+              value: /depot/stick
+            {{- end }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf
             - mountPath: /keytabs
               name: krb5-keytabs
+            {{- if .Values.gatewayDepot.stick.enabled }}
+            - mountPath: /depot
+              name: depot
+              readOnly: true
+            {{- end }}
+            {{- if .Values.gatewayDepot.gateway.privateCASecret }}
+            - mountPath: /config/gateway-ca
+              name: gateway-ca
+            {{- end }}
 
 {{ include "amrc-connectivity-stack.service-probes" (list . 8080) | indent 10 }}
 ---
@@ -136,4 +164,92 @@ spec:
     groups:
       # GatewayDepot.Requirement.ServiceAccount
       - bf5b0af8-ecd7-40df-aa02-2441f9de9693
+{{- if .Values.gatewayDepot.stick.enabled }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: gateway-depot-storage
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  labels:
+    component: gateway-depot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.gatewayDepot.stick.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.gatewayDepot.stick.storage }}
+---
+# Builds the depot stick. The name changes with every release revision,
+# so this runs on every install and upgrade. It does nothing when the
+# stick on the volume is already built from the same inputs.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gateway-depot-stick-r{{ .Release.Revision }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: gateway-depot-stick
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        component: gateway-depot-stick
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # The volume attaches to one node, so run beside the service.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  component: gateway-depot
+      securityContext:
+        fsGroup: 1000
+      volumes:
+        - name: depot
+          persistentVolumeClaim:
+            claimName: gateway-depot-storage
+        {{- with .Values.gatewayDepot.gateway.privateCASecret }}
+        - name: gateway-ca
+          secret:
+            secretName: {{ . }}
+        {{- end }}
+      containers:
+        - name: bake
+{{ include "amrc-connectivity-stack.image" (list . .Values.gatewayDepot) | indent 10 }}
+          command: ["/bin/bash", "stick/bake.sh"]
+          env:
+            - name: DEPOT_DIR
+              value: /depot
+            - name: PUBLIC_URL
+              value: {{ include "amrc-connectivity-stack.external-url" (list . "gateway-depot") | quote }}
+            {{- with .Values.gatewayDepot.stick.ubuntuIsoUrl }}
+            - name: UBUNTU_ISO_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.gatewayDepot.gateway.privateCASecret }}
+            - name: GATEWAY_CA_FILE
+              value: /config/gateway-ca/ca.crt
+            {{- end }}
+          volumeMounts:
+            - mountPath: /depot
+              name: depot
+            {{- if .Values.gatewayDepot.gateway.privateCASecret }}
+            - mountPath: /config/gateway-ca
+              name: gateway-ca
+            {{- end }}
+{{- end }}
 {{- end -}}

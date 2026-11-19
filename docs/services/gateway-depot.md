@@ -98,6 +98,7 @@ These need the **Provision gateways** permission with a wildcard target.
 | --- | --- | --- |
 | `GET` | `gateway` | Lists the gateways, newest first |
 | `GET` | `settings` | Returns `{ defaults: { admin_user }, k3s_version }` |
+| `GET` | `stick` | Says whether the depot stick is built: `{ state }`, where `state` is `ready`, `building` or `none`. A ready stick also has `{ url, size, ubuntu, built_at, current }`. `current` is false when the stick was built for an older release |
 | `GET` | `cluster` | Lists edge clusters: `{ uuid, name, reported, hosts, gateway }`, where `gateway` is the id of the cluster's first gateway if the depot built it |
 | `POST` | `gateway/:id/approve` | Approves a gateway that is waiting. Returns `{ gateway, admin_user, password }`. This is the only time the password is available |
 | `POST` | `gateway/:id/onboard` | Starts onboarding. Returns `{ gateway }` at once; progress follows in the gateway's state |
@@ -201,6 +202,7 @@ gateway's secret in the request body.
 | `POST` | `box/:id/checkin` | Reports what an installed gateway is doing, and collects a job |
 | `GET` | `payload/gateway-:sha.tar.gz` | The setup scripts |
 | `GET` | `payload/k3s-:arch` | The K3s binary |
+| `GET` | `payload/depot-stick-amd64.iso` | The depot stick, for a browser to download. It holds no settings and no secrets |
 
 ## ConfigDB
 
@@ -241,8 +243,30 @@ Set these under `gatewayDepot` in the ACS Helm values.
 | `gateway.locale` | `en_GB.UTF-8` | The gateway's locale |
 | `gateway.keyboard` | `gb` | The gateway's keyboard layout |
 | `gateway.timezone` | `Europe/London` | The gateway's timezone |
+| `gateway.privateCASecret` | empty | A Secret whose `ca.crt` is the CA certificate, if ACS uses a private CA. The depot stick then carries it |
+| `stick.enabled` | `true` | Build the depot stick in the cluster, for download from the Admin UI |
+| `stick.storage` | `10Gi` | Space for the Ubuntu image and the stick |
+| `stick.storageClass` | empty | The storage class for that volume. Empty means the default |
+| `stick.ubuntuIsoUrl` | empty | Where to download the Ubuntu Server image from, if not `releases.ubuntu.com` |
 
-## Building the depot stick
+## The depot stick
+
+Download the depot stick from the Gateway Depot page of the Admin UI and
+write it to a USB stick. A machine booted from it does not touch its
+disk until someone approves it.
+
+The chart builds the stick. A Job runs `stick/bake.sh` on every install
+and upgrade. It downloads the Ubuntu Server image, checks it against a
+pinned checksum, adds the scout and the service's address, and writes
+the result to a volume the service serves it from. The Job does nothing
+when the stick on the volume was already built from the same address,
+scout and Ubuntu version, so most upgrades leave it alone.
+
+The Job needs to reach `releases.ubuntu.com`, or the address in
+`stick.ubuntuIsoUrl`. The volume attaches to one node, so the Job runs
+on the node the service runs on.
+
+To build a stick by hand, for example with `stick.enabled` off:
 
 ```sh
 cd acs-gateway-depot
@@ -251,8 +275,6 @@ stick/build-stick.sh -u https://gateway-depot.<acs.baseUrl>
 ```
 
 Add `-C ca.pem` if the service's certificate comes from a private CA.
-Write the image to a USB stick. A machine booted from it does not touch
-its disk until someone approves it.
 
 ## Testing
 

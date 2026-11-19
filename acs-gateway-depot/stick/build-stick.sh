@@ -41,7 +41,7 @@ while getopts "u:o:a:C:th" flag; do
 done
 [[ "$url" =~ ^https?://[^/]+ ]] || { echo "Give the service address with -u, starting http:// or https://." >&2; exit 1; }
 command -v xorriso >/dev/null || { echo "xorriso is not installed." >&2; exit 1; }
-iso="$root/cache/ubuntu-$UBUNTU_VERSION-live-server-$arch.iso"
+iso="${DEPOT_CACHE:-$root/cache}/ubuntu-$UBUNTU_VERSION-live-server-$arch.iso"
 [ -f "$iso" ] || { echo "Run stick/fetch.sh $arch first." >&2; exit 1; }
 [ -n "$out" ] || { mkdir -p "$root/out"; out="$root/out/depot-stick-$arch.iso"; }
 

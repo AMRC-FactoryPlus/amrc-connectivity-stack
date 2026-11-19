@@ -92,9 +92,11 @@ export class Clusters {
                 throw new DepotError(502,
                     "The Gateway Depot is not allowed to enrol edge clusters.");
             /* 404 means the cluster is not ready yet. */
-            if (st != 404 || Date.now() > end)
+            if (st != 404 || Date.now() > end) {
+                this.log("Cannot enrol cluster %s: status %s", uuid, st);
                 throw new DepotError(504,
                     "Cluster Manager did not finish preparing the cluster in time.");
+            }
             await timers.setTimeout(3000);
         }
     }

@@ -4,9 +4,13 @@
 #
 # Downloads what a gateway install needs and checks it against the
 # checksums in versions.env: the Ubuntu Server image and the K3s binary.
-# Run this on a machine with internet access. Files land in cache/.
+# Run this on a machine with internet access. Files land in cache/, or
+# in $DEPOT_CACHE if that is set.
 #
 #   stick/fetch.sh [amd64|arm64]     (default amd64, which the gateways are)
+#
+# Set STICK_ONLY=yes to fetch only what the depot stick needs, which is
+# the Ubuntu image. Set UBUNTU_ISO_URL to download it from a mirror.
 
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,8 +22,9 @@ case "$arch" in
     *) echo "Architecture must be amd64 or arm64." >&2; exit 1 ;;
 esac
 
-mkdir -p "$root/cache"
-cd "$root/cache"
+cache="${DEPOT_CACHE:-$root/cache}"
+mkdir -p "$cache"
+cd "$cache"
 
 sha256 () {
     if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
@@ -41,12 +46,14 @@ fetch () {
     fi
 }
 
-k3s_asset=k3s
-[ "$arch" = arm64 ] && k3s_asset=k3s-arm64
-k3s_sha="K3S_SHA256_$arch"
-fetch "k3s-$arch" \
-    "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION//+/%2B}/$k3s_asset" \
-    "${!k3s_sha}"
+if [ "${STICK_ONLY:-}" != yes ]; then
+    k3s_asset=k3s
+    [ "$arch" = arm64 ] && k3s_asset=k3s-arm64
+    k3s_sha="K3S_SHA256_$arch"
+    fetch "k3s-$arch" \
+        "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION//+/%2B}/$k3s_asset" \
+        "${!k3s_sha}"
+fi
 
 iso="ubuntu-$UBUNTU_VERSION-live-server-$arch.iso"
 iso_sha="UBUNTU_ISO_SHA256_$arch"
@@ -55,4 +62,4 @@ if [ "$arch" = amd64 ]; then
 else
     iso_url="https://cdimage.ubuntu.com/releases/${UBUNTU_VERSION%.*}/release/$iso"
 fi
-fetch "$iso" "$iso_url" "${!iso_sha}"
+fetch "$iso" "${UBUNTU_ISO_URL:-$iso_url}" "${!iso_sha}"

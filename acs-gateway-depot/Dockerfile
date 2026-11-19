@@ -35,8 +35,9 @@ SHELL
 
 FROM ${base_prefix}-js-run:${base_version} AS run
 # openssl makes the admin password hash for the Ubuntu installer.
+# bash, curl and xorriso build the depot stick (stick/bake.sh).
 USER root
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl bash curl xorriso
 WORKDIR /home/node
 COPY --from=build /home/node/app ./app/
 USER node

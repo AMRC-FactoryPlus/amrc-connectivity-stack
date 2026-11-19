@@ -1514,8 +1514,9 @@ Auth:
 ### Gateway Depot: provision a cell gateway from the Admin UI
 
 A new service, the Gateway Depot, turns a blank PC into a cell gateway
-without anyone typing on the gateway. Boot the PC from a depot USB stick
-and it appears in the Admin UI under Gateway Depot. Approve it there,
+without anyone typing on the gateway. Download the depot USB stick from
+the Gateway Depot page of the Admin UI, boot the PC from it, and the PC
+appears on that page. Approve it there,
 and it installs Ubuntu Server, sets up its network and firewall, and
 installs K3s. Onboard it from the same page and it joins Factory+ as an
 edge cluster. A gateway can also join the cluster of another gateway, or
@@ -1528,6 +1529,12 @@ no wildcard record for the ACS base URL, add a record for that host
 before you upgrade, or set `gatewayDepot.enabled` to `false`. With Let's
 Encrypt a host with no DNS record stops the whole certificate from
 renewing.
+
+The depot builds its USB stick in the cluster. This adds a 10Gi volume,
+and a Job that downloads the Ubuntu Server image from
+`releases.ubuntu.com`. On a cluster with no internet access, set
+`gatewayDepot.stick.ubuntuIsoUrl` to a mirror, or set
+`gatewayDepot.stick.enabled` to `false` and build the stick by hand.
 
 People need the new **Provision gateways** permission to use it.
 Administrators hold it.

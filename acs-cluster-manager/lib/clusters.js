@@ -73,6 +73,18 @@ export class Clusters {
             .pipe(rx.skip(1))
             .subscribe(() => process.exit(0));
 
+        /* We read the templates once, in init. An upgrade loads new
+         * templates after we have started, so restart to pick them up.
+         * Without this we go on serving the old bootstrap script. */
+        for (const app of [Edge.App.Flux, Edge.App.Bootstrap]) {
+            cdb.search_app(app)
+                .pipe(rx.skip(1))
+                .subscribe(() => {
+                    this.log("Template %s changed, restarting", app);
+                    process.exit(0);
+                });
+        }
+
         this.config = await cdb.get_config(
             UUIDs.App.ServiceConfig, Edge.Service.EdgeDeployment)
             .catch(() => null);

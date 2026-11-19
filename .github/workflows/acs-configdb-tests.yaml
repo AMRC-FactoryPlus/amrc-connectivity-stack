@@ -75,7 +75,9 @@ jobs:
         working-directory: lib/js-pg-client
         run: |
           sudo apt-get install -y libpq-dev
-          npm install --no-audit --no-fund
+          # The lock file pins a libpq binding too old to build on
+          # this Node. Services install the library without its lock.
+          npm install --no-audit --no-fund --no-package-lock
 
       - name: Run the pg-client tests
         working-directory: lib/js-pg-client

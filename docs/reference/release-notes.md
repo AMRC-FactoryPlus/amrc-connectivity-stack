@@ -222,6 +222,20 @@ to send to, the firewall rules and the host's receive buffer.
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.
 
+### OPC UA metrics can read one element of an array
+
+An OPC UA address can end in an index to read part of an array node,
+so a metric no longer has to take the whole array. `ns=2;s=Line1/Temps[3]`
+reads element 3 and publishes it as a single value, which a Double or
+Int32 metric can use. `[2:5]` reads elements 2 to 5 as an array, and
+`[1,2]` reads one element of a two-dimensional array. A write to such
+an address writes that element only. Many PLCs already name each array
+element as a node of its own, such as `ns=3;s="DB"."arr"[3]`, so the
+driver tries the address as that node first, and existing addresses
+read what they read before. An index outside the array gets no data
+and one line in the driver's log, and the device's other metrics carry
+on.
+
 ### Keycloak starts faster and is no longer restarted while it starts
 
 Keycloak used to rebuild itself every time its pod started, which took a

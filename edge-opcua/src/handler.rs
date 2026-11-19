@@ -248,7 +248,7 @@ fn plan(addrs: &[Addr], groups: &[AddrGroup<Addr>]) -> Plan {
         }
     }
     let mut by_interval: BTreeMap<u64, Vec<Addr>> = BTreeMap::new();
-    for a in addrs.iter().filter(|a| a.node.is_some()) {
+    for a in addrs.iter().filter(|a| a.usable()) {
         let ms = interval.get(a).copied().unwrap_or(DEFAULT_INTERVAL_MS);
         by_interval.entry(ms).or_default().push(a.clone());
     }
@@ -525,7 +525,7 @@ impl Handler for OpcuaHandler {
 
     fn parse_addr(&self, addr: &str) -> Option<Addr> {
         let parsed = Addr::parse(addr);
-        if parsed.node.is_none() {
+        if !parsed.usable() {
             tracing::error!("address {addr:?} is not an OPC UA node id; it will get no data");
         }
         Some(parsed)
@@ -596,33 +596,61 @@ impl Handler for OpcuaHandler {
         true
     }
 
+    /// Write the value. An address that ends in an array index is
+    /// written in the form the subscription found: the node as written,
+    /// or that element of the array node with the index range. If the
+    /// subscription hasn't found out yet, the node as written is tried
+    /// first, as for reads.
     async fn write(&mut self, addr: &Addr, value: WriteValue) -> Result<(), WriteError> {
-        let Some(node) = &addr.node else {
+        if !addr.usable() {
             return Err(WriteError::BadValue(format!(
                 "{:?} is not an OPC UA node id",
                 addr.raw
             )));
-        };
+        }
         let variant = value::to_variant(&value).map_err(WriteError::BadValue)?;
         let Some(conn) = &self.conn else {
             return Err(WriteError::Failed("not connected".into()));
         };
+        let forms = self
+            .subs
+            .as_ref()
+            .map(|s| s.forms.clone())
+            .unwrap_or_default();
+        let tries: &[bool] = match (forms.element(addr), &addr.element) {
+            (Some(true), _) => &[true],
+            (None, Some(_)) => &[false, true],
+            _ => &[false],
+        };
 
-        let request = UaWriteValue {
-            node_id: node.clone(),
-            attribute_id: AttributeId::Value as u32,
-            value: DataValue::value_only(variant),
-            ..Default::default()
-        };
-        let result = tokio::time::timeout(REQUEST_TIMEOUT, conn.session.write(&[request])).await;
-        let status = match result {
-            Ok(Ok(results)) => results
-                .first()
-                .copied()
-                .unwrap_or(StatusCode::BadUnexpectedError),
-            Ok(Err(e)) => return Err(WriteError::Failed(e.to_string())),
-            Err(_) => return Err(WriteError::Failed("no answer from the server".into())),
-        };
+        let mut status = StatusCode::BadUnexpectedError;
+        for &element in tries {
+            let read = subs::read_value_id(addr, element);
+            let value = match &addr.element {
+                Some(e) if element => value::element_write(variant.clone(), e.dimensions())
+                    .map_err(WriteError::BadValue)?,
+                _ => variant.clone(),
+            };
+            let request = UaWriteValue {
+                node_id: read.node_id,
+                attribute_id: AttributeId::Value as u32,
+                index_range: read.index_range,
+                value: DataValue::value_only(value),
+            };
+            let result =
+                tokio::time::timeout(REQUEST_TIMEOUT, conn.session.write(&[request])).await;
+            status = match result {
+                Ok(Ok(results)) => results
+                    .first()
+                    .copied()
+                    .unwrap_or(StatusCode::BadUnexpectedError),
+                Ok(Err(e)) => return Err(WriteError::Failed(e.to_string())),
+                Err(_) => return Err(WriteError::Failed("no answer from the server".into())),
+            };
+            if status != StatusCode::BadNodeIdUnknown {
+                break;
+            }
+        }
         if status.is_good() {
             return Ok(());
         }

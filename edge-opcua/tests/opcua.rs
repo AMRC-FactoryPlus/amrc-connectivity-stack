@@ -478,3 +478,181 @@ async fn a_stalled_agent_does_not_grow_the_driver() {
     let v = values(&mut agent, &["t199"], secs(60)).await;
     assert!(v["t199"].as_str().unwrap().len() == 1000);
 }
+
+/// An address that ends in an array index reads that part of the
+/// array: one element as a scalar, a slice as an array, and one element
+/// of a matrix as a scalar. A node whose own id ends in an index is
+/// read as that node, and an index on a node that isn't one is read as
+/// that element of the array.
+#[tokio::test(flavor = "multi_thread")]
+async fn array_elements_and_slices() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start().await;
+    let nodes = [
+        node("Temps[3]"),
+        node("Temps[1:3]"),
+        node("Grid[1,2]"),
+        node("Grid[0:1,1]"),
+        node("Elem[3]"),
+        node("Elem[2]"),
+        node("Temps"),
+        node("Temps[0]"),
+    ];
+    let (mut agent, _driver) = driver(conf(&server, "None", "None", None), &nodes).await;
+    let got = values(
+        &mut agent,
+        &["t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7"],
+        secs(10),
+    )
+    .await;
+    assert_eq!(got["t0"], json!(13.5));
+    assert_eq!(got["t1"], json!([11.5, 12.5, 13.5]));
+    assert_eq!(got["t2"], json!(6));
+    assert_eq!(got["t3"], json!([2, 5]));
+    // T/Elem[3] is a node of its own (99), not element 3 of T/Elem.
+    assert_eq!(got["t4"], json!(99));
+    // T/Elem[2] is not a node, so it is element 2 of T/Elem.
+    assert_eq!(got["t5"], json!(2));
+    assert_eq!(got["t6"], json!([10.5, 11.5, 12.5, 13.5, 14.5, 15.5]));
+    assert_eq!(got["t7"], json!(10.5));
+}
+
+/// An element that changes is reported each time, as a scalar.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_changing_element_is_reported() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start().await;
+    let (mut agent, _driver) =
+        driver(conf(&server, "None", "None", None), &[node("Counts[1]")]).await;
+    let number = |v: &serde_json::Value| {
+        v.as_u64()
+            .unwrap_or_else(|| panic!("{v} is not a scalar number"))
+    };
+    let first = number(&values(&mut agent, &["t0"], secs(10)).await["t0"]);
+    let deadline = tokio::time::Instant::now() + secs(10);
+    loop {
+        let v = number(&values(&mut agent, &["t0"], secs(10)).await["t0"]);
+        if v > first {
+            break;
+        }
+        assert!(tokio::time::Instant::now() < deadline, "no new value");
+    }
+}
+
+/// An index outside the array gets no data and one plain log line
+/// naming the address, and the rest of the connection carries on UP.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_index_outside_the_array_does_not_stop_the_others() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start().await;
+    let mut agent = FakeAgent::start("OPCUA").await;
+    let driver = ChildDriver::start(&agent);
+    agent.wait_status("READY", secs(10)).await;
+    agent.send("conf", conf(&server, "None", "None", None).to_string());
+    agent.send(
+        "addr",
+        addr_packet(&[node("Temps[10]"), node("Double"), node("Counts[1]")]),
+    );
+    agent.wait_status("UP", secs(30)).await;
+    let v = values(&mut agent, &["t1", "t2"], secs(10)).await;
+    assert_eq!(v["t1"], json!(2.2));
+    driver
+        .wait_line(&["ns=1;s=T/Temps[10]", "outside the array"], secs(10))
+        .await;
+    for ev in agent.drain(secs(3)).await {
+        match ev {
+            FromDriver::Status(s) => panic!("status changed: {s:?}"),
+            FromDriver::Data { topic, .. } => assert_ne!(topic, "t0", "data for Temps[10]"),
+            _ => {}
+        }
+    }
+    let lines = driver.log();
+    let said = lines.iter().filter(|l| l.contains("Temps[10]")).count();
+    assert_eq!(said, 1, "{lines:#?}");
+}
+
+/// A write to one element writes that element only, and the others
+/// keep their values. A write to a node whose own id ends in an index
+/// writes that node, not the array beside it.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_write_to_one_element_leaves_the_others() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start().await;
+    let nodes = [
+        node("Temps"),
+        node("Temps[2]"),
+        node("Grid"),
+        node("Grid[0,1]"),
+        node("Elem"),
+        node("Elem[3]"),
+        node("Temps[0]"),
+        node("Temps[10]"),
+    ];
+    let (mut agent, _driver) = driver(conf(&server, "None", "None", None), &nodes).await;
+    values(&mut agent, &["t0", "t1", "t2", "t3", "t4", "t5"], secs(10)).await;
+
+    assert_eq!(
+        write(&mut agent, &node("Temps[2]"), "Double", json!(99.5)).await,
+        ""
+    );
+    wait_values(
+        &mut agent,
+        &[
+            ("t1", json!(99.5)),
+            ("t0", json!([10.5, 11.5, 99.5, 13.5, 14.5, 15.5])),
+        ],
+    )
+    .await;
+
+    assert_eq!(
+        write(&mut agent, &node("Grid[0,1]"), "Int32", json!(42)).await,
+        ""
+    );
+    wait_values(
+        &mut agent,
+        &[("t3", json!(42)), ("t2", json!([1, 42, 3, 4, 5, 6]))],
+    )
+    .await;
+
+    assert_eq!(
+        write(&mut agent, &node("Elem[3]"), "Int32", json!(5)).await,
+        ""
+    );
+    wait_value(&mut agent, "t5", &json!(5)).await;
+    // The array beside it is untouched: no new value for it, and it
+    // still reads [0, 1, 2, 3].
+    for ev in agent.drain(secs(2)).await {
+        if let FromDriver::Data { topic, payload } = ev
+            && topic == "t4"
+        {
+            let p: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+            assert_eq!(p["value"], json!([0, 1, 2, 3]));
+        }
+    }
+
+    // An element outside the array is refused, and the connection
+    // carries on.
+    let answer = write(&mut agent, &node("Temps[10]"), "Double", json!(1.0)).await;
+    assert!(
+        answer.starts_with("CMD\n") || answer.starts_with("ERR\n"),
+        "{answer:?}"
+    );
+    assert_eq!(
+        write(&mut agent, &node("Temps[0]"), "Double", json!(1.5)).await,
+        ""
+    );
+    wait_value(
+        &mut agent,
+        "t0",
+        &json!([1.5, 11.5, 99.5, 13.5, 14.5, 15.5]),
+    )
+    .await;
+}

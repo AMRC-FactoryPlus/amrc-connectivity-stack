@@ -240,6 +240,28 @@ pub async fn wait_value(agent: &mut FakeAgent, topic: &str, want: &Value) {
     }
 }
 
+/// Wait for each data topic to report its value, in any order, as when
+/// one write changes several addresses at once.
+pub async fn wait_values(agent: &mut FakeAgent, want: &[(&str, Value)]) {
+    let deadline = tokio::time::Instant::now() + secs(10);
+    let mut seen = vec![false; want.len()];
+    while seen.contains(&false) {
+        let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match agent.next(left).await {
+            Some(FromDriver::Data { topic, payload }) => {
+                let p: Value = serde_json::from_slice(&payload).unwrap();
+                for (i, (t, v)) in want.iter().enumerate() {
+                    if *t == topic && p["value"] == *v {
+                        seen[i] = true;
+                    }
+                }
+            }
+            Some(_) => {}
+            None => panic!("never reported all of {want:?}: saw {seen:?}"),
+        }
+    }
+}
+
 /// Send a typed write with an id, as an agent that waits for answers
 /// does, and return the answer.
 pub async fn write(agent: &mut FakeAgent, address: &str, ty: &str, value: Value) -> String {

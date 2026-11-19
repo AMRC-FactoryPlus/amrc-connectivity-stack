@@ -16,6 +16,12 @@
  *   ns=1;s=T/Bad        a Double with status BadDeviceFailure
  *   ns=1;s=T/Counter    a UInt32 that counts up every 100 ms
  *   ns=1;s=T/Step       an Int32, 0, which SIGUSR2 adds 1 to
+ *   ns=1;s=T/Temps      a Double array [10.5, 11.5, ... 15.5]
+ *   ns=1;s=T/Grid       a 2x3 Int32 matrix [[1, 2, 3], [4, 5, 6]]
+ *   ns=1;s=T/Counts     a UInt32 array [7, n, 7], n counting up every
+ *                       100 ms
+ *   ns=1;s=T/Elem       an Int32 array [0, 1, 2, 3]
+ *   ns=1;s=T/Elem[3]    an Int32 node of its own, 99
  *
  * Settings from the environment, for particular tests:
  *
@@ -126,6 +132,28 @@ const Types = {
 
     variable("DoubleArray", DataType.Double, { valueRank: 1 }).setValueFromSource(
         new Variant({ dataType: DataType.Double, arrayType: VariantArrayType.Array, value: [1.5, 2.5] }));
+    /* Arrays for addresses with an index: a writable Double array, a
+     * 2x3 Int32 matrix, an array whose element 1 counts up every
+     * 100 ms, and an Int32 array T/Elem beside a scalar node whose own
+     * id is T/Elem[3], as PLCs name array elements. */
+    variable("Temps", DataType.Double, { valueRank: 1, arrayDimensions: [6] }).setValueFromSource(
+        new Variant({ dataType: DataType.Double, arrayType: VariantArrayType.Array,
+            value: [10.5, 11.5, 12.5, 13.5, 14.5, 15.5] }));
+    variable("Grid", DataType.Int32, { valueRank: 2, arrayDimensions: [2, 3] }).setValueFromSource(
+        new Variant({ dataType: DataType.Int32, arrayType: VariantArrayType.Matrix,
+            dimensions: [2, 3], value: [1, 2, 3, 4, 5, 6] }));
+    variable("Elem", DataType.Int32, { valueRank: 1 }).setValueFromSource(
+        new Variant({ dataType: DataType.Int32, arrayType: VariantArrayType.Array,
+            value: [0, 1, 2, 3] }));
+    variable("Elem[3]", DataType.Int32).setValueFromSource(
+        new Variant({ dataType: DataType.Int32, value: 99 }));
+    const counts = variable("Counts", DataType.UInt32, { valueRank: 1 });
+    let c = 0;
+    const setCounts = () => counts.setValueFromSource(new Variant({
+        dataType: DataType.UInt32, arrayType: VariantArrayType.Array, value: [7, c++, 7] }));
+    setCounts();
+    setInterval(setCounts, 100);
+
     variable("Bad", DataType.Double).setValueFromSource(
         new Variant({ dataType: DataType.Double, value: 3 }), StatusCodes.BadDeviceFailure);
     variable("ReadOnly", DataType.Double, {

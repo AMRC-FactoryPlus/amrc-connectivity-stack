@@ -1070,7 +1070,7 @@ configs:
       presentation:
         address:
           title: "Node ID"
-          description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed)"
+          description: "The OPC UA Node ID in format ns=X;s=PATH or i=X (e.g. ns=2;s=/Channel/Spindle/actSpeed). Add [3] for one element of an array node, [2:5] for elements 2 to 5, or [1,2] for one element of a 2D array (e.g. ns=2;s=Line1/Temps[3])"
           icon: "sitemap"
           placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
         path:

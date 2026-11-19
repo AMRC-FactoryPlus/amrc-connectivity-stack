@@ -15,7 +15,7 @@ import { defineStore } from 'pinia'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import * as api from '@/lib/gateway-depot/api.js'
-import { CLUSTERS_MAX_AGE_MS, POLL_MS } from '@/lib/gateway-depot/constants.js'
+import { CLUSTERS_MAX_AGE_MS, POLL_MS, STICK_POLL_MS } from '@/lib/gateway-depot/constants.js'
 import { clean, group_gateways, track_links } from '@/lib/gateway-depot/model.js'
 
 let timer = null
@@ -31,6 +31,7 @@ let lastJson = null
 const links = new Map()
 let clustersAt = 0
 let settingsAsked = false
+let stickAt = 0
 let guarding = false
 
 const client = () => useServiceClientStore().client
@@ -49,6 +50,8 @@ export const useGatewayDepotStore = defineStore('gateway-depot', {
     users: 0,
     /* { defaults: { admin_user }, k3s_version } */
     settings: null,
+    /* What GET v1/stick returned, or null before it answers. */
+    stick: null,
     /* What GET v1/cluster returned, or null before it answers. */
     clusters: null,
     /* id -> { name, user, password, ack }. In memory only. */
@@ -110,6 +113,7 @@ export const useGatewayDepotStore = defineStore('gateway-depot', {
         this.error = null
         if (was === epoch) this.setGateways(list)
         this.loadSettings()
+        this.loadStick()
       }
       catch (err) {
         if (err.forbidden) {
@@ -164,6 +168,16 @@ export const useGatewayDepotStore = defineStore('gateway-depot', {
       settingsAsked = true
       try { this.settings = await api.get_settings(client()) }
       catch { settingsAsked = false }
+    },
+
+    /* The stick changes only when a build finishes, so ask again now
+     * and then until there is one. */
+    async loadStick () {
+      if (this.stick && this.stick.state === 'ready') return
+      if (Date.now() - stickAt < STICK_POLL_MS) return
+      stickAt = Date.now()
+      try { this.stick = await api.get_stick(client()) }
+      catch { /* an older service has no stick to offer */ }
     },
 
     /** Fetch the edge clusters, unless the list is still fresh. */

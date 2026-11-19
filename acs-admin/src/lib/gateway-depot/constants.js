@@ -26,3 +26,6 @@ export const CLUSTERS_MAX_AGE_MS = 30 * 1000
 
 /* A port tile shows that its cable or address changed for this long. */
 export const LINK_EVENT_MS = 20 * 1000
+
+/* How often to ask whether the depot stick is built, until it is. */
+export const STICK_POLL_MS = 15 * 1000

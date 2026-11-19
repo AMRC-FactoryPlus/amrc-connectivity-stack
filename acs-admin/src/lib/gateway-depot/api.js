@@ -66,6 +66,12 @@ export async function list_gateways (client) {
 /** { defaults: { admin_user }, k3s_version } */
 export const get_settings = client => depot_request(client, 'GET', 'v1/settings')
 
+/**
+ * The depot stick: { state } where state is ready, building or none.
+ * A ready stick also has { url, size, ubuntu, built_at, current }.
+ */
+export const get_stick = client => depot_request(client, 'GET', 'v1/stick')
+
 /** The edge clusters: [{ uuid, name, reported, hosts, gateway }]. */
 export async function list_clusters (client) {
   const list = await depot_request(client, 'GET', 'v1/cluster')

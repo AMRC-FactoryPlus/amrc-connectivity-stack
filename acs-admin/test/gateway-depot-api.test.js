@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  DepotError, NO_ANSWER, approve_gateway, depot_request, get_settings, list_clusters, list_gateways,
+  DepotError, NO_ANSWER, approve_gateway, depot_request, get_settings, get_stick, list_clusters, list_gateways,
   onboard_gateway, remove_gateway,
 } from '../src/lib/gateway-depot/api.js'
 import { GatewayDepot } from '../src/lib/gateway-depot/constants.js'
@@ -56,6 +56,12 @@ describe('the Gateway Depot API', () => {
   it('treats an answer that is not a list as no gateways', async () => {
     expect(await list_gateways(fake_client(json(200, { oops: true })))).toEqual([])
     expect(await list_clusters(fake_client(json(200, null)))).toEqual([])
+  })
+
+  it('asks whether the depot stick is built', async () => {
+    const stick = fake_client(json(200, { state: 'building' }))
+    expect(await get_stick(stick)).toEqual({ state: 'building' })
+    expect(stick.calls[0]).toMatchObject({ url: 'v1/stick', method: 'GET' })
   })
 
   it('reads the settings and the clusters', async () => {

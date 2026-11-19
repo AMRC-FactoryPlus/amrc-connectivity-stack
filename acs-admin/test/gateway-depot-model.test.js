@@ -100,8 +100,9 @@ describe('grouping the list', () => {
 
   it('counts the gateways in service that are not in contact', () => {
     const service = group_gateways(list).find(g => g.key === 'service')
-    expect(service.count).toBe('2, 1 not in contact')
-    expect(group_gateways(list).find(g => g.key === 'needs').count).toBe('2')
+    expect(service.count).toBe(2)
+    expect(service.quiet).toBe(1)
+    expect(group_gateways(list).find(g => g.key === 'needs').count).toBe(2)
   })
 
   it('leaves out a group with nothing in it', () => {

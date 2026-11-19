@@ -135,8 +135,9 @@ export const is_lost = gw => !gw.online && !QUIET.has(gw.state) && !gw.install_f
  * The gateways in each group, in the order the service lists them, with
  * how many of those in service are not in contact.
  *
- * @returns [{ key, label, gateways, quiet, count }] for the groups that
- *  have gateways. `count` is the text after the group's name.
+ * @returns [{ key, label, gateways, quiet, count }] for the groups
+ *  that have gateways. `quiet` is how many of those in service are not
+ *  in contact.
  */
 export function group_gateways (gateways) {
   const by = { needs: [], working: [], service: [], retired: [] }
@@ -145,7 +146,7 @@ export function group_gateways (gateways) {
     .map(([key, label]) => {
       const list = by[key]
       const quiet = key === 'service' ? list.filter(gw => !gw.online).length : 0
-      return { key, label, gateways: list, quiet, count: list.length + (quiet ? ', ' + quiet + ' not in contact' : '') }
+      return { key, label, gateways: list, quiet, count: list.length }
     })
     .filter(g => g.gateways.length)
 }
@@ -222,15 +223,6 @@ const CURRENT = { pending: 1, installing: 2, 'failed-install': 2, installed: 3, 
 const NEEDS_YOU = new Set(['pending', 'installed', 'ready'])
 /* When each step finished. The last step has no end. */
 const STEP_AT = [null, 'approved_at', 'installed_at', 'ready_at', 'onboarded_at', null]
-
-/* The five steps as the overview lists them. */
-export const HOW = [
-  ['Approve.', 'Configure the gateway'],
-  ['Install.', 'The gateway installs its operating system'],
-  ['Install the gateway at the edge.', 'The gateway powers off, you remove the USB stick, install the gateway at the edge, and power it on.'],
-  ['Onboard.', 'Once the gateway is powered on at the edge this page onboards it.'],
-  ['In service.', 'Factory+ confirms it can see the gateway.'],
-]
 
 /**
  * The five steps for a gateway: [{ n, title, status, tag, hint, at }].

@@ -8,6 +8,11 @@ import {DB, Pg} from "@amrc-factoryplus/pg-client";
 import Queries from "./queries.js";
 import {Service_UUID} from "./constants.js";
 
+/* How often to check the notify connection is alive, and how long to
+ * wait for the answer, in ms. */
+const NOTIFY_CHECK_INTERVAL = 30000;
+const NOTIFY_CHECK_TIMEOUT = 15000;
+
 export default class Model extends Queries {
     constructor(opts) {
         const db = new DB({
@@ -19,6 +24,7 @@ export default class Model extends Queries {
 
         super(db.query.bind(db))
         this.db = db;
+        this.debug = opts.debug;
     }
 
     async init() {
@@ -30,13 +36,35 @@ export default class Model extends Queries {
         return this.db.txn({}, q => work(new Queries(q)));
     }
 
+    /* Open a connection which listens for notifications. A listening
+     * connection only ever reads, so if the server vanishes without
+     * closing it nothing fails and the notifications just stop. We
+     * check it with a query every so often, and if it has gone we
+     * exit so we get restarted with a new one. */
     async notify_client(channels, callback) {
-        const cli = new Pg.Client();
+        const log = this.debug.bound("db");
+        const fatal = err => {
+            log("Notify connection failed, exiting: %s", err?.message ?? err);
+            process.exit(1);
+        };
+
+        const cli = new Pg.Client({
+            query_timeout:                  NOTIFY_CHECK_TIMEOUT,
+            connectionTimeoutMillis:        NOTIFY_CHECK_TIMEOUT,
+            keepAlive:                      true,
+            keepAliveInitialDelayMillis:    NOTIFY_CHECK_INTERVAL,
+        });
+        cli.on("error", fatal);
         await cli.connect();
 
         cli.on("notification", callback);
         for (const c of channels)
             await cli.query(`listen ${c}`);
+
+        const check = setInterval(
+            () => cli.query("select 1").catch(fatal),
+            NOTIFY_CHECK_INTERVAL);
+        check.unref();
 
         return cli;
     }

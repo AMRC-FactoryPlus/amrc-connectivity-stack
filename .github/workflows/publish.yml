@@ -352,14 +352,11 @@ jobs:
           - acs-cluster-manager
           - acs-cmdesc
           - acs-data-access
-          - acs-edge-sync
           - acs-files
           - acs-gateway-depot
           - acs-git
           - acs-identity
-          - acs-krb-keys-operator
           - acs-krb-utils
-          - acs-monitor
           - acs-placement-watcher
           - acs-service-setup
           - acs-user-admin
@@ -461,6 +458,9 @@ jobs:
       matrix:
         service:
           - acs-edge
+          - acs-edge-sync
+          - acs-krb-keys-operator
+          - acs-monitor
           - edge-bacnet
           - edge-modbus
           - edge-test
@@ -511,6 +511,9 @@ jobs:
       matrix:
         service:
           - acs-edge
+          - acs-edge-sync
+          - acs-krb-keys-operator
+          - acs-monitor
           - edge-bacnet
           - edge-modbus
           - edge-test
@@ -561,6 +564,9 @@ jobs:
       matrix:
         service:
           - acs-edge
+          - acs-edge-sync
+          - acs-krb-keys-operator
+          - acs-monitor
           - edge-bacnet
           - edge-modbus
           - edge-test

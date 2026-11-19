@@ -295,6 +295,23 @@ const routes = [
     }
   },
   {
+    path: '/gateway-depot',
+    component: () => import('@pages/GatewayDepot/GatewayDepot.vue'),
+    meta: {
+      name: 'Gateway Depot',
+      icon: 'warehouse'
+    }
+  },
+  {
+    name: 'GatewayDepotGateway',
+    path: '/gateway-depot/:id',
+    component: () => import('@pages/GatewayDepot/Gateway.vue'),
+    meta: {
+      name: 'Gateway Depot',
+      icon: 'warehouse'
+    }
+  },
+  {
     // Full screen, for a tablet next to the equipment.
     path: '/kiosk/:equipment?',
     component: Kiosk,

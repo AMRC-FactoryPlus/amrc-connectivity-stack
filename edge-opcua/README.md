@@ -46,6 +46,50 @@ is logged and gets no data, and the rest of the connection carries on.
 Two spellings of the same node, such as `i=2258` and `ns=0;i=2258`, are
 two addresses.
 
+### Array elements
+
+An address can end in an index to read part of an array node. The
+suffix is sent to the server as the OPC UA index range (`IndexRange`,
+a `NumericRange`) of the monitored item, read or write, so the server
+sends only that part.
+
+Address|Reads|Published as
+---|---|---
+`ns=2;s=Line1/Temps[3]`|element 3 (from 0)|that element, a scalar
+`ns=2;s=Line1/Temps[2:5]`|elements 2 to 5, both included|an array
+`ns=2;s=Line1/Grid[1,2]`|row 1, column 2 of a 2D array|that element, a scalar
+`ns=2;i=1001[4]`|element 4 of a numeric-id node|that element, a scalar
+
+One element is published as a scalar, not an array of one, so a scalar
+metric can use it. A slice is published as an array, as a whole array
+is. The values are converted as any other value (see `src/value.rs`).
+The suffix is the last `[...]` in the address and holds only digits,
+`:` and `,`, so an id such as `ns=2;s=Alarm[high]` or
+`ns=2;s=Line1[2]/Speed` is a plain node id.
+
+**The exact node is tried first.** Many servers, Siemens and Beckhoff
+PLCs among them, make each array element a node of its own whose id
+ends in brackets, such as `ns=3;s="DB"."arr"[3]`. So an address that
+is a node id as written is asked for as that node first. Only if the
+server answers `BadNodeIdUnknown` for it is it asked for again, at
+once, as the node without the suffix with the index range. Existing
+addresses therefore read what they read before. The form that worked
+is kept until the session reconnects or a new one starts, when it is
+found again, and writes use the same form. An address that isn't a
+node id as written, such as `ns=2;i=1001[4]`, is only asked for as an
+element.
+
+A write to an element writes that element only, with the same index
+range, and the rest of the array is left as it was. Writes to a slice
+are not supported: the server refuses them.
+
+An index outside the array gets no data. The driver logs one line
+naming the address, and the rest of the connection carries on, as for
+a node the server doesn't have. Some servers (node-opcua among them)
+monitor such an element without complaint and never send it a value,
+so after making its subscriptions the driver reads each element once
+to find these.
+
 ## What it does
 
 As the built-in connection did:
@@ -246,7 +290,7 @@ Known upstream issues that are still open on that commit:
 src/main.rs        logging and Driver::run, nothing else
 src/lib.rs         the crate root, so the tests can reach the parts
 src/config.rs      the connection details, with unit tests
-src/addr.rs        node id addresses, with unit tests
+src/addr.rs        node id addresses and array indexes, with unit tests
 src/value.rs       OPC UA values to data packets and typed writes to
                    OPC UA values, with unit tests
 src/subs.rs        the subscriptions: make them, retry what the
@@ -275,7 +319,9 @@ They cover every security mode and policy with and without
 credentials, a wrong password (`AUTH`), the value of every OPC UA type,
 a typed write of every Sparkplug type with its answer and the value
 the subscription then reports, refused writes (`RO`, `CMD`, `ERR`),
-bad addresses, reconnecting after the server restarts, a server that
+bad addresses, array elements and slices (read, changed, written, out
+of range, and a node whose own id ends in an index), reconnecting
+after the server restarts, a server that
 comes back with a new certificate, a value that changes during a short
 connection drop, a node that appears after the server starts, low
 server limits, a stalled agent, several devices on one connection, and

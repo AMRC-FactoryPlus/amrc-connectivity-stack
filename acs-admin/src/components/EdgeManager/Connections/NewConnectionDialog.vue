@@ -51,6 +51,17 @@
           </div>
         </div>
 
+        <!-- Password fields are sealed into the cluster's secret as they
+           - lose focus, so say so up front when that will be refused. -->
+        <div v-if="secretsBlocked && hasPasswordFields"
+            class="flex gap-2.5 rounded-md bg-amber-50 ring-1 ring-inset ring-amber-200 p-3">
+          <i class="fa-solid fa-lock text-xs text-amber-700 mt-0.5"></i>
+          <div class="text-xs leading-relaxed text-amber-800">
+            You can't save passwords on this cluster, so the password fields are turned off.
+            Ask an administrator for the Create secrets permission on this cluster.
+          </div>
+        </div>
+
         <!-- Driver-specific form fields -->
         <JSONFormElement
           v-for="key in orderedFormFields"
@@ -63,6 +74,7 @@
           v-model="v$.formData[key].$model"
           :formData="formData"
           :onEncrypt="encryptSensitiveInfo"
+          :secretsDisabled="secretsBlocked"
           :v="v$.formData[key]"
           @change="handleFormChange"
         />
@@ -184,7 +196,7 @@ function sanitizeConnectionName(name) {
 import { helpers, required, minLength } from '@vuelidate/validators'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
-import { save_edge_secret } from '@/lib/edge-secrets.js'
+import { load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
@@ -277,6 +289,7 @@ export default {
       }
 
       this.node = node
+      this.checkSecretAccess(node)
     })
   },
 
@@ -310,6 +323,16 @@ export default {
           'payloadFormat'
         ]
       } : baseSchema;
+    },
+    /* Only a definite no turns the password fields off. While checking,
+     * or when the check can't tell, they stay on and a refused save
+     * reports itself. */
+    secretsBlocked () {
+      return this.secretAccess === false
+    },
+    hasPasswordFields () {
+      const props = this.formSchema?.properties ?? {}
+      return Object.values(props).some(p => p?.format === 'password')
     },
     orderedFormFields() {
       if (!this.formSchema?.properties) return []
@@ -723,9 +746,20 @@ export default {
       }
     },
 
+    /* Each save here adds a fresh random key, so Create secrets is enough
+     * and Manage secrets covers it too. */
+    async checkSecretAccess (node) {
+      this.secretAccess = null
+      const cluster = node?.deployment?.cluster
+      if (!cluster) return
+      const access = await load_secret_access(this.s.client, cluster, 'create')
+      if (this.node?.deployment?.cluster === cluster) this.secretAccess = access
+    },
+
     handleOpen(e) {
       if (e === false) {
         this.node = null
+        this.secretAccess = null
         // Always reset the form when closing the dialog
         this.resetForm()
       }
@@ -804,6 +838,9 @@ export default {
       isSubmitting: false,
       existingConnection: null,
       isDeleting: false,
+      // Whether the user may save secrets on the node's cluster: true,
+      // false, or null while checking or when it can't be told.
+      secretAccess: null,
     }
   },
 }

@@ -155,12 +155,22 @@
               </p>
             </div>
 
+            <div v-if="secretsBlocked"
+                class="flex gap-2.5 rounded-md bg-amber-50 ring-1 ring-inset ring-amber-200 p-3 mt-4">
+              <i class="fa-solid fa-lock text-xs text-amber-700 mt-0.5"></i>
+              <div class="text-xs leading-relaxed text-amber-800">
+                You can't save the broker username and password on this cluster, so those fields
+                are turned off. Ask an administrator for the Manage secrets permission on this cluster.
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-4 mt-4">
               <div class="flex flex-col gap-1">
                 <label class="text-sm font-medium">Username <span class="text-red-500">*</span></label>
                 <Input
                   v-model="v$.remoteUsername.$model"
                   :v="v$.remoteUsername"
+                  :disabled="secretsBlocked"
                   :placeholder="isEditMode ? 'Leave blank to keep existing' : 'Username for remote broker'"
                 />
               </div>
@@ -170,6 +180,7 @@
                   type="password"
                   v-model="v$.remotePassword.$model"
                   :v="v$.remotePassword"
+                  :disabled="secretsBlocked"
                   :placeholder="isEditMode ? 'Leave blank to keep existing' : 'Password for remote broker'"
                 />
               </div>
@@ -227,7 +238,7 @@ import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import useVuelidate from '@vuelidate/core'
 import { helpers, required, numeric, requiredIf } from '@vuelidate/validators'
 import { toast } from 'vue-sonner'
-import { save_edge_secret } from '@/lib/edge-secrets.js'
+import { load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 
@@ -311,6 +322,24 @@ export default {
     },
     isEditMode() {
       return !!this.bridgeUuid
+    },
+    /* Only a definite no turns the credential fields off. While
+     * checking, or when the check can't tell, they stay on and a
+     * refused save reports itself. */
+    secretsBlocked() {
+      return this.bridgeType === 'outgoing' && this.secretAccess === false
+    }
+  },
+
+  watch: {
+    /* The credentials go into fixed keys of the bridge's secret, which
+     * overwrites them on an edit, so this needs Manage secrets: Create
+     * secrets only allows adding a new key. */
+    async selectedClusterUuid(cluster) {
+      this.secretAccess = null
+      if (!cluster) return
+      const access = await load_secret_access(this.s.client, cluster, 'manage')
+      if (this.selectedClusterUuid === cluster) this.secretAccess = access
     }
   },
 
@@ -387,8 +416,10 @@ export default {
       const config = this.selectedCluster
       const namespace = config?.configuration?.namespace || 'fplus-edge'
 
+      // These are fixed keys, overwritten on an edit.
       await save_edge_secret(this.s.client, {
         cluster, namespace, name: secretName, key, value,
+        permission: 'Manage secrets',
       })
     },
 
@@ -487,6 +518,9 @@ export default {
       caFile: null,
       isSubmitting: false,
       unsChartUuid: null,
+      // Whether the user may save secrets on the selected cluster: true,
+      // false, or null while checking or when it can't be told.
+      secretAccess: null,
     }
   },
 

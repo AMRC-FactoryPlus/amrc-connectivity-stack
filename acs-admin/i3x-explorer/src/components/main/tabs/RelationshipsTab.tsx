@@ -255,8 +255,11 @@ export function RelationshipsTab({ object }: { object: ObjectInstance }) {
       {/* The Fusion-style split: browser tree (left) beside the canvas (right).
           Fills the card's height (grows/shrinks with the window); a min-height on
           the panel and a min-width on the map keep it from collapsing. */}
-      <div className="flex flex-1 min-h-0 flex-col lg:flex-row gap-4">
-        <div className="h-[20rem] lg:h-auto lg:w-[340px] lg:flex-shrink-0 min-h-0">
+      {/* ACS: side by side only on a wide screen. Beside the 340px list the
+          map got too narrow for the labels round its rings, so below 2xl the
+          map sits above the list at full width. */}
+      <div className="flex flex-1 min-h-0 flex-col-reverse 2xl:flex-row gap-4">
+        <div className="h-[16rem] 2xl:h-auto 2xl:w-[340px] 2xl:flex-shrink-0 min-h-0">
           <RelationshipList
             tree={tree}
             isLoading={isLoading}
@@ -270,7 +273,7 @@ export function RelationshipsTab({ object }: { object: ObjectInstance }) {
           />
         </div>
 
-        <div className="h-[26rem] lg:h-auto flex-1 min-w-0 lg:min-w-[20rem] min-h-0">
+        <div className="h-[24rem] 2xl:h-auto flex-1 min-w-0 2xl:min-w-[20rem] min-h-0">
           <RelationshipGraph
             root={root}
             graph={graph}

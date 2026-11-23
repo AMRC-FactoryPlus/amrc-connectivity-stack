@@ -27,14 +27,18 @@ const INDENT = 16
  */
 export function ChildValues({ parentId }: { parentId: string }) {
   return (
-    <div role="table" aria-label="Current values" className="border border-i3x-border rounded-lg overflow-hidden text-[13px]">
-      <div role="row" className="grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_auto_auto] gap-3 px-3 py-1.5 bg-i3x-bg text-[11px] font-medium text-i3x-text-muted">
-        <span role="columnheader">Name</span>
-        <span role="columnheader">Value</span>
-        <span role="columnheader">Quality</span>
-        <span role="columnheader" className="w-[5.5rem]">Time</span>
+    // ACS: the columns keep a readable minimum width and the table scrolls
+    // sideways in a narrow pane, rather than wrapping names a letter a line.
+    <div className="border border-i3x-border rounded-lg overflow-x-auto">
+      <div role="table" aria-label="Current values" className="min-w-[26rem] text-[13px]">
+        <div role="row" className="grid grid-cols-[minmax(9rem,2fr)_minmax(6rem,2fr)_auto_auto] gap-3 px-3 py-1.5 bg-i3x-bg text-[11px] font-medium text-i3x-text-muted">
+          <span role="columnheader">Name</span>
+          <span role="columnheader">Value</span>
+          <span role="columnheader">Quality</span>
+          <span role="columnheader" className="w-[5.5rem]">Time</span>
+        </div>
+        <ChildLevel parentId={parentId} depth={0} />
       </div>
-      <ChildLevel parentId={parentId} depth={0} />
     </div>
   )
 }
@@ -116,7 +120,7 @@ function ChildRow({
     <>
       <div
         role="row"
-        className="grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_auto_auto] items-baseline gap-3 px-3 py-1.5 border-t border-i3x-border hover:bg-i3x-bg"
+        className="grid grid-cols-[minmax(9rem,2fr)_minmax(6rem,2fr)_auto_auto] items-baseline gap-3 px-3 py-1.5 border-t border-i3x-border hover:bg-i3x-bg"
       >
         <div role="cell" className="flex items-baseline gap-1.5 min-w-0" style={{ paddingLeft: depth * INDENT }}>
           {container ? (

@@ -3,6 +3,7 @@ import { useExplorerStore, schemaPathTo } from '../../stores/explorer'
 import { getClient } from '../../api/client'
 import { isScalarSchemaType } from '../tree/treeData'
 import { ensureAllObjectsLoaded, loadHierarchicalRoots } from '../../services/catalog'
+import { matchesQuery, matchRank } from '../../acs/searchMatch' // ACS
 import { SearchIcon, CloseIcon, CubeIcon, ActivityIcon } from '../common/icons'
 import { Spinner } from '../common/Spinner'
 import type { ObjectInstance } from '../../api/types'
@@ -80,7 +81,6 @@ export function SearchModal({ onClose, initialQuery = '' }: SearchModalProps) {
         roots = await loadHierarchicalRoots(client)
       }
 
-      const lower = searchQuery.toLowerCase()
       const rootIds = new Set(roots.map(r => r.elementId))
       // Read fresh: a first-run fetch above rebuilt the store's index.
       const objectIndex = useExplorerStore.getState().objectIndex
@@ -90,7 +90,8 @@ export function SearchModal({ onClose, initialQuery = '' }: SearchModalProps) {
       const searchResults: SearchResult[] = []
       for (const obj of objects) {
         const name = obj.displayName
-        if (!(name && name.toLowerCase().includes(lower)) && !obj.elementId.toLowerCase().includes(lower)) {
+        // ACS: words in any order, ignoring case and punctuation.
+        if (!matchesQuery(name, obj.elementId, searchQuery)) {
           continue
         }
         const useHierarchy = rootIds.has(obj.elementId) || !!(obj.parentId && obj.parentId !== '/')
@@ -105,6 +106,8 @@ export function SearchModal({ onClose, initialQuery = '' }: SearchModalProps) {
       // Hierarchy matches first, then alphabetical within each group
       searchResults.sort((a, b) => {
         if (a.useHierarchy !== b.useHierarchy) return a.useHierarchy ? -1 : 1
+        const byRank = matchRank(a.object.displayName, searchQuery) - matchRank(b.object.displayName, searchQuery) // ACS
+        if (byRank !== 0) return byRank
         const aLabel = a.object.displayName || a.object.elementId
         const bLabel = b.object.displayName || b.object.elementId
         return aLabel.localeCompare(bLabel)

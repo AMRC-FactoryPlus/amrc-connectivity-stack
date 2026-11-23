@@ -13,8 +13,8 @@
 
     <div class="flex flex-col gap-1.5">
       <label class="text-sm font-medium leading-none">Unit</label>
-      <Input :model-value="text('Eng_Unit')" :disabled="readonly"
-          placeholder="e.g. mm/min"
+      <EngUnitPicker :model-value="text('Eng_Unit')" :disabled="readonly"
+          placeholder="Choose a unit, e.g. mm/min"
           @update:model-value="v => set('Eng_Unit', v)"/>
     </div>
 
@@ -67,11 +67,12 @@ import { Input } from '@components/ui/input'
 import { Switch } from '@components/ui/switch'
 
 import TypeSelector from './TypeSelector.vue'
+import EngUnitPicker from '@components/Units/EngUnitPicker.vue'
 
 export default {
   name: 'MetricPanel',
 
-  components: { Input, Switch, TypeSelector },
+  components: { EngUnitPicker, Input, Switch, TypeSelector },
 
   props: {
     node: { type: Object, required: true },

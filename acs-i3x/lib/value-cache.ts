@@ -140,7 +140,7 @@ interface ObjectTreeLike {
         schemaUuidPath: string[],
         metricSegments: string[],
         isa95Segments?: string[],
-        uns?: { deviceSegment?: string; type?: string },
+        uns?: { deviceSegment?: string; type?: string; unit?: string },
     ): string | null;
     getObject(elementId: string): { elementId: string; isComposition: boolean; parentId?: string | null } | undefined;
     getChildElementIds(elementId: string): string[];
@@ -636,9 +636,9 @@ export class ValueCache {
         // Also passes ISA-95 segments so the tree can create hierarchy above the device.
         // Returns the leaf elementId, or null if the device is not in
         // the tree: then nothing can find the value, so drop it.
-        // The device segment and Type let the tree give a leaf it
-        // creates MetricMeta, and History find the device's series in
-        // the UNS historian's bucket.
+        // The device segment, Type and Unit let the tree give a leaf
+        // it creates MetricMeta, and History find the device's series
+        // in the UNS historian's bucket.
         const leafId = this.objectTree.addCompositionFromUns(
             instanceUuidPath,
             schemaUuidPath,
@@ -647,6 +647,7 @@ export class ValueCache {
             {
                 deviceSegment: parts[deviceIdIdx],
                 type: typeof userProps.Type === "string" ? userProps.Type : undefined,
+                unit: typeof userProps.Unit === "string" ? userProps.Unit : undefined,
             },
         );
         if (leafId === null) return;

@@ -1,6 +1,7 @@
 import type { I3XClient } from '../../api/client'
 import { bulkRejection, compositionDepth } from '../../api/normalize'
 import type { LastKnownValue } from '../../api/types'
+import { registerComponents } from '../../acs/componentRegistration' // ACS
 
 export const COMPONENT_LOOKUP_ATTEMPTS = 3
 
@@ -50,8 +51,9 @@ export async function registerItem(
     const reason = lastError instanceof Error ? lastError.message : String(lastError)
     throw new Error(`Could not read the components of ${object.elementId}, so it was not subscribed: ${reason}`)
   }
-  return {
-    maxDepth,
-    components: Object.keys(composed.components ?? {}).filter(id => id !== object.elementId),
-  }
+  const components = Object.keys(composed.components ?? {}).filter(id => id !== object.elementId)
+  // ACS: register each component on its own too, for servers that deliver only the exact element
+  // registered (src/acs/componentRegistration.ts). Best effort; the composition stays registered.
+  await registerComponents(client, subscriptionId, components)
+  return { maxDepth, components }
 }

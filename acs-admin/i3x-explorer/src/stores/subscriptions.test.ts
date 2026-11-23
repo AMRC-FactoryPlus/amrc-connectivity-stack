@@ -4,6 +4,7 @@ import {
   groupByDepth,
   isLiveFeed,
   liveSupersedes,
+  trendPointsOf,
   useSubscriptionsStore,
 } from './subscriptions'
 
@@ -67,7 +68,7 @@ describe('subscriptions store live values', () => {
 
     const state = useSubscriptionsStore.getState()
     expect(state.liveValues.get('pump-1')).toMatchObject({ repeatCount: 2, freshAt: 1_000, receivedAt: 5_000 })
-    expect(state.trendData.get('pump-1')).toHaveLength(1)
+    expect(trendPointsOf(state, 'pump-1')).toHaveLength(1)
   })
 
   it('treats the same value with a newer source time as fresh, not a repeat', () => {
@@ -95,7 +96,7 @@ describe('subscriptions store live values', () => {
 
   it('keeps a non-numeric string like "1A0" off the trend', () => {
     useSubscriptionsStore.getState().updateLiveValue(update('1A0'))
-    expect(useSubscriptionsStore.getState().trendData.get('pump-1')).toBeUndefined()
+    expect(trendPointsOf(useSubscriptionsStore.getState(), 'pump-1')).toBeUndefined()
   })
 
   it('removing an item drops it, its components and their values, except what another item still delivers', () => {
@@ -127,7 +128,7 @@ describe('subscriptions store live values', () => {
     expect(listener).toHaveBeenCalledTimes(1)
     const state = useSubscriptionsStore.getState()
     expect(state.liveValues.get('pump-1')).toMatchObject({ value: 2, updateCount: 2 })
-    expect(state.trendData.get('pump-1')?.map(point => point.value)).toEqual([1, 2])
+    expect(trendPointsOf(state, 'pump-1')?.map(point => point.value)).toEqual([1, 2])
   })
 
   it('tracks stopped items, and admits deliveries only for what the subscription still collects', () => {
@@ -176,7 +177,7 @@ describe('subscriptions store live values', () => {
 
     const live = useSubscriptionsStore.getState().liveValues.get('pump-1')
     expect(live).toMatchObject({ value: 10, timestamp: '2026-10-12T12:00:10Z', updateCount: 2 })
-    expect(useSubscriptionsStore.getState().trendData.get('pump-1')?.map(p => p.value)).toEqual([10])
+    expect(trendPointsOf(useSubscriptionsStore.getState(), 'pump-1')?.map(p => p.value)).toEqual([10])
 
     updateLiveValues([{ ...update(7), timestamp: null }])
     expect(useSubscriptionsStore.getState().liveValues.get('pump-1')?.value).toBe(7)

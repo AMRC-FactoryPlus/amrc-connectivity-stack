@@ -269,6 +269,8 @@ export function SubscriptionsView() {
                   index={virtualItem.index}
                   elementId={row.elementId}
                   path={pathOf(row.elementId)}
+                  // ACS: a component is named by its path below its composition.
+                  rootPath={row.isComponent ? pathOf(row.rootId) : undefined}
                   nameLoading={!catalogLoaded}
                   canOpen={objectIndex.has(row.elementId)}
                   isCurrent={row.elementId === selectedElementId}
@@ -284,6 +286,7 @@ export function SubscriptionsView() {
                         onStart: onStartItem,
                         onDelete: onDeleteItem,
                         componentCount,
+                        componentIds: active.components?.[row.rootId],
                         componentsOpen: !foldedRoots.has(row.rootId),
                         onToggleComponents: toggleComponents,
                       })}
@@ -315,7 +318,7 @@ function TransportStatus({ subscription, polling }: { subscription: Subscription
     delivered.reduce((latest, elementId) => Math.max(latest, state.liveValues.get(elementId)?.receivedAt ?? 0), 0)
   )
   return (
-    <span className="flex items-center gap-1.5 text-xs text-i3x-text-muted">
+    <span className="flex items-center gap-1.5 text-xs text-i3x-text-muted tabular-nums">
       {!subscription.isStreaming ? (
         <>
           <span aria-hidden="true" className="w-2 h-2 rounded-full border border-i3x-text-muted" />

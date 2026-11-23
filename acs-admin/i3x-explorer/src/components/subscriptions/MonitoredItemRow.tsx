@@ -12,6 +12,9 @@ import { Sparkline } from './Sparkline'
 import { TrendView } from './TrendView'
 import { CopyButton } from '../details/CopyButton' // ACS
 import { PATH_SEPARATOR } from '../main/navigation' // ACS
+import { rowLabel } from '../../acs/rowLabel' // ACS
+import { formatHeld } from '../../acs/heldDecimals' // ACS
+import { ComponentTrends, trendGridClass } from '../../acs/ComponentTrends' // ACS
 import { ChangeHint, ChangeList } from './ValueChanges'
 
 export const MONITORED_ROW_COLUMNS = 6
@@ -24,6 +27,8 @@ interface MonitoredItemRowProps {
   elementId: string
   /** ACS: display names from the top of the hierarchy down to this element; undefined while unknown. */
   path: string[] | undefined
+  /** ACS: a component's composition's path; the row then shows its path below that composition. */
+  rootPath?: string[]
   /** ACS: the catalog is still loading, so an unknown path may yet arrive. */
   nameLoading?: boolean
   /** ACS: the element is in the catalog, so its name opens it. */
@@ -42,6 +47,8 @@ interface MonitoredItemRowProps {
   onDelete?: ItemAction
   /** A composition root's component count and fold state. */
   componentCount?: number
+  /** ACS: a composition root's components; opening its row shows their trends side by side. */
+  componentIds?: readonly string[]
   componentsOpen?: boolean
   onToggleComponents?: (elementId: string) => void
 }
@@ -57,6 +64,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   index,
   elementId,
   path,
+  rootPath,
   nameLoading = false,
   canOpen = true,
   isCurrent,
@@ -69,6 +77,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   onStart,
   onDelete,
   componentCount = 0,
+  componentIds,
   componentsOpen = false,
   onToggleComponents,
 }: MonitoredItemRowProps, ref) {
@@ -76,7 +85,10 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   const value = liveValue?.value
   const structured = useMemo(() => asStructured(value), [value])
   const numeric = liveValue && structured === undefined ? toFiniteNumber(value) : undefined
-  const expandable = structured !== undefined || numeric !== undefined
+  const ownDetail = structured !== undefined || numeric !== undefined
+  // ACS: a composition opens to its components' trends even before, or without, a value of its own.
+  const hasComponentTrends = (componentIds?.length ?? 0) > 0
+  const expandable = ownDetail || hasComponentTrends
   const rowTone = isCurrent ? 'bg-i3x-primary/5' : isComponent ? 'bg-i3x-bg/40' : ''
   const dim = stopped ? 'opacity-60' : ''
 
@@ -87,6 +99,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           <ElementName
             elementId={elementId}
             path={path}
+            rootPath={rootPath}
             nameLoading={nameLoading}
             canOpen={canOpen}
             isCurrent={isCurrent}
@@ -105,29 +118,41 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           )}
         </td>
         <td className={`px-3 py-2.5 ${dim}`}>
-          {!liveValue ? (
+          {!liveValue && !hasComponentTrends ? (
             <span className="text-xs text-i3x-text-muted">{stopped ? '-' : 'Waiting…'}</span>
           ) : expandable ? (
             <button
               type="button"
               onClick={() => onToggle(elementId)}
               aria-expanded={open}
-              title={open ? 'Hide details' : numeric !== undefined ? 'Show trend' : 'Show value'}
+              title={
+                open
+                  ? 'Hide details'
+                  : hasComponentTrends
+                  ? 'Show the trends of its components'
+                  : numeric !== undefined
+                  ? 'Show trend'
+                  : 'Show value'
+              }
               className="flex items-center gap-2 max-w-[22rem] min-w-0 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
             >
               <Chevron open={open} />
-              {structured !== undefined ? (
+              {!liveValue ? (
+                <span className="text-xs text-i3x-text-muted">Component trends</span>
+              ) : structured !== undefined ? (
                 <StructuredSummary liveValue={liveValue} summary={describeStructure(structured)} />
-              ) : (
+              ) : numeric !== undefined ? (
                 <>
-                  <ScalarValue liveValue={liveValue} />
+                  <ScalarValue liveValue={liveValue} numeric />
                   <Sparkline elementId={elementId} />
                 </>
+              ) : (
+                <ScalarValue liveValue={liveValue} />
               )}
             </button>
           ) : (
             <span className="flex items-baseline gap-2 min-w-0 max-w-[18rem]">
-              <ScalarValue liveValue={liveValue} />
+              {liveValue && <ScalarValue liveValue={liveValue} />}
             </span>
           )}
         </td>
@@ -138,10 +163,10 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
             <span className="text-i3x-text-muted">-</span>
           )}
         </td>
-        <td className={`px-3 py-2.5 font-mono text-i3x-text-muted whitespace-nowrap ${dim}`}>
+        <td className={`px-3 py-2.5 font-mono tabular-nums text-i3x-text-muted whitespace-nowrap ${dim}`}>
           {liveValue?.timestamp ? new Date(liveValue.timestamp).toLocaleTimeString() : '-'}
         </td>
-        <td className="px-3 py-2.5 text-i3x-text-muted whitespace-nowrap">
+        <td className="px-3 py-2.5 text-i3x-text-muted whitespace-nowrap tabular-nums">
           {stopped ? (
             <span className="flex items-center gap-1.5" title="Not monitored on the server; the last value received is kept">
               <span aria-hidden="true" className="w-2 h-2 rounded-full border border-i3x-text-muted" />
@@ -164,22 +189,27 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           )}
         </td>
       </tr>
-      {open && liveValue && expandable && (
+      {open && expandable && (
         <tr className={`border-b border-i3x-border/60 ${rowTone}`}>
           <td colSpan={MONITORED_ROW_COLUMNS} className={`pb-3 pr-3 ${isComponent ? 'pl-8' : 'pl-3'}`}>
-            {liveValue.changes.length > 0 && (
+            {liveValue && liveValue.changes.length > 0 && (
               <p className="mb-1 text-[11px] text-i3x-text-muted">
                 Last change <TimeAgo at={liveValue.changedAt} />
               </p>
             )}
-            {structured !== undefined ? (
+            {/* ACS: a composition's component trends, side by side. */}
+            {hasComponentTrends && componentIds && <ComponentTrends rootId={elementId} componentIds={componentIds} />}
+            {liveValue && structured !== undefined ? (
               <>
                 <ChangeList changes={liveValue.changes} truncated={liveValue.changes.length >= MAX_CHANGED_PATHS} />
                 <JsonViewer data={structured} initialExpanded={true} />
               </>
-            ) : (
-              <TrendView elementId={elementId} />
-            )}
+            ) : liveValue && numeric !== undefined ? (
+              // ACS: one graph alone spans the full width of the panel.
+              <div className={trendGridClass(1)}>
+                <TrendView elementId={elementId} />
+              </div>
+            ) : null}
           </td>
         </tr>
       )}
@@ -265,13 +295,15 @@ function ItemActions({
 }
 
 /**
- * ACS: the element's full path, e.g. "Site / Line 1 / Spindle speed", with the
- * element's own name always in view. A long path loses its top levels first. The element id is
- * in the tooltip and behind a copy button rather than on a line of its own.
+ * ACS: the element's path, e.g. "Site / Line 1 / Spindle speed". A component under an expanded
+ * composition shows only its path below that composition, usually just its name. The element's
+ * own name is never cut short: when space runs out only the leading names are trimmed, from the
+ * left. The full path and the element id are in the tooltip, and the id is behind a copy button.
  */
 function ElementName({
   elementId,
   path,
+  rootPath,
   nameLoading,
   canOpen,
   isCurrent,
@@ -279,6 +311,7 @@ function ElementName({
 }: {
   elementId: string
   path: string[] | undefined
+  rootPath: string[] | undefined
   nameLoading: boolean
   canOpen: boolean
   isCurrent: boolean
@@ -303,32 +336,29 @@ function ElementName({
     )
   }
 
-  const name = path[path.length - 1]
-  const ancestors = path.slice(0, -1)
-  const fullPath = path.join(PATH_SEPARATOR)
+  const { lead, leaf, full } = rowLabel(path, rootPath)
   const label = (
     <>
-      {ancestors.length > 0 && (
-        // Right-to-left so an ellipsis eats the top of the path; <bdi> keeps the names in reading order.
-        // It gives up its width long before the element's own name does.
-        <span dir="rtl" className="truncate min-w-[1.5em] shrink-[1000] text-left text-i3x-text-muted">
-          <bdi>{ancestors.join(PATH_SEPARATOR)}</bdi>
+      {lead && (
+        // Right-to-left so an ellipsis eats the start of the path; <bdi> keeps the names in reading order.
+        <span data-label-lead="" dir="rtl" className="truncate min-w-[1.5em] max-w-[20rem] text-left text-i3x-text-muted">
+          <bdi>{lead}</bdi>
         </span>
       )}
-      {ancestors.length > 0 && <span aria-hidden="true" className="flex-shrink-0 whitespace-pre text-i3x-text-muted">{PATH_SEPARATOR}</span>}
-      <span className="truncate min-w-0">{name}</span>
+      {lead && <span aria-hidden="true" className="flex-shrink-0 whitespace-pre text-i3x-text-muted">{PATH_SEPARATOR}</span>}
+      <span data-label-leaf="" className="flex-shrink-0 whitespace-nowrap">{leaf}</span>
     </>
   )
-  const tooltip = `${fullPath}\n${elementId}`
+  const tooltip = `${full}\n${elementId}`
 
   return (
-    <span className="group flex items-center gap-1 min-w-0 max-w-[28rem]">
+    <span className="group flex items-center gap-1 min-w-0">
       {canOpen ? (
         <button
           type="button"
           onClick={() => onOpen(elementId)}
           title={`Open ${tooltip}`}
-          aria-label={`Open ${fullPath}`}
+          aria-label={`Open ${full}`}
           className={`flex min-w-0 text-left rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
             isCurrent ? 'text-i3x-primary font-medium' : 'text-i3x-text hover:text-i3x-primary'
           }`}
@@ -346,18 +376,31 @@ function ElementName({
 }
 
 /** The value, flashing when it changes, with what it changed from. */
-function ScalarValue({ liveValue }: { liveValue: LiveValue }) {
+function ScalarValue({ liveValue, numeric = false }: { liveValue: LiveValue; numeric?: boolean }) {
+  // ACS: a number keeps its width: held decimal places, tabular digits and, for a numeric metric,
+  // right-aligned slots of a set minimum width for the value and its delta, so the sparkline after
+  // them stays put while the value changes.
   return (
     <>
       {/* Re-keyed on each change, so the flash replays only when the value moves. */}
       <code
         key={liveValue.changedAt}
-        className="value-updated truncate rounded px-1 -mx-1 font-mono text-i3x-text"
+        className={`value-updated truncate rounded px-1 -mx-1 font-mono tabular-nums text-i3x-text ${
+          numeric ? 'flex-shrink-0 min-w-[12ch] text-right' : ''
+        }`}
         title={formatComponentValue(liveValue.value)}
       >
-        {formatComponentValueShort(liveValue.value)}
+        {formatHeld(liveValue.value, liveValue.decimals, formatComponentValueShort)}
       </code>
-      {liveValue.changes[0] && <ChangeHint change={liveValue.changes[0]} />}
+      {liveValue.changes[0] ? (
+        <ChangeHint
+          change={liveValue.changes[0]}
+          decimals={liveValue.decimals}
+          className={numeric ? 'flex-shrink-0 min-w-[11ch] text-right' : ''}
+        />
+      ) : (
+        numeric && <span aria-hidden="true" className="flex-shrink-0 min-w-[11ch]" />
+      )}
     </>
   )
 }

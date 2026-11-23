@@ -190,6 +190,113 @@ upstream, so they are not tied to the Manager UI.
      Subscribe as outline buttons (`useHostActions` in `src/acs/host.ts`).
      Without a host there are none.
 
+13. **The subscriptions list** (`SubscriptionsView.tsx`,
+    `MonitoredItemRow.tsx`, `src/acs/rowLabel.ts`): a component listed
+    under an expanded composition is named by its path below that
+    composition, usually only its own name ("Spindle speed", or
+    "Axis X / Position" when nested), because the composition's row
+    above it already says where it is. A monitored item still shows its
+    full path. The element's own name is never cut short: when a row is
+    too narrow only the leading names are trimmed, from the left. The
+    full path and the element id stay in the tooltip, and the id behind
+    the copy button. Tests in `src/acs/rowLabel.test.ts` and
+    `SubscriptionsView.test.tsx`.
+
+14. **Trends** (`src/stores/subscriptions.ts`, `TrendView.tsx`,
+    `Sparkline.tsx`, `SubscriptionsDrawer.tsx`, `src/acs/trendBuffer.ts`,
+    `src/acs/TrendWindowControl.tsx`): a trend keeps every reading since
+    subscribing, not the last 60, so a feed of 100 updates a second no
+    longer shows one racing second. Each element keeps up to an hour or
+    50,000 readings, whichever comes first, dropping the oldest, in two
+    parallel `Float64Array`s used as a ring (`TrendBuffer`). A reading is
+    still plotted at its source time, or its arrival time without one.
+    The graph's time axis runs from the first reading to now by default
+    ("All"), so the line squashes as time goes on rather than scrolling.
+    "Now" is the newest reading's source time plus how long ago it
+    arrived, so a server clock that is off doesn't push the line out of
+    view. The panel header chooses the window for every graph in it:
+    All, 30 s, 1 min, 5 min, 15 min, 1 h, or the last N readings, kept
+    for the browser session (`sessionStorage`). Before drawing, the
+    readings in view are reduced to the lowest and highest in each pixel
+    column (`downsampleMinMax`), and the graph is as wide as its panel.
+    A graph redraws when its own trend changes, which the frame batcher
+    limits to once a frame, and once a second to move the axis on. The
+    row's sparkline stays the last 60 readings. Tests in
+    `src/acs/trendBuffer.test.ts`, `frameBatcher.test.ts` and
+    `subscriptions.test.ts`.
+
+15. **Graphs in the subscriptions list** (`MonitoredItemRow.tsx`,
+    `SubscriptionsView.tsx`, `TrendView.tsx`, `src/acs/ComponentTrends.tsx`):
+    a row opened to its trend draws the graph across the full width of
+    the panel, not at a fixed 400px. A composition's row now opens even
+    without a value of its own, and shows a graph for each of its
+    components that has numeric readings, side by side: as many columns
+    of at least 28rem as fit, wrapping onto more rows, and one graph
+    alone at full width (`trendGridClass`). Up to 24 are drawn there,
+    and the rest are reached through their own rows. Its own value, if
+    it has one, follows as before. Tests in
+    `src/acs/componentTrends.test.ts` and `SubscriptionsView.test.tsx`.
+
+16. **Live values that keep still** (`MonitoredItemRow.tsx`,
+    `ValueChanges.tsx`, `SubscriptionsView.tsx`, `src/stores/subscriptions.ts`,
+    `src/acs/heldDecimals.ts`): a value updating 100 times a second
+    changed width with every reading, so its delta and sparkline moved
+    sideways. Each element now holds the most decimal places it has
+    shown since it was subscribed, up to six, and pads with trailing
+    zeros (`LiveValue.decimals`), so 1.5 shows as 1.50000 once 1.54571
+    has been seen. Integers stay integers, and strings and booleans are
+    shown as they come. A delta uses the same places. A numeric metric's
+    value and delta sit in right-aligned slots of a set minimum width, so
+    the sparkline starts at the same place, and values, deltas, times
+    and counters use tabular digits. Tests in
+    `src/acs/heldDecimals.test.ts`.
+
+17. **Compositions on servers that deliver only the exact element**
+    (`registerItem.ts`, `recovery.ts`, `SubscriptionTransport.tsx`,
+    `src/stores/subscriptions.ts`, `src/acs/componentRegistration.ts`):
+    a composition is subscribed by registering it with `maxDepth: 0`,
+    and the i3X 1.0 Implementation Guide (Subscribe Methods, `POST
+    /subscriptions/register`) has the server collect its components'
+    changes too. Some servers in use deliver an update only to the exact
+    element registered, so a device subscribed that way showed nothing
+    while its metrics changed. The app now also registers each component
+    on the same subscription with `maxDepth: 1`, in requests of 500,
+    after the composition, whose own registration stays. The guide has a
+    server accept and ignore a repeated registration, so a server that
+    already delivers the components is unaffected. It is best effort: a
+    refusal is logged and the composition stays subscribed. Stopping or
+    deleting a composition unregisters only the components it added that
+    nothing else still needs, so not an item subscribed on its own or a
+    component of another running composition, and stopping or deleting
+    such an item leaves it registered for that composition. Starting a
+    composition again and recovering an expired subscription register
+    its components again. An update delivered twice in one batch, with
+    the same element, source time and value, is recorded once, so its
+    trend and update count don't double. Requests are unchanged in shape.
+    Tests in `src/acs/componentRegistration.test.ts`,
+    `registerItem.test.ts`, `recovery.test.ts`,
+    `SubscriptionTransport.test.tsx` and `frameBatcher.test.ts`.
+
+18. **Popping the subscriptions panel out** (`SubscriptionsDrawer.tsx`,
+    `src/components/layout/StatusBar.tsx`, `src/stores/frameBatcher.ts`,
+    `src/acs/subscriptionsPopout.ts`): a button in the panel's header
+    opens the panel in its own browser window, to keep live values on
+    another screen. The frame opens an empty same-origin window
+    (`window.open('', …)`) and renders the panel into it with a React
+    portal, so it is the same React tree with the same stores and the
+    same subscription transport: there is no second connection or
+    stream. The window gets copies of the frame's stylesheets and follows
+    its theme. While it is out, the drawer is hidden and the status bar
+    says "popped out"; clicking that brings the window to the front, and
+    its Dock button, the window's own Dock button, or closing the window
+    puts the panel back, with keyboard focus on the pop-out button. The
+    window closes when the frame goes away. A blocked window leaves the
+    panel docked with a short note saying so. Live updates are timed by
+    the window's animation frames while it is out, as those keep coming
+    when the Explorer's tab is in the background. The choice is kept in
+    memory, so it lasts for the visit and a reload starts docked. Tests
+    in `src/acs/subscriptionsPopout.test.tsx`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

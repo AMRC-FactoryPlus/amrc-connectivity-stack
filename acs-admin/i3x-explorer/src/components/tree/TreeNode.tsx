@@ -5,7 +5,6 @@ import { Chevron } from '../common/Chevron'
 import { Spinner } from '../common/Spinner'
 import {
   LayersIcon,
-  GridIcon,
   HierarchyIcon,
   GlobeIcon,
   FileTextIcon,
@@ -20,7 +19,6 @@ import {
 import {
   activateRow,
   isScalarSchemaType,
-  OBJECTS_FOLDER_ID,
   HIERARCHICAL_FOLDER_ID,
 } from './treeData'
 import type { NodeRow, MoreRow } from './treeData'
@@ -29,7 +27,7 @@ const ICON_SIZE = 15
 
 /**
  * The icon for one tree row. All SVG (see common/icons.tsx): shape carries the
- * entity kind, color reinforces it. The three root folders get distinct shapes
+ * entity kind, color reinforces it. The root folders get distinct shapes
  * so the top level reads at a glance; object instances bucket into folder /
  * variable / object off the same signals the old emoji buckets used
  * (FolderType, then schema.type scalar = leaf variable, else branch object).
@@ -40,7 +38,6 @@ export function TreeRowIcon({ row }: { row: NodeRow }) {
   if (loading) return <Spinner size={ICON_SIZE} className="text-i3x-primary" />
   switch (row.nodeType) {
     case 'folder':
-      if (row.id === OBJECTS_FOLDER_ID) return <GridIcon size={ICON_SIZE} className="text-i3x-text-muted" />
       if (row.id === HIERARCHICAL_FOLDER_ID) return <HierarchyIcon size={ICON_SIZE} className="text-i3x-text-muted" />
       return <LayersIcon size={ICON_SIZE} className="text-i3x-text-muted" />
     case 'namespace':

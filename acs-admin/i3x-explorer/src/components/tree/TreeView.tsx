@@ -7,11 +7,12 @@ import type { ObjectInstance, RelationshipType } from '../../api/types'
 import { TreeNode, TreeMoreNode, TreeRowIcon, IndentGuides } from './TreeNode'
 import { buildTreeMenu } from './treeMenu'
 import { Chevron } from '../common/Chevron'
-import { CubeIcon, LinkIcon } from '../common/icons'
 import { ContextMenu, type MenuEntry } from '../common/ContextMenu'
+import { SearchIcon } from '../common/icons'
+import { useSearchDialog } from '../../acs/searchDialog' // ACS
 import { NumberPromptDialog } from '../common/NumberPromptDialog'
 import { useElementNavigation } from '../main/navigation'
-import { loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
+import { ensureAllObjectsLoaded, loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
 import { traceSpan } from '../../diagnostics/perfTrace'
 import {
   buildTreeRows,
@@ -22,7 +23,6 @@ import {
   loadRelationshipInstances,
   ESTIMATED_ROW_HEIGHT,
   NAMESPACES_FOLDER_ID,
-  OBJECTS_FOLDER_ID,
   HIERARCHICAL_FOLDER_ID,
   type TreeRow,
   type NodeRow,
@@ -55,7 +55,7 @@ function findTypeAhead(rows: TreeRow[], from: number, buffer: string): number {
 }
 
 /**
- * The sidebar tree. The ENTIRE tree, Namespaces, Objects, Hierarchy, is one
+ * The sidebar tree. The ENTIRE tree, Hierarchy and Schemas, is one
  * flattened row array (buildTreeRows) windowed by a single virtualizer, so the
  * DOM holds only the rows near the viewport no matter how many are visible.
  * Huge child lists are additionally paged with "Show more" rows (see
@@ -87,15 +87,28 @@ export function TreeView() {
   const manualRefreshTick = useExplorerStore(s => s.manualRefreshTick)
   const selectedId = useExplorerStore(s => s.selectedItem?.id ?? null)
   const showRelationshipsInTree = useExplorerStore(s => s.showRelationshipsInTree)
-  const toggleShowRelationshipsInTree = useExplorerStore(s => s.toggleShowRelationshipsInTree)
   const showComponentsInTree = useExplorerStore(s => s.showComponentsInTree)
-  const toggleShowComponentsInTree = useExplorerStore(s => s.toggleShowComponentsInTree)
   const relatedObjects = useExplorerStore(s => s.relatedObjects)
   const hierarchyComponents = useExplorerStore(s => s.hierarchyComponents)
   const relationshipInstances = useExplorerStore(s => s.relationshipInstances)
   const compositionErrors = useExplorerStore(s => s.compositionErrors)
   const relationshipErrors = useExplorerStore(s => s.relationshipErrors)
   const isConnected = useConnectionStore(state => state.isConnected)
+
+  // ACS: Hierarchy starts open, so load what opening it would have loaded
+  // (the catalog and the root objects) once the connection is up.
+  useEffect(() => {
+    if (!isConnected) return
+    if (!useExplorerStore.getState().expandedNodes.has(HIERARCHICAL_FOLDER_ID)) return
+    const client = getClient()
+    if (!client) return
+    void (async () => {
+      try { await ensureAllObjectsLoaded(client) }
+      catch (err) { console.error('Failed to load all objects:', err) }
+      try { await loadHierarchicalRoots(client) }
+      catch (err) { console.error('Failed to load root objects:', err) }
+    })()
+  }, [isConnected])
 
   // The input tracks searchQuery directly; the expensive rebuild follows the
   // deferred value, so typing never blocks on filtering a 58k-object catalog.
@@ -152,8 +165,8 @@ export function TreeView() {
   const [rowHeight, setRowHeight] = useState(ESTIMATED_ROW_HEIGHT)
   const rowHeightRef = useRef(ESTIMATED_ROW_HEIGHT)
 
-  // A new key function makes the virtualizer re-measure every row (all 223k with
-  // the Objects folder open), so it changes only when the rows do.
+  // A new key function makes the virtualizer re-measure every row (all of a
+  // large catalog's rows when it is expanded), so it changes only when the rows do.
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -511,8 +524,7 @@ export function TreeView() {
       else if (nodeId.startsWith('reltype:')) {
         const relationship = relationshipTypes.find(r => r.elementId === nodeId.slice('reltype:'.length))
         if (relationship) relationships.push(relationship)
-      } else if (nodeId === OBJECTS_FOLDER_ID) refreshCatalog = true
-      else if (nodeId === HIERARCHICAL_FOLDER_ID) {
+      } else if (nodeId === HIERARCHICAL_FOLDER_ID) {
         refreshCatalog = true
         refreshRoots = true
       }
@@ -601,17 +613,21 @@ export function TreeView() {
     refreshTree()
   }, [manualRefreshTick, isConnected, refreshTree])
 
-  // Auto-expand the three root folders whenever a search query is active so
+  // Auto-expand the root folders whenever a search query is active so
   // matches are visible without the user having to click each folder open.
   useEffect(() => {
     if (!searchQuery.trim()) return
     const { expandNode } = useExplorerStore.getState()
     expandNode(NAMESPACES_FOLDER_ID)
-    expandNode(OBJECTS_FOLDER_ID)
     expandNode(HIERARCHICAL_FOLDER_ID)
   }, [searchQuery])
 
   const hasNamespaces = namespaces.length > 0
+  // ACS: the filter only reaches what the tree has loaded; when it finds
+  // nothing there, point to search, which looks through the whole catalog.
+  const openSearch = useSearchDialog(s => s.openSearch)
+  const filterFindsNothing = filterText !== '' && hasNamespaces &&
+    !rows.some(row => row.kind === 'node' && row.depth > 0)
   const firstNodeItem = virtualItems.find(vi => rows[vi.index]?.kind === 'node')
 
   return (
@@ -620,70 +636,40 @@ export function TreeView() {
           gives the tree its full width edge-to-edge; the input carries its own
           side padding while rows bleed to the panel edges. */}
       <div className="shrink-0 bg-i3x-surface px-2 pb-2 mb-1">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Filter tree…"
-          className="w-full px-2 py-1 text-sm bg-i3x-bg border border-i3x-border rounded text-i3x-text placeholder:text-i3x-text-muted focus:outline-none focus:border-i3x-primary"
-        />
-        {/* Toggles whether the Hierarchy folder also draws each object's
-            non-hierarchical relationships (grouped by relationship type,
-            in the relationship accent color) alongside its normal children. */}
-        <button
-          type="button"
-          onClick={toggleShowRelationshipsInTree}
-          aria-pressed={showRelationshipsInTree}
-          title={
-            showRelationshipsInTree
-              ? 'Hide non-hierarchical relationships in the tree'
-              : 'Show non-hierarchical relationships in the tree'
-          }
-          className={`mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
-            showRelationshipsInTree
-              ? 'bg-i3x-relationship/15 text-i3x-relationship'
-              : 'text-i3x-text-muted hover:bg-i3x-text/[0.06] hover:text-i3x-text'
-          }`}
-        >
-          <LinkIcon size={13} />
-          <span className="flex-1 text-left">Graph Relationships</span>
-          <span
-            className={`h-3.5 w-6 flex-shrink-0 rounded-full transition-colors ${
-              showRelationshipsInTree ? 'bg-i3x-relationship' : 'bg-i3x-border'
-            }`}
+        {/* ACS: Search sits beside the filter box (it was in the toolbar),
+            and Enter in the box opens search with the filter text. The
+            Graph Relationships and Component Relationships toggles that
+            were under the box are in the settings menu (Toolbar.tsx). */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              openSearch(searchQuery)
+            }}
+            placeholder="Filter tree…"
+            aria-label="Filter tree"
+            className="flex-1 min-w-0 px-2 py-1 text-sm bg-i3x-bg border border-i3x-border rounded text-i3x-text placeholder:text-i3x-text-muted focus:outline-none focus:border-i3x-primary"
+          />
+          <button
+            type="button"
+            onClick={() => openSearch(searchQuery)}
+            title="Search all objects (Enter in the filter box, or ⌘K)"
+            aria-label="Search objects"
+            className="self-stretch px-2 py-1 text-xs bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none flex items-center gap-1.5 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
           >
-            <span
-              className={`block h-3 w-3 translate-y-px rounded-full bg-i3x-surface transition-transform ${
-                showRelationshipsInTree ? 'translate-x-[11px]' : 'translate-x-px'
-              }`}
-            />
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={toggleShowComponentsInTree}
-          aria-pressed={showComponentsInTree}
-          title={showComponentsInTree ? 'Hide component relationships in the tree' : 'Show component relationships in the tree'}
-          className={`mt-1 flex w-full items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
-            showComponentsInTree
-              ? 'tree-component-active'
-              : 'text-i3x-text-muted hover:bg-i3x-text/[0.06] hover:text-i3x-text'
-          }`}
-        >
-          <CubeIcon size={13} />
-          <span className="flex-1 text-left">Component Relationships</span>
-          <span
-            className={`h-3.5 w-6 flex-shrink-0 rounded-full transition-colors ${
-              showComponentsInTree ? 'tree-component-switch' : 'bg-i3x-border'
-            }`}
-          >
-            <span
-              className={`block h-3 w-3 translate-y-px rounded-full bg-i3x-surface transition-transform ${
-                showComponentsInTree ? 'translate-x-[11px]' : 'translate-x-px'
-              }`}
-            />
-          </span>
-        </button>
+            <SearchIcon size={13} className="text-i3x-text-muted" />
+            <span>Search</span>
+          </button>
+        </div>
+        {filterFindsNothing && (
+          <p role="status" className="mt-1.5 px-1 text-xs text-i3x-text-muted">
+            Nothing in the visible tree. Press Enter to search.
+          </p>
+        )}
       </div>
 
       <div className="relative flex-1 min-h-0">

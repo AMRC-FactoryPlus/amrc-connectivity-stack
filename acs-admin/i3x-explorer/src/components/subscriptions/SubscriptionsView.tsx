@@ -8,6 +8,7 @@ import { MONITORED_ROW_COLUMNS, MonitoredItemRow } from './MonitoredItemRow'
 import { Spinner } from '../common/Spinner'
 import { objectPathSegments, useElementNavigation } from '../main/navigation'
 import type { ObjectInstance } from '../../api/types'
+import { useActiveOnly, visibleRows } from '../../acs/activeOnly' // ACS
 
 const EMPTY: readonly string[] = []
 /** Initial row-height guess; real heights, expanded details included, are measured after mount. */
@@ -84,7 +85,20 @@ export function SubscriptionsView() {
 
   const active = activeId ? subscriptions.get(activeId) : undefined
   const stoppedItems = active?.stoppedItems ?? EMPTY
-  const rows = useMemo<TableRow[]>(() => {
+  // ACS: with "Only show active" on, rows still waiting are hidden. The ids
+  // with values are read as one joined string, so the rows are rebuilt only
+  // when an element first gets a value, not on every update.
+  const activeOnly = useActiveOnly(state => state.activeOnly)
+  const activeKey = useSubscriptionsStore(state => {
+    if (!activeOnly || !active) return ''
+    const ids: string[] = []
+    for (const rootId of active.monitoredItems) {
+      if (state.liveValues.has(rootId)) ids.push(rootId)
+      for (const id of active.components?.[rootId] ?? EMPTY) if (state.liveValues.has(id)) ids.push(id)
+    }
+    return ids.join('\n')
+  })
+  const allRows = useMemo<TableRow[]>(() => {
     if (!active) return []
     return active.monitoredItems.flatMap(rootId => {
       const root: TableRow = { key: rootId, elementId: rootId, rootId, isComponent: false }
@@ -95,6 +109,10 @@ export function SubscriptionsView() {
       return [root, ...components]
     })
   }, [active, foldedRoots])
+  const rows = useMemo<TableRow[]>(() => {
+    const activeIds = new Set(activeKey ? activeKey.split('\n') : [])
+    return visibleRows(allRows, activeOnly, id => activeIds.has(id))
+  }, [allRows, activeOnly, activeKey])
 
   // ACS: rows are named by their full path. Worked out for the rows in view only, and kept while
   // the catalog is unchanged so a row's path keeps its identity and the memoized row doesn't re-render.
@@ -269,6 +287,8 @@ export function SubscriptionsView() {
                   index={virtualItem.index}
                   elementId={row.elementId}
                   path={pathOf(row.elementId)}
+                  // ACS: a component is named by its path below its composition.
+                  rootPath={row.isComponent ? pathOf(row.rootId) : undefined}
                   nameLoading={!catalogLoaded}
                   canOpen={objectIndex.has(row.elementId)}
                   isCurrent={row.elementId === selectedElementId}
@@ -284,6 +304,7 @@ export function SubscriptionsView() {
                         onStart: onStartItem,
                         onDelete: onDeleteItem,
                         componentCount,
+                        componentIds: active.components?.[row.rootId],
                         componentsOpen: !foldedRoots.has(row.rootId),
                         onToggleComponents: toggleComponents,
                       })}
@@ -315,7 +336,7 @@ function TransportStatus({ subscription, polling }: { subscription: Subscription
     delivered.reduce((latest, elementId) => Math.max(latest, state.liveValues.get(elementId)?.receivedAt ?? 0), 0)
   )
   return (
-    <span className="flex items-center gap-1.5 text-xs text-i3x-text-muted">
+    <span className="flex items-center gap-1.5 text-xs text-i3x-text-muted tabular-nums">
       {!subscription.isStreaming ? (
         <>
           <span aria-hidden="true" className="w-2 h-2 rounded-full border border-i3x-text-muted" />

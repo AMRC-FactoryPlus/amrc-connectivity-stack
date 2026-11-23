@@ -4,6 +4,9 @@ import { buildObjectIndexes } from '../api/objectCatalog'
 import type { ObjectCatalog } from '../api/objectCatalog'
 import { sameJson } from './sameJson'
 
+/** ACS: the tree folder that is open when the Explorer starts or reconnects. */
+export const HIERARCHY_OPEN_BY_DEFAULT = 'folder:hierarchical'
+
 export type TreeNodeType = 'namespace' | 'objectType' | 'relationshipType' | 'object' | 'folder'
 
 export interface TreeNode {
@@ -23,7 +26,9 @@ export interface SelectedItem {
 }
 
 /** The tabs of the element detail view. Part of a history stop, see NavEntry. */
-export type DetailTab = 'overview' | 'relationships' | 'history' | 'subtree'
+// ACS: Overview and History only. Relationships is a panel on Overview, and
+// the Subtree tab is gone.
+export type DetailTab = 'overview' | 'history'
 
 /** A full-panel page that overlays the selection: the two of them, or neither. */
 export type MainPage = 'insights' | 'diff' | null
@@ -188,11 +193,23 @@ export function parseRelationshipSourceRowId(id: string): { relationshipTypeId: 
 // A node is only visible once every folder/ancestor above it is expanded, so
 // restoring a selection means restoring that path too. Mirrors the expansion
 // SearchModal and the main panel perform before they call selectItem.
+/**
+ * ACS: the tree rows to expand to show an object under its type in the
+ * Schemas folder, now that there is no flat Objects folder. Empty when the
+ * object's type is not in the catalog.
+ */
+export function schemaPathTo(object: ObjectInstance, typeIndex: Map<string, ObjectType>): string[] {
+  const type = typeIndex.get(object.typeId)
+  if (!type) return []
+  return ['folder:namespaces', `ns:${type.namespaceUri}`, `type:${type.elementId}`]
+}
+
 function expandedPathTo(
   item: SelectedItem,
   expandedNodes: Set<string>,
   objectIndex: Map<string, ObjectInstance>,
-  relationshipTypes: RelationshipType[]
+  relationshipTypes: RelationshipType[],
+  typeIndex: Map<string, ObjectType>
 ): Set<string> {
   const expanded = new Set(expandedNodes)
 
@@ -210,8 +227,8 @@ function expandedPathTo(
       current = parent
     }
   } else if (item.id.startsWith('obj:')) {
-    // The Objects folder lists every object at the top level, so no ancestor walk.
-    expanded.add('folder:objects')
+    // ACS: 'obj:' rows now live only under their type in the Schemas folder.
+    for (const id of schemaPathTo(item.data as ObjectInstance, typeIndex)) expanded.add(id)
   } else if (item.id.startsWith('ns:')) {
     expanded.add('folder:namespaces')
     } else if (item.id.startsWith('type:')) {
@@ -423,7 +440,7 @@ function pushEntry(entry: NavEntry) {
 
 /** Restore an existing stop without pushing (Back/Forward). */
 function gotoIndex(index: number) {
-  const { history, expandedNodes, objectIndex, relationshipTypes } = useExplorerStore.getState()
+  const { history, expandedNodes, objectIndex, relationshipTypes, typeIndex } = useExplorerStore.getState()
   const target = history[index]
   if (!target) return
   useExplorerStore.setState({
@@ -433,7 +450,7 @@ function gotoIndex(index: number) {
     historyIndex: index,
     // A null item is Home or a full-panel page: nothing to reveal in the tree.
     expandedNodes: target.item
-      ? expandedPathTo(target.item, expandedNodes, objectIndex, relationshipTypes)
+      ? expandedPathTo(target.item, expandedNodes, objectIndex, relationshipTypes, typeIndex) // ACS
       : expandedNodes,
   })
 }
@@ -470,7 +487,9 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   searchIndex: new Map(),
   objectCountByType: new Map(),
   catalogObjectsByType: new Map(),
-  expandedNodes: new Set(),
+  // ACS: Hierarchy starts open (the folder id is HIERARCHICAL_FOLDER_ID in
+  // components/tree/treeData.ts, not imported here to avoid a cycle).
+  expandedNodes: new Set([HIERARCHY_OPEN_BY_DEFAULT]),
   childPageLimits: new Map(),
   selectedItem: null,
   detailTab: 'overview',
@@ -484,7 +503,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   sidebarCollapsed: false,
   relationshipDepth: DEFAULT_RELATIONSHIP_DEPTH,
   relationshipDepthShown: INITIAL_RELATIONSHIP_DEPTH_PILLS,
-  relationshipView: 'tree',
+  // ACS: the map opens on Rings.
+  relationshipView: 'radial',
   relationshipTraversal: DEFAULT_RELATIONSHIP_TRAVERSAL,
   graphLeafMode: 'show',
   graphFadeDistant: false,
@@ -792,7 +812,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     searchIndex: new Map(),
     objectCountByType: new Map(),
     catalogObjectsByType: new Map(),
-    expandedNodes: new Set(),
+    expandedNodes: new Set([HIERARCHY_OPEN_BY_DEFAULT]),
     childPageLimits: new Map(),
     selectedItem: null,
     detailTab: 'overview',

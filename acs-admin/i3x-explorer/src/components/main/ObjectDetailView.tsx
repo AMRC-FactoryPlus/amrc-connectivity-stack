@@ -8,10 +8,11 @@ import { registerItem } from '../subscriptions/registerItem'
 import { Breadcrumb } from './Breadcrumb'
 import { objectPath } from './navigation' // ACS
 import { OverviewTab } from './tabs/OverviewTab'
-import { RelationshipsTab } from './tabs/RelationshipsTab'
 import { HistoryTab } from './tabs/HistoryTab'
-import { SubtreeTab } from './tabs/SubtreeTab'
-import { BroadcastIcon } from '../common/icons'
+import { BroadcastIcon, ShieldIcon, DatabaseIcon, ChartLineIcon } from '../common/icons'
+import { FormattedText } from '../common/FormattedText' // ACS
+import { useIsContainer } from '../../data/childValues' // ACS
+import { acsHost, useHostActions } from '../../acs/host' // ACS
 import { Spinner } from '../common/Spinner'
 import { useObjectDetails } from '../../data/useObjectDetails'
 import { errorText, useObjectValue } from '../../data/queries'
@@ -23,12 +24,14 @@ import { PerfProfiler } from '../../diagnostics/PerfProfiler'
 // a page, so switching one is a navigation stop and Back returns to it.
 type TabId = DetailTab
 
-const TAB_ORDER: TabId[] = ['overview', 'relationships', 'history', 'subtree']
+// ACS: Overview and History only. Relationships is a panel on Overview, the
+// Subtree tab is gone, and a container (its value is its children's) has no
+// History, so it has no tab bar at all.
+const LEAF_TABS: TabId[] = ['overview', 'history']
+const CONTAINER_TABS: TabId[] = ['overview']
 const TAB_LABELS: Record<TabId, string> = {
   overview: 'Overview',
-  relationships: 'Relationships',
   history: 'History',
-  subtree: 'Subtree',
 }
 
 /**
@@ -42,8 +45,13 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
   // The active tab is the history's, not local state: a deep-link (the tree's
   // "Open Relationships") sets it as it selects, switching tabs pushes a stop,
   // and Back/Forward land on the exact tab you left.
-  const activeTab = useExplorerStore(s => s.detailTab)
+  const storedTab = useExplorerStore(s => s.detailTab)
   const setActiveTab = useExplorerStore(s => s.setDetailTab)
+  // ACS: a container has no History, so a stop or link onto it lands on Overview.
+  const container = useIsContainer(catalogObject)
+  const tabs = container ? CONTAINER_TABS : LEAF_TABS
+  const activeTab: TabId = tabs.includes(storedTab) ? storedTab : 'overview'
+  const { actions: hostActions, selection: hostSelected } = useHostActions(catalogObject)
 
   const valueQuery = useObjectValue(catalogObject.elementId, catalogObject.isComposition)
   const value = valueQuery.data ?? null
@@ -152,6 +160,21 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
           </div>
 
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            {/* ACS: the Manager UI's own actions on this object, run by the host. */}
+            {hostSelected && hostActions.map(action => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => acsHost?.runAction(action.id, hostSelected)}
+                title={action.title}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-i3x-text bg-i3x-surface border border-i3x-border rounded-lg hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+              >
+                {action.id === 'access' && <ShieldIcon size={14} />}
+                {action.id === 'show-dataset' && <ChartLineIcon size={14} />}
+                {action.id === 'dataset' && <DatabaseIcon size={14} />}
+                {action.label}
+              </button>
+            ))}
             {isSubscribed ? (
               <button
                 type="button"
@@ -174,13 +197,24 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
           </div>
         </div>
 
+        <ObjectDescription
+          object={object}
+          pending={detailsPending}
+          error={errorText(detailsError, 'Failed to load object details')}
+          onRetry={retryDetails}
+        />
+
         {subscribeError && (
           <p className="text-xs text-i3x-error mt-1.5 sm:text-right" title={subscribeError}>
             {subscribeError}
           </p>
         )}
 
-        <TabList activeTab={activeTab} onChange={setActiveTab} />
+        {tabs.length > 1 ? (
+          <TabList tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        ) : (
+          <div className="h-3.5" />
+        )}
       </header>
 
       <div className="flex-1 overflow-auto p-3 sm:p-5 min-h-0">
@@ -189,22 +223,14 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
           id={`panel-${activeTab}`}
           aria-labelledby={`tab-${activeTab}`}
           tabIndex={0}
-          // Relationships and Subtree are the full-window workspaces: they fill
-          // the height too, growing/shrinking with it down to a 30rem floor
-          // (then the panel scrolls). Every tab spans the full panel width.
-          className={`focus:outline-none w-full ${
-            activeTab === 'relationships' || activeTab === 'subtree'
-              ? 'h-full min-h-[30rem]'
-              : ''
-          }`}
+          className="focus:outline-none w-full"
         >
           {activeTab === 'overview' && (
             <PerfProfiler id="Overview tab">
               <OverviewTab
                 object={object}
-                detailsPending={detailsPending}
-                detailsError={errorText(detailsError, 'Failed to load object details')}
-                onRetryDetails={retryDetails}
+                catalogObject={catalogObject}
+                container={container}
                 value={value}
                 valueFetchedAt={valueQuery.dataUpdatedAt}
                 valueView={valueView}
@@ -215,20 +241,9 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
               />
             </PerfProfiler>
           )}
-          {/* The walks read only light fields; the stable catalog object avoids a re-walk when details arrive. */}
-          {activeTab === 'relationships' && (
-            <PerfProfiler id="Relationships tab">
-              <RelationshipsTab object={catalogObject} />
-            </PerfProfiler>
-          )}
           {activeTab === 'history' && (
             <PerfProfiler id="History tab">
               <HistoryTab object={catalogObject} />
-            </PerfProfiler>
-          )}
-          {activeTab === 'subtree' && (
-            <PerfProfiler id="Subtree tab">
-              <SubtreeTab object={catalogObject} />
             </PerfProfiler>
           )}
         </div>
@@ -239,9 +254,11 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
 
 /** Roving-tabindex tab strip: arrows move between tabs, Home/End jump to the ends. */
 function TabList({
+  tabs: TAB_ORDER,
   activeTab,
   onChange,
 }: {
+  tabs: TabId[]
   activeTab: TabId
   onChange: (tab: TabId) => void
 }) {
@@ -295,4 +312,51 @@ function TabList({
       })}
     </div>
   )
+}
+
+/**
+ * ACS: the object's description, under its title, in place of the Description
+ * card. Nothing when it has none; a quiet line while it loads or if it failed.
+ */
+function ObjectDescription({
+  object,
+  pending,
+  error,
+  onRetry,
+}: {
+  object: ObjectInstance
+  pending: boolean
+  error: string | null
+  onRetry: () => void
+}) {
+  const metadata = object.metadata
+  const text =
+    object.description || (typeof metadata?.description === 'string' ? metadata.description : undefined)
+  const system = metadata?.system
+  const mimeType =
+    system && typeof system === 'object' ? (system as Record<string, unknown>).descriptionMime : undefined
+
+  if (text) {
+    return (
+      <div className="mt-1 max-w-3xl text-i3x-text-muted" data-testid="object-description">
+        <FormattedText mimeType={mimeType} className="!text-[13px] !text-i3x-text-muted">{text}</FormattedText>
+      </div>
+    )
+  }
+  if (pending) return null
+  if (error) {
+    return (
+      <p role="alert" className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-i3x-error">
+        <span>Details could not be loaded: {error}</span>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="px-2 py-0.5 rounded border border-i3x-border text-i3x-text hover:bg-i3x-bg"
+        >
+          Retry
+        </button>
+      </p>
+    )
+  }
+  return null
 }

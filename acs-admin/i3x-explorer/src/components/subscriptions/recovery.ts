@@ -1,5 +1,6 @@
 import type { I3XClient } from '../../api/client'
 import { groupByDepth, useSubscriptionsStore } from '../../stores/subscriptions'
+import { registerComponents, runningComponents } from '../../acs/componentRegistration' // ACS
 
 /**
  * Server-side subscription expiry recovery, extracted from the transport
@@ -79,6 +80,8 @@ export async function performRecovery(
           const outcome = await client.registerMonitoredItems(newId, elementIds, depth)
           rejected.push(...outcome.rejected.map(({ elementId }) => elementId))
         }
+        // ACS: and each running composition's components on their own, after the compositions.
+        await registerComponents(client, newId, runningComponents({ monitoredItems, components, stoppedItems: [...(stoppedItems ?? []), ...rejected] }))
         if (rejected.length > 0) {
           console.warn(`Subscription ${newId} did not accept ${rejected.join(', ')}; listed as stopped`)
         }

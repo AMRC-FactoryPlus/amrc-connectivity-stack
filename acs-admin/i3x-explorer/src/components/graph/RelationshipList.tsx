@@ -58,7 +58,6 @@ export function RelationshipList({
   tree,
   isLoading,
   error,
-  depth,
   onSelect,
   onFocus,
   onRoot,
@@ -69,8 +68,8 @@ export function RelationshipList({
   tree: EgoTree | null
   isLoading: boolean
   error: string | null
-  /** Hops the walk covers, for the count line. */
-  depth: number
+  /** Hops the walk covers. ACS: unused now the count line is gone. */
+  depth?: number
   /** Navigate to the object, optionally straight onto one of its detail tabs. */
   onSelect: (object: ObjectInstance, tab?: DetailTab) => void
   /** Frame this object and its children on the map. No re-walk, no navigation. */
@@ -213,25 +212,21 @@ export function RelationshipList({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <p className="mb-2 shrink-0 flex items-center gap-1.5 text-[11px] text-i3x-text-muted">
-        {text ? (
-          <>
-            {(filtered?.matches ?? 0).toLocaleString()} of {tree.total.toLocaleString()}{' '}
-            {tree.total === 1 ? 'relationship matches' : 'relationships match'}
-          </>
-        ) : (
-          <>
-            {tree.direct.toLocaleString()} direct
-            {depth > 1 && tree.total > tree.direct && (
-              <> · {tree.total.toLocaleString()} within {depth} hops</>
-            )}{' '}
-            · right-click a row for more
-          </>
-        )}
-        {/* A deeper walk extends what's already here rather than replacing it, so
-            the list stays readable while the next hop is in flight. */}
-        {isLoading && <Spinner size={11} />}
-      </p>
+      {/* ACS: no "N direct · right-click a row for more" line. The match count
+          stays while filtering, and the spinner while a deeper walk loads. */}
+      {(text || isLoading) && (
+        <p className="mb-2 shrink-0 flex items-center gap-1.5 text-[11px] text-i3x-text-muted">
+          {text && (
+            <>
+              {(filtered?.matches ?? 0).toLocaleString()} of {tree.total.toLocaleString()}{' '}
+              {tree.total === 1 ? 'relationship matches' : 'relationships match'}
+            </>
+          )}
+          {/* A deeper walk extends what's already here rather than replacing it, so
+              the list stays readable while the next hop is in flight. */}
+          {isLoading && <Spinner size={11} />}
+        </p>
+      )}
 
       {/* Fills the pane and scrolls in place, so a hub with thousands of children
           doesn't stretch the card. pr/-mr keeps the scrollbar off the rows.
@@ -281,6 +276,18 @@ export function RelationshipList({
       )}
     </div>
   )
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * ACS: a type id as the list shows it. A UUID (a schema's id, say) is cut to its
+ * last 5 characters, which is enough to tell types apart at a glance; a readable
+ * id such as "isa95-level" is shown as it is. The row's tooltip has the full id.
+ */
+export function shortTypeId(typeId: string | null | undefined): string {
+  if (!typeId) return ''
+  return UUID_PATTERN.test(typeId) ? typeId.slice(-5) : typeId
 }
 
 /** Shared by every level below the root, which is where the nesting happens. */
@@ -530,9 +537,14 @@ function NodeRow({
           title={object.elementId}
           className="flex-1 min-w-0 flex items-baseline gap-2 py-1.5 text-left rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
         >
-          <span className="text-[13px] text-i3x-text truncate">{object.displayName}</span>
-          <span className="font-mono text-[11px] text-i3x-text-muted truncate ml-auto">
-            {object.typeId}
+          {/* ACS: the name in full, wrapping if it must, and a UUID type id cut
+              to its last 5 characters so it cannot push the name out. */}
+          <span className="min-w-0 text-[13px] text-i3x-text break-words">{object.displayName}</span>
+          <span
+            className="shrink-0 font-mono text-[11px] text-i3x-text-muted ml-auto"
+            title={object.typeId}
+          >
+            {shortTypeId(object.typeId)}
           </span>
         </button>
 

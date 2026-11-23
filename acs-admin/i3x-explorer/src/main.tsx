@@ -7,6 +7,7 @@ import { applyServerFromQuery } from './services/serverFromQuery'
 import { loadRuntimeConfig } from './config/runtimeConfig'
 // ACS: framed by the Manager UI, connect to its i3X service with its session.
 import { configureForHost, startHosted } from './acs/host'
+import { syncBrowserHistory } from './acs/browserHistory' // ACS
 import { performConnect } from './services/connection'
 
 async function init() {
@@ -35,6 +36,7 @@ async function init() {
   )
 
   startHosted(performConnect) // ACS
+  syncBrowserHistory() // ACS: browser Back/Forward move through the Explorer's stops
 }
 
 init()

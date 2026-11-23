@@ -14,7 +14,7 @@ const composedValue: LastKnownValue = {
 }
 
 function fakeClient(getValue: () => Promise<LastKnownValue | null>) {
-  const accept = async (_id: string, elementIds: string[]): Promise<BulkOutcome> => ({ accepted: elementIds, rejected: [] })
+  const accept = async (_id: string, elementIds: string[], _maxDepth?: number): Promise<BulkOutcome> => ({ accepted: elementIds, rejected: [] })
   return {
     registerMonitoredItems: vi.fn(accept),
     unregisterMonitoredItems: vi.fn(accept),
@@ -33,6 +33,40 @@ describe('registerItem', () => {
       components: ['line:count', 'line:mode'],
     })
     expect(client.registerMonitoredItems).toHaveBeenCalledWith('s', ['line'], 0)
+  })
+
+  // ACS: for servers that deliver only the exact element registered.
+  it('also registers each component on its own, after the composition', async () => {
+    const client = fakeClient(async () => composedValue)
+
+    await registerItem(client, 's', composition, null, noWait)
+
+    expect(client.registerMonitoredItems.mock.calls).toEqual([
+      ['s', ['line'], 0],
+      ['s', ['line:count', 'line:mode'], 1],
+    ])
+  })
+
+  it('registers many components in chunks', async () => {
+    const components = Object.fromEntries(Array.from({ length: 1_200 }, (_, i) => [`line:c${i}`, { value: i }]))
+    const client = fakeClient(async () => ({ ...composedValue, components }))
+
+    await registerItem(client, 's', composition, null, noWait)
+
+    const sizes = client.registerMonitoredItems.mock.calls.slice(1).map(([, ids, depth]) => [ids.length, depth])
+    expect(sizes).toEqual([[500, 1], [500, 1], [200, 1]])
+  })
+
+  it('keeps the composition subscribed when its components cannot be registered on their own', async () => {
+    const client = fakeClient(async () => composedValue)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    client.registerMonitoredItems.mockImplementation(async (_id: string, elementIds: string[], depth?: number) => {
+      if (depth === 1) throw new Error('offline')
+      return { accepted: elementIds, rejected: [] }
+    })
+
+    await expect(registerItem(client, 's', composition, null, noWait)).resolves.toMatchObject({ maxDepth: 0 })
+    expect(client.unregisterMonitoredItems).not.toHaveBeenCalled()
   })
 
   it('reuses a value already read with its components', async () => {

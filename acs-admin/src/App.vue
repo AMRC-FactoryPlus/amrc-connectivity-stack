@@ -95,7 +95,9 @@ import Nav from '@/components/Nav/Nav.vue'
 import EdgeClusterList from '@/components/Nav/EdgeClusterList.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
-import { useMagicKeys } from '@vueuse/core'
+import { useEventListener, useMagicKeys } from '@vueuse/core'
+import { useRouter } from 'vue-router'
+import { is_search_shortcut, request_explorer_search } from '@/lib/explorer-search.js'
 import { Toaster } from '@/components/ui/sonner'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
 import NewClusterDialog from '@components/EdgeManager/EdgeClusters/NewClusterDialog.vue'
@@ -114,6 +116,15 @@ export default {
 
   setup () {
     const { escape } = useMagicKeys()
+
+    /* ⌘K / Ctrl+K on any page opens the Explorer's search. */
+    const router = useRouter()
+    useEventListener(window, 'keydown', event => {
+      if (!is_search_shortcut(event)) return
+      event.preventDefault()
+      if (router.currentRoute.value.path !== '/explorer') router.push('/explorer')
+      request_explorer_search()
+    })
 
     return {
       acs_version: ACS_VERSION,

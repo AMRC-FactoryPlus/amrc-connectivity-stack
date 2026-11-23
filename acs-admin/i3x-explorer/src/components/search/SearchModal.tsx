@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useExplorerStore } from '../../stores/explorer'
+import { useExplorerStore, schemaPathTo } from '../../stores/explorer'
 import { getClient } from '../../api/client'
 import { isScalarSchemaType } from '../tree/treeData'
 import { ensureAllObjectsLoaded, loadHierarchicalRoots } from '../../services/catalog'
+import { matchesQuery, matchRank } from '../../acs/searchMatch' // ACS
 import { SearchIcon, CloseIcon, CubeIcon, ActivityIcon } from '../common/icons'
 import { Spinner } from '../common/Spinner'
 import type { ObjectInstance } from '../../api/types'
@@ -15,6 +16,8 @@ interface SearchResult {
 
 interface SearchModalProps {
   onClose: () => void
+  /** ACS: the text the search box starts with, such as the tree's filter text. */
+  initialQuery?: string
 }
 
 function buildAncestorPath(obj: ObjectInstance, objectIndex: Map<string, ObjectInstance>): string[] {
@@ -35,8 +38,8 @@ function buildAncestorPath(obj: ObjectInstance, objectIndex: Map<string, ObjectI
 
 const MAX_RESULTS = 50
 
-export function SearchModal({ onClose }: SearchModalProps) {
-  const [query, setQuery] = useState('')
+export function SearchModal({ onClose, initialQuery = '' }: SearchModalProps) {
+  const [query, setQuery] = useState(initialQuery) // ACS: was ''
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -78,7 +81,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
         roots = await loadHierarchicalRoots(client)
       }
 
-      const lower = searchQuery.toLowerCase()
       const rootIds = new Set(roots.map(r => r.elementId))
       // Read fresh: a first-run fetch above rebuilt the store's index.
       const objectIndex = useExplorerStore.getState().objectIndex
@@ -88,7 +90,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
       const searchResults: SearchResult[] = []
       for (const obj of objects) {
         const name = obj.displayName
-        if (!(name && name.toLowerCase().includes(lower)) && !obj.elementId.toLowerCase().includes(lower)) {
+        // ACS: words in any order, ignoring case and punctuation.
+        if (!matchesQuery(name, obj.elementId, searchQuery)) {
           continue
         }
         const useHierarchy = rootIds.has(obj.elementId) || !!(obj.parentId && obj.parentId !== '/')
@@ -103,6 +106,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
       // Hierarchy matches first, then alphabetical within each group
       searchResults.sort((a, b) => {
         if (a.useHierarchy !== b.useHierarchy) return a.useHierarchy ? -1 : 1
+        const byRank = matchRank(a.object.displayName, searchQuery) - matchRank(b.object.displayName, searchQuery) // ACS
+        if (byRank !== 0) return byRank
         const aLabel = a.object.displayName || a.object.elementId
         const bLabel = b.object.displayName || b.object.elementId
         return aLabel.localeCompare(bLabel)
@@ -151,7 +156,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
       useExplorerStore.setState({ expandedNodes: newExpanded })
       selectItem({ type: 'object', id: `hier:${result.object.elementId}`, data: result.object })
     } else {
-      newExpanded.add('folder:objects')
+      // ACS: no flat Objects folder; show the object under its type in Schemas.
+      for (const id of schemaPathTo(result.object, useExplorerStore.getState().typeIndex)) newExpanded.add(id)
       useExplorerStore.setState({ expandedNodes: newExpanded })
       selectItem({ type: 'object', id: `obj:${result.object.elementId}`, data: result.object })
     }

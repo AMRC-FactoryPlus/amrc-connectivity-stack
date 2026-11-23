@@ -10,10 +10,11 @@ import { setPerfTraceEnabled } from '../../diagnostics/perfTrace'
 import { usePerfTraceEnabled } from '../../diagnostics/PerfProfiler'
 import { SearchModal } from '../search/SearchModal'
 import { AboutDialog } from './AboutDialog'
-import { SearchIcon, CheckIcon, RedirectIcon, BlockedIcon, CameraIcon, NewWindowIcon } from '../common/icons'
+import { CheckIcon, RedirectIcon, BlockedIcon, CameraIcon, NewWindowIcon } from '../common/icons'
 import { Spinner } from '../common/Spinner'
 import iconPng from '/icon.png'
 import { acsHost } from '../../acs/host' // ACS
+import { useSearchDialog } from '../../acs/searchDialog' // ACS
 
 type Theme = 'light' | 'dark'
 
@@ -29,7 +30,11 @@ export function Toolbar() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showSnapshotMenu, setShowSnapshotMenu] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
+  // ACS: shared with the tree's filter box, which opens the dialog too.
+  const showSearch = useSearchDialog(s => s.open)
+  const searchQuery = useSearchDialog(s => s.initialQuery)
+  const openSearch = useSearchDialog(s => s.openSearch)
+  const closeSearch = useSearchDialog(s => s.closeSearch)
   const [showAbout, setShowAbout] = useState(false)
   const perfTraceEnabled = usePerfTraceEnabled()
   // One hidden file input serves both load actions; this ref says which one is pending.
@@ -81,6 +86,11 @@ export function Toolbar() {
     selectItem: s.selectItem
   })))
   const objectCount = useExplorerStore(s => s.allObjects.length)
+  // ACS: the tree's relationship toggles live in the settings menu.
+  const showRelationshipsInTree = useExplorerStore(s => s.showRelationshipsInTree)
+  const toggleShowRelationshipsInTree = useExplorerStore(s => s.toggleShowRelationshipsInTree)
+  const showComponentsInTree = useExplorerStore(s => s.showComponentsInTree)
+  const toggleShowComponentsInTree = useExplorerStore(s => s.toggleShowComponentsInTree)
   const {
     snapshotBusy,
     hasBaseline,
@@ -130,12 +140,12 @@ export function Toolbar() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        if (isConnected) setShowSearch(true)
+        if (isConnected) openSearch()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isConnected])
+  }, [isConnected, openSearch])
 
   // X1/X2, the side buttons on most mice. Electron only, in the web build they
   // drive the browser's own history and taking them over would strand the SPA.
@@ -164,14 +174,16 @@ export function Toolbar() {
       {/* macOS traffic light spacing */}
       {window.electronAPI?.platform === 'darwin' && <div className="w-16" />}
 
-      <button
+      {/* ACS: framed by the Manager UI, which has its own header, so no
+          logo and name; About is in the settings menu instead. */}
+      {!acsHost && <button
         onClick={() => setShowAbout(true)}
         title="About i3X Explorer"
         className="no-drag flex items-center gap-2 rounded px-1 py-1 hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
       >
         <img src={iconPng} alt="" className="w-5 h-5" />
         <h1 className="hidden md:block text-sm font-semibold text-i3x-text whitespace-nowrap">i3X Explorer</h1>
-      </button>
+      </button>}
 
       <button
         onClick={toggleSidebar}
@@ -264,16 +276,7 @@ export function Toolbar() {
             Disconnect
           </button>
         )}
-        <button
-          onClick={() => setShowSearch(true)}
-          disabled={!isConnected}
-          title="Search objects (⌘K)"
-          aria-label="Search objects"
-          className="px-3 py-1.5 text-xs bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 flex-shrink-0"
-        >
-          <SearchIcon size={13} className="text-i3x-text-muted" />
-          <span className="hidden sm:inline">Search</span>
-        </button>
+        {/* ACS: the Search button is beside the tree's filter box (TreeView.tsx). */}
       </div>
 
       {/* Snapshot camera + settings gear + theme toggle. Connection status,
@@ -374,7 +377,7 @@ export function Toolbar() {
         <div className="relative">
           <button
             onClick={() => setShowSettingsMenu(m => !m)}
-            title="Settings: refresh interval, catalog cache, performance tracing"
+            title="Settings: tree relationships, refresh interval, catalog cache, performance tracing"
             aria-label="Settings"
             className="w-7 h-7 flex items-center justify-center rounded text-i3x-text-muted hover:text-i3x-text hover:bg-i3x-bg transition-colors motion-reduce:transition-none"
           >
@@ -387,6 +390,30 @@ export function Toolbar() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowSettingsMenu(false)} />
               <div className="absolute right-0 top-9 z-50 bg-i3x-surface border border-i3x-border rounded-lg shadow-xl w-56 py-1">
+                {/* ACS: moved here from above the tree, as ticked options. */}
+                <button
+                  onClick={toggleShowRelationshipsInTree}
+                  aria-pressed={showRelationshipsInTree}
+                  title="Also show each object's non-hierarchical relationships in the tree, grouped by relationship type"
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-i3x-bg transition-colors flex items-center justify-between ${
+                    showRelationshipsInTree ? 'text-i3x-primary' : 'text-i3x-text'
+                  }`}
+                >
+                  Graph Relationships
+                  {showRelationshipsInTree && <CheckIcon size={13} />}
+                </button>
+                <button
+                  onClick={toggleShowComponentsInTree}
+                  aria-pressed={showComponentsInTree}
+                  title="Show each object's components (HasComponent) in the tree"
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-i3x-bg transition-colors flex items-center justify-between ${
+                    showComponentsInTree ? 'text-i3x-primary' : 'text-i3x-text'
+                  }`}
+                >
+                  Component Relationships
+                  {showComponentsInTree && <CheckIcon size={13} />}
+                </button>
+                <div className="border-t border-i3x-border my-1" />
                 {POLL_OPTIONS.map(opt => (
                   <button
                     key={opt.ms}
@@ -438,6 +465,19 @@ export function Toolbar() {
                   Trace render performance
                   {perfTraceEnabled && <CheckIcon size={13} />}
                 </button>
+                {/* ACS: hosted, the logo that opens About is hidden, so About is here. */}
+                {acsHost && (
+                  <>
+                    <div className="border-t border-i3x-border my-1" />
+                    <button
+                      onClick={() => { setShowAbout(true); setShowSettingsMenu(false) }}
+                      title="Version, licence and credits"
+                      className="w-full text-left px-3 py-2 text-xs text-i3x-text hover:bg-i3x-bg transition-colors"
+                    >
+                      About i3X Explorer
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -508,7 +548,7 @@ export function Toolbar() {
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
 
-      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      {showSearch && <SearchModal initialQuery={searchQuery} onClose={closeSearch} />}
 
       {unsupportedServer !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

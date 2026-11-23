@@ -21,7 +21,9 @@ describe('ObjectTypeDetail', () => {
   it('opens the object-types request with metadata enabled by default', () => {
     render(<ObjectTypeDetail objectType={OBJECT_TYPE} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'View request' }))
+    // ACS: the request is behind the card's More (⋯) menu.
+    fireEvent.click(screen.getAllByRole('button', { name: 'More' })[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: /View request/ }))
 
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getAllByText('/objecttypes').length).toBeGreaterThan(0)

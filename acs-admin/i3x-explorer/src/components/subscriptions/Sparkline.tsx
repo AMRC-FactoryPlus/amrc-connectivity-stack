@@ -3,10 +3,14 @@ import { useSubscriptionsStore } from '../../stores/subscriptions'
 const WIDTH = 72
 const HEIGHT = 18
 const PAD = 2
+/** ACS: the sparkline stays a short recent window; the trend graph shows the rest. */
+const RECENT_POINTS = 60
 
 /** A tiny trend of an element's recent numeric values, sized to sit in a table cell. */
 export function Sparkline({ elementId }: { elementId: string }) {
-  const points = useSubscriptionsStore(state => state.trendData.get(elementId))
+  const series = useSubscriptionsStore(state => state.trendData.get(elementId))
+  // ACS: read the last readings from the element's trend buffer.
+  const points = series?.buffer.toArray(series.buffer.length - RECENT_POINTS)
   if (!points || points.length < 2) return null
 
   const values = points.map(p => p.value)

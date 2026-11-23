@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { diffValues, toFiniteNumber, type ValueChange } from '../api/structuredValue'
 import { useExplorerStore } from './explorer' // ACS
+import { TrendBuffer, type TrendPoint, type TrendSeries } from '../acs/trendBuffer' // ACS
+
+export type { TrendPoint, TrendSeries } // ACS
 
 export interface LiveValue {
   elementId: string
@@ -30,13 +33,13 @@ export type LiveValueUpdate = Omit<
   'receivedAt' | 'changedAt' | 'updateCount' | 'changes' | 'repeatCount' | 'freshAt'
 >
 
-export interface TrendPoint {
-  value: number
-  timestamp: number // ms since epoch
-}
+// ACS: a trend keeps every reading since subscribing, up to an hour or 50,000 readings, in a
+// compact buffer (src/acs/trendBuffer.ts), instead of the last 60 as an array of objects.
 
-// Max points to keep in trend history
-const MAX_TREND_POINTS = 60
+/** ACS: an element's trend readings, oldest first, or undefined when it has none. */
+export function trendPointsOf(state: Pick<SubscriptionsState, 'trendData'>, elementId: string): TrendPoint[] | undefined {
+  return state.trendData.get(elementId)?.buffer.toArray()
+}
 
 export interface Subscription {
   id: string
@@ -167,8 +170,8 @@ function withoutUnlisted(
   subscriptions: ReadonlyMap<string, Subscription>,
   candidates: string[],
   liveValues: Map<string, LiveValue>,
-  trendData: Map<string, TrendPoint[]>
-): { liveValues: Map<string, LiveValue>; trendData: Map<string, TrendPoint[]> } {
+  trendData: Map<string, TrendSeries>
+): { liveValues: Map<string, LiveValue>; trendData: Map<string, TrendSeries> } {
   const listed = new Set(Array.from(subscriptions.values()).flatMap(listedElementIds))
   const dropped = candidates.filter(id => !listed.has(id) && (liveValues.has(id) || trendData.has(id)))
   if (dropped.length === 0) return { liveValues, trendData }
@@ -184,7 +187,7 @@ function withoutUnlisted(
 interface SubscriptionsState {
   subscriptions: Map<string, Subscription>
   liveValues: Map<string, LiveValue>
-  trendData: Map<string, TrendPoint[]> // keyed by elementId
+  trendData: Map<string, TrendSeries> // keyed by elementId; ACS: a buffer, not an array
   activeSubscriptionId: string | null
   // Subscriptions are global, not scoped to the selected element, so they live in
   // a drawer above the status bar rather than in the element's tabs.
@@ -297,9 +300,9 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
     if (values.length === 0) return
     const { liveValues, trendData } = get()
     const updatedLive = new Map(liveValues)
-    // ACS: each element's trend is copied once per batch, not once per update, since a fast feed
-    // delivers many updates to the same element in one batch.
-    const updatedPoints = new Map<string, TrendPoint[]>()
+    // ACS: readings are appended to each element's buffer in place, and the store holds a new
+    // series per element touched, once per batch, so only that element's graphs re-render.
+    const touched = new Map<string, TrendBuffer>()
     const now = Date.now()
     for (const value of values) {
       const previous = updatedLive.get(value.elementId)
@@ -327,24 +330,23 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
       // A repeat is the same reading again, not a new point in time.
       const numericValue = toFiniteNumber(value.value)
       if (!repeat && numericValue !== undefined) {
-        let points = updatedPoints.get(value.elementId)
-        if (!points) {
-          points = [...(trendData.get(value.elementId) ?? [])]
-          updatedPoints.set(value.elementId, points)
+        let buffer = touched.get(value.elementId)
+        if (!buffer) {
+          buffer = trendData.get(value.elementId)?.buffer ?? new TrendBuffer()
+          touched.set(value.elementId, buffer)
         }
         // ACS: plot a reading at its source time; updates delivered together would otherwise share
         // one arrival time and stack up at one x position.
-        points.push({ value: numericValue, timestamp: sourceTimeMs(value.timestamp) ?? now })
-        if (points.length > MAX_TREND_POINTS * 2) points.splice(0, points.length - MAX_TREND_POINTS)
+        buffer.push(sourceTimeMs(value.timestamp) ?? now, numericValue, now)
       }
     }
-    if (updatedPoints.size === 0) {
+    if (touched.size === 0) {
       set({ liveValues: updatedLive })
       return
     }
     const updatedTrend = new Map(trendData)
-    for (const [elementId, points] of updatedPoints) {
-      updatedTrend.set(elementId, points.length > MAX_TREND_POINTS ? points.slice(-MAX_TREND_POINTS) : points)
+    for (const [elementId, buffer] of touched) {
+      updatedTrend.set(elementId, { buffer, revision: buffer.revision })
     }
     set({ liveValues: updatedLive, trendData: updatedTrend })
   },

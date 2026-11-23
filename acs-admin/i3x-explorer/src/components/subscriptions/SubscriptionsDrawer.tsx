@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useSubscriptionsStore } from '../../stores/subscriptions'
 import { SubscriptionsView } from './SubscriptionsView'
 import { CloseIcon } from '../common/icons'
+import { TrendWindowControl } from '../../acs/TrendWindowControl' // ACS
 
 const MIN_HEIGHT = 120
 const MAX_HEIGHT = 600
@@ -66,12 +67,16 @@ export function SubscriptionsDrawer() {
             {subscriptionCount}
           </span>
         )}
+        {/* ACS: how much of each trend the graphs show. */}
+        <div className="ml-auto min-w-0 overflow-x-auto">
+          <TrendWindowControl />
+        </div>
         <button
           type="button"
           onClick={() => setOpen(false)}
           aria-label="Close subscriptions"
           title="Close subscriptions"
-          className="ml-auto px-1.5 py-0.5 text-i3x-text-muted hover:text-i3x-text rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+          className="px-1.5 py-0.5 text-i3x-text-muted hover:text-i3x-text rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
         >
           <CloseIcon size={13} />
         </button>

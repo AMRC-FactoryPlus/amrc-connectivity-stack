@@ -38,9 +38,15 @@ and shown in a same-origin iframe:
   connection dialog and no second sign-in. When i3X refuses the token
   the app asks the host for a new one, naming the refused token, and
   retries once.
-- The host also hears which object is selected, so the Manager UI can
-  show its own actions above the frame: manage i3X access, and build a
-  dataset. Live values come from the app's own Subscribe.
+- The host also offers the Manager UI's own actions on the selected
+  object, and the app shows them as buttons beside Subscribe: Manage
+  access on a device or on an ISA-95 level whose names match the
+  vocabulary, and Build dataset on a device. The app asks the host
+  `actions({ object, ancestors })` for each object it shows and gets
+  `[{ id, label }]` back, and a click calls `runAction(id, selection)`.
+  The Manager UI works the actions out again before running one, then
+  opens its own access dialog or its dataset builder. Live values come
+  from the app's own Subscribe.
 - Opened on its own, without the Manager UI around it, the app is
   upstream's web build with nothing changed.
 
@@ -53,8 +59,7 @@ upstream, so they are not tied to the Manager UI.
 
 1. **`src/main.tsx`**: after the runtime config loads, point the
    connection at the host's service (`configureForHost`), and after the
-   first render connect and start reporting the selection
-   (`startHosted`). Both do nothing without a host.
+   first render connect (`startHosted`). Both do nothing without a host.
 2. **`src/services/connection.ts`**, `authProviderFor`: with a host,
    return its token provider (`hostAuthProvider`) instead of looking
    for typed-in or OAuth credentials.
@@ -151,6 +156,39 @@ upstream, so they are not tied to the Manager UI.
     toolbar still renders the dialog; whether it is open, and with what
     text, is in `src/acs/searchDialog.ts` so the tree can open it. Tests
     in `src/acs/treeSearch.test.tsx`.
+
+7. **The object detail view** (`ObjectDetailView.tsx`,
+   `tabs/OverviewTab.tsx`, `tabs/RelationshipsTab.tsx`,
+   `graph/RelationshipList.tsx`, `graph/relationshipMenu.tsx`,
+   `tree/treeMenu.tsx`, `stores/explorer.ts`), made shorter and quieter:
+   - the description sits under the title line, and only when the object
+     has one. The Description card and the Object Data panel are gone;
+   - Overview runs Current Value, then Relationships, then Identity. The
+     Relationships tab is now that panel, on every object, and the
+     Subtree tab is gone (`tabs/SubtreeTab.tsx` deleted), with their
+     "Open Relationships" and "Open Subtree" menu items. A metric keeps
+     History as a tab beside Overview. A container (a composition, or an
+     object with children) has no History, so it has no tab bar, and a
+     History link onto one lands on Overview;
+   - the Current Value of a container lists its children one level down,
+     each container among them opening in place to list its own, and a
+     click on a name opens that element (`main/ChildValues.tsx`,
+     `data/childValues.ts`). i3X 1.0 `maxDepth` recurses through
+     HasComponent only and never through HasChildren, so the children
+     come from the hierarchy the app holds (the catalog's parentId
+     children and the HasChildren and HasComponent edges of
+     `/objects/related`), and their values from one batched
+     `POST /objects/value` at `maxDepth: 1` per level shown. A newer
+     subscription update replaces a child's value. Refresh reads them
+     again;
+   - the relationship list shows names in full and a UUID type id as its
+     last 5 characters, in the muted mono of a readable type id such as
+     `isa95-level`, with the full id in the tooltip. The "N direct ·
+     right-click a row for more" line and the help line under the map
+     are gone, and the map opens on Rings;
+   - with a host, the Manager UI's actions (above) sit left of
+     Subscribe as outline buttons (`useHostActions` in `src/acs/host.ts`).
+     Without a host there are none.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

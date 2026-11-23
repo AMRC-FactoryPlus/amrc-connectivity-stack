@@ -57,29 +57,29 @@ describe('navigation history', () => {
 
   it('treats a tab switch as its own stop', () => {
     state().selectItem(item('pump'))
-    state().setDetailTab('relationships')
-    state().setDetailTab('subtree')
+    state().setDetailTab('history')
+    state().setDetailTab('overview')
 
-    expect(state().detailTab).toBe('subtree')
+    expect(state().detailTab).toBe('overview')
 
     state().goBack()
-    expect(state().detailTab).toBe('relationships')
+    expect(state().detailTab).toBe('history')
     expect(state().selectedItem?.id).toBe('hier:pump')
 
     state().goForward()
-    expect(state().detailTab).toBe('subtree')
+    expect(state().detailTab).toBe('overview')
   })
 
   it('returns to the tab it left, not to Overview', () => {
     state().selectItem(item('pump'))
-    state().setDetailTab('subtree')
+    state().setDetailTab('history')
     state().selectItem(item('valve'))
 
     expect(state().detailTab).toBe('overview')
 
     state().goBack()
     expect(state().selectedItem?.id).toBe('hier:pump')
-    expect(state().detailTab).toBe('subtree')
+    expect(state().detailTab).toBe('history')
   })
 
   it('opens an element straight onto a tab (a menu deep-link)', () => {
@@ -89,26 +89,26 @@ describe('navigation history', () => {
 
   it('keeps the tab when the element you are on is re-selected', () => {
     state().selectItem(item('pump'))
-    state().setDetailTab('relationships')
+    state().setDetailTab('history')
     const before = state().history.length
 
     // The tree re-selecting the row you are already on (a poll refresh, a click).
     state().selectItem(item('pump'))
 
-    expect(state().detailTab).toBe('relationships')
+    expect(state().detailTab).toBe('history')
     expect(state().history).toHaveLength(before)
   })
 
   it('makes a full-panel page a stop of its own', () => {
     state().selectItem(item('pump'))
-    state().setDetailTab('relationships')
+    state().setDetailTab('history')
     state().openPage('insights')
 
     expect(state().activePage).toBe('insights')
 
     state().goBack()
     expect(state().activePage).toBeNull()
-    expect(state().detailTab).toBe('relationships')
+    expect(state().detailTab).toBe('history')
 
     state().goForward()
     expect(state().activePage).toBe('insights')
@@ -281,5 +281,11 @@ describe('unchanged writes', () => {
     const related = state().relatedObjects
     state().mergeRelatedObjects([['a', [object('b')]]])
     expect(state().relatedObjects).toBe(related)
+  })
+})
+
+describe('relationship map view (ACS)', () => {
+  it('opens on Rings', () => {
+    expect(useExplorerStore.getState().relationshipView).toBe('radial')
   })
 })

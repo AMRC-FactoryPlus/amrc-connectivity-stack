@@ -147,7 +147,7 @@ function ChildRow({
             {object.displayName}
           </button>
         </div>
-        <div role="cell" className="min-w-0 font-mono text-[12px] text-i3x-text break-words">
+        <div role="cell" className="min-w-0 font-mono text-[12px] text-i3x-text break-words tabular-nums">
           {hasValue ? (
             <span title={formatComponentValue(shown.value)}>{formatComponentValueShort(shown.value)}</span>
           ) : valuesPending && !useLive ? (

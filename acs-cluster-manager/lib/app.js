@@ -20,6 +20,7 @@ export class App {
             permission_group:   Edge.Perm.All,
             git_checkouts:      env.GIT_CHECKOUTS_DIR,
             git_email:          env.GIT_EMAIL,
+            git_timeout:        env.GIT_TIMEOUT_MS,
         });
 
         const enrolment = new Enrolment({

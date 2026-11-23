@@ -10,7 +10,6 @@ import { copyJson, copyText, copyTextFrom } from '../common/clipboard'
 import { catalogObjectsJson, catalogSubtreeJson, catalogValueJson } from '../../data/catalogData'
 import {
   CopyIcon,
-  TargetIcon,
   HierarchyIcon,
   ClockIcon,
   CubeIcon,
@@ -125,8 +124,7 @@ function objectEntries(row: NodeRow, revealInHierarchy: (elementId: string) => v
   const entries: MenuEntry[] = [
     { kind: 'header', label: row.label },
     { kind: 'action', label: 'Open', icon: <CubeIcon size={ICON} />, onSelect: () => selectRow(row) },
-    { kind: 'action', label: 'Open Relationships', icon: <TargetIcon size={ICON} />, onSelect: () => openRowTab(row, 'relationships') },
-    { kind: 'action', label: 'Open Subtree', icon: <HierarchyIcon size={ICON} />, onSelect: () => openRowTab(row, 'subtree') },
+    // ACS: no Open Relationships or Open Subtree; those tabs are gone.
     { kind: 'action', label: 'Open History', icon: <ClockIcon size={ICON} />, onSelect: () => openRowTab(row, 'history') },
     { kind: 'separator' },
   ]

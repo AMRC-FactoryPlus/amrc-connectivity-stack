@@ -11,7 +11,6 @@ import {
   EllipsisIcon,
   ExpandAllIcon,
   FrameIcon,
-  HierarchyIcon,
   TargetIcon,
 } from '../common/icons'
 import type { EgoTreeGroup, EgoTreeNode } from './egoTree'
@@ -88,18 +87,7 @@ export function buildRelationshipNodeMenu(
       icon: <CubeIcon size={ICON} />,
       onSelect: () => actions.onOpen(object),
     },
-    {
-      kind: 'action',
-      label: 'Open Relationships',
-      icon: <TargetIcon size={ICON} />,
-      onSelect: () => actions.onOpen(object, 'relationships'),
-    },
-    {
-      kind: 'action',
-      label: 'Open Subtree',
-      icon: <HierarchyIcon size={ICON} />,
-      onSelect: () => actions.onOpen(object, 'subtree'),
-    },
+    // ACS: no Open Relationships or Open Subtree; those tabs are gone.
     {
       kind: 'action',
       label: 'Open History',

@@ -23,7 +23,9 @@ export interface SelectedItem {
 }
 
 /** The tabs of the element detail view. Part of a history stop, see NavEntry. */
-export type DetailTab = 'overview' | 'relationships' | 'history' | 'subtree'
+// ACS: Overview and History only. Relationships is a panel on Overview, and
+// the Subtree tab is gone.
+export type DetailTab = 'overview' | 'history'
 
 /** A full-panel page that overlays the selection: the two of them, or neither. */
 export type MainPage = 'insights' | 'diff' | null
@@ -484,7 +486,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   sidebarCollapsed: false,
   relationshipDepth: DEFAULT_RELATIONSHIP_DEPTH,
   relationshipDepthShown: INITIAL_RELATIONSHIP_DEPTH_PILLS,
-  relationshipView: 'tree',
+  // ACS: the map opens on Rings.
+  relationshipView: 'radial',
   relationshipTraversal: DEFAULT_RELATIONSHIP_TRAVERSAL,
   graphLeafMode: 'show',
   graphFadeDistant: false,

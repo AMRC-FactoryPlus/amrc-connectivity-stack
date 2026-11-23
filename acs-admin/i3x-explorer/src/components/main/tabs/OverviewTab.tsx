@@ -6,20 +6,24 @@ import { composeCurrentValue } from '../../subscriptions/composedValue'
 import { RefreshIcon } from '../../common/icons'
 import { Spinner } from '../../common/Spinner'
 import { CardCodeSample } from '../../details/CodeSamplePanel'
-import { DataDisclosure, metadataExcept } from '../../details/DataDisclosure'
 import { buildObjectRequestTabs } from '../../details/requestTabs'
-import { ValueDisplay } from '../../details/ValueDisplay'
+import { ValueDisplay, formatComponentValue } from '../../details/ValueDisplay'
+import { StatusFacets } from '../../details/ElementStatus' // ACS
+import { queryClient } from '../../../data/queryClient' // ACS
 import { LiveBadge } from '../../subscriptions/LiveBadge'
-import { DescriptionCard } from '../DescriptionCard'
 import { Card, Field, SegmentedControl } from '../primitives'
+import { ChildValues } from '../ChildValues' // ACS
+import { RelationshipsTab } from './RelationshipsTab' // ACS
 
 interface OverviewTabProps {
   object: ObjectInstance
-  /** The full object (description, metadata) is still on its way from the server. */
-  detailsPending?: boolean
-  /** Why the full object could not be loaded; shown instead of an empty description. */
-  detailsError?: string | null
-  onRetryDetails?: () => void
+  /**
+   * ACS: the catalog's copy of the object, which does not change when the full
+   * details arrive, so the relationship walk is not redone then.
+   */
+  catalogObject?: ObjectInstance
+  /** ACS: a container's value is its children's, so they are listed. */
+  container?: boolean
   value: LastKnownValue | null
   /** When `value` was fetched (ms since epoch); a newer subscription update replaces it. */
   valueFetchedAt: number
@@ -32,9 +36,8 @@ interface OverviewTabProps {
 
 export function OverviewTab({
   object,
-  detailsPending = false,
-  detailsError = null,
-  onRetryDetails,
+  catalogObject,
+  container = false,
   value,
   valueFetchedAt,
   valueView,
@@ -58,34 +61,111 @@ export function OverviewTab({
   )
   const live = liveReadings[0]
   const liveFeed = useSubscriptionsStore(state => isLiveFeed(state.subscriptions, object.elementId))
-  // Stable across live updates, so an open Object Data section doesn't re-serialize on each one.
-  const objectDataSections = useMemo(
-    () => [
-      { label: 'Relationships', data: object.relationships },
-      {
-        label: 'Metadata',
-        data: metadataExcept(object.metadata, ['relationships', 'typeNamespaceUri', 'description', 'sourceTypeId']),
-      },
-      { label: 'Raw Object', data: object },
-    ],
-    [object]
-  )
   const composed = useMemo(() => {
     const byId = new Map([object.elementId, ...componentIds].map((id, i) => [id, liveReadings[i]]))
     return composeCurrentValue(value, object, id => byId.get(id), valueFetchedAt)
   }, [value, object, componentIds, liveReadings, valueFetchedAt])
   const shownValue = composed.value
+  // ACS: a container's own value, shown above its children when it has one.
+  const ownValue = shownValue?.value ?? null
+  // ACS: Refresh reads a container's children again too.
+  const refresh = () => {
+    onRefresh()
+    if (container) {
+      void queryClient.invalidateQueries({ queryKey: ['childValues'] })
+      void queryClient.invalidateQueries({ queryKey: ['valueChildrenRelated'] })
+    }
+  }
   const flashKey = composed.overlaid.reduce((latest, entry) => Math.max(latest, entry.changedAt), 0)
 
   return (
     <div className="space-y-4">
-      <DescriptionCard
-        description={object.description}
-        metadata={object.metadata}
-        pending={detailsPending}
-        error={detailsError}
-        onRetry={onRetryDetails}
-      />
+      <Card
+        title="Current Value"
+        actions={
+          <>
+            {live && liveFeed && (
+              <LiveBadge
+                receivedAt={live.receivedAt}
+                updateCount={live.updateCount}
+                repeatCount={live.repeatCount}
+                freshAt={live.freshAt}
+              />
+            )}
+            {!container && (
+              <SegmentedControl
+                label="Value format"
+                value={valueView}
+                onChange={onValueViewChange}
+                options={[
+                  { value: 'parsed', label: 'Parsed' },
+                  { value: 'raw', label: 'Raw' },
+                ]}
+              />
+            )}
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={isLoadingValue}
+              className="flex items-center gap-1 text-xs text-i3x-primary hover:text-i3x-primary/80 disabled:opacity-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+            >
+              {isLoadingValue ? <><Spinner size={11} /> Loading…</> : <><RefreshIcon size={11} /> Refresh</>}
+            </button>
+            <CardCodeSample
+              tabs={requestTabs}
+              initialTabId="value"
+              title={object.displayName}
+              subtitle="Object Instance"
+            />
+          </>
+        }
+      >
+        {container ? (
+          // ACS: a container's value is its children, read one level at a time.
+          <div className="space-y-3">
+            {ownValue !== null && (
+              <p className="flex flex-wrap items-baseline gap-3 text-[13px]">
+                <span className="font-mono text-i3x-text break-all">{formatComponentValue(ownValue)}</span>
+                {shownValue?.quality && <StatusFacets code={shownValue.quality} variant="dot" />}
+              </p>
+            )}
+            <ChildValues parentId={object.elementId} />
+          </div>
+        ) : valueError && !composed.rootIsLive ? (
+          <div className="px-3 py-2 bg-i3x-error/10 border border-i3x-error/20 rounded-lg text-sm text-i3x-error">
+            {valueError}
+          </div>
+        ) : shownValue ? (
+          <div className="relative">
+            <ValueDisplay value={shownValue} view={valueView} />
+            {/* Re-keyed on each change, so the flash replays over the value. */}
+            {flashKey > 0 && (
+              <span
+                key={flashKey}
+                aria-hidden="true"
+                className="value-updated pointer-events-none absolute inset-0 rounded-lg"
+              />
+            )}
+          </div>
+        ) : (
+          <div className="px-3 py-2 bg-i3x-bg border border-i3x-border rounded-lg text-sm text-i3x-text-muted">
+            {isLoadingValue ? (
+              <span className="flex items-center gap-2">
+                <Spinner size={13} />
+                Loading value…
+              </span>
+            ) : (
+              'No value available'
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* ACS: Relationships is a panel here, under Current Value, on every
+          object. It needs a height to lay its list and map out in. */}
+      <div className="h-[36rem]">
+        <RelationshipsTab object={catalogObject ?? object} />
+      </div>
 
       <Card
         title="Identity"
@@ -117,76 +197,6 @@ export function OverviewTab({
           </span>
         </div>
       </Card>
-
-      <Card
-        title="Current Value"
-        actions={
-          <>
-            {live && liveFeed && (
-              <LiveBadge
-                receivedAt={live.receivedAt}
-                updateCount={live.updateCount}
-                repeatCount={live.repeatCount}
-                freshAt={live.freshAt}
-              />
-            )}
-            <SegmentedControl
-              label="Value format"
-              value={valueView}
-              onChange={onValueViewChange}
-              options={[
-                { value: 'parsed', label: 'Parsed' },
-                { value: 'raw', label: 'Raw' },
-              ]}
-            />
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoadingValue}
-              className="flex items-center gap-1 text-xs text-i3x-primary hover:text-i3x-primary/80 disabled:opacity-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
-            >
-              {isLoadingValue ? <><Spinner size={11} /> Loading…</> : <><RefreshIcon size={11} /> Refresh</>}
-            </button>
-            <CardCodeSample
-              tabs={requestTabs}
-              initialTabId="value"
-              title={object.displayName}
-              subtitle="Object Instance"
-            />
-          </>
-        }
-      >
-        {valueError && !composed.rootIsLive ? (
-          <div className="px-3 py-2 bg-i3x-error/10 border border-i3x-error/20 rounded-lg text-sm text-i3x-error">
-            {valueError}
-          </div>
-        ) : shownValue ? (
-          <div className="relative">
-            <ValueDisplay value={shownValue} view={valueView} />
-            {/* Re-keyed on each change, so the flash replays over the value. */}
-            {flashKey > 0 && (
-              <span
-                key={flashKey}
-                aria-hidden="true"
-                className="value-updated pointer-events-none absolute inset-0 rounded-lg"
-              />
-            )}
-          </div>
-        ) : (
-          <div className="px-3 py-2 bg-i3x-bg border border-i3x-border rounded-lg text-sm text-i3x-text-muted">
-            {isLoadingValue ? (
-              <span className="flex items-center gap-2">
-                <Spinner size={13} />
-                Loading value…
-              </span>
-            ) : (
-              'No value available'
-            )}
-          </div>
-        )}
-      </Card>
-
-      <DataDisclosure title="Object Data" sections={objectDataSections} />
     </div>
   )
 }

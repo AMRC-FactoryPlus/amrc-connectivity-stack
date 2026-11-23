@@ -26,6 +26,7 @@ import type { AuthProvider } from '../api/authProvider'
 import { useConnectionStore } from '../stores/connection'
 import { useExplorerStore, type SelectedItem } from '../stores/explorer'
 import type { ObjectInstance } from '../api/types'
+import { useSearchDialog } from './searchDialog'
 
 export type HostTheme = 'light' | 'dark'
 
@@ -66,6 +67,8 @@ export interface AcsExplorerHost {
   actions(selection: HostSelection): Promise<HostAction[]>
   /** Run one of the actions `actions` gave for this object. */
   runAction(id: string, selection: HostSelection): void
+  /** Register what opens search, for ⌘K pressed outside the frame. */
+  onSearchRequest?(open: () => void): () => void
 }
 
 const HOST_KEY = '__acsI3xExplorerHost'
@@ -187,6 +190,11 @@ export async function configureForHost(): Promise<void> {
 export function startHosted(connect: () => Promise<void>): void {
   if (!acsHost) return
   void connect()
+  // ⌘K pressed anywhere in the Manager UI opens this app's search.
+  acsHost.onSearchRequest?.(() => {
+    window.focus()
+    useSearchDialog.getState().openSearch('')
+  })
 }
 
 /**

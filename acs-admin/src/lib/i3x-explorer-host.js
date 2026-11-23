@@ -66,6 +66,11 @@ export function mk_host (opts) {
             const action = (await opts.actions(selection)).find(a => a.id === id);
             if (action) opts.run(action, selection);
         },
+        /* The app gives what opens its search, for ⌘K pressed outside
+         * the frame. Returns a function that unregisters. */
+        onSearchRequest (open) {
+            return opts.on_search ? opts.on_search(open) : () => {};
+        },
     };
 }
 

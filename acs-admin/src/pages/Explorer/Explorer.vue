@@ -20,6 +20,7 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useISA95Store } from '@store/useISA95Store.js'
 import { HOST_KEY, classify_selection, explorer_actions, mk_host } from '@/lib/i3x-explorer-host.js'
+import { on_explorer_search } from '@/lib/explorer-search.js'
 import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 
 const router = useRouter()
@@ -45,6 +46,9 @@ const access = ref(null)
 const accessOpen = ref(false)
 watch(accessOpen, open => { if (!open) access.value = null })
 
+const frame = ref(null)
+let stop_search = null
+
 window[HOST_KEY] = mk_host({
   client: serviceClientReady().then(() => store.client),
   theme: () => document.documentElement.classList.contains('dark') ? 'dark' : 'light',
@@ -52,6 +56,16 @@ window[HOST_KEY] = mk_host({
   async actions (selection) {
     await isa95_ready()
     return explorer_actions(classify_selection(selection), isa95.data)
+  },
+  /* ⌘K outside the frame: focus the frame so the search box can take
+   * the keyboard, then let the app open its search. */
+  on_search (open) {
+    stop_search?.()
+    stop_search = on_explorer_search(() => {
+      frame.value?.contentWindow?.focus()
+      open()
+    })
+    return () => stop_search?.()
   },
   run (action) {
     if (action.access) {
@@ -61,7 +75,10 @@ window[HOST_KEY] = mk_host({
     else if (action.route) router.push(action.route)
   },
 })
-onBeforeUnmount(() => { delete window[HOST_KEY] })
+onBeforeUnmount(() => {
+  stop_search?.()
+  delete window[HOST_KEY]
+})
 </script>
 
 <template>
@@ -69,6 +86,7 @@ onBeforeUnmount(() => { delete window[HOST_KEY] })
        above from lg up. -->
   <div class="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] px-4 pt-4 lg:p-0">
     <iframe
+      ref="frame"
       src="/i3x-explorer/index.html"
       title="i3X Explorer"
       class="flex-1 min-h-0 w-full rounded-md border bg-white dark:bg-slate-900"/>

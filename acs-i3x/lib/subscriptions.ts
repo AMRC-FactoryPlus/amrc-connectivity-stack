@@ -24,6 +24,7 @@
 import { randomUUID } from "crypto";
 import type { I3xVqt, I3xSubscription, I3xSyncBatch, I3xSyncItem } from "./types/i3x.js";
 import type { Viewer } from "./access.js";
+import { SseStream } from "./sse-stream.js";
 
 interface ValueCacheLike {
     onValueChange(listener: (elementId: string, vqt: I3xVqt) => void): void;
@@ -49,6 +50,9 @@ interface SubscriptionManagerOpts {
      * with HTTP 206. Default 10,000.
      */
     maxQueue?: number;
+    /** When a stream writes what arrived during a turn. Tests pass one
+     * that writes at once. Default setImmediate. */
+    schedule?: (fn: () => void) => void;
     log?: (msg: string, ...args: any[]) => void;
 }
 
@@ -80,7 +84,7 @@ interface Subscription {
      * /sync reported them or a stream opened. */
     dropped: number;
     nextSequenceNumber: number;
-    activeStream: any | null;
+    activeStream: SseStream | null;
     lastAccessed: number;
     ttlTimer: ReturnType<typeof setTimeout>;
     viewer: Viewer;
@@ -92,6 +96,7 @@ export class SubscriptionManager {
     private viewers: { track(owner: string): Viewer };
     private ttl: number;
     private maxQueue: number;
+    private schedule: ((fn: () => void) => void) | undefined;
     private log: (msg: string, ...args: any[]) => void;
     private subscriptions: Map<string, Subscription> = new Map();
     /** The subscriptions registered on each elementId, so a change
@@ -106,6 +111,7 @@ export class SubscriptionManager {
         this.viewers = opts.viewers;
         this.ttl = opts.ttl;
         this.maxQueue = Math.max(1, opts.maxQueue ?? 10_000);
+        this.schedule = opts.schedule;
         this.log = opts.log ?? (() => {});
         this.boundOnValueChange = this.onValueChange.bind(this);
         this.valueCache.onValueChange(this.boundOnValueChange);
@@ -291,14 +297,15 @@ export class SubscriptionManager {
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders();
 
-        sub.activeStream = res;
+        const stream = new SseStream(res, this.schedule);
+        sub.activeStream = stream;
 
         // Flush any queued items
         if (queued.length > 0) {
             this.log("flushing %d queued items", queued.length);
         }
         for (const item of queued) {
-            if (sub.viewer.visible(item.elementId)) this.writeSseEvent(res, item);
+            if (sub.viewer.visible(item.elementId)) stream.send(item);
         }
         sub.batches = [];
         sub.staged = [];
@@ -306,11 +313,12 @@ export class SubscriptionManager {
 
         // Handle close
         res.on("close", () => {
-            this.log("stream closed: sub=%s", subscriptionId.slice(0, 8));
+            stream.close();
+            this.log("stream closed: sub=%s superseded=%d", subscriptionId.slice(0, 8), stream.superseded);
             /* A stream replaced by a newer one must not detach its
              * successor, and a deleted subscription must not get a
              * fresh TTL timer. */
-            if (sub.activeStream !== res) return;
+            if (sub.activeStream !== stream) return;
             sub.activeStream = null;
             /* The TTL counts from when the stream went away. */
             if (this.subscriptions.get(subscriptionId) === sub)
@@ -372,7 +380,7 @@ export class SubscriptionManager {
             if (!sub.viewer.visible(elementId)) continue;
 
             if (sub.activeStream) {
-                this.writeSseEvent(sub.activeStream, { elementId, ...vqt });
+                sub.activeStream.send({ elementId, ...vqt });
                 continue;
             }
 
@@ -422,18 +430,6 @@ export class SubscriptionManager {
             sub.staged.shift();
         }
         sub.dropped++;
-    }
-
-    private writeSseEvent(res: any, item: I3xSyncItem): void {
-        // SSE events are the update itself: there is nothing to acknowledge.
-        const data = `data: ${JSON.stringify([item])}\n\n`;
-        const ok = res.write(data);
-        // Ensure the chunk is flushed to the client immediately
-        if (typeof res.flush === "function") res.flush();
-        if (!ok) {
-            // Back-pressure: drain event will allow more writes
-            res.once("drain", () => {});
-        }
     }
 
     /* Ownership is checked against the authenticated principal. The

@@ -18,15 +18,10 @@ export function routes(opts: {
     const api = new APIv1(opts);
 
     return (app: any) => {
-        // Gzip compression (MUST per i3X spec)
-        // Skip compression for SSE streams — compression buffers chunks
-        // which prevents real-time delivery.
-        app.use(compression({
-            filter: (req: any, res: any) => {
-                if (req.path === "/v1/subscriptions/stream") return false;
-                return compression.filter(req, res);
-            },
-        }));
+        // Gzip compression (MUST per i3X spec), the SSE stream
+        // included. The stream writes once per turn of the event loop
+        // to keep up through zlib; see lib/sse-stream.ts.
+        app.use(compression());
 
         // Mount info endpoint (unauthenticated — goes through WebAPI's
         // public path pattern, see bin/api.ts `public: "/v1/info"`)

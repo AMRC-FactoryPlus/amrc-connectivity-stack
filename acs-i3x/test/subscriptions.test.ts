@@ -30,6 +30,10 @@ function mockSseRes() {
     return res;
 }
 
+/* Streams write each update as it arrives, so the tests can look at
+ * the writes straight away. Batching is tested in sse-stream.test.ts. */
+const now = (fn: () => void) => fn();
+
 const TTL = 30_000;
 const MAX_QUEUE = 5;
 
@@ -64,7 +68,7 @@ describe("SubscriptionManager", () => {
     beforeEach(() => {
         jest.useFakeTimers();
         valueCache = mockValueCache();
-        mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: MAX_QUEUE });
+        mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, schedule: now, ttl: TTL, maxQueue: MAX_QUEUE });
     });
 
     afterEach(() => {
@@ -471,7 +475,7 @@ describe("SubscriptionManager", () => {
 
         it("drops the oldest updates when full, and counts them", () => {
             mgr.destroy();
-            mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: 3 });
+            mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, schedule: now, ttl: TTL, maxQueue: 3 });
             const sub = mgr.create("client-1", "client-1");
             mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             for (let i = 1; i <= 5; i++) listen()("elem-1", makeVqt(i));
@@ -487,7 +491,7 @@ describe("SubscriptionManager", () => {
 
         it("still streams every update when the queue is full", () => {
             mgr.destroy();
-            mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, ttl: TTL, maxQueue: 2 });
+            mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, schedule: now, ttl: TTL, maxQueue: 2 });
             const sub = mgr.create("client-1", "client-1");
             mgr.register("client-1", "client-1", sub.subscriptionId, ["elem-1"]);
             const res = mockSseRes();
@@ -1274,7 +1278,7 @@ describe("SubscriptionManager, compositions", () => {
         jest.useFakeTimers();
         valueCache = mockValueCache();
         tree = mockTree();
-        mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any,
+        mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, schedule: now,
             objectTree: tree, ttl: TTL, maxQueue: 100 });
     });
 
@@ -1413,7 +1417,7 @@ describe("SubscriptionManager, compositions", () => {
     it("deliver only the leaves the owner may see", () => {
         const visible = (id: string) => id !== "dev/b/m2";
         mgr.destroy();
-        mgr = new SubscriptionManager({ valueCache: valueCache as any, objectTree: tree, ttl: TTL,
+        mgr = new SubscriptionManager({ valueCache: valueCache as any, schedule: now, objectTree: tree, ttl: TTL,
             viewers: { track: () => ({ visible, stop: () => {} }) } as any });
         const sub = mgr.create(OWNER, OWNER);
         mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev"], 0);
@@ -1437,7 +1441,7 @@ describe("SubscriptionManager, compositions on the object tree", () => {
         tree.refreshFromSnapshot(pipelineSnapshot(2));
         tree.setReady();
         const valueCache = mockValueCache();
-        const mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any,
+        const mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any, schedule: now,
             objectTree: tree, ttl: 60_000 });
         const change = valueCache.onValueChange.mock.calls[0][0] as (id: string, vqt: I3xVqt) => void;
         try {

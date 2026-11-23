@@ -237,6 +237,20 @@ upstream, so they are not tied to the Manager UI.
     it has one, follows as before. Tests in
     `src/acs/componentTrends.test.ts` and `SubscriptionsView.test.tsx`.
 
+16. **Live values that keep still** (`MonitoredItemRow.tsx`,
+    `ValueChanges.tsx`, `SubscriptionsView.tsx`, `src/stores/subscriptions.ts`,
+    `src/acs/heldDecimals.ts`): a value updating 100 times a second
+    changed width with every reading, so its delta and sparkline moved
+    sideways. Each element now holds the most decimal places it has
+    shown since it was subscribed, up to six, and pads with trailing
+    zeros (`LiveValue.decimals`), so 1.5 shows as 1.50000 once 1.54571
+    has been seen. Integers stay integers, and strings and booleans are
+    shown as they come. A delta uses the same places. A numeric metric's
+    value and delta sit in right-aligned slots of a set minimum width, so
+    the sparkline starts at the same place, and values, deltas, times
+    and counters use tabular digits. Tests in
+    `src/acs/heldDecimals.test.ts`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

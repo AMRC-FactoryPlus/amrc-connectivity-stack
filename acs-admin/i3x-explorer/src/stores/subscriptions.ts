@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { diffValues, toFiniteNumber, type ValueChange } from '../api/structuredValue'
 import { useExplorerStore } from './explorer' // ACS
 import { TrendBuffer, type TrendPoint, type TrendSeries } from '../acs/trendBuffer' // ACS
+import { holdDecimals } from '../acs/heldDecimals' // ACS
 
 export type { TrendPoint, TrendSeries } // ACS
 
@@ -26,11 +27,13 @@ export interface LiveValue {
   repeatCount: number
   /** When the latest delivery that was not a repeat arrived (ms since epoch). */
   freshAt: number
+  /** ACS: the most decimal places a numeric value has shown, so it keeps its width (src/acs/heldDecimals.ts). */
+  decimals?: number
 }
 
 export type LiveValueUpdate = Omit<
   LiveValue,
-  'receivedAt' | 'changedAt' | 'updateCount' | 'changes' | 'repeatCount' | 'freshAt'
+  'receivedAt' | 'changedAt' | 'updateCount' | 'changes' | 'repeatCount' | 'freshAt' | 'decimals'
 >
 
 // ACS: a trend keeps every reading since subscribing, up to an hour or 50,000 readings, in a
@@ -325,6 +328,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
         changes: changed ? changes : previous.changes,
         repeatCount: repeat ? previous.repeatCount + 1 : 0,
         freshAt: repeat ? previous.freshAt : now,
+        decimals: holdDecimals(previous?.decimals, value.value), // ACS
       })
 
       // A repeat is the same reading again, not a new point in time.

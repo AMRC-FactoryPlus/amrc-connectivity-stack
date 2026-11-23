@@ -13,6 +13,7 @@ import { TrendView } from './TrendView'
 import { CopyButton } from '../details/CopyButton' // ACS
 import { PATH_SEPARATOR } from '../main/navigation' // ACS
 import { rowLabel } from '../../acs/rowLabel' // ACS
+import { formatHeld } from '../../acs/heldDecimals' // ACS
 import { ComponentTrends, trendGridClass } from '../../acs/ComponentTrends' // ACS
 import { ChangeHint, ChangeList } from './ValueChanges'
 
@@ -142,7 +143,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
                 <StructuredSummary liveValue={liveValue} summary={describeStructure(structured)} />
               ) : numeric !== undefined ? (
                 <>
-                  <ScalarValue liveValue={liveValue} />
+                  <ScalarValue liveValue={liveValue} numeric />
                   <Sparkline elementId={elementId} />
                 </>
               ) : (
@@ -162,10 +163,10 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
             <span className="text-i3x-text-muted">-</span>
           )}
         </td>
-        <td className={`px-3 py-2.5 font-mono text-i3x-text-muted whitespace-nowrap ${dim}`}>
+        <td className={`px-3 py-2.5 font-mono tabular-nums text-i3x-text-muted whitespace-nowrap ${dim}`}>
           {liveValue?.timestamp ? new Date(liveValue.timestamp).toLocaleTimeString() : '-'}
         </td>
-        <td className="px-3 py-2.5 text-i3x-text-muted whitespace-nowrap">
+        <td className="px-3 py-2.5 text-i3x-text-muted whitespace-nowrap tabular-nums">
           {stopped ? (
             <span className="flex items-center gap-1.5" title="Not monitored on the server; the last value received is kept">
               <span aria-hidden="true" className="w-2 h-2 rounded-full border border-i3x-text-muted" />
@@ -375,18 +376,31 @@ function ElementName({
 }
 
 /** The value, flashing when it changes, with what it changed from. */
-function ScalarValue({ liveValue }: { liveValue: LiveValue }) {
+function ScalarValue({ liveValue, numeric = false }: { liveValue: LiveValue; numeric?: boolean }) {
+  // ACS: a number keeps its width: held decimal places, tabular digits and, for a numeric metric,
+  // right-aligned slots of a set minimum width for the value and its delta, so the sparkline after
+  // them stays put while the value changes.
   return (
     <>
       {/* Re-keyed on each change, so the flash replays only when the value moves. */}
       <code
         key={liveValue.changedAt}
-        className="value-updated truncate rounded px-1 -mx-1 font-mono text-i3x-text"
+        className={`value-updated truncate rounded px-1 -mx-1 font-mono tabular-nums text-i3x-text ${
+          numeric ? 'flex-shrink-0 min-w-[12ch] text-right' : ''
+        }`}
         title={formatComponentValue(liveValue.value)}
       >
-        {formatComponentValueShort(liveValue.value)}
+        {formatHeld(liveValue.value, liveValue.decimals, formatComponentValueShort)}
       </code>
-      {liveValue.changes[0] && <ChangeHint change={liveValue.changes[0]} />}
+      {liveValue.changes[0] ? (
+        <ChangeHint
+          change={liveValue.changes[0]}
+          decimals={liveValue.decimals}
+          className={numeric ? 'flex-shrink-0 min-w-[11ch] text-right' : ''}
+        />
+      ) : (
+        numeric && <span aria-hidden="true" className="flex-shrink-0 min-w-[11ch]" />
+      )}
     </>
   )
 }

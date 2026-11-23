@@ -261,8 +261,18 @@ class OpenIDSetup {
         return `${this.acs.secure ? "https" : "http"}://${name}.${this.acs.domain}`;
     }
 
+    // The root URL with no `<name>.` subdomain, i.e. `acs.baseUrl` itself.
+    bare_root () {
+        return `${this.acs.secure ? "https" : "http"}://${this.acs.domain}`;
+    }
+
     async ensure_client (name, spec) {
         const root = this.redirect_root(name);
+        // A client whose app is also reachable at the bare acs.baseUrl
+        // (no `<name>.` subdomain) - currently just admin, whose Helm
+        // chart serves it on both hosts - needs that host trusted too,
+        // alongside the canonical one.
+        const roots = spec.alsoAtBareBaseUrl ? [root, this.bare_root()] : [root];
         // Public clients have no client secret. Used by Postman, CLI
         // tools and any other native/SPA flow that can't keep one.
         // Such clients MUST use PKCE; we enforce S256 on the client
@@ -270,8 +280,9 @@ class OpenIDSetup {
         const publicClient = !!spec.publicClient;
         const secret = publicClient ? undefined : await this.read_secret(name);
         // Each of these has an auto-derived default keyed off `root`
-        // (i.e. `<proto>://<name>.<acs.baseUrl>`) which is right for
-        // any application served at that canonical host. Apps served
+        // (i.e. `<proto>://<name>.<acs.baseUrl>`, or also `roots` when
+        // `alsoAtBareBaseUrl` applies) which is right for any
+        // application served at that canonical host. Apps served
         // elsewhere - external domains, partner integrations, multiple
         // environments behind one realm - declare the corresponding
         // field in values.yaml to replace the default. Keycloak's
@@ -296,11 +307,11 @@ class OpenIDSetup {
             rootUrl: spec.rootUrl ?? root,
             baseUrl: spec.baseUrl ?? root,
             redirectUris: spec.redirectUris
-                ?? [`${root}${spec.redirectPath ?? "/*"}`],
-            webOrigins: spec.webOrigins ?? [root],
+                ?? roots.map(r => `${r}${spec.redirectPath ?? "/*"}`),
+            webOrigins: spec.webOrigins ?? roots,
             attributes: {
                 "post.logout.redirect.uris":
-                    (spec.postLogoutRedirectUris ?? [root]).join("##"),
+                    (spec.postLogoutRedirectUris ?? roots).join("##"),
                 // When an admin force-logs-out a user in Keycloak,
                 // backchannel.logout.session.required tells Keycloak to
                 // POST a session-end notification to the client so it

@@ -89,6 +89,12 @@ objects:
     !u Clusters.Perm.Secrets:
         name: "Manage secrets"
         iri: clusters/perm/ManageSecrets
+    # Lets a client add a key to a sealed secret but not replace or
+    # delete one. Enough for the Admin UI, which saves each password
+    # under a new key.
+    !u Clusters.Perm.CreateSecrets:
+        name: "Create secrets"
+        iri: clusters/perm/CreateSecrets
 
   !u Local.RepoGroup.Shared:
     !u Local.Repo.HelmCharts:

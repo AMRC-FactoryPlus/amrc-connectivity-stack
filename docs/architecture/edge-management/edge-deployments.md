@@ -125,6 +125,24 @@ sealed secrets service running on the edge cluster. The contents of this
 Secret are then referenced by the Edge Agent configuration in place of
 the secret information.
 
+The Cluster Manager's secret routes are under `/v1/cluster/<uuid>`, with
+the cluster UUID as the permission target:
+
+* `PUT secret/<namespace>/<name>/<key>` seals the request body into the
+  key `<key>` of the SealedSecret `<name>`. With the 'Manage secrets'
+  permission it can set any key. With only 'Create secrets' it can add
+  a key which is not there yet, and gets 403 for a key which is.
+* `DELETE secret/<namespace>/<name>/<key>` removes a key. It needs
+  'Manage secrets'.
+* `GET secret-access` returns `{"manage": bool, "create": bool}` for
+  the caller, so a client can tell before it asks whether it may
+  overwrite keys (`manage`) or add new ones (`create`, which 'Manage
+  secrets' also allows). It needs no permission. The Admin UI uses it
+  because Auth will not show a caller its own ACL entries without Read
+  ACL on them.
+
+Nobody can read a secret back through these routes.
+
 The Edge Monitor also tries to make sure that an Edge Agent which should
 be running is actually running. It treats the Edge Agent as up from any
 packet (normally its NBIRTH) until its NDEATH, which the MQTT broker

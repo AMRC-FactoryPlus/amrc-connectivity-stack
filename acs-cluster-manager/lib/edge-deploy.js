@@ -46,6 +46,8 @@ export class EdgeDeploy {
             .post(this.wrap(this.enrol))
             .delete(this.wrap(this.unenrol));
         app.get("/cluster/:cluster/status", this.wrap(this.cluster_status));
+        app.get("/cluster/:cluster/secret-access",
+            this.wrap(this.secret_access));
         app.route("/cluster/:cluster/secret/:namespace/:name/:key")
             .put(this.wrap(this.seal_secret))
             .delete(this.wrap(this.delete_sealed_secret));
@@ -121,16 +123,37 @@ export class EdgeDeploy {
             return res.status(404).end();
     }
 
+    /* Manage secrets lets a client set or delete any key. Create
+     * secrets only lets it add a key which is not there yet, so it
+     * cannot overwrite a secret someone else saved. `create` says
+     * whether the client may add a new key, which either allows. */
+    async check_secret_access (principal, cluster) {
+        const can = perm => this.fplus.Auth.check_acl(
+            principal, perm, cluster, true);
+        const manage = await can(Edge.Perm.Secrets);
+        const create = manage || await can(Edge.Perm.CreateSecrets);
+        return { manage, create };
+    }
+
+    /* Any client may ask what it may do with secrets on a cluster. The
+     * Admin UI uses this, as Auth will not show a client its own ACL
+     * without Read ACL. */
+    async secret_access (req, res) {
+        const { cluster } = req.params;
+        const access = await this.check_secret_access(req.auth, cluster);
+        return res.status(200).json(access);
+    }
+
     async seal_secret (req, res) {
         const opts = { 
             ...req.params,
             content:    req, 
             dryrun:     "dryrun" in req.query,
         };
-        
-        const ok = await this.fplus.Auth.check_acl(
-            req.auth, Edge.Perm.Secrets, opts.cluster, true);
-        if (!ok) return res.status(403).end();
+
+        const access = await this.check_secret_access(req.auth, opts.cluster);
+        if (!access.create) return res.status(403).end();
+        if (!access.manage) opts.create_only = true;
 
         const st = await this.secrets.seal_secret(opts);
         res.status(st).end();
@@ -142,9 +165,8 @@ export class EdgeDeploy {
             dryrun:         "dryrun" in req.query,
         }
 
-        const ok = await this.fplus.Auth.check_acl(
-            req.auth, Edge.Perm.Secrets, opts.cluster, true);
-        if (!ok) return res.status(403).end();
+        const access = await this.check_secret_access(req.auth, opts.cluster);
+        if (!access.manage) return res.status(403).end();
 
         const st = await this.secrets.delete_secret(opts);
         res.status(st).end();

@@ -11,7 +11,8 @@ interface NamespaceDetailProps {
 
 export function NamespaceDetail({ namespace }: NamespaceDetailProps) {
   // No heading here: SimpleDetailView (the shell every simple detail renders
-  // in) already shows the display name and the "Namespace" kind label.
+  // in) already shows the display name and the "Schema" kind label.
+  // ACS: i3X namespaces are labelled Schemas here.
   return (
     <div className="space-y-4">
       <DescriptionCard metadata={namespace.metadata} />
@@ -22,7 +23,7 @@ export function NamespaceDetail({ namespace }: NamespaceDetailProps) {
           <CardCodeSample
             descriptor={describeGetObjectTypes(namespace.uri)}
             title={namespace.displayName}
-            subtitle="Namespace"
+            subtitle="Schema"
           />
         }
       >
@@ -33,10 +34,10 @@ export function NamespaceDetail({ namespace }: NamespaceDetailProps) {
       </Card>
 
       <DataDisclosure
-        title="Namespace Data"
+        title="Schema Data"
         sections={[
           { label: 'Metadata', data: metadataExcept(namespace.metadata, ['description']) },
-          { label: 'Raw Namespace', data: namespace },
+          { label: 'Raw Schema', data: namespace },
         ]}
       />
     </div>

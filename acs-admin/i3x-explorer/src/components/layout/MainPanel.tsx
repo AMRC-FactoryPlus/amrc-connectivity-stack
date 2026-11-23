@@ -67,7 +67,7 @@ export function MainPanel() {
   if (selectedItem.type === 'namespace') {
     const namespace = selectedItem.data as Namespace
     return (
-      <SimpleDetailView label={namespace.displayName} kind="Namespace">
+      <SimpleDetailView label={namespace.displayName} kind="Schema">{/* ACS: label */}
         <NamespaceDetail namespace={namespace} />
       </SimpleDetailView>
     )

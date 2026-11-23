@@ -112,6 +112,15 @@ upstream, so they are not tied to the Manager UI.
    Objects") is shown under its type in Schemas (`schemaPathTo`). The
    Hierarchy root loads the catalog when it opens, as the Objects root
    did, so the status bar's object count is unchanged.
+8. **`src/components/layout/StatusBar.tsx`**, `MainPanel.tsx`,
+   `src/components/main/ModelOverview.tsx`,
+   `src/components/details/NamespaceDetail.tsx` and `treeMenu.tsx`:
+   i3X namespaces are labelled Schemas wherever the tree's Schemas root
+   would otherwise disagree with them: the status bar ("2 schemas"), the
+   overview's stat and "Objects by schema" card, the kind under a
+   selected namespace's name, its data panel and the tree menu's copy
+   entries. Field names from the i3X model, such as "Namespace URI", keep
+   their names. Tests in `src/acs/schemaLabels.test.tsx`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

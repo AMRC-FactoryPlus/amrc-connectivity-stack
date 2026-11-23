@@ -7,7 +7,6 @@ import type { ObjectInstance, RelationshipType } from '../../api/types'
 import { TreeNode, TreeMoreNode, TreeRowIcon, IndentGuides } from './TreeNode'
 import { buildTreeMenu } from './treeMenu'
 import { Chevron } from '../common/Chevron'
-import { CubeIcon, LinkIcon } from '../common/icons'
 import { ContextMenu, type MenuEntry } from '../common/ContextMenu'
 import { NumberPromptDialog } from '../common/NumberPromptDialog'
 import { useElementNavigation } from '../main/navigation'
@@ -86,9 +85,7 @@ export function TreeView() {
   const manualRefreshTick = useExplorerStore(s => s.manualRefreshTick)
   const selectedId = useExplorerStore(s => s.selectedItem?.id ?? null)
   const showRelationshipsInTree = useExplorerStore(s => s.showRelationshipsInTree)
-  const toggleShowRelationshipsInTree = useExplorerStore(s => s.toggleShowRelationshipsInTree)
   const showComponentsInTree = useExplorerStore(s => s.showComponentsInTree)
-  const toggleShowComponentsInTree = useExplorerStore(s => s.toggleShowComponentsInTree)
   const relatedObjects = useExplorerStore(s => s.relatedObjects)
   const hierarchyComponents = useExplorerStore(s => s.hierarchyComponents)
   const relationshipInstances = useExplorerStore(s => s.relationshipInstances)
@@ -624,63 +621,8 @@ export function TreeView() {
           placeholder="Filter tree…"
           className="w-full px-2 py-1 text-sm bg-i3x-bg border border-i3x-border rounded text-i3x-text placeholder:text-i3x-text-muted focus:outline-none focus:border-i3x-primary"
         />
-        {/* Toggles whether the Hierarchy folder also draws each object's
-            non-hierarchical relationships (grouped by relationship type,
-            in the relationship accent color) alongside its normal children. */}
-        <button
-          type="button"
-          onClick={toggleShowRelationshipsInTree}
-          aria-pressed={showRelationshipsInTree}
-          title={
-            showRelationshipsInTree
-              ? 'Hide non-hierarchical relationships in the tree'
-              : 'Show non-hierarchical relationships in the tree'
-          }
-          className={`mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
-            showRelationshipsInTree
-              ? 'bg-i3x-relationship/15 text-i3x-relationship'
-              : 'text-i3x-text-muted hover:bg-i3x-text/[0.06] hover:text-i3x-text'
-          }`}
-        >
-          <LinkIcon size={13} />
-          <span className="flex-1 text-left">Graph Relationships</span>
-          <span
-            className={`h-3.5 w-6 flex-shrink-0 rounded-full transition-colors ${
-              showRelationshipsInTree ? 'bg-i3x-relationship' : 'bg-i3x-border'
-            }`}
-          >
-            <span
-              className={`block h-3 w-3 translate-y-px rounded-full bg-i3x-surface transition-transform ${
-                showRelationshipsInTree ? 'translate-x-[11px]' : 'translate-x-px'
-              }`}
-            />
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={toggleShowComponentsInTree}
-          aria-pressed={showComponentsInTree}
-          title={showComponentsInTree ? 'Hide component relationships in the tree' : 'Show component relationships in the tree'}
-          className={`mt-1 flex w-full items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
-            showComponentsInTree
-              ? 'tree-component-active'
-              : 'text-i3x-text-muted hover:bg-i3x-text/[0.06] hover:text-i3x-text'
-          }`}
-        >
-          <CubeIcon size={13} />
-          <span className="flex-1 text-left">Component Relationships</span>
-          <span
-            className={`h-3.5 w-6 flex-shrink-0 rounded-full transition-colors ${
-              showComponentsInTree ? 'tree-component-switch' : 'bg-i3x-border'
-            }`}
-          >
-            <span
-              className={`block h-3 w-3 translate-y-px rounded-full bg-i3x-surface transition-transform ${
-                showComponentsInTree ? 'translate-x-[11px]' : 'translate-x-px'
-              }`}
-            />
-          </span>
-        </button>
+        {/* ACS: the Graph Relationships and Component Relationships toggles
+            that were here are in the settings menu (Toolbar.tsx). */}
       </div>
 
       <div className="relative flex-1 min-h-0">

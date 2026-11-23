@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { TreeNode } from './TreeNode'
 import { TreeView } from './TreeView'
 import type { NodeRow } from './treeData'
@@ -66,13 +66,10 @@ it('resolves and distinguishes components in the hierarchy with graph relationsh
   })
 
   render(<TreeView />)
-  const componentToggle = screen.getByRole('button', { name: 'Component Relationships' })
-  const graphToggle = screen.getByRole('button', { name: 'Graph Relationships' })
-  expect(graphToggle.nextElementSibling).toBe(componentToggle)
-  expect(componentToggle.classList.contains('tree-component-active')).toBe(true)
-  expect(componentToggle.classList.contains('rounded')).toBe(true)
-  expect(componentToggle.getAttribute('aria-pressed')).toBe('true')
-  expect(graphToggle.getAttribute('aria-pressed')).toBe('false')
+  // ACS: the toggles are in the toolbar's settings menu, not above the tree.
+  expect(screen.queryByRole('button', { name: 'Component Relationships' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Graph Relationships' })).toBeNull()
+  const toggleComponents = () => act(() => useExplorerStore.getState().toggleShowComponentsInTree())
   await waitFor(() => expect(screen.getByText('Speed').classList.contains('tree-component')).toBe(true))
   expect(screen.queryByText('component')).toBeNull()
   expect(screen.getByText('Child').classList.contains('tree-component')).toBe(false)
@@ -82,14 +79,10 @@ it('resolves and distinguishes components in the hierarchy with graph relationsh
     .toBeLessThan(labels.findIndex(label => label?.includes('Speed')))
   expect(screen.queryByTitle('Relationship: HasComponent')).toBeNull()
 
-  fireEvent.click(componentToggle)
-  expect(componentToggle.getAttribute('aria-pressed')).toBe('false')
-  expect(componentToggle.classList.contains('tree-component-active')).toBe(false)
+  toggleComponents()
   expect(screen.queryByText('Speed')).toBeNull()
   expect(screen.getByText('Child')).toBeTruthy()
-  expect(graphToggle.getAttribute('aria-pressed')).toBe('false')
-  fireEvent.click(componentToggle)
-  expect(componentToggle.getAttribute('aria-pressed')).toBe('true')
+  toggleComponents()
   expect(screen.getByText('Speed')).toBeTruthy()
 })
 
@@ -123,7 +116,7 @@ it('discovers components for a collapsed owner with no parent-linked children wh
   expect(screen.getAllByText('Remote component')).toHaveLength(1)
   expect(screen.getByTitle('Component: Remote component')).toBeTruthy()
 
-  fireEvent.click(screen.getByRole('button', { name: 'Component Relationships' }))
+  act(() => useExplorerStore.getState().toggleShowComponentsInTree()) // ACS: toggle is in the settings menu
   expect(screen.queryByText('Remote component')).toBeNull()
   expect(screen.getByText('Owner').closest('[role="treeitem"]')?.hasAttribute('aria-expanded')).toBe(false)
 })

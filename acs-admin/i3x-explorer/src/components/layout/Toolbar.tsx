@@ -81,6 +81,11 @@ export function Toolbar() {
     selectItem: s.selectItem
   })))
   const objectCount = useExplorerStore(s => s.allObjects.length)
+  // ACS: the tree's relationship toggles live in the settings menu.
+  const showRelationshipsInTree = useExplorerStore(s => s.showRelationshipsInTree)
+  const toggleShowRelationshipsInTree = useExplorerStore(s => s.toggleShowRelationshipsInTree)
+  const showComponentsInTree = useExplorerStore(s => s.showComponentsInTree)
+  const toggleShowComponentsInTree = useExplorerStore(s => s.toggleShowComponentsInTree)
   const {
     snapshotBusy,
     hasBaseline,
@@ -374,7 +379,7 @@ export function Toolbar() {
         <div className="relative">
           <button
             onClick={() => setShowSettingsMenu(m => !m)}
-            title="Settings: refresh interval, catalog cache, performance tracing"
+            title="Settings: tree relationships, refresh interval, catalog cache, performance tracing"
             aria-label="Settings"
             className="w-7 h-7 flex items-center justify-center rounded text-i3x-text-muted hover:text-i3x-text hover:bg-i3x-bg transition-colors motion-reduce:transition-none"
           >
@@ -387,6 +392,30 @@ export function Toolbar() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowSettingsMenu(false)} />
               <div className="absolute right-0 top-9 z-50 bg-i3x-surface border border-i3x-border rounded-lg shadow-xl w-56 py-1">
+                {/* ACS: moved here from above the tree, as ticked options. */}
+                <button
+                  onClick={toggleShowRelationshipsInTree}
+                  aria-pressed={showRelationshipsInTree}
+                  title="Also show each object's non-hierarchical relationships in the tree, grouped by relationship type"
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-i3x-bg transition-colors flex items-center justify-between ${
+                    showRelationshipsInTree ? 'text-i3x-primary' : 'text-i3x-text'
+                  }`}
+                >
+                  Graph Relationships
+                  {showRelationshipsInTree && <CheckIcon size={13} />}
+                </button>
+                <button
+                  onClick={toggleShowComponentsInTree}
+                  aria-pressed={showComponentsInTree}
+                  title="Show each object's components (HasComponent) in the tree"
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-i3x-bg transition-colors flex items-center justify-between ${
+                    showComponentsInTree ? 'text-i3x-primary' : 'text-i3x-text'
+                  }`}
+                >
+                  Component Relationships
+                  {showComponentsInTree && <CheckIcon size={13} />}
+                </button>
+                <div className="border-t border-i3x-border my-1" />
                 {POLL_OPTIONS.map(opt => (
                   <button
                     key={opt.ms}

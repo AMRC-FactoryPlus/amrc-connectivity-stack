@@ -2,6 +2,7 @@ import { useConnectionStore } from '../../stores/connection'
 import { useExplorerStore } from '../../stores/explorer'
 import { useSubscriptionsStore } from '../../stores/subscriptions'
 import { LockIcon, WarningIcon } from '../common/icons'
+import { useSubscriptionsPopout } from '../../acs/subscriptionsPopout' // ACS
 
 /**
  * The bottom status strip. Everything here used to be crammed into the toolbar's
@@ -25,6 +26,10 @@ export function StatusBar() {
   const subscriptionCount = useSubscriptionsStore(state => state.subscriptions.size)
   const isSubscriptionsOpen = useSubscriptionsStore(state => state.isSubscriptionsOpen)
   const setSubscriptionsOpen = useSubscriptionsStore(state => state.setSubscriptionsOpen)
+  // ACS: the subscriptions panel may be in its own window.
+  const poppedOut = useSubscriptionsPopout(state => state.popout !== null)
+  const focusPopout = useSubscriptionsPopout(state => state.focusPopout)
+  const dock = useSubscriptionsPopout(state => state.dock)
 
   const statusLabel = isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'
   const statusColor = isConnected
@@ -77,17 +82,39 @@ export function StatusBar() {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setSubscriptionsOpen(!isSubscriptionsOpen)}
-        aria-expanded={isSubscriptionsOpen}
-        title={isSubscriptionsOpen ? 'Hide subscriptions' : 'Show subscriptions'}
-        className={`flex items-center px-3 border-r border-i3x-border whitespace-nowrap hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary focus-visible:ring-inset ${
-          isSubscriptionsOpen ? 'text-i3x-primary' : ''
-        }`}
-      >
-        {subscriptionCount} {subscriptionCount === 1 ? 'subscription' : 'subscriptions'}
-      </button>
+      {poppedOut ? (
+        // ACS: popped out, the count brings that window to the front, and Dock puts the panel back.
+        <div className="flex items-stretch border-r border-i3x-border">
+          <button
+            type="button"
+            onClick={focusPopout}
+            title="The subscriptions panel is in its own window. Click to bring it to the front."
+            className="flex items-center px-3 whitespace-nowrap text-i3x-primary hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary focus-visible:ring-inset"
+          >
+            {subscriptionCount} {subscriptionCount === 1 ? 'subscription' : 'subscriptions'} · popped out
+          </button>
+          <button
+            type="button"
+            onClick={dock}
+            title="Put the subscriptions panel back here and close its window"
+            className="flex items-center px-2 whitespace-nowrap hover:bg-i3x-bg hover:text-i3x-text transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary focus-visible:ring-inset"
+          >
+            Dock
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setSubscriptionsOpen(!isSubscriptionsOpen)}
+          aria-expanded={isSubscriptionsOpen}
+          title={isSubscriptionsOpen ? 'Hide subscriptions' : 'Show subscriptions'}
+          className={`flex items-center px-3 border-r border-i3x-border whitespace-nowrap hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary focus-visible:ring-inset ${
+            isSubscriptionsOpen ? 'text-i3x-primary' : ''
+          }`}
+        >
+          {subscriptionCount} {subscriptionCount === 1 ? 'subscription' : 'subscriptions'}
+        </button>
+      )}
 
       {error && (
         <div className="flex items-center gap-1.5 px-3 border-r border-i3x-border text-i3x-error min-w-0">

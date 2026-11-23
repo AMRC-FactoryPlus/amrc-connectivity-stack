@@ -20,11 +20,15 @@ export function useCanRebirth (targets) {
     // Fetch the full ACL via the Auth service HTTP API.
     // We call ServiceInterface.fetch directly to avoid the
     // RxClient notify-based override of fetch_raw_acl.
+    // whoami_uuid() resolves our principal server-side from whatever
+    // credentials the request carries (Keycloak JWT or Basic auth), so
+    // this works the same under OIDC and the password fallback - no
+    // need to reconstruct a Kerberos UPN from s.username client-side.
     let acl
     try {
-      const principal = `${s.username}@${s.baseUrl.toUpperCase()}`
+      const uuid = await s.client.Auth.whoami_uuid()
       const [st, json] = await s.client.Auth.fetch(
-        `v2/acl/kerberos/${principal}`
+        `v2/acl/${uuid}`
       )
       if (st !== 200) throw new Error(`ACL fetch returned ${st}`)
       acl = json

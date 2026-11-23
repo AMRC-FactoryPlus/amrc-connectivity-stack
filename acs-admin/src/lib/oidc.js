@@ -109,6 +109,7 @@ export class OidcClient {
         this.redirect_uri = new URL(location.pathname, location.origin)
             .toString();
         this.tokens = null;
+        this.pending_hash = null;
     }
 
     async init () {
@@ -128,6 +129,21 @@ export class OidcClient {
 
     async ensure_login () {
         const here = new URL(location.href);
+
+        /* Keycloak reports a login failure (access_denied, disabled
+         * account, misconfigured client...) as an `error` parameter
+         * rather than a `code`. Surface it instead of falling through
+         * to start_code_flow(), which would just bounce straight back
+         * to Keycloak in a loop if the condition persists. */
+        const error = here.searchParams.get("error");
+        if (error) {
+            const description = here.searchParams.get("error_description");
+            for (const p of ["error", "error_description", "state", "iss"])
+                here.searchParams.delete(p);
+            history.replaceState(null, "", here);
+            throw new Error(`Keycloak login failed: ${error}`
+                + (description ? ` (${description})` : ""));
+        }
 
         /* Returning from Keycloak with an authorization code. */
         if (here.searchParams.get("code")) {
@@ -164,8 +180,12 @@ export class OidcClient {
             new TextEncoder().encode(verifier)));
         const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
 
+        /* The route (hash) the user was on, so it can be restored after
+         * the Keycloak round trip - the redirect_uri we register can't
+         * carry it, as the fragment never reaches the server and
+         * Keycloak's own redirect back would otherwise drop it. */
         sessionStorage.setItem(SESSION,
-            JSON.stringify({ verifier, state }));
+            JSON.stringify({ verifier, state, hash: location.hash }));
 
         const url = new URL(this.provider.authorization_endpoint);
         url.search = new URLSearchParams({
@@ -202,6 +222,21 @@ export class OidcClient {
             code_verifier:  flow.verifier,
         });
         this.schedule_refresh();
+
+        /* The route (hash) the user was on before being sent to
+         * Keycloak: history.replaceState above can't restore it, as
+         * that doesn't trigger the hash-router's navigation. Left for
+         * the caller to apply via take_pending_hash(). */
+        this.pending_hash = flow.hash || null;
+    }
+
+    /* Consumes and returns the route the user was on before being sent
+     * to Keycloak, if any. Callers should apply this (e.g.
+     * `location.hash = hash`) once, after a successful ensure_login(). */
+    take_pending_hash () {
+        const hash = this.pending_hash;
+        this.pending_hash = null;
+        return hash;
     }
 
     async grant (params) {
@@ -225,13 +260,20 @@ export class OidcClient {
         this.save_tokens();
     }
 
+    /* token() and the proactive schedule_refresh() timer can both want
+     * to refresh at once; sharing one in-flight request avoids sending
+     * the same refresh_token twice, which a Keycloak client with
+     * refresh-token rotation/reuse detection would reject the second
+     * use of. */
     async refresh () {
+        if (this._refreshing) return this._refreshing;
         if (!this.tokens?.refresh_token)
             throw new Error("No refresh token");
-        await this.grant({
+        this._refreshing = this.grant({
             grant_type:     "refresh_token",
             refresh_token:  this.tokens.refresh_token,
-        });
+        }).finally(() => { this._refreshing = null; });
+        return this._refreshing;
     }
 
     expiring_soon () {

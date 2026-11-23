@@ -23,6 +23,11 @@ export const useServiceClientStore = defineStore('service-client', {
       ready: false
     }
   },
+  getters: {
+    // Single source of truth for which auth mode is active, so routing
+    // and UI code don't each read import.meta.env independently.
+    oidcConfigured: () => !!import.meta.env.OIDC_DISCOVERY_URL,
+  },
   actions: {
     // since we rely on `this`, we cannot use an arrow function
 
@@ -35,6 +40,10 @@ export const useServiceClientStore = defineStore('service-client', {
       let clientOpts;
 
       if (discoveryUrl) {
+        // No longer used, and may hold a plaintext password left over
+        // from before this deployment had OIDC enabled.
+        localStorage.removeItem('opts');
+
         const oidc = await new OidcClient({
           discovery_url: discoveryUrl,
           client_id: import.meta.env.OIDC_CLIENT_ID,
@@ -67,7 +76,14 @@ export const useServiceClientStore = defineStore('service-client', {
         }
         this.ready = true;
       } catch (e) {
-        this.logout();
+        // This failure may be unrelated to authentication (e.g. a
+        // transient Directory lookup error) and our OIDC tokens, if any,
+        // may still be perfectly valid - so just clear local state and
+        // let the caller retry, rather than forcing a full Keycloak
+        // RP-initiated logout via logout().
+        localStorage.removeItem('opts');
+        this.$reset();
+        this.ready = false;
         throw e;
       }
     },

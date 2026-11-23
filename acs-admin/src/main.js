@@ -347,9 +347,22 @@ router.beforeEach(async (to, from, next) => {
   // from its own stored tokens, or redirects to Keycloak (navigating away
   // and never resolving) - there is no separate login form to send the
   // user to in this case.
-  if (import.meta.env.OIDC_DISCOVERY_URL) {
+  if (useServiceClientStore().oidcConfigured) {
     try {
-      await useServiceClientStore().login()
+      const store = useServiceClientStore()
+      await store.login()
+      // If we were sent to Keycloak mid-session (e.g. a refresh-token
+      // failure) and are now coming back, restore the route we were on
+      // rather than landing on whatever route triggered the redirect.
+      // Setting location.hash (unlike history.replaceState) fires the
+      // hash-router's own navigation, so abort this one and let that
+      // one take over.
+      const hash = store.oidc?.take_pending_hash()
+      if (hash && hash !== location.hash) {
+        next(false)
+        location.hash = hash
+        return
+      }
       next()
     } catch (e) {
       console.error("OIDC login failed", e)

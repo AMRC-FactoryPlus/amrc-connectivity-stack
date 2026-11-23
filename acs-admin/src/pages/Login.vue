@@ -5,6 +5,17 @@
 <template>
   <div class="h-svh flex items-center justify-center">
     <LoginDialog v-if="!oidcConfigured"/>
+    <Card v-else-if="oidcError" class="mx-auto max-w-sm">
+      <CardHeader>
+        <CardTitle class="text-2xl">Unable to sign in</CardTitle>
+        <CardDescription>
+          Something went wrong talking to the login server.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button class="w-full" @click="tryOidcLogin">Try again</Button>
+      </CardContent>
+    </Card>
   </div>
 </template>
 
@@ -13,11 +24,14 @@
 
 import { defineComponent } from 'vue'
 import LoginDialog from '@components/LoginDialog.vue'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { toast } from 'vue-sonner'
 
 export default defineComponent({
   name: 'Login',
-  components: {LoginDialog},
+  components: {LoginDialog, Button, Card, CardContent, CardDescription, CardHeader, CardTitle},
 
   data () {
     return {
@@ -25,18 +39,27 @@ export default defineComponent({
       // straight to Keycloak (or their session is resumed silently). This
       // page is only reachable directly because `/login` is `anonAllowed`
       // and so skips the router auth guard in main.js.
-      oidcConfigured: !!import.meta.env.OIDC_DISCOVERY_URL,
+      oidcConfigured: useServiceClientStore().oidcConfigured,
+      oidcError: false,
     }
   },
 
   async mounted () {
-    if (!this.oidcConfigured) return
-    try {
-      await useServiceClientStore().login()
-      this.$router.push("/")
-    } catch (e) {
-      console.error("OIDC login failed", e)
-    }
+    if (this.oidcConfigured) await this.tryOidcLogin()
+  },
+
+  methods: {
+    async tryOidcLogin () {
+      this.oidcError = false
+      try {
+        await useServiceClientStore().login()
+        this.$router.push("/")
+      } catch (e) {
+        console.error("OIDC login failed", e)
+        toast.error("Login failed")
+        this.oidcError = true
+      }
+    },
   },
 })
 

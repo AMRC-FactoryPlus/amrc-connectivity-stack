@@ -36,6 +36,8 @@ const FALLBACK_PANE = 760
 
 /** Screen px of headroom around the outer ring at fit, for its outward labels. */
 const FIT_PAD_PX = 72
+/** ACS: the most headroom a long outer label may take. */
+const FIT_PAD_MAX_PX = 200
 
 /**
  * A node's label appears when its angular slot × ring radius clears this many
@@ -326,7 +328,24 @@ export function RadialGraph({
   // the pad holds its screen size at any depth; the denominator floor keeps a
   // tiny pane from inflating the extent without bound.
   const outerRadius = layout?.outerRadius ?? 200
-  const extent = outerRadius / Math.max(0.5, 1 - (2 * FIT_PAD_PX) / paneMin)
+  // ACS: size the headroom to the longest label on the outer ring, so a long
+  // name on the left or right edge is not cut off at fit. Estimated from the
+  // character count at LABEL_PX; capped so one very long name can't shrink
+  // the map to nothing (the floor below still applies).
+  const fitPadPx = useMemo(() => {
+    if (!layout || layout.nodes.length === 0) return FIT_PAD_PX
+    const outerDepth = Math.max(...layout.nodes.map(node => node.depth))
+    if (outerDepth === 0) return FIT_PAD_PX
+    const longest = Math.max(0, ...layout.nodes
+      .filter(node => node.depth === outerDepth)
+      .map(node => Math.min(node.object.displayName?.length ?? 0, MAX_LABEL_CHARS)))
+    // A pane wider than it is tall already has spare room either side of the
+    // fitted square, where the left and right labels can sit.
+    const sideSlack = Math.max(0, (pane.width - pane.height) / 2)
+    const needed = longest * LABEL_PX * 0.6 + 20 - sideSlack
+    return Math.min(FIT_PAD_MAX_PX, Math.max(FIT_PAD_PX, needed))
+  }, [layout, pane.width, pane.height])
+  const extent = outerRadius / Math.max(0.5, 1 - (2 * fitPadPx) / paneMin)
 
   // Everything screen-sized is some multiple of this: px × unitOverScale =
   // diagram units that render at px CSS pixels at the current zoom.

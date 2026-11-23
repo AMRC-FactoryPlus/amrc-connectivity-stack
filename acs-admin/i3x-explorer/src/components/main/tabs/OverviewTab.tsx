@@ -163,7 +163,7 @@ export function OverviewTab({
 
       {/* ACS: Relationships is a panel here, under Current Value, on every
           object. It needs a height to lay its list and map out in. */}
-      <div className="h-[36rem]">
+      <div className="h-[48rem] 2xl:h-[36rem]">
         <RelationshipsTab object={catalogObject ?? object} />
       </div>
 

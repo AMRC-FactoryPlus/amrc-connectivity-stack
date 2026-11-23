@@ -67,6 +67,11 @@ upstream, so they are not tied to the Manager UI.
      theme toggle still works;
    - make New window open the Manager UI's Explorer page, not the bare
      frame.
+   - hide the "i3X Explorer" logo and name at the top left, because the
+     Manager UI has its own header. The logo was the way into the About
+     dialog, so with a host About is the last entry in the settings
+     menu, and its MIT licence and credit are unchanged. Tests in
+     `src/acs/toolbarHosted.test.tsx` and `src/acs/toolbar.test.tsx`.
 4. **`src/api/subscription.ts`**: read live updates in the shape the
    i3X 1.0 Implementation Guide defines for the stream (Subscribe
    Methods, Streaming, `POST /subscriptions/stream`): a flat array per

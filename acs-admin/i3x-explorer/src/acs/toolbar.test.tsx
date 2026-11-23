@@ -51,3 +51,19 @@ describe('tree relationship toggles in the settings menu', () => {
     expect(screen.getByRole('button', { name: /Component Relationships/ }).getAttribute('aria-pressed')).toBe('false')
   })
 })
+
+describe('branding when standalone', () => {
+  it('shows the i3X Explorer logo and name, which open About', () => {
+    render(<Toolbar />)
+    const logo = screen.getByRole('button', { name: 'i3X Explorer' })
+    expect(logo.querySelector('img')).not.toBeNull()
+    fireEvent.click(logo)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('leaves About out of the settings menu, as upstream', () => {
+    render(<Toolbar />)
+    openSettings()
+    expect(screen.queryByRole('button', { name: 'About i3X Explorer' })).toBeNull()
+  })
+})

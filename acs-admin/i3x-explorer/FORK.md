@@ -126,6 +126,14 @@ upstream, so they are not tied to the Manager UI.
    dragging it. It is still resizable from 224px to 480px. Upstream keeps
    no width between visits, so neither does this. Test in
    `src/acs/sidebar.test.tsx`.
+10. **`src/components/layout/Toolbar.tsx`** and `TreeView.tsx`: the
+    Graph Relationships and Component Relationships switches move from
+    under the tree's filter box into the settings (gear) menu, as the
+    first group of ticked options, styled like "Cache catalog for fast
+    reconnects". They set the same store flags as before, so the tree
+    behaves the same and, as upstream, the choice lasts for the session.
+    The filter box now sits directly above the tree. Tests in
+    `src/acs/toolbar.test.tsx` and `TreeNode.test.tsx`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

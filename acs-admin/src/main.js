@@ -200,6 +200,15 @@ const routes = [
     }
   },
   {
+    /* Loaded on demand: it brings the UNECE units table. */
+    path: '/units',
+    component: () => import('@pages/Units/Units.vue'),
+    meta: {
+      name: 'Units',
+      icon: 'ruler'
+    }
+  },
+  {
     path: '/schemas',
     component: () => import('@pages/Schemas/Schemas.vue'),
     meta: {

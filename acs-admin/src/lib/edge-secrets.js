@@ -8,7 +8,7 @@
  * certificate and commits it to the cluster's Git repo, and Flux then
  * applies it on the edge. Its answers (acs-cluster-manager
  * lib/edge-deploy.js and lib/secrets.js) are 204 when saved, 403 without
- * the Manage secrets permission on the cluster, 404 for a cluster it
+ * permission to save secrets on the cluster, 404 for a cluster it
  * doesn't know, 503 when the cluster hasn't reported its kubeseal
  * certificate, and 500 when the commit failed.
  *
@@ -36,7 +36,7 @@ export function secret_save_message (status) {
     case 401:
     case 403:
       return 'You don\'t have permission to save secrets on this cluster, so the '
-        + 'password was not saved. Ask an administrator for the Manage secrets '
+        + 'password was not saved. Ask an administrator for the Create secrets '
         + 'permission on this cluster.'
     case 404:
       return 'The Cluster Manager doesn\'t know this cluster, so the password '

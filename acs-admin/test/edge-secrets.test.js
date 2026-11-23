@@ -81,6 +81,10 @@ describe('saving an edge secret', () => {
     expect(err.status).toBe(0)
   })
 
+  it('names the Create secrets permission on a refusal', () => {
+    expect(secret_save_message(403)).toMatch(/Create secrets permission/)
+  })
+
   it('never puts the value in the message', () => {
     for (const st of [0, 401, 403, 404, 500, 503])
       expect(secret_save_message(st)).not.toContain('hunter2')

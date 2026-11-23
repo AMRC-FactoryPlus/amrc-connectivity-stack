@@ -69,6 +69,8 @@ export interface AcsExplorerHost {
   runAction(id: string, selection: HostSelection): void
   /** Register what opens search, for ⌘K pressed outside the frame. */
   onSearchRequest?(open: () => void): () => void
+  /** Esc the app did not use itself, e.g. to leave the console's full screen. */
+  escape?(): void
 }
 
 const HOST_KEY = '__acsI3xExplorerHost'
@@ -194,6 +196,24 @@ export function startHosted(connect: () => Promise<void>): void {
   acsHost.onSearchRequest?.(() => {
     window.focus()
     useSearchDialog.getState().openSearch('')
+  })
+  // Esc that nothing in the app used goes to the console, which toggles its
+  // full screen. Whether a dialog or menu was open is noted before the app
+  // handles the key (capture phase), as closing one removes it at once.
+  // The app's overlays (search, dialogs, menus, an expanded card) all sit on
+  // a full-window fixed layer; Esc in a text box is the box's to use too.
+  let appOwnsEscape = false
+  const OVERLAY = '[role="dialog"], [role="menu"], [role="listbox"], .fixed.inset-0'
+  window.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return
+    const active = document.activeElement
+    const typing = active instanceof HTMLElement &&
+      (active.matches('input, textarea, select') || active.isContentEditable)
+    appOwnsEscape = typing || !!document.querySelector(OVERLAY)
+  }, true)
+  window.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || event.defaultPrevented || appOwnsEscape) return
+    acsHost?.escape?.()
   })
 }
 

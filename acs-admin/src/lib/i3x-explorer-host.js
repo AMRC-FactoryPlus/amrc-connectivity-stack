@@ -72,6 +72,11 @@ export function mk_host (opts) {
         onSearchRequest (open) {
             return opts.on_search ? opts.on_search(open) : () => {};
         },
+        /* Esc pressed in the frame that the app did not use itself, so
+         * full screen can be left from inside the Explorer. */
+        escape () {
+            opts.escape?.();
+        },
     };
 }
 

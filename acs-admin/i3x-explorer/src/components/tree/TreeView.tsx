@@ -10,6 +10,8 @@ import { Chevron } from '../common/Chevron'
 import { ContextMenu, type MenuEntry } from '../common/ContextMenu'
 import { SearchIcon } from '../common/icons'
 import { useSearchDialog } from '../../acs/searchDialog' // ACS
+import { useSubscribeAction, useSubscribeStatus } from '../../acs/useSubscribe' // ACS
+import { ROW_ERROR_MS } from '../../acs/RowSubscribeButton' // ACS
 import { NumberPromptDialog } from '../common/NumberPromptDialog'
 import { useElementNavigation } from '../main/navigation'
 import { ensureAllObjectsLoaded, loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
@@ -303,14 +305,32 @@ export function TreeView() {
     setPagePrompt({ parentId, hidden })
   }, [])
 
+  // ACS: the menu's Subscribe. The menu has closed by the time a subscribe
+  // fails, so the failure shows for a few seconds at the foot of the tree.
+  const subscribeAction = useSubscribeAction()
+  const [subscribeNote, setSubscribeNote] = useState<string | null>(null)
+  useEffect(() => {
+    if (!subscribeNote) return
+    const timer = setTimeout(() => setSubscribeNote(null), ROW_ERROR_MS)
+    return () => clearTimeout(timer)
+  }, [subscribeNote])
+  const subscribeFromMenu = useCallback((object: ObjectInstance) => {
+    setSubscribeNote(null)
+    void subscribeAction(object).then(ok => {
+      if (ok) return
+      const reason = useSubscribeStatus.getState().errors.get(object.elementId) ?? 'Subscribe failed'
+      setSubscribeNote(`Could not subscribe to ${object.displayName}: ${reason}`)
+    })
+  }, [subscribeAction])
+
   const openMenuForRow = useCallback((index: number, x: number, y: number) => {
     const row = rows[index]
     if (!row) return
-    const entries = buildTreeMenu(row, selectElement, promptForChildCount)
+    const entries = buildTreeMenu(row, selectElement, promptForChildCount, subscribeFromMenu)
     if (!entries) return
     setFocusedIndex(index)
     setMenu({ x, y, entries })
-  }, [rows, selectElement, promptForChildCount])
+  }, [rows, selectElement, promptForChildCount, subscribeFromMenu])
 
   const closeMenu = useCallback(() => {
     setMenu(null)
@@ -631,7 +651,7 @@ export function TreeView() {
   const firstNodeItem = virtualItems.find(vi => rows[vi.index]?.kind === 'node')
 
   return (
-    <div className="flex flex-col h-full min-h-0 text-i3x-text">
+    <div className="relative flex flex-col h-full min-h-0 text-i3x-text">
       {/* Filter input, fixed header above the scrolling tree body. The sidebar
           gives the tree its full width edge-to-edge; the input carries its own
           side padding while rows bleed to the panel edges. */}
@@ -788,6 +808,15 @@ export function TreeView() {
       </div>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} entries={menu.entries} onClose={closeMenu} />}
+
+      {/* ACS: a failed Subscribe from the menu. */}
+      <div role="status" className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex justify-center">
+        {subscribeNote && (
+          <p className="pointer-events-auto max-w-full px-2.5 py-1.5 text-xs text-i3x-error bg-i3x-surface border border-i3x-error/40 rounded-md shadow-sm break-words">
+            {subscribeNote}
+          </p>
+        )}
+      </div>
 
       {pagePrompt && (
         <NumberPromptDialog

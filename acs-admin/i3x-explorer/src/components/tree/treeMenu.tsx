@@ -18,7 +18,10 @@ import {
   ExpandAllIcon,
   CollapseAllIcon,
   EllipsisIcon,
+  BroadcastIcon, // ACS
 } from '../common/icons'
+import { useSubscriptionsStore } from '../../stores/subscriptions' // ACS
+import { isElementSubscribed, showSubscriptions } from '../../acs/useSubscribe' // ACS
 import {
   expandRow,
   getObjectLabel,
@@ -112,7 +115,11 @@ function openRowTab(row: NodeRow, tab: DetailTab) {
   selectItem({ type: row.nodeType, id: row.id, data: row.data } as SelectedItem, tab)
 }
 
-function objectEntries(row: NodeRow, revealInHierarchy: (elementId: string) => void): MenuEntry[] {
+function objectEntries(
+  row: NodeRow,
+  revealInHierarchy: (elementId: string) => void,
+  subscribe?: (object: ObjectInstance) => void
+): MenuEntry[] {
   const obj = row.data as ObjectInstance
   const state = useExplorerStore.getState()
   const { childrenByParent, objectIndex, expandedNodes } = state
@@ -126,8 +133,14 @@ function objectEntries(row: NodeRow, revealInHierarchy: (elementId: string) => v
     { kind: 'action', label: 'Open', icon: <CubeIcon size={ICON} />, onSelect: () => selectRow(row) },
     // ACS: no Open Relationships or Open Subtree; those tabs are gone.
     { kind: 'action', label: 'Open History', icon: <ClockIcon size={ICON} />, onSelect: () => openRowTab(row, 'history') },
-    { kind: 'separator' },
   ]
+  // ACS: subscribe without opening the element, or find it in the drawer once subscribed.
+  if (subscribe) {
+    entries.push(isElementSubscribed(useSubscriptionsStore.getState(), obj.elementId)
+      ? { kind: 'action', label: 'Show in subscriptions', icon: <BroadcastIcon size={ICON} />, onSelect: showSubscriptions }
+      : { kind: 'action', label: 'Subscribe', icon: <BroadcastIcon size={ICON} />, onSelect: () => subscribe(obj) })
+  }
+  entries.push({ kind: 'separator' })
 
   // Structure actions. Expand-all/collapse-subtree only make sense in the
   // Hierarchy view, whose expansion is pure local data; composition ('obj:')
@@ -329,7 +342,8 @@ function folderEntries(row: NodeRow): MenuEntry[] {
 export function buildTreeMenu(
   row: TreeRow,
   revealInHierarchy: (elementId: string) => void,
-  promptForChildCount: (parentId: string, hidden: number) => void
+  promptForChildCount: (parentId: string, hidden: number) => void,
+  subscribe?: (object: ObjectInstance) => void // ACS
 ): MenuEntry[] | null {
   if (row.kind === 'marker') return null
   if (row.kind === 'more') {
@@ -361,7 +375,7 @@ export function buildTreeMenu(
     ]
   }
   switch (row.nodeType) {
-    case 'object': return objectEntries(row, revealInHierarchy)
+    case 'object': return objectEntries(row, revealInHierarchy, subscribe)
     case 'objectType': return typeEntries(row)
     case 'relationshipType': return relationshipTypeEntries(row)
     case 'namespace': return namespaceEntries(row)

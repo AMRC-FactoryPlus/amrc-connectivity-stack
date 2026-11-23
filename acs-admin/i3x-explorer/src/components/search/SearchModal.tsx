@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useExplorerStore } from '../../stores/explorer'
+import { useExplorerStore, schemaPathTo } from '../../stores/explorer'
 import { getClient } from '../../api/client'
 import { isScalarSchemaType } from '../tree/treeData'
 import { ensureAllObjectsLoaded, loadHierarchicalRoots } from '../../services/catalog'
@@ -151,7 +151,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
       useExplorerStore.setState({ expandedNodes: newExpanded })
       selectItem({ type: 'object', id: `hier:${result.object.elementId}`, data: result.object })
     } else {
-      newExpanded.add('folder:objects')
+      // ACS: no flat Objects folder; show the object under its type in Schemas.
+      for (const id of schemaPathTo(result.object, useExplorerStore.getState().typeIndex)) newExpanded.add(id)
       useExplorerStore.setState({ expandedNodes: newExpanded })
       selectItem({ type: 'object', id: `obj:${result.object.elementId}`, data: result.object })
     }

@@ -3,6 +3,7 @@ import { diffValues, toFiniteNumber, type ValueChange } from '../api/structuredV
 import { useExplorerStore } from './explorer' // ACS
 import { TrendBuffer, type TrendPoint, type TrendSeries } from '../acs/trendBuffer' // ACS
 import { holdDecimals } from '../acs/heldDecimals' // ACS
+import { sameJson } from './sameJson' // ACS
 
 export type { TrendPoint, TrendSeries } // ACS
 
@@ -109,8 +110,19 @@ export function applyDeliveries(deliveries: Delivery[]): void {
   const { subscriptions, updateLiveValues } = useSubscriptionsStore.getState()
   const { objectIndex } = useExplorerStore.getState()
   const values: LiveValueUpdate[] = []
+  // ACS: one update delivered twice in a batch, as when a component is registered both through its
+  // composition and on its own, is recorded once. Matched by element, source time and value; a
+  // reading without a source time can't be told from a new one, so it is kept.
+  const seen = new Map<string, unknown[]>()
   for (const { subscriptionId, items } of deliveries) {
     for (const item of admittedDeliveries(subscriptions.get(subscriptionId), items)) {
+      if (item.timestamp) {
+        const key = `${item.elementId}\u0000${item.timestamp}`
+        const earlier = seen.get(key)
+        if (earlier?.some(value => sameJson(value, item.value))) continue
+        if (earlier) earlier.push(item.value)
+        else seen.set(key, [item.value])
+      }
       values.push({
         elementId: item.elementId,
         // The element's own name once the catalog holds it, not its id.

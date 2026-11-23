@@ -251,6 +251,32 @@ upstream, so they are not tied to the Manager UI.
     and counters use tabular digits. Tests in
     `src/acs/heldDecimals.test.ts`.
 
+17. **Compositions on servers that deliver only the exact element**
+    (`registerItem.ts`, `recovery.ts`, `SubscriptionTransport.tsx`,
+    `src/stores/subscriptions.ts`, `src/acs/componentRegistration.ts`):
+    a composition is subscribed by registering it with `maxDepth: 0`,
+    and the i3X 1.0 Implementation Guide (Subscribe Methods, `POST
+    /subscriptions/register`) has the server collect its components'
+    changes too. Some servers in use deliver an update only to the exact
+    element registered, so a device subscribed that way showed nothing
+    while its metrics changed. The app now also registers each component
+    on the same subscription with `maxDepth: 1`, in requests of 500,
+    after the composition, whose own registration stays. The guide has a
+    server accept and ignore a repeated registration, so a server that
+    already delivers the components is unaffected. It is best effort: a
+    refusal is logged and the composition stays subscribed. Stopping or
+    deleting a composition unregisters only the components it added that
+    nothing else still needs, so not an item subscribed on its own or a
+    component of another running composition, and stopping or deleting
+    such an item leaves it registered for that composition. Starting a
+    composition again and recovering an expired subscription register
+    its components again. An update delivered twice in one batch, with
+    the same element, source time and value, is recorded once, so its
+    trend and update count don't double. Requests are unchanged in shape.
+    Tests in `src/acs/componentRegistration.test.ts`,
+    `registerItem.test.ts`, `recovery.test.ts`,
+    `SubscriptionTransport.test.tsx` and `frameBatcher.test.ts`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

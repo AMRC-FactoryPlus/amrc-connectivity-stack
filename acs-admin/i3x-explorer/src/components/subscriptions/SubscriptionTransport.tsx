@@ -14,6 +14,12 @@ import { performRecovery, type RecoveryHarness } from './recovery'
 import type { SyncResponseItem } from '../../api/types'
 import { FrameBatcher } from '../../stores/frameBatcher' // ACS
 import type { Delivery } from '../../stores/subscriptions' // ACS
+import {
+  componentsToRelease,
+  neededByComposition,
+  registerComponents,
+  unregisterComponents,
+} from '../../acs/componentRegistration' // ACS
 
 /**
  * Owns the SSE / polling transport for subscriptions.
@@ -220,10 +226,16 @@ export function SubscriptionTransportProvider({ children }: { children: ReactNod
     const client = getClient()
     const sub = useSubscriptionsStore.getState().subscriptions.get(subscriptionId)
     if (!client || !sub) return
-    const outcome = await client.unregisterMonitoredItems(subscriptionId, [elementId], monitoredDepthOf(sub, elementId))
-    const rejection = bulkRejection(outcome)
-    if (rejection) throw rejection
+    // ACS: an item a running composition registered as its component stays registered for it.
+    if (!neededByComposition(sub, elementId)) {
+      const outcome = await client.unregisterMonitoredItems(subscriptionId, [elementId], monitoredDepthOf(sub, elementId))
+      const rejection = bulkRejection(outcome)
+      if (rejection) throw rejection
+    }
+    // ACS: and a composition's components it registered on their own go with it.
+    const release = componentsToRelease(sub, elementId)
     useSubscriptionsStore.getState().setItemStopped(subscriptionId, elementId, true)
+    await unregisterComponents(client, subscriptionId, release)
   }, [])
 
   const startItems = useCallback(async (subscriptionId: string, elementIds: string[]) => {
@@ -235,6 +247,8 @@ export function SubscriptionTransportProvider({ children }: { children: ReactNod
       const outcome = await client.registerMonitoredItems(subscriptionId, ids, depth)
       outcome.accepted.forEach(id => useSubscriptionsStore.getState().setItemStopped(subscriptionId, id, false))
       rejected.push(...outcome.rejected)
+      // ACS: a composition's components are registered on their own again too.
+      for (const id of outcome.accepted) await registerComponents(client, subscriptionId, sub.components?.[id] ?? [])
     }
     const rejection = bulkRejection({ accepted: [], rejected })
     if (rejection) throw rejection
@@ -244,12 +258,17 @@ export function SubscriptionTransportProvider({ children }: { children: ReactNod
     const client = getClient()
     const sub = useSubscriptionsStore.getState().subscriptions.get(subscriptionId)
     if (!client || !sub) return
-    if (!sub.stoppedItems?.includes(elementId)) {
+    const running = !sub.stoppedItems?.includes(elementId)
+    // ACS: an item a running composition registered as its component stays registered for it.
+    if (running && !neededByComposition(sub, elementId)) {
       const outcome = await client.unregisterMonitoredItems(subscriptionId, [elementId], monitoredDepthOf(sub, elementId))
       const rejection = bulkRejection(outcome)
       if (rejection) throw rejection
     }
+    // ACS: a stopped composition already released its components.
+    const release = running ? componentsToRelease(sub, elementId) : []
     useSubscriptionsStore.getState().removeMonitoredItem(subscriptionId, elementId)
+    await unregisterComponents(client, subscriptionId, release)
   }, [])
 
   const connectedClient = getClient()

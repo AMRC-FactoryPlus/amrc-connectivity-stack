@@ -136,6 +136,18 @@ describe('coalesced live values', () => {
     expect(points.map(point => point.value)).toEqual(Array.from({ length: 100 }, (_, i) => i))
   })
 
+  // ACS: a component registered through its composition and on its own may be delivered twice.
+  it('records an update delivered twice in a batch once', () => {
+    const batcher = new FrameBatcher(applyDeliveries)
+    batcher.push([delivery(7, 100)])
+    batcher.push([delivery(7, 100)])
+    batcher.push([delivery(8, 110)])
+    vi.advanceTimersToNextFrame()
+
+    expect(useSubscriptionsStore.getState().liveValues.get('x-pos')).toMatchObject({ value: 8, updateCount: 2 })
+    expect(trendPointsOf(useSubscriptionsStore.getState(), 'x-pos')?.map(point => point.value)).toEqual([7, 8])
+  })
+
   it('plots a reading without a source time at its arrival time', () => {
     vi.setSystemTime(5_000)
     applyDeliveries([{ subscriptionId: 's', items: [{ elementId: 'x-pos', value: 1, quality: null, timestamp: null }] }])

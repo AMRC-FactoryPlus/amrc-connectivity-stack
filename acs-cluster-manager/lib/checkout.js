@@ -10,11 +10,11 @@ import path from "path";
 import util from "util";
 
 import git from "isomorphic-git";
-import http from "isomorphic-git/http/node";
 import yaml from "yaml";
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
+import { git_timeout, http_client, with_retry } from "./git-http.js";
 import * as manifests from "./manifests.js";
 
 function manifest_path (namespace, kind, name) {
@@ -31,6 +31,18 @@ export class Checkout {
         this.prefix = path.join(this.fplus.opts.git_checkouts, "wd-");
         this.git_email = this.fplus.opts.git_email;
         this.log = this.fplus.debug.bound("git");
+        this.http = http_client(git_timeout(this.fplus.opts.git_timeout));
+    }
+
+    /* Run a request to the Git service, retrying it if it times out
+     * or hits a network error. A cold Git service can be slow to
+     * answer, and one slow answer shouldn't fail the caller. */
+    _retry (what, fn) {
+        return with_retry(fn, {
+            on_retry: (err, attempt, delay) =>
+                this.log("Git %s of %s failed (attempt %s): %s; retrying in %sms",
+                    what, this.uuid, attempt, err.message, delay),
+        });
     }
 
     async _setup () {
@@ -39,7 +51,7 @@ export class Checkout {
         this.url = remote.url;
         
         this.log("Cloning %s into %s", remote.url, dir);
-        this.gitopts = { fs, http, ...remote, dir };
+        this.gitopts = { fs, http: this.http, ...remote, dir };
     }
 
     async _set_config () {
@@ -56,12 +68,22 @@ export class Checkout {
     }
 
     async clone () {
-        await this._setup();
-        await git.clone({
-            ...this.gitopts,
-            singleBranch:   true,
-            noTags:         true,
-            depth:          1,
+        /* Each try gets a fresh directory, so a half-finished clone
+         * doesn't get in the way of the next one. */
+        await this._retry("clone", async () => {
+            await this._setup();
+            try {
+                await git.clone({
+                    ...this.gitopts,
+                    singleBranch:   true,
+                    noTags:         true,
+                    depth:          1,
+                });
+            }
+            catch (e) {
+                await this.dispose();
+                throw e;
+            }
         });
         await this._set_config();
         await this._ensure_branch("origin");
@@ -139,7 +161,10 @@ export class Checkout {
             await this.commit(...commit);
 
         this.log("Pushing to %s", this.url);
-        const res = await git.push({ ...this.gitopts });
+        /* A retry after a push which did reach the server finds the
+         * remote already up to date, so this is safe to repeat. */
+        const res = await this._retry("push",
+            () => git.push({ ...this.gitopts }));
         if (!res.ok)
             throw new Error(`Failed to push to ${this.url}`,
                 { cause: res });

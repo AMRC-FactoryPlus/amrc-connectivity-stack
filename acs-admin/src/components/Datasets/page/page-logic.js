@@ -187,6 +187,8 @@ export function metric_tree_rows (devices, { query = '', opened = {}, pinned = (
     const list = devices ?? []
 
     for (const d of list) {
+        // The picker notes a device with no metrics under the tree instead.
+        if (!d.metrics?.length) continue
         const labels = device_metric_labels(d.metrics)
         const shows = m => !words.length || words.every(w =>
             `${m.path} ${m.name ?? ''} ${labels.get(m.path) ?? ''} ${m.unit ?? ''}`.toLowerCase().includes(w))

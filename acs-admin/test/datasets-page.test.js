@@ -135,6 +135,8 @@ describe('page logic', () => {
         it('closes devices when there are several', () => {
             const rows = metric_tree_rows([dev, { ...dev, uuid: 'b', name: 'Other' }])
             expect(rows.map(r => r.kind)).toEqual(['device', 'device'])
+            expect(metric_tree_rows([dev, { uuid: 'c', name: 'Empty', metrics: [] }]).map(r => r.key))
+                .not.toContain(folder_key('c', ''))
         })
 
         it('opens folders the viewer opened, and every folder with Expand all', () => {

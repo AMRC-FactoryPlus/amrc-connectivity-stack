@@ -135,7 +135,7 @@ export function ModelOverview({
       </div>
 
       {stats.byNamespace.length > 1 && (
-        <Card title="Objects by namespace">
+        <Card title="Objects by schema">{/* ACS: label */}
           <BarList items={withOther(stats.byNamespace, MAX_BARS)} total={stats.objects} unit="objects" />
         </Card>
       )}
@@ -193,7 +193,7 @@ function StatRow({ stats }: { stats: ModelStats }) {
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
       <Stat label="Objects" value={stats.objects} />
       <Stat label="Object types" value={stats.typesInUse} sub={`of ${stats.typesDeclared} declared`} />
-      <Stat label="Namespaces" value={stats.namespaces} />
+      <Stat label="Schemas" value={stats.namespaces} />{/* ACS: label */}
       <Stat
         label="Containment links"
         value={stats.links}

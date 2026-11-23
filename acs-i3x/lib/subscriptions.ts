@@ -12,6 +12,13 @@
  * changes since the previous /sync become one batch with the next
  * sequence number, and a batch is sent again on every /sync until the
  * client acknowledges its number.
+ *
+ * A registration on a composition (a device, or a branch inside one)
+ * also delivers the leaves inside it, following the i3X 1.0 maxDepth
+ * exactly: 1 is the element itself only (a composition has no value of
+ * its own, so nothing), 2 adds its direct components, N reaches N-1
+ * levels below it, and 0 reaches every level. Each update keeps the
+ * leaf's own elementId.
  */
 
 import { randomUUID } from "crypto";
@@ -23,8 +30,15 @@ interface ValueCacheLike {
     offValueChange(listener: (elementId: string, vqt: I3xVqt) => void): void;
 }
 
+interface ObjectTreeLike {
+    getObject(elementId: string): { parentId: string | null; isComposition: boolean } | undefined;
+}
+
 interface SubscriptionManagerOpts {
     valueCache: ValueCacheLike;
+    /** The object tree, to find the compositions a leaf sits in.
+     * Without it a registration delivers only its own elementId. */
+    objectTree?: ObjectTreeLike;
     /** What each owner may see, followed live (Access). Updates for
      * objects the owner cannot see are not delivered. */
     viewers: { track(owner: string): Viewer };
@@ -74,15 +88,21 @@ interface Subscription {
 
 export class SubscriptionManager {
     private valueCache: ValueCacheLike;
+    private objectTree: ObjectTreeLike | undefined;
     private viewers: { track(owner: string): Viewer };
     private ttl: number;
     private maxQueue: number;
     private log: (msg: string, ...args: any[]) => void;
     private subscriptions: Map<string, Subscription> = new Map();
+    /** The subscriptions registered on each elementId, so a change
+     * finds its subscribers without visiting every subscription. Each
+     * subscription's depth is in its registeredElements. */
+    private watchers: Map<string, Set<Subscription>> = new Map();
     private boundOnValueChange: (elementId: string, vqt: I3xVqt) => void;
 
     constructor(opts: SubscriptionManagerOpts) {
         this.valueCache = opts.valueCache;
+        this.objectTree = opts.objectTree;
         this.viewers = opts.viewers;
         this.ttl = opts.ttl;
         this.maxQueue = Math.max(1, opts.maxQueue ?? 10_000);
@@ -167,6 +187,7 @@ export class SubscriptionManager {
             sub.activeStream.end();
             sub.activeStream = null;
         }
+        this.unwatchAll(sub);
         this.subscriptions.delete(subscriptionId);
     }
 
@@ -174,7 +195,7 @@ export class SubscriptionManager {
         const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         for (const elementId of elementIds) {
-            sub.registeredElements.set(elementId, maxDepth);
+            this.watch(sub, elementId, maxDepth);
         }
 
         this.log("register: sub=%s elements=%d maxDepth=%d", subscriptionId.slice(0, 8), elementIds.length, maxDepth);
@@ -185,7 +206,7 @@ export class SubscriptionManager {
      * nothing but its depth. */
     registerOne(owner: string, clientId: string, subscriptionId: string, elementId: string, maxDepth: number = 1): void {
         const sub = this.getAndVerify(owner, clientId, subscriptionId);
-        sub.registeredElements.set(elementId, maxDepth);
+        this.watch(sub, elementId, maxDepth);
         this.log("register: sub=%s element=%s maxDepth=%d", subscriptionId.slice(0, 8), elementId, maxDepth);
         this.resetTtl(sub);
     }
@@ -194,7 +215,7 @@ export class SubscriptionManager {
         const sub = this.getAndVerify(owner, clientId, subscriptionId);
 
         for (const elementId of elementIds) {
-            sub.registeredElements.delete(elementId);
+            this.unwatch(sub, elementId);
         }
 
         this.resetTtl(sub);
@@ -202,7 +223,7 @@ export class SubscriptionManager {
 
     unregisterOne(owner: string, clientId: string, subscriptionId: string, elementId: string): void {
         const sub = this.getAndVerify(owner, clientId, subscriptionId);
-        sub.registeredElements.delete(elementId);
+        this.unwatch(sub, elementId);
         this.resetTtl(sub);
     }
 
@@ -309,16 +330,45 @@ export class SubscriptionManager {
             }
         }
         this.subscriptions.clear();
+        this.watchers.clear();
         this.valueCache.offValueChange(this.boundOnValueChange);
     }
 
     /* ---- Private methods ---- */
 
+    /* A leaf's change goes to the subscriptions registered on the leaf
+     * and to those registered on a composition it sits in, deep enough
+     * to reach it. The compositions are found by walking up from the
+     * leaf, which is short: one indexed lookup per level, stopping at
+     * the device (whose parent is an ISA-95 level, not a composition).
+     * The cost per change does not grow with the number of
+     * subscriptions, and nothing is walked while nobody has registered
+     * anything. A subscription that reaches the leaf more than one way
+     * gets it once. */
     private onValueChange(elementId: string, vqt: I3xVqt): void {
-        if (this.subscriptions.size === 0) return;
+        if (this.watchers.size === 0) return;
 
-        for (const sub of this.subscriptions.values()) {
-            if (!sub.registeredElements.has(elementId)) continue;
+        let to: Set<Subscription> | undefined;
+        const direct = this.watchers.get(elementId);
+        if (direct) to = new Set(direct);
+
+        const tree = this.objectTree;
+        let parentId = tree?.getObject(elementId)?.parentId ?? null;
+        for (let distance = 1; tree && parentId; distance++) {
+            const parent = tree.getObject(parentId);
+            if (!parent?.isComposition) break;
+            const subs = this.watchers.get(parentId);
+            if (subs) {
+                for (const sub of subs) {
+                    const depth = sub.registeredElements.get(parentId)!;
+                    if (depth === 0 || distance < depth) (to ??= new Set()).add(sub);
+                }
+            }
+            parentId = parent.parentId;
+        }
+        if (!to) return;
+
+        for (const sub of to) {
             if (!sub.viewer.visible(elementId)) continue;
 
             if (sub.activeStream) {
@@ -331,6 +381,26 @@ export class SubscriptionManager {
             if (this.queued(sub) >= this.maxQueue) this.dropOldest(sub);
             sub.staged.push({ elementId, ...vqt });
         }
+    }
+
+    private watch(sub: Subscription, elementId: string, maxDepth: number): void {
+        sub.registeredElements.set(elementId, maxDepth);
+        let subs = this.watchers.get(elementId);
+        if (!subs) this.watchers.set(elementId, subs = new Set());
+        subs.add(sub);
+    }
+
+    private unwatch(sub: Subscription, elementId: string): void {
+        sub.registeredElements.delete(elementId);
+        const subs = this.watchers.get(elementId);
+        if (!subs) return;
+        subs.delete(sub);
+        if (subs.size === 0) this.watchers.delete(elementId);
+    }
+
+    private unwatchAll(sub: Subscription): void {
+        for (const elementId of [...sub.registeredElements.keys()])
+            this.unwatch(sub, elementId);
     }
 
     /** Updates held for /sync: sent and not acknowledged, or not yet
@@ -413,6 +483,7 @@ export class SubscriptionManager {
         sub.viewer.stop();
         sub.batches = [];
         sub.staged = [];
+        this.unwatchAll(sub);
         this.subscriptions.delete(subscriptionId);
     }
 }

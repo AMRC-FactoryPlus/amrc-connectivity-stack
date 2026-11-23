@@ -3,6 +3,10 @@ import { SubscriptionManager } from "../lib/subscriptions.js";
 import type { I3xVqt, I3xSyncItem } from "../lib/types/i3x.js";
 import type { SyncResult } from "../lib/subscriptions.js";
 import { allowAll } from "./helpers/allow-all.js";
+import { TestObjectTree } from "./helpers/isa95.js";
+import { I3xStore } from "../lib/store.js";
+// @ts-ignore - plain ESM benchmark fixture
+import { pipelineSnapshot, deviceUuid } from "../bench/dataset.mjs";
 
 /* ---- Mock helpers ---- */
 
@@ -1220,5 +1224,249 @@ describe("SubscriptionManager", () => {
             expect(valueCache.onValueChange).toHaveBeenCalledTimes(1);
             expect(valueCache.onValueChange).toHaveBeenCalledWith(expect.any(Function));
         });
+    });
+});
+
+/* ---- Compositions ---- */
+
+/* A level of the ISA-95 hierarchy with one device under it:
+ *
+ *   site            (ISA-95 level, not a composition)
+ *     dev           (device)
+ *       dev/m1
+ *       dev/b       (branch)
+ *         dev/b/m2
+ *         dev/b/c   (branch)
+ *           dev/b/c/m3
+ */
+function mockTree() {
+    const objects = new Map<string, { parentId: string | null; isComposition: boolean }>([
+        ["site", { parentId: null, isComposition: false }],
+        ["dev", { parentId: "site", isComposition: true }],
+        ["dev/m1", { parentId: "dev", isComposition: false }],
+        ["dev/b", { parentId: "dev", isComposition: true }],
+        ["dev/b/m2", { parentId: "dev/b", isComposition: false }],
+        ["dev/b/c", { parentId: "dev/b", isComposition: true }],
+        ["dev/b/c/m3", { parentId: "dev/b/c", isComposition: false }],
+    ]);
+    return { objects, getObject: (id: string) => objects.get(id) };
+}
+
+describe("SubscriptionManager, compositions", () => {
+    const OWNER = "client-1";
+    const LEAVES = ["dev/m1", "dev/b/m2", "dev/b/c/m3"];
+    let valueCache: ReturnType<typeof mockValueCache>;
+    let tree: ReturnType<typeof mockTree>;
+    let mgr: SubscriptionManager;
+
+    const change = (elementId: string, value: unknown = 1) =>
+        (valueCache.onValueChange.mock.calls[0][0] as (id: string, vqt: I3xVqt) => void)(
+            elementId, makeVqt(value));
+
+    /* The elementIds a subscription is sent when every leaf changes.
+     * The sync acknowledges every earlier batch. */
+    const delivered = (subscriptionId: string) => {
+        for (const leaf of LEAVES) change(leaf);
+        return flat(mgr.sync(OWNER, OWNER, subscriptionId, -1)).map(u => u.elementId);
+    };
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        valueCache = mockValueCache();
+        tree = mockTree();
+        mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any,
+            objectTree: tree, ttl: TTL, maxQueue: 100 });
+    });
+
+    afterEach(() => {
+        mgr.destroy();
+        jest.useRealTimers();
+    });
+
+    it("deliver every leaf inside a device registered with maxDepth 0, by sync", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev"], 0);
+
+        change("dev/b/c/m3", 7);
+
+        expect(flat(mgr.sync(OWNER, OWNER, sub.subscriptionId))).toEqual([
+            { elementId: "dev/b/c/m3", ...makeVqt(7) },
+        ]);
+        expect(delivered(sub.subscriptionId)).toEqual(LEAVES);
+    });
+
+    it("deliver every leaf inside a device registered with maxDepth 0, by stream", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.registerOne(OWNER, OWNER, sub.subscriptionId, "dev", 0);
+        const res = mockSseRes();
+        mgr.stream(OWNER, OWNER, sub.subscriptionId, res);
+
+        change("dev/b/c/m3", 7);
+        change("dev/m1", 8);
+
+        /* One flat array per event, each update under the leaf's id. */
+        expect(res.write.mock.calls.map((c: any[]) => c[0])).toEqual([
+            `data: ${JSON.stringify([{ elementId: "dev/b/c/m3", ...makeVqt(7) }])}\n\n`,
+            `data: ${JSON.stringify([{ elementId: "dev/m1", ...makeVqt(8) }])}\n\n`,
+        ]);
+    });
+
+    /* i3X 1.0: maxDepth 1 is the element itself, and a composition
+     * has no value of its own. */
+    it("deliver nothing from inside a composition with maxDepth 1", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev"]);
+        const branch = mgr.create(OWNER, OWNER);
+        mgr.registerOne(OWNER, OWNER, branch.subscriptionId, "dev/b", 1);
+
+        expect(delivered(sub.subscriptionId)).toEqual([]);
+        expect(delivered(branch.subscriptionId)).toEqual([]);
+    });
+
+    it("deliver a leaf registered with maxDepth 1", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev/b/m2"], 1);
+
+        expect(delivered(sub.subscriptionId)).toEqual(["dev/b/m2"]);
+    });
+
+    /* maxDepth N reaches N-1 levels below the element. */
+    it("stop at the depth asked for", () => {
+        const subs = {
+            two: ["dev", 2], three: ["dev", 3], four: ["dev", 4],
+            branchTwo: ["dev/b", 2], branchThree: ["dev/b", 3],
+        } as const;
+        const ids: Record<string, string> = {};
+        for (const [name, [id, depth]] of Object.entries(subs)) {
+            ids[name] = mgr.create(OWNER, OWNER).subscriptionId;
+            mgr.registerOne(OWNER, OWNER, ids[name], id, depth);
+        }
+
+        for (const leaf of LEAVES) change(leaf);
+
+        const got = (name: string) => flat(mgr.sync(OWNER, OWNER, ids[name])).map(u => u.elementId);
+        expect(got("two")).toEqual(["dev/m1"]);
+        expect(got("three")).toEqual(["dev/m1", "dev/b/m2"]);
+        expect(got("four")).toEqual(LEAVES);
+        expect(got("branchTwo")).toEqual(["dev/b/m2"]);
+        expect(got("branchThree")).toEqual(["dev/b/m2", "dev/b/c/m3"]);
+    });
+
+    it("do not follow an ISA-95 level down to its devices", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["site"], 0);
+
+        expect(delivered(sub.subscriptionId)).toEqual([]);
+    });
+
+    it("stop when the composition is unregistered or the subscription deleted", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        const other = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev", "dev/b"], 0);
+        mgr.register(OWNER, OWNER, other.subscriptionId, ["dev"], 0);
+
+        mgr.unregister(OWNER, OWNER, sub.subscriptionId, ["dev"]);
+        expect(delivered(sub.subscriptionId)).toEqual(["dev/b/m2", "dev/b/c/m3"]);
+        mgr.unregisterOne(OWNER, OWNER, sub.subscriptionId, "dev/b");
+        expect(delivered(sub.subscriptionId)).toEqual([]);
+
+        /* The other subscription still has every leaf. */
+        mgr.sync(OWNER, OWNER, other.subscriptionId, -1);
+        expect(delivered(other.subscriptionId)).toEqual(LEAVES);
+        mgr.deleteOne(OWNER, OWNER, other.subscriptionId);
+        expect((mgr as any).watchers.size).toBe(0);
+    });
+
+    it("forget the registrations of a subscription that expires", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev", "dev/m1"], 0);
+
+        jest.advanceTimersByTime(TTL + 1);
+
+        expect((mgr as any).watchers.size).toBe(0);
+    });
+
+    it("deliver a leaf once however many registrations reach it", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev", "dev/b", "dev/b/c"], 0);
+        mgr.registerOne(OWNER, OWNER, sub.subscriptionId, "dev/b/c/m3");
+        const res = mockSseRes();
+        mgr.stream(OWNER, OWNER, sub.subscriptionId, res);
+
+        change("dev/b/c/m3", 9);
+
+        expect(sseUpdates(res)).toEqual([{ elementId: "dev/b/c/m3", ...makeVqt(9) }]);
+    });
+
+    it("deliver a leaf that appeared after the registration", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev"], 0);
+        /* A new UNS node under the branch. */
+        tree.objects.set("dev/b/new", { parentId: "dev/b", isComposition: false });
+
+        change("dev/b/new", 3);
+
+        expect(flat(mgr.sync(OWNER, OWNER, sub.subscriptionId)).map(u => u.elementId))
+            .toEqual(["dev/b/new"]);
+    });
+
+    it("deliver only the leaves the owner may see", () => {
+        const visible = (id: string) => id !== "dev/b/m2";
+        mgr.destroy();
+        mgr = new SubscriptionManager({ valueCache: valueCache as any, objectTree: tree, ttl: TTL,
+            viewers: { track: () => ({ visible, stop: () => {} }) } as any });
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev"], 0);
+
+        for (const leaf of LEAVES)
+            (valueCache.onValueChange.mock.calls.at(-1)![0] as any)(leaf, makeVqt(1));
+
+        expect(flat(mgr.sync(OWNER, OWNER, sub.subscriptionId)).map(u => u.elementId))
+            .toEqual(["dev/m1", "dev/b/c/m3"]);
+    });
+});
+
+/* On a real tree, a composition subscription at maxDepth N delivers
+ * exactly the leaves within N-1 levels below it, which is what
+ * getDescendantLeafIds gives for a depth of N-1 (and for 0, every
+ * level). */
+describe("SubscriptionManager, compositions on the object tree", () => {
+    it("deliver the leaves within maxDepth - 1 levels", () => {
+        const store = new I3xStore();
+        const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
+        tree.refreshFromSnapshot(pipelineSnapshot(2));
+        tree.setReady();
+        const valueCache = mockValueCache();
+        const mgr = new SubscriptionManager({ viewers: allowAll, valueCache: valueCache as any,
+            objectTree: tree, ttl: 60_000 });
+        const change = valueCache.onValueChange.mock.calls[0][0] as (id: string, vqt: I3xVqt) => void;
+        try {
+            const device: string = deviceUuid(0);
+            const all = tree.getDescendantLeafIds(device, 0);
+            const compositions = [device, ...tree.getObjects()
+                .filter(o => o.isComposition && tree.deviceOf(o.elementId) === device)
+                .map(o => o.elementId)];
+            expect(compositions.length).toBeGreaterThan(1);
+            /* Every leaf of both devices changes. */
+            const leaves = tree.getObjects().filter(o => !o.isComposition && o.parentId
+                && tree.getObject(o.parentId)?.isComposition).map(o => o.elementId);
+            expect(leaves.length).toBeGreaterThan(all.length);
+
+            for (const id of compositions) {
+                for (const depth of [0, 1, 2, 3, 4]) {
+                    const sub = mgr.create("p", "p");
+                    mgr.registerOne("p", "p", sub.subscriptionId, id, depth);
+                    for (const leaf of leaves) change(leaf, makeVqt(1));
+                    const got = flat(mgr.sync("p", "p", sub.subscriptionId)).map(u => u.elementId);
+                    const want = depth === 0 ? tree.getDescendantLeafIds(id, 0)
+                        : depth === 1 ? [] : tree.getDescendantLeafIds(id, depth - 1);
+                    expect(got.sort()).toEqual(want.sort());
+                    mgr.deleteOne("p", "p", sub.subscriptionId);
+                }
+            }
+        } finally {
+            mgr.destroy();
+            store.close();
+        }
     });
 });

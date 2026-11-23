@@ -402,6 +402,21 @@ second stream replaces the first. The queue holds at most
 oldest; the next `/sync` reports the drops with a 206. A subscription
 with neither an open stream nor a call within the TTL is deleted.
 
+Registering a composition (a device, or a branch inside one) delivers
+changes to the leaves inside it, each under the leaf's own elementId,
+following the i3X 1.0 `maxDepth` exactly: 1 is the element itself only,
+which for a composition is nothing because it has no value of its own,
+2 adds its direct components, N reaches N-1 levels below it and 0
+reaches every level. A value read does not yet match this, because at
+`maxDepth` 1 it includes a composition's direct leaves, which is a
+known deviation to be fixed separately. An ISA-95 level is not a composition, so registering one
+delivers nothing from the devices under it. The manager keeps an index
+from each registered elementId to its subscriptions, and on each change
+walks up from the leaf to its device (one indexed lookup per level),
+checking the index at each composition. The cost of a change does not
+grow with the number of subscriptions, and a leaf reached by more than
+one registration is delivered once.
+
 ### mapping.ts, quality.ts, types/i3x.ts
 
 Pure translation helpers, quality derivation and the i3X type definitions.

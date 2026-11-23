@@ -9,7 +9,7 @@ import { Breadcrumb } from './Breadcrumb'
 import { objectPath } from './navigation' // ACS
 import { OverviewTab } from './tabs/OverviewTab'
 import { HistoryTab } from './tabs/HistoryTab'
-import { BroadcastIcon } from '../common/icons'
+import { BroadcastIcon, ShieldIcon, DatabaseIcon } from '../common/icons'
 import { FormattedText } from '../common/FormattedText' // ACS
 import { useIsContainer } from '../../data/childValues' // ACS
 import { acsHost, useHostActions } from '../../acs/host' // ACS
@@ -169,6 +169,8 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
                 title={action.title}
                 className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-i3x-text bg-i3x-surface border border-i3x-border rounded-lg hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
               >
+                {action.id === 'access' && <ShieldIcon size={14} />}
+                {action.id === 'dataset' && <DatabaseIcon size={14} />}
                 {action.label}
               </button>
             ))}

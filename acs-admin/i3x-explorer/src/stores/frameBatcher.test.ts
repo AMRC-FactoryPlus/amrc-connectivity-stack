@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FrameBatcher } from './frameBatcher'
-import { applyDeliveries, useSubscriptionsStore, type Delivery } from './subscriptions'
+import { applyDeliveries, trendPointsOf, useSubscriptionsStore, type Delivery } from './subscriptions'
 
 // ACS: coalescing of fast live feeds.
 describe('FrameBatcher', () => {
@@ -116,30 +116,30 @@ describe('coalesced live values', () => {
     expect(liveValues.get('x-pos')).toMatchObject({ value: 99, timestamp: at(990), updateCount: 100 })
     expect(liveValues.get('y-pos')).toMatchObject({ value: 1_099, updateCount: 100 })
 
-    // The trend keeps its cap of 60 points: the last 60 updates, at their source times.
-    const points = trendData.get('x-pos') ?? []
-    expect(points).toHaveLength(60)
-    expect(points.map(point => point.value)).toEqual(Array.from({ length: 60 }, (_, i) => 40 + i))
+    // ACS: the trend keeps every update, at its source time.
+    const points = trendPointsOf({ trendData }, 'x-pos') ?? []
+    expect(points).toHaveLength(100)
+    expect(points.map(point => point.value)).toEqual(Array.from({ length: 100 }, (_, i) => i))
     expect(points.map(point => point.timestamp)).toEqual(
-      Array.from({ length: 60 }, (_, i) => Date.parse(at((40 + i) * 10)))
+      Array.from({ length: 100 }, (_, i) => Date.parse(at(i * 10)))
     )
   })
 
-  it('appends to the trend across frames up to the cap', () => {
+  it('appends to the trend across frames', () => {
     const batcher = new FrameBatcher(applyDeliveries)
     for (let frame = 0; frame < 5; frame++) {
       for (let i = 0; i < 20; i++) batcher.push([delivery(frame * 20 + i, (frame * 20 + i) * 10)])
       vi.advanceTimersToNextFrame()
     }
 
-    const points = useSubscriptionsStore.getState().trendData.get('x-pos') ?? []
-    expect(points.map(point => point.value)).toEqual(Array.from({ length: 60 }, (_, i) => 40 + i))
+    const points = trendPointsOf(useSubscriptionsStore.getState(), 'x-pos') ?? []
+    expect(points.map(point => point.value)).toEqual(Array.from({ length: 100 }, (_, i) => i))
   })
 
   it('plots a reading without a source time at its arrival time', () => {
     vi.setSystemTime(5_000)
     applyDeliveries([{ subscriptionId: 's', items: [{ elementId: 'x-pos', value: 1, quality: null, timestamp: null }] }])
-    expect(useSubscriptionsStore.getState().trendData.get('x-pos')).toEqual([{ value: 1, timestamp: 5_000 }])
+    expect(trendPointsOf(useSubscriptionsStore.getState(), 'x-pos')).toEqual([{ value: 1, timestamp: 5_000 }])
   })
 
   it('drops buffered updates for an item stopped before the frame', () => {

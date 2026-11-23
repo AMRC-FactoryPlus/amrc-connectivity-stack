@@ -202,6 +202,29 @@ upstream, so they are not tied to the Manager UI.
     the copy button. Tests in `src/acs/rowLabel.test.ts` and
     `SubscriptionsView.test.tsx`.
 
+14. **Trends** (`src/stores/subscriptions.ts`, `TrendView.tsx`,
+    `Sparkline.tsx`, `SubscriptionsDrawer.tsx`, `src/acs/trendBuffer.ts`,
+    `src/acs/TrendWindowControl.tsx`): a trend keeps every reading since
+    subscribing, not the last 60, so a feed of 100 updates a second no
+    longer shows one racing second. Each element keeps up to an hour or
+    50,000 readings, whichever comes first, dropping the oldest, in two
+    parallel `Float64Array`s used as a ring (`TrendBuffer`). A reading is
+    still plotted at its source time, or its arrival time without one.
+    The graph's time axis runs from the first reading to now by default
+    ("All"), so the line squashes as time goes on rather than scrolling.
+    "Now" is the newest reading's source time plus how long ago it
+    arrived, so a server clock that is off doesn't push the line out of
+    view. The panel header chooses the window for every graph in it:
+    All, 30 s, 1 min, 5 min, 15 min, 1 h, or the last N readings, kept
+    for the browser session (`sessionStorage`). Before drawing, the
+    readings in view are reduced to the lowest and highest in each pixel
+    column (`downsampleMinMax`), and the graph is as wide as its panel.
+    A graph redraws when its own trend changes, which the frame batcher
+    limits to once a frame, and once a second to move the axis on. The
+    row's sparkline stays the last 60 readings. Tests in
+    `src/acs/trendBuffer.test.ts`, `frameBatcher.test.ts` and
+    `subscriptions.test.ts`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

@@ -99,6 +99,19 @@ upstream, so they are not tied to the Manager UI.
    element, and a component the catalog has not reached yet says
    "Loading name…". `objectPath` and `objectPathSegments` are the shared
    helpers, built on `buildAncestorChain`.
+7. **`src/components/tree/treeData.ts`**, `TreeView.tsx`, `TreeNode.tsx`,
+   `treeMenu.tsx`, `src/components/search/SearchModal.tsx` and
+   `src/stores/explorer.ts`: the tree has two roots, Hierarchy and then
+   Schemas. The flat Objects root, which listed every object in the
+   catalog at the top level, is gone. The Schemas root is upstream's
+   Namespaces root, renamed and moved below Hierarchy; it still lists
+   the i3X namespaces with their object and relationship types, so
+   nothing about the API or the data changes. An object that is not in
+   the Hierarchy (a search result, Back and Forward, or "Reveal in
+   Schemas" in a Hierarchy row's menu, which replaces "Reveal in
+   Objects") is shown under its type in Schemas (`schemaPathTo`). The
+   Hierarchy root loads the catalog when it opens, as the Objects root
+   did, so the status bar's object count is unchanged.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

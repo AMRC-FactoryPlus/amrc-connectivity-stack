@@ -8,8 +8,8 @@ import { bucketOf } from '../graph/relationshipColors'
 import { ensureAllObjectsLoaded, loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
 
 // Special folder IDs
+// ACS: no flat Objects folder; every object is under Hierarchy or its type.
 export const NAMESPACES_FOLDER_ID = 'folder:namespaces'
-export const OBJECTS_FOLDER_ID = 'folder:objects'
 export const HIERARCHICAL_FOLDER_ID = 'folder:hierarchical'
 
 // Max depth for tree rendering to prevent infinite loops
@@ -223,7 +223,7 @@ export function isScalarSchemaType(raw: unknown): boolean {
 }
 
 // ── Flattened tree rows ─────────────────────────────────────────────────────
-// The ENTIRE sidebar tree (Namespaces, Objects, Hierarchy) is flattened into
+// The ENTIRE sidebar tree (Hierarchy, Schemas) is flattened into
 // one ordered array of uniform-height rows and windowed by a single
 // virtualizer in TreeView. Nothing renders recursively: a hierarchy node with
 // 20k children costs the same DOM as one with 2. Rows carry a parentIndex so
@@ -396,7 +396,6 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
   const matchingTypeIds = new Set<string>()
   const hierarchyVisibleIds = new Set<string>()
   const matchedNamespaceUris = new Set<string>()
-  let matchTotal = 0
   if (filterText) {
     const relatedParents = new Map<string, Set<string>>()
     const relatedIndex = new Map<string, ObjectInstance>()
@@ -411,7 +410,6 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
     const pending: string[] = []
     for (const obj of allObjects) {
       if (!objMatches(obj)) continue
-      matchTotal++
       matchingTypeIds.add(obj.typeId)
       pending.push(obj.elementId)
     }
@@ -515,8 +513,8 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
     rows.push({ kind: 'marker', key, depth, message, parentIndex })
   }
 
-  // ── Composition walk ('obj:' ids): objects under a type node and the flat
-  // Objects folder, expanding through fetched compositional children.
+  // ── Composition walk ('obj:' ids): objects under a type node, expanding
+  // through fetched compositional children.
   const walkObj = (obj: ObjectInstance, depth: number, ancestors: ReadonlySet<string>, path: string, parentIndex: number) => {
     const key = `${path}/${obj.elementId}`
     if (depth > MAX_TREE_DEPTH || ancestors.has(obj.elementId)) {
@@ -623,7 +621,38 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
     }
   }
 
-  // ── 1. Namespaces folder ──────────────────────────────────────────────────
+  // ── 1. Hierarchy folder (parent/child structure) ──────────────────────────
+  // ACS: first, above Schemas; the flat Objects folder upstream had here is gone.
+  const visibleRoots = filterText
+    ? hierarchicalRoots.filter(obj => hierarchyVisibleIds.has(obj.elementId))
+    : hierarchicalRoots
+  const hierExpanded = isExpanded(HIERARCHICAL_FOLDER_ID)
+  const hierIndex = rows.length
+  rows.push({
+    kind: 'node', key: HIERARCHICAL_FOLDER_ID, id: HIERARCHICAL_FOLDER_ID,
+    nodeType: 'folder', label: 'Hierarchy', depth: 0,
+    hasChildren: true, isExpanded: hierExpanded,
+    count: filterText ? visibleRoots.length : hierarchicalRoots.length > 0 ? hierarchicalRoots.length : undefined,
+    filtered: filterText ? true : undefined,
+    parentIndex: -1,
+  })
+  if (hierExpanded) {
+    const rootLimit = pageLimit(HIERARCHICAL_FOLDER_ID, visibleRoots.length)
+    for (let i = 0; i < rootLimit; i++) {
+      walkHier(visibleRoots[i], 1, NO_ANCESTORS, 'hier', hierIndex)
+    }
+    if (rootLimit < visibleRoots.length) {
+      pushMore(HIERARCHICAL_FOLDER_ID, 'hier', 1, rootLimit, visibleRoots.length, hierIndex)
+    }
+    emitForcedObjects(visibleRoots, rootLimit, pathHierIds,
+      o => walkHier(o, 1, NO_ANCESTORS, 'hier', hierIndex))
+    if (allObjects.length > 0 && visibleRoots.length === 0) {
+      pushMarker('hier#empty', 1, filterText ? 'No matching objects' : 'No root objects found', hierIndex)
+    }
+  }
+
+  // ── 2. Schemas folder (i3X namespaces) ────────────────────────────────────
+  // ACS: labelled Schemas and placed below Hierarchy. The data is unchanged.
   // Computed before the folder row so a filtered count can sit on it even
   // while the folder is collapsed.
   const visibleNamespaces = namespaces.filter(ns => {
@@ -638,7 +667,7 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
   const namespacesIndex = rows.length
   rows.push({
     kind: 'node', key: NAMESPACES_FOLDER_ID, id: NAMESPACES_FOLDER_ID,
-    nodeType: 'folder', label: 'Namespaces', depth: 0,
+    nodeType: 'folder', label: 'Schemas', depth: 0, // ACS
     hasChildren: namespaces.length > 0, isExpanded: namespacesExpanded,
     count: filterText ? visibleNamespaces.length : namespaces.length > 0 ? namespaces.length : undefined,
     filtered: filterText ? true : undefined,
@@ -807,56 +836,6 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
     emitForced(visibleNamespaces, nsLimit, ns => `ns:${ns.uri}`, emitNamespace)
   }
 
-  // ── 2. Objects folder (flat list) ─────────────────────────────────────────
-  // Deliberately unpaged at the top level: browsing the entire catalog is the
-  // folder's purpose, and the virtualizer makes its size irrelevant to the DOM.
-  const objectsExpanded = isExpanded(OBJECTS_FOLDER_ID)
-  const objectsIndex = rows.length
-  rows.push({
-    kind: 'node', key: OBJECTS_FOLDER_ID, id: OBJECTS_FOLDER_ID,
-    nodeType: 'folder', label: 'Objects', depth: 0,
-    hasChildren: true, isExpanded: objectsExpanded,
-    count: filterText ? matchTotal : allObjects.length > 0 ? allObjects.length : undefined,
-    filtered: filterText ? true : undefined,
-    parentIndex: -1,
-  })
-  if (objectsExpanded) {
-    const visibleRoots = filterText ? allObjects.filter(objMatches) : allObjects
-    for (const obj of visibleRoots) walkObj(obj, 1, NO_ANCESTORS, 'all', objectsIndex)
-    if (allObjects.length > 0 && visibleRoots.length === 0) {
-      pushMarker('all#empty', 1, 'No matching objects', objectsIndex)
-    }
-  }
-
-  // ── 3. Hierarchy folder (parent/child structure) ──────────────────────────
-  const visibleRoots = filterText
-    ? hierarchicalRoots.filter(obj => hierarchyVisibleIds.has(obj.elementId))
-    : hierarchicalRoots
-  const hierExpanded = isExpanded(HIERARCHICAL_FOLDER_ID)
-  const hierIndex = rows.length
-  rows.push({
-    kind: 'node', key: HIERARCHICAL_FOLDER_ID, id: HIERARCHICAL_FOLDER_ID,
-    nodeType: 'folder', label: 'Hierarchy', depth: 0,
-    hasChildren: true, isExpanded: hierExpanded,
-    count: filterText ? visibleRoots.length : hierarchicalRoots.length > 0 ? hierarchicalRoots.length : undefined,
-    filtered: filterText ? true : undefined,
-    parentIndex: -1,
-  })
-  if (hierExpanded) {
-    const rootLimit = pageLimit(HIERARCHICAL_FOLDER_ID, visibleRoots.length)
-    for (let i = 0; i < rootLimit; i++) {
-      walkHier(visibleRoots[i], 1, NO_ANCESTORS, 'hier', hierIndex)
-    }
-    if (rootLimit < visibleRoots.length) {
-      pushMore(HIERARCHICAL_FOLDER_ID, 'hier', 1, rootLimit, visibleRoots.length, hierIndex)
-    }
-    emitForcedObjects(visibleRoots, rootLimit, pathHierIds,
-      o => walkHier(o, 1, NO_ANCESTORS, 'hier', hierIndex))
-    if (allObjects.length > 0 && visibleRoots.length === 0) {
-      pushMarker('hier#empty', 1, filterText ? 'No matching objects' : 'No root objects found', hierIndex)
-    }
-  }
-
   return rows
 }
 
@@ -877,7 +856,6 @@ export async function loadChildrenFor(row: NodeRow): Promise<void> {
   const lazy =
     nodeType === 'objectType' ||
     nodeType === 'relationshipType' ||
-    id === OBJECTS_FOLDER_ID ||
     id === HIERARCHICAL_FOLDER_ID ||
     (id.startsWith('obj:') && !!(data as ObjectInstance | undefined)?.isComposition) ||
     (id.startsWith('hier:') && useExplorerStore.getState().relationshipErrors.has((data as ObjectInstance).elementId))
@@ -930,21 +908,18 @@ async function fetchChildrenFor(client: I3XClient, row: NodeRow): Promise<void> 
   }
 
   // Reuse the shared connection/search/folder load; poll and Refresh now force it.
-  if (id === OBJECTS_FOLDER_ID || id === HIERARCHICAL_FOLDER_ID) {
+  if (id === HIERARCHICAL_FOLDER_ID) {
     try {
       await ensureAllObjectsLoaded(client)
     } catch (err) {
       console.error('Failed to load all objects:', err)
     }
-    // For the Hierarchy folder, also fetch root objects via root=true so the
-    // server determines what counts as a root (avoids relying on
-    // parentId === '/' locally).
-    if (id === HIERARCHICAL_FOLDER_ID) {
-      try {
-        await loadHierarchicalRoots(client)
-      } catch (err) {
-        console.error('Failed to load root objects:', err)
-      }
+    // Also fetch root objects via root=true so the server determines what
+    // counts as a root (avoids relying on parentId === '/' locally).
+    try {
+      await loadHierarchicalRoots(client)
+    } catch (err) {
+      console.error('Failed to load root objects:', err)
     }
     return
   }

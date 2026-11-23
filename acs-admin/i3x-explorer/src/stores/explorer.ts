@@ -4,6 +4,9 @@ import { buildObjectIndexes } from '../api/objectCatalog'
 import type { ObjectCatalog } from '../api/objectCatalog'
 import { sameJson } from './sameJson'
 
+/** ACS: the tree folder that is open when the Explorer starts or reconnects. */
+export const HIERARCHY_OPEN_BY_DEFAULT = 'folder:hierarchical'
+
 export type TreeNodeType = 'namespace' | 'objectType' | 'relationshipType' | 'object' | 'folder'
 
 export interface TreeNode {
@@ -484,7 +487,9 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   searchIndex: new Map(),
   objectCountByType: new Map(),
   catalogObjectsByType: new Map(),
-  expandedNodes: new Set(),
+  // ACS: Hierarchy starts open (the folder id is HIERARCHICAL_FOLDER_ID in
+  // components/tree/treeData.ts, not imported here to avoid a cycle).
+  expandedNodes: new Set([HIERARCHY_OPEN_BY_DEFAULT]),
   childPageLimits: new Map(),
   selectedItem: null,
   detailTab: 'overview',
@@ -807,7 +812,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     searchIndex: new Map(),
     objectCountByType: new Map(),
     catalogObjectsByType: new Map(),
-    expandedNodes: new Set(),
+    expandedNodes: new Set([HIERARCHY_OPEN_BY_DEFAULT]),
     childPageLimits: new Map(),
     selectedItem: null,
     detailTab: 'overview',

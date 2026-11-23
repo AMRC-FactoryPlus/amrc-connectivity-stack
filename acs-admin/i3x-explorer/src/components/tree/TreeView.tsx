@@ -12,7 +12,7 @@ import { SearchIcon } from '../common/icons'
 import { useSearchDialog } from '../../acs/searchDialog' // ACS
 import { NumberPromptDialog } from '../common/NumberPromptDialog'
 import { useElementNavigation } from '../main/navigation'
-import { loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
+import { ensureAllObjectsLoaded, loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
 import { traceSpan } from '../../diagnostics/perfTrace'
 import {
   buildTreeRows,
@@ -94,6 +94,21 @@ export function TreeView() {
   const compositionErrors = useExplorerStore(s => s.compositionErrors)
   const relationshipErrors = useExplorerStore(s => s.relationshipErrors)
   const isConnected = useConnectionStore(state => state.isConnected)
+
+  // ACS: Hierarchy starts open, so load what opening it would have loaded
+  // (the catalog and the root objects) once the connection is up.
+  useEffect(() => {
+    if (!isConnected) return
+    if (!useExplorerStore.getState().expandedNodes.has(HIERARCHICAL_FOLDER_ID)) return
+    const client = getClient()
+    if (!client) return
+    void (async () => {
+      try { await ensureAllObjectsLoaded(client) }
+      catch (err) { console.error('Failed to load all objects:', err) }
+      try { await loadHierarchicalRoots(client) }
+      catch (err) { console.error('Failed to load root objects:', err) }
+    })()
+  }, [isConnected])
 
   // The input tracks searchQuery directly; the expensive rebuild follows the
   // deferred value, so typing never blocks on filtering a 58k-object catalog.
@@ -644,7 +659,7 @@ export function TreeView() {
             onClick={() => openSearch(searchQuery)}
             title="Search all objects (Enter in the filter box, or ⌘K)"
             aria-label="Search objects"
-            className="px-2 py-1 text-xs bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none flex items-center gap-1.5 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+            className="self-stretch px-2 py-1 text-xs bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none flex items-center gap-1.5 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
           >
             <SearchIcon size={13} className="text-i3x-text-muted" />
             <span>Search</span>

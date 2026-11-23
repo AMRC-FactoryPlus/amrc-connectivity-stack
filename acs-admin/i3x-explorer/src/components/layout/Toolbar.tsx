@@ -174,14 +174,16 @@ export function Toolbar() {
       {/* macOS traffic light spacing */}
       {window.electronAPI?.platform === 'darwin' && <div className="w-16" />}
 
-      <button
+      {/* ACS: framed by the Manager UI, which has its own header, so no
+          logo and name; About is in the settings menu instead. */}
+      {!acsHost && <button
         onClick={() => setShowAbout(true)}
         title="About i3X Explorer"
         className="no-drag flex items-center gap-2 rounded px-1 py-1 hover:bg-i3x-bg transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
       >
         <img src={iconPng} alt="" className="w-5 h-5" />
         <h1 className="hidden md:block text-sm font-semibold text-i3x-text whitespace-nowrap">i3X Explorer</h1>
-      </button>
+      </button>}
 
       <button
         onClick={toggleSidebar}
@@ -463,6 +465,19 @@ export function Toolbar() {
                   Trace render performance
                   {perfTraceEnabled && <CheckIcon size={13} />}
                 </button>
+                {/* ACS: hosted, the logo that opens About is hidden, so About is here. */}
+                {acsHost && (
+                  <>
+                    <div className="border-t border-i3x-border my-1" />
+                    <button
+                      onClick={() => { setShowAbout(true); setShowSettingsMenu(false) }}
+                      title="Version, licence and credits"
+                      className="w-full text-left px-3 py-2 text-xs text-i3x-text hover:bg-i3x-bg transition-colors"
+                    >
+                      About i3X Explorer
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}

@@ -21,6 +21,7 @@ lists the edge cases it contains.
 | `run.mjs` | Starts servers, sends requests, records the numbers, prints a table. |
 | `compare.mjs` | Sends identical requests to two servers and compares the bodies byte for byte. |
 | `history.mjs` | Seeds one fast metric and benchmarks a long history read. See [History benchmark](#history-benchmark). |
+| `subscription-load.mjs` | Registers a large subscription under UNS load and measures the live stream. See [Subscription load benchmark](#subscription-load-benchmark). |
 
 ## Run it
 
@@ -153,3 +154,30 @@ node bench/history.mjs --influx http://127.0.0.1:58087 \
 Add `--gzip 0` to ask for an uncompressed response. `--get` uses
 `GET /v1/objects/:elementId/history` instead, which only builds from
 before i3X 1.0 have: 1.0 reads history in bulk only.
+
+## Subscription load benchmark
+
+`subscription-load.mjs` checks that live values keep flowing on an SSE
+stream while a large subscription is registered, the way the Explorer
+registers one. It needs no InfluxDB: History is replaced by a fake that
+streams synthetic points, so the cost of Flux and of parsing its CSV is
+left out. The server runs in a child process with the real routes,
+`ObjectTree`, `ValueCache` and `SubscriptionManager` on a SQLite file;
+UNS messages go straight into `ValueCache.onUnsMessage`.
+
+The tree is 700 ordinary devices plus two busy devices with 240 extra
+metrics each (about 24,000 objects). The stream watches one ordinary
+device from the start. At 10 s the driver registers both busy devices
+at maxDepth 0 and each of their leaves at maxDepth 1, reads the leaves'
+values, reads an hour of history for every leaf (16 requests at a time)
+and lists every object, all with `Accept-Encoding: br, gzip, deflate`.
+
+```sh
+npm run bench:subscriptions -- --hist-points 30000
+```
+
+It prints the server's event-loop delay, the longest gap between SSE
+events, how old the newest value is when each read of the stream
+arrives (per second from the burst), the stream's events per second and
+any process warnings. `--json out.json` writes the full timeline. See
+the header of the script for the other options.

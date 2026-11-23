@@ -180,9 +180,15 @@ export function device(i, wide = 0) {
 
 /** PipelineSnapshot input for ObjectTree.refreshFromSnapshot(). */
 export function pipelineSnapshot(n, wide = 0) {
+    const list = [];
+    for (let i = 0; i < n; i++) list.push(device(i, wide));
+    return snapshotOf(list);
+}
+
+/** PipelineSnapshot input for a given list of device() results. */
+export function snapshotOf(list) {
     const devices = new Map();
-    for (let i = 0; i < n; i++) {
-        const d = device(i, wide);
+    for (const d of list) {
         /* Each device is placed where its origin map says, as the
          * service-setup migration places it. */
         devices.set(d.uuid, { devInfo: { schema: SCHEMA.top, sparkplugName: d.name, originMap: d.originMap }, info: d.info,

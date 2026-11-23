@@ -7,7 +7,6 @@ import {
   resolveRelationshipGroups,
   HIERARCHICAL_FOLDER_ID,
   NAMESPACES_FOLDER_ID,
-  OBJECTS_FOLDER_ID,
   type TreeBuildInput,
   type TreeRow,
   type NodeRow,
@@ -102,8 +101,9 @@ describe('root folder catalog loading', () => {
     useExplorerStore.getState().setAllObjects([obj('cached')])
     const client = createClient('http://server')
     const getBytes = vi.spyOn(client, 'getObjectCatalogBytes').mockResolvedValue(catalogBody([]))
+    vi.spyOn(client, 'getRootObjectBytes').mockResolvedValue(objectBytes([]))
 
-    await loadChildrenFor(rootFolderRow(OBJECTS_FOLDER_ID))
+    await loadChildrenFor(rootFolderRow(HIERARCHICAL_FOLDER_ID))
 
     expect(getBytes).not.toHaveBeenCalled()
   })
@@ -140,8 +140,9 @@ describe('root folder catalog loading', () => {
   it('loads the catalog when it has not been loaded yet', async () => {
     const client = createClient('http://server')
     const getBytes = vi.spyOn(client, 'getObjectCatalogBytes').mockResolvedValue(catalogBody([obj('loaded')]))
+    vi.spyOn(client, 'getRootObjectBytes').mockResolvedValue(objectBytes([]))
 
-    await loadChildrenFor(rootFolderRow(OBJECTS_FOLDER_ID))
+    await loadChildrenFor(rootFolderRow(HIERARCHICAL_FOLDER_ID))
 
     expect(getBytes).toHaveBeenCalledOnce()
     expect(useExplorerStore.getState().allObjectsLoaded).toBe(true)
@@ -156,9 +157,10 @@ describe('root folder catalog loading', () => {
       resolveBody = resolve
     })
     const getBytes = vi.spyOn(client, 'getObjectCatalogBytes').mockReturnValue(body)
+    vi.spyOn(client, 'getRootObjectBytes').mockResolvedValue(objectBytes([]))
 
     const connectLoad = ensureAllObjectsLoaded(client, { force: true, invalidateCurrent: true })
-    const folderLoad = loadChildrenFor(rootFolderRow(OBJECTS_FOLDER_ID))
+    const folderLoad = loadChildrenFor(rootFolderRow(HIERARCHICAL_FOLDER_ID))
 
     expect(getBytes).toHaveBeenCalledOnce()
     resolveBody(catalogBody([obj('loaded')]))
@@ -321,13 +323,21 @@ describe('buildTreeRows: paging', () => {
     expect(rows.some(r => r.kind === 'more')).toBe(false)
   })
 
-  it('leaves the flat Objects folder top level unpaged', () => {
-    const all = Array.from({ length: CHILD_PAGE_SIZE + CHILD_PAGE_SLACK + 50 }, (_, i) => obj(`o${i}`))
-    const rows = buildTreeRows(
-      input({ allObjects: all, expandedNodes: new Set([OBJECTS_FOLDER_ID]) })
-    )
-    expect(rows.filter(r => r.kind === 'node' && r.id.startsWith('obj:'))).toHaveLength(all.length)
-    expect(rows.some(r => r.kind === 'more')).toBe(false)
+  // ACS: the flat Objects folder is gone; Hierarchy comes first, then Schemas.
+  it('has two root folders, Hierarchy then Schemas, and no flat Objects folder', () => {
+    const all = [obj('a'), obj('b')]
+    const rows = buildTreeRows(input({
+      namespaces: [{ uri: 'urn:ns', displayName: 'ns' } as Namespace],
+      allObjects: all,
+      objectIndex: new Map(all.map(o => [o.elementId, o])),
+      expandedNodes: new Set(['folder:objects']),
+    }))
+    const roots = rows.filter((r): r is NodeRow => r.kind === 'node' && r.depth === 0)
+    expect(roots.map(r => [r.id, r.label])).toEqual([
+      [HIERARCHICAL_FOLDER_ID, 'Hierarchy'],
+      [NAMESPACES_FOLDER_ID, 'Schemas'],
+    ])
+    expect(rows.some(r => r.kind === 'node' && r.id.startsWith('obj:'))).toBe(false)
   })
 
   it('force-emits a paged-out row on the selection path, after the more row', () => {
@@ -880,8 +890,11 @@ describe('buildTreeRows: relationship types in namespaces', () => {
   it('keeps the two lookups apart: a relationship error gives a plain object no chevron', () => {
     const A = obj('A')
     const rows = buildTreeRows(input({
+      namespaces: [{ uri: 'urn:ns', displayName: 'ns' } as Namespace],
+      objectTypes: [{ elementId: 'T', displayName: 'T', namespaceUri: 'urn:ns', schema: {} }],
       allObjects: [A],
-      expandedNodes: new Set([OBJECTS_FOLDER_ID, 'obj:A']),
+      catalogObjectsByType: new Map([['T', [A]]]),
+      expandedNodes: new Set([NAMESPACES_FOLDER_ID, 'ns:urn:ns', 'type:T', 'obj:A']),
       relationshipErrors: new Map([['A', 'HTTP 500: down']]),
     }))
     expect(rows[nodeIndexOf(rows, 'obj:A')]).toMatchObject({ hasChildren: false })

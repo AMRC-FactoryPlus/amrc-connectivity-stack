@@ -212,6 +212,21 @@ describe('navigation history', () => {
     expect(state().expandedNodes.has('folder:namespaces')).toBe(true)
     expect(state().expandedNodes.has('ns:demo')).toBe(true)
   })
+
+  // ACS: there is no flat Objects folder, so an 'obj:' row is revealed under its type.
+  it('restores an object row under its type in the Schemas folder', () => {
+    state().setObjectTypes([{ elementId: 'Type', displayName: 'Type', namespaceUri: 'ns', schema: {} }])
+    const objectItem: SelectedItem = { type: 'object', id: 'obj:spindle', data: object('spindle') }
+
+    state().selectItem(objectItem)
+    state().selectItem(null)
+    useExplorerStore.setState({ expandedNodes: new Set() })
+
+    state().goBack()
+
+    expect(state().selectedItem?.id).toBe('obj:spindle')
+    expect([...state().expandedNodes].sort()).toEqual(['folder:namespaces', 'ns:ns', 'type:Type'])
+  })
 })
 
 describe('unchanged writes', () => {

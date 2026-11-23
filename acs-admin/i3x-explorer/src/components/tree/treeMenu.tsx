@@ -1,5 +1,6 @@
 import {
   useExplorerStore,
+  schemaPathTo,
   CHILD_PAGE_SIZE,
   type DetailTab,
   type SelectedItem,
@@ -24,7 +25,6 @@ import {
   getObjectLabel,
   getHierarchyChildren,
   getGraphRelatedObjects,
-  OBJECTS_FOLDER_ID,
   NAMESPACES_FOLDER_ID,
   type TreeRow,
   type NodeRow,
@@ -161,15 +161,17 @@ function objectEntries(row: NodeRow, revealInHierarchy: (elementId: string) => v
       onSelect: () => revealInHierarchy(obj.elementId),
     })
   }
-  if (isHier) {
+  // ACS: with no flat Objects folder, reveal the object under its type in Schemas.
+  const schemaPath = isHier ? schemaPathTo(obj, state.typeIndex) : []
+  if (schemaPath.length > 0) {
     entries.push({
       kind: 'action',
-      label: 'Reveal in Objects',
+      label: 'Reveal in Schemas',
       icon: <GridIcon size={ICON} />,
       onSelect: () => {
         const { expandedNodes, selectItem } = useExplorerStore.getState()
         const expanded = new Set(expandedNodes)
-        expanded.add(OBJECTS_FOLDER_ID)
+        for (const id of schemaPath) expanded.add(id)
         useExplorerStore.setState({ expandedNodes: expanded })
         selectItem({ type: 'object', id: `obj:${obj.elementId}`, data: obj })
       },
@@ -264,7 +266,7 @@ function namespaceEntries(row: NodeRow): MenuEntry[] {
     { kind: 'separator' },
     { kind: 'action', label: 'Copy name', icon: <CopyIcon size={ICON} />, onSelect: () => copyText(namespace.displayName) },
     { kind: 'action', label: 'Copy URI', icon: <CopyIcon size={ICON} />, onSelect: () => copyText(namespace.uri) },
-    { kind: 'action', label: 'Copy namespace JSON', icon: <CopyIcon size={ICON} />, onSelect: () => copyJson(namespace) },
+    { kind: 'action', label: 'Copy schema JSON', icon: <CopyIcon size={ICON} />, onSelect: () => copyJson(namespace) }, // ACS: label
     {
       kind: 'action',
       label: 'Copy types JSON',
@@ -278,7 +280,7 @@ function namespaceEntries(row: NodeRow): MenuEntry[] {
 
 function folderEntries(row: NodeRow): MenuEntry[] {
   const state = useExplorerStore.getState()
-  const { namespaces, allObjects, hierarchicalRoots, expandedNodes } = state
+  const { namespaces, hierarchicalRoots, expandedNodes } = state
   const entries: MenuEntry[] = [
     { kind: 'header', label: row.label },
     row.isExpanded
@@ -297,20 +299,11 @@ function folderEntries(row: NodeRow): MenuEntry[] {
   if (row.id === NAMESPACES_FOLDER_ID) {
     entries.push({
       kind: 'action',
-      label: 'Copy namespaces JSON',
+      label: 'Copy schemas JSON', // ACS
       detail: namespaces.length.toLocaleString(),
       icon: <CopyIcon size={ICON} />,
       disabled: namespaces.length === 0,
       onSelect: () => copyJson(namespaces),
-    })
-  } else if (row.id === OBJECTS_FOLDER_ID) {
-    entries.push({
-      kind: 'action',
-      label: 'Copy all objects JSON',
-      detail: allObjects.length.toLocaleString(),
-      icon: <CopyIcon size={ICON} />,
-      disabled: allObjects.length === 0,
-      onSelect: () => copyTextFrom(catalogObjectsJson(allObjects)),
     })
   } else {
     const { count } = surveySubtree(hierarchicalRoots, id => getHierarchyChildren(id, state).children)

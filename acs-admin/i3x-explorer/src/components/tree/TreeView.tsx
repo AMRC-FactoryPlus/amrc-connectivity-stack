@@ -22,7 +22,6 @@ import {
   loadRelationshipInstances,
   ESTIMATED_ROW_HEIGHT,
   NAMESPACES_FOLDER_ID,
-  OBJECTS_FOLDER_ID,
   HIERARCHICAL_FOLDER_ID,
   type TreeRow,
   type NodeRow,
@@ -55,7 +54,7 @@ function findTypeAhead(rows: TreeRow[], from: number, buffer: string): number {
 }
 
 /**
- * The sidebar tree. The ENTIRE tree, Namespaces, Objects, Hierarchy, is one
+ * The sidebar tree. The ENTIRE tree, Hierarchy and Schemas, is one
  * flattened row array (buildTreeRows) windowed by a single virtualizer, so the
  * DOM holds only the rows near the viewport no matter how many are visible.
  * Huge child lists are additionally paged with "Show more" rows (see
@@ -152,8 +151,8 @@ export function TreeView() {
   const [rowHeight, setRowHeight] = useState(ESTIMATED_ROW_HEIGHT)
   const rowHeightRef = useRef(ESTIMATED_ROW_HEIGHT)
 
-  // A new key function makes the virtualizer re-measure every row (all 223k with
-  // the Objects folder open), so it changes only when the rows do.
+  // A new key function makes the virtualizer re-measure every row (all of a
+  // large catalog's rows when it is expanded), so it changes only when the rows do.
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -511,8 +510,7 @@ export function TreeView() {
       else if (nodeId.startsWith('reltype:')) {
         const relationship = relationshipTypes.find(r => r.elementId === nodeId.slice('reltype:'.length))
         if (relationship) relationships.push(relationship)
-      } else if (nodeId === OBJECTS_FOLDER_ID) refreshCatalog = true
-      else if (nodeId === HIERARCHICAL_FOLDER_ID) {
+      } else if (nodeId === HIERARCHICAL_FOLDER_ID) {
         refreshCatalog = true
         refreshRoots = true
       }
@@ -601,13 +599,12 @@ export function TreeView() {
     refreshTree()
   }, [manualRefreshTick, isConnected, refreshTree])
 
-  // Auto-expand the three root folders whenever a search query is active so
+  // Auto-expand the root folders whenever a search query is active so
   // matches are visible without the user having to click each folder open.
   useEffect(() => {
     if (!searchQuery.trim()) return
     const { expandNode } = useExplorerStore.getState()
     expandNode(NAMESPACES_FOLDER_ID)
-    expandNode(OBJECTS_FOLDER_ID)
     expandNode(HIERARCHICAL_FOLDER_ID)
   }, [searchQuery])
 

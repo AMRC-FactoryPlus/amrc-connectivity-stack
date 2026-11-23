@@ -318,7 +318,7 @@ function TransportStatus({ subscription, polling }: { subscription: Subscription
     delivered.reduce((latest, elementId) => Math.max(latest, state.liveValues.get(elementId)?.receivedAt ?? 0), 0)
   )
   return (
-    <span className="flex items-center gap-1.5 text-xs text-i3x-text-muted">
+    <span className="flex items-center gap-1.5 text-xs text-i3x-text-muted tabular-nums">
       {!subscription.isStreaming ? (
         <>
           <span aria-hidden="true" className="w-2 h-2 rounded-full border border-i3x-text-muted" />

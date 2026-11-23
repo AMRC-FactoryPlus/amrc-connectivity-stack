@@ -13,6 +13,7 @@ import { Spinner } from '../common/Spinner'
 import { StatusFacets } from '../details/ElementStatus'
 import { formatComponentValue, formatComponentValueShort } from '../details/ValueDisplay'
 import { useElementNavigation } from './navigation'
+import { RowSubscribeButton } from '../../acs/RowSubscribeButton'
 
 /** Rows shown per level before "Show more". */
 export const CHILD_ROWS_PAGE = 50
@@ -31,14 +32,16 @@ export function ChildValues({ parentId }: { parentId: string }) {
     // sideways in a narrow pane, rather than wrapping names a letter a line.
     // It also scrolls inside the card, with its header row pinned, so the
     // card's title, Refresh and More stay in view on a long container.
-    // Values sit right, in bold, beside the quality and time.
+    // Values sit right, in bold, beside the quality and time. The last, narrow
+    // column is each row's Subscribe button.
     <div className="border border-i3x-border rounded-lg overflow-auto max-h-[min(60vh,40rem)]">
       <div role="table" aria-label="Current values" className="min-w-[26rem] text-[13px]">
-        <div role="row" className="sticky top-0 z-10 grid grid-cols-[minmax(9rem,1fr)_minmax(6rem,max-content)_auto_auto] gap-3 px-3 py-1.5 bg-i3x-bg text-[11px] font-medium text-i3x-text-muted">
+        <div role="row" className="sticky top-0 z-10 grid grid-cols-[minmax(9rem,1fr)_minmax(6rem,max-content)_auto_auto_1.25rem] gap-3 px-3 py-1.5 bg-i3x-bg text-[11px] font-medium text-i3x-text-muted">
           <span role="columnheader">Name</span>
           <span role="columnheader" className="text-right">Value</span>
           <span role="columnheader">Quality</span>
           <span role="columnheader" className="w-[5.5rem]">Time</span>
+          <span role="columnheader"><span className="sr-only">Subscribe</span></span>
         </div>
         <ChildLevel parentId={parentId} depth={0} />
       </div>
@@ -123,7 +126,7 @@ function ChildRow({
     <>
       <div
         role="row"
-        className="grid grid-cols-[minmax(9rem,1fr)_minmax(6rem,max-content)_auto_auto] items-baseline gap-3 px-3 py-1.5 border-t border-i3x-border hover:bg-i3x-bg"
+        className="grid grid-cols-[minmax(9rem,1fr)_minmax(6rem,max-content)_auto_auto_1.25rem] items-baseline gap-3 px-3 py-1.5 border-t border-i3x-border hover:bg-i3x-bg group"
       >
         <div role="cell" className="flex items-baseline gap-1.5 min-w-0" style={{ paddingLeft: depth * INDENT }}>
           {container ? (
@@ -168,6 +171,10 @@ function ChildRow({
               {new Date(shown.timestamp).toLocaleTimeString()}
             </span>
           )}
+        </div>
+        {/* Centred, so the 20px button sits inside the text line and the row keeps its height. */}
+        <div role="cell" className="self-center -my-0.5">
+          <RowSubscribeButton object={object} value={value} />
         </div>
       </div>
       {open && <ChildLevel parentId={object.elementId} depth={depth + 1} />}

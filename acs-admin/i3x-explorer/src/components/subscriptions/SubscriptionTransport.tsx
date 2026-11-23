@@ -61,6 +61,11 @@ export function useSubscriptionTransport(): SubscriptionTransport {
   return context
 }
 
+/** ACS: the transport, or null outside the provider (a component rendered on its own in a test). */
+export function useOptionalSubscriptionTransport(): SubscriptionTransport | null {
+  return useContext(TransportContext)
+}
+
 // Servers declare streaming support in /info capabilities;
 // when it's false the stream endpoint returns 501 and polling is the only transport.
 const isStreamUnsupported = (client: I3XClient): boolean =>

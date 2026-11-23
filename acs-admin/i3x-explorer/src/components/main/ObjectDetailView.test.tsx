@@ -27,6 +27,7 @@ const host = vi.hoisted(() => {
 
 vi.mock('../subscriptions/SubscriptionTransport', () => ({
   useSubscriptionTransport: () => ({ startStream: vi.fn() }),
+  useOptionalSubscriptionTransport: () => ({ startStream: vi.fn() }),
 }))
 
 // The relationship map draws on a canvas jsdom does not have; its place is what is tested here.

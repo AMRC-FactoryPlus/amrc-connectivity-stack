@@ -22,6 +22,7 @@ import {
   type RelationshipMenuActions,
 } from './relationshipMenu'
 import { ELEMENT_DRAG_TYPE } from './dragType'
+import { RowSubscribeButton } from '../../acs/RowSubscribeButton' // ACS
 
 /**
  * How tall a capped child block is allowed to get. Rows are a hair under 30px,
@@ -556,6 +557,9 @@ function NodeRow({
             {node.descendants.toLocaleString()}
           </span>
         )}
+
+        {/* ACS: subscribe without opening the element; shown on hover like Focus. */}
+        <RowSubscribeButton object={object} className="w-6 h-6" />
 
         {/* Focus, not navigation and not a re-root: the map zooms to this node
             and its children and lights that branch. The picture it is looking

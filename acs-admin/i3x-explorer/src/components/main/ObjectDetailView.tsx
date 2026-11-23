@@ -1,12 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import type { ObjectInstance } from '../../api/types'
-import { getClient } from '../../api/client'
 import { useExplorerStore, type DetailTab } from '../../stores/explorer'
 import { useSubscriptionsStore } from '../../stores/subscriptions'
-import { useSubscriptionTransport } from '../subscriptions/SubscriptionTransport'
-import { registerItem } from '../subscriptions/registerItem'
+import { useIsSubscribed, useSubscribe } from '../../acs/useSubscribe' // ACS
 import { Breadcrumb } from './Breadcrumb'
-import { objectPath } from './navigation' // ACS
 import { OverviewTab } from './tabs/OverviewTab'
 import { HistoryTab } from './tabs/HistoryTab'
 import { BroadcastIcon, ShieldIcon, DatabaseIcon, ChartLineIcon } from '../common/icons'
@@ -60,85 +57,13 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
   const loadValue = () => void valueQuery.refetch()
   const [valueView, setValueView] = useState<'parsed' | 'raw'>('parsed')
 
-  const [isSubscribing, setIsSubscribing] = useState(false)
-  const [subscribeError, setSubscribeError] = useState<string | null>(null)
-  const { startStream } = useSubscriptionTransport()
-  // A boolean selector: live values arriving don't re-render the detail view.
-  const isSubscribed = useSubscriptionsStore(state => {
-    for (const sub of state.subscriptions.values()) {
-      if (sub.monitoredItems.includes(object.elementId)) return true
-    }
-    return false
-  })
-
-  // Clear subscribe error when the selected object changes
-  useEffect(() => {
-    setSubscribeError(null)
-  }, [object.elementId])
-
-  // Read subscription state through getState() inside the handler rather than a
-  // hook: subscribing to the store here would re-render the whole detail view on
-  // every live value that arrives.
-  const handleSubscribe = async () => {
-    const client = getClient()
-    if (!client) return
-
-    setIsSubscribing(true)
-    setSubscribeError(null)
-
-    // Track any subscription we create so we can roll it back if register fails
-    let newlyCreatedSubId: string | null = null
-
-    try {
-      let subscriptionId = useSubscriptionsStore.getState().activeSubscriptionId
-
-      // Create subscription if none exists
-      if (!subscriptionId) {
-        const response = await client.createSubscription()
-        subscriptionId = response.subscriptionId
-        newlyCreatedSubId = subscriptionId
-
-        useSubscriptionsStore.getState().addSubscription({
-          id: subscriptionId,
-          createdAt: new Date().toISOString(),
-          monitoredItems: [],
-          isStreaming: false
-        })
-      }
-
-      // Register this object. If this throws, the catch block cleans up.
-      // A composition object is monitored with its whole component tree, the same depth Current Value reads.
-      const { maxDepth, components } = await registerItem(client, subscriptionId, object, value)
-      // ACS: remember the path, so the row is named even before the catalog holds the object.
-      const name = objectPath(object.elementId, useExplorerStore.getState().objectIndex) ?? object.displayName
-      useSubscriptionsStore.getState().addMonitoredItem(subscriptionId, object.elementId, { maxDepth, components, name })
-      // Start the transport unless it's already live, without this the drawer
-      // opens on "Waiting…" until Start Stream is clicked manually. Guarded
-      // because startStream is not idempotent (it tears down and reopens the
-      // transport); a live stream carries newly registered items as-is.
-      const sub = useSubscriptionsStore.getState().subscriptions.get(subscriptionId)
-      if (!sub?.isStreaming) {
-        await startStream(subscriptionId)
-      }
-      // Reveal the global drawer so the new monitored item is visible immediately.
-      useSubscriptionsStore.getState().setSubscriptionsOpen(true)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Subscribe failed'
-      setSubscribeError(msg)
-      console.error('Failed to subscribe:', err)
-
-      // Roll back any subscription we just created so it doesn't sit empty in
-      // the UI. This assumes the failure came from create/register, if
-      // startStream ever becomes throwing, revisit so a healthy subscription
-      // isn't deleted over a transport hiccup.
-      if (newlyCreatedSubId) {
-        useSubscriptionsStore.getState().removeSubscription(newlyCreatedSubId)
-        try { await client.deleteSubscription(newlyCreatedSubId) } catch { /* best-effort */ }
-      }
-    } finally {
-      setIsSubscribing(false)
-    }
-  }
+  // ACS: the subscribe action is shared with the per-row buttons (src/acs/useSubscribe.ts).
+  // isSubscribed is a boolean selector: live values arriving don't re-render the detail view.
+  const { subscribe, subscribing, error } = useSubscribe()
+  const isSubscribed = useIsSubscribed(object.elementId)
+  const isSubscribing = subscribing(object.elementId)
+  const subscribeError = error(object.elementId)
+  const handleSubscribe = () => void subscribe(object, value)
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-i3x-bg">

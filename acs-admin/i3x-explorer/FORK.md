@@ -297,6 +297,33 @@ upstream, so they are not tied to the Manager UI.
     memory, so it lasts for the visit and a reload starts docked. Tests
     in `src/acs/subscriptionsPopout.test.tsx`.
 
+19. **Subscribing from a row** (`src/acs/useSubscribe.ts`,
+    `src/acs/RowSubscribeButton.tsx`, `ObjectDetailView.tsx`,
+    `ChildValues.tsx`, `RelationshipList.tsx`, `treeMenu.tsx`,
+    `TreeView.tsx`, `SubscriptionTransport.tsx`): a child can be
+    subscribed to without opening it. Each row of the Current value table
+    has a small Subscribe button in a narrow last column, and each row of
+    the relationship list has one beside Focus. Both show on hover or
+    focus (always on a screen with no hover), and always show, in the
+    success colour, once the element is subscribed, when clicking opens
+    the subscriptions drawer. Clicking does not open the element. The
+    tree's menu on an object has Subscribe, or Show in subscriptions once
+    it is subscribed. The header's Subscribe moved out of
+    `ObjectDetailView.tsx` into `useSubscribe.ts` unchanged, so every
+    surface behaves the same: it creates a subscription if none is
+    active, registers the element (a composition at the whole-tree depth;
+    with no value read yet, `registerItem` reads it itself), starts the
+    stream unless it is running, opens the drawer, and deletes a
+    subscription it created if registering fails. Subscribes now run one
+    at a time, so quick clicks on several rows add to one subscription
+    rather than each creating its own. A failure shows on the row's
+    button (its tooltip and colour) for a few seconds, or at the foot of
+    the tree for the menu, and in the header as before.
+    `SubscriptionTransport.tsx` gains `useOptionalSubscriptionTransport`,
+    which returns null outside the provider, for components rendered on
+    their own in tests. Tests in `src/acs/useSubscribe.test.ts` and
+    `src/acs/rowSubscribe.test.tsx`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

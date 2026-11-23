@@ -14,10 +14,11 @@
  * client acknowledges its number.
  *
  * A registration on a composition (a device, or a branch inside one)
- * also delivers the leaves inside it, to the same depth a value read of
- * that composition would include them: maxDepth 1 is its own leaves,
- * N reaches N levels down, and 0 reaches every level. Each update
- * keeps the leaf's own elementId.
+ * also delivers the leaves inside it, following the i3X 1.0 maxDepth
+ * exactly: 1 is the element itself only (a composition has no value of
+ * its own, so nothing), 2 adds its direct components, N reaches N-1
+ * levels below it, and 0 reaches every level. Each update keeps the
+ * leaf's own elementId.
  */
 
 import { randomUUID } from "crypto";
@@ -360,7 +361,7 @@ export class SubscriptionManager {
             if (subs) {
                 for (const sub of subs) {
                     const depth = sub.registeredElements.get(parentId)!;
-                    if (depth === 0 || distance <= depth) (to ??= new Set()).add(sub);
+                    if (depth === 0 || distance < depth) (to ??= new Set()).add(sub);
                 }
             }
             parentId = parent.parentId;

@@ -1311,27 +1311,45 @@ describe("SubscriptionManager, compositions", () => {
         ]);
     });
 
-    it("reach as deep as a value read: maxDepth 1 is a composition's own leaves", () => {
+    /* i3X 1.0: maxDepth 1 is the element itself, and a composition
+     * has no value of its own. */
+    it("deliver nothing from inside a composition with maxDepth 1", () => {
         const sub = mgr.create(OWNER, OWNER);
         mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev"]);
+        const branch = mgr.create(OWNER, OWNER);
+        mgr.registerOne(OWNER, OWNER, branch.subscriptionId, "dev/b", 1);
 
-        expect(delivered(sub.subscriptionId)).toEqual(["dev/m1"]);
+        expect(delivered(sub.subscriptionId)).toEqual([]);
+        expect(delivered(branch.subscriptionId)).toEqual([]);
     });
 
+    it("deliver a leaf registered with maxDepth 1", () => {
+        const sub = mgr.create(OWNER, OWNER);
+        mgr.register(OWNER, OWNER, sub.subscriptionId, ["dev/b/m2"], 1);
+
+        expect(delivered(sub.subscriptionId)).toEqual(["dev/b/m2"]);
+    });
+
+    /* maxDepth N reaches N-1 levels below the element. */
     it("stop at the depth asked for", () => {
-        const two = mgr.create(OWNER, OWNER);
-        mgr.register(OWNER, OWNER, two.subscriptionId, ["dev"], 2);
-        const three = mgr.create(OWNER, OWNER);
-        mgr.register(OWNER, OWNER, three.subscriptionId, ["dev"], 3);
-        const branch = mgr.create(OWNER, OWNER);
-        mgr.register(OWNER, OWNER, branch.subscriptionId, ["dev/b"], 1);
+        const subs = {
+            two: ["dev", 2], three: ["dev", 3], four: ["dev", 4],
+            branchTwo: ["dev/b", 2], branchThree: ["dev/b", 3],
+        } as const;
+        const ids: Record<string, string> = {};
+        for (const [name, [id, depth]] of Object.entries(subs)) {
+            ids[name] = mgr.create(OWNER, OWNER).subscriptionId;
+            mgr.registerOne(OWNER, OWNER, ids[name], id, depth);
+        }
 
         for (const leaf of LEAVES) change(leaf);
 
-        const ids = (id: string) => flat(mgr.sync(OWNER, OWNER, id)).map(u => u.elementId);
-        expect(ids(two.subscriptionId)).toEqual(["dev/m1", "dev/b/m2"]);
-        expect(ids(three.subscriptionId)).toEqual(LEAVES);
-        expect(ids(branch.subscriptionId)).toEqual(["dev/b/m2"]);
+        const got = (name: string) => flat(mgr.sync(OWNER, OWNER, ids[name])).map(u => u.elementId);
+        expect(got("two")).toEqual(["dev/m1"]);
+        expect(got("three")).toEqual(["dev/m1", "dev/b/m2"]);
+        expect(got("four")).toEqual(LEAVES);
+        expect(got("branchTwo")).toEqual(["dev/b/m2"]);
+        expect(got("branchThree")).toEqual(["dev/b/m2", "dev/b/c/m3"]);
     });
 
     it("do not follow an ISA-95 level down to its devices", () => {
@@ -1408,10 +1426,12 @@ describe("SubscriptionManager, compositions", () => {
     });
 });
 
-/* On a real tree, a composition subscription delivers exactly the
- * leaves a value read of it to the same depth includes. */
+/* On a real tree, a composition subscription at maxDepth N delivers
+ * exactly the leaves within N-1 levels below it, which is what
+ * getDescendantLeafIds gives for a depth of N-1 (and for 0, every
+ * level). */
 describe("SubscriptionManager, compositions on the object tree", () => {
-    it("deliver the same leaves a value read includes", () => {
+    it("deliver the leaves within maxDepth - 1 levels", () => {
         const store = new I3xStore();
         const tree = new TestObjectTree({ namespaceName: "NS", namespaceUri: "urn:ns", store });
         tree.refreshFromSnapshot(pipelineSnapshot(2));
@@ -1433,12 +1453,14 @@ describe("SubscriptionManager, compositions on the object tree", () => {
             expect(leaves.length).toBeGreaterThan(all.length);
 
             for (const id of compositions) {
-                for (const depth of [0, 1, 2, 3]) {
+                for (const depth of [0, 1, 2, 3, 4]) {
                     const sub = mgr.create("p", "p");
                     mgr.registerOne("p", "p", sub.subscriptionId, id, depth);
                     for (const leaf of leaves) change(leaf, makeVqt(1));
                     const got = flat(mgr.sync("p", "p", sub.subscriptionId)).map(u => u.elementId);
-                    expect(got.sort()).toEqual(tree.getDescendantLeafIds(id, depth).sort());
+                    const want = depth === 0 ? tree.getDescendantLeafIds(id, 0)
+                        : depth === 1 ? [] : tree.getDescendantLeafIds(id, depth - 1);
+                    expect(got.sort()).toEqual(want.sort());
                     mgr.deleteOne("p", "p", sub.subscriptionId);
                 }
             }

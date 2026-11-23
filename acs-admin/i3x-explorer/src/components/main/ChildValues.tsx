@@ -29,9 +29,11 @@ export function ChildValues({ parentId }: { parentId: string }) {
   return (
     // ACS: the columns keep a readable minimum width and the table scrolls
     // sideways in a narrow pane, rather than wrapping names a letter a line.
-    <div className="border border-i3x-border rounded-lg overflow-x-auto">
+    // It also scrolls inside the card, with its header row pinned, so the
+    // card's title, Refresh and More stay in view on a long container.
+    <div className="border border-i3x-border rounded-lg overflow-auto max-h-[min(60vh,40rem)]">
       <div role="table" aria-label="Current values" className="min-w-[26rem] text-[13px]">
-        <div role="row" className="grid grid-cols-[minmax(9rem,2fr)_minmax(6rem,2fr)_auto_auto] gap-3 px-3 py-1.5 bg-i3x-bg text-[11px] font-medium text-i3x-text-muted">
+        <div role="row" className="sticky top-0 z-10 grid grid-cols-[minmax(9rem,2fr)_minmax(6rem,2fr)_auto_auto] gap-3 px-3 py-1.5 bg-i3x-bg text-[11px] font-medium text-i3x-text-muted">
           <span role="columnheader">Name</span>
           <span role="columnheader">Value</span>
           <span role="columnheader">Quality</span>

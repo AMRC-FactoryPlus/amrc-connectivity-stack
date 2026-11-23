@@ -398,7 +398,7 @@ function buildHelpRows(headerInfo, driverPresentation) {
         'Sparkplug_Type': 'The Sparkplug B data type for this metric.',
         'Allowed_Sparkplug_Types': 'Pipe-separated list of valid Sparkplug types for this metric (informational only, not used on import).',
         'Value': 'Static value for the metric (used instead of Address/Path when the metric has a fixed value).',
-        'Eng_Unit': 'Engineering unit label (e.g. kWh, RPM, degC).',
+        'Eng_Unit': 'Engineering unit: a symbol or alias from the Units page (e.g. kWh, °C). Leave empty for none.',
         'Eng_Low': 'Low engineering limit.',
         'Eng_High': 'High engineering limit.',
         'Deadband': 'Change threshold before a new value is reported.',

@@ -12,9 +12,10 @@ import { describe, it, expect } from 'vitest'
 import { UUIDs, eng_unit_uuid } from '@amrc-factoryplus/service-client'
 
 import {
-  label_clashes, merge_units, merged_unit, save_unit, unit_config,
-  unit_rows, unit_usage, unknown_units, with_alias,
+  csv_unit_problems, label_clashes, merge_units, merged_unit, save_unit,
+  unit_config, unit_rows, unit_usage, unknown_units, with_alias,
 } from '../src/lib/eng-units.js'
+import { eng_unit_resolver } from '@amrc-factoryplus/service-client'
 import { search_unece, suggest_for } from '../src/lib/eng-units-unece.js'
 
 const metric = unit => ({ Sparkplug_Type: 'Double', Eng_Unit: unit })
@@ -74,6 +75,29 @@ describe('unit configs', () => {
     const k5 = { code: 'K5', symbol: 'kVAr', aliases: ['kvar (reactive)'] }
     expect(merged_unit(k5, kvar))
       .toEqual({ code: 'KVR', symbol: 'kVAR', aliases: ['kvar', 'kVAr', 'kvar (reactive)'] })
+  })
+})
+
+describe('CSV import', () => {
+  const resolve = eng_unit_resolver(UNITS)
+  const row = (tagPath, unit) => ({ tagPath, fields: { Eng_Unit: unit, Value: '1' } })
+
+  it('refuses units no unit means', () => {
+    const rows = [row('Energy', 'kWh'), row('Flow', 'm3'), row('Speed', 'furlongs'), row('Odd', '')]
+    expect(csv_unit_problems(rows, resolve, {})).toEqual([
+      { tagPath: 'Flow', unit: 'm3' },
+      { tagPath: 'Speed', unit: 'furlongs' },
+    ])
+  })
+
+  it('lets through a unit the device already uses', () => {
+    const rows = [row('Odd', '$.transformedReading'), row('New', '$.other')]
+    expect(csv_unit_problems(rows, resolve, { Odd: metric('$.transformedReading') }))
+      .toEqual([{ tagPath: 'New', unit: '$.other' }])
+  })
+
+  it('takes rows with no unit column', () => {
+    expect(csv_unit_problems([{ tagPath: 'A', fields: {} }], resolve, {})).toEqual([])
   })
 })
 

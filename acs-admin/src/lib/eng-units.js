@@ -56,6 +56,19 @@ export function unknown_units (units, usage) {
     .sort((a, b) => b.metrics - a.metrics || a.string.localeCompare(b.string))
 }
 
+/** The rows of an origin map CSV whose Eng_Unit no unit means, as
+ * `{tagPath, unit}`. A string the device already uses is let through,
+ * so a CSV exported from the device can be imported again.
+ * @arg rows Rows from parseCsv.
+ * @arg resolve The vocabulary's resolver (eng_unit_resolver).
+ * @arg origin_map The device's origin map as it is now. */
+export function csv_unit_problems (rows, resolve, origin_map) {
+  const used = origin_map_units(origin_map)
+  return (rows ?? [])
+    .map(r => ({ tagPath: r.tagPath, unit: String(r.fields?.Eng_Unit ?? '').trim() }))
+    .filter(r => r.unit !== '' && !resolve(r.unit) && !used.has(r.unit))
+}
+
 /** A unit's config from form fields: trimmed, without empty or
  * repeated aliases, and without the symbol among the aliases. */
 export function unit_config (code, symbol, aliases) {

@@ -277,6 +277,26 @@ upstream, so they are not tied to the Manager UI.
     `registerItem.test.ts`, `recovery.test.ts`,
     `SubscriptionTransport.test.tsx` and `frameBatcher.test.ts`.
 
+18. **Popping the subscriptions panel out** (`SubscriptionsDrawer.tsx`,
+    `src/components/layout/StatusBar.tsx`, `src/stores/frameBatcher.ts`,
+    `src/acs/subscriptionsPopout.ts`): a button in the panel's header
+    opens the panel in its own browser window, to keep live values on
+    another screen. The frame opens an empty same-origin window
+    (`window.open('', …)`) and renders the panel into it with a React
+    portal, so it is the same React tree with the same stores and the
+    same subscription transport: there is no second connection or
+    stream. The window gets copies of the frame's stylesheets and follows
+    its theme. While it is out, the drawer is hidden and the status bar
+    says "popped out"; clicking that brings the window to the front, and
+    its Dock button, the window's own Dock button, or closing the window
+    puts the panel back, with keyboard focus on the pop-out button. The
+    window closes when the frame goes away. A blocked window leaves the
+    panel docked with a short note saying so. Live updates are timed by
+    the window's animation frames while it is out, as those keep coming
+    when the Explorer's tab is in the background. The choice is kept in
+    memory, so it lasts for the visit and a reload starts docked. Tests
+    in `src/acs/subscriptionsPopout.test.tsx`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

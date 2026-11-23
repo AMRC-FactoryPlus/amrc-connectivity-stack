@@ -35,6 +35,7 @@ export class FakeCDB {
         this.versions = new Map();
         this.stale = [];
         this.members = new Set();
+        this.objects = [];
     }
 
     app (a) {
@@ -66,6 +67,11 @@ export class FakeCDB {
             throw new ServiceError(UUIDs.Service.ConfigDB, "Stale", 412);
         this.writes.push({ app: a, obj: o, config: structuredClone(c) });
         this.set(a, o, c);
+    }
+
+    async create_object (klass, uuid) {
+        this.objects.push({ klass, uuid });
+        return uuid;
     }
 
     async delete_config (a, o) {

@@ -121,6 +121,11 @@ upstream, so they are not tied to the Manager UI.
    selected namespace's name, its data panel and the tree menu's copy
    entries. Field names from the i3X model, such as "Namespace URI", keep
    their names. Tests in `src/acs/schemaLabels.test.tsx`.
+9. **`src/components/layout/Sidebar.tsx`**: the tree panel starts 415px
+   wide, not 288px, so a few levels of an ISA-95 path fit without
+   dragging it. It is still resizable from 224px to 480px. Upstream keeps
+   no width between visits, so neither does this. Test in
+   `src/acs/sidebar.test.tsx`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

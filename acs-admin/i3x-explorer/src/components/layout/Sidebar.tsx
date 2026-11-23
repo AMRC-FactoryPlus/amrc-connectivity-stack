@@ -38,13 +38,18 @@ function TreeSkeleton() {
   )
 }
 
+/** ACS: the tree panel's starting width in pixels. */
+export const SIDEBAR_DEFAULT_WIDTH = 415
+
 export function Sidebar() {
   // Narrow selectors: a bare store hook re-renders on every write, and this
   // component re-renders the unmemoized TreeView with it.
   const isConnected = useConnectionStore(s => s.isConnected)
   const isLoading = useExplorerStore(s => s.isLoading)
   const sidebarCollapsed = useExplorerStore(s => s.sidebarCollapsed)
-  const [width, setWidth] = useState(288) // 72 * 4 = 288px (w-72)
+  // ACS: wider by default (upstream's is 288px), so ISA-95 paths fit. Still
+  // resizable between 224px and 480px; upstream keeps no stored width.
+  const [width, setWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
   const [isResizing, setIsResizing] = useState(false)
 
   const handleMouseDown = useCallback(() => {

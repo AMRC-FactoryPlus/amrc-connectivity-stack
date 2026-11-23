@@ -48,7 +48,8 @@ and shown in a same-origin iframe:
 
 Every change is marked `ACS` in the source. Apart from these, the new
 `src/acs/` folder, the two config files and this file, the copy is
-unchanged from upstream.
+unchanged from upstream. Changes 4 onwards are fixes worth offering
+upstream, so they are not tied to the Manager UI.
 
 1. **`src/main.tsx`**: after the runtime config loads, point the
    connection at the host's service (`configureForHost`), and after the
@@ -66,6 +67,14 @@ unchanged from upstream.
      theme toggle still works;
    - make New window open the Manager UI's Explorer page, not the bare
      frame.
+4. **`src/api/subscription.ts`**: read live updates in the shape the
+   i3X 1.0 Implementation Guide defines for the stream (Subscribe
+   Methods, Streaming, `POST /subscriptions/stream`): a flat array per
+   event, `data: [{elementId, value, quality, timestamp}]`, as the
+   reference server sends. `{sequenceNumber, updates}` batches belong to
+   `/sync`, but upstream read only batches from the stream, so it
+   dropped every streamed update without a word. Batches are still read.
+   The parsing is now `parseStreamEvent`, with tests.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
@@ -97,7 +106,7 @@ From `acs-admin`:
    `public/`, and changes to `vite.web.config.ts`.
 2. Replace `src/` (keeping `src/acs/`), `public/`, `index.html`,
    `tsconfig.json`, `tailwind.config.js` and `LICENSE` with upstream's.
-3. Apply the three changes above again. Each is a few lines; search the
+3. Apply the changes above again, leaving out any upstream has taken. Each is a few lines; search the
    old copy for `ACS` to find them.
 4. Update `UPSTREAM_VERSION` in `vite.config.js` from upstream's
    `package.json`, the commit and date at the top of this file, and any

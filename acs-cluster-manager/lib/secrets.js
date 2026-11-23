@@ -9,6 +9,20 @@ import { run_kubeseal }         from "./kubeseal.js";
 import * as manifests           from "./manifests.js";
 import { Edge }                 from "./uuids.js";
 
+/* Put a sealed value under a key in a list of SealedSecret manifests
+ * read from the cluster repo, creating the manifest if there is none.
+ * With opts.create_only the key must not exist already: we return
+ * false and change nothing if it does. */
+export function set_sealed_key (sss, opts, sealed) {
+    if (sss.length == 0)
+        sss[0] = manifests.sealed_secret(opts.namespace, opts.name);
+    const enc = sss[0].spec.encryptedData ??= {};
+    if (opts.create_only && Object.hasOwn(enc, opts.key))
+        return false;
+    enc[opts.key] = sealed;
+    return true;
+}
+
 /* This needs reworking. The repo URLs are now by-uuid and the
  * certificate is in a different App. */
 export class SealedSecrets {
@@ -40,9 +54,12 @@ export class SealedSecrets {
         const dir = await co.mkdir("edo", "secrets", opts.namespace);
         const file = `${opts.name}.yaml`;
         const sss = await co.read_manifests(dir, file);
-        if (sss.length == 0)
-            sss[0] = manifests.sealed_secret(opts.namespace, opts.name);
-        sss[0].spec.encryptedData[opts.key] = sealed;
+        if (!set_sealed_key(sss, opts, sealed)) {
+            this.log("Refusing to replace sealed secret %s/%s/%s",
+                opts.namespace, opts.name, opts.key);
+            await co.dispose();
+            return 403;
+        }
         await co.write_manifests(dir, file, sss);
         await co.commit("Updated sealed secret %s/%s/%s",
             opts.namespace, opts.name, opts.key);

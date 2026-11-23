@@ -127,10 +127,17 @@ export class EdgeDeploy {
             content:    req, 
             dryrun:     "dryrun" in req.query,
         };
-        
-        const ok = await this.fplus.Auth.check_acl(
-            req.auth, Edge.Perm.Secrets, opts.cluster, true);
-        if (!ok) return res.status(403).end();
+
+        /* Manage secrets lets a client set any key. Create secrets
+         * only lets it add a key which is not there yet, so it cannot
+         * overwrite a secret someone else saved. */
+        const can = perm => this.fplus.Auth.check_acl(
+            req.auth, perm, opts.cluster, true);
+        if (!await can(Edge.Perm.Secrets)) {
+            if (!await can(Edge.Perm.CreateSecrets))
+                return res.status(403).end();
+            opts.create_only = true;
+        }
 
         const st = await this.secrets.seal_secret(opts);
         res.status(st).end();

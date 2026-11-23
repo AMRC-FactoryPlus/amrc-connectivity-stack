@@ -114,6 +114,7 @@ const access = new Access({
 // Subscription manager
 const subscriptions = new SubscriptionManager({
     valueCache,
+    objectTree,
     viewers: access,
     ttl: parseInt(env.I3X_SUBSCRIPTION_TTL || "300000"),
     maxQueue: positiveInt("I3X_SUBSCRIPTION_QUEUE_MAX", 10_000),

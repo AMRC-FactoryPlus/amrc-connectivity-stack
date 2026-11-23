@@ -6,7 +6,8 @@
  * Manage secrets lets a client set any key in a sealed secret. Create
  * secrets only lets it add a key which is not there yet. These check
  * the permission choice in the route and the key check made against
- * the manifests read from the cluster repo.
+ * the manifests read from the cluster repo, and the secret-access
+ * route which reports the same decision to the Admin UI.
  */
 
 import assert           from "node:assert/strict";
@@ -70,8 +71,8 @@ describe("set_sealed_key", () => {
 });
 
 /* Run a route handler with a client holding the given permissions.
- * Returns the response status and the opts passed to SealedSecrets,
- * or undefined if the handler never got that far. */
+ * Returns the response status and JSON body, and the opts passed to
+ * SealedSecrets, or undefined if the handler never got that far. */
 async function call (method, perms, secret_st = 204) {
     const fplus = {
         debug,
@@ -91,15 +92,19 @@ async function call (method, perms, secret_st = 204) {
         delete_secret: async o => { seen = o; return secret_st; },
     };
 
-    let status;
-    const res = { status (s) { status = s; return this; }, end () {} };
+    let status, body;
+    const res = {
+        status (s) { status = s; return this; },
+        end () {},
+        json (b) { body = b; },
+    };
     const req = {
         auth:   "client@EXAMPLE.ORG",
         params: { cluster: "cluster-uuid", ...opts },
         query:  {},
     };
     await ed[method](req, res);
-    return { status, seen };
+    return { status, seen, body };
 }
 
 describe("PUT secret permissions", () => {
@@ -147,5 +152,27 @@ describe("DELETE secret permissions", () => {
             [Edge.Perm.CreateSecrets]);
         assert.equal(status, 403);
         assert.equal(seen, undefined);
+    });
+});
+
+describe("GET secret-access", () => {
+    test("Manage secrets may manage and create", async () => {
+        const { status, body } = await call("secret_access",
+            [Edge.Perm.Secrets]);
+        assert.equal(status, 200);
+        assert.deepEqual(body, { manage: true, create: true });
+    });
+
+    test("Create secrets alone may only create", async () => {
+        const { status, body } = await call("secret_access",
+            [Edge.Perm.CreateSecrets]);
+        assert.equal(status, 200);
+        assert.deepEqual(body, { manage: false, create: true });
+    });
+
+    test("no permission may do neither, and is not refused", async () => {
+        const { status, body } = await call("secret_access", []);
+        assert.equal(status, 200);
+        assert.deepEqual(body, { manage: false, create: false });
     });
 });

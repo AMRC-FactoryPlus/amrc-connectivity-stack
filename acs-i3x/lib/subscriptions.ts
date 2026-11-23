@@ -427,13 +427,12 @@ export class SubscriptionManager {
     private writeSseEvent(res: any, item: I3xSyncItem): void {
         // SSE events are the update itself: there is nothing to acknowledge.
         const data = `data: ${JSON.stringify([item])}\n\n`;
-        const ok = res.write(data);
+        /* A full socket buffers the event; there is nothing to wait
+         * for. This used to add a 'drain' listener that did nothing on
+         * every such write, and they piled up on a slow stream. */
+        res.write(data);
         // Ensure the chunk is flushed to the client immediately
         if (typeof res.flush === "function") res.flush();
-        if (!ok) {
-            // Back-pressure: drain event will allow more writes
-            res.once("drain", () => {});
-        }
     }
 
     /* Ownership is checked against the authenticated principal. The

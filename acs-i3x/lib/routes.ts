@@ -6,6 +6,13 @@ import type { ValueCache } from "./value-cache.js";
 import type { History } from "./history.js";
 import type { SubscriptionManager } from "./subscriptions.js";
 
+/** True for a Content-Type of text/event-stream, with or without
+ * parameters. */
+export function isEventStream(type: unknown): boolean {
+    return typeof type === "string"
+        && type.split(";")[0].trim().toLowerCase() === "text/event-stream";
+}
+
 export function routes(opts: {
     objectTree: ObjectTree;
     access: AccessLike;
@@ -18,12 +25,20 @@ export function routes(opts: {
     const api = new APIv1(opts);
 
     return (app: any) => {
-        // Gzip compression (MUST per i3X spec)
-        // Skip compression for SSE streams — compression buffers chunks
-        // which prevents real-time delivery.
+        // Gzip compression (MUST per i3X spec), except for SSE streams.
+        // A compressed stream sends each event through a zlib stream,
+        // which takes one write per turn of the event loop. While other
+        // requests keep the loop busy that is a few dozen events a
+        // second, and the rest queue in memory until the loop is idle:
+        // live values stop for as long as the other work lasts.
+        //
+        // The filter runs when the headers are written, inside the
+        // router mounted on /v1, where req.path no longer starts with
+        // /v1. So it goes by the response's content type, which the
+        // stream sets before it writes anything.
         app.use(compression({
             filter: (req: any, res: any) => {
-                if (req.path === "/v1/subscriptions/stream") return false;
+                if (isEventStream(res.getHeader("Content-Type"))) return false;
                 return compression.filter(req, res);
             },
         }));

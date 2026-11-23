@@ -157,7 +157,7 @@ upstream, so they are not tied to the Manager UI.
     text, is in `src/acs/searchDialog.ts` so the tree can open it. Tests
     in `src/acs/treeSearch.test.tsx`.
 
-7. **The object detail view** (`ObjectDetailView.tsx`,
+12. **The object detail view** (`ObjectDetailView.tsx`,
    `tabs/OverviewTab.tsx`, `tabs/RelationshipsTab.tsx`,
    `graph/RelationshipList.tsx`, `graph/relationshipMenu.tsx`,
    `tree/treeMenu.tsx`, `stores/explorer.ts`), made shorter and quieter:

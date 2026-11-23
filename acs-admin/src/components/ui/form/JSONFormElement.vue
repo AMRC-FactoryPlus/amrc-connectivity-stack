@@ -20,6 +20,7 @@
         :max="element.type === 'number' ? element.maximum : undefined"
         :step="element.type === 'number' ? element.multipleOf || 1 : undefined"
         :onEncrypt="onEncrypt"
+        :disabled="element.format === 'password' && secretsDisabled"
       />
     </template>
 
@@ -116,6 +117,12 @@ export default {
       type: Function,
       required: false,
       default: null
+    },
+    /* Turns a password field off, for a user who can't save secrets
+     * where this form saves them. Other fields are unaffected. */
+    secretsDisabled: {
+      type: Boolean,
+      default: false
     },
     v: {
       type: Object,

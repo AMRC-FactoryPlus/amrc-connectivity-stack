@@ -13,13 +13,15 @@
  *   - sends the Manager UI's own Bearer token for that service, asking the
  *     host for a new one when the service refuses it;
  *   - takes the Manager UI's theme as its starting theme;
- *   - tells the host which object is selected, so the Manager UI can offer
- *     its own actions on it.
+ *   - asks the host which of its own actions (Manage access, Build dataset)
+ *     the selected object has, shows them beside Subscribe, and tells the host
+ *     to run one when it is clicked.
  *
  * Without a host (the files opened on their own) the app is upstream's web
  * build, unchanged.
  */
 
+import { useEffect, useState } from 'react'
 import type { AuthProvider } from '../api/authProvider'
 import { useConnectionStore } from '../stores/connection'
 import { useExplorerStore, type SelectedItem } from '../stores/explorer'
@@ -41,6 +43,16 @@ export interface HostSelection {
   ancestors: HostObject[]
 }
 
+/** One of the host's own actions on the selection, offered as a button. */
+export interface HostAction {
+  /** What to pass back to `runAction`, e.g. "access" or "dataset". */
+  id: string
+  /** The button's text, e.g. "Manage access". */
+  label: string
+  /** The button's tooltip. */
+  title?: string
+}
+
 export interface AcsExplorerHost {
   /** The i3X base URL, including the version path, e.g. https://i3x.example/v1. */
   serviceUrl(): Promise<string>
@@ -50,8 +62,10 @@ export interface AcsExplorerHost {
   theme(): HostTheme
   /** Open the Explorer page of the Manager UI in a new browser window. */
   openNewWindow(): void
-  /** The selected object changed; null when nothing, or something other than an object, is selected. */
-  selected(selection: HostSelection | null): void
+  /** The host's actions on this object, none when it offers nothing. */
+  actions(selection: HostSelection): Promise<HostAction[]>
+  /** Run one of the actions `actions` gave for this object. */
+  runAction(id: string, selection: HostSelection): void
 }
 
 const HOST_KEY = '__acsI3xExplorerHost'
@@ -169,24 +183,40 @@ export async function configureForHost(): Promise<void> {
   })
 }
 
-/** Connect to the host's service, and report the selection to the host from now on. */
+/** Connect to the host's service. */
 export function startHosted(connect: () => Promise<void>): void {
   if (!acsHost) return
-  const host = acsHost
-
-  let last: string | null = null
-  const report = () => {
-    const { selectedItem, objectIndex } = useExplorerStore.getState()
-    const selection = hostSelection(selectedItem, objectIndex)
-    // The catalog fills in after connect, so the same object can gain ancestors.
-    const key = selection ? JSON.stringify(selection) : null
-    if (key === last) return
-    last = key
-    host.selected(selection)
-  }
-  useExplorerStore.subscribe((state, previous) => {
-    if (state.selectedItem !== previous.selectedItem || state.objectIndex !== previous.objectIndex) report()
-  })
-
   void connect()
+}
+
+/**
+ * The host's actions on an object, asked again whenever the object or what the
+ * catalog knows of its ancestors changes. Empty without a host, while the host
+ * is answering, and when the host fails to answer.
+ */
+export function useHostActions(
+  object: ObjectInstance,
+  host: Pick<AcsExplorerHost, 'actions'> | null = acsHost
+): { actions: HostAction[]; selection: HostSelection | null } {
+  const objectIndex = useExplorerStore(state => state.objectIndex)
+  const selection = hostSelection({ type: 'object', id: object.elementId, data: object }, objectIndex)
+  // The catalog fills in after connect, so the same object can gain ancestors.
+  const key = selection ? JSON.stringify(selection) : null
+  const [answer, setAnswer] = useState<{ key: string | null; actions: HostAction[] }>({ key: null, actions: [] })
+
+  useEffect(() => {
+    if (!host || !selection) return
+    let current = true
+    host.actions(selection).then(
+      actions => { if (current) setAnswer({ key, actions: Array.isArray(actions) ? actions : [] }) },
+      err => {
+        console.error('The host could not say what actions this object has:', err)
+        if (current) setAnswer({ key, actions: [] })
+      }
+    )
+    return () => { current = false }
+    // The key stands for the selection: a new object each render, the same content.
+  }, [host, key])
+
+  return { actions: answer.key === key ? answer.actions : [], selection }
 }

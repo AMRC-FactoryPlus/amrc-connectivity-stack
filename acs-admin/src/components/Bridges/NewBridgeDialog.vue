@@ -416,8 +416,10 @@ export default {
       const config = this.selectedCluster
       const namespace = config?.configuration?.namespace || 'fplus-edge'
 
+      // These are fixed keys, overwritten on an edit.
       await save_edge_secret(this.s.client, {
         cluster, namespace, name: secretName, key, value,
+        permission: 'Manage secrets',
       })
     },
 

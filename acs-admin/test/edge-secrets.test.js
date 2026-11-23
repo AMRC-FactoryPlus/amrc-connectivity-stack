@@ -85,6 +85,23 @@ describe('saving an edge secret', () => {
     expect(secret_save_message(403)).toMatch(/Create secrets permission/)
   })
 
+  it('names the permission the caller asks for', () => {
+    expect(secret_save_message(403, 'Manage secrets')).toMatch(/Manage secrets permission/)
+  })
+
+  it('asks for Create secrets when a save is refused', async () => {
+    const err = await save_edge_secret(fake_client({ status: 403 }), secret)
+      .catch(e => e)
+    expect(err.message).toMatch(/for the Create secrets permission/)
+  })
+
+  it('asks for Manage secrets when the caller needs it', async () => {
+    const err = await save_edge_secret(fake_client({ status: 403 }),
+      { ...secret, permission: 'Manage secrets' })
+      .catch(e => e)
+    expect(err.message).toMatch(/for the Manage secrets permission/)
+  })
+
   it('never puts the value in the message', () => {
     for (const st of [0, 401, 403, 404, 500, 503])
       expect(secret_save_message(st)).not.toContain('hunter2')

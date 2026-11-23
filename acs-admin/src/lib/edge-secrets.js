@@ -27,8 +27,9 @@ export class SecretSaveError extends Error {
   }
 }
 
-/** The message to show for a refused save. */
-export function secret_save_message (status) {
+/** The message to show for a refused save. `permission` names the
+ * permission to ask for on a 401 or 403. */
+export function secret_save_message (status, permission = 'Create secrets') {
   switch (status) {
     case 0:
       return 'The Cluster Manager did not answer, so the password was not saved. '
@@ -36,8 +37,8 @@ export function secret_save_message (status) {
     case 401:
     case 403:
       return 'You don\'t have permission to save secrets on this cluster, so the '
-        + 'password was not saved. Ask an administrator for the Create secrets '
-        + 'permission on this cluster.'
+        + 'password was not saved. Ask an administrator for the ' + permission
+        + ' permission on this cluster.'
     case 404:
       return 'The Cluster Manager doesn\'t know this cluster, so the password '
         + 'was not saved.'
@@ -61,8 +62,12 @@ export function secret_save_message (status) {
  * @param name       the secret's name
  * @param key        the key within the secret
  * @param value      the value to seal
+ * @param permission the permission a refusal asks for: Create secrets
+ *                   to add a new key, Manage secrets to overwrite one
  */
-export async function save_edge_secret (client, { cluster, namespace, name, key, value }) {
+export async function save_edge_secret (client, {
+  cluster, namespace, name, key, value, permission = 'Create secrets',
+}) {
   let res
   try {
     res = await client.Fetch.fetch({
@@ -74,13 +79,13 @@ export async function save_edge_secret (client, { cluster, namespace, name, key,
     })
   }
   catch {
-    throw new SecretSaveError(0, secret_save_message(0))
+    throw new SecretSaveError(0, secret_save_message(0, permission))
   }
 
   /* The service client answers a network failure with status 0. */
   const status = res?.status ?? 0
   if (status < 200 || status >= 300)
-    throw new SecretSaveError(status, secret_save_message(status))
+    throw new SecretSaveError(status, secret_save_message(status, permission))
 }
 
 /* Checking before a save whether the signed-in user may save secrets on

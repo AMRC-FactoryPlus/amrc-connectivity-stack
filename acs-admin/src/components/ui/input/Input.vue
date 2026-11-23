@@ -124,6 +124,7 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 <script>
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import {UUIDs} from "@amrc-factoryplus/service-client";
+import { toast } from 'vue-sonner'
 
 export default {
   name: 'Input',
@@ -219,8 +220,14 @@ export default {
           const encryptedKey = await this.onEncrypt(value)
           this.updateValue(encryptedKey)
         } catch (error) {
+          /* The value wasn't saved, so empty the field rather than leave
+           * the plain password in it to be saved into the config, and
+           * say why. */
           console.error('Failed to encrypt sensitive information:', error)
-          this.$emit('error', 'Failed to encrypt sensitive information')
+          this.updateValue('')
+          const message = error?.message || 'The password was not saved.'
+          toast.error('Password not saved', { description: message })
+          this.$emit('error', message)
         } finally {
           this.isEncrypting = false
         }

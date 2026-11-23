@@ -184,6 +184,7 @@ function sanitizeConnectionName(name) {
 import { helpers, required, minLength } from '@vuelidate/validators'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
+import { save_edge_secret } from '@/lib/edge-secrets.js'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
@@ -493,16 +494,9 @@ export default {
 
       const name = 'edge-agent-sensitive-information-' + this.node.uuid;
 
-      await this.s.client.Fetch.fetch({
-        service: UUIDs.Service.Clusters,
-        // url: `v1/cluster/${this.node.cluster}/secret/${this.node.namespace}/edge-agent-sensitive-information-${this.node.uuid}/${key}`,
-        url: `v1/cluster/${cluster}/secret/${namespace}/${name}/${key}`,
-        method: 'PUT',
-        body: value,
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
-      })
+      /* Throws when the Cluster Manager refuses, so the field never
+       * holds a key for a secret that doesn't exist. */
+      await save_edge_secret(this.s.client, { cluster, namespace, name, key, value })
 
       return key
     },

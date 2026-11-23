@@ -73,6 +73,8 @@ describe('performRecovery', () => {
 
     expect(client.registerMonitoredItems).toHaveBeenCalledWith('new-1', ['tp'], 0)
     expect(client.registerMonitoredItems).toHaveBeenCalledWith('new-1', ['count'], 1)
+    // ACS: and the running composition's components on their own, after it.
+    expect(client.registerMonitoredItems).toHaveBeenLastCalledWith('new-1', ['tp:a', 'tp:b'], 1)
     expect(useSubscriptionsStore.getState().subscriptions.get('new-1')?.components).toEqual({ tp: ['tp:a', 'tp:b'] })
   })
 

@@ -82,4 +82,35 @@ describe('subscription item actions', () => {
     expect(fakeClient.registerMonitoredItems).toHaveBeenCalledWith('s', ['pump'], 1)
     expect(subscription().stoppedItems).toEqual(['pump'])
   })
+
+  // ACS: a composition's components are registered on their own too, and released with it.
+  it('deleting a composition unregisters the components it added, but not one subscribed on its own', async () => {
+    useSubscriptionsStore.getState().addMonitoredItem('s', 'line', { maxDepth: 0, components: ['line:count', 'line:mode'] })
+    useSubscriptionsStore.getState().addMonitoredItem('s', 'line:count')
+
+    await renderTransport().deleteItem('s', 'line')
+
+    expect(fakeClient.unregisterMonitoredItems).toHaveBeenCalledWith('s', ['line'], 0)
+    expect(fakeClient.unregisterMonitoredItems).toHaveBeenCalledWith('s', ['line:mode'], 1)
+    expect(fakeClient.unregisterMonitoredItems).toHaveBeenCalledTimes(2)
+  })
+
+  it('stopping a composition releases its components, and starting it registers them again', async () => {
+    const transport = renderTransport()
+    await transport.stopItem('s', 'line')
+    expect(fakeClient.unregisterMonitoredItems).toHaveBeenCalledWith('s', ['line:count'], 1)
+
+    await transport.startItems('s', ['line'])
+    expect(fakeClient.registerMonitoredItems).toHaveBeenCalledWith('s', ['line'], 0)
+    expect(fakeClient.registerMonitoredItems).toHaveBeenCalledWith('s', ['line:count'], 1)
+  })
+
+  it('leaves an item registered on the server while a running composition needs it as a component', async () => {
+    useSubscriptionsStore.getState().addMonitoredItem('s', 'line:count')
+
+    await renderTransport().deleteItem('s', 'line:count')
+
+    expect(fakeClient.unregisterMonitoredItems).not.toHaveBeenCalled()
+    expect(subscription().monitoredItems).toEqual(['line', 'pump'])
+  })
 })

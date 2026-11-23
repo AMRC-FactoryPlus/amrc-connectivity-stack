@@ -135,7 +135,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
                   ? 'Show trend'
                   : 'Show value'
               }
-              className="flex items-center gap-2 max-w-[22rem] min-w-0 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+              className="flex items-center gap-2 w-full min-w-0 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
             >
               <Chevron open={open} />
               {!liveValue ? (

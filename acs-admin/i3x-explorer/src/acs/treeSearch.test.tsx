@@ -119,3 +119,4 @@ describe('the toolbar and search', () => {
     expect((screen.getByPlaceholderText('Search objects by name or ID…') as HTMLInputElement).value).toBe('Spindle speed')
   })
 })
+

@@ -6,6 +6,7 @@ import {
   loadChildrenFor,
   resolveRelationshipGroups,
   HIERARCHICAL_FOLDER_ID,
+  FILTER_OPEN_LIMIT,
   NAMESPACES_FOLDER_ID,
   type TreeBuildInput,
   type TreeRow,
@@ -288,6 +289,37 @@ describe('buildTreeRows: hierarchy walk guards', () => {
       })
     )
     expect(markerMessages(rows)).toContain('(max depth reached)')
+  })
+})
+
+// ACS: a filter opens the parents of its matches, so a deep match shows.
+describe('buildTreeRows: filter opens ancestors', () => {
+  const site = obj('site', { displayName: 'Site' })
+  const line = obj('line', { displayName: 'Line 1', parentId: 'site' })
+  const press = obj('press', { displayName: 'Press 3', parentId: 'line' })
+  const other = obj('other', { displayName: 'Other', parentId: 'site' })
+  const all = [site, line, press, other]
+  const filtered = (filterText: string, extra: ObjectInstance[] = []) => buildTreeRows(input({
+    hierarchicalRoots: [site],
+    allObjects: [...all, ...extra],
+    objectIndex: new Map([...all, ...extra].map(o => [o.elementId, o])),
+    childrenByParent: new Map([['site', [line, other, ...extra]], ['line', [press]]]),
+    filterText,
+  }))
+  const shown = (rows: ReturnType<typeof buildTreeRows>) =>
+    rows.filter(r => r.kind === 'node').map(r => r.id)
+
+  it('shows a deep match with its parents open, without expanding anything by hand', () => {
+    const rows = filtered('press')
+    expect(shown(rows)).toEqual(expect.arrayContaining(['hier:site', 'hier:line', 'hier:press']))
+    expect(shown(rows)).not.toContain('hier:other')
+  })
+
+  it('leaves parents closed when the filter matches more than the limit', () => {
+    const many = Array.from({ length: FILTER_OPEN_LIMIT + 1 }, (_, i) =>
+      obj(`m${i}`, { displayName: `Press ${i}`, parentId: 'site' }))
+    const rows = filtered('press', many)
+    expect(shown(rows)).not.toContain('hier:press')
   })
 })
 

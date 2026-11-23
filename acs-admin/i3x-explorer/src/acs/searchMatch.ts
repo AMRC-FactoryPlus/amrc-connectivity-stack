@@ -1,7 +1,7 @@
 // ACS: search matches names the way people type them.
 //
-// Upstream matched the typed text as one substring, so "cutting table"
-// missed "CuttingTableNorth". Here case, spaces, underscores and other
+// Upstream matched the typed text as one substring, so "line press"
+// missed "LinePressThree". Here case, spaces, underscores and other
 // punctuation are ignored, and each typed word must appear somewhere in
 // the name, in any order. An element ID still matches as typed.
 

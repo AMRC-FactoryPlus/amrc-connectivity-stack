@@ -7,7 +7,7 @@ import { STRUCTURE, DA } from '../src/lib/datasets/constants.js'
 import { merge_datasets, structure_tree } from '../src/lib/datasets/model.js'
 import {
     tabs_for, tab_of, equipment_of, included_list, equipment_change, group_items,
-    labels_for, metric_total, filter_metrics, tree_rows, structure_type,
+    labels_for, metric_total, metric_tree_rows, metric_tree_keys, folder_key, tree_rows, structure_type,
     live_badge, contents_devices,
 } from '../src/components/Datasets/page/page-logic.js'
 import {
@@ -107,10 +107,62 @@ describe('page logic', () => {
             { uuid: 'b', metrics: [{ path: 'Spindle/Speed', name: 'Speed', unit: 'rpm' }] },
         ]
         expect(metric_total(devs)).toBe(3)
-        expect(filter_metrics(devs, '').length).toBe(2)
-        const f = filter_metrics(devs, 'kwh')
-        expect(f.length).toBe(1)
-        expect(f[0].metrics.map(m => m.name)).toEqual(['Energy'])
+    })
+
+    describe('metric tree', () => {
+        const dev = {
+            uuid: 'a', name: 'Cutting table',
+            metrics: [
+                { path: 'Device_Information/ISA95_Hierarchy/Site', name: 'Site', type: 'String' },
+                { path: 'I_beamx', name: 'I_beamx', type: 'Boolean' },
+                { path: 'Extraction/Fan/Speed', name: 'Speed', unit: 'rpm', type: 'Double' },
+                { path: 'Extraction/Fan/Power', name: 'Power', unit: 'kW', type: 'Double' },
+                { path: 'Intake/Damper', name: 'Damper', unit: '%', type: 'Double' },
+            ],
+        }
+        const shape = rows => rows.map(r => `${'  '.repeat(r.depth)}${r.kind === 'device' ? r.device.name : r.label}${r.kind === 'metric' ? '' : ` (${r.count})`}`)
+
+        it('opens a lone device with its folders closed', () => {
+            expect(shape(metric_tree_rows([dev]))).toEqual([
+                'Cutting table (5)',
+                '  Extraction (2)',
+                '  Intake (1)',
+                '  I beamx',
+                '  Device information (1)',
+            ])
+        })
+
+        it('closes devices when there are several', () => {
+            const rows = metric_tree_rows([dev, { ...dev, uuid: 'b', name: 'Other' }])
+            expect(rows.map(r => r.kind)).toEqual(['device', 'device'])
+        })
+
+        it('opens folders the viewer opened, and every folder with Expand all', () => {
+            const one = metric_tree_rows([dev], { opened: { [folder_key('a', 'Extraction')]: true } })
+            expect(shape(one).slice(1, 4)).toEqual(['  Extraction (2)', '    Fan (2)', '  Intake (1)'])
+            const all = metric_tree_rows([dev], { opened: Object.fromEntries(metric_tree_keys([dev]).map(k => [k, true])) })
+            expect(all.filter(r => r.kind === 'metric').map(r => r.metric.path)).toEqual([
+                'Extraction/Fan/Speed', 'Extraction/Fan/Power', 'Intake/Damper', 'I_beamx',
+                'Device_Information/ISA95_Hierarchy/Site',
+            ])
+        })
+
+        it('opens the folders that hold a pin', () => {
+            const rows = metric_tree_rows([dev, { ...dev, uuid: 'b', name: 'Other' }],
+                { pinned: (d, p) => d === 'a' && p === 'Extraction/Fan/Power' })
+            const pinned = rows.find(r => r.kind === 'metric' && r.pinned)
+            expect(pinned.metric.path).toBe('Extraction/Fan/Power')
+            expect(rows.at(-1)).toMatchObject({ kind: 'device', open: false })
+        })
+
+        it('shows only matches while searching, all open', () => {
+            expect(shape(metric_tree_rows([dev, { ...dev, uuid: 'b', name: 'Other', metrics: [] }], { query: 'kw' }))).toEqual([
+                'Cutting table (1)',
+                '  Extraction (1)',
+                '    Fan (1)',
+                '      Power',
+            ])
+        })
     })
 
     it('words the structure tree plainly', () => {

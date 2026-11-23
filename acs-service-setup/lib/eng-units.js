@@ -23,9 +23,11 @@
  */
 
 import {
-    UUIDs, eng_unit_labels, eng_unit_uuid,
+    UUIDs, eng_unit_labels, eng_unit_uuid, origin_map_units,
 } from "@amrc-factoryplus/service-client";
-import { unece_match, unece_unit } from "@amrc-factoryplus/service-client/lib/unece.js";
+import {
+    unece_match, unece_symbol, unece_unit,
+} from "@amrc-factoryplus/service-client/lib/unece.js";
 
 const { App, Class } = UUIDs;
 
@@ -55,32 +57,10 @@ export const COMMON_UNITS = [
     "P1", "59", "2N", "LUX",
 ];
 
-/* Units whose OPC UA display name is not how anyone writes them. */
-const SYMBOLS = {
-    "P1":   "%",            /* shown as "% or pct" */
-};
-
-/* How a unit is written by default: its OPC UA display name, unless
- * that is not a usable symbol. */
-function default_symbol (code) {
-    return SYMBOLS[code] ?? unece_unit(code).symbol;
-}
-
 function count (counts, str) {
     if (typeof str != "string" || str.trim() == "") return;
     const s = str.trim();
     counts.set(s, (counts.get(s) ?? 0) + 1);
-}
-
-/** Add every Eng_Unit string in an origin map to `counts`, by the
- * number of metrics using it. */
-export function origin_map_units (origin_map, counts = new Map()) {
-    if (origin_map == null || typeof origin_map != "object") return counts;
-    for (const [k, v] of Object.entries(origin_map)) {
-        if (k == "Eng_Unit") count(counts, v);
-        else origin_map_units(v, counts);
-    }
-    return counts;
 }
 
 /** Add every Eng_Unit default in a JSON schema to `counts`. */
@@ -156,13 +136,13 @@ export function plan_units (existing, in_use, seed_common) {
             }
         }
         else
-            create(code, strs[0], [...strs.slice(1), default_symbol(code)]);
+            create(code, strs[0], [...strs.slice(1), unece_symbol(code)]);
     }
 
     if (seed_common) {
         for (const code of COMMON_UNITS) {
             if (units.has(eng_unit_uuid(code))) continue;
-            const symbol = default_symbol(code);
+            const symbol = unece_symbol(code);
             /* Already the label of a unit made from what is in use. */
             if (labels.has(symbol)) continue;
             create(code, symbol, []);

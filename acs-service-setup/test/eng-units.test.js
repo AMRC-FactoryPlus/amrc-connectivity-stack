@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { UUIDs, eng_unit_uuid } from "@amrc-factoryplus/service-client";
 
 import {
-    COMMON_UNITS, MigrateEngUnits, origin_map_units, plan_units, schema_units,
+    COMMON_UNITS, MigrateEngUnits, plan_units, schema_units,
 } from "../lib/eng-units.js";
 import { FakeCDB } from "./fake-cdb.js";
 
@@ -21,19 +21,6 @@ const metric = (unit, type = "Double") =>
 
 /* Units by code, from a plan's vocabulary. */
 const by_code = plan => new Map([...plan.units.values()].map(u => [u.code, u]));
-
-test("origin map units are counted by metric, at any depth", () => {
-    const counts = origin_map_units({
-        Schema_UUID: "s",
-        Energy: metric("kWh"),
-        Phases: { "1": { Voltage: metric("V"), Current: metric("A") },
-                  "2": { Voltage: metric("V"), Current: metric("A") } },
-        Status: metric(undefined, "String"),
-        Blank: metric(""),
-        Odd: metric(7),
-    });
-    assert.deepEqual(Object.fromEntries(counts), { kWh: 1, V: 2, A: 2 });
-});
 
 test("schema units are the Eng_Unit defaults", () => {
     const counts = schema_units({

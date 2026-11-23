@@ -10,6 +10,8 @@ import { LivePulse, TimeAgo, isRepeatingFeed, repeatingFeedText } from './LiveBa
 import { formatAgo, useNow } from './liveTime'
 import { Sparkline } from './Sparkline'
 import { TrendView } from './TrendView'
+import { CopyButton } from '../details/CopyButton' // ACS
+import { PATH_SEPARATOR } from '../main/navigation' // ACS
 import { ChangeHint, ChangeList } from './ValueChanges'
 
 export const MONITORED_ROW_COLUMNS = 6
@@ -20,7 +22,12 @@ interface MonitoredItemRowProps {
   /** Position in the windowed list, for measuring. */
   index: number
   elementId: string
-  name: string | undefined
+  /** ACS: display names from the top of the hierarchy down to this element; undefined while unknown. */
+  path: string[] | undefined
+  /** ACS: the catalog is still loading, so an unknown path may yet arrive. */
+  nameLoading?: boolean
+  /** ACS: the element is in the catalog, so its name opens it. */
+  canOpen?: boolean
   isCurrent: boolean
   /** A composition component, indented under its root; it stops and goes with the root. */
   isComponent?: boolean
@@ -49,7 +56,9 @@ interface MonitoredItemRowProps {
 export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, MonitoredItemRowProps>(function MonitoredItemRow({
   index,
   elementId,
-  name,
+  path,
+  nameLoading = false,
+  canOpen = true,
   isCurrent,
   isComponent = false,
   stopped,
@@ -75,7 +84,14 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
     <tbody ref={ref} data-index={index}>
       <tr className={`border-b border-i3x-border/60 ${rowTone}`}>
         <td className={`py-2.5 pr-3 ${isComponent ? 'pl-8' : 'pl-3'}`}>
-          <ElementName elementId={elementId} name={name} isCurrent={isCurrent} onOpen={onOpenElement} />
+          <ElementName
+            elementId={elementId}
+            path={path}
+            nameLoading={nameLoading}
+            canOpen={canOpen}
+            isCurrent={isCurrent}
+            onOpen={onOpenElement}
+          />
           {componentCount > 0 && onToggleComponents && (
             <button
               type="button"
@@ -139,7 +155,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           {onStop && onStart && onDelete && (
             <ItemActions
               elementId={elementId}
-              label={name ?? elementId}
+              label={path ? path.join(PATH_SEPARATOR) : elementId}
               stopped={stopped}
               onStop={onStop}
               onStart={onStart}
@@ -248,40 +264,84 @@ function ItemActions({
   )
 }
 
+/**
+ * ACS: the element's full path, e.g. "Site / Line 1 / Spindle speed", with the
+ * element's own name always in view. A long path loses its top levels first. The element id is
+ * in the tooltip and behind a copy button rather than on a line of its own.
+ */
 function ElementName({
   elementId,
-  name,
+  path,
+  nameLoading,
+  canOpen,
   isCurrent,
   onOpen,
 }: {
   elementId: string
-  name: string | undefined
+  path: string[] | undefined
+  nameLoading: boolean
+  canOpen: boolean
   isCurrent: boolean
   onOpen: (elementId: string) => void
 }) {
-  if (!name) {
+  const copy = (
+    <CopyButton
+      text={elementId}
+      title="Copy element ID"
+      className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+    />
+  )
+
+  if (!path) {
     return (
-      <span className="block truncate max-w-[16rem] text-i3x-text" title={elementId}>
-        {elementId}
+      <span className="group flex items-center gap-1 min-w-0 max-w-[28rem]">
+        <span className={`truncate ${nameLoading ? 'italic text-i3x-text-muted' : 'font-mono text-[12px] text-i3x-text'}`} title={elementId}>
+          {nameLoading ? 'Loading name…' : elementId}
+        </span>
+        {copy}
       </span>
     )
   }
-  return (
+
+  const name = path[path.length - 1]
+  const ancestors = path.slice(0, -1)
+  const fullPath = path.join(PATH_SEPARATOR)
+  const label = (
     <>
-      <button
-        type="button"
-        onClick={() => onOpen(elementId)}
-        title={`Open ${elementId}`}
-        className={`block truncate max-w-[16rem] text-left rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
-          isCurrent ? 'text-i3x-primary font-medium' : 'text-i3x-text hover:text-i3x-primary'
-        }`}
-      >
-        {name}
-      </button>
-      {name !== elementId && (
-        <span className="block truncate max-w-[16rem] font-mono text-[11px] text-i3x-text-muted">{elementId}</span>
+      {ancestors.length > 0 && (
+        // Right-to-left so an ellipsis eats the top of the path; <bdi> keeps the names in reading order.
+        // It gives up its width long before the element's own name does.
+        <span dir="rtl" className="truncate min-w-[1.5em] shrink-[1000] text-left text-i3x-text-muted">
+          <bdi>{ancestors.join(PATH_SEPARATOR)}</bdi>
+        </span>
       )}
+      {ancestors.length > 0 && <span aria-hidden="true" className="flex-shrink-0 whitespace-pre text-i3x-text-muted">{PATH_SEPARATOR}</span>}
+      <span className="truncate min-w-0">{name}</span>
     </>
+  )
+  const tooltip = `${fullPath}\n${elementId}`
+
+  return (
+    <span className="group flex items-center gap-1 min-w-0 max-w-[28rem]">
+      {canOpen ? (
+        <button
+          type="button"
+          onClick={() => onOpen(elementId)}
+          title={`Open ${tooltip}`}
+          aria-label={`Open ${fullPath}`}
+          className={`flex min-w-0 text-left rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
+            isCurrent ? 'text-i3x-primary font-medium' : 'text-i3x-text hover:text-i3x-primary'
+          }`}
+        >
+          {label}
+        </button>
+      ) : (
+        <span title={tooltip} className="flex min-w-0 text-i3x-text">
+          {label}
+        </span>
+      )}
+      {copy}
+    </span>
   )
 }
 

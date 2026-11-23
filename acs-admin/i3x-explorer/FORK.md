@@ -87,6 +87,18 @@ upstream, so they are not tied to the Manager UI.
    trend, capped at 60 points as before, and a trend point is now
    plotted at the reading's source time, so readings that arrive
    together are not stacked at one arrival time.
+6. **`src/components/main/navigation.ts`**, the subscriptions view and
+   its rows (`SubscriptionsView.tsx`, `MonitoredItemRow.tsx`), and
+   `ObjectDetailView.tsx`: name each monitored element by its full
+   path, such as "Site / Line 1 / Spindle speed",
+   instead of its name over its element id. The path runs from the top
+   of the hierarchy, as the Manager UI writes ISA-95 levels, and a long
+   one loses its top levels first so the element's own name stays in
+   view. The id is in the tooltip and behind a copy button. Subscribing
+   records the path, so a row is named before the catalog holds the
+   element, and a component the catalog has not reached yet says
+   "Loading name…". `objectPath` and `objectPathSegments` are the shared
+   helpers, built on `buildAncestorChain`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

@@ -51,6 +51,28 @@ export function buildAncestorChain(
   return chain
 }
 
+/** ACS: what goes between the names in an element's path, as the Manager UI writes ISA-95 levels. */
+export const PATH_SEPARATOR = ' / '
+
+/**
+ * ACS: the display names from the top of the hierarchy down to and including the element,
+ * e.g. ["Site", "Line 1", "Press 3", "Spindle speed"]. Undefined
+ * when the element isn't in the index; it starts lower down while its ancestors are still loading.
+ */
+export function objectPathSegments(
+  elementId: string,
+  objectIndex: Map<string, ObjectInstance>
+): string[] | undefined {
+  const object = objectIndex.get(elementId)
+  if (!object) return undefined
+  return [...buildAncestorChain(object, objectIndex), object].map(item => item.displayName || item.elementId)
+}
+
+/** ACS: the element's path as one string, e.g. "Site / Line 1 / Spindle speed". */
+export function objectPath(elementId: string, objectIndex: Map<string, ObjectInstance>): string | undefined {
+  return objectPathSegments(elementId, objectIndex)?.join(PATH_SEPARATOR)
+}
+
 export function useElementNavigation(): ElementNavigation {
   const selectElement = useCallback((elementId: string, tab?: DetailTab) => {
     // Store-only resolution. This PR is presentational: if the object isn't

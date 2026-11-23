@@ -6,7 +6,7 @@ import { useSubscriptionTransport } from './SubscriptionTransport'
 import { LivePulse, TimeAgo } from './LiveBadge'
 import { MONITORED_ROW_COLUMNS, MonitoredItemRow } from './MonitoredItemRow'
 import { Spinner } from '../common/Spinner'
-import { useElementNavigation } from '../main/navigation'
+import { objectPathSegments, useElementNavigation } from '../main/navigation'
 import type { ObjectInstance } from '../../api/types'
 
 const EMPTY: readonly string[] = []
@@ -42,6 +42,7 @@ export function SubscriptionsView() {
   const activeSubscriptionId = useSubscriptionsStore(state => state.activeSubscriptionId)
   const setActiveSubscription = useSubscriptionsStore(state => state.setActiveSubscription)
   const objectIndex = useExplorerStore(state => state.objectIndex)
+  const catalogLoaded = useExplorerStore(state => state.allObjectsLoaded)
   const { selectElement } = useElementNavigation()
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   // Component lists start open; this holds the roots a user folded.
@@ -94,6 +95,17 @@ export function SubscriptionsView() {
       return [root, ...components]
     })
   }, [active, foldedRoots])
+
+  // ACS: rows are named by their full path. Worked out for the rows in view only, and kept while
+  // the catalog is unchanged so a row's path keeps its identity and the memoized row doesn't re-render.
+  const pathCache = useMemo(() => new Map<string, string[] | undefined>(), [objectIndex, active?.names])
+  const pathOf = (elementId: string): string[] | undefined => {
+    if (!pathCache.has(elementId)) {
+      const recorded = active?.names?.[elementId]
+      pathCache.set(elementId, objectPathSegments(elementId, objectIndex) ?? (recorded ? [recorded] : undefined))
+    }
+    return pathCache.get(elementId)
+  }
 
   const scrollRef = useRef<HTMLDivElement>(null)
   // A new key function makes the virtualizer re-measure every row, so it changes only with the rows.
@@ -256,7 +268,9 @@ export function SubscriptionsView() {
                   ref={virtualizer.measureElement}
                   index={virtualItem.index}
                   elementId={row.elementId}
-                  name={objectIndex.get(row.elementId)?.displayName}
+                  path={pathOf(row.elementId)}
+                  nameLoading={!catalogLoaded}
+                  canOpen={objectIndex.has(row.elementId)}
                   isCurrent={row.elementId === selectedElementId}
                   isComponent={row.isComponent}
                   stopped={stopped}

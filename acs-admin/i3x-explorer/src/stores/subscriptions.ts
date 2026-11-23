@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { diffValues, toFiniteNumber, type ValueChange } from '../api/structuredValue'
+import { useExplorerStore } from './explorer' // ACS
 
 export interface LiveValue {
   elementId: string
@@ -48,6 +49,8 @@ export interface Subscription {
   components?: Record<string, string[]>
   /** Items unregistered on the server but kept in the list, with their last value, to start again. */
   stoppedItems?: string[]
+  /** ACS: each item's path when it was subscribed, shown until the catalog holds the item. */
+  names?: Record<string, string>
 }
 
 /** Registration depth for a monitored item: 0 is the whole composition tree, 1 the item alone. */
@@ -98,12 +101,14 @@ export interface Delivery {
  */
 export function applyDeliveries(deliveries: Delivery[]): void {
   const { subscriptions, updateLiveValues } = useSubscriptionsStore.getState()
+  const { objectIndex } = useExplorerStore.getState()
   const values: LiveValueUpdate[] = []
   for (const { subscriptionId, items } of deliveries) {
     for (const item of admittedDeliveries(subscriptions.get(subscriptionId), items)) {
       values.push({
         elementId: item.elementId,
-        displayName: item.elementId,
+        // The element's own name once the catalog holds it, not its id.
+        displayName: objectIndex.get(item.elementId)?.displayName || item.elementId,
         value: item.value,
         timestamp: item.timestamp,
         quality: item.quality,
@@ -192,7 +197,7 @@ interface SubscriptionsState {
   addMonitoredItem: (
     subscriptionId: string,
     elementId: string,
-    options?: { maxDepth?: number; components?: string[] }
+    options?: { maxDepth?: number; components?: string[]; name?: string }
   ) => void
   removeMonitoredItem: (subscriptionId: string, elementId: string) => void
   setItemStopped: (subscriptionId: string, elementId: string, stopped: boolean) => void
@@ -249,6 +254,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
         ? { ...sub.components, [elementId]: options.components }
         : sub.components,
       stoppedItems: sub.stoppedItems?.filter(id => id !== elementId),
+      names: options?.name ? { ...sub.names, [elementId]: options.name } : sub.names,
     })
     set({ subscriptions: updated })
   },
@@ -259,6 +265,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
     if (!sub) return
     const { [elementId]: _depth, ...monitoredDepth } = sub.monitoredDepth ?? {}
     const { [elementId]: removedComponents = [], ...components } = sub.components ?? {}
+    const { [elementId]: _name, ...names } = sub.names ?? {}
     const updatedSubs = new Map(subscriptions)
     updatedSubs.set(subscriptionId, {
       ...sub,
@@ -266,6 +273,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
       monitoredDepth,
       components,
       stoppedItems: sub.stoppedItems?.filter(id => id !== elementId),
+      names,
     })
     set({
       subscriptions: updatedSubs,

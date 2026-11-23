@@ -225,6 +225,18 @@ upstream, so they are not tied to the Manager UI.
     `src/acs/trendBuffer.test.ts`, `frameBatcher.test.ts` and
     `subscriptions.test.ts`.
 
+15. **Graphs in the subscriptions list** (`MonitoredItemRow.tsx`,
+    `SubscriptionsView.tsx`, `TrendView.tsx`, `src/acs/ComponentTrends.tsx`):
+    a row opened to its trend draws the graph across the full width of
+    the panel, not at a fixed 400px. A composition's row now opens even
+    without a value of its own, and shows a graph for each of its
+    components that has numeric readings, side by side: as many columns
+    of at least 28rem as fit, wrapping onto more rows, and one graph
+    alone at full width (`trendGridClass`). Up to 24 are drawn there,
+    and the rest are reached through their own rows. Its own value, if
+    it has one, follows as before. Tests in
+    `src/acs/componentTrends.test.ts` and `SubscriptionsView.test.tsx`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

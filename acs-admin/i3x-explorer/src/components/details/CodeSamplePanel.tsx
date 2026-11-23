@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { RequestDescriptor } from '../../api/requestShape'
-import { CodeIcon } from '../common/icons'
+import { CodeIcon, EllipsisIcon } from '../common/icons'
+import { ContextMenu } from '../common/ContextMenu' // ACS
 import { RequestInspectorModal } from './RequestInspectorModal'
 import type { RequestInspectorTab, RequestInspectorVariant } from './requestTabs'
 
@@ -61,28 +62,41 @@ export function CardCodeSample({
   const initialTab = resolvedTabs.find(tab => tab.id === initialTabId) ?? resolvedTabs[0]
   const preview = initialTab.descriptor ?? initialTab.variants?.[0]?.descriptor
 
-  // A tinted pill meant for a Card header's `actions` slot, so every card's
-  // request sits in the same top-right corner. The method is aria-hidden to keep
-  // the accessible name "View request"; the tooltip carries method and path.
+  // ACS: the request sits behind a "More" (⋯) button in the card header
+  // rather than a pill on every card, so the cards read as data first. The
+  // menu's one entry opens the same Request Inspector, and its detail shows
+  // the method and path the pill used to.
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        title={preview ? `${preview.method} ${preview.path}` : undefined}
-        className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-i3x-primary/30 bg-i3x-primary/10 px-2.5 py-0.5 text-[11px] font-medium normal-case tracking-normal text-i3x-primary whitespace-nowrap hover:bg-i3x-primary/20 hover:border-i3x-primary/60 transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+        aria-label="More"
+        aria-haspopup="menu"
+        aria-expanded={menu !== null}
+        title="More"
+        onClick={event => {
+          const rect = event.currentTarget.getBoundingClientRect()
+          setMenu({ x: rect.right - 200, y: rect.bottom + 4 })
+        }}
+        className="inline-flex flex-shrink-0 items-center justify-center rounded p-1 text-i3x-text-muted hover:text-i3x-text hover:bg-i3x-text/[0.06] transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
       >
-        <CodeIcon size={12} />
-        View request
-        {preview && (
-          <span
-            aria-hidden="true"
-            className="border-l border-i3x-primary/30 pl-1.5 font-mono text-[10px] font-semibold"
-          >
-            {preview.method}
-          </span>
-        )}
+        <EllipsisIcon size={16} />
       </button>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          entries={[{
+            kind: 'action',
+            label: 'View request',
+            detail: preview?.method,
+            icon: <CodeIcon size={12} />,
+            onSelect: () => { setMenu(null); setOpen(true) },
+          }]}
+        />
+      )}
       {open && (
         <RequestInspectorModal
           title={title}

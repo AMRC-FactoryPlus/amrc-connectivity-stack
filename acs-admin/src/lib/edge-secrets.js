@@ -82,3 +82,70 @@ export async function save_edge_secret (client, { cluster, namespace, name, key,
   if (status < 200 || status >= 300)
     throw new SecretSaveError(status, secret_save_message(status))
 }
+
+/* Checking before a save whether the signed-in user may save secrets on
+ * a cluster, so a dialog can turn its password fields off and say why
+ * instead of letting someone type a password that will be refused.
+ *
+ * The Cluster Manager checks these against the cluster's UUID, with a
+ * wildcard grant counting too. Manage secrets allows adding, overwriting
+ * and deleting keys. Create secrets allows adding a new key only, which
+ * is all the connection dialog needs because every save there uses a
+ * fresh random key. */
+export const SecretPerm = {
+  Manage: '07fba27a-0d01-4c07-875b-d25345261d3a',
+  Create: 'a558eb08-e3fc-449f-8492-ae4f2514714b',
+}
+
+const WILDCARD = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * Whether an ACL lets its principal save secrets on a cluster.
+ *
+ * The Auth service only returns the entries for permissions the caller
+ * may read (Read ACL on that permission), so a missing grant only means
+ * "no" when the ACL also shows the caller can read every permission
+ * asked about. Anything less is "unknown", and the caller should leave
+ * the fields on and rely on the save reporting a refusal.
+ *
+ * @param acl          the principal's ACL, as [{ permission, target }]
+ * @param cluster      the edge cluster's UUID
+ * @param permissions  the permissions, any one of which is enough
+ * @returns true, false, or null when the ACL can't tell
+ */
+export function secret_access (acl, cluster, permissions) {
+  if (!Array.isArray(acl) || !cluster) return null
+
+  const on = (permission, target) => acl.some(ace =>
+    ace.permission === permission
+    && (ace.target === target || ace.target === WILDCARD))
+
+  if (permissions.some(p => on(p, cluster))) return true
+  if (permissions.every(p => on(UUIDs.Permission.Auth.ReadACL, p))) return false
+  return null
+}
+
+/**
+ * Look up whether the signed-in user may save secrets on a cluster.
+ * Reads the user's own ACL from the Auth service in the same way as the
+ * rebirth button, but by principal UUID rather than a guessed Kerberos
+ * name. Never rejects: any failure, such as a user who can't read their
+ * own ACL, gives null.
+ *
+ * @param client       the service client
+ * @param cluster      the edge cluster's UUID
+ * @param permissions  the permissions, any one of which is enough
+ * @returns true, false, or null when it can't tell
+ */
+export async function load_secret_access (client, cluster, permissions) {
+  try {
+    const me = await client.Auth.whoami_uuid()
+    const [st, acl] = await client.Auth.fetch(`v2/acl/${me}`)
+    if (st !== 200) return null
+    return secret_access(acl, cluster, permissions)
+  }
+  catch (e) {
+    console.debug('Could not check permission to save secrets:', e)
+    return null
+  }
+}

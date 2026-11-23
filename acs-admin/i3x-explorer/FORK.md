@@ -39,8 +39,8 @@ and shown in a same-origin iframe:
   the app asks the host for a new one, naming the refused token, and
   retries once.
 - The host also hears which object is selected, so the Manager UI can
-  show its own actions above the frame: add to Live Activity, manage
-  i3X access, and build a dataset.
+  show its own actions above the frame: manage i3X access, and build a
+  dataset. Live values come from the app's own Subscribe.
 - Opened on its own, without the Manager UI around it, the app is
   upstream's web build with nothing changed.
 

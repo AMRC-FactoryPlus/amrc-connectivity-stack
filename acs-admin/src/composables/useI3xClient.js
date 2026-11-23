@@ -217,8 +217,8 @@ export function useI3xClient () {
       return post(c(), 'v1/subscriptions/delete', { clientId, subscriptionIds })
     },
 
-    // Throws when any id fails. The monitor registers one id at a
-    // time and relies on that.
+    // Throws when any id fails, so register one id at a time when
+    // the failing id matters; registerEach reports each id instead.
     registerItems (clientId, subscriptionId, elementIds, maxDepth) {
       const body = { clientId, subscriptionId, elementIds }
       if (maxDepth != null) body.maxDepth = maxDepth

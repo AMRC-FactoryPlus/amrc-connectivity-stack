@@ -4,16 +4,15 @@
   - Copyright 2026 University of Sheffield
   -->
 
-<!-- Any object can be added to the Live Activity monitor. An ISA-95
-     level gets i3X access, granted on its vocabulary node; a device gets
-     i3X access and a link to build a dataset from it. Other objects are
-     read with their device, so they get neither. -->
+<!-- An ISA-95 level gets i3X access, granted on its vocabulary node; a
+     device gets i3X access and a link to build a dataset from it. Other
+     objects are read with their device, so they get neither. Live values
+     are the Explorer's own Subscribe. -->
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { useISA95Store, ISA95_LEVELS } from '@store/useISA95Store.js'
-import { useMonitorStore } from '@store/useMonitorStore.js'
 import { resolve_isa95 } from '@/lib/access/i3x-access.js'
 import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 
@@ -23,15 +22,12 @@ const props = defineProps({
 })
 
 const isa95 = useISA95Store()
-const monitor = useMonitorStore()
 const router = useRouter()
 onMounted(() => isa95.start())
 
 const object = computed(() => props.selection.object)
 const kind = computed(() => props.selection.kind)
 const path = computed(() => props.selection.levels.join(' / '))
-
-const monitored = computed(() => monitor.items.has(object.value.elementId))
 
 /* The ISA-95 nodes for the levels, top first, as far as the names match. */
 const levelNodes = computed(() => resolve_isa95(isa95.data, props.selection.levels))
@@ -44,13 +40,6 @@ const levelMatched = computed(() => levelNodes.value.length === props.selection.
       <span class="text-sm font-medium truncate" :title="object.elementId">{{ object.displayName }}</span>
       <span v-if="path && kind === 'device'" class="text-xs text-gray-500 truncate">in {{ path }}</span>
     </div>
-
-    <Button variant="outline" size="sm" class="gap-2" :disabled="monitored"
-            :title="monitored ? 'Already in Live Activity' : 'Watch this object\'s values in Live Activity'"
-            @click="monitor.subscribe(object.elementId, object.displayName)">
-      <i class="fa-solid fa-eye text-sm"></i>
-      <span>{{ monitored ? 'Monitoring' : 'Monitor' }}</span>
-    </Button>
 
     <template v-if="kind === 'device'">
       <I3xAccessButton :target="object.elementId" device

@@ -15,6 +15,8 @@ interface SearchResult {
 
 interface SearchModalProps {
   onClose: () => void
+  /** ACS: the text the search box starts with, such as the tree's filter text. */
+  initialQuery?: string
 }
 
 function buildAncestorPath(obj: ObjectInstance, objectIndex: Map<string, ObjectInstance>): string[] {
@@ -35,8 +37,8 @@ function buildAncestorPath(obj: ObjectInstance, objectIndex: Map<string, ObjectI
 
 const MAX_RESULTS = 50
 
-export function SearchModal({ onClose }: SearchModalProps) {
-  const [query, setQuery] = useState('')
+export function SearchModal({ onClose, initialQuery = '' }: SearchModalProps) {
+  const [query, setQuery] = useState(initialQuery) // ACS: was ''
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)

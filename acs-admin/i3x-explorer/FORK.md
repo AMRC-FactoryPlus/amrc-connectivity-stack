@@ -134,6 +134,18 @@ upstream, so they are not tied to the Manager UI.
     behaves the same and, as upstream, the choice lasts for the session.
     The filter box now sits directly above the tree. Tests in
     `src/acs/toolbar.test.tsx` and `TreeNode.test.tsx`.
+11. **`src/components/tree/TreeView.tsx`**, `Toolbar.tsx` and
+    `src/components/search/SearchModal.tsx`: search starts from the
+    tree. The Search button moves from the toolbar to the right of the
+    "Filter tree…" box. Typing still filters the tree; Enter in the box,
+    or the button, opens the search dialog with the typed text already in
+    it (`SearchModal`'s new `initialQuery`). When the filter finds
+    nothing among the rows the tree has loaded, a line under the box says
+    "Nothing in the visible tree. Press Enter to search.", because search
+    looks through the whole catalog. ⌘K still opens an empty search. The
+    toolbar still renders the dialog; whether it is open, and with what
+    text, is in `src/acs/searchDialog.ts` so the tree can open it. Tests
+    in `src/acs/treeSearch.test.tsx`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

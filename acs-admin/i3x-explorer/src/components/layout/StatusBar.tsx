@@ -64,7 +64,8 @@ export function StatusBar() {
 
       {isConnected && (
         <div className="hidden md:flex items-center px-3 border-r border-i3x-border text-i3x-primary whitespace-nowrap">
-          {objectCount.toLocaleString()} objects · {namespaceCount} namespaces
+          {/* ACS: i3X namespaces are labelled Schemas. */}
+          {objectCount.toLocaleString()} objects · {namespaceCount} {namespaceCount === 1 ? 'schema' : 'schemas'}
           {cachedAt && (
             <span
               className="ml-2 text-i3x-text-muted"

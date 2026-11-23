@@ -9,9 +9,11 @@
 <!-- A device counts everyone with access to it, by any route. An ISA-95
      node counts only the grants on that node: the dialog shows the rest.
      The dialog mounts only while open, so a table of these buttons does
-     not start the principal stores once per row. -->
+     not start the principal stores once per row. With `headless` there is
+     no button: the parent opens the dialog through v-model:open, as the
+     Explorer page does for the framed i3X Explorer's own button. -->
 <template>
-  <Button variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
+  <Button v-if="!headless" variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
     <i class="fa-solid fa-shield-halved text-sm"></i>
     <span>Manage access</span>
     <Badge variant="secondary" class="min-w-5 justify-center px-1.5" :aria-label="title">
@@ -47,9 +49,12 @@ const props = defineProps({
   name: { type: String, default: '' },
   /* Where the target sits, e.g. "Example Co / North Site / Machine Shop". */
   path: { type: String, default: '' },
+  /* No button: only the dialog, opened by the parent with v-model:open. */
+  headless: { type: Boolean, default: false },
 })
 
-const open = ref(false)
+/* Local state unless the parent binds v-model:open. */
+const open = defineModel('open', { type: Boolean, default: false })
 const rows = ref([])
 const loading = ref(false)
 const loadError = ref(null)

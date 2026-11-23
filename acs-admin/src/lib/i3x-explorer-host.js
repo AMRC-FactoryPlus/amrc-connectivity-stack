@@ -9,9 +9,14 @@
  * it puts a host object on window under HOST_KEY; the app reads it
  * through window.parent (i3x-explorer/src/acs/host.ts holds the other
  * half). The host lends the app this console's session: the i3X service
- * URL from the Directory and a Bearer token from the service client. */
+ * URL from the Directory and a Bearer token from the service client, and
+ * offers this console's own actions on the selected object (Manage
+ * access, Build dataset), which the app shows as buttons beside its
+ * Subscribe and hands back here to run. */
 
 import { UUIDs } from "@amrc-factoryplus/service-client";
+
+import { resolve_isa95 } from "@/lib/access/i3x-access.js";
 
 export const HOST_KEY = "__acsI3xExplorerHost";
 
@@ -24,7 +29,9 @@ export const ISA95_LEVEL_TYPE = "isa95-level";
  * @param opts.client      a promise for the service client, or the client
  * @param opts.theme       () => "light" | "dark"
  * @param opts.open_window () => void, opens the Explorer page in a new window
- * @param opts.selected    (selection | null) => void
+ * @param opts.actions     async (selection) => the explorer_actions() for
+ *                         the app's selection ({ object, ancestors })
+ * @param opts.run         (action, selection) => void, runs one of them
  */
 export function mk_host (opts) {
     const client = () => Promise.resolve(opts.client);
@@ -47,8 +54,17 @@ export function mk_host (opts) {
         openNewWindow () {
             opts.open_window();
         },
-        selected (selection) {
-            opts.selected(selection ?? null);
+        /* What the app shows: only plain { id, label } objects cross
+         * into the frame. */
+        async actions (selection) {
+            const actions = await opts.actions(selection);
+            return actions.map(a => ({ id: a.id, label: a.label }));
+        },
+        /* The actions are worked out again, so the app can only run one
+         * this console offers on that object now. */
+        async runAction (id, selection) {
+            const action = (await opts.actions(selection)).find(a => a.id === id);
+            if (action) opts.run(action, selection);
         },
     };
 }
@@ -96,4 +112,44 @@ export function classify_selection (selection) {
             return { kind: "device", object, levels: chain };
     }
     return { kind: "other", object, levels: [] };
+}
+
+/**
+ * This console's actions on a classified selection, as the Explorer page
+ * offered them above the frame. A device can have its i3X access managed
+ * and a dataset built from it. An ISA-95 level can have its access managed
+ * when every level name down to it matches the ISA-95 vocabulary, since
+ * access is granted on the vocabulary node. Nothing else has either.
+ *
+ * @param selection classify_selection() of the Explorer's selection
+ * @param isa95     the ISA-95 vocabulary nodes (useISA95Store().data)
+ * @returns [{ id: "access", label, access: I3xAccessButton's props }
+ *          | { id: "dataset", label, route }]
+ */
+export function explorer_actions (selection, isa95) {
+    if (!selection) return [];
+    const { kind, object, levels } = selection;
+    const path = levels.join(" / ");
+    const nodes = resolve_isa95(isa95 ?? [], levels);
+
+    if (kind === "device") return [
+        { id: "access", label: "Manage access", access: {
+            target: object.elementId, device: true, via: nodes,
+            noun: "device", name: object.displayName, path,
+        } },
+        { id: "dataset", label: "Build dataset", route: {
+            path: "/datasets/new", query: { devices: object.elementId },
+        } },
+    ];
+
+    if (kind === "level" && levels.length && nodes.length === levels.length) {
+        const node = nodes.at(-1);
+        return [
+            { id: "access", label: "Manage access", access: {
+                target: node.uuid, device: false, via: nodes.slice(0, -1),
+                noun: (node.level ?? "level").toLowerCase(), name: node.name, path,
+            } },
+        ];
+    }
+    return [];
 }

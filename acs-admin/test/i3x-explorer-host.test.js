@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { UUIDs } from '@amrc-factoryplus/service-client'
-import { classify_selection, mk_host, ISA95_LEVEL_TYPE } from '../src/lib/i3x-explorer-host.js'
+import { classify_selection, explorer_actions, mk_host, ISA95_LEVEL_TYPE } from '../src/lib/i3x-explorer-host.js'
 
 const level = (elementId, displayName, parentId = null) =>
   ({ elementId, displayName, typeId: ISA95_LEVEL_TYPE, parentId })
@@ -17,6 +17,12 @@ const enterprise = level('e', 'Example Co')
 const site = level('s', 'North Site', 'e')
 const device = obj('d', 'Lathe 1', 'device-type', 's')
 const branch = obj('b', 'Spindle', 'branch-type', 'd')
+
+/* The ISA-95 vocabulary the levels above resolve against. */
+const VOCAB = [
+  { uuid: 'n-e', name: 'Example Co', aliases: [], children: ['n-s'], level: 'Enterprise' },
+  { uuid: 'n-s', name: 'North Site', aliases: [], children: [], level: 'Site' },
+]
 
 function fake_client () {
   return {
@@ -52,15 +58,78 @@ describe('mk_host', () => {
     expect(client.Fetch.service_token).toHaveBeenLastCalledWith('https://i3x.example/', 'token')
   })
 
-  it('passes theme, new window and selection through', () => {
+  it('passes theme and new window through', () => {
     const open_window = vi.fn()
-    const selected = vi.fn()
-    const host = mk_host({ client: fake_client(), theme: () => 'dark', open_window, selected })
+    const host = mk_host({ client: fake_client(), theme: () => 'dark', open_window })
     expect(host.theme()).toBe('dark')
     host.openNewWindow()
     expect(open_window).toHaveBeenCalledOnce()
-    host.selected(undefined)
-    expect(selected).toHaveBeenLastCalledWith(null)
+  })
+
+  it('tells the app only the id and label of each action', async () => {
+    const actions = vi.fn(async () => explorer_actions(
+      classify_selection({ object: device, ancestors: [enterprise, site] }), VOCAB))
+    const host = mk_host({ client: fake_client(), actions })
+    const selection = { object: device, ancestors: [enterprise, site] }
+    expect(await host.actions(selection)).toEqual([
+      { id: 'access', label: 'Manage access' },
+      { id: 'dataset', label: 'Build dataset' },
+    ])
+    expect(actions).toHaveBeenCalledWith(selection)
+  })
+
+  it('runs the action the app names, worked out again for the selection', async () => {
+    const run = vi.fn()
+    const actions = async sel => explorer_actions(classify_selection(sel), VOCAB)
+    const host = mk_host({ client: fake_client(), actions, run })
+    const selection = { object: device, ancestors: [enterprise, site] }
+
+    await host.runAction('dataset', selection)
+    expect(run).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'dataset', route: { path: '/datasets/new', query: { devices: 'd' } } }),
+      selection)
+
+    await host.runAction('access', selection)
+    expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'access' }), selection)
+  })
+
+  it('runs nothing the selection does not offer', async () => {
+    const run = vi.fn()
+    const actions = async sel => explorer_actions(classify_selection(sel), VOCAB)
+    const host = mk_host({ client: fake_client(), actions, run })
+    await host.runAction('dataset', { object: site, ancestors: [enterprise] })
+    await host.runAction('access', { object: branch, ancestors: [enterprise, site, device] })
+    expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe('explorer_actions', () => {
+  it('offers access and a dataset for a device, naming the levels above it', () => {
+    const actions = explorer_actions(classify_selection({ object: device, ancestors: [enterprise, site] }), VOCAB)
+    expect(actions.map(a => a.id)).toEqual(['access', 'dataset'])
+    expect(actions[0].access).toEqual({
+      target: 'd', device: true, via: VOCAB, noun: 'device', name: 'Lathe 1', path: 'Example Co / North Site',
+    })
+    expect(actions[1].route).toEqual({ path: '/datasets/new', query: { devices: 'd' } })
+  })
+
+  it('offers access on a level whose names match the vocabulary, granted on its node', () => {
+    const actions = explorer_actions(classify_selection({ object: site, ancestors: [enterprise] }), VOCAB)
+    expect(actions).toEqual([{ id: 'access', label: 'Manage access', access: {
+      target: 'n-s', device: false, via: [VOCAB[0]], noun: 'site', name: 'North Site', path: 'Example Co / North Site',
+    } }])
+  })
+
+  it('offers nothing on a level the vocabulary does not hold', () => {
+    const odd = level('o', 'Somewhere Else', 'e')
+    expect(explorer_actions(classify_selection({ object: odd, ancestors: [enterprise] }), VOCAB)).toEqual([])
+    expect(explorer_actions(classify_selection({ object: site, ancestors: [enterprise] }), [])).toEqual([])
+  })
+
+  it('offers nothing inside a device, or with nothing selected', () => {
+    expect(explorer_actions(classify_selection({ object: branch, ancestors: [enterprise, site, device] }), VOCAB))
+      .toEqual([])
+    expect(explorer_actions(null, VOCAB)).toEqual([])
   })
 })
 

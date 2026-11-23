@@ -4,10 +4,12 @@
  * Copyright 2026 University of Sheffield
  */
 
-import { describe, expect, it, vi } from 'vitest'
-import { HostTokenProvider, hostSelection } from './host'
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, renderHook, waitFor } from '@testing-library/react'
+import { HostTokenProvider, hostSelection, useHostActions, type HostSelection } from './host'
 import type { ObjectInstance } from '../api/types'
-import type { SelectedItem } from '../stores/explorer'
+import { useExplorerStore, type SelectedItem } from '../stores/explorer'
 
 const object = (elementId: string, parentId: string | null): ObjectInstance => ({
   elementId,
@@ -81,5 +83,56 @@ describe('hostSelection', () => {
     const b = object('b', 'a')
     const looped = new Map([[a.elementId, a], [b.elementId, b]])
     expect(hostSelection({ type: 'object', id: 'a', data: a }, looped)?.ancestors.map(o => o.elementId)).toEqual(['b'])
+  })
+})
+
+describe('useHostActions', () => {
+  afterEach(() => {
+    cleanup()
+    useExplorerStore.getState().reset()
+  })
+
+  const line = object('line', null)
+  const press = object('press', 'line')
+
+  it('asks the host about the object with its ancestors, and gives its answer', async () => {
+    useExplorerStore.getState().setAllObjects([line, press])
+    const actions = vi.fn(async (_selection: HostSelection) => [{ id: 'access', label: 'Manage access' }])
+    const host = { actions }
+    const { result } = renderHook(() => useHostActions(press, host))
+
+    await waitFor(() => expect(result.current.actions).toEqual([{ id: 'access', label: 'Manage access' }]))
+    expect(actions).toHaveBeenCalledOnce()
+    expect(actions.mock.calls[0][0].ancestors.map(a => a.elementId)).toEqual(['line'])
+    expect(result.current.selection?.object.elementId).toBe('press')
+  })
+
+  it('offers nothing without a host, as when the app runs on its own', () => {
+    const { result } = renderHook(() => useHostActions(press, null))
+    expect(result.current.actions).toEqual([])
+  })
+
+  it('offers nothing when the host fails to answer', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const host = { actions: vi.fn(async () => { throw new Error('no vocabulary') }) }
+    const { result } = renderHook(() => useHostActions(press, host))
+    await waitFor(() => expect(error).toHaveBeenCalled())
+    expect(result.current.actions).toEqual([])
+    error.mockRestore()
+  })
+
+  it('drops an answer for an object no longer shown', async () => {
+    let answer: (value: { id: string; label: string }[]) => void = () => undefined
+    const actions = vi.fn()
+      .mockImplementationOnce(() => new Promise(resolve => { answer = resolve }))
+      .mockImplementation(async () => [])
+    const host = { actions }
+    const { result, rerender } = renderHook(({ target }) => useHostActions(target, host), {
+      initialProps: { target: press },
+    })
+    rerender({ target: line })
+    answer([{ id: 'dataset', label: 'Build dataset' }])
+    await waitFor(() => expect(actions).toHaveBeenCalledTimes(2))
+    expect(result.current.actions).toEqual([])
   })
 })

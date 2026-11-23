@@ -138,8 +138,17 @@ ACS Admin uses the Factory+ authentication system for user authentication and au
 
 ### Authentication Flow
 
+When the deployment has Keycloak OIDC enabled (`OIDC_DISCOVERY_URL` is set - see `acs-admin/src/lib/oidc.js`):
+
+1. The user is redirected to Keycloak and signs in there (Authorization Code + PKCE); an existing Keycloak SSO session bounces straight back with no form shown
+2. The access/refresh token pair is stored by `OidcClient`, which refreshes the access token proactively before it expires
+3. The Factory+ service client is constructed with `bearer_jwt: bad => oidc.token(bad)`, so every service call carries a short-lived Keycloak-issued JWT
+4. Logging out triggers Keycloak's RP-initiated logout
+
+When OIDC is not configured (e.g. local development without Keycloak), ACS Admin falls back to the username/password login page:
+
 1. User enters credentials on the login page
-2. Credentials are passed to the Factory+ service client
+2. Credentials are passed to the Factory+ service client, which exchanges them for opaque per-service tokens
 3. If authentication is successful, the service client is stored in the `useServiceClientStore`
 4. The user is redirected to the requested page
 5. If authentication fails, an error is displayed

@@ -329,7 +329,6 @@ const router = createRouter({
 })
 
 // Setup auth guard.
-// This should pull a token from local storage, but currently uses the users credentials to fetch tokens
 router.beforeEach(async (to, from, next) => {
   // If we don't need auth, we can go straight through
   // This is only for login at the moment, but other pages may be accessible in future
@@ -343,7 +342,23 @@ router.beforeEach(async (to, from, next) => {
     next()
     return
   }
-  // Otherwise we are loading fresh and need to initialise the service client
+
+  // When OIDC is configured, login() resumes an existing Keycloak session
+  // from its own stored tokens, or redirects to Keycloak (navigating away
+  // and never resolving) - there is no separate login form to send the
+  // user to in this case.
+  if (import.meta.env.OIDC_DISCOVERY_URL) {
+    try {
+      await useServiceClientStore().login()
+      next()
+    } catch (e) {
+      console.error("OIDC login failed", e)
+      next(false)
+    }
+    return
+  }
+
+  // Non-OIDC (dev) fallback: username/password form, persisted creds.
   const optsString = localStorage.getItem('opts');
   // If there is no opts value stored, make sure we go to login
   if (!optsString) {

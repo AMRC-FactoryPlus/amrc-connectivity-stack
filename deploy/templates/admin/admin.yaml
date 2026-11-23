@@ -13,6 +13,8 @@ data:
     {{- if .Values.briefcase.enabled }}
     BRIEFCASE_EXPORTER=true
     {{- end }}
+    OIDC_CLIENT_ID=admin
+    OIDC_DISCOVERY_URL={{ if .Values.openid.enabled }}{{ printf "%s/realms/%s/.well-known/openid-configuration" (include "amrc-connectivity-stack.external-url" (list . "openid")) .Values.openid.realm }}{{ end }}
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -360,6 +360,9 @@ export function getHierarchyChildren(
  * guards all resolve here, in one pure pass over store data. TreeView memoizes
  * the result and only windows it.
  */
+/** ACS: above this many matches the filter leaves parents closed. */
+export const FILTER_OPEN_LIMIT = 500
+
 export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
   const {
     namespaces, objectTypes, relationshipTypes, objectsByType, allObjects, hierarchicalRoots,
@@ -370,7 +373,7 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
   } = input
 
   const rows: TreeRow[] = []
-  const isExpanded = (id: string) => expandedNodes.has(id)
+  const isExpanded = (id: string) => expandedNodes.has(id) || filterOpenIds.has(id)
   const typeLabels = new Map(objectTypes.map(type => [type.elementId, type.displayName || type.elementId]))
 
   // Prebuilt blob when the object came through allObjects (the common case);
@@ -396,6 +399,11 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
   const matchingTypeIds = new Set<string>()
   const hierarchyVisibleIds = new Set<string>()
   const matchedNamespaceUris = new Set<string>()
+  // ACS: ancestors of the filter's matches, opened while filtering so a
+  // match deep in the hierarchy can be seen without opening each parent.
+  // Skipped when the filter matches too much, where opening everything
+  // would bury the tree.
+  const filterOpenIds = new Set<string>()
   if (filterText) {
     const relatedParents = new Map<string, Set<string>>()
     const relatedIndex = new Map<string, ObjectInstance>()
@@ -416,14 +424,19 @@ export function buildTreeRows(input: TreeBuildInput): TreeRow[] {
     for (const obj of relatedIndex.values()) {
       if (objMatches(obj)) pending.push(obj.elementId)
     }
+    const openAncestors = pending.length <= FILTER_OPEN_LIMIT
     while (pending.length > 0) {
       const id = pending.pop()!
       if (hierarchyVisibleIds.has(id)) continue
       hierarchyVisibleIds.add(id)
       const object = objectIndex.get(id) ?? relatedIndex.get(id)
-      if (object?.parentId) pending.push(object.parentId)
-      for (const parentId of relatedParents.get(id) ?? []) pending.push(parentId)
+      const parents = [...(object?.parentId ? [object.parentId] : []), ...(relatedParents.get(id) ?? [])]
+      for (const parentId of parents) {
+        if (openAncestors) filterOpenIds.add(`hier:${parentId}`)
+        pending.push(parentId)
+      }
     }
+    if (filterOpenIds.size > 0) filterOpenIds.add(HIERARCHICAL_FOLDER_ID)
     for (const type of objectTypes) {
       const typeMatches =
         type.displayName.toLowerCase().includes(filterText) ||

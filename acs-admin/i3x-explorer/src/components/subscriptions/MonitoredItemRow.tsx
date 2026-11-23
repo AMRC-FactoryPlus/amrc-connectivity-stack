@@ -117,7 +117,8 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
             </button>
           )}
         </td>
-        <td className={`px-3 py-2.5 ${dim}`}>
+        {/* ACS: wide enough for the value, its change and the sparkline side by side. */}
+        <td className={`px-3 py-2.5 min-w-[19rem] whitespace-nowrap ${dim}`}>
           {!liveValue && !hasComponentTrends ? (
             <span className="text-xs text-i3x-text-muted">{stopped ? '-' : 'Waiting…'}</span>
           ) : expandable ? (

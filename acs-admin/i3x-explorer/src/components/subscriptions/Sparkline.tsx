@@ -1,26 +1,30 @@
 import { useSubscriptionsStore } from '../../stores/subscriptions'
+import { downsampleMinMax, useTrendWindow, windowRange } from '../../acs/trendBuffer'
 
 const WIDTH = 72
 const HEIGHT = 18
 const PAD = 2
-/** ACS: the sparkline stays a short recent window; the trend graph shows the rest. */
-const RECENT_POINTS = 60
 
-/** A tiny trend of an element's recent numeric values, sized to sit in a table cell. */
+/**
+ * A tiny trend of an element's values, sized to sit in a table cell.
+ * ACS: it shows the same window as the trend graphs (All, 30 s, … or the last
+ * N readings), on the same time axis, drawn from the element's trend buffer and
+ * reduced to its pixel width.
+ */
 export function Sparkline({ elementId }: { elementId: string }) {
   const series = useSubscriptionsStore(state => state.trendData.get(elementId))
-  // ACS: read the last readings from the element's trend buffer.
-  const points = series?.buffer.toArray(series.buffer.length - RECENT_POINTS)
-  if (!points || points.length < 2) return null
+  const trendWindow = useTrendWindow(state => state.window)
+  if (!series) return null
+  const range = windowRange(series.buffer, trendWindow, Date.now())
+  if (!range || range.to - range.from < 2) return null
 
-  const values = points.map(p => p.value)
-  const min = Math.min(...values)
-  const range = Math.max(...values) - min || 1
-  const first = points[0].timestamp
-  const span = points[points.length - 1].timestamp - first || 1
-  const coords = points.map(p => [
-    PAD + ((p.timestamp - first) / span) * (WIDTH - 2 * PAD),
-    PAD + (1 - (p.value - min) / range) * (HEIGHT - 2 * PAD),
+  const { times, values, yMin, yMax } = downsampleMinMax(series.buffer, range, WIDTH - 2 * PAD)
+  if (times.length < 2) return null
+  const yRange = yMax - yMin || 1
+  const span = range.tEnd - range.tStart || 1
+  const coords = times.map((t, i) => [
+    PAD + Math.max(0, (t - range.tStart) / span) * (WIDTH - 2 * PAD),
+    PAD + (1 - (values[i] - yMin) / yRange) * (HEIGHT - 2 * PAD),
   ])
   const [lastX, lastY] = coords[coords.length - 1]
 

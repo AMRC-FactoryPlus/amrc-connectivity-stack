@@ -35,6 +35,7 @@
   - [Release Notes](./reference/release-notes.md)
 - Services
    - [Briefcase Exporter](./services/briefcase.md)
+   - [Engineering Units](./services/engineering-units.md)
    - [File Service](./services/file-service.md)
    - [Gateway Depot](./services/gateway-depot.md)
    - [Git Server](./services/git-server.md)

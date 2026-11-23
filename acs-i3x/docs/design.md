@@ -106,7 +106,7 @@ Tables:
 | Table | Holds |
 |---|---|
 | `object` | Every i3X object: elementId, parent, type, display name, composition flag, source (`config` or `uns`). `seq` keeps insertion order. |
-| `metric_meta` | InfluxDB query metadata per leaf metric. |
+| `metric_meta` | InfluxDB query metadata per leaf metric, and its `Eng_Unit`. |
 | `object_type` | ObjectTypes: display name and JSON schema. |
 | `device_schema` | The Schema_UUIDs each device in the tree references. |
 | `sync_device`, `sync_schema` | The ConfigDB ETags each device and schema was last built from. |
@@ -514,7 +514,14 @@ bulk items are keyed by `subscriptionId` in place of `elementId`.
 - **A root object** has `parentId: null`.
 - **`includeMetadata`** adds `metadata.typeNamespaceUri`,
   `metadata.sourceTypeId` and `metadata.relationships` (the ids at the
-  other end of the object's edges, by relationship type).
+  other end of the object's edges, by relationship type). A leaf metric
+  with an `Eng_Unit` also has `metadata.system.Eng_Unit`, the string as
+  configured, and `metadata.engUnit`, the UNECE code of the unit that
+  string means in the engineering unit vocabulary (see
+  docs/services/engineering-units.md). A string the vocabulary does not
+  know gives no `engUnit`, since the specification requires a UNECE
+  code there. The vocabulary is part of the metadata, so a listing with
+  metadata takes its ETag from the tree revision and the vocabulary's.
 - **Every `typeElementId` names a listed type.** The ConfigDB schemas
   are the types of devices and of branches that have a schema. The
   service adds `isa95-level`, `unknown`, and the leaf types

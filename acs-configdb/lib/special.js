@@ -4,9 +4,14 @@
  * Copyright 2021 AMRC
  */
 
-import { isa95_chain, isa95_vocabulary } from "@amrc-factoryplus/service-client";
+import {
+    eng_unit_labels, eng_unit_uuid, isa95_chain, isa95_vocabulary,
+} from "@amrc-factoryplus/service-client";
+import { UNECE_UNITS } from "@amrc-factoryplus/service-client/lib/unece-units.js";
 
 import { App, ISA95Level } from "./constants.js";
+
+const UNECE_CODES = new Set(UNECE_UNITS.map(u => u[0]));
 
 class SpecialApp {
     constructor (model) {
@@ -151,4 +156,56 @@ class ISA95Placement extends SpecialApp {
     delete (query, obj) { return 204; }
 }
 
-export const SpecialApps = [ObjectRegistration, ConfigSchema, ISA95Placement];
+/* Check an engineering unit against the UNECE table and the other
+ * units. `uuid` is the unit's object, `others` the configs of every
+ * other unit. Returns undefined if the unit is good, or the reason it
+ * is not. */
+export function eng_unit_problem (uuid, unit, others) {
+    if (!UNECE_CODES.has(unit.code))
+        return `${unit.code} is not a UNECE code`;
+    /* This also means no two units share a code. */
+    if (uuid != eng_unit_uuid(unit.code))
+        return `${uuid} is not the UUID for ${unit.code}`;
+
+    /* A symbol or alias must mean one unit only, or a metric's
+     * Eng_Unit could not be resolved. Unit symbols are case
+     * sensitive (mW, MW), so these compare exactly. */
+    const labels = eng_unit_labels(unit);
+    for (const other of others) {
+        const clash = eng_unit_labels(other).find(l => labels.includes(l));
+        if (clash != undefined)
+            return `"${clash}" already means ${other.code}`;
+    }
+}
+
+/* The engineering unit vocabulary. The ConfigSchema checks the shape;
+ * this checks the code, the object's UUID, and that no symbol or alias
+ * belongs to two units. */
+class EngineeringUnit extends SpecialApp {
+    static application = App.EngineeringUnit;
+
+    async validate (query, obj, unit) {
+        const [uuid, others] = await Promise.all([
+            query(`select uuid::text from object where id = $1`, [obj])
+                .then(dbr => dbr.rows[0]?.uuid),
+            query(`
+                select c.json
+                from config c
+                    join object a on a.id = c.app
+                where a.uuid = $1 and c.object != $2
+            `, [App.EngineeringUnit, obj])
+                .then(dbr => dbr.rows.map(r => r.json)),
+        ]);
+
+        const problem = eng_unit_problem(uuid, unit, others);
+        if (!problem) return 204;
+        this.log("Refusing engineering unit %o: %s", unit, problem);
+        return 422;
+    }
+
+    delete (query, obj) { return 204; }
+}
+
+export const SpecialApps = [
+    ObjectRegistration, ConfigSchema, ISA95Placement, EngineeringUnit,
+];

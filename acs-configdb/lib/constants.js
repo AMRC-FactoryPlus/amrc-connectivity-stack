@@ -31,6 +31,7 @@ export const App = {
     ConfigSchema: "dbd8a535-52ba-4f6e-b4f8-9b71aefe09d3",
     ISA95Vocabulary: "11096075-acc6-4eae-b682-9b27d776384d",
     ISA95Placement: "f9345c57-14e3-4027-b76d-2b0b67eb8fed",
+    EngineeringUnit: "8cd3bb74-c07f-46ed-8422-3d714c945cce",
 };
 
 /* The classes of ISA-95 vocabulary nodes, by level name. */

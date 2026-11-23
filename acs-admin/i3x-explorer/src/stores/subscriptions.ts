@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { diffValues, toFiniteNumber, type ValueChange } from '../api/structuredValue'
+import { useExplorerStore } from './explorer' // ACS
 
 export interface LiveValue {
   elementId: string
@@ -48,6 +49,8 @@ export interface Subscription {
   components?: Record<string, string[]>
   /** Items unregistered on the server but kept in the list, with their last value, to start again. */
   stoppedItems?: string[]
+  /** ACS: each item's path when it was subscribed, shown until the catalog holds the item. */
+  names?: Record<string, string>
 }
 
 /** Registration depth for a monitored item: 0 is the whole composition tree, 1 the item alone. */
@@ -84,6 +87,35 @@ export function admittedDeliveries<T extends { elementId: string }>(sub: Subscri
   if (!sub?.isStreaming) return []
   const collected = new Set(collectedElementIds(sub))
   return items.filter(item => collected.has(item.elementId))
+}
+
+/** One subscription's delivery, as a transport received it. */
+export interface Delivery {
+  subscriptionId: string
+  items: Array<{ elementId: string; value: unknown; quality: string | null; timestamp: string | null }>
+}
+
+/**
+ * ACS: records buffered deliveries in one store write. Admission is checked now, at flush time, so
+ * an update buffered just before its item was stopped or deleted is still dropped.
+ */
+export function applyDeliveries(deliveries: Delivery[]): void {
+  const { subscriptions, updateLiveValues } = useSubscriptionsStore.getState()
+  const { objectIndex } = useExplorerStore.getState()
+  const values: LiveValueUpdate[] = []
+  for (const { subscriptionId, items } of deliveries) {
+    for (const item of admittedDeliveries(subscriptions.get(subscriptionId), items)) {
+      values.push({
+        elementId: item.elementId,
+        // The element's own name once the catalog holds it, not its id.
+        displayName: objectIndex.get(item.elementId)?.displayName || item.elementId,
+        value: item.value,
+        timestamp: item.timestamp,
+        quality: item.quality,
+      })
+    }
+  }
+  updateLiveValues(values)
 }
 
 /** Items grouped by registration depth, for one register call per depth. */
@@ -165,7 +197,7 @@ interface SubscriptionsState {
   addMonitoredItem: (
     subscriptionId: string,
     elementId: string,
-    options?: { maxDepth?: number; components?: string[] }
+    options?: { maxDepth?: number; components?: string[]; name?: string }
   ) => void
   removeMonitoredItem: (subscriptionId: string, elementId: string) => void
   setItemStopped: (subscriptionId: string, elementId: string, stopped: boolean) => void
@@ -222,6 +254,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
         ? { ...sub.components, [elementId]: options.components }
         : sub.components,
       stoppedItems: sub.stoppedItems?.filter(id => id !== elementId),
+      names: options?.name ? { ...sub.names, [elementId]: options.name } : sub.names,
     })
     set({ subscriptions: updated })
   },
@@ -232,6 +265,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
     if (!sub) return
     const { [elementId]: _depth, ...monitoredDepth } = sub.monitoredDepth ?? {}
     const { [elementId]: removedComponents = [], ...components } = sub.components ?? {}
+    const { [elementId]: _name, ...names } = sub.names ?? {}
     const updatedSubs = new Map(subscriptions)
     updatedSubs.set(subscriptionId, {
       ...sub,
@@ -239,6 +273,7 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
       monitoredDepth,
       components,
       stoppedItems: sub.stoppedItems?.filter(id => id !== elementId),
+      names,
     })
     set({
       subscriptions: updatedSubs,
@@ -262,7 +297,9 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
     if (values.length === 0) return
     const { liveValues, trendData } = get()
     const updatedLive = new Map(liveValues)
-    let updatedTrend: Map<string, TrendPoint[]> | undefined
+    // ACS: each element's trend is copied once per batch, not once per update, since a fast feed
+    // delivers many updates to the same element in one batch.
+    const updatedPoints = new Map<string, TrendPoint[]>()
     const now = Date.now()
     for (const value of values) {
       const previous = updatedLive.get(value.elementId)
@@ -290,15 +327,26 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
       // A repeat is the same reading again, not a new point in time.
       const numericValue = toFiniteNumber(value.value)
       if (!repeat && numericValue !== undefined) {
-        updatedTrend ??= new Map(trendData)
-        const points = updatedTrend.get(value.elementId) ?? []
-        updatedTrend.set(
-          value.elementId,
-          [...points, { value: numericValue, timestamp: now }].slice(-MAX_TREND_POINTS)
-        )
+        let points = updatedPoints.get(value.elementId)
+        if (!points) {
+          points = [...(trendData.get(value.elementId) ?? [])]
+          updatedPoints.set(value.elementId, points)
+        }
+        // ACS: plot a reading at its source time; updates delivered together would otherwise share
+        // one arrival time and stack up at one x position.
+        points.push({ value: numericValue, timestamp: sourceTimeMs(value.timestamp) ?? now })
+        if (points.length > MAX_TREND_POINTS * 2) points.splice(0, points.length - MAX_TREND_POINTS)
       }
     }
-    set(updatedTrend ? { liveValues: updatedLive, trendData: updatedTrend } : { liveValues: updatedLive })
+    if (updatedPoints.size === 0) {
+      set({ liveValues: updatedLive })
+      return
+    }
+    const updatedTrend = new Map(trendData)
+    for (const [elementId, points] of updatedPoints) {
+      updatedTrend.set(elementId, points.length > MAX_TREND_POINTS ? points.slice(-MAX_TREND_POINTS) : points)
+    }
+    set({ liveValues: updatedLive, trendData: updatedTrend })
   },
 
   setStreaming: (subscriptionId, streaming) => {

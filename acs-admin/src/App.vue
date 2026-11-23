@@ -62,7 +62,6 @@
           <h3 class="text-lg font-bold tracking-tight">{{$route.meta.name}}</h3>
         </div>
         <div class="flex items-center justify-center">
-          <MonitorButton/>
           <SidebarTrigger/>
           <Button title="Toggle fullscreen" variant="ghost" size="icon" @click="l.toggleFullscreen"><i class="fa-solid fa-expand"></i></Button>
           <Button class="ml-3" variant="link" size="icon" @click="logout">Logout</Button>
@@ -79,7 +78,6 @@
         <NewISA95NodeDialog/>
         <BulkPlacementImportDialog/>
         <MergeISA95NodeDialog/>
-        <MonitorDialog/>
         <RouterView/>
       </main>
     </SidebarInset>
@@ -109,9 +107,6 @@ import NewBridgeDialog from '@components/Bridges/NewBridgeDialog.vue'
 import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 import BulkPlacementImportDialog from '@components/ISA95/BulkPlacementImportDialog.vue'
 import MergeISA95NodeDialog from '@components/ISA95/MergeISA95NodeDialog.vue'
-import MonitorButton from '@components/MonitorButton.vue'
-import MonitorDialog from '@components/MonitorDialog.vue'
-import { useMonitorStore } from '@store/useMonitorStore.js'
 import { ACS_VERSION } from '@/lib/version.js'
 
 export default {
@@ -172,8 +167,6 @@ export default {
     NewISA95NodeDialog,
     BulkPlacementImportDialog,
     MergeISA95NodeDialog,
-    MonitorButton,
-    MonitorDialog,
   },
 
   watch: {
@@ -193,14 +186,6 @@ export default {
   },
 
   async mounted () {
-    window.addEventListener('beforeunload', (e) => {
-      const monitor = useMonitorStore()
-      if (monitor.hasItems) {
-        e.preventDefault()
-        monitor.cleanup()
-      }
-    })
-
     // Check if opts exists in local storage
     if (localStorage.getItem('opts')) {
       // If it does then create the service client

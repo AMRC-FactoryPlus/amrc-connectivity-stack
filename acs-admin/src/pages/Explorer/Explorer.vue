@@ -42,7 +42,7 @@ const selected = computed(() => classify_selection(selection.value))
          object does not move the Explorer down. -->
     <ExplorerActions v-if="selected" :selection="selected"/>
     <p v-else class="flex items-center min-h-9 text-sm text-gray-500">
-      Select an object to monitor it, or a device or ISA-95 level to manage its i3X access.
+      Select a device or ISA-95 level to manage its i3X access. Subscribe in the Explorer to watch live values.
     </p>
     <iframe
       src="/i3x-explorer/index.html"

@@ -6,6 +6,7 @@ import { useSubscriptionsStore } from '../../stores/subscriptions'
 import { useSubscriptionTransport } from '../subscriptions/SubscriptionTransport'
 import { registerItem } from '../subscriptions/registerItem'
 import { Breadcrumb } from './Breadcrumb'
+import { objectPath } from './navigation' // ACS
 import { OverviewTab } from './tabs/OverviewTab'
 import { RelationshipsTab } from './tabs/RelationshipsTab'
 import { HistoryTab } from './tabs/HistoryTab'
@@ -100,7 +101,9 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
       // Register this object. If this throws, the catch block cleans up.
       // A composition object is monitored with its whole component tree, the same depth Current Value reads.
       const { maxDepth, components } = await registerItem(client, subscriptionId, object, value)
-      useSubscriptionsStore.getState().addMonitoredItem(subscriptionId, object.elementId, { maxDepth, components })
+      // ACS: remember the path, so the row is named even before the catalog holds the object.
+      const name = objectPath(object.elementId, useExplorerStore.getState().objectIndex) ?? object.displayName
+      useSubscriptionsStore.getState().addMonitoredItem(subscriptionId, object.elementId, { maxDepth, components, name })
       // Start the transport unless it's already live, without this the drawer
       // opens on "Waiting…" until Start Stream is clicked manually. Guarded
       // because startStream is not idempotent (it tears down and reopens the

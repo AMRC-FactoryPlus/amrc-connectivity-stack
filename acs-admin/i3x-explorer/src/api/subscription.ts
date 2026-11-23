@@ -20,6 +20,39 @@ export function isSubscriptionGoneError(error: Error): boolean {
   return error.message.startsWith('HTTP 404') || error.message.startsWith('HTTP 410')
 }
 
+/**
+ * The updates in one SSE `data:` payload. ACS: the i3X 1.0 Implementation Guide (Subscribe
+ * Methods, Streaming, `POST /subscriptions/stream`) defines each event as a flat array,
+ * `[{elementId, value, quality, timestamp}]`, which is what the reference server sends;
+ * `{sequenceNumber, updates}` batches belong to /sync. Batches are still read, as this client
+ * read them before. Entries of neither shape are skipped. Throws only when the payload is not JSON.
+ */
+export function parseStreamEvent(dataStr: string): SyncResponseItem[] {
+  const parsed: unknown = JSON.parse(dataStr)
+  const entries = Array.isArray(parsed) ? parsed : [parsed]
+  const items: SyncResponseItem[] = []
+  // Consecutive flat updates are read together, in order, so a component also listed on its own is not doubled.
+  let flat: unknown[] = []
+  const takeFlat = () => {
+    if (flat.length > 0) items.push(...subscriptionUpdateItems(flat))
+    flat = []
+  }
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as Record<string, unknown>
+    if (Array.isArray(record.updates)) {
+      // Batch format: {sequenceNumber, updates: [{elementId, value, quality, timestamp}]}
+      takeFlat()
+      items.push(...subscriptionUpdateItems(record.updates))
+    } else if (typeof record.elementId === 'string') {
+      // Flat format: {elementId, value, quality, timestamp}
+      flat.push(record)
+    }
+  }
+  takeFlat()
+  return items
+}
+
 export class SSESubscription {
   private abortController: AbortController | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -205,14 +238,7 @@ export class SSESubscription {
 
   private processMessage(dataStr: string): void {
     try {
-      const rawData = JSON.parse(dataStr) as Array<Record<string, unknown>>
-      const items: SyncResponseItem[] = []
-      for (const entry of rawData) {
-        if (Array.isArray(entry.updates)) {
-          // Batch format: {sequenceNumber, updates: [{elementId, value, quality, timestamp}]}
-          items.push(...subscriptionUpdateItems(entry.updates))
-        }
-      }
+      const items = parseStreamEvent(dataStr)
       if (items.length > 0) {
         this.onData(items)
       }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HttpStatusError, PollingSubscription, SSESubscription, isSubscriptionGoneError } from './subscription'
+import { HttpStatusError, PollingSubscription, SSESubscription, isSubscriptionGoneError, parseStreamEvent } from './subscription'
 import type { SyncResponseItem } from './types'
 import { BearerTokenProvider, StaticAuthProvider } from './authProvider'
 
@@ -18,6 +18,28 @@ function endedStreamResponse() {
     body: {
       getReader: () => ({
         read: async () => ({ done: true as const, value: undefined }),
+      }),
+    },
+  } as unknown as Response
+}
+
+// A 200 response that streams these SSE chunks, then ends.
+function streamingResponse(chunks: string[]) {
+  const encoder = new TextEncoder()
+  const queue = [...chunks]
+  return {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Headers({ 'Content-Type': 'text/event-stream' }),
+    body: {
+      getReader: () => ({
+        read: async () => {
+          const chunk = queue.shift()
+          return chunk === undefined
+            ? { done: true as const, value: undefined }
+            : { done: false as const, value: encoder.encode(chunk) }
+        },
       }),
     },
   } as unknown as Response
@@ -196,6 +218,102 @@ describe('SSESubscription', () => {
     expect((onError.mock.calls[0][0] as HttpStatusError).status).toBe(status)
     await vi.advanceTimersByTimeAsync(60_000)
     expect(fetchStub).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ACS: i3X 1.0 streams flat arrays of updates (Implementation Guide, Streaming); batches are still read.
+describe('parseStreamEvent', () => {
+  const update = { elementId: 'x-pos', value: 12.5, quality: 'Good', timestamp: '2026-11-20T10:00:00.010Z' }
+
+  it('reads the flat form the i3X 1.0 spec defines for the stream', () => {
+    expect(parseStreamEvent(JSON.stringify([update]))).toEqual([update])
+  })
+
+  it('reads several flat updates in order', () => {
+    const later = { ...update, value: 12.6, timestamp: '2026-11-20T10:00:00.020Z' }
+    expect(parseStreamEvent(JSON.stringify([update, later])).map(item => item.value)).toEqual([12.5, 12.6])
+  })
+
+  it('reads a single flat update that is not wrapped in an array', () => {
+    expect(parseStreamEvent(JSON.stringify(update))).toEqual([update])
+  })
+
+  it('reads the batch form', () => {
+    const batch = [{ sequenceNumber: 7, updates: [update, { ...update, elementId: 'y-pos', value: 3 }] }]
+    expect(parseStreamEvent(JSON.stringify(batch)).map(item => item.elementId)).toEqual(['x-pos', 'y-pos'])
+  })
+
+  it('keeps the order of a payload that mixes both forms', () => {
+    const payload = [
+      { ...update, elementId: 'a' },
+      { sequenceNumber: 1, updates: [{ ...update, elementId: 'b' }] },
+      { ...update, elementId: 'c' },
+    ]
+    expect(parseStreamEvent(JSON.stringify(payload)).map(item => item.elementId)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('fills in missing quality and timestamp with null', () => {
+    expect(parseStreamEvent(JSON.stringify([{ elementId: 'x-pos', value: 1 }]))).toEqual([
+      { elementId: 'x-pos', value: 1, quality: null, timestamp: null },
+    ])
+  })
+
+  it('expands the components of a flat composition update', () => {
+    const composed = { ...update, elementId: 'table', value: {}, components: { 'x-pos': { value: 4 } } }
+    expect(parseStreamEvent(JSON.stringify([composed])).map(item => [item.elementId, item.value])).toEqual([
+      ['table', {}],
+      ['x-pos', 4],
+    ])
+  })
+
+  it.each([
+    ['null', 'null'],
+    ['a number', '42'],
+    ['a string', '"hello"'],
+    ['an empty array', '[]'],
+    ['entries of neither shape', JSON.stringify([null, 3, 'x', { value: 1 }, { elementId: 5 }, { updates: 'no' }])],
+  ])('yields nothing for %s', (_label, payload) => {
+    expect(parseStreamEvent(payload)).toEqual([])
+  })
+
+  it('skips junk entries beside good ones', () => {
+    expect(parseStreamEvent(JSON.stringify([null, { value: 1 }, update])).map(item => item.elementId)).toEqual(['x-pos'])
+  })
+
+  it('throws on a payload that is not JSON', () => {
+    expect(() => parseStreamEvent('{not json')).toThrow()
+  })
+})
+
+describe('SSESubscription delivery', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('delivers flat and batched events and drops a malformed one without stopping', async () => {
+    const flat = { elementId: 'x-pos', value: 1, quality: 'Good', timestamp: '2026-11-20T10:00:00Z' }
+    const batch = { sequenceNumber: 2, updates: [{ ...flat, value: 2 }] }
+    vi.stubGlobal('fetch', vi.fn(async () => streamingResponse([
+      `data: ${JSON.stringify([flat])}\n\n`,
+      'data: {broken\n\n',
+      // An event split across two reads.
+      `data: ${JSON.stringify([batch]).slice(0, 10)}`,
+      `${JSON.stringify([batch]).slice(10)}\n\n`,
+    ])))
+    const onData = vi.fn()
+    const sub = new SSESubscription('http://server/stream', onData, vi.fn())
+
+    sub.connect()
+    await vi.waitFor(() => expect(onData).toHaveBeenCalledTimes(2))
+    sub.disconnect()
+
+    expect(onData.mock.calls.map(call => (call[0] as SyncResponseItem[]).map(item => item.value))).toEqual([[1], [2]])
   })
 })
 

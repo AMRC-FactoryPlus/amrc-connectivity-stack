@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  admittedDeliveries,
+  applyDeliveries,
   groupByDepth,
   monitoredDepthOf,
   useSubscriptionsStore,
@@ -12,6 +12,8 @@ import { getClient, type I3XClient } from '../../api/client'
 import { SSESubscription, PollingSubscription, HttpStatusError, isSubscriptionGoneError } from '../../api/subscription'
 import { performRecovery, type RecoveryHarness } from './recovery'
 import type { SyncResponseItem } from '../../api/types'
+import { FrameBatcher } from '../../stores/frameBatcher' // ACS
+import type { Delivery } from '../../stores/subscriptions' // ACS
 
 /**
  * Owns the SSE / polling transport for subscriptions.
@@ -71,11 +73,16 @@ export function SubscriptionTransportProvider({ children }: { children: ReactNod
   const usePollingRef = useRef(usePolling)
   usePollingRef.current = usePolling
 
+  // ACS: a fast feed delivers hundreds of updates a second; record them once per frame.
+  const batcherRef = useRef<FrameBatcher<Delivery> | null>(null)
+  batcherRef.current ??= new FrameBatcher(applyDeliveries)
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       sseRef.current?.disconnect()
       pollingRef.current?.stop()
+      batcherRef.current?.cancel()
     }
   }, [])
 
@@ -86,6 +93,7 @@ export function SubscriptionTransportProvider({ children }: { children: ReactNod
       sseRef.current = null
       pollingRef.current?.stop()
       pollingRef.current = null
+      batcherRef.current?.cancel()
       useSubscriptionsStore.getState().clearAll()
     }
   }, [isConnected])
@@ -93,16 +101,7 @@ export function SubscriptionTransportProvider({ children }: { children: ReactNod
   const handleDataUpdate = useCallback((subscriptionId: string, items: SyncResponseItem[]) => {
     // Data flowing is the strongest health signal, refund the recovery budget.
     recoveryRef.current.attempts = 0
-    const { subscriptions, updateLiveValues } = useSubscriptionsStore.getState()
-    updateLiveValues(
-      admittedDeliveries(subscriptions.get(subscriptionId), items).map(item => ({
-        elementId: item.elementId,
-        displayName: item.elementId,
-        value: item.value,
-        timestamp: item.timestamp,
-        quality: item.quality,
-      }))
-    )
+    batcherRef.current?.push([{ subscriptionId, items }])
   }, [])
 
   // Forward declaration: recovery restarts the stream, and the stream's error

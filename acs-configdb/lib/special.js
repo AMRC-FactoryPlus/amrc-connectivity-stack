@@ -7,11 +7,9 @@
 import {
     eng_unit_labels, eng_unit_uuid, isa95_chain, isa95_vocabulary,
 } from "@amrc-factoryplus/service-client";
-import { UNECE_UNITS } from "@amrc-factoryplus/service-client/lib/unece-units.js";
+import { unece_unit } from "@amrc-factoryplus/service-client/lib/unece.js";
 
 import { App, ISA95Level } from "./constants.js";
-
-const UNECE_CODES = new Set(UNECE_UNITS.map(u => u[0]));
 
 class SpecialApp {
     constructor (model) {
@@ -161,7 +159,7 @@ class ISA95Placement extends SpecialApp {
  * other unit. Returns undefined if the unit is good, or the reason it
  * is not. */
 export function eng_unit_problem (uuid, unit, others) {
-    if (!UNECE_CODES.has(unit.code))
+    if (!unece_unit(unit.code))
         return `${unit.code} is not a UNECE code`;
     /* This also means no two units share a code. */
     if (uuid != eng_unit_uuid(unit.code))

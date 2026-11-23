@@ -12,6 +12,7 @@ import * as rxu from '@amrc-factoryplus/rx-util'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { debug_log } from '@/lib/debug-log.js'
 
 // We track all classes which are members of one of these metaclasses.
 const GROUPS = [
@@ -58,7 +59,7 @@ export const useGroupStore = defineStore('group', {
       );
 
       this.rxsub = details.subscribe(grps => {
-        console.debug("GROUPS UPDATE: %o", grps);
+        debug_log("GROUPS UPDATE: %o", grps);
         this.data = grps;
         this.loading = false;
       });

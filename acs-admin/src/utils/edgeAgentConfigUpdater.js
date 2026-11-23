@@ -15,6 +15,7 @@ import { useISA95Store } from '@/store/useISA95Store.js'
 import { useNodeStore } from '@/store/useNodeStore.js'
 import { storeReady } from '@/store/useStoreReady.js'
 import { sidecarsLeftOut } from '@/utils/hostPorts.js'
+import { debug_log } from '@/lib/debug-log.js'
 
 /**
  * Puts a device's ISA-95 placement into its tags.
@@ -67,7 +68,7 @@ export function applyConnection (existing, connection) {
   if (existing) {
     const update = (key, val) => {
       if (existing[key] != val) {
-        console.debug('Updating %s from %o to %o', key, existing[key], val)
+        debug_log('Updating %s from %o to %o', key, existing[key], val)
         existing[key] = val
       }
     }
@@ -278,7 +279,7 @@ export function deploymentDrivers (deviceConnections, connections, { agent, curr
     // The s-s migration will have given every deviceConnection a uuid
     const connection = connections.find(conn => conn.uuid === deviceConn.uuid)
     if (!connection) {
-      console.debug('No matching connection found for device connection:', deviceConn.name)
+      debug_log('No matching connection found for device connection:', deviceConn.name)
       continue
     }
 
@@ -334,7 +335,7 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
 
   // The store should already be refreshed by the parent function, but let's make sure
   if (!connectionStore.ready) {
-    console.debug('Driver store not ready, waiting...')
+    debug_log('Driver store not ready, waiting...')
     await storeReady(connectionStore)
   }
   try {
@@ -358,7 +359,7 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
       deployment.values.drivers = {}
     }
 
-    console.debug('Updating edge agent deployment for node:', nodeUuid)
+    debug_log('Updating edge agent deployment for node:', nodeUuid)
     const driverMap = deploymentDrivers(deviceConnections, connectionStore.data, {
       agent: nodeUuid,
       current: deployment.values.drivers,
@@ -368,11 +369,11 @@ async function updateEdgeAgentDeployment(nodeUuid, deviceConnections) {
     /* XXX bmz: Here we need a source for EA-level values. */
 
     // Update the deployment configuration with the driver map
-    console.debug('Final driver map:', driverMap)
+    debug_log('Final driver map:', driverMap)
     deployment.values.drivers = driverMap
 
     // Log the final deployment configuration
-    console.debug('Final deployment configuration:', JSON.stringify(deployment, null, 2))
+    debug_log('Final deployment configuration:', JSON.stringify(deployment, null, 2))
 
     // Update the Edge Agent Deployment configuration in the ConfigDB
     await serviceClient.ConfigDB.put_config(UUIDs.App.EdgeAgentDeployment, nodeUuid, deployment)
@@ -400,7 +401,7 @@ export async function updateEdgeAgentConfig(opts) {
       return await buildEdgeAgentConfig(opts)
     } catch (err) {
       if (err?.status !== 412) throw err
-      console.debug('Edge Agent config changed while it was built; rebuilding')
+      debug_log('Edge Agent config changed while it was built; rebuilding')
     }
   }
   console.error('Edge Agent config kept changing; not saved')
@@ -425,7 +426,7 @@ async function buildEdgeAgentConfig({
   }
 
   // Refresh all stores to ensure we have the latest data
-  console.debug('Refreshing stores before updating edge agent config')
+  debug_log('Refreshing stores before updating edge agent config')
 
   // Synchronise all stores
   await Promise.all(
@@ -437,7 +438,7 @@ async function buildEdgeAgentConfig({
   await storeReady(isa95Store)
   const vocab = isa95_vocabulary(isa95Store.data)
 
-  console.debug('All stores refreshed')
+  debug_log('All stores refreshed')
   try {
     // If we have a connectionId, get all devices using this connection
     // If we have a deviceId, just get that device
@@ -459,8 +460,8 @@ async function buildEdgeAgentConfig({
         c.uuid === devices[0].deviceInformation?.connection)
     }
 
-    console.debug('Devices:', devices)
-    console.debug('Connections:', connections)
+    debug_log('Devices:', devices)
+    debug_log('Connections:', connections)
 
     // If we don't have any devices or connections, return
     if (devices.length === 0 || connections.length === 0) {
@@ -508,8 +509,8 @@ async function buildEdgeAgentConfig({
       const connectionConfiguration = connection?.configuration
       if (!connectionConfiguration) continue
 
-      console.debug('Processing connection:', connection.name)
-      console.debug('Connection configuration:', connectionConfiguration)
+      debug_log('Processing connection:', connection.name)
+      debug_log('Connection configuration:', connectionConfiguration)
 
       // Find the connection in the config
       let connectionIndex = -1
@@ -523,7 +524,7 @@ async function buildEdgeAgentConfig({
       }
 
       if (connectionIndex >= 0) {
-        console.debug('Found existing connection in edge agent config at index:', connectionIndex)
+        debug_log('Found existing connection in edge agent config at index:', connectionIndex)
         connectionConfig = applyConnection(config.deviceConnections[connectionIndex], connection)
       }
 
@@ -639,7 +640,7 @@ async function buildEdgeAgentConfig({
     set_driver_ids(config.deviceConnections, entryDriverDef(connectionStore.data))
 
     // Log the final config before saving
-    console.debug('Final edge agent config to be saved:', JSON.stringify(config, null, 2))
+    debug_log('Final edge agent config to be saved:', JSON.stringify(config, null, 2))
 
     // Update the edge agent config in the ConfigDB, only if nobody
     // else has saved it since we read it.

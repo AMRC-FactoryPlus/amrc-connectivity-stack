@@ -80,6 +80,7 @@
   </div>
 </template>
 <script>
+import { debug_log } from '@/lib/debug-log.js'
 
 import { useApplicationStore } from '@store/useApplicationStore.js'
 import { useObjectStore } from '@store/useObjectStore.js'
@@ -187,7 +188,7 @@ export default {
       );
 
       this.rxsub = details.subscribe(appObjects => {
-        console.debug("APP OBJECTS UPDATE: %o", appObjects);
+        debug_log("APP OBJECTS UPDATE: %o", appObjects);
         this.appObjects = appObjects;
       });
     },

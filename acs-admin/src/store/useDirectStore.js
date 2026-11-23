@@ -11,6 +11,7 @@ import * as rxu from "@amrc-factoryplus/rx-util";
 import {useServiceClientStore} from '@/store/serviceClientStore.js'
 import {serviceClientReady} from '@store/useServiceClientReady.js'
 import {useObjectStore} from "@store/useObjectStore.js";
+import { debug_log } from '@/lib/debug-log.js'
 
 export const useDirectStore = defineStore('direct', {
   state: () => ({
@@ -58,7 +59,7 @@ export const useDirectStore = defineStore('direct', {
       );
 
       this.rxsub = direct.subscribe(classes => {
-        console.debug("DIRECT UPDATE: %o", classes);
+        debug_log("DIRECT UPDATE: %o", classes);
         this.data = classes;
         this.loading = false;
       });

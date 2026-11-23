@@ -41,6 +41,7 @@
 </template>
 
 <script>
+import { debug_log } from '@/lib/debug-log.js'
 import { Skeleton } from '@components/ui/skeleton'
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 import { columns } from './TableData/applicationObjectListColumns.ts'
@@ -153,7 +154,7 @@ export default {
       );
 
       this.rxsub = details.subscribe(aObjs => {
-        console.debug("OBJS UPDATE: %o", aObjs);
+        debug_log("OBJS UPDATE: %o", aObjs);
         this.data = aObjs.map(o => ({...o, application: {uuid: this.application.uuid, name: this.application.name}}));
         this.loading = false;
       });

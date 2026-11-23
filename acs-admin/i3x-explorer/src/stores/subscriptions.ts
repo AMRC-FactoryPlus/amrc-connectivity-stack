@@ -86,6 +86,33 @@ export function admittedDeliveries<T extends { elementId: string }>(sub: Subscri
   return items.filter(item => collected.has(item.elementId))
 }
 
+/** One subscription's delivery, as a transport received it. */
+export interface Delivery {
+  subscriptionId: string
+  items: Array<{ elementId: string; value: unknown; quality: string | null; timestamp: string | null }>
+}
+
+/**
+ * ACS: records buffered deliveries in one store write. Admission is checked now, at flush time, so
+ * an update buffered just before its item was stopped or deleted is still dropped.
+ */
+export function applyDeliveries(deliveries: Delivery[]): void {
+  const { subscriptions, updateLiveValues } = useSubscriptionsStore.getState()
+  const values: LiveValueUpdate[] = []
+  for (const { subscriptionId, items } of deliveries) {
+    for (const item of admittedDeliveries(subscriptions.get(subscriptionId), items)) {
+      values.push({
+        elementId: item.elementId,
+        displayName: item.elementId,
+        value: item.value,
+        timestamp: item.timestamp,
+        quality: item.quality,
+      })
+    }
+  }
+  updateLiveValues(values)
+}
+
 /** Items grouped by registration depth, for one register call per depth. */
 export function groupByDepth(sub: Pick<Subscription, 'monitoredDepth'>, elementIds: string[]): Map<number, string[]> {
   const groups = new Map<number, string[]>()
@@ -262,7 +289,9 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
     if (values.length === 0) return
     const { liveValues, trendData } = get()
     const updatedLive = new Map(liveValues)
-    let updatedTrend: Map<string, TrendPoint[]> | undefined
+    // ACS: each element's trend is copied once per batch, not once per update, since a fast feed
+    // delivers many updates to the same element in one batch.
+    const updatedPoints = new Map<string, TrendPoint[]>()
     const now = Date.now()
     for (const value of values) {
       const previous = updatedLive.get(value.elementId)
@@ -290,15 +319,26 @@ export const useSubscriptionsStore = create<SubscriptionsState>((set, get) => ({
       // A repeat is the same reading again, not a new point in time.
       const numericValue = toFiniteNumber(value.value)
       if (!repeat && numericValue !== undefined) {
-        updatedTrend ??= new Map(trendData)
-        const points = updatedTrend.get(value.elementId) ?? []
-        updatedTrend.set(
-          value.elementId,
-          [...points, { value: numericValue, timestamp: now }].slice(-MAX_TREND_POINTS)
-        )
+        let points = updatedPoints.get(value.elementId)
+        if (!points) {
+          points = [...(trendData.get(value.elementId) ?? [])]
+          updatedPoints.set(value.elementId, points)
+        }
+        // ACS: plot a reading at its source time; updates delivered together would otherwise share
+        // one arrival time and stack up at one x position.
+        points.push({ value: numericValue, timestamp: sourceTimeMs(value.timestamp) ?? now })
+        if (points.length > MAX_TREND_POINTS * 2) points.splice(0, points.length - MAX_TREND_POINTS)
       }
     }
-    set(updatedTrend ? { liveValues: updatedLive, trendData: updatedTrend } : { liveValues: updatedLive })
+    if (updatedPoints.size === 0) {
+      set({ liveValues: updatedLive })
+      return
+    }
+    const updatedTrend = new Map(trendData)
+    for (const [elementId, points] of updatedPoints) {
+      updatedTrend.set(elementId, points.length > MAX_TREND_POINTS ? points.slice(-MAX_TREND_POINTS) : points)
+    }
+    set({ liveValues: updatedLive, trendData: updatedTrend })
   },
 
   setStreaming: (subscriptionId, streaming) => {

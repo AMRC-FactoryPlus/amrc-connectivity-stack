@@ -75,6 +75,18 @@ upstream, so they are not tied to the Manager UI.
    `/sync`, but upstream read only batches from the stream, so it
    dropped every streamed update without a word. Batches are still read.
    The parsing is now `parseStreamEvent`, with tests.
+5. **`src/stores/subscriptions.ts`** and
+   **`src/components/subscriptions/SubscriptionTransport.tsx`**: record
+   live updates once per animation frame. A feed of 100 updates a
+   second per metric otherwise copied the value and trend maps, and
+   re-rendered, once per update. The transport buffers deliveries in a
+   `FrameBatcher` (`src/stores/frameBatcher.ts`, which falls back to a
+   timer in a background tab) and `applyDeliveries` records them in one
+   store write, checking each is still wanted at that moment. Each
+   element still shows its latest value and keeps every reading for its
+   trend, capped at 60 points as before, and a trend point is now
+   plotted at the reading's source time, so readings that arrive
+   together are not stacked at one arrival time.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
@@ -106,8 +118,8 @@ From `acs-admin`:
    `public/`, and changes to `vite.web.config.ts`.
 2. Replace `src/` (keeping `src/acs/`), `public/`, `index.html`,
    `tsconfig.json`, `tailwind.config.js` and `LICENSE` with upstream's.
-3. Apply the changes above again, leaving out any upstream has taken. Each is a few lines; search the
-   old copy for `ACS` to find them.
+3. Apply the changes above again, leaving out any upstream has taken.
+   Search the old copy for `ACS` to find them.
 4. Update `UPSTREAM_VERSION` in `vite.config.js` from upstream's
    `package.json`, the commit and date at the top of this file, and any
    dependency in `acs-admin/package.json` whose range upstream changed.

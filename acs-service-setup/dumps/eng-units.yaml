@@ -1,0 +1,55 @@
+# Engineering units
+# The controlled vocabulary of engineering units. Each unit is an object
+# of the Engineering unit class, named by Info. Its Engineering unit
+# config holds its UNECE Recommendation 20 code, the symbol a metric's
+# Eng_Unit is written with, and aliases that also mean it. Metrics keep
+# their Eng_Unit strings; readers resolve them through this vocabulary.
+# ConfigDB refuses a unit whose code is not a UNECE code, whose object
+# UUID is not the one for its code (eng_unit_uuid in service-client),
+# or whose symbol or an alias already means another unit.
+service: !u UUIDs.Service.ConfigDB
+version: 2
+objects:
+  !u ConfigDB.Class.R1Class:
+    !u UUIDs.Class.EngineeringUnit:
+      name: "Engineering unit"
+
+  !u UUIDs.Class.App:
+    !u UUIDs.App.EngineeringUnit:
+      name: "Engineering unit"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+configs:
+  !u UUIDs.App.ConfigSchema:
+    !u UUIDs.App.EngineeringUnit:
+      type: object
+      required: [code, symbol]
+      properties:
+        code:
+          type: string
+          pattern: "^[A-Z0-9]{2,3}$"
+          description: "The unit's UNECE Recommendation 20 common code, e.g. KWH"
+        symbol:
+          type: string
+          pattern: "^\\S(.*\\S)?$"
+          description: "The unit as a metric's Eng_Unit writes it, e.g. kW·h"
+        aliases:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^\\S(.*\\S)?$"
+          description: "Other Eng_Unit strings that mean this unit, e.g. kWh"
+      additionalProperties: false
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  # Any authenticated principal can read the vocabulary: the Manager UI
+  # offers it when editing metrics, and i3X resolves units through it.
+  # Administrators already have full ConfigDB access through
+  # ACS.PermGroup.ConfigDB, which covers writing units.
+  !u Auth.Class.Principal:
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      !u UUIDs.App.EngineeringUnit: false

@@ -9,44 +9,71 @@
      React, so it runs in a same-origin iframe: its styles and the
      console's cannot reach each other. The host object put on window
      here gives it the i3X service URL and this session's token, so it
-     never asks for a server or a sign-in, and tells the page what is
-     selected, for the console's own actions above the frame. -->
+     never asks for a server or a sign-in, and offers this console's own
+     actions on the selected object, which the app shows beside its
+     Subscribe button: Manage access opens the access dialog here, and
+     Build dataset opens the dataset builder. -->
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
-import { HOST_KEY, classify_selection, mk_host } from '@/lib/i3x-explorer-host.js'
-import ExplorerActions from './ExplorerActions.vue'
+import { useISA95Store } from '@store/useISA95Store.js'
+import { HOST_KEY, classify_selection, explorer_actions, mk_host } from '@/lib/i3x-explorer-host.js'
+import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 
 const router = useRouter()
 const store = useServiceClientStore()
-const selection = ref(null)
+const isa95 = useISA95Store()
+onMounted(() => isa95.start())
+
+/* Device access names the levels above the device, and level access
+ * needs the level's vocabulary node, so both wait for the vocabulary. */
+function isa95_ready () {
+  if (isa95.ready) return Promise.resolve()
+  return new Promise(resolve => {
+    const stop = watch(() => isa95.ready, ready => {
+      if (!ready) return
+      stop()
+      resolve()
+    })
+  })
+}
+
+/* The props of the access dialog open now, or null. */
+const access = ref(null)
+const accessOpen = ref(false)
+watch(accessOpen, open => { if (!open) access.value = null })
 
 window[HOST_KEY] = mk_host({
   client: serviceClientReady().then(() => store.client),
   theme: () => document.documentElement.classList.contains('dark') ? 'dark' : 'light',
   open_window: () => window.open(router.resolve('/explorer').href, '_blank', 'noopener'),
-  selected: s => { selection.value = s },
+  async actions (selection) {
+    await isa95_ready()
+    return explorer_actions(classify_selection(selection), isa95.data)
+  },
+  run (action) {
+    if (action.access) {
+      access.value = action.access
+      accessOpen.value = true
+    }
+    else if (action.route) router.push(action.route)
+  },
 })
 onBeforeUnmount(() => { delete window[HOST_KEY] })
-
-const selected = computed(() => classify_selection(selection.value))
 </script>
 
 <template>
   <!-- Fill the space under the header: main pads 1rem below, and 1rem
        above from lg up. -->
-  <div class="flex flex-col gap-3 h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] px-4 pt-4 lg:p-0">
-    <!-- A line is kept for the actions either way, so selecting an
-         object does not move the Explorer down. -->
-    <ExplorerActions v-if="selected" :selection="selected"/>
-    <p v-else class="flex items-center min-h-9 text-sm text-gray-500">
-      Select a device or ISA-95 level to manage its i3X access. Subscribe in the Explorer to watch live values.
-    </p>
+  <div class="flex flex-col h-[calc(100vh-5rem)] lg:h-[calc(100vh-6rem)] px-4 pt-4 lg:p-0">
     <iframe
       src="/i3x-explorer/index.html"
       title="i3X Explorer"
       class="flex-1 min-h-0 w-full rounded-md border bg-white dark:bg-slate-900"/>
+    <I3xAccessButton v-if="access" :key="access.target" headless v-model:open="accessOpen"
+                     :target="access.target" :device="access.device" :via="access.via"
+                     :noun="access.noun" :name="access.name" :path="access.path"/>
   </div>
 </template>

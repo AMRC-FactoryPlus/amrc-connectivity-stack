@@ -8,6 +8,8 @@ import { TreeNode, TreeMoreNode, TreeRowIcon, IndentGuides } from './TreeNode'
 import { buildTreeMenu } from './treeMenu'
 import { Chevron } from '../common/Chevron'
 import { ContextMenu, type MenuEntry } from '../common/ContextMenu'
+import { SearchIcon } from '../common/icons'
+import { useSearchDialog } from '../../acs/searchDialog' // ACS
 import { NumberPromptDialog } from '../common/NumberPromptDialog'
 import { useElementNavigation } from '../main/navigation'
 import { loadHierarchicalRoots, refreshAllObjects } from '../../services/catalog'
@@ -606,6 +608,11 @@ export function TreeView() {
   }, [searchQuery])
 
   const hasNamespaces = namespaces.length > 0
+  // ACS: the filter only reaches what the tree has loaded; when it finds
+  // nothing there, point to search, which looks through the whole catalog.
+  const openSearch = useSearchDialog(s => s.openSearch)
+  const filterFindsNothing = filterText !== '' && hasNamespaces &&
+    !rows.some(row => row.kind === 'node' && row.depth > 0)
   const firstNodeItem = virtualItems.find(vi => rows[vi.index]?.kind === 'node')
 
   return (
@@ -614,15 +621,40 @@ export function TreeView() {
           gives the tree its full width edge-to-edge; the input carries its own
           side padding while rows bleed to the panel edges. */}
       <div className="shrink-0 bg-i3x-surface px-2 pb-2 mb-1">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Filter tree…"
-          className="w-full px-2 py-1 text-sm bg-i3x-bg border border-i3x-border rounded text-i3x-text placeholder:text-i3x-text-muted focus:outline-none focus:border-i3x-primary"
-        />
-        {/* ACS: the Graph Relationships and Component Relationships toggles
-            that were here are in the settings menu (Toolbar.tsx). */}
+        {/* ACS: Search sits beside the filter box (it was in the toolbar),
+            and Enter in the box opens search with the filter text. The
+            Graph Relationships and Component Relationships toggles that
+            were under the box are in the settings menu (Toolbar.tsx). */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              openSearch(searchQuery)
+            }}
+            placeholder="Filter tree…"
+            aria-label="Filter tree"
+            className="flex-1 min-w-0 px-2 py-1 text-sm bg-i3x-bg border border-i3x-border rounded text-i3x-text placeholder:text-i3x-text-muted focus:outline-none focus:border-i3x-primary"
+          />
+          <button
+            type="button"
+            onClick={() => openSearch(searchQuery)}
+            title="Search all objects (Enter in the filter box, or ⌘K)"
+            aria-label="Search objects"
+            className="px-2 py-1 text-xs bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none flex items-center gap-1.5 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
+          >
+            <SearchIcon size={13} className="text-i3x-text-muted" />
+            <span>Search</span>
+          </button>
+        </div>
+        {filterFindsNothing && (
+          <p role="status" className="mt-1.5 px-1 text-xs text-i3x-text-muted">
+            Nothing in the visible tree. Press Enter to search.
+          </p>
+        )}
       </div>
 
       <div className="relative flex-1 min-h-0">

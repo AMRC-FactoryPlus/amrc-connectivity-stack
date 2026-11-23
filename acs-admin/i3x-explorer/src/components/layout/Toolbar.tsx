@@ -10,10 +10,11 @@ import { setPerfTraceEnabled } from '../../diagnostics/perfTrace'
 import { usePerfTraceEnabled } from '../../diagnostics/PerfProfiler'
 import { SearchModal } from '../search/SearchModal'
 import { AboutDialog } from './AboutDialog'
-import { SearchIcon, CheckIcon, RedirectIcon, BlockedIcon, CameraIcon, NewWindowIcon } from '../common/icons'
+import { CheckIcon, RedirectIcon, BlockedIcon, CameraIcon, NewWindowIcon } from '../common/icons'
 import { Spinner } from '../common/Spinner'
 import iconPng from '/icon.png'
 import { acsHost } from '../../acs/host' // ACS
+import { useSearchDialog } from '../../acs/searchDialog' // ACS
 
 type Theme = 'light' | 'dark'
 
@@ -29,7 +30,11 @@ export function Toolbar() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showSnapshotMenu, setShowSnapshotMenu] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
+  // ACS: shared with the tree's filter box, which opens the dialog too.
+  const showSearch = useSearchDialog(s => s.open)
+  const searchQuery = useSearchDialog(s => s.initialQuery)
+  const openSearch = useSearchDialog(s => s.openSearch)
+  const closeSearch = useSearchDialog(s => s.closeSearch)
   const [showAbout, setShowAbout] = useState(false)
   const perfTraceEnabled = usePerfTraceEnabled()
   // One hidden file input serves both load actions; this ref says which one is pending.
@@ -135,12 +140,12 @@ export function Toolbar() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        if (isConnected) setShowSearch(true)
+        if (isConnected) openSearch()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isConnected])
+  }, [isConnected, openSearch])
 
   // X1/X2, the side buttons on most mice. Electron only, in the web build they
   // drive the browser's own history and taking them over would strand the SPA.
@@ -269,16 +274,7 @@ export function Toolbar() {
             Disconnect
           </button>
         )}
-        <button
-          onClick={() => setShowSearch(true)}
-          disabled={!isConnected}
-          title="Search objects (⌘K)"
-          aria-label="Search objects"
-          className="px-3 py-1.5 text-xs bg-i3x-bg rounded border border-i3x-border hover:border-i3x-primary transition-colors motion-reduce:transition-none disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 flex-shrink-0"
-        >
-          <SearchIcon size={13} className="text-i3x-text-muted" />
-          <span className="hidden sm:inline">Search</span>
-        </button>
+        {/* ACS: the Search button is beside the tree's filter box (TreeView.tsx). */}
       </div>
 
       {/* Snapshot camera + settings gear + theme toggle. Connection status,
@@ -537,7 +533,7 @@ export function Toolbar() {
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
 
-      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      {showSearch && <SearchModal initialQuery={searchQuery} onClose={closeSearch} />}
 
       {unsupportedServer !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

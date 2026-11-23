@@ -47,6 +47,18 @@ and shown in a same-origin iframe:
   The Manager UI works the actions out again before running one, then
   opens its own access dialog or its dataset builder. Live values come
   from the app's own Subscribe.
+- The Manager UI's URL names the selected object and its detail tab,
+  `/explorer?object=<elementId>&tab=history` (Overview is left out),
+  so a copied link opens the same object on the same tab.
+  `src/acs/hostLocation.ts` calls the host's `setLocation` whenever the
+  selection or tab changes, and the Manager UI writes it with
+  `router.replace`, so it adds no browser history. At start-up the app
+  asks the host's `location()` and, once the catalog holds the object,
+  selects it under the hierarchy with the tree opened down to it. The
+  host's `onLocationRequest` moves the app when the console's URL
+  changes while the page is open (a link followed from elsewhere in the
+  console). An object the whole catalog does not hold is left, and the
+  URL follows what is shown instead.
 - Opened on its own, without the Manager UI around it, the app is
   upstream's web build with nothing changed.
 
@@ -59,7 +71,9 @@ upstream, so they are not tied to the Manager UI.
 
 1. **`src/main.tsx`**: after the runtime config loads, point the
    connection at the host's service (`configureForHost`), and after the
-   first render connect (`startHosted`). Both do nothing without a host.
+   first render connect (`startHosted`) and keep the Manager UI's URL
+   naming the selection (`syncHostLocation`). All do nothing without a
+   host.
 2. **`src/services/connection.ts`**, `authProviderFor`: with a host,
    return its token provider (`hostAuthProvider`) instead of looking
    for typed-in or OAuth credentials.

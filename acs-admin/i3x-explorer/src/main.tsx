@@ -6,8 +6,9 @@ import { normalizeServerUrl, useConnectionStore } from './stores/connection'
 import { applyServerFromQuery } from './services/serverFromQuery'
 import { loadRuntimeConfig } from './config/runtimeConfig'
 // ACS: framed by the Manager UI, connect to its i3X service with its session.
-import { configureForHost, startHosted } from './acs/host'
+import { acsHost, configureForHost, startHosted } from './acs/host'
 import { syncBrowserHistory } from './acs/browserHistory' // ACS
+import { syncHostLocation } from './acs/hostLocation' // ACS
 import { performConnect } from './services/connection'
 
 async function init() {
@@ -37,6 +38,7 @@ async function init() {
 
   startHosted(performConnect) // ACS
   syncBrowserHistory() // ACS: browser Back/Forward move through the Explorer's stops
+  syncHostLocation(acsHost) // ACS: the console's URL names the selected object and tab
 }
 
 init()

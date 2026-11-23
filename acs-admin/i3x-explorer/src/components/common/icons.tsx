@@ -390,3 +390,10 @@ export const DatabaseIcon = (p: IconProps) => (
     <path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" />
   </Icon>
 )
+
+export const ChartLineIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 4v16h16" />
+    <path d="m7 15 4-5 3 3 5-6" />
+  </Icon>
+)

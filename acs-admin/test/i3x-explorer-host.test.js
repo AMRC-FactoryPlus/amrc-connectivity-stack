@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { classify_selection, explorer_actions, mk_host, ISA95_LEVEL_TYPE } from '../src/lib/i3x-explorer-host.js'
+import { default_dataset_uuid } from '../src/lib/datasets/model.js'
 
 const level = (elementId, displayName, parentId = null) =>
   ({ elementId, displayName, typeId: ISA95_LEVEL_TYPE, parentId })
@@ -73,6 +74,7 @@ describe('mk_host', () => {
     const selection = { object: device, ancestors: [enterprise, site] }
     expect(await host.actions(selection)).toEqual([
       { id: 'access', label: 'Manage access' },
+      { id: 'show-dataset', label: 'Show dataset' },
       { id: 'dataset', label: 'Build dataset' },
     ])
     expect(actions).toHaveBeenCalledWith(selection)
@@ -106,11 +108,13 @@ describe('mk_host', () => {
 describe('explorer_actions', () => {
   it('offers access and a dataset for a device, naming the levels above it', () => {
     const actions = explorer_actions(classify_selection({ object: device, ancestors: [enterprise, site] }), VOCAB)
-    expect(actions.map(a => a.id)).toEqual(['access', 'dataset'])
+    expect(actions.map(a => a.id)).toEqual(['access', 'show-dataset', 'dataset'])
+    // The device's own dataset, which Data Access keeps under a UUID made from the device's.
+    expect(actions[1].route).toEqual({ path: `/datasets/${default_dataset_uuid('d')}` })
     expect(actions[0].access).toEqual({
       target: 'd', device: true, via: VOCAB, noun: 'device', name: 'Lathe 1', path: 'Example Co / North Site',
     })
-    expect(actions[1].route).toEqual({ path: '/datasets/new', query: { devices: 'd' } })
+    expect(actions[2].route).toEqual({ path: '/datasets/new', query: { devices: 'd' } })
   })
 
   it('offers access on a level whose names match the vocabulary, granted on its node', () => {

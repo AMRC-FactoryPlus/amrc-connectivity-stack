@@ -17,6 +17,7 @@
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 import { resolve_isa95 } from "@/lib/access/i3x-access.js";
+import { default_dataset_uuid } from "@/lib/datasets/model.js";
 
 export const HOST_KEY = "__acsI3xExplorerHost";
 
@@ -129,7 +130,7 @@ export function classify_selection (selection) {
  * @param selection classify_selection() of the Explorer's selection
  * @param isa95     the ISA-95 vocabulary nodes (useISA95Store().data)
  * @returns [{ id: "access", label, access: I3xAccessButton's props }
- *          | { id: "dataset", label, route }]
+ *          | { id: "show-dataset" | "dataset", label, route }]
  */
 export function explorer_actions (selection, isa95) {
     if (!selection) return [];
@@ -141,6 +142,11 @@ export function explorer_actions (selection, isa95) {
         { id: "access", label: "Manage access", access: {
             target: object.elementId, device: true, via: nodes,
             noun: "device", name: object.displayName, path,
+        } },
+        /* The device's own dataset, which Data Access keeps for every
+         * placed device under a UUID made from the device's. */
+        { id: "show-dataset", label: "Show dataset", route: {
+            path: `/datasets/${default_dataset_uuid(object.elementId)}`,
         } },
         { id: "dataset", label: "Build dataset", route: {
             path: "/datasets/new", query: { devices: object.elementId },

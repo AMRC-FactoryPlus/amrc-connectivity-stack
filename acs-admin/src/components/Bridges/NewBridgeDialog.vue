@@ -227,6 +227,7 @@ import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import useVuelidate from '@vuelidate/core'
 import { helpers, required, numeric, requiredIf } from '@vuelidate/validators'
 import { toast } from 'vue-sonner'
+import { save_edge_secret } from '@/lib/edge-secrets.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 
@@ -386,12 +387,8 @@ export default {
       const config = this.selectedCluster
       const namespace = config?.configuration?.namespace || 'fplus-edge'
 
-      await this.s.client.Fetch.fetch({
-        service: UUIDs.Service.Clusters,
-        url: `v1/cluster/${cluster}/secret/${namespace}/${secretName}/${key}`,
-        method: 'PUT',
-        body: value,
-        headers: { 'Content-Type': 'application/octet-stream' },
+      await save_edge_secret(this.s.client, {
+        cluster, namespace, name: secretName, key, value,
       })
     },
 

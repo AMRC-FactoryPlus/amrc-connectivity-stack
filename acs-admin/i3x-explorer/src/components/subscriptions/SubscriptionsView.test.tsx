@@ -107,3 +107,49 @@ describe('SubscriptionsView element names', () => {
     expect(screen.queryByText('x-pos')).toBeNull()
   })
 })
+
+// ACS: a component is named by its path below its composition, and its own name is never trimmed.
+describe('SubscriptionsView component labels', () => {
+  const object = (elementId: string, displayName: string, parentId: string) =>
+    ({ elementId, displayName, parentId, typeId: 't', namespaceUri: 'urn:test', isComposition: false }) as ObjectInstance
+
+  it('shows a component\'s name relative to its composition, with the full path in the tooltip', () => {
+    const objects = [
+      object('site', 'Site', '/'),
+      object('line', 'Line 1', 'site'),
+      object('press', 'Press 3', 'line'),
+      object('speed', 'Spindle speed', 'press'),
+      object('axis', 'Axis X', 'press'),
+      object('pos', 'Position', 'axis'),
+    ]
+    useExplorerStore.setState({ objectIndex: new Map(objects.map(item => [item.elementId, item])), allObjectsLoaded: true })
+    useSubscriptionsStore.getState().addSubscription({
+      id: 's',
+      createdAt: '',
+      monitoredItems: ['press'],
+      isStreaming: false,
+      monitoredDepth: { press: 0 },
+      components: { press: ['speed', 'pos'] },
+    })
+    render(
+      <SubscriptionTransportProvider>
+        <SubscriptionsView />
+      </SubscriptionTransportProvider>
+    )
+
+    const root = screen.getByRole('button', { name: 'Open Site / Line 1 / Press 3' })
+    expect(root.textContent).toBe('Site / Line 1 / Press 3')
+
+    const speed = screen.getByRole('button', { name: 'Open Site / Line 1 / Press 3 / Spindle speed' })
+    expect(speed.textContent).toBe('Spindle speed')
+    expect(speed.getAttribute('title')).toContain('Site / Line 1 / Press 3 / Spindle speed')
+    expect(speed.getAttribute('title')).toContain('speed')
+
+    const pos = screen.getByRole('button', { name: 'Open Site / Line 1 / Press 3 / Axis X / Position' })
+    expect(pos.textContent).toBe('Axis X / Position')
+    // Only the lead may be trimmed; the leaf never truncates.
+    expect(pos.querySelector('[data-label-lead]')?.className).toContain('truncate')
+    expect(pos.querySelector('[data-label-leaf]')?.className).not.toContain('truncate')
+    expect(pos.querySelector('[data-label-leaf]')?.className).toContain('flex-shrink-0')
+  })
+})

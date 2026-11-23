@@ -190,6 +190,18 @@ upstream, so they are not tied to the Manager UI.
      Subscribe as outline buttons (`useHostActions` in `src/acs/host.ts`).
      Without a host there are none.
 
+13. **The subscriptions list** (`SubscriptionsView.tsx`,
+    `MonitoredItemRow.tsx`, `src/acs/rowLabel.ts`): a component listed
+    under an expanded composition is named by its path below that
+    composition, usually only its own name ("Spindle speed", or
+    "Axis X / Position" when nested), because the composition's row
+    above it already says where it is. A monitored item still shows its
+    full path. The element's own name is never cut short: when a row is
+    too narrow only the leading names are trimmed, from the left. The
+    full path and the element id stay in the tooltip, and the id behind
+    the copy button. Tests in `src/acs/rowLabel.test.ts` and
+    `SubscriptionsView.test.tsx`.
+
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows
 exactly these changes.

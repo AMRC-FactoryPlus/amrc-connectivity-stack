@@ -12,6 +12,7 @@ import { Sparkline } from './Sparkline'
 import { TrendView } from './TrendView'
 import { CopyButton } from '../details/CopyButton' // ACS
 import { PATH_SEPARATOR } from '../main/navigation' // ACS
+import { rowLabel } from '../../acs/rowLabel' // ACS
 import { ChangeHint, ChangeList } from './ValueChanges'
 
 export const MONITORED_ROW_COLUMNS = 6
@@ -24,6 +25,8 @@ interface MonitoredItemRowProps {
   elementId: string
   /** ACS: display names from the top of the hierarchy down to this element; undefined while unknown. */
   path: string[] | undefined
+  /** ACS: a component's composition's path; the row then shows its path below that composition. */
+  rootPath?: string[]
   /** ACS: the catalog is still loading, so an unknown path may yet arrive. */
   nameLoading?: boolean
   /** ACS: the element is in the catalog, so its name opens it. */
@@ -57,6 +60,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   index,
   elementId,
   path,
+  rootPath,
   nameLoading = false,
   canOpen = true,
   isCurrent,
@@ -87,6 +91,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           <ElementName
             elementId={elementId}
             path={path}
+            rootPath={rootPath}
             nameLoading={nameLoading}
             canOpen={canOpen}
             isCurrent={isCurrent}
@@ -265,13 +270,15 @@ function ItemActions({
 }
 
 /**
- * ACS: the element's full path, e.g. "Site / Line 1 / Spindle speed", with the
- * element's own name always in view. A long path loses its top levels first. The element id is
- * in the tooltip and behind a copy button rather than on a line of its own.
+ * ACS: the element's path, e.g. "Site / Line 1 / Spindle speed". A component under an expanded
+ * composition shows only its path below that composition, usually just its name. The element's
+ * own name is never cut short: when space runs out only the leading names are trimmed, from the
+ * left. The full path and the element id are in the tooltip, and the id is behind a copy button.
  */
 function ElementName({
   elementId,
   path,
+  rootPath,
   nameLoading,
   canOpen,
   isCurrent,
@@ -279,6 +286,7 @@ function ElementName({
 }: {
   elementId: string
   path: string[] | undefined
+  rootPath: string[] | undefined
   nameLoading: boolean
   canOpen: boolean
   isCurrent: boolean
@@ -303,32 +311,29 @@ function ElementName({
     )
   }
 
-  const name = path[path.length - 1]
-  const ancestors = path.slice(0, -1)
-  const fullPath = path.join(PATH_SEPARATOR)
+  const { lead, leaf, full } = rowLabel(path, rootPath)
   const label = (
     <>
-      {ancestors.length > 0 && (
-        // Right-to-left so an ellipsis eats the top of the path; <bdi> keeps the names in reading order.
-        // It gives up its width long before the element's own name does.
-        <span dir="rtl" className="truncate min-w-[1.5em] shrink-[1000] text-left text-i3x-text-muted">
-          <bdi>{ancestors.join(PATH_SEPARATOR)}</bdi>
+      {lead && (
+        // Right-to-left so an ellipsis eats the start of the path; <bdi> keeps the names in reading order.
+        <span data-label-lead="" dir="rtl" className="truncate min-w-[1.5em] max-w-[20rem] text-left text-i3x-text-muted">
+          <bdi>{lead}</bdi>
         </span>
       )}
-      {ancestors.length > 0 && <span aria-hidden="true" className="flex-shrink-0 whitespace-pre text-i3x-text-muted">{PATH_SEPARATOR}</span>}
-      <span className="truncate min-w-0">{name}</span>
+      {lead && <span aria-hidden="true" className="flex-shrink-0 whitespace-pre text-i3x-text-muted">{PATH_SEPARATOR}</span>}
+      <span data-label-leaf="" className="flex-shrink-0 whitespace-nowrap">{leaf}</span>
     </>
   )
-  const tooltip = `${fullPath}\n${elementId}`
+  const tooltip = `${full}\n${elementId}`
 
   return (
-    <span className="group flex items-center gap-1 min-w-0 max-w-[28rem]">
+    <span className="group flex items-center gap-1 min-w-0">
       {canOpen ? (
         <button
           type="button"
           onClick={() => onOpen(elementId)}
           title={`Open ${tooltip}`}
-          aria-label={`Open ${fullPath}`}
+          aria-label={`Open ${full}`}
           className={`flex min-w-0 text-left rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary ${
             isCurrent ? 'text-i3x-primary font-medium' : 'text-i3x-text hover:text-i3x-primary'
           }`}

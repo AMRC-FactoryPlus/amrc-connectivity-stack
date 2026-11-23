@@ -269,6 +269,8 @@ export function SubscriptionsView() {
                   index={virtualItem.index}
                   elementId={row.elementId}
                   path={pathOf(row.elementId)}
+                  // ACS: a component is named by its path below its composition.
+                  rootPath={row.isComponent ? pathOf(row.rootId) : undefined}
                   nameLoading={!catalogLoaded}
                   canOpen={objectIndex.has(row.elementId)}
                   isCurrent={row.elementId === selectedElementId}

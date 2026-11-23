@@ -238,7 +238,7 @@ import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import useVuelidate from '@vuelidate/core'
 import { helpers, required, numeric, requiredIf } from '@vuelidate/validators'
 import { toast } from 'vue-sonner'
-import { SecretPerm, load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
+import { load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 
@@ -338,7 +338,7 @@ export default {
     async selectedClusterUuid(cluster) {
       this.secretAccess = null
       if (!cluster) return
-      const access = await load_secret_access(this.s.client, cluster, [SecretPerm.Manage])
+      const access = await load_secret_access(this.s.client, cluster, 'manage')
       if (this.selectedClusterUuid === cluster) this.secretAccess = access
     }
   },

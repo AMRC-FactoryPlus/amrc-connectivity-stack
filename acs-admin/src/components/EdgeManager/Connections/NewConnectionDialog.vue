@@ -196,7 +196,7 @@ function sanitizeConnectionName(name) {
 import { helpers, required, minLength } from '@vuelidate/validators'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { toast } from 'vue-sonner'
-import { SecretPerm, load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
+import { load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
 import _ from 'lodash'
 import { useConnectionStore } from '@store/useConnectionStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
@@ -752,8 +752,7 @@ export default {
       this.secretAccess = null
       const cluster = node?.deployment?.cluster
       if (!cluster) return
-      const access = await load_secret_access(this.s.client, cluster,
-        [SecretPerm.Manage, SecretPerm.Create])
+      const access = await load_secret_access(this.s.client, cluster, 'create')
       if (this.node?.deployment?.cluster === cluster) this.secretAccess = access
     },
 

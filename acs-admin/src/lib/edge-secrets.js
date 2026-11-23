@@ -87,62 +87,48 @@ export async function save_edge_secret (client, { cluster, namespace, name, key,
  * a cluster, so a dialog can turn its password fields off and say why
  * instead of letting someone type a password that will be refused.
  *
- * The Cluster Manager checks these against the cluster's UUID, with a
- * wildcard grant counting too. Manage secrets allows adding, overwriting
- * and deleting keys. Create secrets allows adding a new key only, which
- * is all the connection dialog needs because every save there uses a
- * fresh random key. */
-export const SecretPerm = {
-  Manage: '07fba27a-0d01-4c07-875b-d25345261d3a',
-  Create: 'a558eb08-e3fc-449f-8492-ae4f2514714b',
-}
-
-const WILDCARD = '00000000-0000-0000-0000-000000000000'
+ * The Cluster Manager answers GET v1/cluster/:cluster/secret-access with
+ * { manage, create } for the caller. manage is the Manage secrets
+ * permission, which allows adding, overwriting and deleting keys.
+ * create is true when the caller can add a new key, which Create
+ * secrets or Manage secrets allows, and is all the connection dialog
+ * needs because every save there uses a fresh random key. */
 
 /**
- * Whether an ACL lets its principal save secrets on a cluster.
+ * Turn the Cluster Manager's answer into true, false, or null when it
+ * can't tell. A Cluster Manager without the route answers 404, and that
+ * or any other failure is null, so the caller leaves the fields on and
+ * relies on the save reporting a refusal.
  *
- * The Auth service only returns the entries for permissions the caller
- * may read (Read ACL on that permission), so a missing grant only means
- * "no" when the ACL also shows the caller can read every permission
- * asked about. Anything less is "unknown", and the caller should leave
- * the fields on and rely on the save reporting a refusal.
- *
- * @param acl          the principal's ACL, as [{ permission, target }]
- * @param cluster      the edge cluster's UUID
- * @param permissions  the permissions, any one of which is enough
- * @returns true, false, or null when the ACL can't tell
+ * @param status  the HTTP status, 0 for no answer
+ * @param body    the parsed JSON body
+ * @param need    'create' to add a new key, 'manage' to overwrite one
  */
-export function secret_access (acl, cluster, permissions) {
-  if (!Array.isArray(acl) || !cluster) return null
-
-  const on = (permission, target) => acl.some(ace =>
-    ace.permission === permission
-    && (ace.target === target || ace.target === WILDCARD))
-
-  if (permissions.some(p => on(p, cluster))) return true
-  if (permissions.every(p => on(UUIDs.Permission.Auth.ReadACL, p))) return false
-  return null
+export function secret_access (status, body, need) {
+  if (status !== 200) return null
+  const answer = body?.[need]
+  return typeof answer === 'boolean' ? answer : null
 }
 
 /**
- * Look up whether the signed-in user may save secrets on a cluster.
- * Reads the user's own ACL from the Auth service in the same way as the
- * rebirth button, but by principal UUID rather than a guessed Kerberos
- * name. Never rejects: any failure, such as a user who can't read their
- * own ACL, gives null.
+ * Ask the Cluster Manager whether the signed-in user may save secrets on
+ * a cluster. Never rejects: any failure gives null.
  *
- * @param client       the service client
- * @param cluster      the edge cluster's UUID
- * @param permissions  the permissions, any one of which is enough
+ * @param client   the service client
+ * @param cluster  the edge cluster's UUID
+ * @param need     'create' or 'manage', as for secret_access
  * @returns true, false, or null when it can't tell
  */
-export async function load_secret_access (client, cluster, permissions) {
+export async function load_secret_access (client, cluster, need) {
+  if (!cluster) return null
   try {
-    const me = await client.Auth.whoami_uuid()
-    const [st, acl] = await client.Auth.fetch(`v2/acl/${me}`)
-    if (st !== 200) return null
-    return secret_access(acl, cluster, permissions)
+    const res = await client.Fetch.fetch({
+      service: UUIDs.Service.Clusters,
+      url: `v1/cluster/${cluster}/secret-access`,
+    })
+    const status = res?.status ?? 0
+    const body = status === 200 ? await res.json() : null
+    return secret_access(status, body, need)
   }
   catch (e) {
     console.debug('Could not check permission to save secrets:', e)

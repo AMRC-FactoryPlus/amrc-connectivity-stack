@@ -4,6 +4,7 @@ import { useSubscriptionsStore } from '../../stores/subscriptions'
 import { SubscriptionsView } from './SubscriptionsView'
 import { CloseIcon, NewWindowIcon } from '../common/icons'
 import { TrendWindowControl } from '../../acs/TrendWindowControl' // ACS
+import { ActiveOnlyToggle } from '../../acs/activeOnly' // ACS
 import { useSubscriptionsPopout } from '../../acs/subscriptionsPopout' // ACS
 
 const MIN_HEIGHT = 120
@@ -109,7 +110,8 @@ function PanelHeader({ onClose }: { onClose?: () => void }) {
           {subscriptionCount}
         </span>
       )}
-      <div className="ml-auto min-w-0 overflow-x-auto">
+      <div className="ml-auto min-w-0 overflow-x-auto flex items-center gap-3">
+        <ActiveOnlyToggle />
         <TrendWindowControl />
       </div>
       {poppedOut ? (

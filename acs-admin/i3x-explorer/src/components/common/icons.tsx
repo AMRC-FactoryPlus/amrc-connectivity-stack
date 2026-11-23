@@ -375,3 +375,18 @@ export const CodeIcon = (p: IconProps) => (
     <path d="m16 6 6 6-6 6" />
   </Icon>
 )
+
+// ACS: icons for the Manager UI's actions in the detail header.
+export const ShieldIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6L12 3z" />
+  </Icon>
+)
+
+export const DatabaseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <ellipse cx="12" cy="5.5" rx="7" ry="2.5" />
+    <path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13" />
+    <path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" />
+  </Icon>
+)

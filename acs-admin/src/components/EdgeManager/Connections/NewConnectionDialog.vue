@@ -171,6 +171,7 @@
 </template>
 
 <script>
+import { debug_log } from '@/lib/debug-log.js'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@components/ui/dialog'
 import HostPathsEditor from '@components/EdgeManager/Connections/HostPathsEditor.vue'
 import { Button } from '@components/ui/button'
@@ -385,7 +386,7 @@ export default {
 
     // Initialize formData if it doesn't exist
     if (!this.formData) {
-      console.debug('Initializing formData')
+      debug_log('Initializing formData')
       this.formData = {
         payloadFormat: "Defined by Protocol"
       }
@@ -510,7 +511,7 @@ export default {
       const config = this.c.data.find(c => c.uuid === cluster)
       const namespace = config?.configuration?.namespace;
 
-      console.debug("Node: %o, cluster: %o, config: %o, ns: %o",
+      debug_log("Node: %o, cluster: %o, config: %o, ns: %o",
           this.node, cluster, config, namespace);
 
       if (!namespace) throw new Error('No namespace found for cluster')
@@ -650,8 +651,8 @@ export default {
         // Sanitize the name for Kubernetes compatibility
         const sanitizedName = sanitizeConnectionName(originalName);
 
-        console.debug('Connection name:', originalName);
-        console.debug('Sanitized name for Kubernetes:', sanitizedName);
+        debug_log('Connection name:', originalName);
+        debug_log('Sanitized name for Kubernetes:', sanitizedName);
 
         if (this.existingConnection) {
 
@@ -682,11 +683,11 @@ export default {
           ])
 
           // Update the edge agent config
-          console.debug('Updating edge agent config for connection:', this.existingConnection.uuid)
+          debug_log('Updating edge agent config for connection:', this.existingConnection.uuid)
           await updateEdgeAgentConfig({
             connectionId: this.existingConnection.uuid
           })
-          console.debug('Edge agent config update completed')
+          debug_log('Edge agent config update completed')
 
           toast.success('Success!', {
             description: 'The connection has been updated successfully.',
@@ -694,7 +695,7 @@ export default {
         }
         else {
           // Log the payload format being saved for new connection
-          console.debug('Creating new connection with payload format:', payloadFormat)
+          debug_log('Creating new connection with payload format:', payloadFormat)
           // Create new connection
           const connectionUUID = await this.s.client.ConfigDB.create_object(UUIDs.Class.EdgeAgentConnection)
 
@@ -725,11 +726,11 @@ export default {
           await this.s.client.ConfigDB.put_config(UUIDs.App.ConnectionConfiguration, connectionUUID, payload)
 
           // Update the edge agent config
-          console.debug('Updating edge agent config for new connection:', connectionUUID)
+          debug_log('Updating edge agent config for new connection:', connectionUUID)
           await updateEdgeAgentConfig({
             connectionId: connectionUUID
           })
-          console.debug('Edge agent config update completed for new connection')
+          debug_log('Edge agent config update completed for new connection')
 
           toast.success('Success!', {
             description: 'The connection has been created successfully.',

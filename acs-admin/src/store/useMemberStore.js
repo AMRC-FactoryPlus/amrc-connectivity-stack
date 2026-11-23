@@ -8,6 +8,7 @@ import * as rxu from '@amrc-factoryplus/rx-util'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { debug_log } from '@/lib/debug-log.js'
 
 export const useMemberStore = defineStore('members', {
   state: () => ({
@@ -36,7 +37,7 @@ export const useMemberStore = defineStore('members', {
       );
 
       this.rxsub = members.subscribe(members => {
-        console.debug("MEMBERS UPDATE: %o", members);
+        debug_log("MEMBERS UPDATE: %o", members);
         this.data = members;
         this.loading = false;
       });

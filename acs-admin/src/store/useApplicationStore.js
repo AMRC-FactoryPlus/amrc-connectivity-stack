@@ -12,6 +12,7 @@ import * as rxu from '@amrc-factoryplus/rx-util'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { debug_log } from '@/lib/debug-log.js'
 
 export const useApplicationStore = defineStore('application', {
   state: () => ({
@@ -42,7 +43,7 @@ export const useApplicationStore = defineStore('application', {
       );
 
       this.rxsub = details.subscribe(apps => {
-        console.debug("APPS UPDATE: %o", apps);
+        debug_log("APPS UPDATE: %o", apps);
         // Sort applications alphabetically by name
         this.data = apps.sort((a, b) =>
           a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })

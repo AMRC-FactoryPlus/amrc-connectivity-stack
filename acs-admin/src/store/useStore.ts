@@ -10,6 +10,7 @@ import { Map as ImmutableMap } from 'immutable'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { debug_log } from '@/lib/debug-log.js'
 
 interface BaseObject {
   uuid: string
@@ -169,7 +170,7 @@ export const useStore = (name: string, classUUID: string, appBindings: AppBindin
         )
 
         this.rxsub = details.subscribe(cs => {
-          console.debug(`${name.toUpperCase()} UPDATE: %o`, cs)
+          debug_log(`${name.toUpperCase()} UPDATE: %o`, cs)
           this.data = cs
           this.loading = false
           this.ready = true  // Set ready state when data is loaded

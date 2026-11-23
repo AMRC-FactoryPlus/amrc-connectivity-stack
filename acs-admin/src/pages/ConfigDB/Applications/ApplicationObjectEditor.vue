@@ -91,6 +91,7 @@
 </template>
 
 <script>
+import { debug_log } from '@/lib/debug-log.js'
 import {Skeleton} from '@components/ui/skeleton'
 import {columns} from './TableData/applicationListColumns.ts'
 import {Card} from "@components/ui/card/index.js";
@@ -207,7 +208,7 @@ export default {
       this.rxsub = null;
     },
     syncMessageReceived: function (message) {
-      console.debug("CONFIG UPDATE: %o", message);
+      debug_log("CONFIG UPDATE: %o", message);
       this.data = message
       this.incomingBufferJson = this.formats.json.stringify(message)
       // If the code has been changed and the server is sending something different, ask the user what to do

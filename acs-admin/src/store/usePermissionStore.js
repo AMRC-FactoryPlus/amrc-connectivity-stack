@@ -12,6 +12,7 @@ import * as rxu from '@amrc-factoryplus/rx-util'
 import { useObjectStore } from '@store/useObjectStore.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { debug_log } from '@/lib/debug-log.js'
 
 export const usePermissionStore = defineStore('permission', {
   state: () => ({
@@ -48,7 +49,7 @@ export const usePermissionStore = defineStore('permission', {
       );
 
       this.rxsub = details.subscribe(ps => {
-        console.debug("PERMS UPDATE: %o", ps);
+        debug_log("PERMS UPDATE: %o", ps);
         this.data = ps;
         this.loading = false;
       });

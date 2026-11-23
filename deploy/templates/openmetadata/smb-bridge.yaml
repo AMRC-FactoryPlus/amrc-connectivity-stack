@@ -1,0 +1,160 @@
+{{- /*
+  OpenMetadata has no SMB connector, only an SFTP Drive connector. This
+  mounts each configured SMB share read-only through csi-driver-smb
+  (the csi-driver-smb subchart) and serves it over SFTP
+  inside the cluster, so OpenMetadata's SFTP connector can catalogue it.
+  See acs-openmetadata/README.md.
+*/}}
+{{- if and .Values.openmetadata.enabled .Values.openmetadataSmb.enabled }}
+{{- $smb := .Values.openmetadataSmb }}
+{{- if not (lookup "v1" "Secret" .Release.Namespace "openmetadata-sftp") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openmetadata-sftp
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+type: Opaque
+data:
+  # Entered by hand into the OpenMetadata SFTP service connection.
+  password: {{ randAlphaNum 32 | b64enc | quote }}
+---
+{{- end }}
+{{- range $smb.shares }}
+# PersistentVolumes are cluster-scoped, so the name includes the namespace.
+# source and mountOptions are immutable: changing them means deleting this
+# PV and its PVC.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $.Release.Namespace }}-openmetadata-smb-{{ .name }}
+  annotations:
+    pv.kubernetes.io/provisioned-by: smb.csi.k8s.io
+spec:
+  capacity:
+    # Nominal; the share's real size is whatever the file server says.
+    storage: 1Gi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  # Reserve this PV for our PVC. volumeName on the PVC alone binds only
+  # one way; without this any other unclassed PVC could claim it.
+  claimRef:
+    namespace: {{ $.Release.Namespace }}
+    name: openmetadata-smb-{{ .name }}
+  mountOptions:
+    {{- toYaml $smb.mountOptions | nindent 4 }}
+  csi:
+    driver: smb.csi.k8s.io
+    readOnly: true
+    volumeHandle: {{ $.Release.Namespace }}-openmetadata-smb-{{ .name }}
+    volumeAttributes:
+      source: {{ .source | required "openmetadataSmb.shares[].source is required" | quote }}
+    nodeStageSecretRef:
+      name: {{ $smb.credentialsSecret }}
+      namespace: {{ $.Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openmetadata-smb-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: ""
+  volumeName: {{ $.Release.Namespace }}-openmetadata-smb-{{ .name }}
+  resources:
+    requests:
+      storage: 1Gi
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openmetadata-sftp
+  namespace: {{ .Release.Namespace }}
+  labels:
+    component: openmetadata-sftp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: openmetadata-sftp
+  template:
+    metadata:
+      labels:
+        component: openmetadata-sftp
+    spec:
+      {{- with .Values.acs.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        # Host keys and sshd config are generated here on each start.
+        # The SFTP connector doesn't check host keys, so they needn't
+        # persist.
+        - name: config
+          emptyDir: {}
+        - name: sftp-password
+          secret:
+            secretName: openmetadata-sftp
+        {{- range $smb.shares }}
+        - name: share-{{ .name }}
+          persistentVolumeClaim:
+            claimName: openmetadata-smb-{{ .name }}
+            readOnly: true
+        {{- end }}
+      containers:
+        - name: sftp
+{{ include "amrc-connectivity-stack.image" (list . $smb.sftp) | indent 10 }}
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: USER_NAME
+              value: openmetadata
+            - name: USER_PASSWORD_FILE
+              value: /run/sftp/password
+            - name: PASSWORD_ACCESS
+              value: "true"
+            - name: SUDO_ACCESS
+              value: "false"
+            - name: LOG_STDOUT
+              value: "true"
+          ports:
+            - name: sftp
+              containerPort: 2222
+          volumeMounts:
+            - mountPath: /config
+              name: config
+            - mountPath: /run/sftp
+              name: sftp-password
+              readOnly: true
+            {{- range $smb.shares }}
+            # Outside /config, which the image chowns on startup.
+            - mountPath: /shares/{{ .name }}
+              name: share-{{ .name }}
+              readOnly: true
+            {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: 2222
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openmetadata-sftp
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+    - name: sftp
+      port: 22
+      targetPort: 2222
+  selector:
+    component: openmetadata-sftp
+{{- end -}}

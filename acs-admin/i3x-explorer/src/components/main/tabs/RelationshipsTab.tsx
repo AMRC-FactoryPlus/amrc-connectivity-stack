@@ -53,6 +53,9 @@ const TRAVERSAL_OPTIONS: { value: RelationshipTraversal; label: string }[] = [
  * moves the viewport onto a row's branch and lights it, leaving the walk, the
  * root and the selection exactly as they were. Re-rooting costs a round trip
  * per hop and redraws both panes; focusing costs nothing and redraws nothing.
+ *
+ * ACS: no longer a tab of its own. It is a panel on every object's Overview,
+ * under Current Value; the name is upstream's, kept for refreshes.
  */
 export function RelationshipsTab({ object }: { object: ObjectInstance }) {
   const objectIndex = useExplorerStore(state => state.objectIndex)
@@ -282,12 +285,7 @@ export function RelationshipsTab({ object }: { object: ObjectInstance }) {
         </div>
       </div>
 
-      <p className="mt-3 shrink-0 text-[11.5px] text-i3x-text-muted">
-        Hover a row to spotlight it on the map · use a row's focus button to zoom to it and its
-        children · drag a row onto the map to root it there · right-click a row for more · drag to
-        pan · scroll to zoom · click a node to root the map on it
-      </p>
-
+      {/* ACS: no help line under the map. */}
       {/* The key sits below the split, not inside the drawing, so it can never
           overlap a node and it wraps on a narrow pane. */}
       <RelationshipLegend

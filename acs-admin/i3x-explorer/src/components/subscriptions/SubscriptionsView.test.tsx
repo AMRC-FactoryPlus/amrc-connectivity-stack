@@ -153,3 +153,53 @@ describe('SubscriptionsView component labels', () => {
     expect(pos.querySelector('[data-label-leaf]')?.className).toContain('flex-shrink-0')
   })
 })
+
+// ACS: one graph spans the full width; several sit side by side in a grid.
+describe('SubscriptionsView trend layout', () => {
+  function renderComposite(numericComponents: string[]) {
+    useExplorerStore.setState({ allObjectsLoaded: true })
+    useSubscriptionsStore.getState().addSubscription({
+      id: 's',
+      createdAt: '',
+      monitoredItems: ['press'],
+      isStreaming: false,
+      monitoredDepth: { press: 0 },
+      components: { press: ['speed', 'temp', 'mode'] },
+    })
+    const reading = (elementId: string, value: unknown) => ({
+      elementId,
+      displayName: elementId,
+      value,
+      timestamp: null,
+      quality: 'Good',
+    })
+    act(() => {
+      const { updateLiveValues } = useSubscriptionsStore.getState()
+      updateLiveValues([reading('mode', 'Auto'), ...numericComponents.map(id => reading(id, 1))])
+      updateLiveValues(numericComponents.map(id => reading(id, 2)))
+    })
+    return render(
+      <SubscriptionTransportProvider>
+        <SubscriptionsView />
+      </SubscriptionTransportProvider>
+    )
+  }
+
+  it('lays several component trends side by side in a grid that wraps', () => {
+    const view = renderComposite(['speed', 'temp'])
+    act(() => screen.getByRole('button', { name: /Component trends/ }).click())
+
+    const grid = view.container.querySelector('[data-trend-grid]') as HTMLElement
+    expect(grid.className).toContain('grid-cols-[repeat(auto-fit,minmax(min(28rem,100%),1fr))]')
+    expect(grid.querySelectorAll('[data-trend-view]')).toHaveLength(2)
+  })
+
+  it('gives a single trend the full width', () => {
+    const view = renderComposite(['speed'])
+    act(() => screen.getByRole('button', { name: /Component trends/ }).click())
+
+    const grid = view.container.querySelector('[data-trend-grid]') as HTMLElement
+    expect(grid.className).toContain('grid-cols-1')
+    expect(grid.querySelectorAll('[data-trend-view]')).toHaveLength(1)
+  })
+})

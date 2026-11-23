@@ -13,6 +13,7 @@ import { TrendView } from './TrendView'
 import { CopyButton } from '../details/CopyButton' // ACS
 import { PATH_SEPARATOR } from '../main/navigation' // ACS
 import { rowLabel } from '../../acs/rowLabel' // ACS
+import { ComponentTrends, trendGridClass } from '../../acs/ComponentTrends' // ACS
 import { ChangeHint, ChangeList } from './ValueChanges'
 
 export const MONITORED_ROW_COLUMNS = 6
@@ -45,6 +46,8 @@ interface MonitoredItemRowProps {
   onDelete?: ItemAction
   /** A composition root's component count and fold state. */
   componentCount?: number
+  /** ACS: a composition root's components; opening its row shows their trends side by side. */
+  componentIds?: readonly string[]
   componentsOpen?: boolean
   onToggleComponents?: (elementId: string) => void
 }
@@ -73,6 +76,7 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   onStart,
   onDelete,
   componentCount = 0,
+  componentIds,
   componentsOpen = false,
   onToggleComponents,
 }: MonitoredItemRowProps, ref) {
@@ -80,7 +84,10 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   const value = liveValue?.value
   const structured = useMemo(() => asStructured(value), [value])
   const numeric = liveValue && structured === undefined ? toFiniteNumber(value) : undefined
-  const expandable = structured !== undefined || numeric !== undefined
+  const ownDetail = structured !== undefined || numeric !== undefined
+  // ACS: a composition opens to its components' trends even before, or without, a value of its own.
+  const hasComponentTrends = (componentIds?.length ?? 0) > 0
+  const expandable = ownDetail || hasComponentTrends
   const rowTone = isCurrent ? 'bg-i3x-primary/5' : isComponent ? 'bg-i3x-bg/40' : ''
   const dim = stopped ? 'opacity-60' : ''
 
@@ -110,29 +117,41 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           )}
         </td>
         <td className={`px-3 py-2.5 ${dim}`}>
-          {!liveValue ? (
+          {!liveValue && !hasComponentTrends ? (
             <span className="text-xs text-i3x-text-muted">{stopped ? '-' : 'Waiting…'}</span>
           ) : expandable ? (
             <button
               type="button"
               onClick={() => onToggle(elementId)}
               aria-expanded={open}
-              title={open ? 'Hide details' : numeric !== undefined ? 'Show trend' : 'Show value'}
+              title={
+                open
+                  ? 'Hide details'
+                  : hasComponentTrends
+                  ? 'Show the trends of its components'
+                  : numeric !== undefined
+                  ? 'Show trend'
+                  : 'Show value'
+              }
               className="flex items-center gap-2 max-w-[22rem] min-w-0 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-i3x-primary"
             >
               <Chevron open={open} />
-              {structured !== undefined ? (
+              {!liveValue ? (
+                <span className="text-xs text-i3x-text-muted">Component trends</span>
+              ) : structured !== undefined ? (
                 <StructuredSummary liveValue={liveValue} summary={describeStructure(structured)} />
-              ) : (
+              ) : numeric !== undefined ? (
                 <>
                   <ScalarValue liveValue={liveValue} />
                   <Sparkline elementId={elementId} />
                 </>
+              ) : (
+                <ScalarValue liveValue={liveValue} />
               )}
             </button>
           ) : (
             <span className="flex items-baseline gap-2 min-w-0 max-w-[18rem]">
-              <ScalarValue liveValue={liveValue} />
+              {liveValue && <ScalarValue liveValue={liveValue} />}
             </span>
           )}
         </td>
@@ -169,22 +188,27 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
           )}
         </td>
       </tr>
-      {open && liveValue && expandable && (
+      {open && expandable && (
         <tr className={`border-b border-i3x-border/60 ${rowTone}`}>
           <td colSpan={MONITORED_ROW_COLUMNS} className={`pb-3 pr-3 ${isComponent ? 'pl-8' : 'pl-3'}`}>
-            {liveValue.changes.length > 0 && (
+            {liveValue && liveValue.changes.length > 0 && (
               <p className="mb-1 text-[11px] text-i3x-text-muted">
                 Last change <TimeAgo at={liveValue.changedAt} />
               </p>
             )}
-            {structured !== undefined ? (
+            {/* ACS: a composition's component trends, side by side. */}
+            {hasComponentTrends && componentIds && <ComponentTrends rootId={elementId} componentIds={componentIds} />}
+            {liveValue && structured !== undefined ? (
               <>
                 <ChangeList changes={liveValue.changes} truncated={liveValue.changes.length >= MAX_CHANGED_PATHS} />
                 <JsonViewer data={structured} initialExpanded={true} />
               </>
-            ) : (
-              <TrendView elementId={elementId} />
-            )}
+            ) : liveValue && numeric !== undefined ? (
+              // ACS: one graph alone spans the full width of the panel.
+              <div className={trendGridClass(1)}>
+                <TrendView elementId={elementId} />
+              </div>
+            ) : null}
           </td>
         </tr>
       )}

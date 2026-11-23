@@ -286,6 +286,7 @@ export function SubscriptionsView() {
                         onStart: onStartItem,
                         onDelete: onDeleteItem,
                         componentCount,
+                        componentIds: active.components?.[row.rootId],
                         componentsOpen: !foldedRoots.has(row.rootId),
                         onToggleComponents: toggleComponents,
                       })}

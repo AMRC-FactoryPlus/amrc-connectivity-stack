@@ -18,16 +18,18 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use rs_edge_driver::{
-    ConnectError, DEFAULT_MAX_PACKET_SIZE, DriverHandle, Handler, HandlerError, WriteError,
-    WriteValue,
+    ConnectError, DEFAULT_MAX_PACKET_SIZE, DriverHandle, Handler, HandlerError, Scouter,
+    WriteError, WriteValue,
 };
 use rumqttc::{
     AsyncClient, ConnectReturnCode, ConnectionError, Event, EventLoop, Incoming, MqttOptions, QoS,
     SubscribeFilter, SubscribeReasonCode, TlsConfiguration, Transport,
 };
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 use crate::config::{Conf, Protocol, WS_PATH};
+use crate::scout::MqttScouter;
 use crate::{topics, write};
 
 /// The largest packet MQTT allows. The built-in accepts any message,
@@ -79,31 +81,53 @@ struct Session {
     subscribed: BTreeSet<String>,
     /// Filters waiting for a SUBACK, in the order they were sent.
     pending: Arc<Mutex<VecDeque<Vec<String>>>>,
+    /// Set when this connection is lost, so a scan can stop.
+    lost: Arc<Lost>,
+}
+
+/// Whether the driver's own connection has been lost. A scan watches
+/// it and stops when it is set, because a broker that sets the client
+/// id from the login gives the scan's connection the driver's client
+/// id. mosquitto does this with `use_username_as_clientid`. The broker
+/// then drops the driver's connection for the scan's, and when the
+/// driver reconnects it drops the scan's in turn. Stopping the scan at
+/// the first loss lets the driver reconnect once and carry on.
+#[derive(Default)]
+pub(crate) struct Lost {
+    set: AtomicBool,
+    notify: Notify,
+}
+
+impl Lost {
+    /// Mark the connection lost and wake every waiter.
+    pub(crate) fn set(&self) {
+        self.set.store(true, Ordering::SeqCst);
+        self.notify.notify_waiters();
+    }
+
+    pub(crate) fn is_set(&self) -> bool {
+        self.set.load(Ordering::SeqCst)
+    }
+
+    /// Wait until the connection is lost.
+    pub(crate) async fn wait(&self) {
+        loop {
+            // Made before the check, so a `set` between the check and
+            // the await still wakes it.
+            let notified = self.notify.notified();
+            if self.is_set() {
+                return;
+            }
+            notified.await;
+        }
+    }
 }
 
 impl MqttHandler {
-    /// The client options for one connection.
+    /// The client options for the driver's connection.
     fn options(&self) -> Result<MqttOptions, String> {
-        let c = &self.conf;
-        let mut opts = match c.protocol {
-            Protocol::Tcp | Protocol::Tls => MqttOptions::new(&self.client_id, &c.host, c.port),
-            Protocol::Ws | Protocol::Wss => {
-                MqttOptions::new(&self.client_id, format!("{}{WS_PATH}", c.url()), c.port)
-            }
-        };
-        let transport = match c.protocol {
-            Protocol::Tcp => Transport::Tcp,
-            Protocol::Tls => Transport::Tls(tls_config()?),
-            Protocol::Ws => Transport::Ws,
-            Protocol::Wss => Transport::Wss(tls_config()?),
-        };
-        opts.set_transport(transport);
-        if let Some((u, p)) = &c.credentials {
-            opts.set_credentials(u, p);
-        }
-        opts.set_clean_session(c.clean_session);
-        opts.set_keep_alive(c.keep_alive);
-        opts.set_max_packet_size(MQTT_MAX_PACKET, MQTT_MAX_PACKET);
+        let mut opts = client_options(&self.conf, &self.client_id)?;
+        opts.set_clean_session(self.conf.clean_session);
         opts.set_request_channel_capacity(REQUEST_QUEUE);
         Ok(opts)
     }
@@ -124,6 +148,31 @@ impl MqttHandler {
             s.task.abort();
         }
     }
+}
+
+/// The client options for a connection to the broker in `c` with
+/// `client_id`: host, transport, TLS, credentials and keep-alive. The
+/// driver's connection and a scan's connection both use this.
+pub(crate) fn client_options(c: &Conf, client_id: &str) -> Result<MqttOptions, String> {
+    let mut opts = match c.protocol {
+        Protocol::Tcp | Protocol::Tls => MqttOptions::new(client_id, &c.host, c.port),
+        Protocol::Ws | Protocol::Wss => {
+            MqttOptions::new(client_id, format!("{}{WS_PATH}", c.url()), c.port)
+        }
+    };
+    let transport = match c.protocol {
+        Protocol::Tcp => Transport::Tcp,
+        Protocol::Tls => Transport::Tls(tls_config()?),
+        Protocol::Ws => Transport::Ws,
+        Protocol::Wss => Transport::Wss(tls_config()?),
+    };
+    opts.set_transport(transport);
+    if let Some((u, p)) = &c.credentials {
+        opts.set_credentials(u, p);
+    }
+    opts.set_keep_alive(c.keep_alive);
+    opts.set_max_packet_size(MQTT_MAX_PACKET, MQTT_MAX_PACKET);
+    Ok(opts)
 }
 
 /// Server certificates are checked against the system's CA
@@ -160,6 +209,7 @@ async fn read_loop(
     url: String,
     stopping: Arc<AtomicBool>,
     pending: Arc<Mutex<VecDeque<Vec<String>>>>,
+    lost: Arc<Lost>,
 ) {
     loop {
         match eventloop.poll().await {
@@ -191,6 +241,7 @@ async fn read_loop(
             Err(e) => {
                 if !stopping.load(Ordering::SeqCst) {
                     tracing::warn!(%url, %e, "lost the connection to the MQTT server");
+                    lost.set();
                     handle.disconnected(ConnectError::ConnectionFailed);
                 }
                 return;
@@ -209,6 +260,10 @@ impl Handler for MqttHandler {
     /// A write is published to the address's topic, and reported
     /// written once the client has taken it.
     const TYPED_WRITES: bool = true;
+
+    /// A scan listens on the broker with a second client. See
+    /// [`crate::scout`].
+    const SCOUTS: bool = true;
 
     fn create(
         handle: DriverHandle<String>,
@@ -267,12 +322,14 @@ impl Handler for MqttHandler {
 
         let stopping = Arc::new(AtomicBool::new(false));
         let pending = Arc::new(Mutex::new(VecDeque::new()));
+        let lost = Arc::new(Lost::default());
         let task = tokio::spawn(read_loop(
             eventloop,
             self.handle.clone(),
             url,
             stopping.clone(),
             pending.clone(),
+            lost.clone(),
         ));
         self.session = Some(Session {
             client,
@@ -280,12 +337,27 @@ impl Handler for MqttHandler {
             stopping,
             subscribed: BTreeSet::new(),
             pending,
+            lost,
         });
         Ok(())
     }
 
     async fn close(&mut self) {
         self.stop().await;
+    }
+
+    /// A scan opens its own connection with the same details, so it
+    /// needs only those. It is offered only while the driver is
+    /// connected, so a broker the driver can't reach gives `CONN`. The
+    /// scan watches this connection and stops with `CONN` if it is
+    /// lost. See [`Lost`].
+    fn scouter(&self) -> Option<Arc<dyn Scouter>> {
+        let s = self.session.as_ref()?;
+        Some(Arc::new(MqttScouter::new(
+            self.conf.clone(),
+            self.client_id.clone(),
+            s.lost.clone(),
+        )))
     }
 
     /// Called with every address after each connect and each new

@@ -11,10 +11,14 @@
 //! - [`config`] reads the connection details;
 //! - [`topics`] works out which topic filters to subscribe to;
 //! - [`write`] makes the payload for a write;
+//! - [`survey`] turns what a scan heard into scout items;
+//! - [`scout`] runs a scan on its own connection to the broker;
 //! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait.
 
 pub mod config;
 pub mod handler;
+pub mod scout;
+pub mod survey;
 pub mod topics;
 pub mod write;
 

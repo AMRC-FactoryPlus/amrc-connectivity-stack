@@ -49,7 +49,8 @@ REGISTRY_MIRROR=
 
 # An apt mirror to use instead of the Ubuntu archive. Leave empty to keep
 # the Ubuntu sources. If set, APT_MIRROR_KEY_SHA256 must be the SHA-256 of
-# <APT_MIRROR>/keyring.gpg.
+# <APT_MIRROR>/keyring.gpg. The mirror should carry the -updates and
+# -security suites as well as the release, or gateways get no updates.
 APT_MIRROR=
 APT_MIRROR_KEY_SHA256=
 

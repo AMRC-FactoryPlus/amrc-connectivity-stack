@@ -8,11 +8,29 @@
       <CardTitle class="text-2xl">
         Welcome to ACS!
       </CardTitle>
-      <CardDescription>
+      <CardDescription v-if="oidc">
+        Sign in with your Factory+ account
+      </CardDescription>
+      <CardDescription v-else>
         Enter your details below to login to your account
       </CardDescription>
     </CardHeader>
-    <CardContent>
+    <CardContent v-if="oidc">
+      <div class="grid gap-4">
+        <p v-if="s.sign_in_error" role="alert" class="text-sm text-red-600">{{ s.sign_in_error }}</p>
+        <div class="flex items-center gap-3">
+          <Checkbox id="verbose" v-model="verbose" />
+          <label for="verbose" class="text-sm font-medium cursor-pointer">Verbose logging</label>
+        </div>
+        <Button :disabled="loggingIn" @click="sign_in" type="submit" class="w-full">
+          <div v-if="!loggingIn">Sign in</div>
+          <div v-else class="flex items-center justify-center">
+            <i class="fa-solid fa-circle-notch animate-spin"></i>
+          </div>
+        </Button>
+      </div>
+    </CardContent>
+    <CardContent v-else>
       <div class="grid gap-4">
         <div class="grid gap-2">
           <Label for="username">Username</Label>
@@ -56,6 +74,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { oidc_session } from '@/lib/oidc.js'
+import { save_login } from '@/lib/saved-login.js'
 import {toast} from "vue-sonner";
 
 export default {
@@ -77,6 +97,7 @@ export default {
   setup () {
     return {
       s: useServiceClientStore(),
+      oidc: oidc_session(),
     }
   },
 
@@ -91,6 +112,14 @@ export default {
   },
 
   methods: {
+    // With Keycloak: keep the Verbose setting for this tab, then go to
+    // Keycloak, which comes back to the Admin signed in.
+    async sign_in () {
+      this.loggingIn = true
+      save_login({ verbose: this.verbose ? "ALL" : (import.meta.env.VERBOSE ?? "") })
+      await this.oidc.start_sign_in("/")
+    },
+
     async login () {
       this.loggingIn = true
       try{

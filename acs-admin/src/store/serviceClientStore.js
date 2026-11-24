@@ -15,7 +15,9 @@ export const useServiceClientStore = defineStore('service-client', {
       scheme: null,
       baseUrl: null,
       urls: {},
-      ready: false
+      ready: false,
+      // Why the last sign-in failed, for the sign-in page to show
+      sign_in_error: null,
     }
   },
   actions: {
@@ -38,6 +40,19 @@ export const useServiceClientStore = defineStore('service-client', {
         this.logout();
         throw e;
       }
+    },
+
+    // Sign in with a Keycloak session (see lib/oidc.js). The service
+    // client asks the session for a token on each request, so nothing
+    // here holds a password.
+    async login_oidc (session, opts = {}) {
+      await this.login({
+        directory_url: import.meta.env.SCHEME + '://directory.' + import.meta.env.BASEURL,
+        browser: true,
+        verbose: opts.verbose ?? (import.meta.env.VERBOSE ?? ""),
+        username: session.username,
+        bearer_jwt: bad => session.token(bad),
+      });
     },
 
     logout () {

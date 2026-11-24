@@ -151,6 +151,7 @@ export const ACS = {
         Pathfindr:              "6f971ef5-c3d7-4222-9254-d8f02f91c1f7",
         Sim:                    "da866ba6-cd0e-491b-a780-19466723b23f",
         FTP:                    "f9af82a7-0c2b-45f9-b259-9d64973ff473",
+        Focas:                  "435d4769-13fc-4aa5-8645-87a1c3939618",
 
         /* External driver */
         External:               "eb669a2c-e213-11ef-998e-a7fc6f4817b5",

@@ -65,6 +65,7 @@ objects:
     !u ACS.Driver.MQTTSplit:        { name: "MQTT" }
     !u ACS.Driver.OPCUASplit:       { name: "OPC-UA" }
     !u ACS.Driver.UDPSplit:         { name: "UDP" }
+    !u ACS.Driver.Focas:            { name: "FANUC FOCAS" }
 
 configs:
   # Driver Definition Configuration
@@ -166,6 +167,45 @@ configs:
         required:
           - host
         title: Modbus Connection Details
+        type: object
+    !u ACS.Driver.Focas:
+      polled: true
+      presentation:
+        address:
+          title: "FOCAS Read"
+          description: "What to read: sysinfo, status, alarm, program, speeds, position, macro:<n>, param:<n>[:<axis>] or pmc:<area><n>[:byte|word|long] (e.g. pmc:D100:word). Every read answers with JSON, so set the payload format to JSON."
+          icon: "gears"
+          placeholder: "e.g. position"
+        path:
+          title: "JSON Path"
+          description: "Where the value sits in the JSON the read answers with, e.g. $.absolute[0] for the first axis of a position read, or $.value for a macro variable"
+          icon: "code"
+          placeholder: "e.g. $.absolute[0]"
+      image:
+        repository: edge-focas
+      schema:
+        properties:
+          host:
+            minLength: 1
+            title: Hostname/IP
+            type: string
+            options:
+              order: 1
+          port:
+            default: 8193
+            title: Port
+            type: number
+            options:
+              order: 2
+          timeout:
+            default: 5000
+            title: Timeout (ms)
+            type: number
+            options:
+              order: 3
+        required:
+          - host
+        title: FANUC FOCAS Connection Details
         type: object
     !u ACS.Driver.Test:
       polled: true

@@ -61,7 +61,8 @@ export class APIv2 {
 
         api.get("/whoami", this.id_whoami.bind(this));
         api.get("/whoami/uuid", this.id_whoami_uuid.bind(this));
-    
+        api.get("/whoami/acl", this.id_whoami_acl.bind(this));
+
         return api;
     }
 
@@ -296,5 +297,14 @@ export class APIv2 {
         const uuid = await this._whoami_uuid(req);
         if (!uuid) fail(404);
         return res.status(200).json(uuid);
+    }
+
+    /* No auth check: the caller's own ACL, so a client can show only
+     * the actions its user may take. Reading another principal's ACL
+     * still needs ReadACL. */
+    async id_whoami_acl (req, res) {
+        const own = await rx.firstValueFrom(
+            this.data.track_own_acl(req.auth));
+        return res.status(200).json(own);
     }
 }

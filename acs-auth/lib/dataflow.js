@@ -311,6 +311,28 @@ export class DataFlow {
         return rx.firstValueFrom(this.track_kerberos(upn));
     }
 
+    /** Track the caller's own ACL.
+     * This needs no ReadACL: a principal may always see what it is
+     * allowed to do, so that a client can offer only those actions.
+     * `root` is true for the root principal, whose access does not
+     * show in its ACL.
+     * @param caller A principal UUID (JWT) or Kerberos UPN
+     * @returns A seq of {principal, root, acl}
+     */
+    track_own_acl (caller) {
+        const root = this.root != null && caller == this.root;
+        const principal$ = valid_uuid(caller)
+            ? rx.of(caller)
+            : this.track_kerberos(caller);
+        return rxx.rx(
+            principal$,
+            rx.switchMap(p => !p
+                ? rx.of({ principal: null, root, acl: [] })
+                : rxx.rx(
+                    this.acl_for(p),
+                    rx.map(acl => ({ principal: p, root, acl: acl ?? [] })))));
+    }
+
     /** Backend for the v2 `principal/:uuid/groups` endpoint.
      *
      * Returns the UUIDs of all principal-groups (subclasses of

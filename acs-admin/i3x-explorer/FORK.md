@@ -338,6 +338,22 @@ upstream, so they are not tied to the Manager UI.
     which returns null outside the provider, for components rendered on
     their own in tests. Tests in `src/acs/useSubscribe.test.ts` and
     `src/acs/rowSubscribe.test.tsx`.
+20. **Subscribing to an ISA-95 level** (`src/acs/levelSubscribe.ts`,
+    `src/acs/useSubscribe.ts`): subscribing to a level subscribes to
+    the devices under it. i3X 1.0 `maxDepth` recurses through
+    HasComponent only, so a registration on a level (which has no value,
+    and whose devices are HasChildren, not components) delivers nothing,
+    and its row used to sit on "Waiting…" for ever. A level is an object
+    of type `isa95-level`, or any other object that is not a composition
+    but has children. The Explorer walks down from it through the
+    hierarchy it holds, takes the first composition on each branch (a
+    device), and subscribes to each one as if it were clicked, at the
+    whole-tree depth. A metric that sits in a level outside any device is
+    subscribed on its own. With more than 25 to subscribe to it asks
+    first. A level with nothing under it says so instead of waiting, and
+    when some fail the rest are still subscribed and the failures are
+    listed together. The level itself is not registered, so its button
+    does not turn green. Tests in `src/acs/levelSubscribe.test.ts`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

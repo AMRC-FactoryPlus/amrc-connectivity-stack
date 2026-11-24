@@ -2,7 +2,8 @@
 // per-row Subscribe buttons, so both behave the same. Upstream had this inline
 // in ObjectDetailView's handleSubscribe; it moved here unchanged apart from
 // running one subscribe at a time, so quick clicks on several rows add to one
-// subscription instead of each creating its own.
+// subscription instead of each creating its own. Subscribing to an ISA-95 level
+// subscribes to the devices under it (levelSubscribe.ts).
 
 import { useCallback } from 'react'
 import { create } from 'zustand'
@@ -13,6 +14,7 @@ import { useExplorerStore } from '../stores/explorer'
 import { registerItem } from '../components/subscriptions/registerItem'
 import { useOptionalSubscriptionTransport } from '../components/subscriptions/SubscriptionTransport'
 import { objectPath } from '../components/main/navigation'
+import { confirmMessage, countLabel, isLevel, LEVEL_CONFIRM_DEVICES, targetsUnder } from './levelSubscribe'
 
 type SubscribeTarget = Pick<ObjectInstance, 'elementId' | 'displayName' | 'isComposition'>
 
@@ -115,9 +117,62 @@ async function subscribeNow(
   value: LastKnownValue | null | undefined,
   startStream: StartStream | null
 ): Promise<void> {
+  if (!getClient()) throw new Error('Not connected to a server')
+  if (!startStream) throw new Error('Subscriptions are not available here')
+
+  // An ISA-95 level has no value and its devices are not its components, so a
+  // registration on it would deliver nothing. Subscribe to its devices instead.
+  const explorer = useExplorerStore.getState()
+  if (isLevel(object, explorer)) {
+    await subscribeLevel(object, targetsUnder(object.elementId, explorer), startStream)
+    return
+  }
+  await subscribeOne(object, value, startStream)
+}
+
+/**
+ * Subscribes to each device under a level (and any metric outside a device),
+ * one after another, asking first when there are many. Those already subscribed
+ * are left as they are. One that fails does not stop the rest; the failures are
+ * reported together.
+ */
+async function subscribeLevel(
+  level: SubscribeTarget,
+  targets: ObjectInstance[],
+  startStream: StartStream
+): Promise<void> {
+  if (targets.length === 0) {
+    throw new Error(`${level.displayName} has no devices under it to subscribe to`)
+  }
+  if (targets.length > LEVEL_CONFIRM_DEVICES && !window.confirm(confirmMessage(level.displayName, targets))) {
+    return
+  }
+
+  const failed: string[] = []
+  for (const target of targets) {
+    try {
+      await subscribeOne(target, null, startStream)
+    } catch (err) {
+      const name = objectPath(target.elementId, useExplorerStore.getState().objectIndex) ?? target.displayName
+      failed.push(`${name}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  if (failed.length > 0) {
+    const total = countLabel(targets).replace(/^\d+ /, '')
+    throw new Error(
+      `Subscribed to ${targets.length - failed.length} of ${targets.length} ${total} under ${level.displayName}. ` +
+      `Failed: ${failed.join('; ')}`
+    )
+  }
+}
+
+async function subscribeOne(
+  object: SubscribeTarget,
+  value: LastKnownValue | null | undefined,
+  startStream: StartStream
+): Promise<void> {
   const client = getClient()
   if (!client) throw new Error('Not connected to a server')
-  if (!startStream) throw new Error('Subscriptions are not available here')
 
   // Already listed: nothing to register, show it.
   if (isElementSubscribed(useSubscriptionsStore.getState(), object.elementId)) {

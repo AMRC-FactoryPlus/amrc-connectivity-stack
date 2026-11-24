@@ -37,9 +37,9 @@ const object = (elementId: string, displayName: string, parentId: string | null,
   ...extra,
 })
 
-// Line 1 holds Press 3 (a container of Spindle speed) and Robot 2 (a metric).
+// Line 1 holds Press 3 (a device, holding Spindle speed) and Robot 2 (a metric).
 const line = object('line-1', 'Line 1', null)
-const press = object('press-3', 'Press 3', 'line-1')
+const press = object('press-3', 'Press 3', 'line-1', { isComposition: true })
 const robot = object('robot-2', 'Robot 2', 'line-1')
 const spindle = object('spindle', 'Spindle speed', 'press-3')
 
@@ -129,7 +129,7 @@ describe('Current value table', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /Press 3 is subscribed/ })).toBeTruthy())
     expect(server.create).toHaveBeenCalledTimes(1)
-    expect(server.register).toHaveBeenCalledWith('sub-1', ['press-3'], 1)
+    expect(server.register).toHaveBeenCalledWith('sub-1', ['press-3'], 0)
     expect(startStream).toHaveBeenCalledWith('sub-1')
     expect(useSubscriptionsStore.getState().isSubscriptionsOpen).toBe(true)
     // The row's name was not clicked, so nothing was opened.
@@ -173,7 +173,7 @@ describe('Relationship list', () => {
     fireEvent.click(button)
 
     await waitFor(() => expect(screen.getByRole('button', { name: /Press 3 is subscribed/ })).toBeTruthy())
-    expect(server.register).toHaveBeenCalledWith('sub-1', ['press-3'], 1)
+    expect(server.register).toHaveBeenCalledWith('sub-1', ['press-3'], 0)
     expect(onSelect).not.toHaveBeenCalled()
   })
 })

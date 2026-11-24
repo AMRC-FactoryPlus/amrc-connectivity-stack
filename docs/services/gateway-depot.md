@@ -148,6 +148,7 @@ A gateway looks like this. Fields appear as it progresses.
   "remote_ip": "10.31.4.57",
   "approved_by": "alice@REALM",
   "approved_at": 1795082400000,
+  "install_started_at": 1795082410000,
   "installed_at": 1795083300000,
   "ready_at": 1795086000000,
   "onboarded_at": 1795086400000,
@@ -200,6 +201,7 @@ gateway's secret in the request body.
 | --- | --- | --- |
 | `POST` | `box/scout` | Registers a waiting machine, or collects its installer settings once it is approved |
 | `POST` | `box/:id/checkin` | Reports what an installed gateway is doing, and collects a job |
+| `POST` | `box/:id/progress/:token` | The Ubuntu installer's webhook. Each event goes into the gateway's log, and the latest step becomes `install_step`. The token comes with the installer settings, lives only in memory and only works while the gateway installs |
 | `GET` | `payload/gateway-:sha.tar.gz` | The setup scripts |
 | `GET` | `payload/k3s-:arch` | The K3s binary |
 | `GET` | `payload/depot-stick-amd64.iso` | The depot stick, for a browser to download. It holds no settings and no secrets |
@@ -252,8 +254,10 @@ Set these under `gatewayDepot` in the ACS Helm values.
 ## The depot stick
 
 Download the depot stick from the Gateway Depot page of the Admin UI and
-write it to a USB stick. A machine booted from it does not touch its
-disk until someone approves it.
+write it to a USB stick. With no gateways yet, the page shows a download
+button. Once there are gateways, the download is in the menu beside
+View. A machine booted from it does not touch its disk until someone
+approves it.
 
 The chart builds the stick. A Job runs `stick/bake.sh` on every install
 and upgrade. It downloads the Ubuntu Server image, checks it against a

@@ -99,6 +99,7 @@ import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 
 import { devices, drafts, schemas } from './fixtures.js'
 import { target as i3xTarget } from './i3x-fixtures.js'
+import { nodes as isa95Nodes } from './isa95-fixtures.js'
 
 export default {
   name: 'Preview',
@@ -113,6 +114,54 @@ export default {
     return {
       drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
       placementA: [], placementB: [], settling: false,
+    }
+  },
+
+  /* `demo` sets up an ISA-95 state for screenshots, by driving the
+   * page the way a user would:
+   *   isa95&demo=duplicate     the tree, open, with a duplicate selected
+   *   isa95&demo=add           adding an Area that already exists
+   *   isa95-picker&demo=warning  the picker's duplicate warning */
+  async mounted () {
+    const demo = this.$route.query.demo
+    if (!demo) return
+    const wait = ms => new Promise(r => setTimeout(r, ms))
+    const row = name => [...document.querySelectorAll('[role=treeitem]')]
+      .find(e => e.getAttribute('aria-label').startsWith(name + ','))
+    const button = text => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === text)
+    const type = async (input, text) => {
+      input.focus()
+      input.value = text
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await wait(300)
+    }
+    const key = (el, k) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }))
+    await wait(500)
+
+    if (this.surface === 'isa95') {
+      button('Expand all')?.click()
+      await wait(200)
+      if (demo === 'duplicate') row('NW')?.click()
+      if (demo === 'add') {
+        const r = row('South Works')
+        r?.click()
+        await wait(100)
+        r?.querySelector('button[title^="Add"]')?.click()
+        await wait(200)
+        const input = document.activeElement
+        await type(input, 'Machining')
+        key(input, 'Enter')
+      }
+    }
+
+    if (this.surface === 'isa95-picker' && demo === 'warning') {
+      this.placementB = [isa95Nodes[0].uuid]
+      await wait(300)
+      const site = document.querySelectorAll('input[role=combobox]')[6]
+      await type(site, 'North-Works')
+      key(site, 'ArrowDown')
+      await wait(100)
+      key(site, 'Enter')
     }
   },
 

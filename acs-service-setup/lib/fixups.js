@@ -8,6 +8,7 @@ import * as k8s from "@kubernetes/client-node";
 import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 
 import { ACS, Auth, Clusters } from "./uuids.js";
+import { remove_dataset_maker } from "./remove-dataset-maker.js";
 
 const APIVERSION = "factoryplus.app.amrc.co.uk/v1";
 const ACCUUID = "krbkeys.factoryplus.app.amrc.co.uk/account-uuid";
@@ -20,6 +21,7 @@ export async function fixups (ss, local) {
     const { fplus } = ss;
 
     await delete_old_entries(fplus);
+    await remove_dataset_maker(fplus);
     await new FixupAccounts(fplus, local).run();
 
     return;

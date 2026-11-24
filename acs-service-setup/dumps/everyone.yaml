@@ -1,0 +1,47 @@
+#-REQUIRE: auth isa95 eng-units data-access
+# Grants to every principal.
+#
+# A dump load replaces every grant of each principal it names, and each
+# file loads on its own, so two files that both grant to the Principal
+# class remove each other's grants. Every grant to the Principal class
+# lives here, and nowhere else.
+---
+service: !u UUIDs.Service.Authentication
+version: 2
+grants:
+  !u Auth.Class.Principal:
+    !u UUIDs.Permission.ConfigDB.ReadConfig:
+      # The ISA-95 vocabulary: the Manager UI offers it in the
+      # placement dropdowns for device configurers.
+      !u UUIDs.App.ISA95Vocabulary: false
+      # Placements are no more sensitive than the vocabulary, and the
+      # Manager UI shows them beside every device.
+      !u UUIDs.App.ISA95Placement: false
+      # Engineering units: the Manager UI offers them when editing
+      # metrics, and i3X resolves units through them.
+      !u UUIDs.App.EngineeringUnit: false
+      # The Admin UI names datasets, devices and people from these.
+      !u DataAccess.App.DatasetMetadata: true
+      !u UUIDs.App.Info: false
+      !u UUIDs.App.Registration: false
+
+    # Anyone may make a dataset from the sources they hold permission
+    # on (Build datasets from device, Include in union, Use for
+    # session), and Data Access records them as its owner. These let
+    # them read, use, edit and delete what they made, and nothing
+    # else: Special.Mine covers only the datasets a principal owns.
+    !u DataAccess.Perm.ReadDataset:
+      !u UUIDs.Special.Mine: true
+    !u DataAccess.Perm.IncludeInUnion:
+      !u UUIDs.Special.Mine: true
+    !u DataAccess.Perm.UseForSession:
+      !u UUIDs.Special.Mine: true
+    !u DataAccess.Perm.EditDataset:
+      !u UUIDs.Special.Mine: true
+    !u DataAccess.Perm.DeleteDataset:
+      !u UUIDs.Special.Mine: true
+
+    # The kiosk's recording lock sits on the equipment, and any operator
+    # at the machine starts and stops it, so it is a direct write.
+    !u UUIDs.Permission.ConfigDB.WriteConfig:
+      !u DataAccess.App.Recording: false

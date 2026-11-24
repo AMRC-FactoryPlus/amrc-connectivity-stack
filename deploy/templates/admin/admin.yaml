@@ -13,6 +13,11 @@ data:
     {{- if .Values.briefcase.enabled }}
     BRIEFCASE_EXPORTER=true
     {{- end }}
+    {{- if and .Values.openid.enabled (dig "admin" "enabled" false .Values.serviceSetup.config.openidClients) }}
+    OPENID_URL={{ include "amrc-connectivity-stack.external-url" (list . "openid") }}
+    OPENID_REALM={{ .Values.openid.realm }}
+    OPENID_CLIENT=admin
+    {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -31,12 +36,11 @@ spec:
       labels:
         component: admin
         factory-plus.service: admin
-      {{- if .Values.briefcase.enabled }}
       # The console reads its .env only when it starts, so turning the
-      # briefcase exporter on or off has to restart it.
+      # briefcase exporter or Keycloak sign-in on or off has to restart it.
       annotations:
-        factoryplus.app.amrc.co.uk/briefcase-exporter: "true"
-      {{- end }}
+        factoryplus.app.amrc.co.uk/briefcase-exporter: {{ .Values.briefcase.enabled | toString | quote }}
+        factoryplus.app.amrc.co.uk/openid-sign-in: {{ and .Values.openid.enabled (dig "admin" "enabled" false .Values.serviceSetup.config.openidClients) | toString | quote }}
     spec:
       {{- with .Values.acs.imagePullSecrets }}
       imagePullSecrets:

@@ -66,6 +66,11 @@ export class APIv1 {
          * made up when it first called. */
         api.post("/box/scout", this.wrap(this.scout));
         api.post("/box/:id/checkin", this.wrap(this.checkin));
+        /* The Ubuntu installer's webhook. It may not say its body is
+         * JSON, so read anything the JSON parser left as text. */
+        api.post("/box/:id/progress/:token",
+            express.text({ type: () => true, limit: "64kb" }),
+            this.wrap(this.progress));
         api.get("/payload/gateway-:sha.tar.gz", this.wrap(this.archive));
         api.get("/payload/k3s-:arch", this.wrap(this.k3s));
         /* The depot stick holds no settings and no secrets, and a
@@ -87,6 +92,16 @@ export class APIv1 {
 
     checkin (req) {
         return this.depot.checkin(req.params.id, req.body ?? {}, remote_ip(req));
+    }
+
+    progress (req, res) {
+        let event = req.body;
+        if (typeof event == "string") {
+            try { event = JSON.parse(event); }
+            catch { throw new DepotError(400, "A progress report must be JSON."); }
+        }
+        this.depot.progress(req.params.id, req.params.token, event ?? {});
+        res.status(204).end();
     }
 
     archive (req, res) {

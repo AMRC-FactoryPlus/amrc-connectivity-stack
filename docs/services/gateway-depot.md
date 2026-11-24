@@ -201,6 +201,7 @@ gateway's secret in the request body.
 | --- | --- | --- |
 | `POST` | `box/scout` | Registers a waiting machine, or collects its installer settings once it is approved |
 | `POST` | `box/:id/checkin` | Reports what an installed gateway is doing, and collects a job |
+| `POST` | `box/:id/progress/:token` | The Ubuntu installer's webhook. Each event goes into the gateway's log, and the latest step becomes `install_step`. The token comes with the installer settings, lives only in memory and only works while the gateway installs |
 | `GET` | `payload/gateway-:sha.tar.gz` | The setup scripts |
 | `GET` | `payload/k3s-:arch` | The K3s binary |
 | `GET` | `payload/depot-stick-amd64.iso` | The depot stick, for a browser to download. It holds no settings and no secrets |
@@ -254,8 +255,9 @@ Set these under `gatewayDepot` in the ACS Helm values.
 
 Download the depot stick from the Gateway Depot page of the Admin UI and
 write it to a USB stick. With no gateways yet, the page shows a download
-button. Once there are gateways, the download is in the menu beside View. A machine booted from it does not touch its
-disk until someone approves it.
+button. Once there are gateways, the download is in the menu beside
+View. A machine booted from it does not touch its disk until someone
+approves it.
 
 The chart builds the stick. A Job runs `stick/bake.sh` on every install
 and upgrade. It downloads the Ubuntu Server image, checks it against a

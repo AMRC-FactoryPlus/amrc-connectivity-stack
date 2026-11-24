@@ -212,6 +212,42 @@ test("approval puts the gateway on record and hands its settings to it once", as
     assert.equal(depot.list()[0].state, State.Installing);
 });
 
+test("the installer's progress reports show as the install step and log", async () => {
+    const { cdb, depot } = await setup();
+    const m = machine();
+    depot.scout(m, "10.0.0.5");
+    await depot.approve(m.id, SETTINGS, "alice@R");
+    const ai = depot.scout(m, "10.0.0.5").autoinstall.autoinstall;
+
+    assert.equal(ai.reporting.builtin.type, "print");
+    const url = new URL(ai.reporting.depot.endpoint);
+    assert.equal(url.origin, "https://depot.example");
+    const [, , , id, , token] = url.pathname.split("/");
+    assert.equal(id, m.id);
+
+    const ev = (event_type, name, description, more = {}) =>
+        ({ event_type, name, description, origin: "curtin", timestamp: 1, ...more });
+    depot.progress(id, token, ev("start", "subiquity/Install/install/curtin_install", "installing system"));
+    depot.progress(id, token, ev("start", "subiquity/Meta/status_GET", "status"));
+    depot.progress(id, token, ev("finish", "subiquity/Install/install/postinstall/x", "configuring cloud-init", { result: "FAIL" }));
+
+    const gw = depot.list()[0];
+    assert.equal(gw.install_step, "installing system");
+    assert.match(gw.log, /start: installing system\n/);
+    assert.match(gw.log, /finish: configuring cloud-init \(FAIL\)/);
+    assert.doesNotMatch(gw.log, /status/);
+    assert.equal(gw.progress_hash, undefined);
+
+    assert.throws(() => depot.progress(id, "wrong", ev("start", "a/b", "c")),
+        e => e.status == 403);
+    assert.ok(!JSON.stringify([...cdb.configs.values()]).includes("installing system"));
+
+    /* Once it has installed, late reports change nothing. */
+    depot.checkin(m.id, { secret: m.secret, phase: "installed" }, "10.0.0.5");
+    depot.progress(id, token, ev("start", "subiquity/Install/x", "late"));
+    assert.equal(depot.list()[0].install_step, "installing system");
+});
+
 test("a gateway is reloaded from the ConfigDB after a restart", async () => {
     const first = await setup();
     const m = machine();

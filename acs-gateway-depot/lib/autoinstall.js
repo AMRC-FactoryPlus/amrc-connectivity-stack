@@ -52,7 +52,7 @@ function write_file (target, content, mode) {
 }
 
 export function build_autoinstall (opts) {
-    const { box, settings, payload, public_url } = opts;
+    const { box, settings, payload, public_url, progress_token } = opts;
     const k3s = payload.k3s_for(box.inventory.arch);
     const curl = "curl -fsS --retry 5 --retry-delay 3"
         + (settings.has_ca ? " --cacert /cdrom/fplus-gw/ca.pem" : "");
@@ -77,6 +77,17 @@ export function build_autoinstall (opts) {
             apt:        { fallback: "offline-install" },
             updates:    "security",
             shutdown:   "poweroff",
+            /* Keep the installer's own screen output, and also post each
+             * event to the depot so the Admin UI can show progress. A
+             * failed post is logged by the installer and ignored. */
+            ...(progress_token ? { reporting: {
+                builtin:    { type: "print" },
+                depot:      {
+                    type:       "webhook",
+                    endpoint:   `${public_url}/v1/box/${box.id}/progress/${progress_token}`,
+                    level:      "INFO",
+                },
+            } } : {}),
             "late-commands": [
                 "mkdir -p /target/opt/fplus-gw/payload /target/etc/fplus-gw",
                 "chmod 700 /target/etc/fplus-gw",

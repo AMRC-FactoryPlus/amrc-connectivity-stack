@@ -9,6 +9,7 @@ import express from "express";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 //import { Clusters }         from "./clusters.js";
+import { NodeDelete }       from "./node-delete.js";
 import { SealedSecrets }    from "./secrets.js";
 import { Edge }             from "./uuids.js";
 
@@ -23,6 +24,7 @@ export class EdgeDeploy {
         this.routes = express.Router();
 
         this.secrets = new SealedSecrets(opts);
+        this.node_delete = opts.node_delete ?? new NodeDelete(opts);
     }
 
     wrap (fn) {
@@ -51,6 +53,10 @@ export class EdgeDeploy {
         app.route("/cluster/:cluster/secret/:namespace/:name/:key")
             .put(this.wrap(this.seal_secret))
             .delete(this.wrap(this.delete_sealed_secret));
+        app.route("/cluster/:cluster/node/:node")
+            .delete(this.wrap(this.delete_node));
+        app.get("/cluster/:cluster/node/:node/delete",
+            this.wrap(this.node_delete_plan));
 
         return this;
     }
@@ -170,5 +176,39 @@ export class EdgeDeploy {
 
         const st = await this.secrets.delete_secret(opts);
         res.status(st).end();
+    }
+
+    /* Deleting a node removes its connections and devices too, so it
+     * needs Manage clusters on the node's cluster. The Admin UI asks
+     * here first, to decide whether to offer Delete and to list what
+     * would go. Anyone may ask; only the answer for them is given. */
+    async node_delete_plan (req, res) {
+        const { cluster, node } = req.params;
+
+        const ok = await this.fplus.Auth.check_acl(
+            req.auth, Edge.Perm.Clusters, cluster, true);
+        if (!ok) return res.status(200).json({ allowed: false });
+
+        const plan = await this.node_delete.plan(cluster, node);
+        if (plan === null) return res.status(404).end();
+        if (plan === false) return res.status(409).end();
+
+        const { deployment, ...view } = plan;
+        return res.status(200).json({ allowed: true, ...view });
+    }
+
+    async delete_node (req, res) {
+        const { cluster, node } = req.params;
+
+        const ok = await this.fplus.Auth.check_acl(
+            req.auth, Edge.Perm.Clusters, cluster, true);
+        if (!ok) return res.status(403).end();
+
+        const plan = await this.node_delete.plan(cluster, node);
+        if (plan === null) return res.status(404).end();
+        if (plan === false) return res.status(409).end();
+
+        this.node_delete.start(plan, req.auth);
+        return res.status(202).end();
     }
 }

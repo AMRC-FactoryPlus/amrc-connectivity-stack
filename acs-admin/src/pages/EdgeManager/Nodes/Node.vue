@@ -137,6 +137,13 @@
           </SidebarDetail>
 
         </div>
+        <!-- Only for people the Cluster Manager says may delete it. -->
+        <div v-if="deletePlan.allowed" class="p-4 border-t">
+          <Button variant="destructiveOutline" size="sm" class="w-full gap-2" :disabled="deleting" @click="deleteNode">
+            <i :class="deleting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-trash'"></i>
+            Delete node
+          </Button>
+        </div>
       </div>
     </div>
   </EdgeContainer>
@@ -171,6 +178,10 @@ import StaleHostPill from '@components/EdgeManager/Nodes/StaleHostPill.vue'
 import { staleHostWarning } from '@utils/hosts.js'
 import moment from 'moment'
 import { toast } from 'vue-sonner'
+import { useDialog } from '@/composables/useDialog'
+import { useServiceClientStore } from '@store/serviceClientStore.js'
+import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { delete_lines, delete_node, node_delete_plan } from '@/lib/node-delete.js'
 
 export default {
   components: {
@@ -224,9 +235,21 @@ export default {
     this.isa95.start();
   },
 
+  watch: {
+    /* Ask again whenever the page shows a different node. */
+    deleteKey: {
+      immediate: true,
+      handler () { this.loadDeletePlan() },
+    },
+  },
+
   computed: {
     node () {
       return this.n.data.find(e => e.uuid === this.$route.params.nodeuuid)
+    },
+
+    deleteKey () {
+      return `${this.node?.deployment?.cluster ?? ''}/${this.node?.uuid ?? ''}`
     },
 
     nodeLoading () {
@@ -323,6 +346,59 @@ export default {
         existingConnection: e.original
       })
     },
+
+    /* Ask the Cluster Manager whether this person may delete the node,
+     * and what would go with it. */
+    async loadDeletePlan () {
+      const cluster = this.node?.deployment?.cluster
+      const uuid = this.node?.uuid
+      if (!cluster || !uuid) {
+        this.deletePlan = { allowed: false }
+        return
+      }
+      await serviceClientReady()
+      const plan = await node_delete_plan(useServiceClientStore().client, cluster, uuid)
+      /* The page may have moved on to another node meanwhile. */
+      if (this.node?.uuid === uuid) this.deletePlan = plan
+    },
+
+    async deleteNode () {
+      const cluster = this.node.deployment?.cluster
+      const name = this.node.name
+      /* Show what is there now, not what was there when the page opened. */
+      await this.loadDeletePlan()
+      if (!this.deletePlan.allowed) {
+        toast.error('You can no longer delete this node.')
+        return
+      }
+      useDialog({
+        title: 'Delete this node?',
+        message: `${name} on ${this.cluster ?? 'its cluster'}. You cannot undo this.`,
+        details: delete_lines(this.deletePlan),
+        confirmText: 'Delete node',
+        onConfirm: async () => {
+          this.deleting = true
+          try {
+            await delete_node(useServiceClientStore().client, cluster, this.node.uuid)
+            toast.success(`Deleting ${name}. It leaves the cluster within a minute or two.`)
+            this.$router.push({ name: 'Cluster', params: { clusteruuid: cluster } })
+          }
+          catch (err) {
+            toast.error(err.message)
+          }
+          finally {
+            this.deleting = false
+          }
+        },
+      })
+    },
+  },
+
+  data () {
+    return {
+      deletePlan: { allowed: false },
+      deleting: false,
+    }
   },
 }
 </script>

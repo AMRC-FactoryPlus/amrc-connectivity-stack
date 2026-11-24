@@ -6,7 +6,7 @@
   <!-- Labelled, the button says what it does; a tooltip would only
      - repeat it. Icon-only in a table row, it needs one. -->
   <Button
-      v-if="labelled"
+      v-if="allowed && labelled"
       size="xs"
       variant="outline"
       class="flex items-center justify-center gap-1.5 hover:bg-gray-800 hover:text-white"
@@ -16,7 +16,7 @@
     <i class="fa-solid fa-right-left text-xs"></i>
     Move
   </Button>
-  <TooltipProvider v-else>
+  <TooltipProvider v-else-if="allowed">
     <Tooltip>
       <TooltipTrigger as-child>
         <Button
@@ -38,6 +38,9 @@
 <script>
 import { Button } from '@components/ui/button/index.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_move_host } from '@/lib/access/perms-edge.js'
+import { useConnectionStore } from '@store/useConnectionStore.js'
 
 export default {
   name: 'MoveHostButton',
@@ -53,6 +56,19 @@ export default {
     deployment: { type: Object, required: true },
     /* Sidebars have room for the word; table rows do not. */
     labelled: { type: Boolean, default: false },
+  },
+
+  setup () {
+    return { access: useAccessStore(), cn: useConnectionStore() }
+  },
+
+  computed: {
+    /* A move patches the deployment, and for a node its connections. */
+    allowed () {
+      const conns = Array.isArray(this.cn.data) ? this.cn.data : []
+      const has_connections = conns.some(e => e.configuration?.edgeAgent === this.uuid)
+      return can_move_host(this.access.check, this.kind, has_connections)
+    },
   },
 
   methods: {

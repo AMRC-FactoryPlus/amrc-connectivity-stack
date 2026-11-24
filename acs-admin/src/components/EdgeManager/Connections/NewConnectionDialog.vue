@@ -128,7 +128,7 @@
         <div class="flex w-full items-center justify-between">
           <!-- Delete button - only show when editing -->
           <Button
-            v-if="existingConnection"
+            v-if="existingConnection && can.delete"
             variant="destructiveGhost"
             :disabled="isSubmitting || isDeleting"
             @click="deleteConnection"
@@ -149,6 +149,7 @@
           <div class="flex items-center gap-2">
             <Button variant="outline" :disabled="isSubmitting || isDeleting" @click="handleOpen(false)">Cancel</Button>
             <Button
+              v-if="can.save"
               :disabled="v$.$invalid || isSubmitting"
               @click="save"
             >
@@ -204,6 +205,8 @@ import { useNodeStore } from '@store/useNodeStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
 import { hostPortClash } from '@utils/hostPorts.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_delete_connection, can_edit_connection, can_new_connection } from '@/lib/access/perms-edge.js'
 import { driverByUuid, driverChoices } from '@utils/driverChoices.js'
 
 const PAYLOAD_FORMATS = [
@@ -227,6 +230,7 @@ export default {
       cn: useConnectionStore(),
       n: useNodeStore(),
       d: useDeviceStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -295,6 +299,17 @@ export default {
   },
 
   computed: {
+    /* An existing connection opens for viewing even without the
+     * permissions to save or delete it. */
+    can () {
+      const c = this.access.check
+      return {
+        save: this.existingConnection ? can_edit_connection(c) : can_new_connection(c),
+        delete: !!this.existingConnection
+          && can_delete_connection(c, this.existingConnection.uuid),
+      }
+    },
+
     sortedDrivers() {
       /* A hidden driver is not offered for new connections, but a
        * connection that already uses one still shows it: since ACS 7

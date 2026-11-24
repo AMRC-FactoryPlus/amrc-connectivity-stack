@@ -215,7 +215,7 @@ EOF</code></pre>
       </div>
 
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
-        <Button v-if="bridgeType === 'outgoing'" :disabled="v$.$invalid || isSubmitting || bridgeType === 'incoming'" @click="formSubmit">
+        <Button v-if="bridgeType === 'outgoing' && canSave" :disabled="v$.$invalid || isSubmitting || bridgeType === 'incoming'" @click="formSubmit">
           <div class="flex items-center justify-center gap-2">
             <i :class="{'fa-solid': true, 'fa-plus': !isEditMode && !isSubmitting, 'fa-save': isEditMode && !isSubmitting, 'fa-circle-notch animate-spin': isSubmitting}"></i>
             <div>{{ isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Bridge') }}</div>
@@ -241,6 +241,8 @@ import { toast } from 'vue-sonner'
 import { load_secret_access, save_edge_secret } from '@/lib/edge-secrets.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_save_bridge } from '@/lib/access/perms-edge.js'
 
 // Sanitize name for Kubernetes
 function sanitizeName(name) {
@@ -257,6 +259,7 @@ export default {
       v$: useVuelidate(),
       s: useServiceClientStore(),
       c: useEdgeClusterStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -303,6 +306,11 @@ export default {
   },
 
   computed: {
+    /* An existing bridge opens for viewing even when it can't be saved. */
+    canSave() {
+      return can_save_bridge(this.access.check, this.isEditMode)
+    },
+
     clusters() {
       return this.c.data.filter(cluster => cluster.status?.hosts?.length > 0)
     },

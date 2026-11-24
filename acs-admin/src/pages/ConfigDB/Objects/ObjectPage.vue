@@ -45,6 +45,7 @@
         <template #toolbar-right>
           <div class="flex justify-between items-end flex-grow">
             <ObjectSelector
+                v-if="canAddClassification"
                 v-model="subclassOfToAdd"
                 :store-data="availableSubclassOf"
                 title="Select Classifications"
@@ -79,6 +80,7 @@
         <template #toolbar-right>
           <div class="flex justify-between items-end flex-grow">
             <ObjectSelector
+                v-if="canAddMembership"
                 v-model="membershipsToAdd"
                 :store-data="availableMemberships"
                 title="Select Memberships"
@@ -114,6 +116,7 @@
         <template #toolbar-right>
           <div class="flex justify-between items-end flex-grow">
             <ObjectSelector
+                v-if="canAddSubclass"
                 v-model="subclassesToAdd"
                 :store-data="availableSubclasses"
                 title="Select new Subclasses"
@@ -149,6 +152,7 @@
         <template #toolbar-right>
           <div class="flex justify-between items-end flex-grow">
             <ObjectSelector
+                v-if="canAddMember"
                 v-model="membersToAdd"
                 :store-data="availableMembers"
                 title="Select new Members"
@@ -221,6 +225,7 @@
       <div class="flex items-center justify-between gap-2 p-4 border-b">
         <div class="font-semibold text-lg">Owner</div>
         <Button title="Change owner"
+            v-if="access.check.patch_app(UUIDs.App.Registration)"
             @click="showOwnerDialog"
             size="sm"
             variant="ghost"
@@ -257,6 +262,8 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { toast } from 'vue-sonner'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import {UUIDs} from "@amrc-factoryplus/service-client";
+import { useAccessStore } from '@store/useAccessStore.js'
+import { ConfigDB } from '@/lib/access/perms.js'
 
 export default {
   emits: ['rowClick'],
@@ -273,6 +280,7 @@ export default {
       m: useMemberStore(),
       route: useRoute(),
       router: useRouter(),
+      access: useAccessStore(),
       UUIDs,
     }
   },
@@ -288,6 +296,24 @@ export default {
   },
 
   computed: {
+    // ConfigDB checks both ends of a class relation. The other end is
+    // picked in the selector, so any grant counts for that end.
+    canAddClassification () {
+      const c = this.access.check
+      return c.can_any(ConfigDB.WriteSubclasses) && c.can(ConfigDB.WriteSuperclasses, this.route.params.object)
+    },
+    canAddMembership () {
+      const c = this.access.check
+      return c.can_any(ConfigDB.WriteMembers) && c.can(ConfigDB.WriteMemberships, this.route.params.object)
+    },
+    canAddSubclass () {
+      const c = this.access.check
+      return c.can(ConfigDB.WriteSubclasses, this.route.params.object) && c.can_any(ConfigDB.WriteSuperclasses)
+    },
+    canAddMember () {
+      const c = this.access.check
+      return c.can(ConfigDB.WriteMembers, this.route.params.object) && c.can_any(ConfigDB.WriteMemberships)
+    },
     object () {
       return this.obj.data.find(o => o.uuid === this.route.params.object)
     },

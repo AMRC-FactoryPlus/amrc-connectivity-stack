@@ -7,41 +7,18 @@ import type {Row} from '@tanstack/vue-table'
 import type {Alert} from './columns'
 
 import {Button} from '@/components/ui/button'
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
-import {useDialog} from '@/composables/useDialog';
-import {useServiceClientStore} from '@store/serviceClientStore.js'
 
 interface DataTableRowActionsProps {
     row: Row<Alert>
 }
-
-const s = useServiceClientStore()
 
 const props = defineProps<DataTableRowActionsProps>()
 
 function copy(id: string) {
     navigator.clipboard.writeText(id)
     toast.success('UUID copied to clipboard')
-}
-
-function handleDelete() {
-    const who = props.row.original.principal.kerberos
-        ?? props.row.original.principal.name
-        ?? props.row.original.principal.uuid
-    useDialog({
-        title: 'Remove from group?',
-        message: `Are you sure that you want to remove ${who} from the ${props.row.original.name} group? The user will lose all permissions associated with the group.`,
-        confirmText: 'Remove from Group',
-        onConfirm: () => {
-            s.client.Auth.remove_from_group(props.row.original.uuid, props.row.original.principal.uuid).then(() => {
-                toast.success(`${who} has been removed from the ${props.row.original.name} group`)
-            }).catch((err) => {
-                toast.error(`Unable to remove ${who} from ${props.row.original.name}`)
-                console.error(`Unable to remove ${who} from ${props.row.original.name}`, err)
-            })
-        }
-    });
 }
 
 </script>
@@ -68,15 +45,9 @@ function handleDelete() {
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>
-      <DropdownMenuSeparator/>
-      <DropdownMenuGroup>
-        <DropdownMenuItem @click="handleDelete">
-          <div class="flex items-center justify-center gap-2">
-            <i class="fa-solid fa-fw fa-trash text-red-500"></i>
-            Remove
-          </div>
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
+      <!-- No "Remove from Group" here: it called Auth.remove_from_group,
+           which always throws because Auth v2 dropped that API. Remove
+           members from the group's own page instead. -->
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

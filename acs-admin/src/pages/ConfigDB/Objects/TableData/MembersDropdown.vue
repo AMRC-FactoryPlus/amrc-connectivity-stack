@@ -4,12 +4,15 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
+import {computed} from 'vue'
 import type {MembersMapping} from './objectMembersListColumns'
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
+import {useAccessStore} from '@store/useAccessStore.js'
+import {ConfigDB} from '@/lib/access/perms.js'
 
 interface DataTableRowActionsProps {
     row: Row<MembersMapping>
@@ -19,6 +22,11 @@ const s = useServiceClientStore()
 const cdb = s.client.ConfigDB
 
 const props = defineProps<DataTableRowActionsProps>()
+const access = useAccessStore()
+
+// ConfigDB checks both ends of the relation.
+const canRemove = computed(() => access.check.can(ConfigDB.WriteMembers, props.row.original.originalObject.uuid)
+    && access.check.can(ConfigDB.WriteMemberships, props.row.original.uuid))
 
 function copy(id: string) {
     navigator.clipboard.writeText(id)
@@ -73,7 +81,7 @@ function handleDelete() {
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>
-      <div v-if="props.row.original.direct === 'Direct'">
+      <div v-if="props.row.original.direct === 'Direct' && canRemove">
         <DropdownMenuSeparator/>
         <DropdownMenuGroup>
           <DropdownMenuItem @click="handleDelete" class="cursor-pointer">

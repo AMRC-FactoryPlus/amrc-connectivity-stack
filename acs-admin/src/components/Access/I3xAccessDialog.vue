@@ -6,8 +6,9 @@
   - Copyright 2026 University of Sheffield AMRC
   -->
 
-<!-- Only administrators can change grants today, so there is no
-     permission check first: it tries, and a refusal says so. Grants the
+<!-- Controls to change grants show only when the viewer's own ACL
+     allows them; anything the ACL can't show, Auth still refuses and
+     the refusal says so. Grants the
      viewer may not read are not listed. Only grants on the target itself
      can be removed here; the others live on a node above, a class, or
      the wildcard. The dataset roles' grants are rewritten by service
@@ -22,7 +23,7 @@
             <DialogTitle>Access: {{ name || target }}</DialogTitle>
             <DialogDescription>{{ Noun }}<template v-if="path"> - {{ path }}</template></DialogDescription>
           </DialogHeader>
-          <Button size="sm" class="shrink-0" @click="startGive">
+          <Button v-if="canGive" size="sm" class="shrink-0" @click="startGive">
             <i class="fa-solid fa-plus mr-2"></i>Give access
           </Button>
         </div>
@@ -84,7 +85,7 @@
                           :class="h.direct.length ? 'border-slate-900 bg-slate-900 text-slate-50' : 'border-slate-200 bg-white text-slate-950'"
                           :title="halfTitle(h, e)">
                       {{ h.label }}
-                      <button v-if="h.removable" type="button" class="inline-flex opacity-80 hover:opacity-100"
+                      <button v-if="h.removable && can_revoke(access.check, h.direct.map(r => r.grant))" type="button" class="inline-flex opacity-80 hover:opacity-100"
                               :disabled="busy" :aria-label="`Remove ${h.label} access given to ${nameOf(e.principal)} on this ${noun}`"
                               @click="removeHalf(e, h)">
                         <i class="fa-solid fa-xmark text-[10px]"></i>
@@ -116,7 +117,7 @@
                       <DropdownMenuItem @click="openInAccessControl(e.principal)">
                         Open {{ nameOf(e.principal) }} in Access Control
                       </DropdownMenuItem>
-                      <template v-if="e.here && !isRole(e)">
+                      <template v-if="e.here && !isRole(e) && canRemoveAll(e)">
                         <DropdownMenuSeparator/>
                         <DropdownMenuItem class="text-red-600" :disabled="busy" @click="removeAll(e)">
                           Remove access given on this {{ noun }}
@@ -253,6 +254,8 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useISA95Store } from '@store/useISA95Store.js'
 import { devices_placed_under } from '@/lib/isa95-placement.js'
 import { READ_OBJECT, by_principal } from '@/lib/access/i3x-access.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_give_i3x, can_revoke } from '@/lib/access/perms-admin.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -440,6 +443,13 @@ const query = ref('')
 const suggest = ref(false)
 const picked = ref([])
 const scope = ref(props.target)
+
+/* What the viewer may change here. Hidden controls would only be
+ * refused by Auth. */
+const access = useAccessStore()
+const canGive = computed(() => can_give_i3x(access.check))
+const canRemoveAll = e => can_revoke(access.check,
+  e.routes.filter(r => r.reason === 'direct').map(r => r.grant))
 
 /* The halves ticked. Browse is on by default, as before Build existed. */
 const browse = ref(true)

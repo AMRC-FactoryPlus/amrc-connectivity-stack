@@ -20,6 +20,7 @@
     </template>
     <template #below-toolbar>
       <ObjectSelector
+          v-if="access.check.can_any(Auth.WriteACL)"
           v-model="permissionsToAdd"
           v-model:open="isPermissionSelectorOpen"
           :store-data="p.data"
@@ -68,6 +69,8 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { Button } from '@components/ui/button/index.js'
 import { defineAsyncComponent } from 'vue'
+import { useAccessStore } from "@store/useAccessStore.js";
+import { Auth } from "@/lib/access/perms.js";
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { toast } from 'vue-sonner'
 import {useGrantStore} from "@store/useGrantStore.js";
@@ -80,6 +83,8 @@ export default {
 
   setup () {
     return {
+      access: useAccessStore(),
+      Auth,
       columns,
       p: usePermissionStore(),
       s: useServiceClientStore(),

@@ -13,7 +13,7 @@
      no button: the parent opens the dialog through v-model:open, as the
      Explorer page does for the framed i3X Explorer's own button. -->
 <template>
-  <Button v-if="!headless" variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
+  <Button v-if="!headless && canGive" variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
     <i class="fa-solid fa-shield-halved text-sm"></i>
     <span>Manage access</span>
     <Badge variant="secondary" class="min-w-5 justify-center px-1.5" :aria-label="title">
@@ -35,6 +35,8 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { read_access } from '@/lib/access/i3x-access.js'
 import I3xAccessDialog from './I3xAccessDialog.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_give_i3x } from '@/lib/access/perms-admin.js'
 
 const props = defineProps({
   /* What to grant on: a device UUID or an ISA-95 node UUID. */
@@ -52,6 +54,10 @@ const props = defineProps({
   /* No button: only the dialog, opened by the parent with v-model:open. */
   headless: { type: Boolean, default: false },
 })
+
+/* No button for a viewer who can give none of the access it manages. */
+const access = useAccessStore()
+const canGive = computed(() => can_give_i3x(access.check))
 
 /* Local state unless the parent binds v-model:open. */
 const open = defineModel('open', { type: Boolean, default: false })

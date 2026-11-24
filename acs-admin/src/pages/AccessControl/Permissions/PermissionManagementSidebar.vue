@@ -13,6 +13,7 @@
     </SheetHeader>
     <div>
       <ObjectSelector
+          v-if="permissionDetails?.uuid && access.check.can(Auth.WriteACL, permissionDetails.uuid)"
           v-model="principalsToAdd"
           v-model:open="isPrincipalSelectorOpen"
           :store-data="availablePrincipals"
@@ -76,6 +77,8 @@ import {usePermissionStore} from "@store/usePermissionStore.js";
 import Copyable from "@components/Copyable.vue";
 import {Button} from "@components/ui/button/index.js";
 import {defineAsyncComponent} from "vue";
+import { useAccessStore } from "@store/useAccessStore.js";
+import { Auth } from "@/lib/access/perms.js";
 import {usePrincipalStore} from "@store/usePrincipalStore.js";
 import {useGroupStore} from "@store/useGroupStore.js";
 import {toast} from "vue-sonner";
@@ -87,6 +90,8 @@ import {Checkbox} from "@components/ui/checkbox/index.js";
 export default {
   setup () {
     return {
+      access: useAccessStore(),
+      Auth,
       s: useServiceClientStore(),
       p: usePermissionStore(),
       pr: usePrincipalStore(),

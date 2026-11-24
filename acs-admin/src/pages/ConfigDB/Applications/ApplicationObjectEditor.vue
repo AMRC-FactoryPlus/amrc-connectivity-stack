@@ -22,7 +22,7 @@
     <template #header>
       <div class="flex justify-between items-center mr-3">
         <div class="flex items-center gap-2">
-          <Button variant="destructive" :disabled="!v$.$dirty || v$.$invalid" @click="formSubmit" class="shrink-0">
+          <Button v-if="access.check.write_apps(route.params.application)" variant="destructive" :disabled="!v$.$dirty || v$.$invalid" @click="formSubmit" class="shrink-0">
             <div class="flex items-center justify-center gap-1">
               <span>Save Changes</span>
               <i v-if="!saveLoading" class="fa-sharp fa-solid fa-save ml-2"></i>
@@ -112,6 +112,7 @@ import {useDialog} from '@/composables/useDialog';
 import {useUserSettingsStore} from "@store/useUserSettingsStore.js";
 import ConfigDBContainer from '@components/Containers/ConfigDBContainer.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
+import {useAccessStore} from "@store/useAccessStore.js";
 
 MonacoEditor.render = () => h('div')
 
@@ -128,6 +129,7 @@ export default {
       columns: columns,
       router: useRouter(),
       route: useRoute(),
+      access: useAccessStore(),
     }
   },
 

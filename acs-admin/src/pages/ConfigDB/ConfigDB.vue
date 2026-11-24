@@ -7,7 +7,7 @@
     <TabsContent value="objects">
       <ObjectList @rowClick="e => objectClicked(e.original)">
         <template #toolbar-right>
-          <CreateObjectDialog v-if="activeTab==='objects'" :objs="obj.data" />
+          <CreateObjectDialog v-if="activeTab==='objects' && canCreateObject" :objs="obj.data" />
         </template>
         <TabsList>
           <TabsTrigger value="applications">
@@ -56,6 +56,8 @@ import ObjectList from "@pages/ConfigDB/Objects/ObjectList.vue";
 import PrincipalList from "@pages/AccessControl/Principals/PrincipalList.vue";
 import {useApplicationStore} from "@store/useApplicationStore.js";
 import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
+import { useAccessStore } from "@store/useAccessStore.js";
+import { ConfigDB } from "@/lib/access/perms.js";
 
 export default {
   setup () {
@@ -65,6 +67,7 @@ export default {
       app: useApplicationStore(),
       router: useRouter(),
       route: useRoute(),
+      access: useAccessStore(),
     }
   },
 
@@ -177,6 +180,13 @@ export default {
   },
 
   computed: {
+    // The class is picked in the dialog. The dialog then names the
+    // object with a merge-patch of its Info entry.
+    canCreateObject () {
+      const c = this.access.check
+      return (c.can_any(ConfigDB.CreateObj) || c.can_any(ConfigDB.CreateSpecificObj))
+        && c.patch_app(UUIDs.App.Info)
+    },
     activeTab () {
       return this.route.params.tab || 'applications'
     },

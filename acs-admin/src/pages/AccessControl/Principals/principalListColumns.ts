@@ -7,6 +7,8 @@ import {h} from 'vue'
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {usePrincipalStore} from "@store/usePrincipalStore.js"
 import {useDialog} from '@/composables/useDialog';
+import {useAccessStore} from "@store/useAccessStore.js";
+import {Auth} from "@/lib/access/perms.js";
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import {toast} from "vue-sonner";
@@ -82,6 +84,7 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
 },{
     id: 'actions',
     cell: ({row}) => {
+        if (!useAccessStore().check.can(Auth.WriteKrb, row.getValue('uuid'))) return null
         return h('div', {onClick: async (e) => {
             e.stopPropagation()
             useDialog({

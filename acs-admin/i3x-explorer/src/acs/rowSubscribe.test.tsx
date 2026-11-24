@@ -92,7 +92,7 @@ describe('Current value table', () => {
     await screen.findByRole('button', { name: 'Robot 2' })
 
     const header = screen.getAllByRole('row')[0]
-    expect(within(header).getAllByRole('columnheader')).toHaveLength(5)
+    expect(within(header).getAllByRole('columnheader')).toHaveLength(6)
     expect(header.className).toContain('_1.25rem]')
 
     for (const name of ['Press 3', 'Robot 2']) {

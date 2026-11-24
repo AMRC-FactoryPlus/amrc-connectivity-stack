@@ -194,7 +194,8 @@ upstream, so they are not tied to the Manager UI.
      `/objects/related`), and their values from one batched
      `POST /objects/value` at `maxDepth: 1` per level shown. A newer
      subscription update replaces a child's value. Refresh reads them
-     again;
+     again. Each value's timestamp shows as a Date column and a Time
+     column, so a value that is days old is visible at a glance;
    - the relationship list shows names in full and a UUID type id as its
      last 5 characters, in the muted mono of a readable type id such as
      `isa95-level`, with the full id in the tooltip. The "N direct ·

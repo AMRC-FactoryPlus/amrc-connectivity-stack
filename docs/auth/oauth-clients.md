@@ -658,10 +658,16 @@ configuration changes.
   branch's prior work is not yet in production; new deployments are
   fine, in-place upgrades from a Kerberos-federated realm need the
   realm rebuilt.
-- **Public clients are not currently provisioned.** All clients
-  created by service-setup are confidential. If you need a SPA / PKCE
-  public client, edit it manually in Keycloak after first run, or
-  open an issue to extend `openidClients` schema.
+- **Browser apps use public clients.** Set `publicClient: true` for
+  a SPA that cannot keep a secret; service-setup then enforces PKCE
+  S256 on it. The `admin`, `visualiser` and `acs-cli` entries in
+  `values.yaml` are examples.
+- **Pods must resolve the openid host.** Services validate a JWT by
+  fetching Keycloak's keys from the external `openid.<acs-base>` URL,
+  from inside the cluster. If cluster DNS cannot resolve that name,
+  every JWT is refused with "Auth unavailable: OIDC discovery failed"
+  in the service's log, while Kerberos and password sign-in keep
+  working.
 - **Per-client Keycloak roles are not used.** The previous design
   used `viewer`/`editor`/`admin`/`grafanaAdmin` roles per client.
   These are gone. Authorization is driven from F+ via the

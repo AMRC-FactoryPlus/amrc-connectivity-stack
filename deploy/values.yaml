@@ -341,6 +341,17 @@ openid:
   # keycloak.v2 theme, or set to a different name if you've baked a
   # custom theme into your own Keycloak image.
   loginTheme: factory-plus
+  # -- "Remember me" on the Keycloak sign-in page. A person who ticks
+  # it stays signed in to the Admin, Grafana and the Visualiser across
+  # browser restarts until they have been idle for `idle` seconds, or
+  # for `max` seconds in all. Without it Keycloak's defaults apply: 30
+  # minutes idle, 10 hours in all. Set `enabled: false` to hide the box.
+  rememberMe:
+    enabled: true
+    # 7 days
+    idle: 604800
+    # 30 days
+    max: 2592000
   # -- Kerberos realms trusted for cross-realm login. A user from a
   # listed realm can sign in without an administrator hand-creating a
   # Factory+ principal for them first: once their home KDC accepts the

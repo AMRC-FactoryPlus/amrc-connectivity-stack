@@ -71,6 +71,14 @@ spec:
             # built-in keycloak.v2 theme.
             - name: OPENID_LOGIN_THEME
               value: {{ .Values.openid.loginTheme | default "" | quote }}
+            # "Remember me" on the sign-in page, and how long a
+            # remembered session lasts (seconds). Empty turns it off.
+            {{- with .Values.openid.rememberMe }}
+            - name: OPENID_REMEMBER_ME_IDLE
+              value: {{ .enabled | ternary (.idle | int64 | toString) "" | quote }}
+            - name: OPENID_REMEMBER_ME_MAX
+              value: {{ .enabled | ternary (.max | int64 | toString) "" | quote }}
+            {{- end }}
             # Cluster-internal URL for the F+ auth service. The Keycloak
             # SPI federation will be configured to call this URL for
             # principal/group lookups; the SPI authenticates as

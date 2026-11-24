@@ -148,6 +148,7 @@ A gateway looks like this. Fields appear as it progresses.
   "remote_ip": "10.31.4.57",
   "approved_by": "alice@REALM",
   "approved_at": 1795082400000,
+  "install_started_at": 1795082410000,
   "installed_at": 1795083300000,
   "ready_at": 1795086000000,
   "onboarded_at": 1795086400000,

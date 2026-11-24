@@ -43,7 +43,9 @@
           </Button>
         </div>
 
-        <AdminLogin :id="id"/>
+        <!-- While it installs, the login sits in the Install step, where
+             the person is looking after they approve. -->
+        <AdminLogin v-if="kind !== 'installing'" :id="id"/>
 
         <div v-if="kind === 'replaced'" class="flex flex-col gap-4">
           <div class="flex flex-col gap-2 rounded-lg bg-slate-100 p-4 text-sm">
@@ -92,9 +94,19 @@
             <ApproveForm v-else-if="kind === 'pending'" :gateway="gateway"/>
 
             <div v-else-if="kind === 'installing'" class="flex flex-col gap-4 text-sm">
-              <p>{{ gateway.state === 'approved' ? 'The install is about to start.' : 'The gateway installs its operating system.' }}</p>
-              <p class="text-slate-500">The gateway is not in contact while it installs.</p>
-              <p class="text-slate-500">Approved {{ gateway.approved_at ? ago(gateway.approved_at, now.getTime()) : '' }}{{ gateway.approved_by ? ' by ' + gateway.approved_by : '' }}.</p>
+              <AdminLogin :id="id"/>
+              <p class="flex items-center gap-2 text-base font-semibold" role="status">
+                <i class="fa-solid fa-circle-notch fa-spin text-slate-500" aria-hidden="true"></i>
+                {{ gateway.state === 'approved' ? 'Waiting for the gateway to start the install' : 'Installing the operating system' }}
+              </p>
+              <p class="text-slate-500">
+                {{ gateway.state === 'approved' ? 'Approved' : 'Started' }} {{ install_from ? ago(install_from, now.getTime()) : '' }}{{ gateway.approved_by ? ' by ' + gateway.approved_by : '' }}.
+                The gateway does not report while it installs, so this page updates when the install finishes and the gateway powers off.
+              </p>
+              <div v-if="gateway.log">
+                <h3 class="mb-2 text-sm font-semibold">Log from the gateway</h3>
+                <GatewayLog :text="gateway.log"/>
+              </div>
             </div>
 
             <div v-else-if="kind === 'failed-install'" class="flex flex-col gap-4 text-sm">
@@ -214,6 +226,10 @@ const contact = computed(() => contact_of(gateway.value, now.value.getTime()))
 const relation = computed(() => relation_of(gateway.value, depot.gateways))
 const related = computed(() => (relation.value ? depot.byId.get(relation.value.id) ?? null : null))
 
+/* When the gateway collected its settings, or failing that when it was
+ * approved. */
+const install_from = computed(() => gateway.value.install_started_at ?? gateway.value.approved_at ?? null)
+
 const progress = computed(() => {
   const o = gateway.value.onboard || {}
   return { step: clean(o.step) || 'Starting', started: o.started, by: clean(o.by) }
@@ -248,7 +264,7 @@ function remove () {
         await depot.remove(gw.id)
         toast.success(pending ? 'Gateway rejected.' : 'Gateway removed from the list.')
         /* Stay while the page still holds this gateway's password. */
-        if (!secret) router.push('/gateway-depot')
+        if (!secret || secret.ack) router.push('/gateway-depot')
       }
       catch (err) {
         toast.error(err.message)

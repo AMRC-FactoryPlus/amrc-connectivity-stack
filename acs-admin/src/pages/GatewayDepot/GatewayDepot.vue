@@ -57,7 +57,7 @@ const columns = computed(() => (wide.value ? gatewayColumns : gatewayColumnsNarr
 
 const groups = computed(() => depot.groups.map(g => ({
   ...g,
-  rows: g.gateways.map(gw => ({ ...row_of(gw, now.value.getTime()), password: !!depot.secrets[gw.id] })),
+  rows: g.gateways.map(gw => ({ ...row_of(gw, now.value.getTime()), password: !!depot.secrets[gw.id] && !depot.secrets[gw.id].ack })),
 })))
 
 const open = id => router.push({ name: 'GatewayDepotGateway', params: { id } })

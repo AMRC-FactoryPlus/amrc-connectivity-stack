@@ -3,12 +3,18 @@
   -->
 
 <!-- The admin login made when a gateway is approved. The service gives
-     the password once, so it stays here while the tab is open. It is
-     rendered as text, and never put in the URL, storage or the console. -->
+     the password once, so it stays here until the person says they have
+     recorded it. It is rendered as text, and never put in the URL,
+     storage or the console. -->
 <template>
-  <section v-if="secret" class="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4" aria-label="Admin login">
-    <h3 class="text-sm font-semibold">{{ title }}</h3>
-    <p class="text-sm">This password will not be shown again, so make sure to make a note of it now.</p>
+  <section v-if="secret && !secret.ack" ref="panel" class="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4" aria-label="Admin login">
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <h3 class="text-sm font-semibold">{{ title }}</h3>
+      <Button variant="outline" size="sm" class="gap-2" @click="depot.secrets[id].ack = true">
+        <i class="fa-solid fa-check"></i>I have recorded it
+      </Button>
+    </div>
+    <p class="text-sm">This password will not be shown again once you hide it, so make a note of it now.</p>
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
       <span class="w-20 shrink-0 text-sm text-slate-600">Username</span>
       <span class="min-w-0 flex-1 basis-48 select-all break-all font-mono text-base font-semibold">{{ secret.user }}</span>
@@ -25,17 +31,12 @@
         <i class="fa-solid fa-copy"></i>Copy
       </Button>
     </div>
-    <label class="flex min-h-9 cursor-pointer items-center gap-2 text-sm">
-      <Checkbox :model-value="secret.ack" @update:model-value="v => depot.secrets[id].ack = !!v"/>
-      I have recorded this password
-    </label>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { useGatewayDepotStore } from '@store/useGatewayDepotStore.js'
 import { copy_text } from '@/lib/gateway-depot/copy.js'
 
@@ -51,4 +52,12 @@ const title = computed(() => props.named ? 'Admin login for ' + secret.value.nam
 const chars = computed(() => [...secret.value.password].map(text => ({ text, digit: /[0-9]/.test(text) })))
 /* Groups of four are easier to copy by hand. */
 const grouped = computed(() => /^[A-Za-z0-9]+$/.test(secret.value.password))
+
+/* A password nobody has recorded yet is the one thing on the page that
+ * cannot wait, so bring it into view. */
+const panel = ref(null)
+onMounted(() => {
+  if (panel.value && secret.value && !secret.value.ack)
+    panel.value.scrollIntoView({ block: 'center', behavior: 'smooth' })
+})
 </script>

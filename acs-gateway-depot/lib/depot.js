@@ -112,18 +112,51 @@ export class Depot {
 
         if (box.state == State.Approved) {
             box.state = State.Installing;
+            box.install_started_at = Date.now();
+            /* The installer reports its progress to a URL carrying this
+             * token, because it cannot sign its requests. The token is
+             * kept in memory only: after a restart the reports are
+             * refused, and the install carries on regardless. */
+            const progress_token = crypto.randomBytes(24).toString("base64url");
+            box.progress_hash = sha256(progress_token);
             this.store.put(box);
             this.log("Gateway %s collected its settings and is installing", id);
             return {
                 state:          "approved",
                 autoinstall:    build_autoinstall({
-                    box, settings: box.settings,
+                    box, settings: box.settings, progress_token,
                     payload: this.payload, public_url: this.public_url,
                 }),
             };
         }
         this.store.put(box);
         return { state: box.state };
+    }
+
+    /* The Ubuntu installer posts each of its events here while it
+     * installs. They go into the gateway's log, and the latest step
+     * becomes install_step, so the Admin UI can show what it is doing.
+     * Neither is written to the ConfigDB. */
+    progress (id, token, event) {
+        const box = this.store.get(id);
+        if (!box?.progress_hash || typeof token != "string"
+            || !same(box.progress_hash, sha256(token)))
+            throw new DepotError(403, "Unknown gateway or wrong token.");
+        if (box.state != State.Installing) return;
+
+        const name = String(event?.name ?? "");
+        const what = String(event?.description ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+        const type = event?.event_type;
+        /* Subiquity polls its own status, which says nothing. */
+        if (!what || name.includes("/Meta/")) return;
+        if (type != "start" && type != "finish") return;
+
+        const failed = type == "finish" && event.result && event.result != "SUCCESS";
+        const depth = Math.max(0, name.split("/").length - 2);
+        this.append_log(box, `${"  ".repeat(Math.min(depth, 6))}${type}: ${what}`
+            + (failed ? ` (${String(event.result).slice(0, 20)})` : "") + "\n");
+        if (type == "start") box.install_step = what;
+        box.last_seen = Date.now();
     }
 
     /* An installed gateway calls this every few seconds. It says what
@@ -223,7 +256,7 @@ export class Depot {
     /* What the Admin UI may see of a gateway. Never the secrets. */
     view (box) {
         // eslint-disable-next-line no-unused-vars
-        const { secret_hash, password_hash, ...rest } = box;
+        const { secret_hash, password_hash, progress_hash, ...rest } = box;
         return { ...rest, online: Date.now() - (box.last_seen ?? 0) < ONLINE };
     }
 

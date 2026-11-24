@@ -79,6 +79,11 @@
         <BulkPlacementImportDialog/>
         <MergeISA95NodeDialog/>
         <RouterView/>
+        <!-- Kept from the first visit to the Explorer page until
+             sign-out, and hidden on other pages, so the Explorer keeps
+             its subscriptions and pop-out window while you look
+             elsewhere. See ExplorerFrame.vue. -->
+        <ExplorerFrame v-if="explorer_kept && s.loaded" v-show="$route.path === '/explorer'"/>
       </main>
     </SidebarInset>
   </SidebarProvider>
@@ -97,6 +102,7 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
 import { useEventListener, useMagicKeys } from '@vueuse/core'
 import { useRouter } from 'vue-router'
+import { defineAsyncComponent, ref, watch } from 'vue'
 import { is_search_shortcut, request_explorer_search } from '@/lib/explorer-search.js'
 import { Toaster } from '@/components/ui/sonner'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
@@ -126,15 +132,28 @@ export default {
       request_explorer_search()
     })
 
+    /* The Explorer's frame is made on the first visit to its page and
+     * dropped at sign-out, so the next user starts afresh. */
+    const s = useServiceClientStore()
+    const explorer_kept = ref(false)
+    watch(() => router.currentRoute.value.path, path => {
+      if (path === '/explorer') explorer_kept.value = true
+    }, { immediate: true })
+    watch(() => s.loaded, loaded => {
+      if (!loaded) explorer_kept.value = router.currentRoute.value.path === '/explorer'
+    })
+
     return {
       acs_version: ACS_VERSION,
-      s: useServiceClientStore(),
+      explorer_kept,
+      s,
       l: useLayoutStore(),
       escape,
     }
   },
 
   components: {
+    ExplorerFrame: defineAsyncComponent(() => import('@components/Explorer/ExplorerFrame.vue')),
     NewClusterDialog,
     NewEdgeDeploymentDialog,
     MoveHostDialog,

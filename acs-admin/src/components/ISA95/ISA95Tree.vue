@@ -6,9 +6,10 @@
 
 <template>
   <div class="flex flex-col min-h-0 flex-1 rounded-md border border-slate-200 bg-white">
-    <div class="flex items-center h-9 px-3 border-b border-slate-200 text-xs text-slate-500">
+    <div class="flex items-center gap-2 h-9 pl-3 pr-[13px] border-b border-slate-200 text-xs text-slate-500">
       <span class="pl-8">Node</span>
-      <span class="ml-auto">Devices, including below</span>
+      <span class="ml-auto w-24 text-center">Level</span>
+      <span class="w-16 text-right" title="Devices on the node and everything below it">Devices</span>
     </div>
 
     <div ref="tree"
@@ -55,7 +56,6 @@
               @click.stop="$emit('toggle', r.key)">
             <i class="fa-solid fa-xs" :class="r.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
           </button>
-          <span class="w-20 shrink-0 text-center text-[10px] uppercase tracking-wide text-slate-500 border border-slate-200 rounded bg-white font-normal">{{ node(r).level }}</span>
           <span class="truncate">
             <template v-if="hl(r)">{{ hl(r).pre }}<mark class="bg-yellow-200 rounded-sm">{{ hl(r).mid }}</mark>{{ hl(r).post }}</template>
             <template v-else>{{ node(r).name }}</template>
@@ -90,7 +90,8 @@
               <i class="fa-solid fa-code-merge fa-xs"></i>
             </button>
           </span>
-          <span class="w-12 shrink-0 text-right text-xs text-slate-500 tabular-nums font-normal">{{ counts.get(r.uuid)?.total ?? 0 }}</span>
+          <span class="w-24 shrink-0 text-center text-[10px] uppercase tracking-wide text-slate-500 border border-slate-200 rounded bg-white font-normal">{{ node(r).level }}</span>
+          <span class="w-16 shrink-0 text-right text-xs text-slate-500 tabular-nums font-normal">{{ counts.get(r.uuid)?.total ?? 0 }}</span>
         </div>
 
         <template v-if="edit && edit.key === r.key">
@@ -140,7 +141,6 @@ const EditRow = {
       class: 'flex items-center gap-2 h-[38px] pr-2 rounded-md bg-slate-50 mb-px',
       style: { paddingLeft: `${8 + this.depth * 20 + 28}px` },
     }, [
-      h('span', { class: 'w-20 shrink-0 text-center text-[10px] uppercase tracking-wide text-slate-500 border border-slate-200 rounded bg-white' }, e.level),
       h('input', {
         ref: 'input',
         class: 'h-7 flex-1 min-w-0 rounded border border-slate-300 bg-white px-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-900',
@@ -161,6 +161,8 @@ const EditRow = {
       e.error
         ? h('span', { class: 'text-xs text-red-600 truncate', role: 'alert' }, e.error)
         : h('span', { class: 'text-xs text-slate-400 truncate hidden lg:inline' }, 'Enter saves, Escape cancels'),
+      h('span', { class: 'ml-auto w-24 shrink-0 text-center text-[10px] uppercase tracking-wide text-slate-500 border border-slate-200 rounded bg-white' }, e.level),
+      h('span', { class: 'w-16 shrink-0' }),
     ])
   },
 }

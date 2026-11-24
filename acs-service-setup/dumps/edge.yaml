@@ -168,12 +168,7 @@ configs:
           - host
         title: Modbus Connection Details
         type: object
-    # Hidden until the edge-focas image has been published in a release
-    # and the driver has been tried against a real FANUC control: it is
-    # built from a reverse-engineered protocol and so far only tested
-    # against its own fake control.
     !u ACS.Driver.Focas:
-      hidden: true
       polled: true
       presentation:
         address:

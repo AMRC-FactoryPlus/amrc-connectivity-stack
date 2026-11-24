@@ -59,6 +59,7 @@ import DatasetBuilder from '@pages/Datasets/DatasetBuilder.vue';
 import DatasetCompare from '@pages/Datasets/DatasetCompare.vue';
 import DatasetAddons from '@pages/Datasets/AddonsPage.vue';
 import Kiosk from '@pages/Datasets/Kiosk.vue';
+import { load_login } from '@/lib/saved-login.js';
 
 // Create an event bus
 window.events = mitt()
@@ -338,7 +339,7 @@ const router = createRouter({
 })
 
 // Setup auth guard.
-// This should pull a token from local storage, but currently uses the users credentials to fetch tokens
+// A reload signs in again with the details saved for this tab
 router.beforeEach(async (to, from, next) => {
   // If we don't need auth, we can go straight through
   // This is only for login at the moment, but other pages may be accessible in future
@@ -353,9 +354,9 @@ router.beforeEach(async (to, from, next) => {
     return
   }
   // Otherwise we are loading fresh and need to initialise the service client
-  const optsString = localStorage.getItem('opts');
+  const opts = load_login();
   // If there is no opts value stored, make sure we go to login
-  if (!optsString) {
+  if (!opts) {
     // Make sure we go to login
     if (to.path !== "/login") {
       next({ path: "/login" })
@@ -367,7 +368,6 @@ router.beforeEach(async (to, from, next) => {
   }
   // We do have opts, we should try to use them
   try {
-    const opts = JSON.parse(optsString)
     await useServiceClientStore().login(opts)
     // Seems to have worked! Go through
     next()

@@ -185,6 +185,18 @@ describe('Explorer location in the URL', () => {
     expect(location_query({ object: null, tab: 'history' }, { object: 'o', other: '1' })).toEqual({ other: '1' })
   })
 
+  it('returns to where the Explorer is when reopened without an object', async () => {
+    const { returning_query } = await import('../src/lib/i3x-explorer-host.js')
+    const shown = { object: 'o', tab: 'history' }
+    expect(returning_query({}, shown)).toEqual({ object: 'o', tab: 'history' })
+    expect(returning_query({ other: '1' }, shown)).toEqual({ other: '1', object: 'o', tab: 'history' })
+    // A link naming an object wins over where the Explorer was.
+    expect(returning_query({ object: 'p' }, shown)).toBeNull()
+    // Nothing selected: nothing to put back.
+    expect(returning_query({}, { object: null, tab: null })).toBeNull()
+    expect(returning_query({}, null)).toBeNull()
+  })
+
   it('passes locations between the host and the console', () => {
     const set_location = vi.fn()
     const go = vi.fn()

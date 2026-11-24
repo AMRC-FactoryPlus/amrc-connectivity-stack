@@ -120,6 +120,21 @@ export function location_query (loc, query = {}) {
     return { ...rest, object: loc.object, ...(loc.tab ? { tab: loc.tab } : {}) };
 }
 
+/**
+ * The route query to put back when the Explorer page is opened again
+ * from another page of this console, or null to follow the URL. The
+ * Explorer's frame stays loaded while other pages show, so a plain
+ * link to the page (the menu, ⌘K) returns to where the Explorer is,
+ * while a link naming an object moves it there.
+ *
+ * @param query the route query the page was opened with
+ * @param shown the location the Explorer last reported, or null
+ */
+export function returning_query (query, shown) {
+    if (query_location(query).object || !shown?.object) return null;
+    return location_query(shown, query);
+}
+
 /* The ISA-95 level names from the top down to, and including, the last
  * of `chain` that is a level, stopping at the first object that is not
  * one. `chain` runs from the top of the tree down. */

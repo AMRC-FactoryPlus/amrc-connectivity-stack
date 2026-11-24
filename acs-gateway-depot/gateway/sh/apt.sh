@@ -19,7 +19,21 @@ if [ -n "$APT_MIRROR" ]; then
     install -D -m 644 "$keytmp" /etc/apt/keyrings/fplus-mirror.gpg
     rm -f "$keytmp"
 
-    log "Pointing apt at $APT_MIRROR"
+    # Updates and security fixes are published as their own suites. Use
+    # each one the mirror carries, so a mirror that only holds the
+    # release still works.
+    suites="$codename"
+    for suite in "$codename-updates" "$codename-security"; do
+        if curl -fs -o /dev/null "$APT_MIRROR/dists/$suite/InRelease" \
+            || curl -fs -o /dev/null "$APT_MIRROR/dists/$suite/Release"
+        then
+            suites="$suites $suite"
+        else
+            warn "The apt mirror has no $suite suite, so this gateway will not get the updates published there."
+        fi
+    done
+
+    log "Pointing apt at $APT_MIRROR ($suites)"
     backup="$GW_BACKUP/apt-$(date +%Y%m%dT%H%M%S)"
     mkdir -p "$backup"
     cp -a /etc/apt/sources.list /etc/apt/sources.list.d "$backup/" 2>/dev/null || true
@@ -28,7 +42,7 @@ if [ -n "$APT_MIRROR" ]; then
     cat > /etc/apt/sources.list.d/fplus-mirror.sources <<SOURCES
 Types: deb
 URIs: $APT_MIRROR
-Suites: $codename
+Suites: $suites
 Components: main restricted universe multiverse
 Signed-By: /etc/apt/keyrings/fplus-mirror.gpg
 SOURCES
@@ -72,6 +86,11 @@ APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 Unattended-Upgrade::Remove-Unused-Dependencies "true";
 Unattended-Upgrade::Automatic-Reboot "true";
+// Ubuntu only installs security fixes by default. Bug fixes are
+// published in -updates, so allow those too.
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}-updates";
+};
 APT
 
 systemctl daemon-reload

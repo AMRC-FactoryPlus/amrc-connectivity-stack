@@ -64,10 +64,22 @@ image, which serves them to a gateway while it installs.
 | Part | Runs | Does |
 | --- | --- | --- |
 | Scout (`agent.py scout`) | In the Ubuntu installer, before the install | Reports hardware, waits for approval, writes the installer settings |
-| Setup scripts (`sh/`) | On first boot, and again at onboarding | Hostname, network, firewall, K3s |
+| Setup scripts (`sh/`) | On first boot, and again at onboarding | Hostname, network, firewall, package updates, K3s |
 | Agent (`agent.py agent`) | On the installed gateway | Calls the service, runs the jobs it is given |
 
 The agent only ever calls out. Nothing connects in to the gateway.
+
+### Package updates
+
+Each gateway installs Ubuntu updates by itself every night. It downloads
+them at 03:30, installs them at 04:00 and reboots if an update needs it.
+It takes both security fixes and bug fixes, which Ubuntu publishes as
+the `-security` and `-updates` suites.
+
+With an apt mirror set, the gateway uses the release suite and whichever
+of the `-updates` and `-security` suites the mirror carries. A mirror
+that carries only the release still works, but its gateways get no
+updates, and setup prints a warning for each missing suite.
 
 ### Trust
 

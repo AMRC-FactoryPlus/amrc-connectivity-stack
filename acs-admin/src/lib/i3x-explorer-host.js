@@ -33,6 +33,10 @@ export const ISA95_LEVEL_TYPE = "isa95-level";
  * @param opts.actions     async (selection) => the explorer_actions() for
  *                         the app's selection ({ object, ancestors })
  * @param opts.run         (action, selection) => void, runs one of them
+ * @param opts.location    () => { object, tab } the console's URL names
+ * @param opts.set_location ({ object, tab }) => void, writes it to the URL
+ * @param opts.on_location (go) => unregister: call go({ object, tab })
+ *                         when the console's URL changes under the page
  */
 export function mk_host (opts) {
     const client = () => Promise.resolve(opts.client);
@@ -72,12 +76,48 @@ export function mk_host (opts) {
         onSearchRequest (open) {
             return opts.on_search ? opts.on_search(open) : () => {};
         },
+        /* Where the console's URL says the Explorer should be. */
+        location () {
+            return opts.location?.() ?? null;
+        },
+        /* The Explorer moved; only plain strings cross back. */
+        setLocation (loc) {
+            opts.set_location?.({
+                object: typeof loc?.object === "string" ? loc.object : null,
+                tab: typeof loc?.tab === "string" ? loc.tab : null,
+            });
+        },
+        onLocationRequest (go) {
+            return opts.on_location ? opts.on_location(go) : () => {};
+        },
         /* Esc pressed in the frame that the app did not use itself, so
          * full screen can be left from inside the Explorer. */
         escape () {
             opts.escape?.();
         },
     };
+}
+
+/**
+ * The Explorer location a route query names: { object, tab }, each a
+ * string or null. Repeated keys take the first.
+ */
+export function query_location (query) {
+    const one = v => {
+        const x = Array.isArray(v) ? v[0] : v;
+        return typeof x === "string" && x ? x : null;
+    };
+    return { object: one(query?.object), tab: one(query?.tab) };
+}
+
+/**
+ * The route query for an Explorer location, keeping any other keys.
+ * No object means neither key; a tab only goes with an object.
+ */
+export function location_query (loc, query = {}) {
+    const { object: _o, tab: _t, ...rest } = query ?? {};
+    if (!loc?.object) return rest;
+    return { ...rest, object: loc.object, ...(loc.tab ? { tab: loc.tab } : {}) };
 }
 
 /* The ISA-95 level names from the top down to, and including, the last

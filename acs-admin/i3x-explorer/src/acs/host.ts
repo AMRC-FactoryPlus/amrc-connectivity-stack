@@ -13,6 +13,8 @@
  *   - sends the Manager UI's own Bearer token for that service, asking the
  *     host for a new one when the service refuses it;
  *   - takes the Manager UI's theme as its starting theme;
+ *   - keeps the Manager UI's URL naming the selected object and tab, and
+ *     opens the object a URL names (hostLocation.ts);
  *   - asks the host which of its own actions (Manage access, Build dataset)
  *     the selected object has, shows them beside Subscribe, and tells the host
  *     to run one when it is clicked.
@@ -27,6 +29,7 @@ import { useConnectionStore } from '../stores/connection'
 import { useExplorerStore, type SelectedItem } from '../stores/explorer'
 import type { ObjectInstance } from '../api/types'
 import { useSearchDialog } from './searchDialog'
+import type { LocationHost } from './hostLocation'
 
 export type HostTheme = 'light' | 'dark'
 
@@ -54,7 +57,7 @@ export interface HostAction {
   title?: string
 }
 
-export interface AcsExplorerHost {
+export interface AcsExplorerHost extends LocationHost {
   /** The i3X base URL, including the version path, e.g. https://i3x.example/v1. */
   serviceUrl(): Promise<string>
   /** A Bearer token for the service; `bad` is one the service refused. */

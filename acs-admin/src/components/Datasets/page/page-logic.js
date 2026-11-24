@@ -7,7 +7,7 @@
 
 import { STRUCTURE, is_device_structure, is_metrics_structure } from '@/lib/datasets/constants.js'
 import { direct_sources, included_in, fmt_window } from '@/lib/datasets/model.js'
-import { i3x_leaf_id, metric_label, device_metric_labels, split_key, chartable } from '@/lib/datasets/series.js'
+import { i3x_leaf_id, metric_label, device_metric_labels, split_key, series_key, chartable } from '@/lib/datasets/series.js'
 
 // The Data Access "Read dataset" permission, granted by Share.
 export const READ_DATASET = 'ec48462e-37eb-4f56-8efa-83d813e85559'
@@ -125,29 +125,6 @@ export function metric_total (devices) {
     return devices.reduce((n, d) => n + (d?.metrics?.length ?? 0), 0)
 }
 
-/**
- * Filter each device's metrics by a search. Words must all match the
- * path, name or unit. Devices with no match are dropped while searching.
- */
-export function filter_metrics (devices, query) {
-    const words = (query ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
-    return devices
-        .map(d => {
-            const labels = device_metric_labels(d.metrics)
-            const metrics = picker_order(d.metrics ?? [])
-            return {
-                device: d,
-                metrics: words.length
-                    ? metrics.filter(m => {
-                        const hay = `${m.path} ${m.name} ${labels.get(m.path) ?? ''} ${m.unit ?? ''}`.toLowerCase()
-                        return words.every(w => hay.includes(w))
-                    })
-                    : metrics,
-            }
-        })
-        .filter(g => !words.length || g.metrics.length)
-}
-
 // Groups that describe the device or drive it, not what it measures.
 const LAST_GROUPS = new Set(['Player_Controls', 'Device_Information'])
 
@@ -159,6 +136,120 @@ const LAST_GROUPS = new Set(['Player_Controls', 'Device_Information'])
 export function picker_order (metrics) {
     const rank = m => (LAST_GROUPS.has(String(m.path ?? '').split('/')[0]) ? 2 : 0) + (chartable(m.type) ? 0 : 1)
     return metrics.map((m, i) => [rank(m), i, m]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2])
+}
+
+/*
+ * A device's metrics as a tree of their path segments, as the origin
+ * map and the i3X Explorer lay them out. A folder is
+ * { name, path, folders, metrics }; metrics keep picker_order. At each
+ * level folders come first, then metrics, then the Player_Controls
+ * and Device_Information folders.
+ */
+function metric_folders (metrics) {
+    const root = { name: '', path: '', folders: new Map(), metrics: [] }
+    for (const m of picker_order(metrics ?? [])) {
+        const segs = String(m.path ?? '').split('/').filter(Boolean)
+        let at = root
+        segs.slice(0, -1).forEach((s, i) => {
+            if (!at.folders.has(s)) at.folders.set(s, { name: s, path: segs.slice(0, i + 1).join('/'), folders: new Map(), metrics: [] })
+            at = at.folders.get(s)
+        })
+        at.metrics.push(m)
+    }
+    return root
+}
+
+/** The folder key for the Data tab tree: device UUID and folder path. */
+export const folder_key = (device, path) => `${device}\u0000${path}`
+
+/**
+ * The Data tab's metric picker rows, top down. Each device is a row,
+ * and under it its metrics nest in folders by path segment:
+ *
+ *   { kind: 'device', key, device, depth: 0, open, count }
+ *   { kind: 'folder', key, device, name, label, path, depth, open, count }
+ *   { kind: 'metric', key, device, metric, label, depth, pinned }
+ *
+ * `count` is the metrics under the row the search shows. A device is
+ * open by default when it is the only one or holds a pin; a folder when
+ * it holds a pin. `opened` (key -> boolean) overrides the default.
+ * While searching, only rows with a match show, and they are all open.
+ *
+ * @param devices  [{ uuid, name, metrics: [{ path, name, unit, type }] }]
+ * @param opts.query   search text
+ * @param opts.opened  Map or object of key -> boolean
+ * @param opts.pinned  (device uuid, path) => boolean
+ */
+export function metric_tree_rows (devices, { query = '', opened = {}, pinned = () => false } = {}) {
+    const words = (query ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const get = k => opened instanceof Map ? opened.get(k) : opened[k]
+    const rows = []
+    const list = devices ?? []
+
+    for (const d of list) {
+        // The picker notes a device with no metrics under the tree instead.
+        if (!d.metrics?.length) continue
+        const labels = device_metric_labels(d.metrics)
+        const shows = m => !words.length || words.every(w =>
+            `${m.path} ${m.name ?? ''} ${labels.get(m.path) ?? ''} ${m.unit ?? ''}`.toLowerCase().includes(w))
+        const has_pin = m => pinned(d.uuid, m.path)
+
+        // Walk a folder: the rows under it, its count and whether it holds a pin.
+        const walk = (f, depth) => {
+            const out = []
+            let count = 0, pin = false
+            const sub = (g) => {
+                const key = folder_key(d.uuid, g.path)
+                const r = walk(g, depth + 1)
+                if (!r.count) return
+                count += r.count
+                pin ||= r.pin
+                const open = words.length ? true : get(key) ?? r.pin
+                out.push({ kind: 'folder', key, device: d.uuid, name: g.name, label: metric_label(g.name), path: g.path, depth, open, count: r.count })
+                if (open) out.push(...r.rows)
+            }
+            const folders = [...f.folders.values()]
+            const last = g => depth === 1 && LAST_GROUPS.has(g.name)
+            folders.filter(g => !last(g)).forEach(sub)
+            for (const m of f.metrics) {
+                if (!shows(m)) continue
+                count++
+                const p = has_pin(m)
+                pin ||= p
+                const segs = String(m.path).split('/').filter(Boolean)
+                out.push({ kind: 'metric', key: series_key(d.uuid, m.path), device: d.uuid, metric: m,
+                    label: metric_label(segs.at(-1) ?? m.path), depth, pinned: p })
+            }
+            folders.filter(last).forEach(sub)
+            return { rows: out, count, pin }
+        }
+
+        const r = walk(metric_folders(d.metrics), 1)
+        if (words.length && !r.count) continue
+        const key = folder_key(d.uuid, '')
+        const open = words.length ? true : get(key) ?? (list.length === 1 || r.pin)
+        rows.push({ kind: 'device', key, device: d, depth: 0, open, count: r.count })
+        if (open) rows.push(...r.rows)
+    }
+    return rows
+}
+
+/**
+ * Every folder and device key in metric_tree_rows' tree, for Expand all.
+ */
+export function metric_tree_keys (devices) {
+    const keys = []
+    for (const d of devices ?? []) {
+        keys.push(folder_key(d.uuid, ''))
+        const walk = f => {
+            for (const g of f.folders.values()) {
+                keys.push(folder_key(d.uuid, g.path))
+                walk(g)
+            }
+        }
+        walk(metric_folders(d.metrics))
+    }
+    return keys
 }
 
 /* ------------------------------------------------------------------

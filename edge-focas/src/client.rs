@@ -86,10 +86,29 @@ impl std::fmt::Display for ReadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Link(e) => write!(f, "{e}"),
-            Self::Cnc(code) => write!(f, "control returned error {code}"),
+            Self::Cnc(code) => match ew_name(*code) {
+                Some(name) => write!(f, "control returned error {code} ({name})"),
+                None => write!(f, "control returned error {code}"),
+            },
             Self::Data(what) => write!(f, "unexpected data: {what}"),
         }
     }
+}
+
+/// The name and meaning FANUC's library gives an error code, from the
+/// `EW_` list in `fwlib32.h`.
+pub fn ew_name(code: i16) -> Option<&'static str> {
+    Some(match code {
+        -1 => "EW_BUSY: the control is busy",
+        1 => "EW_FUNC: not available on this control",
+        2 => "EW_LENGTH: wrong data length",
+        3 => "EW_NUMBER: no such number on this control",
+        4 => "EW_ATTRIB: wrong attribute, for example an axis for a parameter that has none",
+        5 => "EW_DATA: bad data",
+        6 => "EW_NOOPT: the control does not have the option",
+        7 => "EW_PROT: write protected",
+        _ => return None,
+    })
 }
 
 impl From<ProtoError> for ReadError {
@@ -260,10 +279,7 @@ impl Client {
 
             Addr::Param(n, axis) => {
                 let d = self
-                    .one(Request::cnc(
-                        cmd::READ_PARAM,
-                        [n, n, axis.unwrap_or(-1), 0, 0],
-                    ))
+                    .one(Request::cnc(cmd::READ_PARAM, [n, n, axis, 0, 0]))
                     .await?;
                 Ok(json!({ "values": decode_param(&d, self.info.axes)? }))
             }
@@ -275,10 +291,13 @@ impl Client {
                 if d.len() < size.bytes() {
                     return Err(ReadError::Data("pmc length"));
                 }
-                let v: u32 = match size {
-                    PmcSize::Byte => d[0] as u32,
-                    PmcSize::Word => u16::from_be_bytes([d[0], d[1]]) as u32,
-                    PmcSize::Long => u32::from_be_bytes(d[0..4].try_into().unwrap()),
+                // FANUC's IODBPMC holds words and longs as signed
+                // `short` and `long`, so those come back signed. A byte
+                // is usually a set of bits, so it stays 0 to 255.
+                let v: i64 = match size {
+                    PmcSize::Byte => d[0] as i64,
+                    PmcSize::Word => i16::from_be_bytes([d[0], d[1]]) as i64,
+                    PmcSize::Long => i32::from_be_bytes(d[0..4].try_into().unwrap()) as i64,
                 };
                 Ok(json!({ "value": v }))
             }

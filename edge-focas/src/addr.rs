@@ -15,7 +15,8 @@
 //! | `speeds`             | `{"feed","spindle"}`                             |
 //! | `position`           | `{"absolute":[..],"relative":[..],"machine":[..],"distance":[..]}` |
 //! | `macro:<n>`          | `{"value"}`                                      |
-//! | `param:<n>`          | `{"values":[..]}`, one per axis for axis parameters |
+//! | `param:<n>`          | `{"values":[v]}` for a parameter with no axis    |
+//! | `param:<n>:all`      | `{"values":[..]}`, one per axis                  |
 //! | `param:<n>:<axis>`   | `{"values":[v]}` for one axis (1-based)          |
 //! | `pmc:<area><n>[:<size>]` | `{"value"}`; size is `byte` (default), `word` or `long` |
 
@@ -108,8 +109,10 @@ pub enum Addr {
     Speeds,
     Position,
     Macro(i32),
-    /// The parameter number, and the axis (1-based) or `None` for all.
-    Param(i32, Option<i32>),
+    /// The parameter number and the axis, as FANUC's `cnc_rdparam`
+    /// numbers it: 0 for a parameter with no axis, 1 to the number of
+    /// axes for one axis, and -1 (`ALL_AXES`) for every axis.
+    Param(i32, i32),
     Pmc(PmcArea, i32, PmcSize),
 }
 
@@ -125,8 +128,9 @@ impl Addr {
             ["speeds"] => Some(Self::Speeds),
             ["position"] => Some(Self::Position),
             ["macro", n] => Some(Self::Macro(num(n)?)),
-            ["param", n] => Some(Self::Param(num(n)?, None)),
-            ["param", n, axis] => Some(Self::Param(num(n)?, Some(num(axis).filter(|a| *a > 0)?))),
+            ["param", n] => Some(Self::Param(num(n)?, 0)),
+            ["param", n, "all"] => Some(Self::Param(num(n)?, -1)),
+            ["param", n, axis] => Some(Self::Param(num(n)?, num(axis).filter(|a| *a > 0)?)),
             ["pmc", a] => Self::parse_pmc(a, PmcSize::Byte),
             ["pmc", a, size] => Self::parse_pmc(
                 a,
@@ -158,11 +162,9 @@ mod tests {
         assert_eq!(Addr::parse("status"), Some(Addr::Status));
         assert_eq!(Addr::parse(" position "), Some(Addr::Position));
         assert_eq!(Addr::parse("macro:500"), Some(Addr::Macro(500)));
-        assert_eq!(Addr::parse("param:1320"), Some(Addr::Param(1320, None)));
-        assert_eq!(
-            Addr::parse("param:1320:2"),
-            Some(Addr::Param(1320, Some(2)))
-        );
+        assert_eq!(Addr::parse("param:6711"), Some(Addr::Param(6711, 0)));
+        assert_eq!(Addr::parse("param:1320:all"), Some(Addr::Param(1320, -1)));
+        assert_eq!(Addr::parse("param:1320:2"), Some(Addr::Param(1320, 2)));
         assert_eq!(
             Addr::parse("pmc:R100"),
             Some(Addr::Pmc(PmcArea::R, 100, PmcSize::Byte))
@@ -182,6 +184,8 @@ mod tests {
             "macro:x",
             "macro:-1",
             "param:1320:0",
+            "param:1320:-1",
+            "param:1320:ALL",
             "pmc:Q1",
             "pmc:R",
             "pmc:R1:float",

@@ -74,7 +74,7 @@ async fn reads_every_address() {
     assert_eq!(read(&mut c, "macro:3901").await, json!({ "value": 0.0 }));
 
     assert_eq!(
-        read(&mut c, "param:1320").await,
+        read(&mut c, "param:1320:all").await,
         json!({ "values": [500000, 400000, 300000] })
     );
     assert_eq!(
@@ -84,6 +84,8 @@ async fn reads_every_address() {
     assert_eq!(read(&mut c, "param:6711").await, json!({ "values": [0] }));
 
     assert_eq!(read(&mut c, "pmc:D10:word").await, json!({ "value": 1234 }));
+    assert_eq!(read(&mut c, "pmc:D20:word").await, json!({ "value": -5 }));
+    assert_eq!(read(&mut c, "pmc:D20").await, json!({ "value": 255 }));
     assert_eq!(read(&mut c, "pmc:D10").await, json!({ "value": 4 }));
     assert_eq!(read(&mut c, "pmc:R0:long").await, json!({ "value": 0 }));
     assert_eq!(read(&mut c, "pmc:G0").await, json!({ "value": 0 }));
@@ -101,6 +103,14 @@ async fn refused_reads_keep_the_connection() {
     match c.read(&Addr::parse("pmc:R9999:word").unwrap()).await {
         Err(ReadError::Cnc(3)) => {}
         other => panic!("{other:?}"),
+    }
+    // An axis parameter read with no axis, and a plain one read for
+    // every axis, are both attribute errors.
+    for addr in ["param:1320", "param:6711:all"] {
+        match c.read(&Addr::parse(addr).unwrap()).await {
+            Err(e @ ReadError::Cnc(4)) => assert!(e.to_string().contains("EW_ATTRIB"), "{e}"),
+            other => panic!("{addr}: {other:?}"),
+        }
     }
     // The session still works.
     assert_eq!(read(&mut c, "macro:100").await, json!({ "value": 12.345 }));

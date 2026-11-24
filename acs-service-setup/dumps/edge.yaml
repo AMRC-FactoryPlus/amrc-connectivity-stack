@@ -173,7 +173,7 @@ configs:
       presentation:
         address:
           title: "FOCAS Read"
-          description: "What to read: sysinfo, status, alarm, program, speeds, position, macro:<n>, param:<n>[:<axis>] or pmc:<area><n>[:byte|word|long] (e.g. pmc:D100:word). Every read answers with JSON, so set the payload format to JSON."
+          description: "What to read: sysinfo, status, alarm, program, speeds, position, macro:<n>, param:<n> (no axis), param:<n>:all or param:<n>:<axis>, or pmc:<area><n>[:byte|word|long] (e.g. pmc:D100:word). Every read answers with JSON, so set the payload format to JSON."
           icon: "gears"
           placeholder: "e.g. position"
         path:

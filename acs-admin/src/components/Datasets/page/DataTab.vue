@@ -23,31 +23,45 @@
           <input v-model="query" type="search" aria-label="Search metrics" :placeholder="`Search ${total} metrics...`"
                  class="h-9 w-full rounded-md border border-slate-200 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-slate-950"/>
         </div>
+        <div v-if="devices.length && !searching" class="mt-2 flex justify-end gap-3 text-xs">
+          <button type="button" class="text-slate-500 hover:text-slate-900" @click="expandAll">Expand all</button>
+          <button type="button" class="text-slate-500 hover:text-slate-900" @click="collapseAll">Collapse all</button>
+        </div>
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div v-if="!devices.length" class="p-4 text-center text-sm text-slate-500">
           {{ resolved.devices.length ? 'The device details are still loading.' : 'This dataset covers no devices.' }}
         </div>
-        <div v-else-if="!groups.length" class="p-4 text-center text-sm text-slate-500">No metric matches "{{ search }}".</div>
-        <div v-for="g in groups" :key="g.device.uuid" class="border-b border-slate-100 py-2 last:border-b-0">
-          <div class="flex items-center justify-between gap-2 px-3 pb-1 text-[13px]">
-            <span class="truncate font-semibold" :title="g.device.name">{{ g.device.name }}</span>
-            <span class="shrink-0 text-xs text-slate-500">{{ metric_count(g.device.metrics.length) }}</span>
-          </div>
-          <div v-if="!g.device.metrics.length" class="px-3 text-xs text-slate-500">Records no metrics to the historian.</div>
-          <label v-for="m in g.shown" :key="m.path"
-                 class="flex items-center gap-2 px-3 py-1 text-[13px]"
-                 :class="m.chartable ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default text-slate-400'"
-                 :title="m.path">
-            <input type="checkbox" class="size-3.5 shrink-0 accent-slate-900"
-                   :checked="m.pinned" :disabled="!m.chartable"
-                   @change="pins.toggle(g.device.uuid, m.path)"/>
-            <span class="min-w-0 flex-1 truncate">{{ m.label }}</span>
-            <span v-if="!m.chartable" class="shrink-0 text-xs text-slate-500">Text, not charted</span>
-            <span v-else-if="m.unit" class="shrink-0 text-xs text-slate-400">{{ m.unit }}</span>
-          </label>
-          <div v-if="g.more" class="px-3 pt-1 text-xs text-slate-500">
-            {{ g.more }} more, {{ search.trim() ? 'narrow the search to see them' : 'search to find them' }}
+        <div v-else-if="!rows.length" class="p-4 text-center text-sm text-slate-500">No metric matches "{{ search }}".</div>
+        <div v-else class="py-1" role="tree" aria-label="Metrics">
+          <template v-for="r in shownRows" :key="r.key">
+            <button v-if="r.kind !== 'metric'" type="button" role="treeitem" :aria-expanded="r.open"
+                    class="flex w-full items-center gap-1.5 py-1 pr-3 text-left text-[13px] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-950"
+                    :class="r.kind === 'device' ? 'font-semibold' : ''"
+                    :style="{ paddingLeft: `${8 + r.depth * 14}px` }"
+                    :title="r.kind === 'device' ? r.device.name : r.path"
+                    :disabled="searching" @click="toggle(r)">
+              <i class="fa-solid fa-chevron-right w-3 shrink-0 text-[10px] text-slate-400 transition-transform" :class="r.open && 'rotate-90'" aria-hidden="true"></i>
+              <i v-if="r.kind === 'folder'" :class="['fa-solid w-3.5 shrink-0 text-xs text-slate-400', r.open ? 'fa-folder-open' : 'fa-folder']" aria-hidden="true"></i>
+              <span class="min-w-0 flex-1 truncate">{{ r.kind === 'device' ? r.device.name : r.label }}</span>
+              <span class="shrink-0 text-xs font-normal text-slate-500">{{ r.kind === 'device' ? metric_count(r.count) : r.count }}</span>
+            </button>
+            <label v-else role="treeitem"
+                   class="flex items-center gap-2 py-1 pr-3 text-[13px]"
+                   :class="chartable(r.metric.type) ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default text-slate-400'"
+                   :style="{ paddingLeft: `${8 + r.depth * 14 + 18}px` }"
+                   :title="r.metric.path">
+              <input type="checkbox" class="size-3.5 shrink-0 accent-slate-900"
+                     :checked="r.pinned" :disabled="!chartable(r.metric.type)"
+                     @change="pins.toggle(r.device, r.metric.path)"/>
+              <span class="min-w-0 flex-1 truncate">{{ r.label }}</span>
+              <span v-if="!chartable(r.metric.type)" class="shrink-0 text-xs text-slate-500">Text, not charted</span>
+              <span v-else-if="r.metric.unit" class="shrink-0 text-xs text-slate-400">{{ r.metric.unit }}</span>
+            </label>
+          </template>
+          <div v-for="r in emptyDevices" :key="r" class="px-3 text-xs text-slate-500">{{ r }} records no metrics to the historian.</div>
+          <div v-if="hiddenRows" class="px-3 pt-1 text-xs text-slate-500">
+            {{ hiddenRows }} more rows. Close a folder or search to see them.
           </div>
         </div>
       </div>
@@ -172,8 +186,8 @@ import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { fmt_window, fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { download_csv } from '@/lib/datasets/api.js'
-import { axis_ticks, chartable, series_key, latest_point, device_metric_labels, fmt_since, STEP_MS } from '@/lib/datasets/series.js'
-import { metric_total, filter_metrics, live_badge, LIVE_DENIED } from './page-logic.js'
+import { axis_ticks, chartable, series_key, latest_point, fmt_since, STEP_MS } from '@/lib/datasets/series.js'
+import { metric_total, metric_tree_rows, metric_tree_keys, live_badge, LIVE_DENIED } from './page-logic.js'
 import { useDatasetPins, useDatasetDevices } from './usePins.js'
 import { useChartSeries } from './useChartSeries.js'
 import TimelineToolbar from '../timeline/TimelineToolbar.vue'
@@ -187,16 +201,14 @@ const props = defineProps({
 })
 defineEmits(['download'])
 
-const FIRST = 6
-const MAX_MATCHES = 50
-
 const ds = useDatasetsStore()
 const sc = useServiceClientStore()
 const query = ref('')
 // Filter once typing pauses, not on every key.
 const search = refDebounced(query, 200)
-// At most this many metric rows render at once, across all devices.
-const MAX_ROWS = 300
+const searching = computed(() => !!search.value.trim())
+// At most this many picker rows render at once.
+const MAX_ROWS = 500
 
 const { devices, byUuid } = useDatasetDevices(() => props.record, () => props.resolved)
 const missing = computed(() => ds.devicesReady ? props.resolved.devices.length - devices.value.length : 0)
@@ -204,27 +216,29 @@ const total = computed(() => metric_total(devices.value))
 
 const { pins, entries } = useDatasetPins(() => props.record, () => props.resolved, byUuid)
 
-// Pinned metrics always show; otherwise the first few, or the matches,
-// up to MAX_ROWS in all.
-const groups = computed(() => {
-  let room = MAX_ROWS
-  return filter_metrics(devices.value, search.value).map(g => {
-    const limit = Math.max(0, Math.min(room, search.value.trim() ? MAX_MATCHES : FIRST))
-    const labels = device_metric_labels(g.device.metrics)
-    const shown = g.metrics
-      .filter((m, i) => i < limit || pins.has(series_key(g.device.uuid, m.path)))
-      .map(m => ({
-        path: m.path,
-        label: labels.get(m.path),
-        unit: m.unit,
-        chartable: chartable(m.type),
-        pinned: pins.has(series_key(g.device.uuid, m.path)),
-      }))
-    room -= shown.length
-    return { device: g.device, shown, more: g.metrics.length - shown.length }
-  })
-})
+/* The picker tree: devices, then folders by metric path, as the i3X
+ * Explorer lays them out. Folders the viewer opens or closes are kept
+ * here; the rest follow metric_tree_rows' defaults. */
+const opened = ref(new Map())
+const rows = computed(() => metric_tree_rows(devices.value, {
+  query: search.value,
+  opened: opened.value,
+  pinned: (d, p) => pins.has(series_key(d, p)),
+}))
+const shownRows = computed(() => rows.value.slice(0, MAX_ROWS))
+const hiddenRows = computed(() => Math.max(0, rows.value.length - MAX_ROWS))
+const emptyDevices = computed(() => searching.value ? [] : devices.value.filter(d => !d.metrics?.length).map(d => d.name))
 
+function toggle (r) {
+  if (searching.value) return
+  opened.value = new Map(opened.value).set(r.key, !r.open)
+}
+function expandAll () {
+  opened.value = new Map(metric_tree_keys(devices.value).map(k => [k, true]))
+}
+function collapseAll () {
+  opened.value = new Map(metric_tree_keys(devices.value).map(k => [k, false]))
+}
 
 // Each chart is the charts column less its label and unpin columns.
 const LABEL_PX = 200 + 32

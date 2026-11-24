@@ -15,16 +15,17 @@
      Build dataset opens the dataset builder. -->
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useISA95Store } from '@store/useISA95Store.js'
 import { useLayoutStore } from '@store/layoutStore.js'
-import { HOST_KEY, classify_selection, explorer_actions, mk_host } from '@/lib/i3x-explorer-host.js'
+import { HOST_KEY, classify_selection, explorer_actions, location_query, mk_host, query_location } from '@/lib/i3x-explorer-host.js'
 import { on_explorer_search } from '@/lib/explorer-search.js'
 import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useServiceClientStore()
 /* Full screen (Esc) hides the console's menu and header; the Explorer
  * then fills the whole window with no frame around it. */
@@ -53,6 +54,19 @@ watch(accessOpen, open => { if (!open) access.value = null })
 const frame = ref(null)
 let stop_search = null
 
+/* The URL names the Explorer's selected object and tab
+ * (?object=…&tab=history), so a link opens the same place. The app
+ * reports each move and the URL is replaced, not pushed: the app keeps
+ * its own history. A URL changed from outside (a link elsewhere in the
+ * console to this page) moves the app. */
+const same_location = (a, b) => a.object === b.object && a.tab === b.tab
+let go_location = null
+watch(() => route.query, query => {
+  if (route.path !== '/explorer') return
+  const loc = query_location(query)
+  go_location?.(loc)
+})
+
 window[HOST_KEY] = mk_host({
   client: serviceClientReady().then(() => store.client),
   theme: () => document.documentElement.classList.contains('dark') ? 'dark' : 'light',
@@ -72,6 +86,15 @@ window[HOST_KEY] = mk_host({
     return () => stop_search?.()
   },
   escape: () => layout.toggleFullscreen(),
+  location: () => query_location(route.query),
+  set_location (loc) {
+    if (route.path !== '/explorer' || same_location(loc, query_location(route.query))) return
+    router.replace({ query: location_query(loc, route.query) })
+  },
+  on_location (go) {
+    go_location = go
+    return () => { if (go_location === go) go_location = null }
+  },
   run (action) {
     if (action.access) {
       access.value = action.access

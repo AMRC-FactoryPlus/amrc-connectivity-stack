@@ -167,3 +167,48 @@ describe('classify_selection', () => {
     expect(classify_selection({ object: enterprise }).kind).toBe('level')
   })
 })
+
+describe('Explorer location in the URL', () => {
+  it('reads the object and tab from a route query', async () => {
+    const { query_location } = await import('../src/lib/i3x-explorer-host.js')
+    expect(query_location({ object: 'a/b c', tab: 'history' })).toEqual({ object: 'a/b c', tab: 'history' })
+    expect(query_location({ object: ['x', 'y'] })).toEqual({ object: 'x', tab: null })
+    expect(query_location({ object: '' })).toEqual({ object: null, tab: null })
+    expect(query_location(undefined)).toEqual({ object: null, tab: null })
+  })
+
+  it('writes a location into a query, keeping other keys', async () => {
+    const { location_query } = await import('../src/lib/i3x-explorer-host.js')
+    expect(location_query({ object: 'o', tab: 'history' }, { other: '1', tab: 'old' }))
+      .toEqual({ other: '1', object: 'o', tab: 'history' })
+    expect(location_query({ object: 'o', tab: null }, { tab: 'history' })).toEqual({ object: 'o' })
+    expect(location_query({ object: null, tab: 'history' }, { object: 'o', other: '1' })).toEqual({ other: '1' })
+  })
+
+  it('passes locations between the host and the console', () => {
+    const set_location = vi.fn()
+    const go = vi.fn()
+    let registered = null
+    const host = mk_host({
+      client: fake_client(),
+      location: () => ({ object: 'o', tab: 'history' }),
+      set_location,
+      on_location: g => { registered = g; return () => { registered = null } },
+    })
+    expect(host.location()).toEqual({ object: 'o', tab: 'history' })
+    host.setLocation({ object: 'p', tab: 7, extra: true })
+    expect(set_location).toHaveBeenCalledWith({ object: 'p', tab: null })
+    const stop = host.onLocationRequest(go)
+    registered({ object: 'q', tab: null })
+    expect(go).toHaveBeenCalledWith({ object: 'q', tab: null })
+    stop()
+    expect(registered).toBe(null)
+  })
+
+  it('has no location without the console options', () => {
+    const host = mk_host({ client: fake_client() })
+    expect(host.location()).toBe(null)
+    expect(() => host.setLocation({ object: 'o' })).not.toThrow()
+    expect(typeof host.onLocationRequest(() => {})).toBe('function')
+  })
+})

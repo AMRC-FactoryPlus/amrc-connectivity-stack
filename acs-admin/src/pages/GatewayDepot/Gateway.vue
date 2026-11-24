@@ -97,16 +97,16 @@
               <AdminLogin :id="id"/>
               <p class="flex items-center gap-2 text-base font-semibold" role="status">
                 <i class="fa-solid fa-circle-notch fa-spin text-slate-500" aria-hidden="true"></i>
-                {{ gateway.state === 'approved' ? 'Waiting for the gateway to start the install' : 'Installing the operating system' }}
+                <span class="break-words">{{ install_text }}</span>
               </p>
               <p class="text-slate-500">
                 {{ gateway.state === 'approved' ? 'Approved' : 'Started' }} {{ install_from ? ago(install_from, now.getTime()) : '' }}{{ gateway.approved_by ? ' by ' + gateway.approved_by : '' }}.
-                The gateway does not report while it installs, so this page updates when the install finishes and the gateway powers off.
+                The gateway powers off when the install finishes.
               </p>
-              <div v-if="gateway.log">
-                <h3 class="mb-2 text-sm font-semibold">Log from the gateway</h3>
-                <GatewayLog :text="gateway.log"/>
-              </div>
+              <details v-if="gateway.log" open>
+                <summary class="cursor-pointer py-1 text-sm font-medium">Log from the installer</summary>
+                <GatewayLog class="mt-2" :text="gateway.log"/>
+              </details>
             </div>
 
             <div v-else-if="kind === 'failed-install'" class="flex flex-col gap-4 text-sm">
@@ -229,6 +229,13 @@ const related = computed(() => (relation.value ? depot.byId.get(relation.value.i
 /* When the gateway collected its settings, or failing that when it was
  * approved. */
 const install_from = computed(() => gateway.value.install_started_at ?? gateway.value.approved_at ?? null)
+
+/* What the installer says it is doing, as it reports each step. */
+const install_text = computed(() => {
+  if (gateway.value.state === 'approved') return 'Waiting for the gateway to start the install'
+  const step = clean(gateway.value.install_step)
+  return step ? 'Installing: ' + step : 'Installing the operating system'
+})
 
 const progress = computed(() => {
   const o = gateway.value.onboard || {}

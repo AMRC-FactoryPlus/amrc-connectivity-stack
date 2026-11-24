@@ -310,8 +310,16 @@ class OpenIDSetup {
                 ?? roots.map(r => `${r}${spec.redirectPath ?? "/*"}`),
             webOrigins: spec.webOrigins ?? roots,
             attributes: {
+                // Default to the same wildcarded roots as redirectUris,
+                // not the bare roots: a SPA's post_logout_redirect_uri is
+                // built from location.origin + location.pathname, which
+                // for a root-hosted app is `<root>/` - that trailing
+                // slash fails Keycloak's exact-match check against a bare
+                // root and logout fails with "invalid redirect uri".
                 "post.logout.redirect.uris":
-                    (spec.postLogoutRedirectUris ?? roots).join("##"),
+                    (spec.postLogoutRedirectUris
+                        ?? roots.map(r => `${r}${spec.redirectPath ?? "/*"}`))
+                        .join("##"),
                 // When an admin force-logs-out a user in Keycloak,
                 // backchannel.logout.session.required tells Keycloak to
                 // POST a session-end notification to the client so it

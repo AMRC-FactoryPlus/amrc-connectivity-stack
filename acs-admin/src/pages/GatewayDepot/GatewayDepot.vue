@@ -14,8 +14,7 @@
         <template #actions><StickDownload/></template>
       </EmptyState>
       <template v-else>
-        <div class="mb-4 flex justify-end"><StickDownload/></div>
-        <section v-for="g in groups" :key="g.key" :aria-label="g.label">
+        <section v-for="(g, i) in groups" :key="g.key" :aria-label="g.label">
           <DataTable :data="g.rows" :columns="columns" :filters="[]" @row-click="row => open(row.original.id)">
             <template #toolbar-left>
               <h2 class="flex items-center gap-2 text-sm font-semibold">
@@ -27,6 +26,7 @@
                 </template>
               </h2>
             </template>
+            <template v-if="i === 0" #toolbar-right><StickMenu/></template>
           </DataTable>
         </section>
       </template>
@@ -43,6 +43,7 @@ import DataTable from '@components/ui/data-table/DataTable.vue'
 import GatewayDepotContainer from '@components/Containers/GatewayDepotContainer.vue'
 import DepotLoad from '@components/GatewayDepot/DepotLoad.vue'
 import StickDownload from '@components/GatewayDepot/StickDownload.vue'
+import StickMenu from '@components/GatewayDepot/StickMenu.vue'
 import { useGatewayDepotStore } from '@store/useGatewayDepotStore.js'
 import { row_of } from '@/lib/gateway-depot/model.js'
 import { gatewayColumns, gatewayColumnsNarrow } from './gatewayColumns.ts'

@@ -252,7 +252,8 @@ Set these under `gatewayDepot` in the ACS Helm values.
 ## The depot stick
 
 Download the depot stick from the Gateway Depot page of the Admin UI and
-write it to a USB stick. A machine booted from it does not touch its
+write it to a USB stick. With no gateways yet, the page shows a download
+button. Once there are gateways, the download is in the menu beside View. A machine booted from it does not touch its
 disk until someone approves it.
 
 The chart builds the stick. A Job runs `stick/bake.sh` on every install

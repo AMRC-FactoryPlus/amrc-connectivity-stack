@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  ago, can_be_replaced, clock, configured_ports, contact_of, disk_size, dur, group_gateways, is_lost, kind_of,
+  ago, can_be_replaced, depot_setup_of, clock, configured_ports, contact_of, disk_size, dur, group_gateways, is_lost, kind_of,
   label_for, link_key, mem_size, name_of, onboarded_text, real, relation_of, replace_candidates, row_of,
   serial_of, service_cluster_text, settings_rows, state_meta, steps_of, subline_of, track_links,
 } from '../src/lib/gateway-depot/model.js'
@@ -356,5 +356,32 @@ describe('times and sizes', () => {
     expect(disk_size(1500000000000)).toBe('1.5 TB')
     expect(disk_size(0)).toBe('')
     expect(mem_size(8589934592)).toBe('8 GB memory')
+  })
+})
+
+describe('depot_setup_of', () => {
+  const rec = (state, onboard, name = 'fpcgw-abc') =>
+    ({ uuid: 'u1', name, gateway: { scout_id: 's1', state, onboard, inventory: { serial: 'SN1' } } })
+  const C = 'cluster-1'
+
+  it('finds a gateway onboarding the cluster', () => {
+    const r = depot_setup_of([rec('onboarding', { cluster: { uuid: C }, step: 'Installing K3s' })], C)
+    expect(r).toEqual({ id: 's1', name: 'fpcgw-abc', step: 'Installing K3s' })
+  })
+
+  it('keeps it until Factory+ can see the gateway', () => {
+    expect(depot_setup_of([rec('onboarded', { cluster: { uuid: C }, reported: false })], C)).not.toBeNull()
+    expect(depot_setup_of([rec('onboarded', { cluster: { uuid: C }, reported: true })], C)).toBeNull()
+  })
+
+  it('ignores failed onboarding and other clusters', () => {
+    expect(depot_setup_of([rec('failed', { cluster: { uuid: C }, error: 'x' })], C)).toBeNull()
+    expect(depot_setup_of([rec('onboarding', { cluster: { uuid: 'other' } })], C)).toBeNull()
+    expect(depot_setup_of([{ uuid: 'u2', name: 'x' }], C)).toBeNull()
+    expect(depot_setup_of(undefined, C)).toBeNull()
+  })
+
+  it('falls back to the serial for a name', () => {
+    expect(depot_setup_of([rec('onboarding', { cluster: { uuid: C } }, '')], C).name).toBe('Gateway SN1')
   })
 })

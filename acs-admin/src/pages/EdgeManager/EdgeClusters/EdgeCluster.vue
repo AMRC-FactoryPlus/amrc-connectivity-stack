@@ -8,7 +8,21 @@
     <div v-else class="flex h-full min-h-0">
       <div class="flex-1 min-w-0 flex flex-col gap-4 pr-4 -my-4 py-4 overflow-y-auto">
         <EmptyState
-            v-if="!bootstrapped"
+            v-if="!bootstrapped && depotSetup"
+            :title="`${depotSetup.name} is setting up ${cluster.name}`"
+            :description="`The Gateway Depot onboarded this gateway, and it is installing K3s and bootstrapping the cluster by itself, so there is nothing to run. This page updates when the cluster reports in, usually within 10 minutes.${depotSetup.step ? ' Now: ' + depotSetup.step + '.' : ''}`"
+            icon="circle-notch fa-spin"
+        >
+            <template #actions>
+                <Button variant="outline" as-child>
+                    <RouterLink :to="{ name: 'GatewayDepotGateway', params: { id: depotSetup.id } }">
+                        <i class="fa-solid fa-server mr-2"></i>Open in the Gateway Depot
+                    </RouterLink>
+                </Button>
+            </template>
+        </EmptyState>
+        <EmptyState
+            v-else-if="!bootstrapped"
             :title="`Bootstrap Required for ${cluster.name}`"
             description="This edge cluster needs to be bootstrapped before it can be used. Click the button below to copy the bootstrap command to run on the Linux host of the first node in the cluster. Note that it may take a few minutes to show up after running the bootstrap command."
             icon="rocket"
@@ -184,6 +198,8 @@ import EmptyState from '@components/EmptyState.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
 import moment from 'moment'
 import { useDeploymentStore } from '@store/useDeploymentStore.js'
+import { useDepotGatewayStore } from '@store/useDepotGatewayStore.js'
+import { depot_setup_of } from '@/lib/gateway-depot/model.js'
 import { hostIsKnown } from '@utils/hosts.js'
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 
@@ -221,6 +237,7 @@ export default {
     const canRebirthMap = useCanRebirth(nodeUuids)
 
     return {
+      depotGateways: useDepotGatewayStore(),
       e: useEdgeClusterStore(),
       dp: useDeploymentStore(),
       n,
@@ -264,6 +281,11 @@ export default {
 
     bootstrapped () {
       return this.hosts?.length > 0
+    },
+
+    /* A gateway the Gateway Depot is setting this cluster up on, if any. */
+    depotSetup () {
+      return depot_setup_of(this.depotGateways.data, this.cluster?.uuid)
     },
 
     initialNameSort () {
@@ -354,7 +376,20 @@ export default {
   data () {
     return {
       copyingBootstrap: false,
+      /* Whether this page started the depot gateway store. */
+      startedDepot: false,
     }
+  },
+
+  mounted () {
+    if (!this.depotGateways.rxsub) {
+      this.startedDepot = true
+      this.depotGateways.start()
+    }
+  },
+
+  unmounted () {
+    if (this.startedDepot) this.depotGateways.stop()
   },
 }
 </script>

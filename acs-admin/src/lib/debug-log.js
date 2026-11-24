@@ -11,6 +11,8 @@
  * person ticked Verbose logging at sign-in (the same setting that turns
  * on the service client's own logging), or the build sets VERBOSE. */
 
+import { load_login } from "./saved-login.js";
+
 let cached = null;
 let checked = 0;
 
@@ -19,11 +21,7 @@ export function verbose () {
     const now = Date.now();
     if (cached !== null && now - checked < 1000) return cached;
     checked = now;
-    let setting = "";
-    try {
-        setting = JSON.parse(localStorage.getItem("opts") ?? "{}")?.verbose ?? "";
-    }
-    catch { /* no storage, or not JSON: off */ }
+    const setting = load_login()?.verbose ?? "";
     cached = Boolean(setting || import.meta.env?.VERBOSE);
     return cached;
 }

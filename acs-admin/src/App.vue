@@ -99,6 +99,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Nav from '@/components/Nav/Nav.vue'
 import EdgeClusterList from '@/components/Nav/EdgeClusterList.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { load_login } from '@/lib/saved-login.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
 import { useEventListener, useMagicKeys } from '@vueuse/core'
 import { useRouter } from 'vue-router'
@@ -216,10 +217,11 @@ export default {
   },
 
   async mounted () {
-    // Check if opts exists in local storage
-    if (localStorage.getItem('opts')) {
+    // Check if this tab has saved sign-in details
+    const opts = load_login()
+    if (opts) {
       // If it does then create the service client
-      await this.s.login(JSON.parse(localStorage.getItem('opts')))
+      await this.s.login(opts)
     }
 
     this.$router.isReady().then(() => {

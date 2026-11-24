@@ -4,6 +4,7 @@
 
 import { defineStore } from 'pinia'
 import { RxClient, UUIDs } from '@amrc-factoryplus/rx-client'
+import { save_login, clear_login } from '@/lib/saved-login.js'
 
 export const useServiceClientStore = defineStore('service-client', {
   state: () => {
@@ -29,9 +30,8 @@ export const useServiceClientStore = defineStore('service-client', {
         this.loaded = true;
         this.scheme  = import.meta.env.SCHEME;
         this.baseUrl = import.meta.env.BASEURL;
-        // Save opts to local storage for use on page reload
-        // Here we should store a token rather than the actual credentials
-        localStorage.setItem('opts', JSON.stringify(opts));
+        // Keep opts for this tab so a page reload stays signed in
+        save_login(opts);
         // client.Fetch.cache = 'reload';
         this.ready = true;
       } catch (e) {
@@ -41,8 +41,8 @@ export const useServiceClientStore = defineStore('service-client', {
     },
 
     logout () {
-      // Delete the opts local storage item
-      localStorage.removeItem('opts');
+      // Forget the saved sign-in details
+      clear_login();
       // Reset the local state
       this.$reset();
       this.ready = false;

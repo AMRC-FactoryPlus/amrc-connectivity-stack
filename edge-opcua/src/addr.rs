@@ -108,6 +108,15 @@ impl Addr {
     }
 }
 
+/// The canonical address of a node: the form a scan reports, and the
+/// form the Admin UI's `opcua` normaliser turns a metric's address into
+/// before it compares. Namespace 0 is written without `ns=0;`, so
+/// `i=2258`, never `ns=0;i=2258`. [`Addr::parse`] reads it back as the
+/// same node.
+pub fn canonical(node: &NodeId) -> String {
+    node.to_string()
+}
+
 impl PartialEq for Addr {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
@@ -214,6 +223,44 @@ mod tests {
         let e = a.element.unwrap();
         assert_eq!(e.node, NodeId::new(3, r#""DB"."arr""#));
         assert_eq!(e.range.to_string(), "3");
+    }
+
+    /// The canonical form drops `ns=0;` and reads back as the same
+    /// node, for every kind of identifier.
+    #[test]
+    fn canonical_addresses_read_back_as_the_same_node() {
+        let guid = Guid::from_str("72962b91-fa75-4ae6-8d28-b404dc7daf63").unwrap();
+        let cases = [
+            (NodeId::new(0, 2258u32), "i=2258"),
+            (NodeId::new(0, "Name"), "s=Name"),
+            (NodeId::new(2, 1001u32), "ns=2;i=1001"),
+            (
+                NodeId::new(2, "Line 1/Speed;x=y"),
+                "ns=2;s=Line 1/Speed;x=y",
+            ),
+            (
+                NodeId::new(3, r#""DB"."arr"[3]"#),
+                r#"ns=3;s="DB"."arr"[3]"#,
+            ),
+            (
+                NodeId::new(3, guid),
+                "ns=3;g=72962b91-fa75-4ae6-8d28-b404dc7daf63",
+            ),
+            (
+                NodeId::new(1, opcua::types::ByteString::from(vec![1u8, 2, 3])),
+                "ns=1;b=AQID",
+            ),
+        ];
+        for (node, want) in cases {
+            let s = canonical(&node);
+            assert_eq!(s, want);
+            assert_eq!(Addr::parse(&s).node, Some(node), "{s}");
+        }
+        // A metric written the long way names the same node.
+        assert_eq!(
+            Addr::parse("ns=0;i=2258").node.map(|n| canonical(&n)),
+            Some("i=2258".into())
+        );
     }
 
     #[test]

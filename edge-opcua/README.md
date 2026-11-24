@@ -284,6 +284,105 @@ Known upstream issues that are still open on that commit:
   driver turns on `ignore_clock_skew`, which avoids it (see "Server
   clocks").
 
+## Scanning the address space
+
+The driver takes part in Edge Scout, which lists a device's addresses
+so an operator can pick them in the Admin UI's origin map editor
+instead of typing them. The protocol is the "Scouting" section of
+`acs-edge/docs/edge-split.md`, and the driver only scans when the Edge
+Agent advertises it, so it works with any Edge Agent.
+
+A scan uses the driver's own session, because many PLC servers have
+few session slots, and it shares that session with the subscriptions,
+so data keeps flowing during a scan. It walks the server's address
+space breadth first from Objects (`i=85`), or from the node a branch
+scan names:
+
+- It browses forward `HierarchicalReferences` and their subtypes, for
+  Objects and Variables only, asking for up to 1000 references per
+  node, and follows every continuation point with BrowseNext. When the
+  scan stops early (a cancel, a cap or an error) it releases the
+  continuation points it still holds. A request still running when the
+  scan stops waiting for it, or when the Edge Agent's session ends, is
+  left to a task of its own, which waits up to 30 s for the answer and
+  releases the continuation points in it, because they belong to the
+  driver's session and servers allow few of them.
+- It sends one request at a time, with `pace_ms` (20 ms by default)
+  between requests. A request names at most the server's
+  `MaxNodesPerBrowse` or `MaxNodesPerRead`, and never more than 50
+  nodes per Browse or 100 attributes per Read. When the server answers
+  `BadTooManyOperations`, which a server does when it enforces limits
+  it doesn't advertise, the batch halves and the pace doubles, up to
+  2 s. When an answer is too big for the message size (the server
+  says `BadResponseTooLarge`, or node-opcua's `BadTcpMessageTooLarge`),
+  the batch halves, then a Browse of one node asks for a quarter as
+  many references each time, down to 10. A node or attribute still
+  too big on its own gets `more: true` or no value, and the scan
+  carries on.
+- Each node is listed once, under the first parent the walk reaches
+  it from, so `Organizes` cycles end and a node with two parents is
+  not listed twice.
+- An Object is a folder and a Variable is a value. Both have the
+  node's canonical id as their `id`, and a value has it as its
+  `address`: namespace 0 is written `i=2258`, never `ns=0;i=2258`. A
+  node outside namespace 0 carries its namespace URI in
+  `detail.namespace_uri`, because the index can change when a server
+  is rebuilt.
+- A variable gets its DataType as a Sparkplug type: Boolean, SByte
+  (Int8), Byte (UInt8), Int16 to UInt64, Float, Double, String,
+  DateTime, Guid (UUID), LocalizedText (String) and enumerations
+  (Int32). A subtype of one of these, such as Duration or a server's
+  own enumeration, gets its supertype's type. Anything else, such as a
+  structure or a ByteString, gets no type and `detail.ua_type`, the
+  DataType's node id. An array gets no type and `detail.dims`, with 0
+  for a length the server doesn't give. `access` comes from the
+  UserAccessLevel and `description` from the Description.
+- The Server object (`i=2253`) is skipped, and the scan says so, with
+  the prefix `i=`, so the Admin UI never calls a mapped `CurrentTime`
+  or `ServerStatus` metric missing. A scan whose root is inside the
+  Server object lists it.
+- A node at the depth cap is only checked for children, and gets
+  `more: true` if it has any. A node the server won't let the driver
+  browse (`BadUserAccessDenied`) gets `more: true` and
+  `detail.denied`, and the scan carries on and ends with the reason
+  `partial_access`.
+- A lost session ends the scan with `CONN`, and the driver doesn't
+  retry it. A root that is not a node id, does not exist, or is not an
+  Object or a Variable ends it with `OPTIONS`.
+
+Options, from the Scan panel:
+
+| Option | Default | What it does |
+|---|---|---|
+| `include_server` | false | List the Server object too |
+| `expand_arrays` | false | Give arrays of up to 64 elements an item per element, addressed `node[i]` or `node[i,j]` (see "Array elements"). An element whose id is already a node of its own, as a PLC's `node[3]` is, is listed once, as that node |
+| `units` | false | Read each variable's EngineeringUnits property into `unit` |
+
+The scan reads a variable's value only for a sample, when the scan
+asks for samples and the variable has a Sparkplug type, and for the
+length of an array that doesn't declare it, with `expand_arrays`. It
+reads arrays with the index range `0:64` in each dimension, so the
+answer holds at most 65 elements a dimension however long the array
+is, and doesn't read arrays of more than two dimensions at all. It
+asks for cached values (`maxAge` the Int32 maximum), so a gateway
+server doesn't read the device for a scan.
+
+The client accepts messages of up to 2 MiB (32 chunks of 64 KiB),
+and any array or string that fits in one. async-opcua's defaults are
+5 chunks, 1,000 array elements and 64 KiB strings, and it closes the
+connection when it can't decode a message, so one long array in a
+subscribed value or a scan's answer would put every device on the
+connection offline.
+
+**Load and size.** The test server's 20,445-node tree, 20,000
+variables in 445 folders with PLC-style names and a description each,
+takes 1,420 requests and about 3 s with no pace, and the default 20 ms
+pace adds about 28 s to that. It comes to 6.8 MB of items (334 bytes each) as the
+Edge Agent stores them, and 208 KB gzipped. Real tag names repeat less
+than the test server's, so expect a larger gzipped size. Each variable
+costs one Browse slot and five attributes, so a server's own limits
+decide how many requests a scan takes.
+
 ## Layout
 
 ```
@@ -297,11 +396,15 @@ src/subs.rs        the subscriptions: make them, retry what the
                    server refused, count what the session holds
 src/handler.rs     the rs-edge-driver Handler: session, reconnects
                    and writes
+src/scout.rs       scanning the address space, with unit tests
+                   against a fake server in src/scout/tests.rs
 tests/opcua.rs     the driver end to end against a node-opcua server
+tests/scout.rs     scans against the node-opcua server's SCOUT mode
 tests/clock.rs     a server whose clock is an hour fast
 tests/refused.rs   a server that refuses the driver's certificate
 tests/support/     that server, a TCP proxy and the fake Edge Agent
-tests/server/      the node-opcua server
+tests/server/      the node-opcua server, and scout.cjs, its address
+                   space for scans
 ```
 
 ## Tests
@@ -312,7 +415,7 @@ node-opcua server, and run when `EDGE_OPCUA_SERVER_TESTS` is set:
 
 ```sh
 (cd ../acs-edge && npm install --save=false --install-links)
-EDGE_OPCUA_SERVER_TESTS=1 cargo test --test opcua --test clock --test refused
+EDGE_OPCUA_SERVER_TESTS=1 cargo test --test opcua --test clock --test refused --test scout
 ```
 
 They cover every security mode and policy with and without
@@ -327,6 +430,13 @@ connection drop, a node that appears after the server starts, low
 server limits, a stalled agent, several devices on one connection, and
 a server clock an hour fast. `tests/refused.rs` runs the driver binary
 against a server that refuses its certificate and checks what it logs.
+`tests/scout.rs` scans the server's `SCOUT` address space and checks
+the exact item set, the Server object, the caps, a cancel releasing
+its continuation points within a second, a denied branch,
+`BadTooManyOperations`, a lost server, the data rate during a scan
+with every option on and an array of 5,000 elements, folders whose
+Browse is over the message size, the options, and the size of a
+20,000-variable scan, which it prints.
 
 The golden-output harness compares the Edge Agent's Sparkplug output
 with this driver against the built-in connection's, from runs recorded

@@ -364,3 +364,30 @@ export function replace_candidates (gateways, for_id) {
 export function secret_name (gw, note) {
   return [clean(note), serial_of(gw) ? 'serial ' + serial_of(gw) : hardware_of(gw)].filter(Boolean).join(', ') || 'this gateway'
 }
+
+/**
+ * The gateway the depot is setting up an edge cluster on, from the
+ * depot's ConfigDB records, or null. A cluster a gateway is onboarding,
+ * or has onboarded but Factory+ cannot see yet, is being bootstrapped
+ * by that gateway, so the person should wait rather than bootstrap it
+ * by hand. A failed onboarding is not, so the page offers the command.
+ *
+ * @param records  { uuid, name, gateway } from the depot gateway store
+ * @param cluster  the edge cluster's UUID
+ */
+export function depot_setup_of (records, cluster) {
+  if (!cluster) return null
+  for (const r of records ?? []) {
+    const gw = r && r.gateway
+    const ob = gw && gw.onboard
+    if (!ob || !ob.cluster || ob.cluster.uuid !== cluster) continue
+    const busy = gw.state === 'onboarding' || (gw.state === 'onboarded' && !ob.reported)
+    if (!busy) continue
+    return {
+      id: clean(gw.scout_id),
+      name: clean(r.name) || (gw.inventory && clean(gw.inventory.serial) ? 'Gateway ' + clean(gw.inventory.serial) : 'A gateway'),
+      step: clean(ob.step),
+    }
+  }
+  return null
+}

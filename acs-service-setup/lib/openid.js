@@ -13,6 +13,25 @@ const READY_TIMEOUT_MS = 10 * 60 * 1000;
 const READY_POLL_MS = 5 * 1000;
 const TOKEN_REFRESH_BUFFER_MS = 10 * 1000;
 
+/** The realm fields for Keycloak's "Remember me", from the
+ * OPENID_REMEMBER_ME_IDLE and OPENID_REMEMBER_ME_MAX seconds. Either
+ * missing, empty or not a positive number turns it off. */
+export function remember_me_from (env) {
+    const secs = v => {
+        const n = Number.parseInt(v ?? "", 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    const idle = secs(env.OPENID_REMEMBER_ME_IDLE);
+    const max = secs(env.OPENID_REMEMBER_ME_MAX);
+    if (idle == null || max == null)
+        return { rememberMe: false };
+    return {
+        rememberMe: true,
+        ssoSessionIdleTimeoutRememberMe: idle,
+        ssoSessionMaxLifespanRememberMe: max,
+    };
+}
+
 class OpenIDSetup {
     constructor (ss) {
         const { fplus } = ss;
@@ -27,6 +46,9 @@ class OpenIDSetup {
         // Empty string disables theme override and lets Keycloak fall
         // back to its built-in keycloak.v2 theme.
         this.login_theme = process.env.OPENID_LOGIN_THEME ?? "";
+        // "Remember me" session lengths in seconds. Unset or empty
+        // hides the box on the sign-in page.
+        this.remember_me = remember_me_from(process.env);
         // Cluster-internal F+ auth URL (e.g.
         // http://auth.factory-plus.svc.cluster.local). The Keycloak
         // SPI federation calls this URL for principal/group lookups.
@@ -138,6 +160,7 @@ class OpenIDSetup {
         // off actually propagates instead of being shadowed by the
         // existing realm value during the merge below.
         desired.loginTheme = this.login_theme;
+        Object.assign(desired, this.remember_me);
         if (get.status === 404) {
             this.log("Creating realm %s", this.realm);
             await this.api("POST", "/admin/realms", desired);

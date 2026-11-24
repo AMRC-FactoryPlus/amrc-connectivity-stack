@@ -260,6 +260,31 @@ grant, so after each run only one of the two was readable by people
 who are not administrators. All grants to every account now live in
 one file.
 
+### The admin UI signs in through Keycloak
+
+When ACS deploys Keycloak (`openid.enabled`, the default), the admin UI
+now signs people in on the Keycloak sign-in page instead of its own
+username and password form, and never sees or keeps the password.
+Closing a tab no longer signs you out: a reload or a new tab returns
+from Keycloak without asking again for as long as the Keycloak session
+lasts. That is 30 minutes idle and 10 hours in all by default, and the
+sign-in page now has a "Remember me" box that stretches it to 7 days
+idle and 30 days in all. `openid.rememberMe` in `values.yaml` sets
+those lengths, or turns the box off. Signing out of the admin UI also
+signs you out of Grafana and the visualiser.
+
+Sites with Keycloak turned off keep the admin UI's own form, which
+since the previous release keeps its sign-in details only until the
+tab closes.
+
+**Upgrading.** Nothing to do. Service setup creates a public Keycloak
+client called `admin`. Every service must be able to resolve the
+`openid.<acs-base>` host name from inside the cluster, because the
+services fetch Keycloak's keys from it; if a service logs "Auth
+unavailable: OIDC discovery failed", fix the cluster's DNS for that
+name. The services' notify websockets now accept a Keycloak token, so
+an older admin UI or client keeps working against new services.
+
 ### Upgrading: engineering units come from a vocabulary
 
 Metrics keep their `Eng_Unit` strings, but a new vocabulary of units

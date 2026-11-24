@@ -204,6 +204,25 @@ immediately. No refresh is possible in this mode, so mint the token
 from a service-account client with a long `accessTokenLifespan` (see
 `values.yaml` `serviceSetup.config.openidClients`).
 
+## The Admin
+
+When the chart deploys Keycloak (`openid.enabled`), the Admin signs
+people in through the Keycloak login page too (Authorization Code +
+PKCE, public client `admin`). It keeps the tokens in the page's
+memory only, renews the access token a minute before it expires, and
+hands it to the service client as `bearer_jwt`, so HTTP calls, the
+MQTT connection and the ConfigDB notify websockets all use it.
+
+A reload or a new tab sends the browser back to Keycloak, which sees
+its own session cookie and returns at once without a form, so closing
+a tab does not sign anyone out. Keycloak's session length decides
+that: 30 minutes idle and 10 hours in all by default, or the
+`openid.rememberMe` lengths when the person ticks "Remember me" on the
+login page. Logout ends the Keycloak session, which also signs the
+person out of Grafana and the visualiser.
+
+Without Keycloak the Admin keeps its own username and password form.
+
 ## How services validate the JWT
 
 The auth middleware in `lib/js-service-api`:

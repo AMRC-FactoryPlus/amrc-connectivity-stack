@@ -59,7 +59,19 @@ import DatasetBuilder from '@pages/Datasets/DatasetBuilder.vue';
 import DatasetCompare from '@pages/Datasets/DatasetCompare.vue';
 import DatasetAddons from '@pages/Datasets/AddonsPage.vue';
 import Kiosk from '@pages/Datasets/Kiosk.vue';
-import { load_login } from '@/lib/saved-login.js';
+import { load_login, save_login } from '@/lib/saved-login.js';
+import { oidc_session } from '@/lib/oidc.js';
+
+// With Keycloak, finish a sign-in the browser has just come back from
+// before the router reads the address bar. Without it the Admin uses
+// its own password form.
+const oidc = oidc_session()
+const oidc_return = oidc ? await oidc.finish_sign_in() : null
+if (oidc) {
+  // A password an older Admin saved for this tab is not needed now
+  const saved = load_login()
+  if (saved?.password) save_login({ verbose: saved.verbose })
+}
 
 // Create an event bus
 window.events = mitt()
@@ -339,7 +351,8 @@ const router = createRouter({
 })
 
 // Setup auth guard.
-// A reload signs in again with the details saved for this tab
+// With Keycloak a reload signs in again through Keycloak's own session.
+// Without it a reload signs in with the details saved for this tab.
 router.beforeEach(async (to, from, next) => {
   // If we don't need auth, we can go straight through
   // This is only for login at the moment, but other pages may be accessible in future
@@ -354,6 +367,10 @@ router.beforeEach(async (to, from, next) => {
     return
   }
   // Otherwise we are loading fresh and need to initialise the service client
+  if (oidc) {
+    await oidc_guard(to, next)
+    return
+  }
   const opts = load_login();
   // If there is no opts value stored, make sure we go to login
   if (!opts) {
@@ -380,6 +397,41 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 })
+
+async function oidc_guard (to, next) {
+  const store = useServiceClientStore()
+  if (oidc.signed_in) {
+    try {
+      await store.login_oidc(oidc, { verbose: load_login()?.verbose })
+      next()
+    } catch (e) {
+      console.error("Sign-in with the Keycloak token failed", e)
+      store.logout()
+      store.sign_in_error = `ACS refused the sign-in: ${e?.message ?? e}`
+      next({ path: "/login" })
+    }
+    return
+  }
+  // Coming back from Keycloak with an error: show it rather than
+  // sending the browser straight back, which could loop.
+  if (oidc_return?.error) {
+    store.sign_in_error = oidc_return.error
+    next({ path: "/login" })
+    return
+  }
+  // Off to Keycloak. With a live Keycloak session it comes straight
+  // back without a form. The page is leaving, so leave this navigation
+  // pending: cancelling it reports an uncaught "Navigation aborted".
+  await oidc.start_sign_in(to.fullPath)
+  await new Promise(() => {})
+}
+
+// When Keycloak refuses to renew the token the session has ended (it
+// timed out, or the person signed out in another app). Sign in again,
+// coming back to the same page.
+if (oidc) {
+  oidc.on_ended = () => oidc.start_sign_in(router.currentRoute.value.fullPath)
+}
 
 const pinia = createPinia()
 pinia.use(piniaPersist)

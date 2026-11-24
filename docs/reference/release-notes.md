@@ -222,6 +222,28 @@ to send to, the firewall rules and the host's receive buffer.
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.
 
+### Upgrading: Dataset maker no longer reaches every device
+
+**Dataset maker** used to hold **Build datasets from device** and
+**Read i3X objects** on every device, and could read every dataset,
+which includes every device's default dataset. Putting someone in the
+role gave them every device's data, so a per-device **Device data**
+grant limited nothing.
+
+The role now gives only what making datasets needs: **Create
+dataset**, and read, union and session use of the datasets the member
+created. A member builds from the devices they hold **Device data** on,
+which also covers each of those devices' default datasets, and reads
+other people's datasets when they are shared with them. **Dataset
+manager** is unchanged and still reaches every device and dataset.
+
+**What you must do.** After the upgrade, a Dataset maker who built from
+devices through the role alone sees no devices in the dataset builder.
+Give them **Device data** on each device they need, from **Manage
+access** on the device or ISA-95 page, or make them a Dataset manager.
+Their own datasets keep working, but a dataset they did not create,
+including one made before Data Access recorded owners, needs a share.
+
 ### Upgrading: engineering units come from a vocabulary
 
 Metrics keep their `Eng_Unit` strings, but a new vocabulary of units

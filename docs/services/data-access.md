@@ -271,23 +271,24 @@ under, and its schema in the dump says what each field means.
 Two client roles hold what the Admin UI needs to make datasets and
 record runs as the signed-in user:
 
-- `Dataset maker` edits and deletes only the datasets its member
-  created, and that includes their metadata. Data Access records the
-  creator as each new dataset's owner, and these two grants target
-  `Special.Mine`. Datasets created before that change are owned by Data
-  Access, so only a `Dataset manager` can edit or delete them.
-- `Dataset manager` edits and deletes every dataset.
+- `Dataset maker` reads, edits and deletes only the datasets its
+  member created, and that includes their metadata, and uses only
+  those in a union or session. Data Access records the creator as each
+  new dataset's owner, and these grants target `Special.Mine`. The role
+  gives no device: a member builds from the devices they hold `Device
+  data` on, which also covers each device's default dataset, and reads
+  other people's datasets when they are shared with them.
+- `Dataset manager` reads, edits and deletes every dataset, uses any
+  dataset in a union or session, and holds `Build datasets from device`
+  and i3X's `Read i3X objects` on every device. Datasets created before
+  Data Access recorded owners are owned by Data Access, so only a
+  manager can edit or delete them. The i3X grant is direct rather than
+  the `Device data` composite, so a manager never loses it part way
+  through a dump load.
 
-Both roles read every dataset and any device's data, and can use any
-dataset in a union or session. Both can write any equipment's
-`Recording in progress` entry: any operator at a machine starts and
-stops its recordings. Neither has any other ConfigDB write.
-
-Both roles also hold i3X's `Read i3X objects` on every device. The
-Admin UI lists the devices a person can pick for a dataset, and shows
-live values, through i3X, so a role member needs this to build
-datasets. These are direct grants rather than the `Device data`
-composite, so a member never loses them part way through a dump load.
+Both roles can write any equipment's `Recording in progress` entry:
+any operator at a machine starts and stops its recordings. Neither has
+any other ConfigDB write.
 
 `dumps/data-access.yaml` defines both roles and all their grants.
 Service setup loads it on every run, and a dump load replaces every

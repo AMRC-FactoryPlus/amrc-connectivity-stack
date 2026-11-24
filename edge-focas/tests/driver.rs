@@ -9,6 +9,9 @@
 #[path = "../../lib/rs-edge-driver/tests/common/mod.rs"]
 mod common;
 
+#[path = "support/fake_cnc.rs"]
+mod fake_cnc;
+
 use common::{FakeAgent, secs, spawn_driver};
 use edge_focas::FocasHandler;
 use serde_json::{Value, json};
@@ -17,7 +20,7 @@ use tokio::net::TcpListener;
 async fn sim() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
-    tokio::spawn(edge_focas::sim::serve(listener));
+    tokio::spawn(fake_cnc::serve(listener));
     port
 }
 
@@ -101,6 +104,6 @@ async fn no_control_reports_conn_then_recovers() {
     agent.wait_status("CONN", secs(5)).await;
 
     let listener = TcpListener::bind(("127.0.0.1", port)).await.unwrap();
-    tokio::spawn(edge_focas::sim::serve(listener));
+    tokio::spawn(fake_cnc::serve(listener));
     agent.wait_status("UP", secs(10)).await;
 }

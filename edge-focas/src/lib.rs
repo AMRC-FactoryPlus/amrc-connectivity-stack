@@ -12,14 +12,11 @@
 //! - [`client`] is a connection to one control and the read behind
 //!   each address;
 //! - [`handler`] joins it to `rs-edge-driver`'s `Handler` trait;
-//! - [`sim`] is a fake control for tests and for trying the driver
-//!   without a machine (the `focas-sim` binary).
 
 pub mod addr;
 pub mod client;
 pub mod handler;
 pub mod protocol;
-pub mod sim;
 
 pub use addr::Addr;
 pub use handler::FocasHandler;

@@ -8,16 +8,12 @@ publish = false
 name = "driver"
 path = "src/main.rs"
 
-# The fake CNC in src/bin/focas-sim.rs is found by cargo's own bin
-# discovery, not declared here, because the Dockerfile builds the
-# dependencies against a stub main.rs with no other files in src/.
-
 [dependencies]
 rs-edge-driver = { path = "../lib/rs-edge-driver" }
 async-trait = "0.1"
 bytes = "1"
 serde_json = "1"
-tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1"
 
 [dev-dependencies]

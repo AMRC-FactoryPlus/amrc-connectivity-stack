@@ -1,9 +1,12 @@
 // ACS FOCAS driver
-// A fake FANUC control for testing without a machine
+// A fake FANUC control for the integration tests
 // Copyright 2026 University of Sheffield
 
-//! A FOCAS server that plays a three-axis mill running a 60-second
-//! cycle, so the driver can be tried and tested without a machine.
+#![allow(dead_code)]
+
+//! A FOCAS server for the integration tests. It plays a three-axis mill
+//! running a 60-second cycle. It is test code only: it is not built
+//! into the driver or its image.
 //!
 //! | Seconds into the cycle | What the machine does                          |
 //! |------------------------|-------------------------------------------------|
@@ -12,7 +15,7 @@
 //! | 55 to 60               | In alarm (alarm bit 1 set), stopped             |
 //!
 //! Every value is a pure function of the time since the server
-//! started (see [`answer`]), so the tests can ask for any moment.
+//! started (see [`answer`]).
 //!
 //! It answers these reads, and refuses anything else with
 //! `EW_FUNC` (1) or an unknown number with `EW_NUMBER` (3):
@@ -36,8 +39,8 @@ use bytes::{BufMut, Bytes, BytesMut};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::addr::{PmcArea, PmcSize};
-use crate::protocol::{
+use edge_focas::addr::{PmcArea, PmcSize};
+use edge_focas::protocol::{
     Answer, Request, cmd, decode_requests, encode_frame, encode_real, encode_responses, ew, ftype,
     read_frame,
 };
@@ -254,7 +257,10 @@ pub async fn serve(listener: TcpListener) -> std::io::Result<()> {
     }
 }
 
-async fn session(mut stream: TcpStream, start: Instant) -> Result<(), crate::protocol::ProtoError> {
+async fn session(
+    mut stream: TcpStream,
+    start: Instant,
+) -> Result<(), edge_focas::protocol::ProtoError> {
     stream.set_nodelay(true)?;
     loop {
         let frame = read_frame(&mut stream).await?;
@@ -273,35 +279,8 @@ async fn session(mut stream: TcpStream, start: Instant) -> Result<(), crate::pro
                 tracing::debug!("{answers:?}");
                 encode_frame(ftype::VAR_RESP, &encode_responses(&answers))
             }
-            other => return Err(crate::protocol::ProtoError::UnexpectedFrame(other)),
+            other => return Err(edge_focas::protocol::ProtoError::UnexpectedFrame(other)),
         };
         stream.write_all(&reply).await?;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cycle_phases() {
-        let m = Machine::at(2.5);
-        assert!(m.running && !m.alarm);
-        assert_eq!((m.spindle, m.feed), (1200.0, 500.0));
-        let m = Machine::at(50.0);
-        assert!(!m.running && !m.alarm);
-        let m = Machine::at(125.0 + 57.0 - 5.0);
-        assert!(m.alarm);
-        assert_eq!(m.cycles, 2);
-    }
-
-    #[test]
-    fn unknown_reads_are_refused() {
-        assert_eq!(answer(&Request::cnc(0x7777, [0; 5]), 0.0), Err(ew::FUNC));
-        assert_eq!(
-            answer(&Request::cnc(cmd::READ_MACRO, [9999, 9999, 0, 0, 0]), 0.0),
-            Err(ew::NUMBER)
-        );
-        assert_eq!(answer(&Request::pmc(5, 1, 9999), 0.0), Err(ew::NUMBER));
     }
 }

@@ -6,6 +6,9 @@
 //! control. The values change with time, so each check allows for the
 //! whole range the machine can be in.
 
+#[path = "support/fake_cnc.rs"]
+mod fake_cnc;
+
 use std::time::Duration;
 
 use edge_focas::Addr;
@@ -16,7 +19,7 @@ use tokio::net::TcpListener;
 async fn sim() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
-    tokio::spawn(edge_focas::sim::serve(listener));
+    tokio::spawn(fake_cnc::serve(listener));
     port
 }
 

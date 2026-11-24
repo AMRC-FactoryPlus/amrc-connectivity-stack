@@ -16,9 +16,10 @@ The driver is read-only. It never writes to the control.
 FANUC does not publish the FOCAS wire format. The driver follows the
 open protocol analysis in [pyfanuc](https://github.com/diohpix/pyfanuc),
 and the request bytes match pyfanuc's worked examples (see the tests in
-`src/protocol.rs`). The fake control in this directory was written from
-the same analysis, so the tests prove that the driver and the fake
-control agree, not that the driver reads a real machine correctly.
+`src/protocol.rs`). The fake control the tests run against
+(`tests/support/fake_cnc.rs`) was written from the same analysis, so
+the tests prove that the driver and the fake control agree, not that
+the driver reads a real machine correctly.
 
 Before you rely on it, run it against one real control and compare a
 few values with the control's own screens. The reads that need the
@@ -68,34 +69,10 @@ A read the control refuses, for example a macro variable it does not
 have, gives no value and logs a warning once. A connection that drops
 sets the connection's status to `CONN` and the driver reconnects.
 
-## Trying it without a machine
-
-`focas-sim` is a fake FANUC control. It plays a three-axis mill on a
-60-second loop: 45 seconds cutting (program O1234, spindle at 1200 rpm,
-X and Y moving in a circle), 10 seconds idle, and 5 seconds in alarm.
-The top of `src/sim.rs` lists every value it gives.
-
-To run it in Docker, from the top of the repository:
-
-```bash
-docker buildx build --build-context lib=lib -f edge-focas/Dockerfile.sim -t focas-sim edge-focas
-```
-
-```bash
-docker run --rm -p 8193:8193 focas-sim
-```
-
-Then point a FOCAS connection at your machine's IP address on port
-8193, or at `127.0.0.1` for a driver running on the same machine. Set
-`RUST_LOG=debug` on the container to log every request.
-
-With Rust installed, `cargo run --bin focas-sim` does the same, and
-`cargo run --bin focas-sim 0.0.0.0:9000` picks another port.
-
 ## Development
 
 `cargo test` runs the unit tests, the client against the fake control
-over TCP (`tests/sim.rs`), and the whole driver against a fake Edge
+over TCP (`tests/client.rs`), and the whole driver against a fake Edge
 Agent and the fake control (`tests/driver.rs`). See
 [`docs/development/rust-drivers.md`](../docs/development/rust-drivers.md)
 for how Rust drivers are built and published.

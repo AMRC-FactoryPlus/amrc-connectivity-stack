@@ -255,6 +255,10 @@ export class OidcClient {
         this.tokens = {
             access_token:   json.access_token,
             refresh_token:  json.refresh_token,
+            // Kept only for id_token_hint on logout() - without it
+            // Keycloak shows an interactive "do you want to log out?"
+            // confirmation instead of completing RP-initiated logout.
+            id_token:       json.id_token,
             expires_at:     Date.now() + json.expires_in * 1000,
         };
         this.save_tokens();
@@ -330,6 +334,7 @@ export class OidcClient {
 
     logout () {
         clearTimeout(this._timer);
+        const id_token = this.tokens?.id_token;
         this.clear_tokens();
         if (!this.provider.end_session_endpoint) {
             location.reload();
@@ -339,6 +344,7 @@ export class OidcClient {
         url.search = new URLSearchParams({
             client_id:                  this.client_id,
             post_logout_redirect_uri:   this.redirect_uri,
+            ...(id_token ? { id_token_hint: id_token } : {}),
         });
         location.assign(url);
     }

@@ -190,9 +190,18 @@ export default {
 
   methods: {
     logout(){
-      // Cleanup the client store state.
+      // Under OIDC, logout() itself navigates the whole browser away to
+      // Keycloak's RP-initiated logout - pushing to /login here as well
+      // would mount Login.vue, which immediately starts a *new* login
+      // and fires its own navigation to Keycloak's authorize endpoint.
+      // That second navigation wins the race and cancels the pending
+      // logout one, so the SSO session never actually ends and the
+      // "new" login just bounces straight back in.
+      const oidcConfigured = this.s.oidcConfigured;
       this.s.logout();
-      this.$router.push("/login");
+      if (!oidcConfigured) {
+        this.$router.push("/login");
+      }
     }
   },
 

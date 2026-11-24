@@ -354,13 +354,14 @@ router.beforeEach(async (to, from, next) => {
       // If we were sent to Keycloak mid-session (e.g. a refresh-token
       // failure) and are now coming back, restore the route we were on
       // rather than landing on whatever route triggered the redirect.
-      // Setting location.hash (unlike history.replaceState) fires the
-      // hash-router's own navigation, so abort this one and let that
-      // one take over.
+      // Redirecting the current navigation (rather than next(false) +
+      // a manual location.hash assignment) keeps this inside Vue
+      // Router's own navigation promise - next(false) on the very
+      // first/initial navigation has nothing awaiting it and surfaces
+      // as an uncaught promise rejection in the console.
       const hash = store.oidc?.take_pending_hash()
       if (hash && hash !== location.hash) {
-        next(false)
-        location.hash = hash
+        next(hash.slice(1))
         return
       }
       next()

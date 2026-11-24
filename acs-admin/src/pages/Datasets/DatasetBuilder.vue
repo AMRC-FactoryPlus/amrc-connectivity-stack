@@ -216,7 +216,7 @@
         <div class="flex flex-wrap items-center justify-end gap-2">
           <span v-if="touched && problemList.length" class="mr-auto text-sm text-red-600">{{ problemList.join(' ') }}</span>
           <Button variant="outline" :disabled="saving" @click="cancel">Cancel</Button>
-          <Button :disabled="saving" @click="save">
+          <Button v-if="maySave" :disabled="saving" @click="save">
             <i :class="`fa-solid ${saving ? 'fa-circle-notch animate-spin' : 'fa-check'} mr-2`"></i>
             {{ mode === 'edit' ? 'Save changes' : 'Create dataset' }}
           </Button>
@@ -259,6 +259,8 @@ import TagChips from '@/components/Datasets/TagChips.vue'
 import BuilderRail from '@/components/Datasets/builder/BuilderRail.vue'
 import DevicePickerDialog from '@/components/Datasets/DevicePickerDialog.vue'
 import DatasetPickerDialog from '@/components/Datasets/DatasetPickerDialog.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 const QUICK = [
   { id: 'today', label: 'Today' },
@@ -296,6 +298,13 @@ onUnmounted(() => {
 /* ---------- Mode and prefill ---------- */
 
 const mode = computed(() => route.params.uuid ? 'edit' : 'new')
+
+/* Hide Save when the user's ACL can't do it. */
+const access = useAccessStore()
+const maySave = computed(() => {
+  const may = dataset_access(access.check, route.params.uuid ?? null)
+  return mode.value === 'edit' ? may.edit : may.create
+})
 const loaded = computed(() => ds.ready && ds.structureReady)
 const record = computed(() => mode.value === 'edit' ? ds.byUuid[route.params.uuid] ?? null : null)
 const shape = computed(() => record.value ? edit_shape(record.value, ds.byUuid) : { ok: false })

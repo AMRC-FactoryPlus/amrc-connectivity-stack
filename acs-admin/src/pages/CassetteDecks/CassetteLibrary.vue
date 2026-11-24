@@ -7,7 +7,7 @@
           {{ filtered.length }}
         </span>
       </div>
-      <Button size="sm" @click="$emit('upload')">
+      <Button v-if="mayUpload" size="sm" @click="$emit('upload')">
         <i class="fa-solid fa-plus mr-1.5 text-[11px]"></i>Upload
       </Button>
     </div>
@@ -73,6 +73,9 @@
 <script>
 import { Button } from '@components/ui/button/index.js'
 import { mmss } from '@/composables/useCassetteDecks.js'
+import { UUIDs } from '@amrc-factoryplus/service-client'
+import { EdgeSim } from '@/lib/edge-sim-uuids.js'
+import { useAccessStore } from '@store/useAccessStore.js'
 
 export default {
   components: { Button },
@@ -82,10 +85,20 @@ export default {
     selected: { type: String, default: null },
   },
   emits: ['select', 'upload'],
+  setup () {
+    return { access: useAccessStore() }
+  },
   data () {
     return { query: '' }
   },
   computed: {
+    /* Upload makes a cassette object and writes its name and recording.
+     * Hidden when the user's ACL can't do that. */
+    mayUpload () {
+      const c = this.access.check
+      return c.create_in(EdgeSim.CassetteClass)
+        && c.write_apps(UUIDs.App.Info, EdgeSim.CassetteApp)
+    },
     filtered () {
       const q = this.query.trim().toLowerCase()
       if (!q) return this.cassettes

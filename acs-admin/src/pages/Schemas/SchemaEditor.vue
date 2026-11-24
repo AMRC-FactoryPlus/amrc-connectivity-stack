@@ -41,14 +41,14 @@
             <i class="fa-solid fa-code mr-2"></i>Raw JSON
           </Button>
           <div class="h-5 w-px bg-slate-200"></div>
-          <Button v-if="readonly" size="sm" @click="fork">
+          <Button v-if="readonly" v-show="may.new_draft" size="sm" @click="fork">
             <i class="fa-solid fa-code-branch mr-2"></i>Make a local copy
           </Button>
           <template v-else>
-            <Button variant="outline" size="sm" :disabled="saving || !dirty" @click="save">
+            <Button v-if="canSave" variant="outline" size="sm" :disabled="saving || !dirty" @click="save">
               <i v-if="saving" class="fa-solid fa-circle-notch fa-spin mr-2"></i>Save
             </Button>
-            <Button size="sm" @click="openPublish">
+            <Button v-if="canSave && may.publish" size="sm" @click="openPublish">
               <i class="fa-solid fa-rocket mr-2"></i>Publish
             </Button>
           </template>
@@ -225,6 +225,8 @@ import { toast } from 'vue-sonner'
 import { v4 as uuidv4 } from 'uuid'
 
 import { Badge } from '@components/ui/badge'
+import { schema_access } from '@/lib/schema/access.js'
+import { useAccessStore } from '@store/useAccessStore.js'
 import { Button } from '@components/ui/button'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -273,6 +275,7 @@ export default {
       sch: useSchemaStore(),
       drafts: useSchemaDraftStore(),
       s: useServiceClientStore(),
+      access: useAccessStore(),
       doc: ref(null),
     }
   },
@@ -334,6 +337,14 @@ export default {
   },
 
   computed: {
+    /* Hide what the user's ACL can't do. */
+    may () {
+      return schema_access(this.access.check)
+    },
+    /* Save writes the draft, making it first if there isn't one. */
+    canSave () {
+      return this.draftUuid ? this.may.save_draft : this.may.new_draft
+    },
     isDraft () {
       return !!this.draftUuid
     },

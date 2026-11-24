@@ -42,7 +42,7 @@
               <i class="fa-solid mr-2" :class="hideSuperseded ? 'fa-eye' : 'fa-eye-slash'"></i>
               {{ hideSuperseded ? 'Show superseded' : 'Hide superseded' }}
             </Button>
-            <Button size="sm" class="whitespace-nowrap" @click="newSchema">
+            <Button v-if="may.new_draft" size="sm" class="whitespace-nowrap" @click="newSchema">
               <i class="fa-solid fa-plus mr-2"></i>New schema
             </Button>
           </template>
@@ -50,7 +50,7 @@
             <EmptyState
                 title="No schemas here"
                 :description="emptyDescription"
-                button-text="New schema"
+                :button-text="may.new_draft ? 'New schema' : ''"
                 button-icon="plus"
                 @button-click="newSchema"/>
           </template>
@@ -101,7 +101,7 @@
             <Button v-if="selected.isDraft" class="w-full" @click="open">
               <i class="fa-solid fa-pen-to-square mr-2"></i>Edit schema
             </Button>
-            <Button v-else-if="selected.origin === 'AMRC library'" class="w-full"
+            <Button v-else-if="selected.origin === 'AMRC library'" v-show="may.new_draft" class="w-full"
                 @click="fork">
               <i class="fa-solid fa-code-branch mr-2"></i>Make a local copy
             </Button>
@@ -109,16 +109,16 @@
               <i class="fa-solid fa-pen-to-square mr-2"></i>Edit schema
             </Button>
 
-            <Button v-if="selected.isDraft" variant="outline" class="w-full"
+            <Button v-if="selected.isDraft" v-show="may.publish" variant="outline" class="w-full"
                 @click="publishDraft">
               <i class="fa-solid fa-rocket mr-2"></i>Publish
             </Button>
-            <Button v-else-if="selected.origin !== 'AMRC library'" variant="ghost"
+            <Button v-else-if="selected.origin !== 'AMRC library'" v-show="may.new_draft" variant="ghost"
                 class="w-full justify-start text-slate-500" @click="fork">
               <i class="fa-solid fa-code-branch mr-2"></i>Fork
             </Button>
 
-            <Button v-if="selected.isDraft" variant="destructiveGhost"
+            <Button v-if="selected.isDraft" v-show="may.delete_draft(selected.uuid)" variant="destructiveGhost"
                 class="w-full justify-start" @click="removeDraft">
               <i class="fa-solid fa-trash mr-2"></i>Delete draft
             </Button>
@@ -161,6 +161,8 @@ import {
   deleteDraft, derivedFromOf, isLibrarySchema, successorIndex, versionOf,
 } from '@/lib/schema/registry.js'
 import { buildUsageIndex } from '@/lib/schema/usage.js'
+import { schema_access } from '@/lib/schema/access.js'
+import { useAccessStore } from '@store/useAccessStore.js'
 
 export default {
   name: 'Schemas',
@@ -178,6 +180,7 @@ export default {
       drafts: useSchemaDraftStore(),
       dev: useDeviceStore(),
       s: useServiceClientStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -193,6 +196,11 @@ export default {
   },
 
   computed: {
+    /* Hide what the user's ACL can't do. */
+    may () {
+      return schema_access(this.access.check)
+    },
+
     ready () {
       return this.sch.ready && this.drafts.ready
     },

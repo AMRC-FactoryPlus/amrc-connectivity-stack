@@ -14,10 +14,10 @@
           <span class="font-semibold">Release</span>
           <span :class="['rounded px-2 py-0.5 text-xs font-medium', STATES[state].pill]">{{ STATES[state].label }}</span>
         </div>
-        <Button v-if="published" size="sm" variant="outline" @click="withdrawDialog?.open(record, live?.uuid)">
+        <Button v-if="published" v-show="may.release" size="sm" variant="outline" @click="withdrawDialog?.open(record, live?.uuid)">
           <i class="fa-solid fa-ban mr-2"></i>Withdraw
         </Button>
-        <Button v-else size="sm" :disabled="!!blocker" :title="blocker ?? ''" @click="releaseDialog?.open(record)">
+        <Button v-else v-show="may.release" size="sm" :disabled="!!blocker" :title="blocker ?? ''" @click="releaseDialog?.open(record)">
           <i class="fa-solid fa-paper-plane mr-2"></i>Release
         </Button>
       </div>
@@ -28,7 +28,7 @@
     <Card class="flex flex-col gap-3 p-4">
       <div class="flex items-center justify-between gap-2">
         <span class="font-semibold">Release policy</span>
-        <Button size="sm" variant="outline" @click="policyDialog?.open(record)">
+        <Button v-if="may.release_policy" size="sm" variant="outline" @click="policyDialog?.open(record)">
           <i class="fa-solid fa-pen mr-2"></i>{{ policy ? 'Edit' : 'Add a policy' }}
         </Button>
       </div>
@@ -122,8 +122,14 @@ import {
 import ReleasePolicyDialog from './ReleasePolicyDialog.vue'
 import ReleaseDialog from './ReleaseDialog.vue'
 import WithdrawDialog from './WithdrawDialog.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 const props = defineProps({ record: { type: Object, required: true } })
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check, props.record.uuid))
 
 const sc = useServiceClientStore()
 

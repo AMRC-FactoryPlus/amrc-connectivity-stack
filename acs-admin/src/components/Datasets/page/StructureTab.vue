@@ -45,7 +45,7 @@
         names it after the device and keeps it.
       </p>
     </Card>
-    <Card v-else class="flex flex-wrap items-center justify-between gap-4 p-5">
+    <Card v-else-if="may.delete" class="flex flex-wrap items-center justify-between gap-4 p-5">
       <div class="max-w-prose text-sm">
         <div class="font-semibold text-gray-900">Delete this dataset</div>
         <p class="mt-1 text-slate-600">
@@ -69,8 +69,14 @@ import { STRUCTURE, is_device_structure, is_metrics_structure } from '@/lib/data
 import { structure_tree } from '@/lib/datasets/model.js'
 import { tree_rows, structure_type } from './page-logic.js'
 import IncludedIn from './IncludedIn.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 const props = defineProps({ record: { type: Object, required: true } })
+
+/* Hide Delete when the user's ACL can't do it. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check, props.record.uuid))
 defineEmits(['delete'])
 
 const ds = useDatasetsStore()

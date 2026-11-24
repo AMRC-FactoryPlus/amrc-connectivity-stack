@@ -13,6 +13,8 @@ export const EdgeSim = {
   CassetteClass: '64139528-3dbf-4b34-afb5-3a71fc1c4f3b',
   /* ConfigDB Application holding cassette recordings. */
   CassetteApp: '844c9d80-97ab-4ffc-918c-f4e529411108',
+  /* Command Escalation permission for the player transport. */
+  ControlPlayer: 'd29ff0fc-a3b5-485d-aa58-cc77c6d39d7b',
 }
 
 /* The transport metrics of the Player_Controls schema, as mounted in a

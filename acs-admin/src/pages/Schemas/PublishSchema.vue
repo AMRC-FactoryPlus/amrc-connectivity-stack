@@ -263,7 +263,7 @@
                   </div>
                 </div>
 
-                <Button class="w-full" :disabled="!canPublish || working" @click="publish">
+                <Button v-if="mayPublish" class="w-full" :disabled="!canPublish || working" @click="publish">
                   <i v-if="working" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
                   <i v-else class="fa-solid fa-rocket mr-2"></i>
                   {{ actionLabel }}
@@ -303,6 +303,8 @@ import { blastRadius } from '@/lib/schema/usage.js'
 import {
   deleteDraft, publishInPlace, publishNew, unresolvedReferences, versionOf,
 } from '@/lib/schema/registry.js'
+import { schema_access } from '@/lib/schema/access.js'
+import { useAccessStore } from '@store/useAccessStore.js'
 
 export default {
   name: 'PublishSchema',
@@ -315,6 +317,7 @@ export default {
       drafts: useSchemaDraftStore(),
       dev: useDeviceStore(),
       s: useServiceClientStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -351,6 +354,13 @@ export default {
   },
 
   computed: {
+    /* Hide Publish when the user's ACL can't do it. A breaking edit
+     * or a first publish makes a new schema object. */
+    mayPublish () {
+      const may = schema_access(this.access.check)
+      const makesNew = !this.basedOn || this.breaking
+      return may.publish && (!makesNew || may.publish_new)
+    },
     breakingChanges () {
       return this.changes.filter(c => c.breaking)
     },

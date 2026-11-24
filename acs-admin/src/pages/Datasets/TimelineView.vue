@@ -32,7 +32,7 @@
       <div v-if="!ds.equipment.length"
            class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
         <span><i class="fa-solid fa-industry mr-2 text-slate-500"></i>No equipment yet. Equipment groups devices so you can record runs on it.</span>
-        <Button size="sm" variant="outline" @click="router.push({ path: '/datasets/new', query: { kind: 'equipment' } })">
+        <Button v-if="may.create" size="sm" variant="outline" @click="router.push({ path: '/datasets/new', query: { kind: 'equipment' } })">
           <i class="fa-solid fa-plus mr-1.5"></i>New equipment
         </Button>
       </div>
@@ -156,9 +156,15 @@ import { window_gaps } from '@/lib/datasets/gaps.js'
 import TimelineLegend from '@/components/Datasets/timeline/TimelineLegend.vue'
 import { useTimelineData } from '@/components/Datasets/timeline/useTimelineData.js'
 import { device_status, quiet_note } from '@/lib/datasets/series.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 const ds = useDatasetsStore()
 const router = useRouter()
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check))
 
 const FUTURE_HATCH = 'repeating-linear-gradient(135deg, rgba(241,245,249,0.7) 0 6px, rgba(248,250,252,0.7) 6px 12px)'
 const MIN_SELECTION_MS = 5 * 60 * 1000

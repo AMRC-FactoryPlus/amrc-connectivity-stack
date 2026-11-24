@@ -37,7 +37,7 @@
         <i class="fa-solid fa-clock text-[10px]"></i> Ends in the future. It fills in as data arrives.
       </div>
     </div>
-    <div class="flex gap-1.5 rounded-b-md border-t border-slate-200 bg-slate-50 px-3 py-2.5">
+    <div v-if="may.create" class="flex gap-1.5 rounded-b-md border-t border-slate-200 bg-slate-50 px-3 py-2.5">
       <Button size="sm" class="flex-1" :disabled="!summary.count" @click="emit('make')">
         <i class="fa-solid fa-plus mr-1.5"></i>Make dataset
       </Button>
@@ -51,6 +51,12 @@ import { Button } from '@/components/ui/button'
 import { fmt_time, fmt_duration } from '@/lib/datasets/model.js'
 import { metric_count } from '@/lib/datasets/timeline.js'
 import { selection_gap_line } from '@/lib/datasets/gaps.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check))
 
 const props = defineProps({
   from: { type: Number, required: true },

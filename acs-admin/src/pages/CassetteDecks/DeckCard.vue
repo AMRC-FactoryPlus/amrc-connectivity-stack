@@ -115,7 +115,7 @@
     </div>
 
     <!-- Transport + rate -->
-    <div class="flex flex-wrap items-center justify-between gap-4 px-5 pb-4 pt-3.5">
+    <div v-if="mayControl" class="flex flex-wrap items-center justify-between gap-4 px-5 pb-4 pt-3.5">
       <div class="flex items-center gap-1.5">
         <Button v-if="rt.status === 'ENDED'" size="sm" :disabled="!controllable"
           @click="$emit('play', deck)">
@@ -205,7 +205,8 @@
 
 <script>
 import { Button } from '@components/ui/button/index.js'
-import { DECK_RATES } from '@/lib/edge-sim-uuids.js'
+import { DECK_RATES, EdgeSim } from '@/lib/edge-sim-uuids.js'
+import { useAccessStore } from '@store/useAccessStore.js'
 import { mmss, drift } from '@/composables/useCassetteDecks.js'
 
 export default {
@@ -222,6 +223,9 @@ export default {
     selectedCassette: { type: String, default: null },
   },
   emits: ['play', 'pause', 'stop', 'eject', 'seek', 'rate', 'reload', 'dismiss', 'load'],
+  setup () {
+    return { access: useAccessStore() }
+  },
   data () {
     return {
       rates: DECK_RATES,
@@ -250,8 +254,13 @@ export default {
     durationMs () {
       return this.cassetteMeta?.duration_ms ?? 0
     },
+    /* The user's ACL lets them command this deck's player. Without
+     * it the transport is hidden. */
+    mayControl () {
+      return this.access.check.can(EdgeSim.ControlPlayer, this.deck.uuid)
+    },
     controllable () {
-      return this.rt.online && this.deck.address
+      return this.rt.online && this.deck.address && this.mayControl
     },
     scrubbable () {
       return this.controllable && this.cassetteLoaded && this.durationMs > 0
@@ -312,7 +321,7 @@ export default {
     onDrop (e) {
       this.rt.dragOver = false
       const uuid = e.dataTransfer?.getData('application/x-cassette')
-      if (uuid) this.$emit('load', this.deck, uuid)
+      if (uuid && this.mayControl) this.$emit('load', this.deck, uuid)
     },
     onSlotClick () {
       if (this.selectedCassette && this.controllable)

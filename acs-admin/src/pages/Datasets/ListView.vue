@@ -55,12 +55,12 @@
           <i class="fa-solid fa-chart-line mr-1.5"></i>Compare
         </Button>
       </span>
-      <span :title="groupWhy ?? ''">
+      <span v-if="may.create" :title="groupWhy ?? ''">
         <Button size="sm" variant="outline" :disabled="!!groupWhy" @click="saveDialog.open('process', tickedIds)">
           <i class="fa-solid fa-diagram-project mr-1.5"></i>Save as process
         </Button>
       </span>
-      <span :title="groupWhy ?? ''">
+      <span v-if="may.create" :title="groupWhy ?? ''">
         <Button size="sm" variant="outline" :disabled="!!groupWhy" @click="saveDialog.open('part', tickedIds)">
           <i class="fa-solid fa-cube mr-1.5"></i>Save as part
         </Button>
@@ -173,6 +173,12 @@ import { display_name, direct_sources, fmt_window, matches } from '@/lib/dataset
 import { is_other_kind } from '@/lib/datasets/constants.js'
 import { download_csv } from '@/lib/datasets/api.js'
 import { comparable, compare_problem, group_problem } from '@/lib/datasets/compare.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check))
 
 const TABS = [
   { id: 'all',       label: 'All' },

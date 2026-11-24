@@ -24,12 +24,11 @@ export const DATA_ACCESS_ALL = '1e3cb5aa-a3f7-4bb6-9ef1-c3bc08427f60'
 export const DEVICE_DATA = '6abc1879-429d-4c0f-a5e4-00a655a09f26'
 export const ACCESS_PERMS = [...I3X_PERMS, BUILD_DATASETS, DATA_ACCESS_ALL, DEVICE_DATA]
 
-/* The dataset roles. acs-service-setup rewrites their grants on every
- * run, so a grant on them is "set by role": it cannot be removed here,
- * and nobody can give them one here either. */
-export const DATASET_MAKER = 'b7aa3036-fc1f-4869-b0f5-50f28b028905'
+/* The dataset role. acs-service-setup rewrites its grants on every
+ * run, so a grant on it is "set by role": it cannot be removed here,
+ * and nobody can give it one here either. */
 export const DATASET_MANAGER = '4ab8468a-166b-4c01-afa6-7bd558db806b'
-export const ROLE_GROUPS = [DATASET_MAKER, DATASET_MANAGER]
+export const ROLE_GROUPS = [DATASET_MANAGER]
 
 const fold = s => String(s ?? '').trim().toLowerCase()
 

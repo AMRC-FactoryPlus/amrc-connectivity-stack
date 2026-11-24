@@ -15,7 +15,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { read_access, by_principal } from '../src/lib/access/i3x-access.js'
 import {
   READ_OBJECT, I3X_PERM_ALL, BUILD_DATASETS, DATA_ACCESS_ALL, DEVICE_DATA,
-  DATASET_MAKER, DATASET_MANAGER, CREATE_DATASET, USE_FOR_SESSION,
+  DATASET_MANAGER, CREATE_DATASET, USE_FOR_SESSION,
   allows, route_halves, grant_permission, without_half, remove_half,
   entry_halves, halves_on, missing_halves,
 } from '../src/lib/access/device-data.js'
@@ -27,7 +27,6 @@ describe('permission UUIDs', () => {
     expect(DEVICE_DATA).toBe('6abc1879-429d-4c0f-a5e4-00a655a09f26')
     expect(CREATE_DATASET).toBe('2d666b41-7a0d-4845-ad59-3113f25b469a')
     expect(USE_FOR_SESSION).toBe('c089b9a9-06cd-4211-94fc-9ad52a759987')
-    expect(DATASET_MAKER).toBe('b7aa3036-fc1f-4869-b0f5-50f28b028905')
     expect(DATASET_MANAGER).toBe('4ab8468a-166b-4c01-afa6-7bd558db806b')
   })
 })
@@ -154,9 +153,8 @@ describe('read_access with Device data', () => {
     d3: { principal: 'kim', permission: READ_OBJECT, target: 'dev', plural: false },
     n1: { principal: 'area-team', permission: DEVICE_DATA, target: 'area', plural: false },
     w1: { principal: 'admins', permission: DATA_ACCESS_ALL, target: UUIDs.Special.Null, plural: false },
-    r1: { principal: DATASET_MAKER, permission: BUILD_DATASETS, target: DEVICE_CLASS, plural: true },
-    r2: { principal: DATASET_MAKER, permission: READ_OBJECT, target: DEVICE_CLASS, plural: true },
-    r3: { principal: DATASET_MANAGER, permission: BUILD_DATASETS, target: DEVICE_CLASS, plural: true },
+    r1: { principal: DATASET_MANAGER, permission: BUILD_DATASETS, target: DEVICE_CLASS, plural: true },
+    r2: { principal: DATASET_MANAGER, permission: READ_OBJECT, target: DEVICE_CLASS, plural: true },
     x1: { principal: 'other', permission: CREATE_DATASET, target: 'dev', plural: false },
   }
   const client = {
@@ -167,7 +165,7 @@ describe('read_access with Device data', () => {
   }
   const opts = { target: { uuid: 'dev', device: true }, via: [{ uuid: 'area', name: 'Area 1' }] }
 
-  it('lists i3X and Data Access grants, and marks the dataset roles', async () => {
+  it('lists i3X and Data Access grants, and marks the dataset role', async () => {
     const rows = await read_access(client, opts)
     const key = r => [r.grant.principal, r.reason, r.role]
     expect(rows.map(key)).toEqual(expect.arrayContaining([
@@ -176,7 +174,6 @@ describe('read_access with Device data', () => {
       ['kim', 'direct', false],
       ['area-team', 'node', false],
       ['admins', 'all', false],
-      [DATASET_MAKER, 'class', true],
       [DATASET_MANAGER, 'class', true],
     ]))
     expect(rows.some(r => r.grant.principal === 'other')).toBe(false)
@@ -192,7 +189,7 @@ describe('read_access with Device data', () => {
     expect(halves('kim')).toEqual([['i3x', 1, false, true]])
     expect(halves('area-team')).toEqual([['i3x', 0, true, false]])
     expect(halves('admins')).toEqual([['datasets', 0, true, false]])
-    expect(halves(DATASET_MAKER)).toEqual([['i3x', 0, true, false], ['datasets', 0, true, false]])
+    expect(halves(DATASET_MANAGER)).toEqual([['i3x', 0, true, false], ['datasets', 0, true, false]])
   })
 })
 
@@ -207,7 +204,7 @@ describe('entry_halves', () => {
   })
 
   it('never lets a role entry be changed, even with a grant on the device', () => {
-    const entry = { principal: DATASET_MAKER, routes: [
+    const entry = { principal: DATASET_MANAGER, routes: [
       { grant: { uuid: 'a', permission: READ_OBJECT }, reason: 'direct', role: true },
     ] }
     expect(entry_halves(entry, true)[0].removable).toBe(false)

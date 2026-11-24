@@ -206,18 +206,6 @@
           </label>
         </fieldset>
 
-        <label v-if="needMaker.length"
-               class="flex cursor-pointer items-start gap-2.5 rounded-md border bg-slate-50 px-3 py-2.5 text-sm">
-          <input v-model="makeMaker" type="checkbox" class="mt-1 accent-slate-900">
-          <span class="flex flex-col gap-0.5">
-            <span class="font-medium">Also make {{ makerNames }} a Dataset maker</span>
-            <span class="text-xs text-slate-500">
-              Building datasets also needs the Dataset maker role, and {{ makerNames }}
-              {{ needMaker.length === 1 ? 'does' : 'do' }} not have it.
-            </span>
-          </span>
-        </label>
-
         <div v-for="o in overlaps" :key="o.uuid"
              class="flex items-start gap-2.5 rounded-md border bg-slate-50 px-3 py-2.5 text-sm">
           <i class="fa-solid fa-circle-info mt-0.5 text-slate-500"></i>
@@ -239,16 +227,15 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 // Device data: the i3X and Datasets halves of access to a device.
 import {
-  ROLE_GROUPS, CREATE_DATASET, DATASET_MAKER, grant_permission, entry_halves, halves_on,
+  ROLE_GROUPS, grant_permission, entry_halves, halves_on,
   missing_halves, remove_half,
 } from '@/lib/access/device-data.js'
-import { STRUCTURE } from '@/lib/datasets/constants.js'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -457,7 +444,6 @@ const scope = ref(props.target)
 /* The halves ticked. Browse is on by default, as before Build existed. */
 const browse = ref(true)
 const build = ref(false)
-const makeMaker = ref(false)
 
 function startGive () {
   error.value = null
@@ -466,11 +452,10 @@ function startGive () {
   scope.value = props.target
   browse.value = true
   build.value = false
-  makeMaker.value = false
   view.value = 'give'
 }
 
-/* The dataset roles are never offered: service setup would delete the
+/* The dataset role is never offered: service setup would delete the
  * grant on its next run. */
 const suggestions = computed(() => {
   const q = query.value.trim().toLowerCase()
@@ -554,29 +539,6 @@ const overlaps = computed(() => picked.value.flatMap(p => {
     + `A grant on ${scopeName.value} adds a second route, so removing either one later leaves them with access.` }]
 }))
 
-/* Building datasets also needs CreateDataset, which the Dataset maker
- * role gives. Users picked to build who lack it are offered the role.
- * Groups are not: a group joins a role as a subclass, which is done in
- * Access Control. An ACL that cannot be read (null) offers nothing. */
-const canCreate = ref({})
-watch(() => [want.value.build, picked.value.map(p => p.uuid).join()], async () => {
-  if (!want.value.build) return
-  const client = useServiceClientStore().client
-  for (const p of picked.value) {
-    if (p.group || p.uuid in canCreate.value) continue
-    canCreate.value = { ...canCreate.value, [p.uuid]: undefined }
-    const ok = await client.Auth.check_acl(p.uuid, CREATE_DATASET, STRUCTURE.UNS_DEVICE, true)
-      .catch(() => null)
-    canCreate.value = { ...canCreate.value, [p.uuid]: ok }
-  }
-})
-const needMaker = computed(() => !want.value.build
-  ? []
-  : toGrant.value.filter(p => !p.group && canCreate.value[p.uuid] === false))
-const makerNames = computed(() => needMaker.value.length === 1
-  ? needMaker.value[0].label
-  : `these ${needMaker.value.length} users`)
-
 const giveText = computed(() => {
   const n = toGrant.value.length
   if (!n) return 'Give access'
@@ -587,16 +549,11 @@ async function give () {
   busy.value = true
   error.value = null
   const client = useServiceClientStore().client
-  const makers = makeMaker.value ? needMaker.value.map(p => p.uuid) : []
   const done = []
   try {
     for (const p of toGrant.value) {
       const permission = grant_permission(missing(p))
       await client.Auth.add_grant({ principal: p.uuid, permission, target: scope.value, plural: false })
-      if (makers.includes(p.uuid)) {
-        await client.ConfigDB.class_add_member(DATASET_MAKER, p.uuid)
-        canCreate.value = { ...canCreate.value, [p.uuid]: true }
-      }
       done.push(p)
     }
     toast.success(done.length === 1

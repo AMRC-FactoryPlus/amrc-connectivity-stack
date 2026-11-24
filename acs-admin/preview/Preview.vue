@@ -53,6 +53,26 @@
 
       <ISA95 v-else-if="surface === 'i3x-isa95'"/>
 
+      <div v-else-if="surface === 'isa95'" class="flex min-h-0 flex-1 flex-col p-4">
+        <ISA95/>
+        <MergeISA95NodeDialog/>
+        <MoveISA95NodeDialog/>
+        <NewISA95NodeDialog/>
+      </div>
+
+      <div v-else-if="surface === 'isa95-picker'" class="flex gap-8 overflow-auto p-6">
+        <div class="shrink-0 space-y-2" style="width: 352px">
+          <div class="text-sm font-semibold">Device sidebar (352px)</div>
+          <ISA95PlacementPicker v-model="placementA" compact/>
+          <div class="text-xs text-slate-500 break-all">{{ placementA }}</div>
+        </div>
+        <div class="shrink-0 space-y-2" style="width: 552px">
+          <div class="text-sm font-semibold">New device dialog (552px)</div>
+          <ISA95PlacementPicker v-model="placementB" required @settling="v => settling = v"/>
+          <div class="text-xs text-slate-500">Create is {{ settling ? 'held: settle the placement first' : 'allowed' }}</div>
+        </div>
+      </div>
+
       <div v-else class="p-10">
         <p class="text-sm text-gray-500">Unknown surface: {{ surface }}</p>
       </div>
@@ -72,20 +92,77 @@ import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
 
 import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 import ISA95 from '@pages/ISA95/ISA95.vue'
+import ISA95PlacementPicker from '@components/ISA95/ISA95PlacementPicker.vue'
+import MergeISA95NodeDialog from '@components/ISA95/MergeISA95NodeDialog.vue'
+import MoveISA95NodeDialog from '@components/ISA95/MoveISA95NodeDialog.vue'
+import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 
 import { devices, drafts, schemas } from './fixtures.js'
 import { target as i3xTarget } from './i3x-fixtures.js'
+import { nodes as isa95Nodes } from './isa95-fixtures.js'
 
 export default {
   name: 'Preview',
 
   components: {
     ComponentPickerDialog, I3xAccessButton, ISA95, PublishSchema,
+    ISA95PlacementPicker, MergeISA95NodeDialog, MoveISA95NodeDialog, NewISA95NodeDialog,
     RawSchemaDialog, SchemaPicker, Schemas, SchemaEditor, Toaster,
   },
 
   data () {
-    return { drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null }
+    return {
+      drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
+      placementA: [], placementB: [], settling: false,
+    }
+  },
+
+  /* `demo` sets up an ISA-95 state for screenshots, by driving the
+   * page the way a user would:
+   *   isa95&demo=duplicate     the tree, open, with a duplicate selected
+   *   isa95&demo=add           adding an Area that already exists
+   *   isa95-picker&demo=warning  the picker's duplicate warning */
+  async mounted () {
+    const demo = this.$route.query.demo
+    if (!demo) return
+    const wait = ms => new Promise(r => setTimeout(r, ms))
+    const row = name => [...document.querySelectorAll('[role=treeitem]')]
+      .find(e => e.getAttribute('aria-label').startsWith(name + ','))
+    const button = text => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === text)
+    const type = async (input, text) => {
+      input.focus()
+      input.value = text
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await wait(300)
+    }
+    const key = (el, k) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }))
+    await wait(500)
+
+    if (this.surface === 'isa95') {
+      button('Expand all')?.click()
+      await wait(200)
+      if (demo === 'duplicate') row('NW')?.click()
+      if (demo === 'add') {
+        const r = row('South Works')
+        r?.click()
+        await wait(100)
+        r?.querySelector('button[title^="Add"]')?.click()
+        await wait(200)
+        const input = document.activeElement
+        await type(input, 'Machining')
+        key(input, 'Enter')
+      }
+    }
+
+    if (this.surface === 'isa95-picker' && demo === 'warning') {
+      this.placementB = [isa95Nodes[0].uuid]
+      await wait(300)
+      const site = document.querySelectorAll('input[role=combobox]')[6]
+      await type(site, 'North-Works')
+      key(site, 'ArrowDown')
+      await wait(100)
+      key(site, 'Enter')
+    }
   },
 
   computed: {
@@ -94,7 +171,8 @@ export default {
     },
 
     title () {
-      if (this.surface === 'i3x-isa95') return 'ISA-95 Hierarchy'
+      if (this.surface === 'i3x-isa95' || this.surface === 'isa95') return 'ISA-95 Hierarchy'
+      if (this.surface === 'isa95-picker') return 'ISA-95 Placement'
       if (this.surface === 'i3x-device') return 'Devices'
       return 'Schemas'
     },

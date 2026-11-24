@@ -42,6 +42,7 @@
       <ISA95PlacementPicker
           :model-value="shown"
           :disabled="busy || !canPlace"
+          compact
           @update:model-value="place"
       />
     </template>

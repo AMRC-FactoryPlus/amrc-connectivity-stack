@@ -24,6 +24,9 @@ import { useISA95Store } from '../src/store/useISA95Store.js'
 import { useObjectStore } from '../src/store/useObjectStore.js'
 import { usePrincipalStore } from '../src/store/usePrincipalStore.js'
 import * as i3x from './i3x-fixtures.js'
+import * as isa95fx from './isa95-fixtures.js'
+import { useAccessStore } from '../src/store/useAccessStore.js'
+import { Status, make_checker } from '../src/lib/access/acl.js'
 
 window.events = mitt()
 
@@ -92,6 +95,19 @@ const seed = () => {
 
   const surface = new URL(window.location.hash.slice(1), window.location.origin)
     .searchParams.get('surface') ?? ''
+  /* The ISA-95 hierarchy surfaces write to an in-memory ConfigDB.
+   * `ro=1` shows them to someone with no edit rights. */
+  if (surface.startsWith('isa95')) {
+    const store = useISA95Store()
+    stub(store, isa95fx.nodes)
+    stub(useDeviceStore(), isa95fx.devices)
+    s.client = isa95fx.make_client(store)
+    const ro = new URL(window.location.hash.slice(1), window.location.origin).searchParams.get('ro')
+    useAccessStore().check = make_checker({ status: ro ? Status.Loading : Status.Unknown })
+    useAccessStore().start = async () => {}
+    return
+  }
+
   if (surface.startsWith('i3x')) {
     stub(useDeviceStore(), i3x.i3xDevices)
     stub(useISA95Store(), i3x.isa95)

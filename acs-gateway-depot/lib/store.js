@@ -28,6 +28,7 @@ function record (box) {
         settings:       box.settings,
         approved_by:    box.approved_by,
         approved_at:    box.approved_at,
+        install_started_at: box.install_started_at,
         installed_at:   box.installed_at,
         ready_at:       box.ready_at,
         onboarded_at:   box.onboarded_at,

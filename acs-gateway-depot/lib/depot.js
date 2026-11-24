@@ -112,6 +112,7 @@ export class Depot {
 
         if (box.state == State.Approved) {
             box.state = State.Installing;
+            box.install_started_at = Date.now();
             this.store.put(box);
             this.log("Gateway %s collected its settings and is installing", id);
             return {

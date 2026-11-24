@@ -57,11 +57,16 @@ function data_wait () {
     return ms >= 0 ? Math.min(ms, MAX_DATA_WAIT) : DATA_WAIT;
 }
 
+/* The features key of every addr packet. */
+export const DRIVER_FEATURES = { scout: 1 };
+
 export class DriverConnection extends DeviceConnection {
     id:         string
     conf:       any
     broker:     DriverBroker
     status:     string
+    /* When the driver last went UP, in ms, or null while it isn't. */
+    up_since:   number | null = null
     addrs:      Map<string, string>
     topics:     Map<string, string>
     groups:     Map<string, addrGroup>
@@ -338,14 +343,18 @@ export class DriverConnection extends DeviceConnection {
         //log(util.format("DRIVER message: %s %s", id, msg));
         /* Anything else the driver says comes after the data it sent
          * before, so hand that data on first. A status change can close
-         * the devices, and a write result reports a value. */
-        if (msg != "data") this.#flush_data();
+         * the devices, and a write result reports a value. Scout
+         * results have nothing to do with the data, so they don't
+         * split a group of values during a scan. */
+        if (msg != "data" && msg != "found") this.#flush_data();
 
         switch (msg) {
         case "status":  return this.#msg_status(payload.toString());
         case "data":    return this.#msg_data(data, payload);
         case "err":     return this.#msg_err(data, payload.toString());
         case "result":  return this.#msg_result(data, payload.toString());
+        /* The ScoutManager listens for these. See lib/scout.ts. */
+        case "found":   return void this.emit("found", data, payload);
 
         /* Our messages are looped */
         case "active":
@@ -354,6 +363,7 @@ export class DriverConnection extends DeviceConnection {
         case "cmd":
         case "write":
         case "poll":
+        case "scout":
             return;
         }
         log(`Unexpected ${msg} message from ${id}`);
@@ -363,6 +373,13 @@ export class DriverConnection extends DeviceConnection {
         const ost = this.status;
         this.status = status;
         log(`DRIVER [${this.id}]: status ${ost} -> ${status}`);
+        if (status == "UP" && ost != "UP")
+            this.up_since = Date.now();
+        else if (status != "UP")
+            this.up_since = null;
+        /* Before the conf below goes out, so that the ScoutManager
+         * can cancel a running scan ahead of the new config. */
+        this.emit("status", status, ost);
 
         switch (status) {
         case "READY":
@@ -431,6 +448,11 @@ export class DriverConnection extends DeviceConnection {
                     poll:   i.poll,
                     addrs:  [...i.addrs],
                 }])),
+            /* The optional parts of the protocol this agent serves. A
+             * driver subscribes to scout only after it sees this on
+             * its current session. See "Scouting" in
+             * docs/edge-split.md. */
+            features: DRIVER_FEATURES,
         };
         this.broker.publish({
             id:         this.id,

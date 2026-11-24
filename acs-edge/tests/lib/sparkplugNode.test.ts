@@ -181,3 +181,50 @@ test("stop stops the client and marks the node offline", async () => {
     expect(client.of("stop")).toHaveLength(1);
     expect(node.isOnline).toBe(false);
 });
+
+test("the NBIRTH offers Node Control/Scout as an empty String", async () => {
+    const { client } = await setup();
+    client.emit("birth");
+    await settle();
+    const [[, payload]] = client.of("NBIRTH");
+    const scout = payload.metrics.find((m: any) => m.name == "Node Control/Scout");
+    expect(scout).toBeDefined();
+    expect(scout.type).toBe(sparkplugDataType.string);
+    expect(scout.value).toBeNull();
+});
+
+test("NCMD Scout passes the parsed request on, by name or by alias", async () => {
+    const { node, client } = await setup();
+    const scout = jest.fn();
+    node.on("scout", scout);
+    const req = { version: 1, op: "cancel", request: "r", connection: "c" };
+
+    client.emit("ncmd", { metrics: [{ name: "Node Control/Scout", value: JSON.stringify(req) }] });
+    await settle();
+    expect(scout).toHaveBeenCalledWith(req);
+
+    client.emit("birth");
+    await settle();
+    const [[, payload]] = client.of("NBIRTH");
+    const alias = payload.metrics.find((m: any) => m.name == "Node Control/Scout").alias;
+    client.emit("ncmd", { metrics: [{ alias: Long.fromNumber(alias), value: JSON.stringify(req) }] });
+    await settle();
+    expect(scout).toHaveBeenCalledTimes(2);
+});
+
+test("NCMD Scout ignores a value that is not a JSON object", async () => {
+    const { node, client } = await setup();
+    const scout = jest.fn();
+    node.on("scout", scout);
+    const err = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+        for (const value of ["{bad", "[1]", "\"text\"", "null", ""])
+            client.emit("ncmd", { metrics: [{ name: "Node Control/Scout", value }] });
+        await settle();
+        expect(scout).not.toHaveBeenCalled();
+        expect(err).toHaveBeenCalledTimes(5);
+    }
+    finally {
+        err.mockRestore();
+    }
+});

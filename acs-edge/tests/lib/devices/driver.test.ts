@@ -40,6 +40,8 @@ function expectedAddrs (conn: DriverConnection) {
         groups: Object.fromEntries(
             [...conn.groups.entries()]
             .map(([n, i]) => [n, { poll: i.poll, addrs: [...i.addrs] }])),
+        /* Every map advertises Edge Scout. */
+        features: { scout: 1 },
     };
 }
 

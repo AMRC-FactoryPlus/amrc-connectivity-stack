@@ -12,10 +12,14 @@ ARG acs_npm=NO
 USER root
 RUN <<'SHELL'
     set -e
-    install -d -o node /home/node /usr/app
+    install -d -o node /home/node /home/node/app
 SHELL
+# The file: dependencies (../lib/*) resolve to /home/node/lib, and
+# --install-links copies them into node_modules, so the later stages
+# don't need lib.
+COPY --from=lib --chown=node . /home/node/lib/
 USER node
-WORKDIR /usr/app
+WORKDIR /home/node/app
 COPY --chown=node package.json ./
 RUN <<'SHELL'
     set -e
@@ -25,7 +29,7 @@ RUN <<'SHELL'
         echo "SETTING NPM REGISTRY TO ${acs_npm}" >&2
         npm config set @amrc-factoryplus:registry "${acs_npm}"
     fi
-    npm install --save=false
+    npm install --save=false --install-links
 SHELL
 
 COPY --chown=node . ./
@@ -47,14 +51,15 @@ RUN <<'SHELL'
     apk upgrade --update-cache --available
     apk add openssl
     rm -rf /var/cache/apk/*
-    install -d -o node /home/node /usr/app
+    install -d -o node /home/node /home/node/app
 SHELL
+COPY --from=lib --chown=node . /home/node/lib/
 USER node
-WORKDIR /usr/app
+WORKDIR /home/node/app
 COPY --chown=node --from=ts-compiler /home/node/.npmrc /home/node
-COPY --chown=node --from=ts-compiler /usr/app/package*.json ./
-RUN npm install --save=false --only=production
-COPY --chown=node --from=ts-compiler /usr/app/build ./
+COPY --chown=node --from=ts-compiler /home/node/app/package*.json ./
+RUN npm install --save=false --only=production --install-links
+COPY --chown=node --from=ts-compiler /home/node/app/build ./
 
 FROM ${base_prefix}-js-run:${base_version}
 USER root
@@ -67,6 +72,6 @@ SHELL
 WORKDIR /usr/app
 # This copy leaves the app files owned as root, i.e. read-only to the
 # running application. This is a Good Thing.
-COPY --from=util-build /usr/app ./
+COPY --from=util-build /home/node/app ./
 USER node
 CMD [ "node", "--es-module-specifier-resolution=node", "app.js" ]

@@ -31,6 +31,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@amrc-factoryplus/edge-scout-schemas": "file:../lib/edge-scout-schemas",
     "@amrc-factoryplus/service-client": "file:../lib/js-service-client",
     "@amrc-factoryplus/utilities": "^1.3.4",
     "@types/dotenv": "^8.2.0",
@@ -39,6 +40,7 @@
     "@types/xmldom": "^0.1.31",
     "@xmldom/xmldom": "^0.8.6",
     "aedes": "^0.51.2",
+    "ajv": "^8.20.0",
     "ajv-formats": "^2.1.1",
     "cookie-parser": "^1.4.5",
     "crypto-random-string": "^3.3.1",

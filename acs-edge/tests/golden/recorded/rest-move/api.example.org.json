@@ -173,6 +173,12 @@
      "t": -25150
     },
     {
+     "name": "Node Control/Scout",
+     "type": "String",
+     "value": "null",
+     "t": -25150
+    },
+    {
      "name": "Alerts/Config_Unavailable/Schema_UUID",
      "type": "UUID",
      "value": "\"8853aa15-2228-4309-b98e-e086cefbc72c\"",

@@ -143,6 +143,40 @@ the cluster UUID as the permission target:
 
 Nobody can read a secret back through these routes.
 
+### Deleting an edge node
+
+An edge node is spread across several places: its ConfigDB object and
+deployment, the HelmRelease edge-sync makes from it, the Kerberos
+identity, role membership and Sparkplug address the edge krbkeys
+operator makes for it, its connections and devices, the sealed secret
+holding the connections' passwords, and any grants made on it. The
+Cluster Manager removes all of these, in order, under
+`/v1/cluster/<cluster>/node/<node>`:
+
+* `GET delete` returns `{"allowed": false}` if the caller lacks 'Manage
+  clusters' on the cluster. Otherwise it returns `{"allowed": true,
+  "name", "connections", "devices"}`, listing what a delete would
+  remove. A node on another cluster gives 409 and anything that is not
+  an edge node gives 404. The Admin UI uses this to decide whether to
+  offer Delete and to say what goes with it.
+* `DELETE` starts the delete and answers 202 at once. It needs 'Manage
+  clusters' on the cluster.
+
+The delete removes the node's deployment first, so edge-sync removes the
+agent and krbkeys removes its account. It waits up to 5 minutes for the
+Kerberos identity to go. If the cluster is offline and it does not go,
+the Cluster Manager removes the identity, the role membership and the
+Sparkplug address itself. It then deletes the node's devices (found by
+`DeviceInformation.node`, or through its connections), its connections,
+the sealed secret file `edge-agent-sensitive-information-<node>` in the
+cluster repo, any grants for or on the node that it may remove, and
+last the node object, which takes its remaining config entries with it.
+Each step tolerates having been done already, so a delete that stopped
+part way can be started again from the same route.
+
+Two things are left: the disabled Kerberos principal, which krbkeys
+never deletes, and the node's Directory history.
+
 The Edge Monitor also tries to make sure that an Edge Agent which should
 be running is actually running. It treats the Edge Agent as up from any
 packet (normally its NBIRTH) until its NDEATH, which the MQTT broker

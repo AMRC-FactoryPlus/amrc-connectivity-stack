@@ -475,12 +475,26 @@ grants:
       !u Clusters.App.K8sTemplate: false
       !u Clusters.App.Bootstrap: false
       !u UUIDs.App.SparkplugAddress: false
+      # To find what belongs to an edge node it is asked to delete.
+      !u UUIDs.App.Registration: false
+      !u UUIDs.App.EdgeAgentDeployment: false
+      !u UUIDs.App.ConnectionConfiguration: false
+      !u UUIDs.App.DeviceInformation: false
 
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u UUIDs.App.Info: false
       !u Clusters.App.Status: false
       !u Git.App.Config: false
       !u UUIDs.App.SparkplugAddress: false
+      # Deleting an edge node removes its deployment first, so the
+      # cluster removes the agent before anything else goes.
+      !u UUIDs.App.EdgeAgentDeployment: false
+
+    # Deleting an edge node deletes it with its connections and devices.
+    !u ConfigDB.Perm.DeleteObject:
+      !u UUIDs.Class.EdgeAgent: true
+      !u UUIDs.Class.EdgeAgentConnection: true
+      !u UUIDs.Class.Device: true
 
     !u ConfigDB.Perm.CreateObject:
       !u Clusters.Class.Account: false
@@ -489,6 +503,9 @@ grants:
       !u Clusters.Class.Cluster: true
     !u ConfigDB.Perm.WriteMembers:
       !u Clusters.Class.ClusterGroups: true
+      # When a deleted node's cluster is offline, the Cluster Manager
+      # takes the agent out of its role, as the edge krbkeys would.
+      !u Local.Role.EdgeAgent: false
 
     !u Git.Perm.Pull:
       # XXX This does nothing; the Req has no members.

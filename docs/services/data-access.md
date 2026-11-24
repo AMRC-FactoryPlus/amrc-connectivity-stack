@@ -257,7 +257,6 @@ Application | `Equipment device labels` * | `dfc3983b-658c-4099-b76a-01ce7c18bde
 Application | `Run metadata` * | `2b2b4dbc-e0a0-474e-93a8-257bbcbb7f7a`
 Application | `Recording in progress` * | `cf3f6103-0f0e-4839-953a-ad2cedc78c30`
 Application | `Release policy` * | `cb9b2307-3b82-4ffd-9665-0d214379ac21`
-Client role | `Dataset maker` | `b7aa3036-fc1f-4869-b0f5-50f28b028905`
 Client role | `Dataset manager` | `4ab8468a-166b-4c01-afa6-7bd558db806b`
 Composite permission | `Device data` | `6abc1879-429d-4c0f-a5e4-00a655a09f26`
 Service function | `Data Access service` | `06cee697-29d3-4972-9479-bc392e24946e`
@@ -268,43 +267,46 @@ run details through the metadata routes below, which check
 `Edit dataset`. It writes `Recording in progress` directly to ConfigDB.
 `Release policy` holds the terms a `Published` dataset is released
 under, and its schema in the dump says what each field means.
-Two client roles hold what the Admin UI needs to make datasets and
-record runs as the signed-in user:
+Nobody needs a role to make datasets. Data Access lets anyone create a
+dataset from the sources they hold permission on: `Build datasets from
+device` on a device, `Include in union` on each dataset in a union, and
+`Use for session` on a session's source. A `Device data` grant on a
+device covers its `Build datasets from device` half, and also lets the
+holder read the device's default dataset and use it in unions and
+sessions. Data Access records the creator as each new dataset's owner.
 
-- `Dataset maker` reads, edits and deletes only the datasets its
-  member created, and that includes their metadata, and uses only
-  those in a union or session. Data Access records the creator as each
-  new dataset's owner, and these grants target `Special.Mine`. The role
-  gives no device: a member builds from the devices they hold `Device
-  data` on, which also covers each device's default dataset, and reads
-  other people's datasets when they are shared with them.
-- `Dataset manager` reads, edits and deletes every dataset, uses any
-  dataset in a union or session, and holds `Build datasets from device`
-  and i3X's `Read i3X objects` on every device. Datasets created before
-  Data Access recorded owners are owned by Data Access, so only a
-  manager can edit or delete them. The i3X grant is direct rather than
-  the `Device data` composite, so a manager never loses it part way
-  through a dump load.
+`dumps/everyone.yaml` grants every principal `Read dataset`, `Include
+in union`, `Use for session`, `Edit dataset` and `Delete dataset` on
+`Special.Mine`, which covers only the datasets a principal owns, so
+people manage what they made and nothing else. It also lets everyone
+read the names the Admin UI shows (`Info`, `Registration` and the
+dataset metadata apps), and write any equipment's `Recording in
+progress` entry: any operator at a machine starts and stops its
+recordings. Other people's datasets are reached through a share.
 
-Both roles can write any equipment's `Recording in progress` entry:
-any operator at a machine starts and stops its recordings. Neither has
-any other ConfigDB write.
+The `Dataset manager` client role reads, edits and deletes every
+dataset, uses any dataset in a union or session, and holds `Build
+datasets from device` and i3X's `Read i3X objects` on every device.
+Datasets created before Data Access recorded owners are owned by Data
+Access, so only a manager can edit or delete them. The i3X grant is
+direct rather than the `Device data` composite, so a manager never
+loses it part way through a dump load. The manager is a subclass of
+`Principal`, because Auth only treats subclasses of `Principal` as
+groups.
 
-`dumps/data-access.yaml` defines both roles and all their grants.
-Service setup loads it on every run, and a dump load replaces every
-grant of each principal it names. A grant you add to either role by
-hand is removed on the next service-setup run. Give extra access to
-the people instead, or to a group of your own.
+`dumps/data-access.yaml` defines the role and all its grants. Service
+setup loads it on every run, and a dump load replaces every grant of
+each principal it names. A grant you add to the role by hand is
+removed on the next service-setup run. Give extra access to the people
+instead, or to a group of your own.
 
-Each role is defined with `Create dataset` on `Dataset definition`, the
-class of every structural app, as a plural grant. That covers the new
-`UNS device` kinds. A principal that holds `Create dataset` on single
-structural apps, such as `Sparkplug source`, needs new grants on
-`UNS device` or `UNS device metrics` to make device datasets.
+Every grant to the `Principal` class must live in `everyone.yaml`. Each
+dump file loads on its own, so a second file granting to `Principal`
+would remove the first file's grants on every run.
 
-Both roles are subclasses of `Principal`. Auth only treats subclasses of
-`Principal` as groups, so a role declared without it grants nothing to
-its members.
+There used to be a `Dataset maker` role
+(`b7aa3036-fc1f-4869-b0f5-50f28b028905`). Service setup deletes its
+grants and the role itself wherever it still exists.
 
 
 ## HTTP API (`v1`)
@@ -955,11 +957,15 @@ The body does not hold the dataset UUID.
 ### `POST v1/structure`
 
 Body: `{ "structure": "<app UUID>", "config": <structure-specific> }`.
-Validates the config shape for the chosen structural app, then requires:
+Validates the config shape for the chosen structural app, then requires
+the relevant per-source permission for every source named in `config`
+(see [Permissions](#permissions)). That is enough on its own: the
+caller needs no other permission to create.
 
-* `Create dataset` on the `structure` app UUID itself, and
-* the relevant per-source permission for every source named in `config`
-  (see [Permissions](#permissions)).
+A config that names no source, which only an empty `Union components`
+can do, proves no permission, so it needs `Create dataset` on the
+`structure` app UUID instead. `Create dataset` never stands in for a
+source permission.
 
 On success, creates a new `Dataset` object, writes the config entry
 under `structure`, records the corresponding subclass relationship(s),
@@ -1113,7 +1119,7 @@ Permission | UUID | Targets | Grants
 ---|---|---|---
 `Read dataset` | `ec48462e-37eb-4f56-8efa-83d813e85559` | Dataset | `v1/metadata/:uuid`, `v1/metadata/:uuid/contents`, `v1/data/:uuid` and `v1/series` for the dataset
 `Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT), the `v1/metadata/:uuid/<field>` writes, and inclusion in the `v1/structure` list
-`Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`UNS device` / `UNS device metrics` / `Union components` / `Session limits`), or `Dataset definition` as a plural grant for all of them | Creating a dataset of that structure via `POST v1/structure`
+`Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`UNS device` / `UNS device metrics` / `Union components` / `Session limits`), or `Dataset definition` as a plural grant for all of them | Creating an empty union via `POST v1/structure`. Any other create needs only the source permissions
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`
 `Build datasets from device` (`UseDevice`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Device | Referencing it as the source of a device structure, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
 `Use for session` (`UseForSession`) | `c089b9a9-06cd-4211-94fc-9ad52a759987` | Dataset | Referencing it as a `Session limits` source

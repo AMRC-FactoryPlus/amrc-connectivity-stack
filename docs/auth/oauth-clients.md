@@ -300,9 +300,9 @@ If the consumer also builds Data Access datasets from those devices,
 grant it **Device data** instead. This composite permission holds
 **Read i3X objects** and Data Access's **Build datasets from device**,
 so one grant on a device covers both. Data Access checks its half on
-the device only, so give it on devices, not on ISA-95 nodes. The
-consumer also needs **Create dataset** on the structures it makes; the
-**Dataset maker** role holds it.
+the device only, so give it on devices, not on ISA-95 nodes. That is
+all the consumer needs to make datasets from those devices, and to
+read, change and delete the datasets it makes.
 
 ## Worked example: minimal Express + openid-client
 

@@ -222,27 +222,43 @@ to send to, the firewall rules and the host's receive buffer.
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.
 
-### Upgrading: Dataset maker no longer reaches every device
+### Upgrading: the Dataset maker role is gone
 
 **Dataset maker** used to hold **Build datasets from device** and
 **Read i3X objects** on every device, and could read every dataset,
 which includes every device's default dataset. Putting someone in the
 role gave them every device's data, so a per-device **Device data**
-grant limited nothing.
+grant limited nothing. Giving someone **Device data** also wasn't
+enough on its own: they needed the role as well before they could make
+a dataset.
 
-The role now gives only what making datasets needs: **Create
-dataset**, and read, union and session use of the datasets the member
-created. A member builds from the devices they hold **Device data** on,
-which also covers each of those devices' default datasets, and reads
-other people's datasets when they are shared with them. **Dataset
+**Device data** on a device is now all anyone needs to make datasets
+from it. Data Access lets a person create a dataset when they hold the
+permission on everything it reads: **Build datasets from device** on
+its devices, **Include in union** on the datasets it combines, and
+**Use for session** on a session's source. Every account can read,
+use, change and delete the datasets it made, and no others unless they
+are shared with it. **Use for sessions** on the Share card is now
+enough for the other person to make session datasets, so the card no
+longer offers a separate session-making grant, and **Manage access** no
+longer offers to make someone a Dataset maker.
+
+Service setup deletes the Dataset maker role and its grants. **Dataset
 manager** is unchanged and still reaches every device and dataset.
 
-**What you must do.** After the upgrade, a Dataset maker who built from
-devices through the role alone sees no devices in the dataset builder.
+**What you must do.** After the upgrade, a former Dataset maker sees in
+the dataset builder only the devices they hold **Device data** on.
 Give them **Device data** on each device they need, from **Manage
 access** on the device or ISA-95 page, or make them a Dataset manager.
-Their own datasets keep working, but a dataset they did not create,
+Their own datasets keep working. A dataset they did not create,
 including one made before Data Access recorded owners, needs a share.
+
+**Fixed: everyone can read both the ISA-95 vocabulary and engineering
+units.** Two service-setup files each granted every account read
+access to one vocabulary, and loading either file removed the other's
+grant, so after each run only one of the two was readable by people
+who are not administrators. All grants to every account now live in
+one file.
 
 ### Upgrading: engineering units come from a vocabulary
 

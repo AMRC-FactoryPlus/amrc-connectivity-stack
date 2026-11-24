@@ -31,8 +31,18 @@ jobs:
           node-version: '24.x'
 
       # The local libraries are file: dependencies, which npm links
-      # rather than copies. vitest.config.js dedupes the packages they
-      # share with acs-admin, so they need no install of their own.
+      # rather than copies, so each one resolves its own dependencies
+      # from its own folder. A developer's checkout has them installed.
+      # A fresh CI checkout does not, and the tests that import the
+      # service client then fail to find optional-js. Optional
+      # dependencies (the native GSSAPI module) are left out.
+      - name: Install the linked libraries' dependencies
+        run: |
+          for lib in js-service-client js-rx-client js-rx-util js-sparkplug-app
+          do
+            (cd "lib/$lib" && npm install --no-audit --no-fund --omit=optional)
+          done
+
       - name: Install dependencies
         working-directory: acs-admin
         run: npm ci --no-audit --no-fund

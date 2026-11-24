@@ -971,23 +971,19 @@ Edge Agent's own item or size cap stops it, the Edge Agent also sends
 edge-agent chart's 100m CPU and 200Mi, a 49,950-item edge-test-rs scan
 while edge-mqtt delivered a value every 50 ms:
 
-Scan|Scan time|DDATA latency p50 / p95 / max|Peak memory
----|---|---|---
-No scan||14 / 26 / 52 ms|112 MiB
-`pace_ms` 0|47.5 s|p95 721 ms|120 to 131 MiB
-`pace_ms` 20 (the default)|50.5 s|94 / 347 / 1951 ms|131 MiB
-`pace_ms` 100|52.2 s|p95 155 ms|120 to 131 MiB
-`pace_ms` 200|102.5 s|p95 108 ms|120 to 131 MiB
-`pace_ms` 0, no CPU limit|1.6 s|p95 12 ms|152 MiB
+Scan|Scan time|DDATA latency p50 / p95 / max|Agent CPU|Peak memory
+---|---|---|---|---
+Before the window and the CPU budget|57 s|98 / 772 / 2152 ms|0.100 (the limit)|131 MiB
+With them (the default pace)|21 s|12 / 22 / 86 ms|0.057|113 MiB
 
-Memory stays well inside the limit. Latency does not: the scan uses
-the whole CPU quota while it runs, and CFS throttling then holds up the
-agent's event loop, so data from that agent reaches Sparkplug later
-until the scan ends. Without a CPU limit the same scan needs about 1.3
-CPU-seconds and does not change latency. The latency rule in
-the end-to-end load test (p95 at most twice the baseline) fails at
-every pace tried with the 100m limit, and the defaults are still under
-review.
+Without the window and the budget, the scan used the whole CPU quota
+and CFS throttling held up the agent's event loop, so data from that
+agent reached Sparkplug late until the scan ended. With them, the scan
+uses only spare CPU and data latency stays where it was. The baseline
+p95 on a shared machine varies from about 15 ms to a few hundred
+between runs, so the end-to-end load test passes when the p95 during
+the scan is at most max(2 x baseline p95, 100 ms) and memory stays
+under 180Mi.
 
 ### Compatibility
 

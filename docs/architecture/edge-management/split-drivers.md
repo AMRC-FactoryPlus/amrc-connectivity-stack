@@ -491,6 +491,12 @@ Going back to version 6 after upgrading to version 7 is not supported.
 Fix forward instead, as in [If a connection has no data
 afterwards](#if-a-connection-has-no-data-afterwards).
 
+## Listing a device's addresses
+
+The OPC UA, MQTT and simulator drivers can list the addresses their
+device offers, so you can pick them in the origin map editor instead
+of typing them. See [Scanning a device for addresses](edge-scout-scanning.md).
+
 ## For developers
 
 The golden-output harness (`acs-edge/tests/golden`) proves each split

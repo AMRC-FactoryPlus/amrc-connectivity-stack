@@ -285,6 +285,52 @@ unavailable: OIDC discovery failed", fix the cluster's DNS for that
 name. The services' notify websockets now accept a Keycloak token, so
 an older admin UI or client keeps working against new services.
 
+### Scan a device for its addresses (Edge Scout)
+
+The origin map editor has a new **Addresses** panel. Press **Scan**
+and the device's driver lists the addresses the device offers, so you
+can pick them for metrics instead of typing them, map many at once,
+and see what changed on the device since the last scan. OPC UA scans
+browse the server's address space, and MQTT scans listen to the broker
+for a few seconds and list the topics and JSON fields they hear. Data
+collection carries on during a scan, and nothing changes in the origin
+map until you press Save. See
+[Scanning a device for addresses](../architecture/edge-management/edge-scout-scanning.md).
+
+- **Who can scan.** Only administrators, through a new "Scan device
+  addresses" permission in the command escalation group, which
+  administrators already hold. No grant is needed.
+- **What it needs.** service-setup creates the permission, the Edge
+  Agent's grants, a ConfigDB app for each connection's scan status and
+  a class for stored scans during the upgrade. The Edge Agent and the
+  drivers must be from this release: an older Edge Agent shows "This
+  Edge Agent can't scan", and a driver built on an older driver
+  library shows "This driver was built before scouting". Drivers from
+  this release still work with older Edge Agents, which never offer
+  scanning.
+- **Which drivers scan.** OPC UA, MQTT and the simulator, plus the two
+  test drivers. Every other driver in ACS, which is Modbus, ADS,
+  BACnet, FTP, Pathfindr, RTDE, Open Protocol, TP-Link smart plug,
+  REST, UDP and FOCAS, says it cannot list its addresses, because the
+  JavaScript drivers are now built on the driver library in the same
+  release, as the Rust drivers already were. See
+  [Edge Scout driver notes](../architecture/edge-management/edge-scout-driver-notes.md).
+- **Scans are stored in the Files service,** which gains a `DELETE
+  /v1/file/:uuid` route and a "Delete" permission. Each connection
+  keeps its last two scans, and service-setup removes stored scans
+  nothing refers to on each upgrade.
+- **Load on the Edge Agent.** Live data comes first. The Edge Agent
+  works on a scan only with CPU it can spare, and drivers wait for it
+  to catch up, so a scan on a busy Edge Agent takes longer instead of
+  delaying data. A 50,000-address scan on an agent held to the chart's
+  100m CPU took about 21 seconds and left data latency unchanged.
+  Memory stays well inside the limit.
+- **Driver custom UIs** can use version 2 of the contract to open the
+  address picker. See
+  [Driver-supplied configuration UIs](../architecture/edge-management/driver-custom-uis.md#contract-version-2-edge-scout).
+- **Driver authors** can add scanning to a JS, Python or Rust driver.
+  See [Adding scouting to a driver](../architecture/edge-management/edge-scout-drivers.md).
+
 ### Upgrading: engineering units come from a vocabulary
 
 Metrics keep their `Eng_Unit` strings, but a new vocabulary of units

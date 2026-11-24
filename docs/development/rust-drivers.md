@@ -90,6 +90,19 @@ repo?=edge-foo
 include ${mk}/acs.docker.mk
 ```
 
+### Listing the device's addresses (optional)
+
+A driver can take part in Edge Scout, which lets an operator scan the
+device from the Admin UI and pick addresses instead of typing them. Set
+`const SCOUTS: bool = true` on the handler and return a `Scouter` from
+`Handler::scouter`. [Adding scouting to a driver](../architecture/edge-management/edge-scout-drivers.md)
+explains the rules for items and has a complete example, and
+[`edge-test-rs/src/scout.rs`](../../edge-test-rs/src/scout.rs) is the
+smallest real scouter. A driver that leaves `SCOUTS` false answers
+every scan with "This driver can't list its addresses."
+
+Give the driver definition a `scout` key as well (step 5).
+
 ## 2. The Dockerfile
 
 Copy `lib/rs-edge-driver/driver-template/Dockerfile` and
@@ -173,6 +186,11 @@ definition in the ConfigDB, which service setup loads from
    `image.repository: edge-foo` and a JSON `schema` for the
    connection details. The Modbus entry is a good model, and the
    comment at the top of the configs section lists every field.
+4. If the driver scans, add a `scout` key with a `title`, an
+   `address_form` and an `options` schema listing only the options the
+   scouter reads. If it never will, `scout: false` hides the Addresses
+   panel. See
+   [the driver definition](../architecture/edge-management/edge-scout-drivers.md#the-driver-definition).
 
 Set `hidden: true` until the image has been published in a release,
 so the Admin UI does not offer a driver whose image does not exist yet.

@@ -149,6 +149,119 @@ malformed proposal is reported rather than applied:
 `null` clears a field. Keys outside the allowlist are dropped silently, so a
 panel written against a later contract degrades rather than breaking.
 
+## Contract version 2: Edge Scout
+
+Version 2 lets a panel use [Edge Scout](edge-scout-scanning.md), the
+list of addresses a scan found on the device's connection. A panel
+replaces the standard fields, so the operator loses the standard
+**Pick from scan** button. Version 2 gives the panel its own way to
+pick, and lets it read the scan to draw its own list. Everything in
+version 1 works the same in version 2.
+
+To use it, declare version 2 in the driver definition and send version
+2 in your messages:
+
+```yaml
+ui:
+  version: 2
+  document: |
+    ...
+scout:
+  share_samples: false
+```
+
+- **The envelope.** Every message between the Manager and your document
+  carries `fpDriverUi: 2`. The Manager answers each document in the
+  version its driver definition declares, so a version 1 document such
+  as Pathfindr's keeps getting version 1 messages. A version 1 message
+  that carries a version 2 type is ignored.
+- **The shell stays on version 1.** The shell page's own messages,
+  `host-ready`, `host-failed` and `document`, always carry
+  `fpDriverUi: 1`. Your document never sees them.
+- **No scans from the sandbox.** No message starts or stops a scan, so
+  third-party code in the sandbox can never put load on production
+  equipment. Only an operator pressing Scan in the Addresses panel
+  can.
+
+The exchange adds these messages:
+
+```
+  { fpDriverUi: 2, type: "init", ..., scout }        Manager → panel
+  { fpDriverUi: 2, type: "scout-changed", scout }    Manager → panel
+
+  { fpDriverUi: 2, type: "pick-address", filter }    panel  → Manager
+  { fpDriverUi: 2, type: "picked", item }            Manager → panel
+
+  { fpDriverUi: 2, type: "scout-query", prefix, limit }  panel → Manager
+  { fpDriverUi: 2, type: "scout-items", items }      Manager → panel
+```
+
+### `init.scout` and `scout-changed`
+
+A version 2 `init` has one more field, `scout`, a summary of the
+connection's scan:
+
+| Field | Meaning |
+|---|---|
+| `available` | `true` when there is a complete scan to pick from |
+| `state` | The latest scan's state: `queued`, `running`, `done`, `failed`, `cancelled`, or null when the connection has never been scanned |
+| `finished` | When the current scan finished, as an ISO 8601 string, or null |
+| `items` | How many items the current scan has, or 0 |
+
+The Manager sends `scout-changed` with the same `scout` object when a
+scan starts, finishes or fails while the panel is open, so the panel
+can enable or update a "choose from the scan" control.
+
+### `pick-address`
+
+Send `pick-address` to open the Manager's own address picker over your
+panel. The picker shows the scan's tree with a search box. `filter` is
+optional:
+
+| Field | Meaning |
+|---|---|
+| `prefix` | Show only items whose address starts with this, at most 1024 characters |
+| `kind` | `value` or `folder`, to show only that kind |
+
+The Manager answers with `picked`. `item` is the item the operator
+chose, in the [item format](edge-scout-reference.md#fpedge1-protocol-additions),
+or null when the operator closed the picker, the connection has no
+scan, or a picker was already open. A second `pick-address` while the
+picker is open is answered with `item: null` at once.
+
+To use the item, send `propose` as usual, for example
+`{ Address: item.address, Path: item.path }`. The same allowlist and
+checks apply.
+
+### `scout-query`
+
+Send `scout-query` with a `prefix` (a string, possibly empty) and a
+`limit` to read items without the picker. The Manager answers with
+`scout-items`, holding the items whose `address` starts with `prefix`,
+in the order the scan found them. `limit` is cut to 500, and a missing
+or bad `limit` means 500. With no scan, `items` is empty. A
+`scout-query` without a string `prefix` is ignored.
+
+### Samples
+
+An item's `sample` is the device's value when it was scanned, which
+may be sensitive. The Manager removes `sample` from every item it
+sends to a panel unless the driver definition sets
+`scout.share_samples: true`.
+
+### Item strings are untrusted
+
+Every string in an item comes from the device. Show it with
+`textContent`, never `innerHTML`, as the test document does.
+
+### Test document
+
+`acs-admin/test/fixtures/driver-ui/scout-v2.html` is a working version
+2 panel. It shows the scan summary, lists two addresses with
+`scout-query`, and has a button that opens the picker and proposes the
+chosen address. `acs-admin/test/driver-ui-v2-host.test.js` runs it in
+the real shell page in jsdom. Copy its shape.
+
 ## Falling back
 
 The standard fields are shown whenever:
@@ -172,5 +285,6 @@ fails if the two drift. Copy its shape.
 
 ## Next Steps
 
+- [Scanning a device for addresses](edge-scout-scanning.md) - Edge Scout, which contract version 2 reads from
 - [Edge Deployments](edge-deployments.md) - deploying to edge clusters
 - [Edge Management Overview](overview.md) - return to the edge management overview

@@ -1,0 +1,10 @@
+{
+    "extends": "../../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "../../..",
+        "outDir": "../../../node_modules/.cache/scout-e2e",
+        "noEmitOnError": true
+    },
+    "include": [],
+    "files": ["agent-main.ts"]
+}

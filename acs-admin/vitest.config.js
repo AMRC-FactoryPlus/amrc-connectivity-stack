@@ -9,8 +9,12 @@
 
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  /* Compiles .vue files for the component smoke tests, which mount in
+   * jsdom. The plain-module tests do not use it. */
+  plugins: [vue()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

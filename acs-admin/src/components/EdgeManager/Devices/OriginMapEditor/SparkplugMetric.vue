@@ -11,6 +11,8 @@
       v-if="showCustomUI"
       :key="customUIKey"
       :document="driverUiDocument"
+      :version="driverUiVersion"
+      :share-samples="driverInfo?.scout?.share_samples === true"
       :config="driverConfig"
       :config-schema="driverConfigSchema"
       :metric="localModel"
@@ -45,7 +47,16 @@
     <div class="rounded-lg border border-gray-300 p-5 bg-gray-100">
       <div class="grid gap-3 2xl:grid-cols-3">
         <Control v-if="!isStatic" :label="addressLabel" :help="addressHelp">
-          <Input v-model="localModel.Address" :placeholder="addressPlaceholder" :icon="addressIcon"/>
+          <div class="flex items-center gap-2">
+            <Input v-model="localModel.Address" :placeholder="addressPlaceholder" :icon="addressIcon" class="flex-1"/>
+            <!-- Only when a scan of this connection is loaded. -->
+            <Button v-if="canPick" variant="outline" size="sm" class="shrink-0 gap-1.5"
+                title="Choose this metric's address from the last scan"
+                @click="$emit('pick-from-scan')">
+              <i class="fa-solid fa-sitemap text-xs"></i>
+              <span>Pick from scan</span>
+            </Button>
+          </div>
         </Control>
         <Control v-if="!isStatic && !hidePathField" :label="pathLabel" :help="pathHelp">
           <Input v-model="localModel.Path" :placeholder="pathPlaceholder" :icon="pathIcon"/>
@@ -156,7 +167,7 @@ import { Button } from '@/components/ui/button'
 import { useConnectionStore } from '@/store/useConnectionStore'
 import { useDriverStore }     from '@/store/useDriverStore'
 import DriverCustomUI from './DriverCustomUI.vue'
-import { ui_document, apply_proposal } from '@/lib/driver-ui/contract.js'
+import { ui_document, ui_version, apply_proposal } from '@/lib/driver-ui/contract.js'
 
 export default {
   name: 'SparkplugMetric',
@@ -210,7 +221,14 @@ export default {
       type: String,
       default: null,
     },
+    /* A scan of this connection is loaded, so Pick from scan can work. */
+    canPick: {
+      type: Boolean,
+      default: false,
+    },
   },
+
+  emits: ['input', 'remove-metric', 'pick-from-scan'],
 
   data () {
     return {
@@ -266,6 +284,11 @@ export default {
      * ships one written against a contract version we do not know. */
     driverUiDocument() {
       return ui_document(this.driverInfo)
+    },
+
+    /* The contract version that document was written against. */
+    driverUiVersion() {
+      return ui_version(this.driverInfo) ?? 1
     },
 
     allowedTypeNames() {

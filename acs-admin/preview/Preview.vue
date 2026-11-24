@@ -73,6 +73,44 @@
         </div>
       </div>
 
+      <!-- Edge Scout: the Addresses panel beside a stand-in metric pane -->
+      <div v-else-if="surface === 'scout'" class="flex gap-4 p-4 h-[calc(100vh-4rem)]">
+        <div class="flex-1 rounded-lg border p-4 text-sm text-gray-500">
+          <div class="font-semibold text-gray-700 mb-2">Spindle / Speed</div>
+          <div class="font-mono text-xs">{{ scoutModel.Spindle.Speed.Address }}</div>
+        </div>
+        <div class="w-[440px] flex flex-col border rounded-lg p-3 bg-gray-50">
+          <ScoutPanel :scout="scout" :driver="scoutDriver" driver-name="OPC-UA"
+              :model="scoutModel" :devices="[{ name: 'Mill 1', model: scoutModel }]"
+              :selected-metric="{ path: ['Spindle', 'Speed'], model: scoutModel.Spindle.Speed }"
+              @map="items => { mapItems = items; mapOpen = true }"/>
+        </div>
+        <ScoutMapDialog :open="mapOpen" :items="mapItems" :schema="scoutSchema" :index="scout.current_index.value"
+            @close="mapOpen = false" @apply="mapOpen = false"/>
+      </div>
+
+      <!-- Driver custom UI contract version 2: the test document in a real
+           sandboxed frame, with the scan and the Manager's picker -->
+      <div v-else-if="surface === 'driver-ui'" class="flex gap-4 p-4">
+        <div class="flex-1 max-w-xl rounded-lg border p-4">
+          <div class="mb-3 flex items-center gap-2 text-xs">
+            <span class="font-semibold text-gray-700">Driver interface, contract version {{ uiVersion }}</span>
+            <button type="button" class="ml-auto rounded border px-2 py-1" data-test="scan-start"
+                @click="uiScout.summary = { ...uiScout.summary, state: 'running' }">Pretend a scan started</button>
+            <button type="button" class="rounded border px-2 py-1" data-test="scan-done"
+                @click="uiScout.summary = { ...uiScout.summary, state: 'done' }">Pretend it finished</button>
+          </div>
+          <DriverCustomUI :document="uiDocument" :version="uiVersion" :metric="uiMetric"
+              :allowed-types="['DoubleBE', 'FloatBE']" :share-samples="$route.query.samples === '1'"
+              @propose="v => uiMetric = { ...uiMetric, ...v }"/>
+          <div class="mt-3 text-xs text-gray-500">Metric now reads
+            <span class="font-mono" data-test="metric-address">{{ uiMetric.Address ?? 'nothing' }}</span>
+          </div>
+        </div>
+        <ScoutPicker :open="picker.open" :index="uiScout.index" :filter="picker.filter"
+            @pick="item => closePicker(item)" @close="closePicker(null)"/>
+      </div>
+
       <div v-else class="p-10">
         <p class="text-sm text-gray-500">Unknown surface: {{ surface }}</p>
       </div>
@@ -97,9 +135,26 @@ import MergeISA95NodeDialog from '@components/ISA95/MergeISA95NodeDialog.vue'
 import MoveISA95NodeDialog from '@components/ISA95/MoveISA95NodeDialog.vue'
 import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 
+import ScoutPanel from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPanel.vue'
+import ScoutMapDialog from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutMapDialog.vue'
+import ScoutPicker from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPicker.vue'
+import DriverCustomUI from '@components/EdgeManager/Devices/OriginMapEditor/DriverCustomUI.vue'
+import scoutV2Document from '../test/fixtures/driver-ui/scout-v2.html?raw'
+
 import { devices, drafts, schemas } from './fixtures.js'
 import { target as i3xTarget } from './i3x-fixtures.js'
 import { nodes as isa95Nodes } from './isa95-fixtures.js'
+import { preview_scout, preview_index, scout_driver, scout_model } from './scout-fixtures.js'
+
+const metric = t => ({ allOf: [{}, { properties: { Sparkplug_Type: { enum: [t] } } }] })
+const SCOUT_SCHEMA = {
+  properties: {
+    Spindle: { properties: { Speed: metric('DoubleBE'), Load: metric('FloatBE') } },
+    Feed_Rate: metric('DoubleBE'),
+    Coolant_Temp: metric('DoubleBE'),
+    Mode: metric('String'),
+  },
+}
 
 export default {
   name: 'Preview',
@@ -108,12 +163,35 @@ export default {
     ComponentPickerDialog, I3xAccessButton, ISA95, PublishSchema,
     ISA95PlacementPicker, MergeISA95NodeDialog, MoveISA95NodeDialog, NewISA95NodeDialog,
     RawSchemaDialog, SchemaPicker, Schemas, SchemaEditor, Toaster,
+    ScoutPanel, ScoutMapDialog, ScoutPicker, DriverCustomUI,
+  },
+
+  /* What DriverCustomUI injects for a version 2 document. The functions
+   * read live state, as OriginMapEditor's do. */
+  provide () {
+    return {
+      driverUiScout: {
+        summary: () => this.uiScout.summary,
+        index: () => this.uiScout.index,
+        pick: filter => this.openPicker(filter),
+      },
+    }
   },
 
   data () {
+    const scout = this.$route.query.surface === 'scout' ? preview_scout(this.$route.query.state) : null
     return {
       drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
       placementA: [], placementB: [], settling: false,
+      scout, scoutModel: scout_model, scoutDriver: scout_driver, scoutSchema: SCOUT_SCHEMA,
+      mapOpen: false, mapItems: [],
+      uiDocument: scoutV2Document,
+      uiVersion: this.$route.query.v === '1' ? 1 : 2,
+      uiMetric: { Address: null },
+      uiScout: this.$route.query.surface === 'driver-ui' && this.$route.query.scan !== 'none'
+        ? { index: preview_index(), summary: { available: true, state: 'done', finished: '2026-11-24T10:42:13Z', items: preview_index().items.length } }
+        : { index: null, summary: { available: false, state: null, finished: null, items: 0 } },
+      picker: { open: false, filter: {}, resolve: null },
     }
   },
 
@@ -174,6 +252,8 @@ export default {
       if (this.surface === 'i3x-isa95' || this.surface === 'isa95') return 'ISA-95 Hierarchy'
       if (this.surface === 'isa95-picker') return 'ISA-95 Placement'
       if (this.surface === 'i3x-device') return 'Devices'
+      if (this.surface === 'scout') return 'Edge Scout'
+      if (this.surface === 'driver-ui') return 'Driver interface'
       return 'Schemas'
     },
 
@@ -196,6 +276,22 @@ export default {
           isDraft: true,
         })))
         .sort((a, b) => a.label.localeCompare(b.label))
+    },
+  },
+
+  methods: {
+    /* As OriginMapEditor: one picker at a time. */
+    openPicker (filter) {
+      if (this.picker.open) return Promise.resolve(null)
+      return new Promise(resolve => {
+        this.picker = { open: true, filter: filter ?? {}, resolve }
+      })
+    },
+
+    closePicker (item) {
+      const resolve = this.picker.resolve
+      this.picker = { open: false, filter: {}, resolve: null }
+      resolve?.(item ?? null)
     },
   },
 }

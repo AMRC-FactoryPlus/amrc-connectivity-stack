@@ -1,0 +1,42 @@
+name: Admin UI tests
+
+# Runs acs-admin's vitest suites: the Admin UI's own tests and the i3X
+# Explorer's. They ran nowhere before. The Edge Scout tests read the
+# shared fixtures in lib/edge-scout-schemas, so a schema or fixture
+# change there runs them too.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'acs-admin/**'
+      - 'lib/js-*/**'
+      - 'lib/edge-scout-schemas/**'
+      - '.github/workflows/acs-admin-tests.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      # The local libraries are file: dependencies, which npm links
+      # rather than copies. vitest.config.js dedupes the packages they
+      # share with acs-admin, so they need no install of their own.
+      - name: Install dependencies
+        working-directory: acs-admin
+        run: npm ci --no-audit --no-fund
+
+      - name: Run the tests
+        working-directory: acs-admin
+        run: npm test

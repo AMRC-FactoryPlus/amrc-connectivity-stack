@@ -54,23 +54,26 @@
 <script>
 import { Button } from '@/components/ui/button'
 
-import {
-  HANDSHAKE_TIMEOUT_MS,
-  HOST_PAGE,
-  build_document_message,
-  build_init,
-  parse_message,
-  validate_proposal,
-} from '@/lib/driver-ui/contract.js'
+import { HANDSHAKE_TIMEOUT_MS, HOST_PAGE, CONTRACT_VERSION } from '@/lib/driver-ui/contract.js'
+import { create_host } from '@/lib/driver-ui/host.js'
 
 export default {
   name: 'DriverCustomUI',
 
   components: { Button },
 
+  /* Edge Scout access, provided by the origin map editor. A version 2
+   * document reads discovered addresses and opens the picker through
+   * it. Null where the editor has no Addresses panel. */
+  inject: {
+    scout: { from: 'driverUiScout', default: null },
+  },
+
   props: {
     /** The HTML document from the driver definition. */
     document:     { type: String,  required: true },
+    /** The contract version the document was written against. */
+    version:      { type: Number,  default: CONTRACT_VERSION },
     /** Driver connection configuration. Secrets are redacted before it
      * crosses into the frame; see contract.js. */
     config:       { type: Object,  default: () => ({}) },
@@ -80,6 +83,8 @@ export default {
     metric:       { type: Object,  default: () => ({}) },
     /** Sparkplug type names this metric is permitted to take. */
     allowedTypes: { type: Array,   default: () => [] },
+    /** DriverDef `scout.share_samples`: let the document see samples. */
+    shareSamples: { type: Boolean, default: false },
   },
 
   emits: ['propose', 'use-standard', 'unavailable'],
@@ -94,6 +99,56 @@ export default {
       problems: [],
       timer:    null,
     }
+  },
+
+  computed: {
+    /* The scan summary, as a string so the watcher only fires when it
+     * actually changes. */
+    scoutKey () {
+      return JSON.stringify(this.scout?.summary() ?? null)
+    },
+  },
+
+  watch: {
+    scoutKey () {
+      if (this.ready && this.scout) this.host?.scout_changed(this.scout.summary())
+    },
+  },
+
+  created () {
+    this.host = create_host({
+      post:     msg => this.post(msg),
+      document: this.document,
+      version:  this.version,
+      scout:    this.scout,
+      share_samples: this.shareSamples,
+      init_values: () => ({
+        config:        this.config,
+        config_schema: this.configSchema,
+        metric:        this.metric,
+        allowed_types: this.allowedTypes,
+      }),
+      on: {
+        /* The driver's own document is now running and listening. The
+         * host sends init only now, because sending earlier would race
+         * the document attaching its listener. */
+        ready: () => {
+          this.ready = true
+          this.clear_timer()
+        },
+        /* The shell could not write the document at all. No point waiting
+         * out the handshake timeout. */
+        failed: reason => {
+          this.clear_timer()
+          this.$emit('unavailable', reason)
+        },
+        resize: h => { this.height = h },
+        problems: list => { this.problems = list },
+        /* Apply whatever was valid. Discarding good values because a
+         * sibling field was malformed would be its own surprise. */
+        propose: values => this.$emit('propose', values),
+      },
+    })
   },
 
   mounted () {
@@ -131,52 +186,7 @@ export default {
       /* Only listen to our own frame. The console shares a window with
        * other things that post messages. */
       if (!frame || event.source !== frame.contentWindow) return
-
-      const msg = parse_message(event.data)
-      if (!msg) return
-
-      switch (msg.type) {
-        /* The shell is up and listening; hand it the driver's document. */
-        case 'host-ready':
-          this.post(build_document_message(this.document))
-          break
-
-        /* The shell could not write the document at all. No point waiting
-         * out the handshake timeout. */
-        case 'host-failed':
-          this.clear_timer()
-          this.$emit('unavailable', msg.reason)
-          break
-
-        /* The driver's own document is now running and listening. Only now
-         * is it safe to send init; sending earlier would race the document
-         * attaching its listener. */
-        case 'ready':
-          this.ready = true
-          this.clear_timer()
-          this.post(build_init({
-            config:        this.config,
-            config_schema: this.configSchema,
-            metric:        this.metric,
-            allowed_types: this.allowedTypes,
-          }))
-          break
-
-        case 'resize':
-          this.height = msg.height
-          break
-
-        case 'propose': {
-          const { values, errors } = validate_proposal(msg.values, {
-            allowed_types: this.allowedTypes,
-          })
-          this.problems = errors
-          /* Apply whatever was valid. Discarding good values because a
-           * sibling field was malformed would be its own surprise. */
-          if (Object.keys(values).length) this.$emit('propose', values)
-          break
-        }
-      }
+      this.host.handle(event.data)
     },
   },
 }

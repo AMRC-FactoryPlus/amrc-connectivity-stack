@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  Copyright (c) University of Sheffield AMRC 2026.
+
+  A driver custom UI written against contract version 2, for the jsdom
+  test in test/driver-ui-v2-host.test.js. No driver in this repo has a
+  version 2 interface yet, so this document stands in for one. It shows
+  the scan summary, lists the first addresses with scout-query, and has a
+  button that asks the Manager's picker for an address and proposes it.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scout test interface</title>
+</head>
+<body>
+<p id="summary">Waiting for the Manager</p>
+<ul id="items"></ul>
+<button id="pick" type="button">Choose from the scan</button>
+<p id="picked"></p>
+<script>
+(function () {
+  "use strict";
+
+  var ENVELOPE = "fpDriverUi", VERSION = 2;
+
+  function send (msg) {
+    msg[ENVELOPE] = VERSION;
+    parent.postMessage(msg, "*");
+  }
+
+  function show_summary (scout) {
+    var text = scout.available
+      ? scout.items + " addresses, state " + (scout.state || "none")
+      : "No scan" + (scout.state ? ", state " + scout.state : "");
+    document.getElementById("summary").textContent = text;
+  }
+
+  window.addEventListener("message", function (event) {
+    if (event.source !== parent) return;
+    var data = event.data;
+    if (!data || data[ENVELOPE] !== VERSION) return;
+
+    switch (data.type) {
+      case "init":
+        show_summary(data.scout);
+        if (data.scout.available)
+          send({ type: "scout-query", prefix: "", limit: 2 });
+        break;
+      case "scout-changed":
+        show_summary(data.scout);
+        break;
+      case "scout-items": {
+        var list = document.getElementById("items");
+        list.textContent = "";
+        data.items.forEach(function (item) {
+          var li = document.createElement("li");
+          /* Item strings come from the device, so text only. */
+          li.textContent = item.name + " " + item.address;
+          list.appendChild(li);
+        });
+        break;
+      }
+      case "picked":
+        if (!data.item) {
+          document.getElementById("picked").textContent = "Nothing chosen";
+          break;
+        }
+        document.getElementById("picked").textContent = data.item.address;
+        send({ type: "propose", values: { Address: data.item.address, Path: data.item.path } });
+        break;
+    }
+  });
+
+  document.getElementById("pick").addEventListener("click", function () {
+    send({ type: "pick-address", filter: { kind: "value" } });
+  });
+
+  send({ type: "ready" });
+}());
+</script>
+</body>
+</html>

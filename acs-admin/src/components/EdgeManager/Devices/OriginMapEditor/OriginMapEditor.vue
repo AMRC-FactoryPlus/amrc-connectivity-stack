@@ -4,8 +4,13 @@
 
 <template>
   <!-- Wrapper div with fixed height and no scrolling -->
-  <div class="w-full overflow-hidden flex-1">
+  <div class="w-full overflow-hidden flex-1 relative">
     <SidebarProvider class="overflow-hidden">
+      <!-- Edge Scout bulk mapping and the picker a driver UI opens -->
+      <ScoutMapDialog :open="mapOpen" :items="mapItems" :schema="schema" :index="scout.current_index.value"
+          :model="model" @apply="applyScoutMap" @close="mapOpen = false"/>
+      <ScoutPicker :open="picker.open" :index="scout.current_index.value" :filter="picker.filter"
+          @pick="item => closePicker(item)" @close="closePicker(null)"/>
       <Dialog :open="!!newObjectContext" @update:open="(open) => { if (!open) newObjectContext = null }">
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
@@ -52,6 +57,7 @@
               <SidebarMenu>
                 <SchemaGroup v-if="schema" :key="groupRerenderTrigger"
                     @selected="selectMetric"
+                    @dropItem="onScoutDrop"
                     @newObject="newObject"
                     @deleteObject="maybeDeleteObject"
                     @toggle-show-only-populated="handleToggleShowOnlyPopulated"
@@ -121,15 +127,37 @@
           <div class="flex items-center gap-3">
             <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
             <slot name="actions"/>
+            <!-- Edge Scout: the discovered addresses of this connection -->
+            <Button v-if="scoutVisible" variant="outline" size="sm" class="gap-2"
+                :aria-pressed="scoutOpen" :aria-expanded="scoutOpen"
+                @click="toggleScout()">
+              <i class="fa-solid fa-sitemap text-sm"></i>
+              <span>Addresses</span>
+              <span v-if="scoutCount != null" class="rounded-full bg-gray-100 px-1.5 text-xs text-gray-600">
+                {{ scoutCount.toLocaleString('en-GB') }}
+              </span>
+            </Button>
           </div>
         </header>
         <!-- Scrollable content area -->
         <div class="flex-1 content-scroll">
         <div v-if="selectedMetric">
+          <!-- What the last scan says about this metric's address -->
+          <div v-if="selectedScanStatus?.status === 'missing'"
+              class="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            Not found in the scan of {{ scanWhen }}.
+          </div>
+          <div v-else-if="selectedScanStatus?.conflict"
+              class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            The scan found this address as {{ selectedScanStatus.item.type }}, but the metric's type is
+            {{ selectedMetric.model.Sparkplug_Type }}.
+          </div>
           <SparkplugMetric :key="rerenderTrigger"
               :selected-metric="selectedMetric" :model="model"
               :schema="sparkplugMetricSchema.schema"
               :connection="device.deviceInformation?.connection"
+              :can-pick="scoutVisible && !!scout.status.value?.current"
+              @pick-from-scan="pickFromScan"
               @input="metricDetailsEdited"
               @remove-metric="removeMetric">
           </SparkplugMetric>
@@ -143,6 +171,28 @@
         </div>
       </div>
     </SidebarInset>
+
+    <!-- Edge Scout: the Addresses panel. Resizable on wide screens, and a
+       - sheet over the metric pane below lg. -->
+    <aside v-if="scoutVisible && scoutOpen"
+        class="absolute inset-y-0 right-0 z-20 flex shadow-xl lg:static lg:z-auto lg:shadow-none my-3 mr-3"
+        :style="{ width: `${scoutWidth}px`, maxWidth: 'calc(100% - 1.5rem)' }"
+        aria-label="Addresses">
+      <div class="hidden lg:block w-1.5 shrink-0 cursor-col-resize hover:bg-gray-300 rounded"
+          role="separator" aria-orientation="vertical" aria-label="Resize the Addresses panel"
+          tabindex="0"
+          @mousedown.prevent="startResize"
+          @keydown.left.prevent="resizeBy(24)" @keydown.right.prevent="resizeBy(-24)"></div>
+      <div class="flex-1 min-w-0 flex flex-col border rounded-lg p-3 bg-white lg:bg-gray-50">
+        <ScoutPanel ref="scoutPanel"
+            :scout="scout" :driver="driverDef" :driver-name="driverName" :kind="scoutKind"
+            :model="model" :devices="scoutDevices" :selected-metric="selectedMetric"
+            :pick-for="scoutPickFor ? scoutPickFor.join(' / ') : null"
+            @use="useScoutItem" @map="openScoutMap" @close="scoutOpen = false; scoutPickFor = null"
+            @cancel-pick="scoutPickFor = null"
+            @select-metric="selectMetricByPath"/>
+      </div>
+    </aside>
   </SidebarProvider>
   </div>
 </template>
@@ -176,17 +226,77 @@ import { useAccessStore } from '@store/useAccessStore.js'
 import { can_edit_device_ea } from '@/lib/access/perms-edge.js'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
+import ScoutPanel from './Scout/ScoutPanel.vue'
+import ScoutMapDialog from './Scout/ScoutMapDialog.vue'
+import ScoutPicker from './Scout/ScoutPicker.vue'
+import { useScout } from '@/composables/useScout.js'
+import { useNodeStore } from '@store/useNodeStore.js'
+import { useDriverStore } from '@store/useDriverStore.js'
+import { useDeviceStore } from '@store/useDeviceStore.js'
+import { apply_item, ensure_metric, schema_chain, set_at, value_at } from '@/lib/scout/ensure-metric.js'
+import { bulk_rows, is_split_driver, metric_status, proposal_for_item, when_text } from '@/lib/scout/model.js'
+import { apply_proposal, ui_version, validate_proposal } from '@/lib/driver-ui/contract.js'
+import { EdgeSim } from '@/lib/edge-sim-uuids.js'
+import { computed, ref } from 'vue'
+
+/* Width of the Addresses panel, remembered per browser. */
+const SCOUT_WIDTH_KEY = 'scoutPanelWidth'
+const SCOUT_WIDTH_MIN = 320
+const SCOUT_WIDTH_MAX = 900
 
 const SparkplugMetricUUID = 'b16275f1-e443-4c41-a482-fcbdfbd20769'
 export default {
 
-  setup () {
+  setup (props) {
+    const conn = useConnectionStore()
+    const nodes = useNodeStore()
+
+    const connection = computed(() => conn.data.find(c => c.uuid === props.device?.deviceInformation?.connection) ?? null)
+    const driverDef = computed(() => connection.value?.configuration?.driver ?? null)
+    const nodeAddress = computed(() => {
+      const addr = nodes.data.find(n => n.uuid === props.device?.deviceInformation?.node)?.sparkplugAddress
+      return addr?.group_id && addr?.node_id ? `${addr.group_id}/${addr.node_id}` : null
+    })
+
+    /* The panel opens on demand. A version 2 driver UI needs the scan as
+     * well, to answer pick-address and scout-query. */
+    const scoutOpen = ref(false)
+    const scoutActive = computed(() => scoutOpen.value || ui_version(driverDef.value) >= 2)
+
+    const scout = useScout({
+      node: () => props.device?.deviceInformation?.node ?? null,
+      connection: () => props.device?.deviceInformation?.connection ?? null,
+      address: nodeAddress,
+      driver: driverDef,
+      active: scoutActive,
+    })
 
     return {
       sch: useSchemaStore(),
       s: useServiceClientStore(),
-      conn: useConnectionStore(),
+      conn,
       access: useAccessStore(),
+      nodes,
+      drivers: useDriverStore(),
+      devices: useDeviceStore(),
+      units: useEngUnitStore(),
+      scout,
+      scoutOpen,
+      connectionInfo: connection,
+      driverDef,
+    }
+  },
+
+  /* Edge Scout access for a version 2 driver UI (DriverCustomUI.vue).
+   * The functions read live state, so the frame always sees the current
+   * scan. */
+  provide () {
+    return {
+      driverUiScout: {
+        summary: () => this.scout.summary.value,
+        index: () => this.scout.current_index.value,
+        pick: filter => this.openPicker(filter),
+      },
     }
   },
 
@@ -235,6 +345,9 @@ export default {
     Separator,
     File,
     Tree,
+    ScoutPanel,
+    ScoutMapDialog,
+    ScoutPicker,
   },
 
   mounted () {
@@ -252,6 +365,19 @@ export default {
     // Start the connection store
     this.conn.start()
 
+    // The node, driver and device stores, for the Addresses panel
+    this.nodes.start()
+    this.drivers.start()
+    this.devices.start()
+
+    try {
+      const width = Number(localStorage.getItem(SCOUT_WIDTH_KEY))
+      if (width) this.scoutWidth = Math.min(SCOUT_WIDTH_MAX, Math.max(SCOUT_WIDTH_MIN, width))
+    }
+    catch {
+      /* Storage can be unavailable, and the default width stands. */
+    }
+
     // The unit vocabulary, to check units in a CSV import
     useEngUnitStore().start()
   },
@@ -265,6 +391,53 @@ export default {
 
     sparkplugMetricSchema () {
       return this.sch.data.find(e => e.uuid === SparkplugMetricUUID)
+    },
+
+    /* The panel shows for every split driver connection unless its
+     * DriverDef says `scout: false`. A driver with no `scout` key gets it,
+     * and its hello says whether it can scan. A built-in driver has no
+     * split DriverDef, and the agent cannot ask it to scan. */
+    scoutVisible () {
+      return !!this.device?.deviceInformation?.connection
+        && is_split_driver(this.driverDef)
+        && this.driverDef.scout !== false
+    },
+
+    scoutCount () {
+      return this.scout.status.value?.current?.items ?? null
+    },
+
+    driverName () {
+      const uuid = this.connectionInfo?.configuration?.driver_uuid
+      return this.drivers.data.find(d => d.uuid === uuid)?.name ?? null
+    },
+
+    scoutKind () {
+      if (this.connectionInfo?.configuration?.driver_uuid === EdgeSim.Driver) return 'sim'
+      return this.driverDef?.scout?.address_form === 'mqtt' ? 'mqtt' : null
+    },
+
+    /* Every device on this connection, for "mapped to" and the Not
+     * mapped filter. This device uses the editor's live model, so unsaved
+     * mappings count. */
+    scoutDevices () {
+      const conn = this.device?.deviceInformation?.connection
+      const others = this.devices.data
+        .filter(d => d.uuid !== this.device.uuid && d.deviceInformation?.connection === conn)
+        .map(d => ({ name: d.name, model: d.deviceInformation?.originMap ?? {} }))
+      return [{ name: this.device.name ?? 'This device', model: this.model }, ...others]
+    },
+
+    selectedScanStatus () {
+      const index = this.scout.current_index.value
+      const meta = this.scout.status.value?.current
+      if (!index || !meta || !this.selectedMetric) return null
+      return metric_status(this.selectedMetric.model, index, meta,
+        this.driverDef?.scout?.address_form ?? 'exact')
+    },
+
+    scanWhen () {
+      return when_text(this.scout.status.value?.current?.finished)
     },
   },
   watch: {
@@ -308,6 +481,12 @@ export default {
 
   beforeDestroy () {
     document.removeEventListener('keydown', this.doSave)
+  },
+
+  beforeUnmount () {
+    this.scout.stop()
+    this.closePicker(null)
+    this.stopResize()
   },
 
   methods: {
@@ -748,87 +927,191 @@ export default {
     },
 
     selectMetric (val) {
-      let reversed = [...val].reverse()
+      const res = this.ensureMetric(val)
+      if (!res) return
 
-      // Get the existing value
-      let value = reversed.reduce((acc, curr) => acc && acc[curr.key], this.model)
-
-      // Get the schema for this metric
-      let metricSchema = {
-        ...val[0].value.allOf[0].properties, ...val[0].value.allOf[1].properties,
-      }
-
-      // If the value is null or undefined then we need to create the model
-      if (value === null || value === undefined) {
-
-        // Check that the template is a valid Factory+ metric
-        if (!('allOf' in val[0].value) || Object.keys(val[0].value).length !== 1 || val[0].value.allOf.length !== 2) {
-          console.error(
-            'Metric not configured correctly. It must be contained within an allOf and have a second element specifying the Sparkplug type and other overloads. See the Factory+ Schema definition for more information.',
-            val[0].value, reversed.map(e => e.key).join('.'))
-          return
-        }
-
-        let newMetric = {}
-
-        Object.keys(metricSchema).forEach(e => {
-
-          // e.g. e = Documentation
-
-          if ('default' in metricSchema[e]) {
-            // If we have a default value then set it
-            newMetric[e] = metricSchema[e].default
-          }
-          else if ('enum' in metricSchema[e]) {
-            // If we have an enum then set the first value
-            newMetric[e] = metricSchema[e].enum[0]
-          }
-          else {
-            // Otherwise delete it
-            delete newMetric[e]
-          }
-        })
-
-        // Set the new metric defaults in the model
-        this.set(reversed.map(e => e.key).join('.'), newMetric, this.model, '.')
-
-        // Ensure that the Schema_UUID and Instance_UUID are set on every model in the chain where required.
-        // console.log(reversed) will show the incoming payload and will make this more clear.
-        reversed.forEach((e, index) => {
-          // If this entry in the chain has a Schema_UUID and the model doesn't have one yet then stamp it on
-          if (e.schemaUUID && !reversed.slice(0, index + 1).reduce((acc, curr) => acc && acc[curr.key]?.Schema_UUID, this.model)) {
-            // If this entry in the chain has a Schema_UUID then stamp that onto the model, using this and all of the elements before
-            this.set(reversed.slice(0, index + 1).map(e => e.key).join('.') + '.Schema_UUID', e.schemaUUID, this.model, '.')
-
-            // Generate an Instance_UUID for this schema instance, only if we're stamping this for the first time and it's not a metric
-            if (e.schemaUUID !== SparkplugMetricUUID) {
-              this.set(reversed.slice(0, index + 1).map(e => e.key).join('.') + '.Instance_UUID', uuidv4(), this.model, '.')
-            }
-          }
-        })
-
-        // Then go and fetch it and return it
-        this.selectedMetric = {
-          path: reversed.map(e => e.key),
-          model: newMetric,
-          schema: metricSchema,
-        }
-      }
-      else {
-        // Otherwise we have an existing metric so just return it
-        this.selectedMetric = {
-          path: reversed.map(e => e.key),
-          model: value,
-          schema: metricSchema,
-        }
+      this.selectedMetric = {
+        path: res.path,
+        model: res.metric,
+        schema: res.schema,
       }
 
       // Update the toggle state in localStorage to ensure parent objects are expanded
       // This is done after setting selectedMetric so that the SchemaGroup component can use it
       // to determine which objects should be expanded
-      this.ensureParentObjectsExpanded(reversed.map(e => e.key));
+      this.ensureParentObjectsExpanded(res.path);
 
       this.rerenderTrigger = +new Date()
+    },
+
+    /**
+     * Find the metric for a SchemaGroup chain, creating it with its
+     * defaults if the origin map has no entry yet. See
+     * lib/scout/ensure-metric.js. The metric returned is the object in
+     * this.model, which is what the editor must change in place.
+     */
+    ensureMetric (chain) {
+      const res = ensure_metric({
+        model: this.model,
+        chain,
+        new_uuid: uuidv4,
+        set: (path, value) => set_at(this.model, path, value),
+      })
+      if (!res) {
+        console.error(
+          'Metric not configured correctly. It must be contained within an allOf and have a second element specifying the Sparkplug type and other overloads. See the Factory+ Schema definition for more information.',
+          chain[0]?.value, [...chain].reverse().map(e => e.key).join('.'))
+      }
+      return res
+    },
+
+    selectMetricByPath (path) {
+      const chain = this.schema && schema_chain(this.schema, path)
+      if (chain) this.selectMetric(chain)
+    },
+
+    /* ---- Edge Scout ---- */
+
+    toggleScout (open = !this.scoutOpen) {
+      this.scoutOpen = open
+      if (!open) this.scoutPickFor = null
+    },
+
+    pickFromScan () {
+      if (!this.selectedMetric) return
+      this.scoutPickFor = [...this.selectedMetric.path]
+      this.scoutOpen = true
+    },
+
+    /* Enter, Use, or a click in pick mode. */
+    useScoutItem (item) {
+      const path = this.scoutPickFor ?? this.selectedMetric?.path
+      if (!path) {
+        toast.info('Select a metric first', {
+          description: 'Or drag the address onto a metric in the schema tree.',
+          pauseOnHover: true,
+        })
+        return
+      }
+      const chain = schema_chain(this.schema, path)
+      if (chain) this.applyScoutItem(item, chain)
+      this.scoutPickFor = null
+    },
+
+    onScoutDrop (chain, id) {
+      const item = this.scout.current_index.value?.by_id.get(id)
+      if (item?.kind === 'value') this.applyScoutItem(item, chain)
+    },
+
+    /**
+     * Fill a metric from a discovered item, selected or not.
+     *
+     * The values go through the same allowlist and checks as a driver UI
+     * proposal, and onto the metric object in place, because the editor
+     * identifies metrics by identity. A metric that is not selected has
+     * no SparkplugMetric to emit input, so this marks the form dirty and
+     * re-renders itself. Nothing is saved until Save.
+     */
+    applyScoutItem (item, chain) {
+      const resolve_unit = this.units.ready ? this.units.resolve : undefined
+      const res = apply_item({
+        model: this.model,
+        chain,
+        item,
+        new_uuid: uuidv4,
+        set: (path, value) => set_at(this.model, path, value),
+        propose: (it, metric, opts) => proposal_for_item(it, metric, { ...opts, resolve_unit }),
+        validate: validate_proposal,
+        apply: apply_proposal,
+      })
+      if (!res) {
+        toast.error('This metric cannot take an address', {
+          description: 'Its schema entry is not a Factory+ metric.',
+          pauseOnHover: true,
+        })
+        return
+      }
+
+      this.markDirty('Address from scan')
+      this.rerenderTrigger = +new Date()
+      this.groupRerenderTrigger = +new Date()
+      toast.success(`${res.path.join(' / ')} now reads ${item.address}`, {
+        description: res.errors.length ? res.errors.join(' ') : 'Save to keep it.',
+        pauseOnHover: true,
+      })
+    },
+
+    openScoutMap (items) {
+      this.mapItems = items
+      this.mapOpen = true
+    },
+
+    /* Bulk mapping goes through the CSV import path, which creates
+     * metrics and pattern objects and stamps their markers. */
+    applyScoutMap (choices) {
+      const rows = bulk_rows(choices.map(c => ({ ...c, metric: value_at(this.model, c.path) ?? null })), {
+        resolve_unit: this.units.ready ? this.units.resolve : undefined,
+      })
+      const result = this.applyRows(rows)
+      this.mapOpen = false
+      this.$refs.scoutPanel?.clear_checked()
+      if (result.applied > 0)
+        toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} mapped from the scan`, {
+          description: 'Save to keep them.',
+          pauseOnHover: true,
+        })
+      if (result.skipped > 0)
+        toast.warning(`${result.skipped} address${result.skipped === 1 ? '' : 'es'} not mapped`, {
+          description: 'The schema has no metric at that path.',
+          pauseOnHover: true,
+        })
+    },
+
+    /* The picker a version 2 driver UI opens with pick-address. */
+    openPicker (filter) {
+      if (this.picker.open) return Promise.resolve(null)
+      return new Promise(resolve => {
+        this.picker.filter = filter ?? {}
+        this.picker.resolve = resolve
+        this.picker.open = true
+      })
+    },
+
+    closePicker (item) {
+      const resolve = this.picker.resolve
+      this.picker.open = false
+      this.picker.resolve = null
+      resolve?.(item ?? null)
+    },
+
+    startResize (event) {
+      const startX = event.clientX
+      const startWidth = this.scoutWidth
+      this.onResizeMove = e => this.setScoutWidth(startWidth + (startX - e.clientX))
+      this.onResizeEnd = () => this.stopResize()
+      document.addEventListener('mousemove', this.onResizeMove)
+      document.addEventListener('mouseup', this.onResizeEnd)
+    },
+
+    stopResize () {
+      if (this.onResizeMove) document.removeEventListener('mousemove', this.onResizeMove)
+      if (this.onResizeEnd) document.removeEventListener('mouseup', this.onResizeEnd)
+      this.onResizeMove = this.onResizeEnd = null
+      try {
+        localStorage.setItem(SCOUT_WIDTH_KEY, String(this.scoutWidth))
+      }
+      catch {
+        /* Not remembering the width is fine. */
+      }
+    },
+
+    resizeBy (delta) {
+      this.setScoutWidth(this.scoutWidth + delta)
+      this.stopResize()
+    },
+
+    setScoutWidth (w) {
+      this.scoutWidth = Math.round(Math.min(SCOUT_WIDTH_MAX, Math.max(SCOUT_WIDTH_MIN, w)))
     },
 
     ensureParentObjectsExpanded(path) {
@@ -1101,11 +1384,13 @@ export default {
       this.$refs.csvFileInput.value = ''
     },
 
-    applyParsedCsv () {
-      if (!this.csvParsedData) return { applied: 0, skipped: 0, ignored: 0 }
-      
+    /**
+     * Apply CSV-shaped rows to the model. The CSV import and Edge Scout's
+     * bulk mapping both come through here.
+     */
+    applyRows (rows) {
       // Pass the schema to applyCsvToModel so missing metrics can be created
-      const result = applyCsvToModel(this.csvParsedData, this.model, this.schema, this.set)
+      const result = applyCsvToModel(rows, this.model, this.schema, this.set)
 
       // Force model replacement to trigger Vue reactivity
       this.model = JSON.parse(JSON.stringify(this.model))
@@ -1113,6 +1398,19 @@ export default {
       // The import may have created schema-array instances; materialise
       // them into the schema tree or the sidebar cannot render them.
       this.updateDynamicSchemaObjects()
+
+      this.markDirty()
+      this.groupRerenderTrigger = +new Date()
+      this.rerenderTrigger = +new Date()
+      this.selectedMetric = null
+
+      return result
+    },
+
+    applyParsedCsv () {
+      if (!this.csvParsedData) return { applied: 0, skipped: 0, ignored: 0 }
+
+      const result = this.applyRows(this.csvParsedData)
 
       if (result.applied > 0) {
         toast.success(`${result.applied} metric${result.applied === 1 ? '' : 's'} updated from CSV`, { pauseOnHover: true })
@@ -1138,11 +1436,6 @@ export default {
           pauseOnHover: true,
         })
       }
-
-      this.markDirty()
-      this.groupRerenderTrigger = +new Date()
-      this.rerenderTrigger = +new Date()
-      this.selectedMetric = null
 
       return result
     },
@@ -1252,6 +1545,14 @@ export default {
 
       csvDialogOpen: false,
       csvParsedData: null,
+
+      /* Edge Scout */
+      scoutWidth: 420,
+      /* The metric path Pick from scan fills, while it waits. */
+      scoutPickFor: null,
+      mapOpen: false,
+      mapItems: [],
+      picker: { open: false, filter: {}, resolve: null },
     }
   },
 }

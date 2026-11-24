@@ -79,8 +79,8 @@
           <div class="font-semibold text-gray-700 mb-2">Spindle / Speed</div>
           <div class="font-mono text-xs">{{ scoutModel.Spindle.Speed.Address }}</div>
         </div>
-        <div class="w-[440px] flex flex-col border rounded-lg p-3 bg-gray-50">
-          <ScoutPanel :scout="scout" :driver="scoutDriver" driver-name="OPC-UA"
+        <div class="min-w-0 shrink-0 flex flex-col border rounded-lg p-3 bg-gray-50" style="width: 640px">
+          <ScoutPanel :scout="scout" :driver="scoutDriver" :driver-name="$route.query.driver ?? 'OPC-UA'"
               :model="scoutModel" :devices="[{ name: 'Mill 1', model: scoutModel }]"
               :selected-metric="{ path: ['Spindle', 'Speed'], model: scoutModel.Spindle.Speed }"
               @map="items => { mapItems = items; mapOpen = true }"/>
@@ -119,6 +119,7 @@
 </template>
 
 <script>
+import { markRaw } from 'vue'
 import { Toaster } from '@components/ui/sonner'
 
 import Schemas from '@pages/Schemas/Schemas.vue'
@@ -179,7 +180,11 @@ export default {
   },
 
   data () {
-    const scout = this.$route.query.surface === 'scout' ? preview_scout(this.$route.query.state) : null
+    /* markRaw keeps the scan's refs as refs. data() makes everything
+     * deeply reactive, which unwraps refs inside objects, so the panel
+     * would read `.value` of plain values. OriginMapEditor returns the
+     * same object from setup(), which leaves it alone. */
+    const scout = this.$route.query.surface === 'scout' ? markRaw(preview_scout(this.$route.query.state)) : null
     return {
       drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
       placementA: [], placementB: [], settling: false,

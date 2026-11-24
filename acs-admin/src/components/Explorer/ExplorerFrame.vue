@@ -1,6 +1,6 @@
 <!--
   - ACS Admin
-  - The Explorer page: the i3X Explorer, framed, using this console's session
+  - The i3X Explorer, framed, using this console's session
   - Copyright 2026 University of Sheffield
   -->
 
@@ -12,20 +12,29 @@
      never asks for a server or a sign-in, and offers this console's own
      actions on the selected object, which the app shows beside its
      Subscribe button: Manage access opens the access dialog here, and
-     Build dataset opens the dataset builder. -->
+     Build dataset opens the dataset builder.
+
+     App.vue keeps this frame from the first visit to the Explorer page
+     until sign-out, and only hides it while another page shows. So
+     moving to another page and back keeps the Explorer as it was, with
+     its subscriptions running and its pop-out window open, because
+     unmounting the frame would unload the app inside it. -->
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { until } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useISA95Store } from '@store/useISA95Store.js'
 import { useLayoutStore } from '@store/layoutStore.js'
-import { HOST_KEY, classify_selection, explorer_actions, location_query, mk_host, query_location } from '@/lib/i3x-explorer-host.js'
+import { HOST_KEY, classify_selection, explorer_actions, location_query, mk_host, query_location, returning_query } from '@/lib/i3x-explorer-host.js'
 import { on_explorer_search } from '@/lib/explorer-search.js'
 import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 
 const router = useRouter()
 const route = useRoute()
+/* The frame is hidden, not removed, while another page shows. */
+const shown = computed(() => route.path === '/explorer')
 const store = useServiceClientStore()
 /* Full screen (Esc) hides the console's menu and header; the Explorer
  * then fills the whole window with no frame around it. */
@@ -61,10 +70,18 @@ let stop_search = null
  * console to this page) moves the app. */
 const same_location = (a, b) => a.object === b.object && a.tab === b.tab
 let go_location = null
+/* Where the Explorer last said it was, kept while hidden so the URL can
+ * name it again when the page is opened from the menu. */
+let shown_location = null
 watch(() => route.query, query => {
   if (route.path !== '/explorer') return
   const loc = query_location(query)
   go_location?.(loc)
+})
+watch(shown, now => {
+  if (!now) return
+  const query = returning_query(route.query, shown_location)
+  if (query) router.replace({ query })
 })
 
 window[HOST_KEY] = mk_host({
@@ -79,7 +96,11 @@ window[HOST_KEY] = mk_host({
    * the keyboard, then let the app open its search. */
   on_search (open) {
     stop_search?.()
-    stop_search = on_explorer_search(() => {
+    stop_search = on_explorer_search(async () => {
+      /* From another page the console is still moving here, and a
+       * hidden frame cannot take focus. */
+      await until(shown).toBe(true)
+      await nextTick()
       frame.value?.contentWindow?.focus()
       open()
     })
@@ -88,6 +109,7 @@ window[HOST_KEY] = mk_host({
   escape: () => layout.toggleFullscreen(),
   location: () => query_location(route.query),
   set_location (loc) {
+    shown_location = loc
     if (route.path !== '/explorer' || same_location(loc, query_location(route.query))) return
     router.replace({ query: location_query(loc, route.query) })
   },

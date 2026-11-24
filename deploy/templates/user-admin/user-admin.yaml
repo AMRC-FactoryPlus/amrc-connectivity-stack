@@ -69,6 +69,7 @@ spec:
               value: {{ .Values.identity.realm | required "values.identity.realm is required!" }}
             - name: DIRECTORY_URL
               value: http://directory.{{ .Release.Namespace }}.svc.cluster.local
+{{ include "amrc-connectivity-stack.oidc-env" . | indent 12 }}
           volumeMounts:
             - mountPath: /config/krb5-conf
               name: krb5-conf

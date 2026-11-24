@@ -11,6 +11,8 @@ import  gssapi
 import  krb5
 from    flask    import g, jsonify, request
 
+from    .jwt     import AuthUnavailable, JwtVerifier, looks_like_jwt
+
 log = logging.getLogger(__name__)
 
 SESSION_LENGTH = 3 * 3600
@@ -18,10 +20,9 @@ DATE_FUZZ = 60
 
 class FplusHttpAuth:
     """Inbound HTTP auth for acs-user-admin. Accepts Basic and Negotiate
-    (SPNEGO) against our Kerberos keytab, and issues opaque Bearer
-    tokens from POST /token which are accepted on subsequent calls.
-    Modeled on lib/js-service-api/lib/auth.js's FplusHttpAuth, trimmed
-    to the three schemes this service needs - no Keycloak JWT."""
+    (SPNEGO) against our Kerberos keytab, Keycloak-issued JWTs, and
+    opaque Bearer tokens issued from POST /token. Modeled on
+    lib/js-service-api/lib/auth.js's FplusHttpAuth."""
 
     def __init__ (self, session_length=SESSION_LENGTH):
         self.session_length = session_length
@@ -30,6 +31,14 @@ class FplusHttpAuth:
     def setup (self, app):
         self.fplus = app.fplus
         self.realm = app.config["REALM"]
+
+        # Keycloak JWT acceptance. Lazy: discovery/JWKS are only
+        # fetched on the first JWT we actually see. None (the admin
+        # UI's OIDC switch is off, or REALM-only deployments) turns
+        # this off and opaque Bearer tokens keep working unchanged.
+        discovery_url = app.config.get("OIDC_DISCOVERY_URL")
+        self.jwt = JwtVerifier(discovery_url) if discovery_url else None
+
         app.before_request(self.auth)
         app.after_request(self.add_negotiate_header)
         app.add_url_rule("/token", "token", self.token, methods=["POST"])
@@ -58,6 +67,12 @@ class FplusHttpAuth:
                 client = self.auth_bearer(creds)
             else:
                 raise ValueError(f"Unknown authentication scheme {scheme}")
+        except AuthUnavailable as e:
+            # A 503 tells the caller their credentials may well be
+            # fine - we just couldn't check them - so they don't throw
+            # away a still-good JWT because Keycloak had a blip.
+            log.info(f"Auth unavailable: {e}")
+            return "", 503, {"Content-Type": "text/plain"}
         except Exception as e:
             log.info(f"Auth failed: {e}")
             return self._unauthorized()
@@ -106,6 +121,10 @@ class FplusHttpAuth:
         return uuid
 
     def auth_bearer (self, token):
+        # Keycloak JWT? Structural test, no network call.
+        if self.jwt and looks_like_jwt(token):
+            return self.auth_jwt(token)
+
         client = self.tokens.get(token)
         if client is None:
             raise ValueError("Bad token")
@@ -113,6 +132,17 @@ class FplusHttpAuth:
             del self.tokens[token]
             raise ValueError("Expired token")
         return client["principal"]
+
+    def auth_jwt (self, token):
+        payload = self.jwt.verify(token)
+
+        # The acs-keycloak-spi protocol mapper stamps fp_principal_uuid
+        # on every token issued by our realm. A JWT without it isn't
+        # one of ours, even if the signature is valid.
+        principal = payload.get("fp_principal_uuid")
+        if not principal:
+            raise ValueError("JWT missing fp_principal_uuid claim")
+        return principal
 
     def token (self):
         token = secrets.token_urlsafe(66)

@@ -79,3 +79,70 @@ def test_bearer_token_from_basic_auth_is_accepted_later (app, client, mocker):
     # check_acl returning False -> 403, not 401 - proves the Bearer
     # token was accepted, not rejected as bad auth.
     assert r.status_code == 403
+
+def fake_jwt ():
+    """A credential shaped like a JWT (three dot-separated base64url
+    segments, header has an `alg`) but with no real signature - good
+    enough to route through auth_bearer's looks_like_jwt() check, since
+    JwtVerifier.verify is mocked in the tests below rather than really
+    checking the signature."""
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256"}').rstrip(b"=").decode()
+    return f"{header}.payload.sig"
+
+@pytest.fixture
+def oidc_app ():
+    return create_app(env={
+        "REALM": "EXAMPLE.COM",
+        "OIDC_DISCOVERY_URL": "https://keycloak.example/realms/x/.well-known/openid-configuration",
+    })
+
+@pytest.fixture
+def oidc_client (oidc_app):
+    return oidc_app.test_client()
+
+def test_bearer_jwt_is_accepted_when_oidc_configured (oidc_app, oidc_client, mocker):
+    """A Keycloak-issued JWT - the admin UI's OIDC switch sends these
+    directly as Bearer credentials, bypassing the opaque /token
+    exchange entirely - is routed to JWT verification and accepted."""
+    mocker.patch.object(oidc_app.auth.jwt, "verify",
+        return_value={"fp_principal_uuid": str(CALLER)})
+    mocker.patch.object(oidc_app.fplus.auth, "check_acl", return_value=False)
+
+    r = oidc_client.post("/v1/user",
+        headers={"Authorization": f"Bearer {fake_jwt()}"}, json={})
+    # check_acl returning False -> 403, not 401 - proves the JWT was
+    # accepted, not rejected as bad auth.
+    assert r.status_code == 403
+
+def test_bearer_jwt_missing_principal_claim_rejected (oidc_app, oidc_client, mocker):
+    """A validly-signed JWT lacking fp_principal_uuid isn't one of ours
+    and must not be treated as an authenticated Factory+ identity."""
+    mocker.patch.object(oidc_app.auth.jwt, "verify", return_value={})
+
+    r = oidc_client.post("/v1/user",
+        headers={"Authorization": f"Bearer {fake_jwt()}"}, json={})
+    assert r.status_code == 401
+
+def test_bearer_jwt_unavailable_returns_503_not_401 (oidc_app, oidc_client, mocker):
+    """When Keycloak can't be reached to check the JWT, that's our
+    failure, not the caller's - a 503 tells the client to retry rather
+    than throw away a token that may still be perfectly good."""
+    from amrc.factoryplus.user_admin.lib.jwt import AuthUnavailable
+    mocker.patch.object(oidc_app.auth.jwt, "verify",
+        side_effect=AuthUnavailable("boom"))
+
+    r = oidc_client.post("/v1/user",
+        headers={"Authorization": f"Bearer {fake_jwt()}"}, json={})
+    assert r.status_code == 503
+
+def test_opaque_bearer_token_unaffected_by_oidc_configuration (oidc_app, oidc_client, mocker):
+    """Opaque session tokens (not JWT-shaped) keep working unchanged
+    even when OIDC is configured."""
+    mocker.patch.object(oidc_app.fplus.auth, "check_acl", return_value=False)
+    oidc_app.auth.tokens["opaque-token"] = {
+        "principal": CALLER, "expiry": time.time() + 3600,
+    }
+
+    r = oidc_client.post("/v1/user",
+        headers={"Authorization": "Bearer opaque-token"}, json={})
+    assert r.status_code == 403

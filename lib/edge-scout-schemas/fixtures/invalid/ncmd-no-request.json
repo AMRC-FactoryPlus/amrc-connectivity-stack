@@ -1,0 +1,9 @@
+{
+    "schema": "ncmd",
+    "description": "A request must carry its request UUID",
+    "data": {
+        "version": 1,
+        "op": "start",
+        "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a"
+    }
+}

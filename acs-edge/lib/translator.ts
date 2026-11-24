@@ -18,6 +18,7 @@ import { reHashConf } from "../utils/FormatConfig.js";
 
 import { DataGroup, Device, DeviceConnection, deviceOptions } from "./device.js";
 import { DriverBroker } from "./driverBroker.js";
+import { connection_hash, ScoutManager } from "./scout.js";
 import { SparkplugNode } from "./sparkplugNode.js";
 import * as UUIDs from "./uuids.js";
 
@@ -155,6 +156,11 @@ export class Translator extends EventEmitter {
     /* The largest file a driver may have fetched from the Files
      * service, in bytes. */
     fileLimit: number
+    /* Runs Edge Scout scans. Made once the agent knows its UUID. */
+    scout?: ScoutManager
+    /* The config_hash of each connection, by connection UUID, from
+     * the config as stored, before secrets are filled in. */
+    configHashes: Map<string, string> = new Map()
 
     constructor(fplus: ServiceClient, pollInt: number, broker: DriverBroker) {
         super();
@@ -291,6 +297,19 @@ export class Translator extends EventEmitter {
             this.sparkplugNode = await new SparkplugNode(this.fplus, spConf).init();
             log(`Created Sparkplug node "${ids.sparkplug!}".`);
 
+            /* Scanning is an extra. If it can't start, the devices
+             * still run. */
+            try {
+                this.scout = new ScoutManager({
+                    fplus:  this.fplus,
+                    broker: this.broker,
+                    node:   ids.uuid!,
+                });
+            }
+            catch (e) {
+                console.error(`Edge Scout is not available: ${(e as Error).message}`);
+            }
+
             log("Starting driver broker...");
             //this.broker.on("message", msg => 
             //    log(util.format("Driver message: %O", msg)));
@@ -303,6 +322,10 @@ export class Translator extends EventEmitter {
 
             // Setup Sparkplug node handlers
             this.setupSparkplug();
+
+            /* Record any scan that was running when the agent last
+             * stopped as interrupted. */
+            await this.scout?.init();
 
             if (this.missingSecrets.length)
                 this.waitForSecrets(this.missingSecrets)
@@ -323,6 +346,11 @@ export class Translator extends EventEmitter {
      */
     async stop(kill: Boolean = false) {
         this.abort.abort();
+        /* Cancel running scans and finish their status writes while
+         * the broker can still reach the drivers. */
+        log('Waiting for scans to stop...');
+        await this.scout?.stop()
+            .catch(e => console.error(`Stopping scans failed: ${e}`));
         log('Waiting for devices to stop...');
         await Promise.all(Object.values(this.devices)?.map((dev: Device) => {
             log(`Stopping device ${dev._name}`);
@@ -376,6 +404,9 @@ export class Translator extends EventEmitter {
             Object.values(this.devices).find((e: Device) => e._name === deviceId)?._handleDCmd(payload);
         });
 
+        /* Node Control/Scout, already parsed from JSON. */
+        sp.on('scout', (req) => this.scout?.request(req));
+
         // Listen to the stop event
         sp.on('stop', () => {
             log('Handling stop request for all devices');
@@ -405,14 +436,16 @@ export class Translator extends EventEmitter {
 
         this.allConnections.push(newConn);
 
+        /* Every split driver can be asked to scan, under its
+         * connection's UUID. */
+        if (this.scout && newConn instanceof DriverConnection
+            && typeof connection.uuid == "string")
+            this.scout.add_connection(connection.uuid, newConn, {
+                config_hash: this.configHashes.get(connection.uuid) ?? null,
+            });
+
         this.checkPayloadFormats(connection);
 
-        /* Edge Scout (address browsing) went with the built-in OPC UA
-         * and MQTT connections, the only ones that had it. A config
-         * asking for it runs its devices as usual. */
-        if (connection.scout?.scoutDetails?.isEnabled)
-            log(`Edge Scout is not available, so connection ${connection.name} `
-                + `runs its devices instead of scouting.`);
         this.runDevices(connection, newConn);
     }
 
@@ -573,6 +606,11 @@ export class Translator extends EventEmitter {
         let [config, etag] = await this.retry("config", () => cdb.get_config_with_etag(UUIDs.App.AgentConfig, uuid));
 
         log(`Fetched config with etag [${etag}]`);
+
+        /* Hash each connection before secrets are filled in. */
+        this.configHashes = new Map((config?.deviceConnections ?? [])
+            .filter((c: any) => typeof c?.uuid == "string")
+            .map((c: any) => [c.uuid, connection_hash(c)]));
 
         let valid = true;
         /* Skip the string round trip when there is nothing to fill. For

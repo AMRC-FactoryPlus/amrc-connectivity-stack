@@ -1,0 +1,9 @@
+{
+    "schema": "found",
+    "description": "First answer to a start, from a driver that keeps to the window",
+    "data": {
+        "seq": 0,
+        "type": "accept",
+        "window": 4
+    }
+}

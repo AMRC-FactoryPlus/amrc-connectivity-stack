@@ -25,6 +25,9 @@ tracing = "0.1"
 # own tests, which needs these.
 rumqttc = { version = "0.25.1", default-features = false }
 tokio = { version = "1", features = ["full"] }
+# Checks scan output against lib/edge-scout-schemas. The schemas are
+# read from disk, so no HTTP resolver.
+jsonschema = { version = "0.33", default-features = false }
 
 [profile.release]
 strip = true

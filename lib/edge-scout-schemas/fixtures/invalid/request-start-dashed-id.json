@@ -1,0 +1,19 @@
+{
+    "schema": "request",
+    "description": "A scan id on the driver topics has no dashes",
+    "data": {
+        "op": "start",
+        "id": "3f9c1a2b-44e0-4d0c-9a7e-5b1f2c3d4e5f",
+        "version": 1,
+        "root": null,
+        "folder_id": null,
+        "options": {},
+        "limits": {
+            "items": 20000,
+            "depth": 8,
+            "seconds": 120,
+            "pace_ms": 20,
+            "samples": false
+        }
+    }
+}

@@ -5,18 +5,20 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.0.5",
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
     "async": "^3.2.5",
     "mqtt": "^5.7.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "^9.20.1",
     "globals": "^15.14.0"
   }

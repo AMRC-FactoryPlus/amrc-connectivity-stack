@@ -1,0 +1,9 @@
+{
+    "schema": "found",
+    "description": "A window is at least 1",
+    "data": {
+        "seq": 0,
+        "type": "accept",
+        "window": 0
+    }
+}

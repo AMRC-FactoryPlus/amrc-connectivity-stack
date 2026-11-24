@@ -5,12 +5,12 @@
   "main": "bin/driver.js",
   "type": "module",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.1.0"
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver"
   }
 }

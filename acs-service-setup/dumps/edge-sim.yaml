@@ -38,6 +38,15 @@ configs:
       image:
         repository: edge-sim
       polled: false
+      # Edge Scout lists the loaded cassette's channels and the player
+      # addresses. With no cassette loaded the scan finds nothing.
+      scout:
+        title: "List the cassette's channels"
+        address_form: exact
+        options:
+          type: object
+          properties: {}
+        share_samples: false
       presentation:
         address:
           title: "Channel or control address"

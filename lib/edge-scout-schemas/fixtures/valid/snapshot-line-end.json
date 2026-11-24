@@ -1,0 +1,24 @@
+{
+    "schema": "snapshot-line",
+    "description": "An end line",
+    "data": {
+        "end": {
+            "finished": "2026-11-24T10:42:13Z",
+            "exhaustive": true,
+            "truncated": false,
+            "reason": null,
+            "excluded": [
+                {
+                    "id": "i=2253",
+                    "reason": "skipped",
+                    "prefixes": [
+                        "i="
+                    ]
+                }
+            ],
+            "rejected": 0,
+            "items": 2,
+            "branches": []
+        }
+    }
+}

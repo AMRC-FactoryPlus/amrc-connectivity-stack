@@ -7,6 +7,7 @@ import * as k8s from "@kubernetes/client-node";
 
 import { ServiceError, UUIDs } from "@amrc-factoryplus/service-client";
 
+import { fixup_edge_scout } from "./edge-scout.js";
 import { ACS, Auth, Clusters } from "./uuids.js";
 import { remove_dataset_maker } from "./remove-dataset-maker.js";
 
@@ -23,6 +24,7 @@ export async function fixups (ss, local) {
     await delete_old_entries(fplus);
     await remove_dataset_maker(fplus);
     await new FixupAccounts(fplus, local).run();
+    await fixup_edge_scout(fplus);
 
     return;
 }

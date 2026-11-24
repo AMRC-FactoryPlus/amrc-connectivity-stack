@@ -1,0 +1,117 @@
+name: Edge Scout end to end
+
+# Runs acs-edge/tests/scout/e2e.test.ts: the Edge Agent as its own
+# process, with the central services faked over HTTP, mosquitto for
+# Sparkplug and as edge-mqtt's device broker, edge-opcua against the
+# node-opcua test server in its SCOUT mode, edge-mqtt, edge-test-rs and
+# edge-test. It covers full, branch and repeated scans, cancel, an
+# agent restart during a scan, drivers that can't scan or predate
+# scouting, drivers against older agents' ACLs, the caps, and the load
+# case, which holds the agent to the edge-agent chart's 100m CPU and
+# 200Mi with limit.sh and records DDATA latency and peak memory.
+#
+# No other job has every driver binary, node-opcua and mosquitto
+# together. The test skips without SCOUT_E2E=1, so it writes a marker
+# file only when every case has passed, and the last step checks it.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'acs-edge/lib/**'
+      - 'acs-edge/tests/scout/**'
+      - 'acs-edge/tests/golden/driver.ts'
+      - 'acs-edge/tests/lib/scout/**'
+      - 'acs-edge/package.json'
+      - 'acs-edge/package-lock.json'
+      - 'edge-opcua/**'
+      - 'edge-mqtt/**'
+      - 'edge-test-rs/**'
+      - 'edge-test/**'
+      - 'lib/rs-edge-driver/**'
+      - 'lib/js-edge-driver/**'
+      - 'lib/js-service-client/**'
+      - 'lib/edge-scout-schemas/**'
+      - '.github/workflows/scout-e2e.yaml'
+
+env:
+  # The same toolchain as rust.yaml and the driver Dockerfiles.
+  RUSTUP_TOOLCHAIN: '1.99'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            edge-opcua/target
+            edge-mqtt/target
+            edge-test-rs/target
+          key: ${{ runner.os }}-scout-e2e-${{ env.RUSTUP_TOOLCHAIN }}-${{ hashFiles('edge-opcua/Cargo.lock', 'edge-mqtt/Cargo.lock', 'edge-test-rs/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-scout-e2e-${{ env.RUSTUP_TOOLCHAIN }}-
+
+      - name: Build the drivers
+        run: |
+          for d in edge-opcua edge-mqtt edge-test-rs; do
+            (cd "$d" && cargo build --release --locked)
+          done
+
+      # The same major version as the JS base image the agent runs on.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # As acs-edge-tests.yaml: the npm shipped with Node 22 crashes on
+      # file: dependencies, and the service client's optional GSSAPI
+      # module needs the Kerberos headers.
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev mosquitto
+
+      # node-opcua for the OPC UA test server comes from here too.
+      - name: Install Edge Agent dependencies
+        working-directory: acs-edge
+        run: npm install --save=false --install-links
+
+      - name: Install edge-test dependencies
+        working-directory: edge-test
+        run: npm ci --install-links --no-audit --no-fund
+
+      # limit.sh needs root to make the cgroup, then runs the agent as
+      # the runner user.
+      - name: Run the end-to-end tests
+        working-directory: acs-edge
+        shell: bash
+        run: |
+          export SCOUT_E2E=1
+          export SCOUT_E2E_MARKER="$RUNNER_TEMP/scout-e2e.marker"
+          export SCOUT_E2E_REPORT="$RUNNER_TEMP/scout-e2e-report.json"
+          export SCOUT_E2E_AGENT_WRAP="sudo -E LIMIT_UID=$(id -u) LIMIT_GID=$(id -g) $PWD/tests/scout/e2e/limit.sh 100 200"
+          npx jest --ci tests/scout/e2e.test.ts
+
+      - name: Check every case ran
+        if: always()
+        shell: bash
+        run: |
+          cat "$RUNNER_TEMP/scout-e2e.marker" || true
+          cat "$RUNNER_TEMP/scout-e2e-report.json" || true
+          grep -qx "all cases passed" "$RUNNER_TEMP/scout-e2e.marker"

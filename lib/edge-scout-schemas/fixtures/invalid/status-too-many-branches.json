@@ -1,0 +1,76 @@
+{
+    "schema": "status",
+    "description": "A snapshot keeps at most 10 branch scans",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "supported": true,
+        "current": {
+            "file": "e3f4a5b6-c7d8-4e9f-8a1b-2c3d4e5f6071",
+            "items": 9812,
+            "bytes_gz": 402113,
+            "exhaustive": true,
+            "truncated": false,
+            "reason": null,
+            "finished": "2026-11-24T10:42:13Z",
+            "root": null,
+            "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "config_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "excluded": [
+                {
+                    "id": "i=2253",
+                    "reason": "skipped",
+                    "prefixes": [
+                        "i="
+                    ]
+                }
+            ],
+            "branches": [
+                {
+                    "folder_id": "f0",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f1",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f2",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f3",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f4",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f5",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f6",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f7",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f8",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f9",
+                    "finished": "2026-11-24T10:42:13Z"
+                },
+                {
+                    "folder_id": "f10",
+                    "finished": "2026-11-24T10:42:13Z"
+                }
+            ]
+        }
+    }
+}

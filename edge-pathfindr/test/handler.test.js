@@ -3,7 +3,7 @@
  * Handler tests.
  * Copyright 2026 University of Sheffield AMRC
  *
- * Run with `node --test test/`.
+ * Run with `npm test`.
  *
  * These are mostly about failure mapping. Getting it wrong is expensive in
  * opposite directions: treat a 404 as a connection fault and one bad address

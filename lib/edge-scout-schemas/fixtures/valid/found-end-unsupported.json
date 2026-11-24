@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "The library default answer to a start",
+    "data": {
+        "seq": 0,
+        "type": "end",
+        "error": {
+            "code": "UNSUPPORTED"
+        }
+    }
+}

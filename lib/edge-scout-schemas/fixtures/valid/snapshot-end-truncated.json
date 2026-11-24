@@ -1,0 +1,16 @@
+{
+    "schema": "snapshot-end",
+    "description": "The end line of a truncated scan with one rejected item",
+    "data": {
+        "end": {
+            "finished": "2026-11-24T10:42:13Z",
+            "exhaustive": true,
+            "truncated": true,
+            "reason": "size",
+            "excluded": [],
+            "rejected": 1,
+            "items": 0,
+            "branches": []
+        }
+    }
+}

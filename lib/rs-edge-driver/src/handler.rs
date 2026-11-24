@@ -6,6 +6,7 @@ use bytes::Bytes;
 
 use crate::driver::DriverHandle;
 use crate::error::{ConnectError, HandlerError, WriteError};
+use crate::scout::Scouter;
 use crate::write::WriteValue;
 
 /// The trait that driver authors implement to define how to communicate
@@ -116,6 +117,19 @@ pub trait Handler: Send + Sized {
     ///
     /// Defaults to `false`, which keeps `cmd` exactly as before.
     const TYPED_WRITES: bool = false;
+
+    /// Whether this handler can list its device's addresses through a
+    /// [`Scouter`], for the Edge Scout panel in the Admin UI.
+    ///
+    /// The driver answers the Edge Agent's scouting hello with this
+    /// value, whatever state the handler is in, so a driver whose
+    /// configuration failed still answers correctly. With `false`, the
+    /// default, every scan ends with `UNSUPPORTED` and
+    /// [`scouter`](Handler::scouter) is never called.
+    ///
+    /// The driver takes part in scouting only when the Edge Agent
+    /// advertises it, so this is safe with any Edge Agent.
+    const SCOUTS: bool = false;
 
     /// Construct a new handler from the configuration object sent
     /// by the edge agent.
@@ -263,6 +277,22 @@ pub trait Handler: Send + Sized {
     ///
     /// The default returns `None`, which keeps the locked `poll`.
     fn poller(&self) -> Option<Arc<dyn Poller<Self::Addr>>> {
+        None
+    }
+
+    /// **Scouting, optional**: hand out a [`Scouter`] that lists the
+    /// device's addresses. Only called when
+    /// [`SCOUTS`](Handler::SCOUTS) is `true`.
+    ///
+    /// The driver asks for it after each successful
+    /// [`connect`](Handler::connect), as it does for
+    /// [`poller`](Handler::poller), and runs scans without taking the
+    /// handler's lock, so polls and writes carry on during a scan.
+    /// Usually it holds a clone of the handler's device client.
+    ///
+    /// Return `None` when the handler has no connection to scan with.
+    /// A scan then ends with `CONN`. The default returns `None`.
+    fn scouter(&self) -> Option<Arc<dyn Scouter>> {
         None
     }
 }

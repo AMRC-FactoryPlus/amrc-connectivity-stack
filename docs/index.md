@@ -10,7 +10,13 @@
      - [Overview](./architecture/edge-management/overview.md)
      - [Edge Bootstrap](./architecture/edge-management/edge-bootstrap.md)
      - [Edge Deployments](./architecture/edge-management/edge-deployments.md)
-     - [Edge Scout](./architecture/edge-management/edge-scout.md)
+     - Edge Scout
+       - [Scanning a device for addresses](./architecture/edge-management/edge-scout-scanning.md)
+       - [Driver notes](./architecture/edge-management/edge-scout-driver-notes.md)
+       - [Adding scouting to a driver](./architecture/edge-management/edge-scout-drivers.md)
+       - [Reference](./architecture/edge-management/edge-scout-reference.md)
+       - [Design](./architecture/edge-management/edge-scout.md)
+     - [Driver Custom UIs](./architecture/edge-management/driver-custom-uis.md)
      - [Split Drivers](./architecture/edge-management/split-drivers.md)
 - ConfigDB
   - [Object Model](./configDB/object-model.md)

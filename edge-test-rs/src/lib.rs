@@ -14,10 +14,12 @@
 //! - [`addr`] parses address strings, with unit tests;
 //! - [`wave`] is the device side, here a pure function of the address
 //!   and the time;
-//! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait.
+//! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait;
+//! - [`scout`] lists a made-up address tree for Edge Scout tests.
 
 pub mod addr;
 pub mod handler;
+pub mod scout;
 pub mod wave;
 
 pub use addr::Addr;

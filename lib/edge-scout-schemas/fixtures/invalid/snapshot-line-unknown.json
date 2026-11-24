@@ -1,0 +1,7 @@
+{
+    "schema": "snapshot-line",
+    "description": "A line that is none of header, item or end",
+    "data": {
+        "foo": 1
+    }
+}

@@ -24,6 +24,8 @@ The basic structure of any driver using this library looks like this:
         parseAddr (addr) { }
         async subscribe (specs) { }
         async close () { }
+        static scouts;
+        async scout (req, out) { }
     }
     
     /* Don't use Driver directly, use a subclass */
@@ -266,3 +268,92 @@ The method supports both Promise-based and callback-based APIs. The
 method is passed a callback, which can be called to indicate cleanup is
 finished. Alternatively the method can return a Promise.
 
+### `scouts`
+
+    class MyHandler {
+        static scouts = true;
+        ...
+    }
+
+This property is optional, and needs an Edge Agent with Edge Scout.
+
+If a handler class sets this static property to `true`, the driver
+tells the Edge Agent that it can list its device's addresses, and calls
+`scout` when an operator presses Scan in the Admin UI. Without it the
+driver answers every scan with `UNSUPPORTED`, even if the handler has a
+method called `scout`. The answer comes from the class, so a driver
+whose configuration failed still answers correctly.
+
+### `scout`
+
+    const end = await handler.scout(req, out);
+
+This method is called only when the handler class sets `scouts`. It
+lists the addresses the southbound device offers. The protocol is the
+"Scouting" section of `acs-edge/docs/edge-split.md`, and the library
+does all of it except producing items: the subscription, the hello,
+`seq`, batching, the limits, the time limit, cancel and errors.
+
+`req` has these properties:
+
+Property|Meaning
+---|---
+`root`|Where to start, in the driver's own terms, or null for the device's natural top
+`folder_id`|For a branch scan, the `id` of the folder it replaces, or null. The first item must have this `id`
+`options`|Driver-specific options, an object, which the handler checks
+`limits`|`items`, `depth`, `seconds`, `pace_ms` and `samples`, already clamped
+
+`out` has these properties:
+
+Property|Meaning
+---|---
+`add(items)`|Queue an item or an array of items. Returns a Promise that resolves when they are queued, so a handler slows to the speed of the broker. It rejects with `ScoutStopped` once the scan has stopped
+`progress({visited, note})`|Record how far the scan has got. The library sends progress at least every 5 s, with `found` counted from the items added
+`pace()`|Returns a Promise that resolves after `limits.pace_ms`. Await it between southbound requests
+`signal`|An `AbortSignal` that aborts when the scan stops: on cancel, on a new configuration, at the item cap or at the time limit
+`limits`|The same as `req.limits`
+
+Each item is an object, as the protocol describes:
+
+    { id: "ns=2;s=Line1/Speed", parent: "ns=2;s=Line1", name: "Speed",
+      kind: "value", address: "ns=2;s=Line1/Speed", path: null,
+      type: "Double", access: "rw", unit: "rpm" }
+
+The `id` must come from the device alone, never from the scan's root,
+so a node has the same `id` in a full scan and in a branch scan. A
+value's `address` must be in the form the driver's own address parser
+accepts and prints.
+
+Return an object with these properties, all optional:
+
+Property|Meaning
+---|---
+`exhaustive`|`true` when the scan found everything there is, within its caps
+`truncated`|`true` when a cap of the handler's own stopped the scan
+`reason`|With `truncated`: `items`, `depth`, `seconds`, `size` or `partial_access`
+`excluded`|Up to 8 parts of the device the scan skipped on purpose, as `{id, reason, prefixes}`
+
+To fail the scan, throw `ScoutError` with a code:
+
+    import { ScoutError } from "@amrc-factoryplus/edge-driver";
+    throw new ScoutError("OPTIONS", `Root ${req.root} does not exist`);
+
+The codes are `OPTIONS` for a bad `root`, `folder_id` or option, and
+`CONN` or `AUTH` when the device can't be reached or refuses the
+driver. Anything else thrown ends the scan with `ERR` and its message.
+
+The library also keeps to the limits itself, so a handler that misses
+one still ends the scan correctly:
+
+* At the item cap `out.add` rejects, and the scan ends truncated with
+  reason `items`.
+* Items deeper than `limits.depth` are dropped, and the scan ends
+  truncated with reason `depth`.
+* At `limits.seconds` the scan ends truncated with reason `seconds`,
+  even if `scout` never returns.
+* A cancel or a new configuration ends the scan with `CANCELLED`.
+* Items without an `id`, and `sample` unless `limits.samples` is set,
+  are left out.
+
+After the scan has stopped, `scout` has 2 s to return before the
+library ends the scan without it. Only one scan runs at a time.

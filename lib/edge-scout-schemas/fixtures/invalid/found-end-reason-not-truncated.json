@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "reason is null when the scan was not truncated",
+    "data": {
+        "seq": 4,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": "items"
+    }
+}

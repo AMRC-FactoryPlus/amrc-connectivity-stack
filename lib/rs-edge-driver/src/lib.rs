@@ -57,6 +57,7 @@ mod error;
 mod handler;
 mod logging;
 mod redact;
+mod scout;
 mod status;
 mod write;
 
@@ -69,5 +70,10 @@ pub use error::{ConnectError, Error, HandlerError, WriteError};
 pub use handler::{AddrGroup, Handler, Poller};
 pub use logging::{init_logging, log_filter};
 pub use redact::redact;
+pub use scout::{
+    Access, Excluded, Item, ItemKind, LIBRARY, Progress, SCOUT_VERSION, ScoutCode, ScoutEnd,
+    ScoutError, ScoutLimits, ScoutRequest, ScoutSink, ScoutType, Scouter, Stop, Truncation,
+};
 pub use status::Status;
+pub use tokio_util::sync::CancellationToken;
 pub use write::WriteValue;

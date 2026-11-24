@@ -1,0 +1,11 @@
+{
+    "schema": "item",
+    "description": "The MQTT folder for topic level plant/line1",
+    "data": {
+        "id": "plant/line1/",
+        "parent": "plant/",
+        "name": "line1",
+        "kind": "folder",
+        "root": "plant/line1/#"
+    }
+}

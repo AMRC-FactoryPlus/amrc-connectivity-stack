@@ -1,0 +1,157 @@
+{
+    "description": "exhaustive is the AND, truncated the OR, reason the branch's when it is truncated, excluded the union by id keeping the base copy, and root and options_hash the base's",
+    "base": {
+        "root": null,
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "excluded": [
+            {
+                "id": "i=2253",
+                "reason": "skipped",
+                "prefixes": [
+                    "i="
+                ]
+            }
+        ],
+        "branches": [
+            {
+                "folder_id": "ns=2;s=Line1",
+                "finished": "2026-11-24T10:41:00Z"
+            }
+        ],
+        "items": [
+            {
+                "id": "ns=2;s=Line1",
+                "parent": null,
+                "name": "Line1",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;s=Line1/Speed",
+                "parent": "ns=2;s=Line1",
+                "name": "Speed",
+                "kind": "value",
+                "address": "ns=2;s=Line1/Speed",
+                "type": "Double"
+            },
+            {
+                "id": "ns=2;s=Line1/Motor",
+                "parent": "ns=2;s=Line1",
+                "name": "Motor",
+                "kind": "folder",
+                "more": true
+            },
+            {
+                "id": "ns=2;s=Line1/Motor/Temp",
+                "parent": "ns=2;s=Line1/Motor",
+                "name": "Temp",
+                "kind": "value",
+                "address": "ns=2;s=Line1/Motor/Temp",
+                "type": "Float"
+            }
+        ]
+    },
+    "scan": {
+        "root": "ns=2;s=Line1/Motor",
+        "folder_id": "ns=2;s=Line1/Motor",
+        "finished": "2026-11-24T10:42:15.500Z",
+        "options_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "exhaustive": false,
+        "truncated": true,
+        "reason": "items",
+        "excluded": [
+            {
+                "id": "i=2253",
+                "reason": "denied"
+            },
+            {
+                "id": "ns=2;s=Line1/Motor/Logs",
+                "reason": "skipped",
+                "prefixes": [
+                    "ns=2;s=Line1/Motor/Logs"
+                ]
+            }
+        ],
+        "items": [
+            {
+                "id": "ns=2;s=Line1/Motor",
+                "parent": null,
+                "name": "Motor",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;s=Line1/Motor/Temp",
+                "parent": "ns=2;s=Line1/Motor",
+                "name": "Temp",
+                "kind": "value",
+                "address": "ns=2;s=Line1/Motor/Temp",
+                "type": "Double"
+            }
+        ]
+    },
+    "expected": {
+        "root": null,
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": false,
+        "truncated": true,
+        "reason": "items",
+        "excluded": [
+            {
+                "id": "i=2253",
+                "reason": "skipped",
+                "prefixes": [
+                    "i="
+                ]
+            },
+            {
+                "id": "ns=2;s=Line1/Motor/Logs",
+                "reason": "skipped",
+                "prefixes": [
+                    "ns=2;s=Line1/Motor/Logs"
+                ]
+            }
+        ],
+        "branches": [
+            {
+                "folder_id": "ns=2;s=Line1",
+                "finished": "2026-11-24T10:41:00Z"
+            },
+            {
+                "folder_id": "ns=2;s=Line1/Motor",
+                "finished": "2026-11-24T10:42:15.500Z"
+            }
+        ],
+        "items": [
+            {
+                "id": "ns=2;s=Line1",
+                "parent": null,
+                "name": "Line1",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;s=Line1/Speed",
+                "parent": "ns=2;s=Line1",
+                "name": "Speed",
+                "kind": "value",
+                "address": "ns=2;s=Line1/Speed",
+                "type": "Double"
+            },
+            {
+                "id": "ns=2;s=Line1/Motor",
+                "parent": "ns=2;s=Line1",
+                "name": "Motor",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;s=Line1/Motor/Temp",
+                "parent": "ns=2;s=Line1/Motor",
+                "name": "Temp",
+                "kind": "value",
+                "address": "ns=2;s=Line1/Motor/Temp",
+                "type": "Double"
+            }
+        ]
+    }
+}

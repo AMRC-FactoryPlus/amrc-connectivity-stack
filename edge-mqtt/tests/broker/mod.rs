@@ -6,10 +6,12 @@
 //! device's broker. It records what the driver sends (CONNECT,
 //! SUBSCRIBE, UNSUBSCRIBE, PUBLISH) and lets a test publish to the
 //! driver, refuse a connection or a subscription, and drop the
-//! connection.
+//! connection. It keeps each connection by its client id, so a test
+//! can publish to the driver's own connection or a scan's.
 
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -47,8 +49,12 @@ pub enum Seen {
 struct Shared {
     /// The current connection's sender.
     conn: Option<mpsc::UnboundedSender<Option<Publish>>>,
+    /// Each connection's sender, by client id.
+    clients: HashMap<String, mpsc::UnboundedSender<Option<Publish>>>,
     /// The CONNACK code to answer with.
     connack: Option<ConnectReturnCode>,
+    /// The CONNACK code for client ids that start with a prefix.
+    connack_for: Option<(String, ConnectReturnCode)>,
     /// Filters containing this are refused in the SUBACK.
     refuse: Option<String>,
     /// Close this many more connections straight after their CONNACK.
@@ -100,6 +106,39 @@ impl FakeBroker {
         self.shared.lock().unwrap().connack = Some(code);
     }
 
+    /// Answer CONNECTs from client ids starting with `prefix` with
+    /// this code.
+    pub fn refuse_client(&self, prefix: &str, code: ConnectReturnCode) {
+        self.shared.lock().unwrap().connack_for = Some((prefix.to_owned(), code));
+    }
+
+    /// Publish to the connection with this client id, which must be
+    /// connected.
+    pub fn publish_to(
+        &self,
+        client_id: &str,
+        topic: &str,
+        payload: impl Into<Vec<u8>>,
+        retain: bool,
+    ) {
+        let tx = self.shared.lock().unwrap().clients.get(client_id).cloned();
+        let mut p = Publish::new(topic, QoS::AtMostOnce, payload);
+        p.retain = retain;
+        tx.unwrap_or_else(|| panic!("{client_id} is not connected"))
+            .send(Some(p))
+            .expect("connection gone");
+    }
+
+    /// Whether a connection with this client id is open.
+    pub fn connected(&self, client_id: &str) -> bool {
+        self.shared
+            .lock()
+            .unwrap()
+            .clients
+            .get(client_id)
+            .is_some_and(|tx| !tx.is_closed())
+    }
+
     /// Close the next `n` connections straight after accepting them.
     pub fn drop_after_connack(&self, n: usize) {
         self.shared.lock().unwrap().drop_after_connack = n;
@@ -121,6 +160,14 @@ impl FakeBroker {
     /// Drop the driver's connection.
     pub fn kick(&self) {
         if let Some(tx) = self.shared.lock().unwrap().conn.take() {
+            let _ = tx.send(None);
+        }
+    }
+
+    /// Drop the connection with this client id, as a broker does when
+    /// another client takes the id over.
+    pub fn kick_client(&self, client_id: &str) {
+        if let Some(tx) = self.shared.lock().unwrap().clients.get(client_id) {
             let _ = tx.send(None);
         }
     }
@@ -175,7 +222,7 @@ async fn accept(
             return;
         };
         let (tx, mut rx) = mpsc::unbounded_channel::<Option<Publish>>();
-        shared.lock().unwrap().conn = Some(tx);
+        shared.lock().unwrap().conn = Some(tx.clone());
         let shared = shared.clone();
         let events = events.clone();
         tokio::spawn(async move {
@@ -203,8 +250,14 @@ async fn accept(
                                         keep_alive: c.keep_alive,
                                         login: c.login.map(|l| (l.username, l.password)),
                                     });
-                                    let code = shared.lock().unwrap().connack
-                                        .unwrap_or(ConnectReturnCode::Success);
+                                    let code = {
+                                        let mut sh = shared.lock().unwrap();
+                                        sh.clients.insert(c.client_id.clone(), tx.clone());
+                                        match &sh.connack_for {
+                                            Some((prefix, code)) if c.client_id.starts_with(prefix.as_str()) => *code,
+                                            _ => sh.connack.unwrap_or(ConnectReturnCode::Success),
+                                        }
+                                    };
                                     ConnAck::new(code, false).write(&mut out).unwrap();
                                     close = code != ConnectReturnCode::Success;
                                     let mut sh = shared.lock().unwrap();

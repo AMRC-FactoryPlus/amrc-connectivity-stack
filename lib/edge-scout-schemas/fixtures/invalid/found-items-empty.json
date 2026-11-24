@@ -1,0 +1,9 @@
+{
+    "schema": "found",
+    "description": "An items message carries at least one item",
+    "data": {
+        "seq": 1,
+        "type": "items",
+        "items": []
+    }
+}

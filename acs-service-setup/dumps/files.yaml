@@ -27,6 +27,7 @@ objects:
   !u Files.Perm.All:
     !u Files.Perm.Upload: { name: "Upload" }
     !u Files.Perm.Download: { name: "Download" }
+    !u Files.Perm.Delete: { name: "Delete" }
     !u Files.Perm.ListStorage: { name: "List Storage" }
 
   !u ConfigDB.Class.R2Class:

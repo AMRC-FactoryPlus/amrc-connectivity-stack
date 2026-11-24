@@ -1,0 +1,47 @@
+name: Python edge driver library tests
+
+# Runs the tests of lib/py-edge-driver, including the Edge Scout tests,
+# which check every message against lib/edge-scout-schemas, and the
+# reconnect test against mosquitto in Docker.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'lib/py-edge-driver/**'
+      - 'lib/edge-scout-schemas/**'
+      - '.github/workflows/py-edge-driver.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: lib/py-edge-driver
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: pip install 'poetry>=2,<3'
+
+      - name: Install dependencies
+        run: poetry install --with test
+
+      - name: Pull mosquitto
+        run: docker pull eclipse-mosquitto:2.0.20
+
+      # SCOUT_MOSQUITTO makes the mosquitto test fail, not skip, if
+      # Docker is missing.
+      - name: Run the tests
+        env:
+          SCOUT_MOSQUITTO: '1'
+        run: poetry run pytest

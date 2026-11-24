@@ -1,0 +1,10 @@
+{
+    "schema": "item",
+    "description": "kind is folder or value",
+    "data": {
+        "id": "x",
+        "parent": null,
+        "name": "x",
+        "kind": "object"
+    }
+}

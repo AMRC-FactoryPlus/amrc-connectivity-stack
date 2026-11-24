@@ -12,6 +12,18 @@ export const App = {
     AgentConfig:      "aac6f843-cfee-4683-b121-6943bfdf9173",
     /* edge-sim cassettes; must match acs-service-setup EdgeSim.App */
     Cassette:         "844c9d80-97ab-4ffc-918c-f4e529411108",
+    /* Edge Scout status, one entry per connection; must match
+     * acs-service-setup Edge.App.ScoutStatus */
+    ScoutStatus:      "ad73fae4-a3b9-457a-8c36-12a2019bff2c",
+};
+export const Class = {
+    /* An Edge Scout snapshot File object; Edge.Class.ScoutResult */
+    ScoutResult:      "10916e96-f6fe-44cc-8c01-16a775426038",
+};
+export const Perm = {
+    /* "Scan device addresses", the CmdEsc permission for
+     * Node Control/Scout; Edge.Perm.Scout */
+    Scout:            "41443382-ecad-439b-999f-cb611bc11f7c",
 };
 export const Service = {
     /* Drivers' file requests are fetched from here */

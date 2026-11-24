@@ -8,7 +8,7 @@
  * to survive it sending anything at all.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 import {
   CONTRACT_VERSION,
@@ -24,7 +24,16 @@ import {
   parse_message,
   validate_proposal,
   apply_proposal,
+  CONTRACT_VERSIONS,
+  SCOUT_VERSION,
+  ui_version,
+  message_version,
+  build_scout_changed,
+  build_picked,
+  build_scout_items,
 } from '../src/lib/driver-ui/contract.js'
+import { create_host } from '../src/lib/driver-ui/host.js'
+import { build_index } from '../src/lib/scout/model.js'
 
 const TYPES = ['Int32', 'Float', 'Double', 'String', 'Boolean']
 
@@ -348,5 +357,217 @@ describe('apply_proposal', () => {
     const model = { a: 1 }
     expect(apply_proposal(model, {})).toBe(model)
     expect(model).toEqual({ a: 1 })
+  })
+})
+
+/* ---- Contract version 2: Edge Scout ---- */
+
+describe('contract version 2', () => {
+  const v2 = o => ({ [ENVELOPE]: 2, ...o })
+  const v1 = o => ({ [ENVELOPE]: 1, ...o })
+
+  it('accepts version 1 and 2 documents and reports the version', () => {
+    expect(CONTRACT_VERSIONS).toEqual([1, 2])
+    expect(ui_document({ ui: { version: 2, document: '<p>x</p>' } })).toEqual('<p>x</p>')
+    expect(ui_version({ ui: { version: 2, document: '<p>x</p>' } })).toEqual(2)
+    expect(ui_version({ ui: { version: 1, document: '<p>x</p>' } })).toEqual(1)
+    expect(ui_version({ ui: { version: 3, document: '<p>x</p>' } })).toBeNull()
+    expect(message_version(v2({ type: 'ready' }))).toEqual(2)
+    expect(message_version({ [ENVELOPE]: 3 })).toBeNull()
+  })
+
+  it('parses pick-address with an optional, cleaned filter', () => {
+    expect(parse_message(v2({ type: 'pick-address' }))).toEqual({ type: 'pick-address', filter: {} })
+    expect(parse_message(v2({ type: 'pick-address', filter: { prefix: 'ns=2;', kind: 'value', x: 1 } })))
+      .toEqual({ type: 'pick-address', filter: { prefix: 'ns=2;', kind: 'value' } })
+    expect(parse_message(v2({ type: 'pick-address', filter: { kind: 'evil' } })))
+      .toEqual({ type: 'pick-address', filter: {} })
+  })
+
+  it('cuts scout-query limits to 500 and needs a prefix', () => {
+    expect(parse_message(v2({ type: 'scout-query', prefix: 'a', limit: 10 })))
+      .toEqual({ type: 'scout-query', prefix: 'a', limit: 10 })
+    expect(parse_message(v2({ type: 'scout-query', prefix: 'a', limit: 100000 })).limit).toEqual(500)
+    expect(parse_message(v2({ type: 'scout-query', prefix: 'a', limit: -1 })).limit).toEqual(500)
+    expect(parse_message(v2({ type: 'scout-query', prefix: 'a' })).limit).toEqual(500)
+    expect(parse_message(v2({ type: 'scout-query' }))).toBeNull()
+  })
+
+  it('ignores version 2 messages in a version 1 envelope', () => {
+    expect(parse_message(v1({ type: 'pick-address' }))).toBeNull()
+    expect(parse_message(v1({ type: 'scout-query', prefix: '' }))).toBeNull()
+  })
+
+  it('adds scout to init only for version 2', () => {
+    const scout = { available: true, state: 'done', finished: 't', items: 4, secret: 'no' }
+    expect(build_init({ scout })).not.toHaveProperty('scout')
+    const msg = build_init({ version: 2, scout })
+    expect(msg[ENVELOPE]).toEqual(2)
+    expect(msg.scout).toEqual({ available: true, state: 'done', finished: 't', items: 4 })
+    expect(build_init({ version: 2 }).scout).toEqual({ available: false, state: null, finished: null, items: 0 })
+  })
+
+  it('builds the version 2 host messages', () => {
+    expect(build_scout_changed({ available: true, state: 'running', finished: null, items: 0 }))
+      .toEqual({ [ENVELOPE]: SCOUT_VERSION, type: 'scout-changed',
+        scout: { available: true, state: 'running', finished: null, items: 0 } })
+    expect(build_picked(null)).toEqual({ [ENVELOPE]: 2, type: 'picked', item: null })
+    expect(build_scout_items([{ id: 'a' }]).items).toEqual([{ id: 'a' }])
+  })
+})
+
+describe('the host controller', () => {
+  const items = [
+    { id: 'L', parent: null, name: 'Line', kind: 'folder' },
+    { id: 'L/a', parent: 'L', name: 'a', kind: 'value', address: 'ns=2;s=a', path: null, sample: '42' },
+    { id: 'L/b', parent: 'L', name: 'b', kind: 'value', address: 'ns=2;s=b', path: null, sample: '7' },
+  ]
+  const index = build_index(items)
+
+  function host ({ version = 2, share_samples = false, pick, has_index = true } = {}) {
+    const sent = []
+    const on = { ready: vi.fn(), failed: vi.fn(), resize: vi.fn(), propose: vi.fn(), problems: vi.fn() }
+    const h = create_host({
+      post: m => sent.push(m),
+      document: '<p>doc</p>',
+      version,
+      share_samples,
+      init_values: () => ({ config: {}, metric: { Address: 'x' }, allowed_types: ['Double'] }),
+      scout: {
+        summary: () => ({ available: true, state: 'done', finished: 't', items: 3 }),
+        index: () => (has_index ? index : null),
+        pick: pick ?? (async () => items[1]),
+      },
+      on,
+    })
+    return { h, sent, on }
+  }
+  const msg = (v, o) => ({ [ENVELOPE]: v, ...o })
+
+  it('answers the shell in version 1 and the document in its own version', () => {
+    const { h, sent, on } = host()
+    h.handle(msg(1, { type: 'host-ready' }))
+    expect(sent[0]).toMatchObject({ [ENVELOPE]: 1, type: 'document' })
+    h.handle(msg(2, { type: 'ready' }))
+    expect(on.ready).toHaveBeenCalled()
+    expect(sent[1]).toMatchObject({ [ENVELOPE]: 2, type: 'init', scout: { items: 3 } })
+  })
+
+  it('ignores a document speaking a version it did not declare', () => {
+    const { h, sent } = host({ version: 1 })
+    h.handle(msg(2, { type: 'ready' }))
+    h.handle(msg(2, { type: 'pick-address' }))
+    expect(sent).toEqual([])
+    h.handle(msg(1, { type: 'ready' }))
+    expect(sent[0]).toMatchObject({ [ENVELOPE]: 1, type: 'init' })
+    expect(sent[0]).not.toHaveProperty('scout')
+  })
+
+  it('answers pick-address with the item, without its sample', async () => {
+    const { h, sent } = host()
+    h.handle(msg(2, { type: 'pick-address' }))
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]).toMatchObject({ type: 'picked', item: { id: 'L/a', address: 'ns=2;s=a' } })
+    expect(sent[0].item).not.toHaveProperty('sample')
+  })
+
+  it('shares samples when the DriverDef allows it', async () => {
+    const { h, sent } = host({ share_samples: true })
+    h.handle(msg(2, { type: 'pick-address' }))
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0].item.sample).toEqual('42')
+  })
+
+  it('answers a second pick-address at once with null', async () => {
+    let release
+    const { h, sent } = host({ pick: () => new Promise(r => { release = r }) })
+    h.handle(msg(2, { type: 'pick-address' }))
+    h.handle(msg(2, { type: 'pick-address' }))
+    expect(sent).toEqual([{ [ENVELOPE]: 2, type: 'picked', item: null }])
+    release(items[2])
+    await vi.waitFor(() => expect(sent).toHaveLength(2))
+    expect(sent[1].item.id).toEqual('L/b')
+  })
+
+  it('answers null with no snapshot or when the operator closes the picker', async () => {
+    const none = host({ has_index: false })
+    none.h.handle(msg(2, { type: 'pick-address' }))
+    expect(none.sent).toEqual([{ [ENVELOPE]: 2, type: 'picked', item: null }])
+
+    const closed = host({ pick: async () => null })
+    closed.h.handle(msg(2, { type: 'pick-address' }))
+    await vi.waitFor(() => expect(closed.sent).toHaveLength(1))
+    expect(closed.sent[0].item).toBeNull()
+  })
+
+  it('answers scout-query in snapshot order with the sample rule', () => {
+    const { h, sent } = host()
+    h.handle(msg(2, { type: 'scout-query', prefix: 'ns=2;s=', limit: 1 }))
+    expect(sent[0].type).toEqual('scout-items')
+    expect(sent[0].items.map(i => i.id)).toEqual(['L/a'])
+    expect(sent[0].items[0]).not.toHaveProperty('sample')
+    h.handle(msg(2, { type: 'scout-query', prefix: 'nope' }))
+    expect(sent[1].items).toEqual([])
+  })
+
+  it('answers scout-query with nothing when there is no snapshot', () => {
+    const { h, sent } = host({ has_index: false })
+    h.handle(msg(2, { type: 'scout-query', prefix: '' }))
+    expect(sent[0].items).toEqual([])
+  })
+
+  it('sends scout-changed only to version 2 documents', () => {
+    const two = host()
+    two.h.scout_changed({ available: false, state: 'running', finished: null, items: 0 })
+    expect(two.sent[0]).toMatchObject({ type: 'scout-changed', scout: { state: 'running' } })
+    const one = host({ version: 1 })
+    one.h.scout_changed({ available: false, state: 'running' })
+    expect(one.sent).toEqual([])
+  })
+
+  it('gives a document no way to start or stop a scan', () => {
+    const start = vi.fn()
+    const cancel = vi.fn()
+    const sent = []
+    const h = create_host({
+      post: m => sent.push(m),
+      document: '<p>doc</p>',
+      version: 2,
+      init_values: () => ({ config: {}, metric: {}, allowed_types: [] }),
+      /* Even if the editor handed over more than it should, the
+       * controller only ever calls summary, index and pick. */
+      scout: {
+        summary: () => ({ available: false, state: null, finished: null, items: 0 }),
+        index: () => null,
+        pick: async () => null,
+        start,
+        cancel,
+      },
+      on: {},
+    })
+    for (const type of ['scan', 'start', 'scout', 'scout-start', 'scout-cancel', 'cancel', 'rescan'])
+      for (const v of [1, 2]) {
+        const m = msg(v, { type, connection: 'c', options: {} })
+        expect(parse_message(m)).toBeNull()
+        h.handle(m)
+      }
+    expect(start).not.toHaveBeenCalled()
+    expect(cancel).not.toHaveBeenCalled()
+    expect(sent).toEqual([])
+  })
+
+  it('ignores scout messages that come before the document is ready', () => {
+    const { h, sent } = host()
+    h.handle(msg(2, { type: 'scout-changed', scout: { available: true } }))
+    h.handle(msg(2, { type: 'picked', item: { id: 'forged' } }))
+    h.handle(msg(2, { type: 'scout-items', items: [] }))
+    expect(sent).toEqual([])
+  })
+
+  it('validates proposals as before', () => {
+    const { h, on } = host()
+    h.handle(msg(2, { type: 'propose', values: { Address: 'a', Sparkplug_Type: 'Nope', Evil: 1 } }))
+    expect(on.propose).toHaveBeenCalledWith({ Address: 'a' })
+    expect(on.problems.mock.calls[0][0][0]).toMatch(/Sparkplug_Type/)
   })
 })

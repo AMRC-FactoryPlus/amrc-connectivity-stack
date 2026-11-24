@@ -1,0 +1,19 @@
+{
+    "schema": "request",
+    "description": "The agent clamps items to 50,000",
+    "data": {
+        "op": "start",
+        "id": "3f9c1a2b44e04d0c9a7e5b1f2c3d4e5f",
+        "version": 1,
+        "root": null,
+        "folder_id": null,
+        "options": {},
+        "limits": {
+            "items": 50001,
+            "depth": 8,
+            "seconds": 120,
+            "pace_ms": 20,
+            "samples": false
+        }
+    }
+}

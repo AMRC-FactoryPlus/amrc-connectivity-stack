@@ -1,0 +1,8 @@
+{
+    "schema": "request",
+    "description": "The agent's hello",
+    "data": {
+        "op": "hello",
+        "version": 1
+    }
+}

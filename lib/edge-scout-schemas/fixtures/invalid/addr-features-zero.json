@@ -1,0 +1,11 @@
+{
+    "schema": "addr",
+    "description": "Feature versions start at 1",
+    "data": {
+        "version": 1,
+        "addrs": {},
+        "features": {
+            "scout": 0
+        }
+    }
+}

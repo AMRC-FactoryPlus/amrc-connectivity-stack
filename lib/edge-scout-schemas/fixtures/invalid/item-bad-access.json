@@ -1,0 +1,12 @@
+{
+    "schema": "item",
+    "description": "access is r, w, rw or null",
+    "data": {
+        "id": "x",
+        "parent": null,
+        "name": "x",
+        "kind": "value",
+        "address": "x",
+        "access": "read"
+    }
+}

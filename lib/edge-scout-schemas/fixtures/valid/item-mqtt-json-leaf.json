@@ -1,0 +1,14 @@
+{
+    "schema": "item",
+    "description": "A JSON leaf of a topic, whose id has a NUL between the topic and the JSONPath",
+    "data": {
+        "id": "plant/line1\u0000$.speed",
+        "parent": "plant/line1",
+        "name": "speed",
+        "kind": "value",
+        "address": "plant/line1",
+        "path": "$.speed",
+        "type": "Int64",
+        "sample": "1450"
+    }
+}

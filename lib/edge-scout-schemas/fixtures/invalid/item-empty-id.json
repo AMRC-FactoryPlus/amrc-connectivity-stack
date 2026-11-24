@@ -1,0 +1,10 @@
+{
+    "schema": "item",
+    "description": "An id is not empty",
+    "data": {
+        "id": "",
+        "parent": null,
+        "name": "x",
+        "kind": "folder"
+    }
+}

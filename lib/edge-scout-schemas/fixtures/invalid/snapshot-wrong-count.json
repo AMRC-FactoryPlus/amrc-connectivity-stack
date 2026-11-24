@@ -1,0 +1,54 @@
+{
+    "schema": "snapshot-line",
+    "description": "The end line's count must match the item lines",
+    "lines": [
+        {
+            "version": 1,
+            "scan": "3f9c1a2b-44e0-4d0c-9a7e-5b1f2c3d4e5f",
+            "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a",
+            "driver": "rs-edge-driver 0.1.0",
+            "started": "2026-11-24T10:41:00Z",
+            "root": null,
+            "folder_id": null,
+            "options": {}
+        },
+        {
+            "id": "ns=2;s=Line1/Speed",
+            "parent": "ns=2;s=Line1",
+            "name": "Speed",
+            "kind": "value",
+            "address": "ns=2;s=Line1/Speed",
+            "path": null,
+            "type": "Double",
+            "access": "rw",
+            "unit": "rpm",
+            "description": "Spindle speed",
+            "sample": null,
+            "more": false,
+            "root": null,
+            "detail": {
+                "namespace_uri": "urn:plc:line1"
+            }
+        },
+        {
+            "end": {
+                "finished": "2026-11-24T10:42:13Z",
+                "exhaustive": true,
+                "truncated": false,
+                "reason": null,
+                "excluded": [
+                    {
+                        "id": "i=2253",
+                        "reason": "skipped",
+                        "prefixes": [
+                            "i="
+                        ]
+                    }
+                ],
+                "rejected": 0,
+                "items": 2,
+                "branches": []
+            }
+        }
+    ]
+}

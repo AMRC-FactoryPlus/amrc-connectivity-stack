@@ -1,0 +1,11 @@
+{
+    "schema": "status",
+    "description": "A driver built on a library from before scouting",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "supported": "library",
+        "current": null,
+        "previous": null
+    }
+}

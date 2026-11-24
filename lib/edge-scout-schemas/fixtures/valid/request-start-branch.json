@@ -1,0 +1,21 @@
+{
+    "schema": "request",
+    "description": "A branch scan start",
+    "data": {
+        "op": "start",
+        "id": "3f9c1a2b44e04d0c9a7e5b1f2c3d4e5f",
+        "version": 1,
+        "root": "plant/line1/#",
+        "folder_id": "plant/line1/",
+        "options": {
+            "seconds": 10
+        },
+        "limits": {
+            "items": 20000,
+            "depth": 8,
+            "seconds": 120,
+            "pace_ms": 20,
+            "samples": true
+        }
+    }
+}

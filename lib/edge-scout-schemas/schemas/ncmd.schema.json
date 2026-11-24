@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:ncmd",
+    "title": "Node Control/Scout request",
+    "description": "The JSON string the Admin UI sends as the value of the Node Control/Scout NCMD, through the Command Escalation service.",
+    "type": "object",
+    "required": ["version", "op", "request", "connection"],
+    "properties": {
+        "version": { "const": 1 },
+        "op": { "enum": ["start", "cancel"] },
+        "request": { "$ref": "urn:edge-scout:common#/$defs/uuid" },
+        "connection": { "$ref": "urn:edge-scout:common#/$defs/uuid" }
+    },
+    "oneOf": [
+        {
+            "properties": {
+                "op": { "const": "start" },
+                "root": { "$ref": "urn:edge-scout:common#/$defs/root" },
+                "folder_id": { "$ref": "urn:edge-scout:common#/$defs/folder_id" },
+                "options": { "$ref": "urn:edge-scout:common#/$defs/options" },
+                "limits": { "$ref": "urn:edge-scout:common#/$defs/requested_limits" }
+            },
+            "if": {
+                "required": ["folder_id"],
+                "properties": { "folder_id": { "type": "string" } }
+            },
+            "then": {
+                "required": ["root"],
+                "properties": { "root": { "type": "string" } }
+            }
+        },
+        {
+            "properties": { "op": { "const": "cancel" } }
+        }
+    ]
+}

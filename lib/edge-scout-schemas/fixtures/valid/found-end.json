@@ -1,0 +1,20 @@
+{
+    "schema": "found",
+    "description": "An exhaustive scan that skipped the OPC UA Server object",
+    "data": {
+        "seq": 9,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "excluded": [
+            {
+                "id": "i=2253",
+                "reason": "skipped",
+                "prefixes": [
+                    "i="
+                ]
+            }
+        ]
+    }
+}

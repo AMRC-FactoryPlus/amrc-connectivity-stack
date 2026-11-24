@@ -26,6 +26,22 @@
  * standard fields, rather than guessing at a format it does not know. */
 export const CONTRACT_VERSION = 1
 
+/** Every contract version the Manager speaks.
+ *
+ * Version 2 adds Edge Scout: `init.scout`, `scout-changed`, and the
+ * document messages `pick-address` and `scout-query`. It changes nothing
+ * a version 1 document sees, and the host answers each document in the
+ * version it declared. The shell page (public/driver-ui/host.html) stays
+ * on version 1 for its own `host-ready`, `host-failed` and `document`
+ * messages. */
+export const CONTRACT_VERSIONS = [1, 2]
+
+/** The latest version, which adds Edge Scout. */
+export const SCOUT_VERSION = 2
+
+/* Message types only a version 2 document may send. */
+const V2_ONLY = new Set(['pick-address', 'scout-query'])
+
 /** Discriminator on every message in both directions, so a driver UI can
  * safely share a window with other postMessage traffic. */
 export const ENVELOPE = 'fpDriverUi'
@@ -92,10 +108,32 @@ export const THEME_TOKENS = {
 export function ui_document (driver_info) {
   const ui = driver_info?.ui
   if (!ui || typeof ui !== 'object') return null
-  if (ui.version !== CONTRACT_VERSION) return null
+  if (!CONTRACT_VERSIONS.includes(ui.version)) return null
   const doc = ui.document
   if (typeof doc !== 'string' || doc.trim() === '') return null
   return doc
+}
+
+/**
+ * The contract version a driver's UI document was written against.
+ *
+ * @param {object|null} driver_info The driver definition.
+ * @returns {number|null} 1 or 2, or null when `ui_document` is null.
+ */
+export function ui_version (driver_info) {
+  return ui_document(driver_info) == null ? null : driver_info.ui.version
+}
+
+/**
+ * The envelope version of a message, or null if it is not one of ours.
+ *
+ * @param {*} data The raw `event.data`.
+ * @returns {number|null}
+ */
+export function message_version (data) {
+  if (!data || typeof data !== 'object') return null
+  const v = data[ENVELOPE]
+  return CONTRACT_VERSIONS.includes(v) ? v : null
 }
 
 /** Placeholder substituted for any config value we refuse to hand over. */
@@ -151,9 +189,10 @@ export function redact_config (config, schema) {
  * @param {object} [opts.theme] Theme token overrides.
  * @returns {object} The message to post into the frame.
  */
-export function build_init ({ config, config_schema, metric, allowed_types, theme }) {
-  return {
-    [ENVELOPE]: CONTRACT_VERSION,
+export function build_init ({ config, config_schema, metric, allowed_types, theme, version, scout }) {
+  const v = CONTRACT_VERSIONS.includes(version) ? version : CONTRACT_VERSION
+  const msg = {
+    [ENVELOPE]: v,
     type:       'init',
     config:     redact_config(config, config_schema),
     metric:     { ...(metric ?? {}) },
@@ -163,7 +202,52 @@ export function build_init ({ config, config_schema, metric, allowed_types, them
     },
     theme: { ...THEME_TOKENS, ...(theme ?? {}) },
   }
+  /* Version 1 documents never see the scout key. */
+  if (v >= SCOUT_VERSION) msg.scout = scout_state(scout)
+  return msg
 }
+
+/* The scout summary a document sees. Copied field by field so nothing
+ * else on the object crosses into the sandbox. */
+function scout_state (scout) {
+  return {
+    available: !!scout?.available,
+    state:     typeof scout?.state === 'string' ? scout.state : null,
+    finished:  typeof scout?.finished === 'string' ? scout.finished : null,
+    items:     Number.isInteger(scout?.items) ? scout.items : 0,
+  }
+}
+
+/**
+ * Tell a version 2 document that a scan started, finished or failed.
+ *
+ * @param {object} scout The summary, as in `init.scout`.
+ */
+export function build_scout_changed (scout) {
+  return { [ENVELOPE]: SCOUT_VERSION, type: 'scout-changed', scout: scout_state(scout) }
+}
+
+/**
+ * Answer a `pick-address`. `item` is null when the operator closed the
+ * picker, there is no snapshot, or a picker was already open.
+ *
+ * @param {object|null} item The item, already passed through `share_item`.
+ */
+export function build_picked (item) {
+  return { [ENVELOPE]: SCOUT_VERSION, type: 'picked', item: item ?? null }
+}
+
+/**
+ * Answer a `scout-query`.
+ *
+ * @param {object[]} items At most 500 items, already shared.
+ */
+export function build_scout_items (items) {
+  return { [ENVELOPE]: SCOUT_VERSION, type: 'scout-items', items: [...(items ?? [])] }
+}
+
+/** The most items one `scout-query` returns. */
+export const SCOUT_QUERY_MAX = 500
 
 /**
  * Message handing the driver document to the shell page for writing.
@@ -192,11 +276,17 @@ export function build_document_message (document) {
  * `propose` and `resize` as the operator works.
  *
  * @param {*} data The raw `event.data`.
- * @returns {{type: string, values?: object, height?: number}|null}
+ * A version 2 document may also send `pick-address`, with an optional
+ * `filter` of `prefix` and `kind`, and `scout-query`, with a `prefix` and
+ * a `limit` cut to 500. A version 1 envelope carrying either is ignored.
+ *
+ * @returns {{type: string, values?: object, height?: number,
+ *   filter?: object, prefix?: string, limit?: number}|null}
  */
 export function parse_message (data) {
-  if (!data || typeof data !== 'object') return null
-  if (data[ENVELOPE] !== CONTRACT_VERSION) return null
+  const version = message_version(data)
+  if (version == null) return null
+  if (V2_ONLY.has(data.type) && version < SCOUT_VERSION) return null
 
   switch (data.type) {
     case 'host-ready':
@@ -221,6 +311,25 @@ export function parse_message (data) {
        * far more likely to be buggy than malicious, and refusing outright
        * would leave it unusable. */
       return { type: 'resize', height: Math.min(Math.round(h), 2000) }
+    }
+    case 'pick-address': {
+      /* The filter is optional, and a bad one is dropped rather than
+       * refused, so the operator still gets a picker. */
+      const f = data.filter
+      const filter = {}
+      if (f && typeof f === 'object' && !Array.isArray(f)) {
+        if (typeof f.prefix === 'string') filter.prefix = f.prefix.slice(0, 1024)
+        if (f.kind === 'folder' || f.kind === 'value') filter.kind = f.kind
+      }
+      return { type: 'pick-address', filter }
+    }
+    case 'scout-query': {
+      if (typeof data.prefix !== 'string') return null
+      const n = data.limit
+      const limit = typeof n === 'number' && Number.isFinite(n) && n > 0
+        ? Math.min(Math.floor(n), SCOUT_QUERY_MAX)
+        : SCOUT_QUERY_MAX
+      return { type: 'scout-query', prefix: data.prefix.slice(0, 1024), limit }
     }
     default:
       return null

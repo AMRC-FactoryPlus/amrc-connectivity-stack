@@ -8,6 +8,10 @@ RUN <<'SHELL'
     set -e
     install -d -o node -g node /home/node/app
 SHELL
+# The edge-driver dependency is file:../lib/js-edge-driver, which
+# resolves to /home/node/lib. --install-links copies it into
+# node_modules, so the run stage doesn't need lib.
+COPY --from=lib --chown=node . /home/node/lib/
 WORKDIR /home/node/app
 USER node
 COPY package*.json ./
@@ -19,7 +23,7 @@ RUN <<'SHELL'
         npm config set @amrc-factoryplus:registry "${acs_npm}"
     fi
 
-    npm install --save=false
+    npm install --save=false --install-links
 SHELL
 COPY --chown=node . .
 # Declare this late: changing an ARG reruns every RUN after it

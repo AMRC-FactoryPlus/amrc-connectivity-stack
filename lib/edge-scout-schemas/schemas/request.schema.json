@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:request",
+    "title": "Edge Agent to driver scout message",
+    "description": "A message the Edge Agent publishes on fpEdge1/<Conn>/scout.",
+    "type": "object",
+    "required": ["op"],
+    "oneOf": [
+        { "$ref": "#/$defs/hello" },
+        { "$ref": "#/$defs/start" },
+        { "$ref": "#/$defs/cancel" },
+        { "$ref": "#/$defs/ack" }
+    ],
+    "$defs": {
+        "hello": {
+            "type": "object",
+            "required": ["op", "version"],
+            "properties": {
+                "op": { "const": "hello" },
+                "version": { "const": 1 }
+            }
+        },
+        "start": {
+            "type": "object",
+            "required": ["op", "id", "version", "root", "folder_id", "options", "limits"],
+            "properties": {
+                "op": { "const": "start" },
+                "id": { "$ref": "urn:edge-scout:common#/$defs/scan_id" },
+                "version": { "const": 1 },
+                "root": { "$ref": "urn:edge-scout:common#/$defs/root" },
+                "folder_id": { "$ref": "urn:edge-scout:common#/$defs/folder_id" },
+                "options": { "$ref": "urn:edge-scout:common#/$defs/options" },
+                "limits": { "$ref": "urn:edge-scout:common#/$defs/limits" },
+                "window": {
+                    "description": "The most items messages the driver may send ahead of the Edge Agent's acks. A driver that keeps to it echoes it in its accept.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                }
+            },
+            "if": { "properties": { "folder_id": { "type": "string" } } },
+            "then": { "properties": { "root": { "type": "string" } } }
+        },
+        "cancel": {
+            "type": "object",
+            "required": ["op", "id"],
+            "properties": {
+                "op": { "const": "cancel" },
+                "id": { "$ref": "urn:edge-scout:common#/$defs/scan_id" }
+            }
+        },
+        "ack": {
+            "description": "The Edge Agent has handled every message of the scan up to seq. Sent only to a driver whose accept had a window.",
+            "type": "object",
+            "required": ["op", "id", "seq"],
+            "properties": {
+                "op": { "const": "ack" },
+                "id": { "$ref": "urn:edge-scout:common#/$defs/scan_id" },
+                "seq": { "type": "integer", "minimum": 0 }
+            }
+        }
+    }
+}

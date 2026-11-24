@@ -19,7 +19,7 @@ bytes = "1"
 rumqttc = { version = "0.25.1", default-features = false, features = ["websocket", "use-rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1"
 uuid = { version = "1", features = ["v4"] }
 
@@ -27,6 +27,9 @@ uuid = { version = "1", features = ["v4"] }
 # The driver-loop tests borrow the fake Edge Agent from the library's
 # own tests, which needs these.
 tokio = { version = "1", features = ["full"] }
+# Checks scan messages against lib/edge-scout-schemas. The schemas are
+# read from disk, so no HTTP resolver.
+jsonschema = { version = "0.33", default-features = false }
 
 [profile.release]
 strip = true

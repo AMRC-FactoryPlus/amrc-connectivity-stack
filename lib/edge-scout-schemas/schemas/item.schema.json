@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:item",
+    "title": "Scout item",
+    "description": "One discovered entry, as a driver sends it in an items message and as a snapshot stores it. The agent truncates over-long strings before it checks an item against this schema. The 2 KiB cap on detail is checked in code.",
+    "type": "object",
+    "required": ["id", "parent", "name", "kind"],
+    "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "parent": { "type": ["string", "null"], "minLength": 1, "maxLength": 512 },
+        "name": { "type": "string", "maxLength": 256 },
+        "kind": { "enum": ["folder", "value"] },
+        "address": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+        "path": { "type": ["string", "null"], "maxLength": 1024 },
+        "type": {
+            "anyOf": [
+                { "$ref": "urn:edge-scout:common#/$defs/sparkplug_type" },
+                { "type": "null" }
+            ]
+        },
+        "access": { "enum": ["r", "w", "rw", null] },
+        "unit": { "type": ["string", "null"], "maxLength": 64 },
+        "description": { "type": ["string", "null"], "maxLength": 1024 },
+        "sample": { "type": ["string", "null"], "maxLength": 256 },
+        "more": { "type": "boolean" },
+        "root": { "type": ["string", "null"], "maxLength": 1024 },
+        "detail": { "type": ["object", "null"] }
+    },
+    "if": { "properties": { "kind": { "const": "value" } } },
+    "then": {
+        "required": ["address"],
+        "properties": { "address": { "type": "string" } }
+    }
+}

@@ -14,6 +14,9 @@ on:
     paths:
       - 'acs-edge/**'
       - 'lib/js-service-client/**'
+      # The Edge Scout schemas and the shared merge fixtures, which
+      # the agent validates against and tests with.
+      - 'lib/edge-scout-schemas/**'
       # The golden-output harness (acs-edge/tests/golden) runs the
       # reference REST driver on lib/js-edge-driver and reads
       # service-setup's split driver payload format maps.

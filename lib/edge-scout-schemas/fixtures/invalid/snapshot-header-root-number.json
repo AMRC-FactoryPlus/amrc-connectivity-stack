@@ -1,0 +1,14 @@
+{
+    "schema": "snapshot-header",
+    "description": "root is a string or null",
+    "data": {
+        "version": 1,
+        "scan": "3f9c1a2b-44e0-4d0c-9a7e-5b1f2c3d4e5f",
+        "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a",
+        "driver": "rs-edge-driver 0.1.0",
+        "started": "2026-11-24T10:41:00Z",
+        "root": 85,
+        "folder_id": null,
+        "options": {}
+    }
+}

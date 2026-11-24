@@ -1,0 +1,11 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:snapshot-line",
+    "title": "Snapshot line",
+    "description": "Any one line of a snapshot's NDJSON: the header, an item, or the end line. check_snapshot in lib/index.js also checks their order.",
+    "oneOf": [
+        { "$ref": "urn:edge-scout:snapshot-header" },
+        { "$ref": "urn:edge-scout:item" },
+        { "$ref": "urn:edge-scout:snapshot-end" }
+    ]
+}

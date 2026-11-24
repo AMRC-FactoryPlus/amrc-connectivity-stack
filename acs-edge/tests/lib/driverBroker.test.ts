@@ -9,7 +9,7 @@ import path from "path";
 
 import * as mqtt from "mqtt";
 
-import { DriverBroker } from "../../lib/driverBroker";
+import { DriverBroker, driver_acl } from "../../lib/driverBroker";
 
 /* Enough queued driver messages to overflow the stack if the broker
  * drains them recursively. A live edge node with 7,302 devices
@@ -224,6 +224,89 @@ describe("DriverBroker", () => {
             await br.start();
             await br.stop();
             await expect(br.stop()).resolves.toBeUndefined();
+        });
+    });
+
+    describe("Edge Scout", () => {
+        function connected (c: mqtt.MqttClient) {
+            return new Promise<void>((resolve, reject) => {
+                c.once("connect", () => resolve());
+                c.once("error", reject);
+            });
+        }
+
+        it("lets a driver subscribe to scout and publish on found", async () => {
+            const br = broker();
+            await br.start();
+            const events: [string, boolean][] = [];
+            br.on("scout", (id, on) => events.push([id, on]));
+            const seen: string[] = [];
+            br.on("message", m => seen.push(`${m.msg}/${m.data}`));
+
+            const drv = driver("drv");
+            await connected(drv);
+            expect(br.scouts("drv")).toBe(false);
+            const granted = await drv.subscribeAsync("fpEdge1/drv/scout");
+            expect(granted[0].qos).not.toBe(128);
+            await until(() => br.scouts("drv"), "scout subscription");
+            expect(events).toEqual([["drv", true]]);
+
+            drv.publish("fpEdge1/drv/found/hello", "{}");
+            drv.publish("fpEdge1/drv/found/0123abcd", "{}");
+            await until(() => seen.length == 2, "found messages");
+            expect(seen).toEqual(["found/hello", "found/0123abcd"]);
+
+            await drv.unsubscribeAsync("fpEdge1/drv/scout");
+            await until(() => !br.scouts("drv"), "unsubscribe");
+            expect(events).toEqual([["drv", true], ["drv", false]]);
+        });
+
+        it("forgets a scouting driver when it disconnects", async () => {
+            const br = broker();
+            await br.start();
+            const drv = driver("drv");
+            await connected(drv);
+            await drv.subscribeAsync("fpEdge1/drv/scout");
+            await until(() => br.scouts("drv"), "scout subscription");
+            drv.end(true);
+            await until(() => !br.scouts("drv"), "disconnect");
+        });
+
+        it("still refuses other topics, and another driver's scout", () => {
+            const acl = driver_acl("drv");
+            expect(acl.subscribe.test("fpEdge1/drv/scout")).toBe(true);
+            expect(acl.subscribe.test("fpEdge1/other/scout")).toBe(false);
+            expect(acl.subscribe.test("fpEdge1/drv/scout/x")).toBe(false);
+            expect(acl.publish.test("fpEdge1/drv/found/abc_1")).toBe(true);
+            expect(acl.publish.test("fpEdge1/drv/found/a-b")).toBe(false);
+            expect(acl.publish.test("fpEdge1/drv/found")).toBe(false);
+            expect(acl.publish.test("fpEdge1/drv/scout")).toBe(false);
+        });
+
+        /* The ACL before v6.8.0, which the test-only acl option puts
+         * back. A driver that subscribes to scout under it is dropped,
+         * which is why drivers wait for features.scout. */
+        it("drops a driver that subscribes to scout under an older ACL", async () => {
+            const old = (id: string) => ({
+                publish: new RegExp(`^fpEdge1/${id}/(?:status|data/\\w+|err/\\w+)$`),
+                subscribe: new RegExp(`^fpEdge1/${id}/(?:active|conf|addr|cmd/#|poll)$`),
+            });
+            const br = new DriverBroker(env(), { acl: old });
+            brokers.push(br);
+            await br.start();
+            const quiet = jest.spyOn(console, "log").mockImplementation(() => {});
+            try {
+                const drv = driver("drv");
+                await connected(drv);
+                await drv.subscribeAsync("fpEdge1/drv/conf");
+                const closed = new Promise<void>(r => drv.once("close", () => r()));
+                drv.subscribe("fpEdge1/drv/scout");
+                await closed;
+                expect(br.scouts("drv")).toBe(false);
+            }
+            finally {
+                quiet.mockRestore();
+            }
         });
     });
 });

@@ -21,9 +21,25 @@ function log (f, ...a) {
     console.log("driver: %s", msg);
 }
 
-interface ACL {
+export interface ACL {
     publish:    RegExp,
     subscribe:  RegExp,
+}
+
+/* The ACL a driver gets, by its connection name. */
+export function driver_acl (id: string): ACL {
+    return {
+        publish: new RegExp(
+            `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+|req/\\w+|result/\\w+|found/\\w+)$`),
+        subscribe: new RegExp(
+            `^${prefix}/${id}/(?:active|conf|addr|cmd/#|write/#|poll|rsp/\\w+|scout)$`),
+    };
+}
+
+export interface DriverBrokerOpts {
+    /* Tests only: the ACL to give each driver in place of
+     * driver_acl, such as an older agent's. */
+    acl?:   (id: string) => ACL,
 }
 
 export class DriverBroker extends EventEmitter {
@@ -40,9 +56,17 @@ export class DriverBroker extends EventEmitter {
      * result/<id>, so the agent waits for the answer before it
      * reports the value. See "Write results" in docs/edge-split.md. */
     #typed:     Map<string, any> = new Map()
+    /* Drivers that subscribed to their own scout topic, by client id,
+     * kept in the same way. A driver only does that once it has seen
+     * features.scout in an addr on its current session. See
+     * "Scouting" in docs/edge-split.md. */
+    #scouts:    Map<string, any> = new Map()
+    #driver_acl: (id: string) => ACL
 
-    constructor (env) {
+    constructor (env, opts: DriverBrokerOpts = {}) {
         super();
+
+        this.#driver_acl = opts.acl ?? driver_acl;
 
         const url = new URL(env.EDGE_MQTT);
 
@@ -66,14 +90,25 @@ export class DriverBroker extends EventEmitter {
         br.authorizeSubscribe = this.authSub.bind(this);
 
         br.on("subscribe", (subs, client) => {
-            if (client && subs.some(s => s.topic == this.#write_topic(client)))
+            if (!client) return;
+            if (subs.some(s => s.topic == this.#write_topic(client)))
                 this.#typed.set(client.id, client);
+            if (subs.some(s => s.topic == this.#scout_topic(client))) {
+                this.#scouts.set(client.id, client);
+                this.emit("scout", client.id, true);
+            }
         });
         br.on("unsubscribe", (topics, client) => {
-            if (client && topics.includes(this.#write_topic(client)))
-                this.#forget(client);
+            if (!client) return;
+            if (topics.includes(this.#write_topic(client)))
+                this.#forget(this.#typed, client);
+            if (topics.includes(this.#scout_topic(client)))
+                this.#forget_scout(client);
         });
-        br.on("clientDisconnect", client => this.#forget(client));
+        br.on("clientDisconnect", client => {
+            this.#forget(this.#typed, client);
+            this.#forget_scout(client);
+        });
 
         /* Never call back from inside a callback. The callback
          * releases this message's slot in Aedes' mqemitter, and when
@@ -111,16 +146,34 @@ export class DriverBroker extends EventEmitter {
         return `${prefix}/${client.id}/write/#`;
     }
 
+    #scout_topic (client): string {
+        return `${prefix}/${client.id}/scout`;
+    }
+
     /* A driver that reconnects under the same id replaces the old
      * client, which may disconnect after the new one subscribed. */
-    #forget (client) {
-        if (client && this.#typed.get(client.id) === client)
-            this.#typed.delete(client.id);
+    #forget (map: Map<string, any>, client): boolean {
+        if (client && map.get(client.id) === client) {
+            map.delete(client.id);
+            return true;
+        }
+        return false;
+    }
+
+    #forget_scout (client) {
+        if (this.#forget(this.#scouts, client))
+            this.emit("scout", client.id, false);
     }
 
     /* Whether the driver for this connection answers writes. */
     confirms_writes (id: string): boolean {
         return this.#typed.has(id);
+    }
+
+    /* Whether the driver for this connection has subscribed to its
+     * scout topic on its current session. */
+    scouts (id: string): boolean {
+        return this.#scouts.has(id);
     }
 
     start () {
@@ -184,12 +237,7 @@ export class DriverBroker extends EventEmitter {
         if (id != username)
             return fail("Invalid client-id %s for %s", id, username);
 
-        this.acl.set(id, {
-            publish: new RegExp(
-                `^${prefix}/${id}/(?:status|data/\\w+|err/\\w+|req/\\w+|result/\\w+)$`),
-            subscribe: new RegExp(
-                `^${prefix}/${id}/(?:active|conf|addr|cmd/#|write/#|poll|rsp/\\w+)$`),
-        });
+        this.acl.set(id, this.#driver_acl(id));
 
         callback(null, true);
     }

@@ -15,11 +15,14 @@
 //!   into OPC UA values;
 //! - [`subs`] makes the subscriptions and retries what the server
 //!   refused;
+//! - [`scout`] lists the server's address space for the Edge Scout
+//!   panel;
 //! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait.
 
 pub mod addr;
 pub mod config;
 pub mod handler;
+pub mod scout;
 pub mod subs;
 pub mod value;
 

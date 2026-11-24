@@ -3,6 +3,8 @@ name: Service setup tests
 # Runs acs-service-setup's unit tests, which include the split driver
 # migration and the whole-site REST move with the chart's defaults
 # (test/rest-move.test.js reads deploy/values.yaml and dumps/edge.yaml).
+# test/edge-scout.test.js checks the status ConfigSchema in
+# dumps/edge.yaml against lib/edge-scout-schemas.
 
 on:
   pull_request:
@@ -16,6 +18,7 @@ on:
       - 'lib/js-rx-client/**'
       - 'lib/js-rx-util/**'
       - 'deploy/values.yaml'
+      - 'lib/edge-scout-schemas/schemas/status.schema.json'
       - 'acs-edge/tests/fixtures/drivers/samples/rest-*/**'
       - 'acs-edge/tests/fixtures/drivers/samples/opcua/**'
       - '.github/workflows/service-setup-tests.yaml'

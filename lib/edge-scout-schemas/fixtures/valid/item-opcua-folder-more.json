@@ -1,0 +1,11 @@
+{
+    "schema": "item",
+    "description": "An OPC UA folder at the depth cap",
+    "data": {
+        "id": "ns=2;s=Line1/Motor",
+        "parent": "ns=2;s=Line1",
+        "name": "Motor",
+        "kind": "folder",
+        "more": true
+    }
+}

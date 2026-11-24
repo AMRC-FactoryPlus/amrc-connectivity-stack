@@ -372,6 +372,8 @@ export const Edge = {
         DeliveryFile:       "6bf0450c-16c1-450e-8913-fad7272c6df4",
         Driver:             "3874e06c-de4a-11ef-a68c-0f1c2d4d555c",
         LinkRelation:       "2bce9142-6b5b-4a5e-8e2f-f8a8d51d6c15",
+        /* Edge Scout snapshots, stored in the Files service */
+        ScoutResult:        "10916e96-f6fe-44cc-8c01-16a775426038",
     },
     Group: {
         EdgeGroup:          "9ba0de4b-056f-4b5e-b966-2d5d85d07767",
@@ -383,9 +385,13 @@ export const Edge = {
         ConnConfig:         "fa8b429c-de3e-11ef-87fd-6382f0eac944",
         Deployment:         "f2b9417a-ef7f-421f-b387-bb8183a48cdb",
         DriverDef:          "454e5bec-de4a-11ef-bfea-4bc400f636a5",
+        /* Edge Scout: the scan status of a connection */
+        ScoutStatus:        "ad73fae4-a3b9-457a-8c36-12a2019bff2c",
     },
     Perm: {
         ReloadConfig:       "6335f100-e68e-4e4d-b46d-85b42f85a036",
+        /* Edge Scout: the Node Control/Scout command */
+        Scout:              "41443382-ecad-439b-999f-cb611bc11f7c",
     },
     Role: {
         Monitor:            "4cb43b27-287c-4363-b819-944d567d4e48",
@@ -444,6 +450,7 @@ export const Files = {
     All: '09cce2eb-dc82-4a5a-b2ec-bca12f456ab8',
     Upload: '81ed0b6c-7305-4f51-85c5-5c66bdac7920',
     Download: '3b436260-2100-454b-aea5-8f933a1ed7e5',
+    Delete: '82a2206b-b9d8-4eee-bc0e-63fb8785019e',
     ListStorage: 'c9dc7146-3f55-4721-8638-0ab8c7834e72',
   },
   Requirement: {

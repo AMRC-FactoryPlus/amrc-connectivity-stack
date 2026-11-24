@@ -1,0 +1,138 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:status",
+    "title": "Edge scout status",
+    "description": "The scan status of one connection, kept in ConfigDB under the Edge scout status app and keyed by the connection's UUID. Only the Edge Agent writes it. This schema is self-contained because ConfigDB loads it as the app's ConfigSchema.",
+    "type": "object",
+    "required": ["version", "node", "supported"],
+    "additionalProperties": false,
+    "properties": {
+        "version": { "const": 1 },
+        "node": { "$ref": "#/$defs/uuid" },
+        "supported": { "enum": [true, false, "library", null] },
+        "scan": { "$ref": "#/$defs/uuid_or_null" },
+        "request": { "$ref": "#/$defs/uuid_or_null" },
+        "state": { "enum": ["queued", "running", "done", "failed", "cancelled", null] },
+        "code": {
+            "enum": ["UNSUPPORTED", "OPTIONS", "CONN", "AUTH", "CANCELLED", "ERR",
+                     "REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
+                     "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT", null]
+        },
+        "message": { "type": ["string", "null"], "maxLength": 512 },
+        "started": { "$ref": "#/$defs/timestamp_or_null" },
+        "updated": { "$ref": "#/$defs/timestamp_or_null" },
+        "finished": { "$ref": "#/$defs/timestamp_or_null" },
+        "root": { "type": ["string", "null"], "maxLength": 1024 },
+        "folder_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+        "options_hash": { "$ref": "#/$defs/hash_or_null" },
+        "config_hash": { "$ref": "#/$defs/hash_or_null" },
+        "progress": {
+            "oneOf": [
+                { "type": "null" },
+                {
+                    "type": "object",
+                    "required": ["visited", "found"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "visited": { "type": "integer", "minimum": 0 },
+                        "found": { "type": "integer", "minimum": 0 },
+                        "note": { "type": ["string", "null"], "maxLength": 512 }
+                    }
+                }
+            ]
+        },
+        "last_request": {
+            "oneOf": [
+                { "type": "null" },
+                {
+                    "type": "object",
+                    "required": ["request", "code", "at"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "request": { "$ref": "#/$defs/uuid_or_null" },
+                        "code": {
+                            "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY",
+                                     "LIMIT", "NOTRUNNING", null]
+                        },
+                        "message": { "type": ["string", "null"], "maxLength": 512 },
+                        "at": { "$ref": "#/$defs/timestamp" }
+                    }
+                }
+            ]
+        },
+        "current": { "$ref": "#/$defs/snapshot_ref" },
+        "previous": { "$ref": "#/$defs/snapshot_ref" }
+    },
+    "$defs": {
+        "uuid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "uuid_or_null": {
+            "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+        },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "timestamp_or_null": {
+            "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+        },
+        "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "hash_or_null": {
+            "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/hash" }]
+        },
+        "excluded_scope": {
+            "type": "object",
+            "required": ["id", "reason"],
+            "additionalProperties": false,
+            "properties": {
+                "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+                "reason": { "type": "string", "minLength": 1, "maxLength": 32 },
+                "prefixes": {
+                    "type": "array",
+                    "maxItems": 4,
+                    "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+                }
+            }
+        },
+        "snapshot_ref": {
+            "oneOf": [
+                { "type": "null" },
+                {
+                    "type": "object",
+                    "required": ["file", "items", "bytes_gz", "exhaustive", "truncated", "reason",
+                                 "finished", "root", "options_hash", "config_hash", "excluded", "branches"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "file": { "$ref": "#/$defs/uuid" },
+                        "items": { "type": "integer", "minimum": 0 },
+                        "bytes_gz": { "type": "integer", "minimum": 0 },
+                        "exhaustive": { "type": "boolean" },
+                        "truncated": { "type": "boolean" },
+                        "reason": { "enum": ["items", "depth", "seconds", "size", "partial_access", null] },
+                        "finished": { "$ref": "#/$defs/timestamp" },
+                        "root": { "type": ["string", "null"], "maxLength": 1024 },
+                        "options_hash": { "$ref": "#/$defs/hash" },
+                        "config_hash": { "$ref": "#/$defs/hash_or_null" },
+                        "excluded": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": { "$ref": "#/$defs/excluded_scope" }
+                        },
+                        "branches": {
+                            "type": "array",
+                            "maxItems": 10,
+                            "items": {
+                                "type": "object",
+                                "required": ["folder_id", "finished"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "folder_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                                    "finished": { "$ref": "#/$defs/timestamp" }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

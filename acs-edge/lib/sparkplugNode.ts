@@ -181,6 +181,15 @@ export class SparkplugNode extends (
                 type: sparkplugDataType.boolean,
                 value: this.#conf.nodeControl?.compressPayload ?? false,
             },
+            {
+                /* Edge Scout: start or cancel a scan of a connection's
+                 * addresses. The command is a JSON string; see
+                 * lib/scout.ts. The Admin UI looks for this metric to
+                 * tell whether this agent can scan. */
+                name: "Node Control/Scout",
+                type: sparkplugDataType.string,
+                value: "",
+            },
             ...builder.build_alert(
                 UUIDs.Alert.ConfigFetchFailed, "Config_Unavailable",
                 this.#conf.alerts?.configFetchFailed ?? false),
@@ -390,12 +399,34 @@ export class SparkplugNode extends (
                         break;
                     case "Node Control/Reboot": // Reboot Edge Node
                         break;
+                    case "Node Control/Scout":
+                        this.#handleScout(metric.value);
+                        break;
                     default:
                         log(`Unhandled NCMD: ${metric.name}`);
                         break;
                 }
             })
         );
+    }
+
+    /* An Edge Scout request. Anything that isn't a JSON object is
+     * logged and ignored, because there is no request UUID to answer.
+     * The ScoutManager checks the rest. */
+    #handleScout (value: unknown) {
+        let req: unknown;
+        try {
+            req = JSON.parse(String(value ?? ""));
+        }
+        catch (e) {
+            console.error(`Ignoring a Node Control/Scout command that is not JSON: ${(e as Error).message}`);
+            return;
+        }
+        if (req === null || typeof req != "object" || Array.isArray(req)) {
+            console.error("Ignoring a Node Control/Scout command that is not a JSON object");
+            return;
+        }
+        this.emit("scout", req);
     }
 
     /**

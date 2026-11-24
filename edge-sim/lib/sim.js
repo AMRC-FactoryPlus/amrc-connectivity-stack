@@ -13,6 +13,7 @@
 
 import { CassetteStore } from "./cassette.js";
 import { Player, Status } from "./player.js";
+import { scout_cassette } from "./scout.js";
 
 const CONTROLS = new Set(
     ["load", "eject", "play", "pause", "stop", "seek", "rate"]);
@@ -60,6 +61,18 @@ export class SimHandler {
 
     static create (driver, conf) {
         return new SimHandler(driver, conf);
+    }
+
+    /* Edge Scout lists the loaded cassette's channels and the player's
+     * addresses. See scout.js. */
+    static scouts = true;
+
+    scout (req, out) {
+        return scout_cassette({
+            cassette:   this.player.cassette,
+            player:     this.player,
+            log:        this.log,
+        }, req, out);
     }
 
     async connect () {

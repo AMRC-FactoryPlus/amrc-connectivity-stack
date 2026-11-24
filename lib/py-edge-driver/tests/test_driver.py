@@ -67,8 +67,8 @@ def test_driver_mqtt_url(basic_driver_instance):
     with pytest.raises(ValueError, match="Hostname not found"):
         basic_driver_instance.get_mqtt_details("mqtts://:1883")
 
-    with pytest.raises(ValueError, match="Port not found"):
-        basic_driver_instance.get_mqtt_details("mqtt://my.example.com")
+    # The protocol says an mqtt:// URL's port defaults to 1883.
+    assert basic_driver_instance.get_mqtt_details("mqtt://my.example.com") == ("my.example.com", 1883)
 
 
 async def test_conf_logged_without_secrets(caplog):

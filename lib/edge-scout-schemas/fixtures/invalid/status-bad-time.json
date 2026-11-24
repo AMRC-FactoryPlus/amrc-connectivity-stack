@@ -1,0 +1,10 @@
+{
+    "schema": "status",
+    "description": "Times are RFC 3339",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "supported": true,
+        "started": "24/11/2026 10:41"
+    }
+}

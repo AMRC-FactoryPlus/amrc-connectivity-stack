@@ -9,9 +9,10 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use rs_edge_driver::{ConnectError, DriverHandle, Handler, HandlerError, Poller};
+use rs_edge_driver::{ConnectError, DriverHandle, Handler, HandlerError, Poller, Scouter};
 
 use crate::addr::Addr;
+use crate::scout::TestScouter;
 use crate::wave;
 
 /// The time waves are measured from.
@@ -56,6 +57,10 @@ impl Poller<Addr> for WavePoller {
 impl Handler for TestHandler {
     type Addr = Addr;
 
+    /// Scans list a made-up tree, set by the scan's options. See
+    /// [`crate::scout`].
+    const SCOUTS: bool = true;
+
     /// Any config is accepted and ignored, as in the JS driver.
     fn create(
         _handle: DriverHandle<Addr>,
@@ -82,6 +87,10 @@ impl Handler for TestHandler {
 
     fn poller(&self) -> Option<Arc<dyn Poller<Addr>>> {
         Some(Arc::new(WavePoller))
+    }
+
+    fn scouter(&self) -> Option<Arc<dyn Scouter>> {
+        Some(TestScouter::new())
     }
 
     async fn close(&mut self) {}

@@ -1,0 +1,32 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:snapshot-end",
+    "title": "Snapshot end line",
+    "description": "The last line of a snapshot's NDJSON. A snapshot without it is invalid.",
+    "type": "object",
+    "required": ["end"],
+    "properties": {
+        "end": {
+            "type": "object",
+            "required": ["finished", "exhaustive", "truncated", "reason", "excluded", "rejected", "items", "branches"],
+            "properties": {
+                "finished": { "$ref": "urn:edge-scout:common#/$defs/timestamp" },
+                "exhaustive": { "type": "boolean" },
+                "truncated": { "type": "boolean" },
+                "reason": {
+                    "anyOf": [
+                        { "$ref": "urn:edge-scout:common#/$defs/truncation_reason" },
+                        { "type": "null" }
+                    ]
+                },
+                "excluded": { "$ref": "urn:edge-scout:common#/$defs/excluded" },
+                "rejected": { "type": "integer", "minimum": 0 },
+                "items": { "type": "integer", "minimum": 0 },
+                "branches": { "$ref": "urn:edge-scout:common#/$defs/branches" }
+            },
+            "if": { "properties": { "truncated": { "const": true } } },
+            "then": { "properties": { "reason": { "$ref": "urn:edge-scout:common#/$defs/truncation_reason" } } },
+            "else": { "properties": { "reason": { "type": "null" } } }
+        }
+    }
+}

@@ -1,5 +1,5 @@
 import express from 'express';
-import { UUIDs } from '@amrc-factoryplus/service-client';
+import { ServiceError, UUIDs } from '@amrc-factoryplus/service-client';
 import { App, Class, Perm, Special } from './constants.js';
 import fs from 'node:fs/promises'
 import path from 'path';
@@ -29,6 +29,7 @@ export class APIv1 {
     api.get('/:uuid', this.get_file_by_uuid.bind(this));
     api.get('/', this.list_storage.bind(this));
     api.put('/:uuid', this.put_file_by_uuid.bind(this));
+    api.delete('/:uuid', this.delete_file_by_uuid.bind(this));
     api.post('/', this.post_file.bind(this));
   }
 
@@ -94,22 +95,29 @@ export class APIv1 {
   }
 
   async put_file_by_uuid(req, res) {
-    // Check the client has permission.
-    const ok = await this.auth.check_acl(
-        req.auth,
-        Perm.Upload,
-        Special.Null,
-        false
-    );
-
-    if (!ok) {
-      return res.status(403).json({ message: 'FAILED: No Upload permission' });
-    }
-
     // Check we have a UUID to work with.
     const file_uuid = req.params.uuid;
     if (!file_uuid){
       return res.status(404).json({ message: 'FAILED: File Uuid not provided.' });
+    }
+    if (!Valid.uuid.test(file_uuid))
+      return res.status(400).json({ message: 'FAILED: File Uuid is invalid' });
+
+    /* Check the client has permission on this file. With wildcards a
+     * grant on the wildcard target still covers every file, as it
+     * always has, and a grant on a class of files or on Special.Mine
+     * covers only those files. Checking against the wildcard alone
+     * would let a principal that may upload one kind of file fill any
+     * File object that has no content yet. */
+    const ok = await this.auth.check_acl(
+        req.auth,
+        Perm.Upload,
+        file_uuid,
+        true
+    );
+
+    if (!ok) {
+      return res.status(403).json({ message: 'FAILED: No Upload permission' });
     }
 
     // Check the file object uuid exists.
@@ -200,6 +208,49 @@ export class APIv1 {
       message: 'File uploaded successfully.',
       uuid: file_uuid,
     });
+  }
+
+  /* Delete a file's content and its upload record. The File object
+   * itself stays in the ConfigDB, and the caller deletes it afterwards
+   * if it wants to. The permission is checked against the file UUID
+   * with wildcards, so a grant on a class of files applies, which needs
+   * the object to still exist. A file with no content is not an error,
+   * because an object is created before its upload and the upload may
+   * never have happened, so this answers 204 either way. */
+  async delete_file_by_uuid(req, res, next) {
+    try {
+      const file_uuid = req.params.uuid;
+
+      if (!Valid.uuid.test(file_uuid))
+        return res.status(400).json({ message: 'FAILED: File Uuid is invalid' });
+
+      const ok = await this.auth.check_acl(
+        req.auth,
+        Perm.Delete,
+        file_uuid,
+        true
+      );
+
+      if (!ok)
+        return res.status(403).json({ message: 'FAILED: No Delete permission' });
+
+      const file_path = path.resolve(this.uploadPath, file_uuid);
+      await fs.unlink(file_path).catch(e => {
+        if (e.code !== 'ENOENT') throw e;
+      });
+
+      /* Remove the upload record after the content, so a failure here
+       * leaves nothing that claims content which is gone. A retry
+       * finishes the job. */
+      await this.configDb.delete_config(App.Config, file_uuid)
+        .catch(ServiceError.check(404));
+
+      this.log("Deleted file %s for %s", file_uuid, req.auth);
+      return res.status(204).end();
+    }
+    catch (e) {
+      next(e);
+    }
   }
 
   async post_file(req, res) {

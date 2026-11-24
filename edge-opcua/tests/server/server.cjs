@@ -38,6 +38,27 @@
  *                       but put it in <pki dir>/server/rejected, as a
  *                       server set up by hand does
  *
+ * For scanning (tests/scout.rs):
+ *
+ *   SCOUT               build the address space under ns=1;s=Scout that
+ *                       scout.cjs describes, and limit Browse to 10
+ *                       nodes a request (MaxNodesPerBrowse)
+ *   SCOUT_SIZE          that many more variables under ns=1;s=Plant, in
+ *                       folders as a PLC lays out its tags, to measure
+ *                       the size of a large scan
+ *   SCOUT_WIDE          that many folders of 1,000 variables with long
+ *                       ids under ns=1;s=Wide, for answers over the
+ *                       client's message size
+ *   MAX_NODES_PER_BROWSE, MAX_NODES_PER_READ
+ *                       the server's operation limits
+ *   HIDE_LIMITS         enforce the operation limits but report them as
+ *                       0 (none), so a client finds them out from
+ *                       BadTooManyOperations
+ *   MAX_REFS_PER_NODE   send at most this many references per node in
+ *                       a Browse or BrowseNext, whatever the client
+ *                       asks, so a big folder needs continuation points
+ *   BROWSE_DELAY_MS     answer each Browse and BrowseNext this late
+ *
  * It prints READY once it is listening. */
 
 /* SKEW_MS puts this server's clock that far out, as a PLC on local
@@ -56,6 +77,8 @@ const {
     OPCUAServer, OPCUACertificateManager, DataType, Variant, VariantArrayType,
     StatusCodes, SecurityPolicy, MessageSecurityMode, LocalizedText,
 } = require("node-opcua");
+
+const scout = require("./scout.cjs");
 
 const port = Number(process.argv[2]);
 const pki = process.argv[3];
@@ -108,9 +131,11 @@ const Types = {
             maxSessions: 500,
             ...(process.env.SUBS_PER_SESSION
                 ? { maxSubscriptionsPerSession: Number(process.env.SUBS_PER_SESSION) } : {}),
-            ...(process.env.ITEMS_PER_CALL
-                ? { operationLimits: { maxMonitoredItemsPerCall: Number(process.env.ITEMS_PER_CALL) } }
-                : {}),
+            operationLimits: {
+                ...(process.env.ITEMS_PER_CALL
+                    ? { maxMonitoredItemsPerCall: Number(process.env.ITEMS_PER_CALL) } : {}),
+                ...scout.operation_limits(process.env),
+            },
         },
     });
     await server.initialize();
@@ -193,6 +218,8 @@ const Types = {
             for (const v of bulk)
                 v.setValueFromSource(new Variant({ dataType: bulkType, value }));
         }, 100);
+
+    scout.build(server, process.env);
 
     await server.start();
     console.log("READY");

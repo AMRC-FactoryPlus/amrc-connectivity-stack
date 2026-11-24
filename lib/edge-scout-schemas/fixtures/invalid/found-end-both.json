@@ -1,0 +1,14 @@
+{
+    "schema": "found",
+    "description": "An end has the result keys or an error, not both",
+    "data": {
+        "seq": 4,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "error": {
+            "code": "ERR"
+        }
+    }
+}

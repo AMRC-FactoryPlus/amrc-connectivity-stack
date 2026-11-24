@@ -1,0 +1,69 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:merge-fixture",
+    "title": "Merge fixture",
+    "description": "The format of the files in fixtures/merge. Each gives a current snapshot, a scan, and what the agent must store as the new current snapshot. Items are compared by id, order is not significant.",
+    "type": "object",
+    "required": ["description", "base", "scan", "expected"],
+    "additionalProperties": false,
+    "properties": {
+        "description": { "type": "string" },
+        "base": { "$ref": "#/$defs/snapshot" },
+        "scan": {
+            "type": "object",
+            "required": ["root", "folder_id", "finished", "options_hash", "exhaustive", "truncated", "reason", "excluded", "items"],
+            "additionalProperties": false,
+            "properties": {
+                "root": { "$ref": "urn:edge-scout:common#/$defs/root" },
+                "folder_id": { "$ref": "urn:edge-scout:common#/$defs/folder_id" },
+                "finished": { "$ref": "urn:edge-scout:common#/$defs/timestamp" },
+                "options_hash": { "type": "string" },
+                "exhaustive": { "type": "boolean" },
+                "truncated": { "type": "boolean" },
+                "reason": {
+                    "anyOf": [
+                        { "$ref": "urn:edge-scout:common#/$defs/truncation_reason" },
+                        { "type": "null" }
+                    ]
+                },
+                "excluded": { "$ref": "urn:edge-scout:common#/$defs/excluded" },
+                "items": { "type": "array", "items": { "$ref": "urn:edge-scout:item" } }
+            }
+        },
+        "expected": {
+            "oneOf": [
+                { "$ref": "#/$defs/snapshot" },
+                {
+                    "type": "object",
+                    "required": ["error"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "error": { "$ref": "urn:edge-scout:common#/$defs/code" }
+                    }
+                }
+            ]
+        }
+    },
+    "$defs": {
+        "snapshot": {
+            "type": "object",
+            "required": ["root", "options_hash", "exhaustive", "truncated", "reason", "excluded", "branches", "items"],
+            "additionalProperties": false,
+            "properties": {
+                "root": { "$ref": "urn:edge-scout:common#/$defs/root" },
+                "options_hash": { "type": "string" },
+                "exhaustive": { "type": "boolean" },
+                "truncated": { "type": "boolean" },
+                "reason": {
+                    "anyOf": [
+                        { "$ref": "urn:edge-scout:common#/$defs/truncation_reason" },
+                        { "type": "null" }
+                    ]
+                },
+                "excluded": { "$ref": "urn:edge-scout:common#/$defs/excluded" },
+                "branches": { "$ref": "urn:edge-scout:common#/$defs/branches" },
+                "items": { "type": "array", "items": { "$ref": "urn:edge-scout:item" } }
+            }
+        }
+    }
+}

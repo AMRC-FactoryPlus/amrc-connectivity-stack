@@ -1,0 +1,10 @@
+{
+    "schema": "ncmd",
+    "description": "Only version 1 exists",
+    "data": {
+        "version": 2,
+        "op": "cancel",
+        "request": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a"
+    }
+}

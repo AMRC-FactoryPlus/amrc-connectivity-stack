@@ -30,6 +30,25 @@ The full format and transport reference is
   the authenticated fetch, scoped to the Cassette app only.
   `CASSETTE_DIR` is a development-only local source.
 
+## Edge Scout
+
+The driver takes part in Edge Scout, so an operator can press Scan in
+the origin map editor and pick addresses from a list. A scan lists:
+
+- every channel of the loaded cassette, with its path as both the id
+  and the address, `$.value` as the path, and the channel's `type`
+  (without its byte order) and `engUnit`. Each `/` in a path makes a
+  folder, whose id is the path up to and including that `/`, such as
+  `Axes/X/`.
+- the player's addresses, in a folder `player:`. The controls are
+  writable and the state addresses are read-only.
+
+With no cassette loaded the scan finds nothing, and it is exhaustive,
+so the Admin UI asks the operator to load a cassette first. With
+samples turned on, each channel's sample is its value at the player's
+position. The scan takes no options. `lib/scout.js` is the reference
+scouter for JavaScript drivers.
+
 ## Development
 
 ```sh

@@ -427,6 +427,5 @@ default "helm-charts" source.
 ## Next Steps
 
 - [Edge Bootstrap](edge-bootstrap.md) - Learn about the bootstrap process for edge clusters
-- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
 - [Edge Management Overview](overview.md) - Return to the edge management overview
 - [Architecture Overview](../overview.md) - Return to the architecture overview

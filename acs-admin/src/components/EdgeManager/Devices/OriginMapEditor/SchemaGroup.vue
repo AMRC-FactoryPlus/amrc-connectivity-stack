@@ -29,13 +29,17 @@
         :is-active="isMetricSelected(key)"
         :class="[
           'h-7 border-l -ml-2 rounded-none hover:bg-gray-100 rounded-r-full',
-          isMetricSelected(key) ? 'border-l-2 border-gray-500 !bg-gray-200/70 font-medium' : ''
+          isMetricSelected(key) ? 'border-l-2 border-gray-500 !bg-gray-200/70 font-medium' : '',
+          dropKey === key ? '!bg-blue-100 ring-1 ring-inset ring-blue-400' : ''
         ]"
         @click="$emit('selected', [{
           key: key,
           value: schema.properties[key],
           schemaUUID: schema.properties[key].allOf[0]?.properties?.Schema_UUID?.const,
         }])"
+        @dragover="onDragOver(key, $event)"
+        @dragleave="dropKey = null"
+        @drop="onDrop(key, $event)"
       >
         <div class="w-3 border-b -ml-2 -mr-1"></div>
         <div class="flex items-center gap-1 justify-between w-full">
@@ -94,6 +98,7 @@
                 @selected="e => $emit('selected', [...e, ...[{key: key, schemaUUID: schema.properties[key].properties?.Schema_UUID?.const}]])"
                 @newObject="e => $emit('newObject', [...e, ...[{key: key}]])"
                 @deleteObject="e => $emit('deleteObject', [...e, ...[{key: key}]])"
+                @dropItem="(e, id) => $emit('dropItem', [...e, ...[{key: key, schemaUUID: schema.properties[key].properties?.Schema_UUID?.const}]], id)"
                 @addToMetricArray="$emit('addToMetricArray')"
                 @toggle-show-only-populated="$emit('toggle-show-only-populated', $event)"
                 :selected-metric="selectedMetric"
@@ -204,6 +209,32 @@ export default {
   },
 
   methods: {
+
+    /* An address dragged from the Addresses panel. Only that drag type is
+     * accepted, so other drags over the tree behave as before. */
+    isScoutDrag(event) {
+      return [...(event.dataTransfer?.types ?? [])].includes('application/x-acs-scout-item');
+    },
+
+    onDragOver(key, event) {
+      if (!this.isScoutDrag(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      this.dropKey = key;
+    },
+
+    onDrop(key, event) {
+      if (!this.isScoutDrag(event)) return;
+      event.preventDefault();
+      this.dropKey = null;
+      const id = event.dataTransfer.getData('application/x-acs-scout-item');
+      if (!id) return;
+      this.$emit('dropItem', [{
+        key: key,
+        value: this.schema.properties[key],
+        schemaUUID: this.schema.properties[key].allOf[0]?.properties?.Schema_UUID?.const,
+      }], id);
+    },
 
     isMetricSelected(key) {
       // If selectedMetric is not set, return false
@@ -934,6 +965,7 @@ export default {
       showOnlyPopulated: false,
       tabValue: 'all', // Default tab value
       defaultCollapsed: true, // Default state for collapsibles (true = collapsed)
+      dropKey: null, // The metric an address is being dragged over
     }
   },
 }

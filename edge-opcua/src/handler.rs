@@ -36,13 +36,14 @@ use opcua::types::{
     WriteValue as UaWriteValue,
 };
 use rs_edge_driver::{
-    AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, WriteError, WriteValue,
+    AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, Scouter, WriteError, WriteValue,
 };
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 use crate::addr::Addr;
 use crate::config::Config;
+use crate::scout::OpcuaScouter;
 use crate::subs::{self, Dropped, Plan, Sink, Subs};
 use crate::value::{self, WriteFailure};
 
@@ -64,6 +65,12 @@ const CHANNEL_LIFETIME_MS: u32 = 600_000;
 const CONNECT_WAIT: Duration = Duration::from_secs(30);
 /// How long a single request (GetEndpoints, Write) may take.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// The most chunks of 64 KiB an incoming message may have, so a message
+/// may be 2 MiB. async-opcua's default is 5, and a scan's Browse of a
+/// few large PLC folders needs more.
+const MAX_CHUNKS: usize = 32;
+/// The largest message the client accepts.
+const MAX_MESSAGE_SIZE: usize = 65_535 * MAX_CHUNKS;
 /// How many attempts in a row must fail to reconnect before the driver
 /// asks the server for its endpoints again, to see whether its
 /// certificate has changed. A short network drop is over before this.
@@ -287,6 +294,18 @@ impl OpcuaHandler {
             // back as the server sent them.
             .ignore_clock_skew(true)
             .request_timeout(REQUEST_TIMEOUT)
+            // async-opcua closes the connection when it can't decode a
+            // message, so one array of more than 1,000 elements, or one
+            // string of more than 64 KiB, in a value or a scan's answer
+            // would put every device offline. Let the message size be
+            // the only limit: no array or string in a message can be
+            // longer than the message, and a message too big fails only
+            // its own request.
+            .max_chunk_count(MAX_CHUNKS)
+            .max_message_size(MAX_MESSAGE_SIZE)
+            .max_array_length(MAX_MESSAGE_SIZE)
+            .max_string_length(MAX_MESSAGE_SIZE)
+            .max_byte_string_length(MAX_MESSAGE_SIZE)
             .client()
             .map_err(|e| {
                 tracing::error!("can't make an OPC UA client: {}", e.join(", "));
@@ -503,6 +522,9 @@ impl Handler for OpcuaHandler {
     /// so polls are ignored.
     const SUPPORTS_POLL: bool = false;
     const TYPED_WRITES: bool = true;
+    /// Scans browse the server with the handler's own session (see
+    /// `scout.rs`).
+    const SCOUTS: bool = true;
 
     fn create(handle: DriverHandle<Addr>, config: serde_json::Value) -> Result<Self, HandlerError> {
         let config = Config::from_json(config).map_err(HandlerError::new)?;
@@ -552,6 +574,14 @@ impl Handler for OpcuaHandler {
             tracing::warn!("OPC UA connection not up yet ({e:?}); still trying");
         }
         result
+    }
+
+    /// A scouter on the current session, which the library asks for
+    /// after each successful `connect`. Without a session a scan ends
+    /// with `CONN`.
+    fn scouter(&self) -> Option<Arc<dyn Scouter>> {
+        let conn = self.conn.as_ref()?;
+        Some(Arc::new(OpcuaScouter::new(conn.session.clone())))
     }
 
     async fn close(&mut self) {

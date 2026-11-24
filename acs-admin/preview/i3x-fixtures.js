@@ -9,7 +9,7 @@
 import { UUIDs } from '@amrc-factoryplus/service-client'
 
 import { I3X_PERM_ALL, READ_OBJECT } from '../src/lib/access/i3x-access.js'
-import { BUILD_DATASETS, DATASET_MAKER, DATASET_MANAGER, DEVICE_DATA }
+import { DATASET_MAKER, DATASET_MANAGER, DEVICE_DATA }
   from '../src/lib/access/device-data.js'
 
 const id = n => `a1a1a1a1-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -120,8 +120,6 @@ export const grants = [
   grant(7, ADMINS, UUIDs.Special.Null, { permission: I3X_PERM_ALL }),
   grant(8, PRIYA, F2050),
   grant(9, CHRIS, CNC_01, { permission: DEVICE_DATA }),
-  grant(10, DATASET_MAKER, UUIDs.Class.Device, { plural: true, permission: BUILD_DATASETS }),
-  grant(11, DATASET_MAKER, UUIDs.Class.Device, { plural: true }),
 ]
 
 const classMembers = {

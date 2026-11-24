@@ -339,27 +339,22 @@ grants:
     !u Auth.Perm.ReadKerberos: null
 
   # Everything the Admin UI needs to make datasets and record runs as
-  # the signed-in user. A member edits and deletes only the datasets
-  # they created (Data Access records the creator as owner), and that
-  # includes their names, tags, labels, kinds and run details, which
-  # Data Access writes for them. Reading, unions and sessions still
-  # cover every dataset.
+  # the signed-in user. The role reaches no device and no other
+  # person's dataset: a member reads, edits and deletes only the
+  # datasets they created (Data Access records the creator as owner),
+  # and that includes their names, tags, labels, kinds and run
+  # details, which Data Access writes for them. The devices a member
+  # builds from come from a Device data grant on each device, which
+  # also covers its default dataset. Other datasets come from a share.
   !u DataAccess.Group.DatasetMaker:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
-    !u DataAccess.Perm.UseDevice:
-      !u UUIDs.Class.Device: true
-    # The builder picks devices and shows live values through i3X.
-    # A direct grant, not the composite, so the role never loses it
-    # while the dumps load.
-    !u I3X.Perm.ReadObject:
-      !u UUIDs.Class.Device: true
     !u DataAccess.Perm.ReadDataset:
-      !u DataAccess.Class.Dataset: true
+      !u UUIDs.Special.Mine: true
     !u DataAccess.Perm.IncludeInUnion:
-      !u DataAccess.Class.Dataset: true
+      !u UUIDs.Special.Mine: true
     !u DataAccess.Perm.UseForSession:
-      !u DataAccess.Class.Dataset: true
+      !u UUIDs.Special.Mine: true
     !u DataAccess.Perm.EditDataset:
       !u UUIDs.Special.Mine: true
     !u DataAccess.Perm.DeleteDataset:
@@ -382,14 +377,17 @@ grants:
     !u UUIDs.Permission.ConfigDB.WriteConfig:
       !u DataAccess.App.Recording: false
 
-  # Dataset maker's grants, with edit and delete on every dataset. For
-  # whoever tidies up other people's datasets, and the datasets made
-  # before Data Access recorded owners.
+  # Every dataset and every device's data, with edit and delete on
+  # every dataset. For whoever tidies up other people's datasets, and
+  # the datasets made before Data Access recorded owners.
   !u DataAccess.Group.DatasetManager:
     !u DataAccess.Perm.CreateDataset:
       !u DataAccess.App.DatasetDefinition: true
     !u DataAccess.Perm.UseDevice:
       !u UUIDs.Class.Device: true
+    # The builder picks devices and shows live values through i3X.
+    # A direct grant, not the composite, so the role never loses it
+    # while the dumps load.
     !u I3X.Perm.ReadObject:
       !u UUIDs.Class.Device: true
     !u DataAccess.Perm.ReadDataset:

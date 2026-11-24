@@ -26,11 +26,11 @@
 //! - absolute, relative, machine and distance-to-go positions;
 //! - macro variables `#100` (12.345), `#101` (empty) and `#3901`
 //!   (parts made, one per finished cycle);
-//! - parameters 6711 (parts made, long), 1320 (per-axis stroke limits,
+//! - parameters 6711 (parts made, long, no axis), 1320 (per-axis stroke limits,
 //!   long, in 0.001 mm) and 1020 (per-axis names as ASCII, byte);
 //! - PMC memory in every area up to address 9999, all zero except
 //!   `R0`-`R3` (the cycle count as a long) and `D10`-`D11` (1234 as a
-//!   word).
+//!   word) and `D20`-`D21` (-5 as a word).
 
 use std::f64::consts::TAU;
 use std::time::Instant;
@@ -118,6 +118,7 @@ impl Machine {
         match (area, addr) {
             (PmcArea::R, 0..=3) => self.cycles.to_be_bytes()[addr as usize],
             (PmcArea::D, 10..=11) => 1234u16.to_be_bytes()[addr as usize - 10],
+            (PmcArea::D, 20..=21) => (-5i16).to_be_bytes()[addr as usize - 20],
             _ => 0,
         }
     }
@@ -178,7 +179,9 @@ pub fn answer(req: &Request, t: f64) -> Answer {
         )),
         (1, cmd::PROGNUM) => {
             let mut b = BytesMut::new();
-            b.put_i32(if m.running { 1234 } else { 0 });
+            // FANUC's cnc_rdprgnum gives the selected program, running
+            // or not, and the same number twice outside a sub-program.
+            b.put_i32(1234);
             b.put_i32(1234);
             Ok(b.freeze())
         }
@@ -217,11 +220,16 @@ pub fn answer(req: &Request, t: f64) -> Answer {
                 _ => None,
             };
             let kind = if a0 == 1020 { 0 } else { 3 };
+            // The axis argument is 0 for no axis, -1 for every axis or
+            // 1 to 3 for one, as in FANUC's cnc_rdparam. Giving an axis
+            // to a parameter that has none, or none to one that has, is
+            // refused as an attribute error.
             match (a0, per_axis, a2) {
-                (6711, _, _) => Ok(param(6711, 0, 3, &[m.cycles as i32])),
+                (6711, _, 0) => Ok(param(6711, 0, 3, &[m.cycles as i32])),
+                (6711, _, _) => Err(ew::ATTRIB),
                 (n, Some(vs), -1) => Ok(param(n, -1, kind, &vs)),
                 (n, Some(vs), 1..=3) => Ok(param(n, a2 as i16, kind, &[vs[a2 as usize - 1]])),
-                (_, Some(_), _) => Err(ew::NUMBER),
+                (_, Some(_), 0) => Err(ew::ATTRIB),
                 _ => Err(ew::NUMBER),
             }
         }

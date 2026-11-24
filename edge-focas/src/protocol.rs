@@ -310,21 +310,24 @@ pub fn decode_responses(mut p: Bytes, reqs: &[Request]) -> Result<Vec<Answer>, P
 }
 
 /// FOCAS sends positions, speeds and macro variables as eight bytes:
-/// an `i32` mantissa, a `u16` radix (10, or 2 for binary) and a `u16`
-/// count of places, so the value is `mantissa / radix^places`. A
-/// place count of `0xffff` marks an empty variable or an axis that is
-/// not there.
+/// an `i32` mantissa, a `u16` radix (10, or 2 for binary) and an `i16`
+/// exponent, so the value is `mantissa / radix^exponent`.
+///
+/// FANUC's `cnc_rdmacro` documentation gives the exponent as signed,
+/// from -128 to 127, and marks an empty ("vacant") macro variable
+/// with an exponent of -1. pyfanuc uses the same -1 (`ff ff`) for an
+/// axis that is not there, so -1 always means no value.
 pub fn decode_real(b: &[u8]) -> Option<f64> {
     if b.len() < 8 {
         return None;
     }
     let mantissa = i32::from_be_bytes(b[0..4].try_into().unwrap());
     let radix = u16::from_be_bytes([b[4], b[5]]);
-    let places = u16::from_be_bytes([b[6], b[7]]);
-    if places == 0xffff || !(radix == 10 || radix == 2) {
+    let exponent = i16::from_be_bytes([b[6], b[7]]);
+    if exponent == -1 || !(radix == 10 || radix == 2) {
         return None;
     }
-    Some(mantissa as f64 / (radix as f64).powi(places as i32))
+    Some(mantissa as f64 / (radix as f64).powi(exponent as i32))
 }
 
 /// Encode a value in the eight-byte format with `places` decimal
@@ -418,6 +421,14 @@ mod tests {
         assert_eq!(decode_real(&[0, 0, 0, 1, 0, 2, 0, 1]), Some(0.5));
         assert_eq!(decode_real(&[0, 0, 0, 0, 0, 10, 0xff, 0xff]), None);
         assert_eq!(decode_real(&[0, 0, 0, 0, 0, 7, 0, 0]), None);
+
+        // FANUC's example: 12.345 as a nine-digit mantissa and 7 places.
+        let b = [0x07, 0x5b, 0xb2, 0x90, 0, 10, 0, 7];
+        assert_eq!(i32::from_be_bytes(b[0..4].try_into().unwrap()), 123_450_000);
+        assert!((decode_real(&b).unwrap() - 12.345).abs() < 1e-12);
+
+        // A negative exponent other than -1 multiplies: 3 * 2^2.
+        assert_eq!(decode_real(&[0, 0, 0, 3, 0, 2, 0xff, 0xfe]), Some(12.0));
 
         let mut buf = BytesMut::new();
         encode_real(Some(-1.5), 4, &mut buf);

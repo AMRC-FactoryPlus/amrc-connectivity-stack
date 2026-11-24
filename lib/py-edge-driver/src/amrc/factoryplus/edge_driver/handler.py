@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
 
+from .scout import ScoutEnd, ScoutError, ScoutRequest, ScoutSink
+
 if TYPE_CHECKING:
     from .driver import Driver
 
@@ -17,6 +19,11 @@ class Handler(ABC):
 
     validAddrs: ClassVar[Optional[Set[Any]]] = None
     """Set of valid addresses that this handler can manage, or None if any address is valid."""
+
+    scouts: ClassVar[bool] = False
+    """Set this to True in a handler class that implements scout. The
+    driver tells the Edge Agent so in its hello, from the class, so a
+    driver whose configuration failed still answers correctly."""
 
     def parseAddr(self, addr: Any) -> Any:
         """
@@ -92,3 +99,27 @@ class Handler(ABC):
             or an awaitable that resolves to the data. Returns None if no data available.
         """
         return None
+
+    async def scout(self, request: ScoutRequest, out: ScoutSink) -> ScoutEnd:
+        """
+        List the addresses the southbound device offers (Edge Scout).
+
+        This is only called when the handler class sets `scouts = True`.
+        Add items with `await out.add(items)`, report how far the scan
+        has got with `out.progress(visited=..., note=...)`, wait
+        `await out.pace()` between southbound requests, and stop when
+        `out.cancelled` is set. `request.limits` holds the caps. The
+        library enforces the item cap, the depth cap, the time limit
+        and cancel itself, so a handler that misses one still ends the
+        scan correctly.
+
+        Args:
+            request: Where to start, the options and the limits
+            out: Where to send what the scan finds
+
+        Returns:
+            A ScoutEnd, a dict with the same keys, or None for a plain
+            result. Raise ScoutError with OPTIONS, CONN or AUTH to fail
+            the scan with that code. Anything else raised becomes ERR.
+        """
+        raise ScoutError("UNSUPPORTED", "This driver can't list its addresses")

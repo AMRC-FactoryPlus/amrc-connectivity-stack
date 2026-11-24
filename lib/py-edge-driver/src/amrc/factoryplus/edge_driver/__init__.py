@@ -10,4 +10,5 @@ from .async_driver import AsyncDriver
 from .polled_driver import PolledDriver
 from .handler import Handler
 from .redact import redact
+from .scout import ScoutEnd, ScoutError, ScoutRequest, ScoutSink, ScoutStopped
 from . import bufferx as BufferX

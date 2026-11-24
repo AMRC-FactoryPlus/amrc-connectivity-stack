@@ -6,10 +6,12 @@ from typing import Dict, Optional, Callable, Type, Set, Tuple
 import paho.mqtt.client as mqtt  # type: ignore
 from paho.mqtt.enums import CallbackAPIVersion
 import asyncio
+import inspect
 import urllib.parse
 
 from .handler import Handler
 from .redact import redact
+from .scout import SCOUT_VERSIONS, Scouter
 
 # Permitted status returns from Handler.connect.
 CONNECT_STATUS: Set[str] = {"UP", "CONN", "AUTH"}
@@ -46,6 +48,17 @@ class Driver:
 
         self.mqtt_host, self.mqtt_port = self.get_mqtt_details(edge_mqtt)
         self.mqtt = self.create_mqtt_client(edge_password)
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+        # Edge Scout. A handler class that sets `scouts = True` lists its
+        # device's addresses through its scout method. The scout topic
+        # is not in message_handlers, because connected() subscribes to
+        # all of those before any addr arrives. The driver subscribes to
+        # it from addr handling, once the agent has advertised the
+        # feature on this MQTT session.
+        self.scout_seen = False
+        self.scout_session = 0
+        self.scouter = Scouter(self)
 
         self.message_handlers: Dict[str, Callable] = {}
         self.setup_message_handlers()
@@ -254,6 +267,36 @@ class Driver:
         self.addrs = {}
         self.topics = {}
 
+    def check_features(self, pkt) -> None:
+        """
+        Read the features key of an address configuration.
+
+        This comes before every other check in set_addrs, so a driver
+        with a bad configuration or a bad address map still subscribes
+        to scout and answers that it can't scan, instead of looking like
+        a driver built before scouting. The subscription is made at most
+        once per MQTT session, and only when the agent advertises a
+        version this library speaks, so a driver never asks an older
+        agent's broker for a topic its ACL refuses.
+        """
+        features = pkt.get("features") if isinstance(pkt, dict) else None
+        version = features.get("scout") if isinstance(features, dict) else None
+        if isinstance(version, bool) or version not in SCOUT_VERSIONS:
+            return
+        if self.scout_seen:
+            return
+
+        self.scout_seen = True
+        topic = self.topic("scout")
+        self.log.info(f"Edge Agent offers scout version {version}, subscribing")
+        try:
+            result, _ = self.mqtt.subscribe(topic)
+        except Exception as e:
+            result = e
+        if result != mqtt.MQTT_ERR_SUCCESS:
+            self.log.error(f"Can't subscribe to {topic}: {result}")
+            self.scout_seen = False
+
     async def set_addrs(self, pkt: dict) -> bool:
         """
         Set device addresses from a configuration packet.
@@ -264,6 +307,8 @@ class Driver:
         Returns:
             True if addresses were successfully set, False otherwise
         """
+        self.check_features(pkt)
+
         if not self.handler:
             self.log.error("Received addrs without handler")
             return False
@@ -329,6 +374,16 @@ class Driver:
 
     def connected(self, *args, **kwargs) -> None:
         """Subscribe to topics and set ready status."""
+        # Scouting is negotiated afresh on each MQTT session. After an
+        # agent rollback the older agent's addr has no features key, so
+        # the driver must not subscribe to scout again.
+        self.scout_session += 1
+        self.scout_seen = False
+        if self._loop:
+            self._loop.call_soon_threadsafe(self.scouter.reset)
+        else:
+            self.scouter.reset()
+
         topics = [(self.topic(t), 0) for t in self.message_handlers.keys()]
 
         if topics:
@@ -364,6 +419,15 @@ class Driver:
         # contain "/", so take everything after the message type.
         data = "/".join(topic_parts[3:]) if len(topic_parts) > 3 else None
 
+        # The scout topic is the library's own, not a message handler.
+        if msg == "scout" and data is None:
+            if not self.scout_seen:
+                self.log.warning("Ignoring a scout message before the feature was offered")
+            elif self._loop:
+                asyncio.run_coroutine_threadsafe(
+                    self.scouter.handle(payload), self._loop)
+            return
+
         # If the message is a command, add a trailing slash to make sure that
         # we get the correct handler.
         handler_key = msg
@@ -377,7 +441,7 @@ class Driver:
 
         try:
             payload = payload.decode("utf-8")
-            if asyncio.iscoroutinefunction(handler):
+            if inspect.iscoroutinefunction(handler):
                 if self._loop:
                     asyncio.run_coroutine_threadsafe(handler(payload, data), self._loop)
             else:
@@ -412,6 +476,9 @@ class Driver:
         conf = self.json(payload)
         # The config may contain secrets from the Edge Agent.
         self.log.debug(f"CONF: {redact(conf)}")
+
+        # A new configuration ends a running scan.
+        self.scouter.cancel("A new driver configuration arrived")
 
         self.clear_addrs()
         old = getattr(self, "handler", None)

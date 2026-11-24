@@ -203,6 +203,98 @@ once. Set `serial_poll` in `DriverConfig` to force one poll at a time
 either way. A poll's `poll_timeout` (in `DriverOptions`) starts when the poll starts, not
 while it waits for the lock.
 
+## Scouting
+
+Scouting lets the Admin UI ask a driver to list the addresses its
+device offers, so an operator can pick them in the origin map editor
+instead of typing them. The library handles the protocol, which is the
+"Scouting" section of
+[`acs-edge/docs/edge-split.md`](../../acs-edge/docs/edge-split.md). A
+handler only produces items.
+
+A handler that does nothing answers that it can't scan, and every scan
+ends with `UNSUPPORTED`. To take part:
+
+1. Set `const SCOUTS: bool = true` on the handler.
+2. Return a `Scouter` from `Handler::scouter`. The driver asks for it
+   after each successful `connect`, as it does for `poller`, and runs
+   scans on their own task without the handler's lock, so polls and
+   writes carry on during a scan. Return `None` when there is no
+   connection to scan with, and the scan ends with `CONN`.
+3. In `Scouter::scout`, send items with `sink.add(items).await?` and
+   call `sink.pace().await?` between requests to the device. Return a
+   `ScoutEnd`, or a `ScoutError` such as `ScoutError::options("...")`
+   for a bad root or bad options.
+
+```rust,ignore
+struct MyScouter { client: Arc<DeviceClient> }
+
+#[async_trait]
+impl Scouter for MyScouter {
+    async fn scout(&self, req: ScoutRequest, sink: ScoutSink) -> Result<ScoutEnd, ScoutError> {
+        for folder in self.client.folders(req.root.as_deref()).await? {
+            sink.add(vec![Item::folder(&folder.id, None, &folder.name)]).await?;
+            for tag in self.client.tags(&folder).await? {
+                let item = Item::value(&tag.id, Some(&folder.id), &tag.name, &tag.address)
+                    .with_type(ScoutType::Double)
+                    .with_access(Access::Read);
+                sink.add(vec![item]).await?;
+            }
+            sink.pace().await?;
+        }
+        Ok(ScoutEnd::new(true))
+    }
+}
+```
+
+The library does the rest:
+
+- It subscribes to `scout` only after the Edge Agent's `addr` message
+  advertises `features.scout` on the current MQTT session, and forgets
+  it on every reconnect. An Edge Agent from before scouting would drop
+  the driver's connection for that subscription, so this keeps a new
+  driver safe on an old Edge Agent, including after a rollback.
+- It answers the Edge Agent's hello from `SCOUTS`, whatever state the
+  handler is in.
+- It numbers the messages, splits items into batches of at most 500
+  items and 256 KiB, cuts names, descriptions, units and samples that
+  are too long, and leaves out `sample` unless the scan asked for
+  samples. It never cuts an address, path or root, because a cut one
+  names a different place on the device. A value whose address or path
+  is over 1024 characters goes out as a folder with nothing to bind, so
+  its children keep their parent, and an item whose root is over 1024
+  characters is dropped.
+- `add` waits while the data waiting to go to the Edge Agent is over
+  half the publish queue, so a scan gives way to data.
+- At the item cap `add` returns `Stop::Items`, and the scan ends as
+  truncated. A cancel from the Edge Agent or a new `conf` makes `add`
+  and `pace` return `Stop::Cancelled` and `sink.cancelled()` fire, and
+  the scan ends with `CANCELLED`.
+- At `limits.seconds` it ends the scan as truncated, even if the
+  scouter has stopped answering. A scouter that does not stop within
+  3 s of a cancel or the time cap is aborted.
+- A panic in the scouter ends the scan with `ERR`.
+- A second scan that starts while one is running ends with `ERR`.
+- It sends a progress message at least every 5 s. Call
+  `sink.progress(Progress::new(visited))` to add counts and a note.
+
+The scouter keeps to `limits.depth` itself, giving a folder at the cap
+`more: true`, because the library can't see the device's structure.
+
+An item's `id` must come from the device alone, never from the scan's
+root, so a node has the same id in a full scan and in a branch scan. A
+branch scan sets `req.folder_id`, and its first item must have that id.
+An `address` must be in the driver's canonical form, the form the
+driver prints from a parsed address. List the parts of the device the
+scan skipped on purpose with `ScoutEnd::exclude`, so the Admin UI does
+not call their addresses missing.
+
+The tests check every message against the JSON Schemas in
+[`lib/edge-scout-schemas`](../edge-scout-schemas). `tests/scout_mosquitto.rs`
+runs the feature gate against a real mosquitto broker when `mosquitto`
+is on the PATH, and fails without it when `RS_EDGE_DRIVER_MOSQUITTO=1`
+is set.
+
 ## API reference
 
 The full API is documented via rustdoc — run `cargo doc --open` in
@@ -210,7 +302,7 @@ this directory, or read the doc comments directly in
 [`src/handler.rs`](./src/handler.rs) (the `Handler` trait — the
 interface driver authors implement) and
 [`src/driver.rs`](./src/driver.rs) (`Driver` and `DriverHandle` — the
-library's own runtime). Any method or property not documented there
+library's own runtime) and [`src/scout.rs`](./src/scout.rs) (scouting). Any method or property not documented there
 must not be relied on.
 
 ## Environment variables

@@ -10,11 +10,13 @@ use rumqttc::{
 use serde::Deserialize;
 use tokio::sync::{Mutex, Semaphore, mpsc};
 use tokio::task::{JoinHandle, JoinSet};
+use tokio_util::sync::CancellationToken;
 
 use crate::config::{DriverConfig, DriverOptions, PUBLISH_QUEUE_OVERHEAD};
 use crate::error::{ConnectError, Error, WriteError};
 use crate::handler::{AddrGroup, Handler, Poller};
 use crate::redact::{redact, redact_url};
+use crate::scout::{self, ScoutError, ScoutOp, Scouter, Wire};
 use crate::status::State as Status;
 use crate::write::WriteValue;
 
@@ -108,8 +110,22 @@ impl PublishQueue {
         }
     }
 
+    /// Wait until the data waiting is at most half the limit, so
+    /// scouting output gives way to data.
+    pub(crate) async fn wait_below_half(&self) {
+        loop {
+            let freed = self.freed.notified();
+            tokio::pin!(freed);
+            freed.as_mut().enable();
+            if self.bytes.load(Ordering::Relaxed) <= self.limit / 2 {
+                return;
+            }
+            freed.await;
+        }
+    }
+
     /// Count `size` bytes in whatever the limit.
-    fn force(self: &Arc<Self>, size: usize) -> Queued {
+    pub(crate) fn force(self: &Arc<Self>, size: usize) -> Queued {
         self.bytes.fetch_add(size, Ordering::Relaxed);
         Queued::new(self.clone(), size)
     }
@@ -160,6 +176,7 @@ pub(crate) enum DriverEvent<A> {
         attempt: u64,
         result: Result<(), ConnectError>,
         poller: Option<Arc<dyn Poller<A>>>,
+        scouter: Option<Arc<dyn Scouter>>,
     },
     /// An address map has been parsed, as (data topic, address,
     /// parsed address). `None` if the handler rejected an address.
@@ -357,7 +374,7 @@ type OpQueue<A> = (mpsc::UnboundedSender<Op<A>>, JoinHandle<()>);
 /// A message for the publisher task: topic, QoS, payload, for data its
 /// share of the publish queue, and for data the handler generation
 /// that must still be live when it is sent.
-type Outbound = (String, QoS, Bytes, Option<Queued>, Option<u64>);
+pub(crate) type Outbound = (String, QoS, Bytes, Option<Queued>, Option<u64>);
 
 /// The size of an MQTT PUBLISH packet as rumqttc counts it against
 /// the packet limit, rounded up: fixed header (at most 5 bytes),
@@ -371,6 +388,17 @@ struct Session<H: Handler> {
     /// Messages for the publisher task, which sends them in order.
     outbound: mpsc::UnboundedSender<Outbound>,
     poll_tx: mpsc::Sender<PollJob<H>>,
+    /// The MQTT client, for the `scout` subscription only. Everything
+    /// published goes through `outbound`.
+    client: AsyncClient,
+}
+
+/// The scan running now, or the last one.
+struct RunningScan {
+    id: String,
+    wire: Arc<Wire>,
+    cancel: CancellationToken,
+    task: JoinHandle<()>,
 }
 
 /// The driver runtime. Manages the MQTT connection to the edge agent,
@@ -410,6 +438,18 @@ pub struct Driver<H: Handler> {
     /// hasn't reported a lost connection since.
     connected: bool,
     poller: Option<Arc<dyn Poller<H::Addr>>>,
+    /// The current handler's scouter, asked for after each successful
+    /// connect, as `poller` is.
+    scouter: Option<Arc<dyn Scouter>>,
+    /// Whether the Edge Agent has advertised scouting on this MQTT
+    /// session, so the driver has subscribed to `scout`. Cleared on
+    /// every connect to the broker.
+    scout_seen: bool,
+    /// The SUBACK for the control topics has arrived on this session,
+    /// and `READY` has gone out.
+    control_acked: bool,
+    /// The scan running now, if any.
+    scan: Option<RunningScan>,
     /// The current handler's op queue and the task working through it.
     ops: Option<OpQueue<H::Addr>>,
     /// A `connect` (or the wait before one) in progress.
@@ -470,6 +510,10 @@ impl<H: Handler + 'static> Driver<H> {
             live: Arc::new(AtomicU64::new(0)),
             connected: false,
             poller: None,
+            scouter: None,
+            scout_seen: false,
+            control_acked: false,
+            scan: None,
             ops: None,
             connecting: None,
             closing: None,
@@ -591,6 +635,12 @@ impl<H: Handler + 'static> Driver<H> {
         rx: &mut mpsc::UnboundedReceiver<DriverEvent<H::Addr>>,
     ) -> Result<(), Error> {
         let (client, eventloop) = self.connect_mqtt()?;
+        // The scouting feature is per session: a driver only learns it
+        // from an addr sent on this connection, so an Edge Agent rolled
+        // back to one without scouting never sees a scout subscription
+        // its ACL would refuse.
+        self.scout_seen = false;
+        self.control_acked = false;
         let (net_tx, mut net_rx) = mpsc::channel(NETWORK_QUEUE);
         let network = tokio::spawn(Self::network(eventloop, net_tx));
 
@@ -630,6 +680,7 @@ impl<H: Handler + 'static> Driver<H> {
         let session = Session {
             outbound: out_tx,
             poll_tx,
+            client: client.clone(),
         };
 
         // Main event loop. Nothing in it waits for the handler, so the
@@ -638,8 +689,19 @@ impl<H: Handler + 'static> Driver<H> {
             tokio::select! {
                 event = net_rx.recv() => {
                     match event {
-                        Some(Ok(Incoming::SubAck(_))) => {
-                            self.set_status(&session, Status::Ready);
+                        Some(Ok(Incoming::SubAck(ack))) => {
+                            // The first SUBACK is for the control
+                            // topics. A later one is for `scout`, and
+                            // must not send READY again, which would
+                            // make the agent resend conf.
+                            if !self.control_acked {
+                                self.control_acked = true;
+                                self.set_status(&session, Status::Ready);
+                            } else if ack.return_codes.iter().any(|c| {
+                                matches!(c, rumqttc::SubscribeReasonCode::Failure)
+                            }) {
+                                tracing::error!("the edge agent refused the scout subscription");
+                            }
                         }
                         Some(Ok(Incoming::Publish(publish))) => {
                             self.on_publish(&session, publish);
@@ -658,6 +720,11 @@ impl<H: Handler + 'static> Driver<H> {
         network.abort();
         publisher.abort();
         poll_worker.abort();
+        // A scan can't answer on a later session, which has not been
+        // told about scouting yet.
+        if let Some(scan) = self.scan.take() {
+            scan.task.abort();
+        }
         result
     }
 
@@ -888,6 +955,8 @@ impl<H: Handler + 'static> Driver<H> {
         match msg.as_str() {
             "active" => self.on_active(session, &publish.payload),
             "conf" => self.on_conf(session, &publish.payload),
+            // Scouting doesn't use the address map, so it never waits.
+            "scout" if data.is_none() => self.on_scout(session, &publish.payload),
             // Everything else depends on the address map, so it waits
             // for one being parsed.
             _ if self.parsing.is_some() => self.defer(session, publish),
@@ -1046,6 +1115,11 @@ impl<H: Handler + 'static> Driver<H> {
             let attempt = attempts.fetch_add(1, Ordering::SeqCst) + 1;
             let result = h.connect().await;
             let poller = if result.is_ok() { h.poller() } else { None };
+            let scouter = if result.is_ok() && H::SCOUTS {
+                h.scouter()
+            } else {
+                None
+            };
             drop(h);
 
             let _ = tx.send(DriverEvent::Connected {
@@ -1053,6 +1127,7 @@ impl<H: Handler + 'static> Driver<H> {
                 attempt,
                 result,
                 poller,
+                scouter,
             });
         }));
     }
@@ -1122,7 +1197,21 @@ impl<H: Handler + 'static> Driver<H> {
 
     /// Handle `addr` message — parse and store address mappings.
     fn on_addr(&mut self, session: &Session<H>, payload: &[u8]) {
-        let pkt: AddrConfig = match serde_json::from_slice(payload) {
+        let raw: serde_json::Value = match serde_json::from_slice(payload) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(%e, "failed to parse addr JSON");
+                self.reject_addrs(session);
+                return;
+            }
+        };
+        // Read the features before anything else, so a driver with no
+        // handler, an unknown version or a bad address still answers
+        // that it can't scan, instead of looking like an old library.
+        if scout::scout_feature(&raw) {
+            self.scout_gate(session);
+        }
+        let pkt: AddrConfig = match serde_json::from_value(raw) {
             Ok(v) => v,
             Err(e) => {
                 tracing::error!(%e, "failed to parse addr JSON");
@@ -1168,6 +1257,126 @@ impl<H: Handler + 'static> Driver<H> {
         }) {
             self.parsing = Some(seq);
         }
+    }
+
+    /// The Edge Agent has advertised scouting: subscribe to `scout`,
+    /// once per MQTT session. Never called from the connect path.
+    fn scout_gate(&mut self, session: &Session<H>) {
+        if self.scout_seen {
+            return;
+        }
+        self.scout_seen = true;
+        let topic = self.topic("scout");
+        tracing::info!(%topic, "edge agent supports scouting, subscribing");
+        if let Err(e) = session.client.try_subscribe(&topic, QoS::AtMostOnce) {
+            // The client's request queue is full. Wait for room on
+            // another task, so the driver loop never blocks.
+            tracing::debug!(%e, "scout subscription queued");
+            let client = session.client.clone();
+            tokio::spawn(async move {
+                if let Err(e) = client.subscribe(topic, QoS::AtMostOnce).await {
+                    tracing::error!(%e, "failed to subscribe to scout");
+                }
+            });
+        }
+    }
+
+    /// Handle a message on `scout`: a hello, a start or a cancel.
+    fn on_scout(&mut self, session: &Session<H>, payload: &[u8]) {
+        if !self.scout_seen {
+            // Not subscribed on this session, so not ours to answer.
+            return;
+        }
+        match scout::parse_op(payload) {
+            Ok(ScoutOp::Hello) => {
+                let _ = session.outbound.send((
+                    self.topic_with("found", "hello"),
+                    QoS::AtMostOnce,
+                    Bytes::from(scout::hello_answer(H::SCOUTS)),
+                    None,
+                    None,
+                ));
+            }
+            Ok(ScoutOp::Cancel { id }) => match &self.scan {
+                Some(scan) if scan.id == id && !scan.wire.is_closed() => {
+                    tracing::info!(id, "scan cancelled by the edge agent");
+                    scan.cancel.cancel();
+                }
+                _ => tracing::debug!(id, "cancel for a scan that is not running"),
+            },
+            Ok(ScoutOp::Ack { id, seq }) => match &self.scan {
+                Some(scan) if scan.id == id => scan.wire.ack(seq),
+                _ => tracing::debug!(id, "ack for a scan that is not running"),
+            },
+            Ok(ScoutOp::Start {
+                version,
+                req,
+                window,
+            }) => self.on_scout_start(session, version, req, window),
+            Err((Some(id), why)) => {
+                tracing::warn!(id, why, "bad scout request");
+                self.scout_wire(session, &id).end(Err(ScoutError::err(why)));
+            }
+            Err((None, why)) => tracing::warn!(why, "bad scout request, ignoring"),
+        }
+    }
+
+    fn scout_wire(&self, session: &Session<H>, id: &str) -> Arc<Wire> {
+        Wire::new(self.topic_with("found", id), session.outbound.clone())
+    }
+
+    /// Start a scan, or end it at once with the reason it can't run.
+    fn on_scout_start(
+        &mut self,
+        session: &Session<H>,
+        version: Option<u64>,
+        req: scout::ScoutRequest,
+        window: Option<u64>,
+    ) {
+        let wire = self.scout_wire(session, &req.id);
+        if self
+            .scan
+            .as_ref()
+            .is_some_and(|s| !s.wire.is_closed() && !s.task.is_finished())
+        {
+            tracing::warn!(id = req.id, "scan start while another is running");
+            wire.end(Err(ScoutError::err("another scan is already running")));
+            return;
+        }
+        if !H::SCOUTS {
+            wire.end(Err(ScoutError::unsupported()));
+            return;
+        }
+        if version != Some(scout::SCOUT_VERSION) {
+            wire.end(Err(ScoutError::err(format!(
+                "scan request version {version:?} is not supported"
+            ))));
+            return;
+        }
+        let scouter = match &self.scouter {
+            Some(s) if self.connected => s.clone(),
+            _ => {
+                wire.end(Err(ScoutError::conn(
+                    "the driver is not connected to its device",
+                )));
+                return;
+            }
+        };
+        wire.set_window(window);
+        let cancel = CancellationToken::new();
+        let task = tokio::spawn(scout::run_scan(
+            scouter,
+            req.clone(),
+            wire.clone(),
+            cancel.clone(),
+            self.queue.clone(),
+        ));
+        self.scan = Some(RunningScan {
+            id: req.id,
+            wire,
+            cancel,
+            task,
+        });
     }
 
     /// An address map has been parsed: store it, then handle the
@@ -1416,6 +1625,7 @@ impl<H: Handler + 'static> Driver<H> {
                 }
                 tracing::warn!(%status, "handler lost its connection, reconnecting");
                 self.connected = false;
+                self.scouter = None;
                 self.set_status(session, status);
                 self.start_connect(self.config.reconnect_delay);
             }
@@ -1424,6 +1634,7 @@ impl<H: Handler + 'static> Driver<H> {
                 attempt,
                 result,
                 poller,
+                scouter,
             } => {
                 if generation != self.generation {
                     return;
@@ -1442,6 +1653,7 @@ impl<H: Handler + 'static> Driver<H> {
                     Ok(()) => {
                         self.connected = true;
                         self.poller = poller;
+                        self.scouter = scouter;
                         if self.addr_rejected {
                             self.set_status(session, Status::Addr);
                         } else {
@@ -1507,6 +1719,12 @@ impl<H: Handler + 'static> Driver<H> {
         self.addr_rejected = false;
         self.connected = false;
         self.poller = None;
+        self.scouter = None;
+        // A new conf, OFFLINE or the end of the session stops a scan,
+        // which ends with CANCELLED if it still can.
+        if let Some(scan) = &self.scan {
+            scan.cancel.cancel();
+        }
         self.live.store(0, Ordering::SeqCst);
         self.parsing = None;
         self.deferred.clear();

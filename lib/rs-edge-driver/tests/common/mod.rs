@@ -60,6 +60,59 @@ pub struct Stats {
     pub read_delay_ms: std::sync::atomic::AtomicU64,
     /// When each data message was read off the socket, in order.
     pub data_arrivals: Mutex<Vec<Instant>>,
+    /// The topics the driver may use, if the broker checks them. A
+    /// driver that steps outside them is disconnected, as the Edge
+    /// Agent's broker does.
+    pub acl: Mutex<Option<Acl>>,
+    /// Connections dropped for breaking the ACL.
+    pub kicked: AtomicUsize,
+}
+
+/// Which topics under `fpEdge1/<id>/` a driver may use, as the Edge
+/// Agent's broker checks them (`acs-edge/lib/driverBroker.ts`).
+#[derive(Clone, Debug)]
+pub struct Acl {
+    /// Allowed publish topics, as suffixes. `x/+` allows one level.
+    pub publish: Vec<&'static str>,
+    /// Allowed subscribe filters, as suffixes.
+    pub subscribe: Vec<&'static str>,
+}
+
+impl Acl {
+    /// The ACL of an Edge Agent before v6.8.0, before `req`, typed
+    /// writes and scouting.
+    pub fn pre_v6_8() -> Self {
+        Self {
+            publish: vec!["status", "data/+", "err/+"],
+            subscribe: vec!["active", "conf", "addr", "cmd/#", "poll"],
+        }
+    }
+
+    /// The ACL of an Edge Agent with scouting.
+    pub fn with_scout() -> Self {
+        Self {
+            publish: vec!["status", "data/+", "err/+", "result/+", "found/+"],
+            subscribe: vec![
+                "active", "conf", "addr", "cmd/#", "poll", "write/#", "scout",
+            ],
+        }
+    }
+
+    fn publish_ok(&self, suffix: &str) -> bool {
+        self.publish.iter().any(|p| match p.strip_suffix("/+") {
+            Some(base) => suffix
+                .strip_prefix(base)
+                .and_then(|r| r.strip_prefix('/'))
+                .is_some_and(|r| {
+                    !r.is_empty() && r.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                }),
+            None => *p == suffix,
+        })
+    }
+
+    fn subscribe_ok(&self, suffix: &str) -> bool {
+        self.subscribe.contains(&suffix)
+    }
 }
 
 impl Stats {
@@ -74,6 +127,13 @@ impl Stats {
     }
     pub fn subscriptions(&self) -> Vec<String> {
         self.subscriptions.lock().unwrap().clone()
+    }
+    pub fn kicked(&self) -> usize {
+        self.kicked.load(Ordering::SeqCst)
+    }
+    /// Check topics against `acl` from now on, or stop checking.
+    pub fn set_acl(&self, acl: Option<Acl>) {
+        *self.acl.lock().unwrap() = acl;
     }
 }
 
@@ -156,6 +216,19 @@ impl FakeAgent {
             .map(|(t, a)| ((*t).to_owned(), serde_json::Value::from(*a)))
             .collect();
         let pkt = serde_json::json!({ "version": 1, "addrs": map, "groups": {} });
+        self.send("addr", pkt.to_string());
+    }
+
+    /// Send an address map with a `features` key, as an Edge Agent
+    /// with scouting does.
+    pub fn send_addrs_features(&self, addrs: &[(&str, &str)], features: serde_json::Value) {
+        let map: serde_json::Map<String, serde_json::Value> = addrs
+            .iter()
+            .map(|(t, a)| ((*t).to_owned(), serde_json::Value::from(*a)))
+            .collect();
+        let pkt = serde_json::json!({
+            "version": 1, "addrs": map, "groups": {}, "features": features,
+        });
         self.send("addr", pkt.to_string());
     }
 
@@ -299,6 +372,16 @@ async fn serve(
                         Packet::Subscribe(s) => {
                             stats.subscriptions.lock().unwrap()
                                 .extend(s.filters.iter().map(|f| f.path.clone()));
+                            let acl = stats.acl.lock().unwrap().clone();
+                            if let Some(acl) = acl {
+                                let refused = s.filters.iter().any(|f| {
+                                    !f.path.strip_prefix(&prefix).is_some_and(|t| acl.subscribe_ok(t))
+                                });
+                                if refused {
+                                    stats.kicked.fetch_add(1, Ordering::SeqCst);
+                                    break 'conn;
+                                }
+                            }
                             let codes = s
                                 .filters
                                 .iter()
@@ -315,6 +398,11 @@ async fn serve(
                                 PubAck::new(p.pkid).write(&mut out).unwrap();
                             }
                             let suffix = p.topic.strip_prefix(&prefix).unwrap_or(&p.topic);
+                            let acl = stats.acl.lock().unwrap().clone();
+                            if acl.is_some_and(|acl| !acl.publish_ok(suffix)) {
+                                stats.kicked.fetch_add(1, Ordering::SeqCst);
+                                break 'conn;
+                            }
                             let ev = if suffix == "status" {
                                 FromDriver::Status(String::from_utf8_lossy(&p.payload).into_owned())
                             } else if let Some(t) = suffix.strip_prefix("data/") {

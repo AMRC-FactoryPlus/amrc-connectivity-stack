@@ -20,6 +20,7 @@
     </template>
     <template #below-toolbar>
       <ObjectSelector
+          v-if="canAddToGroup"
           v-model="groupsToAddTo"
           :store-data="g.data.filter(group => !group.members.includes(principal.uuid))"
           title="Select Groups"
@@ -50,13 +51,16 @@ import {toast} from "vue-sonner";
 import {Label} from "@components/ui/label/index.js";
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {defineAsyncComponent} from "vue";
+import {useAccessStore} from "@store/useAccessStore.js";
+import {ConfigDB} from "@/lib/access/perms.js";
 
 export default {
   setup () {
     return {
       columns,
       g: useGroupStore(),
-      s: useServiceClientStore()
+      s: useServiceClientStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -118,6 +122,13 @@ export default {
   },
 
   computed: {
+    // The group is picked in the selector, so any WriteMembers grant
+    // counts for it.
+    canAddToGroup () {
+      const c = this.access.check
+      return c.can_any(ConfigDB.WriteMembers)
+        && c.can(ConfigDB.WriteMemberships, this.principal?.uuid)
+    },
     initialSort () {
       return [{
         id: 'name',

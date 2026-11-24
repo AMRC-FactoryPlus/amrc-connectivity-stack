@@ -51,12 +51,12 @@
             <span class="text-slate-300">|</span>
             <span>{{ fmt_window(rec.from, rec.to) }}</span>
             <span class="text-slate-300">|</span>
-            <TagChips :tags="rec.tags" :known="ds.allTags" :editable="rec.editable" @update="saveTags"/>
+            <TagChips :tags="rec.tags" :known="ds.allTags" :editable="rec.editable && may.edit" @update="saveTags"/>
           </div>
         </div>
 
         <div class="flex shrink-0 flex-wrap gap-2">
-          <Button v-if="recording" size="sm" variant="destructive" @click="stopOpen = true">
+          <Button v-if="recording && may.stop_record" size="sm" variant="destructive" @click="stopOpen = true">
             <i class="fa-solid fa-stop mr-2"></i>Stop recording
           </Button>
           <Button size="sm" variant="outline" :disabled="downloading" @click="download">
@@ -65,7 +65,7 @@
           <Button v-if="grafana" size="sm" variant="outline" as-child>
             <a :href="grafana" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square mr-2"></i>Grafana</a>
           </Button>
-          <DropdownMenu>
+          <DropdownMenu v-if="menu.length">
             <DropdownMenuTrigger as-child>
               <Button size="sm" variant="outline" aria-label="More actions" title="More actions">
                 <i class="fa-solid fa-ellipsis"></i>
@@ -115,7 +115,7 @@
           <AlertTitle>Voided</AlertTitle>
           <AlertDescription class="text-gray-700">{{ voidText }}</AlertDescription>
         </div>
-        <Button size="sm" variant="outline" :disabled="restoring" @click="restore">
+        <Button v-if="may.edit" size="sm" variant="outline" :disabled="restoring" @click="restore">
           <i :class="['fa-solid mr-2', restoring ? 'fa-circle-notch animate-spin' : 'fa-rotate-left']"></i>Restore
         </Button>
       </Alert>
@@ -202,6 +202,8 @@ import VoidDialog from '@/components/Datasets/page/VoidDialog.vue'
 import EnergyCarbon from '@/components/Datasets/addons/EnergyCarbon.vue'
 import { useEnergyCarbon } from '@/components/Datasets/addons/useEnergyCarbon.js'
 import { tabs_for, tab_of, equipment_of, equipment_change, labels_for } from '@/components/Datasets/page/page-logic.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 const ds = useDatasetsStore()
 const sc = useServiceClientStore()
@@ -222,6 +224,10 @@ function setTab (t) {
 // Invalid datasets only come from the structure search, so wait for
 // both before saying a dataset does not exist.
 const rec = computed(() => ds.byUuid[uuid.value] ?? null)
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check, uuid.value ?? null))
 const loaded = computed(() => !!rec.value || (ds.ready && ds.structureReady))
 const name = computed(() => display_name(rec.value))
 
@@ -296,7 +302,10 @@ const menu = computed(() => {
     reason: r.is_default ? 'Every placed device has this dataset. It cannot be deleted.' : null,
     go: () => deleteDialog.value?.open(r),
   })
-  return items
+  /* Leave out what the user's ACL can't do. */
+  const m = may.value
+  const allowed = { edit: m.edit, times: m.edit, void: m.edit, restore: m.edit, duplicate: m.create, delete: m.delete }
+  return items.filter(i => allowed[i.id] ?? true)
 })
 
 async function saveTags (tags) {

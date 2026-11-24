@@ -27,6 +27,7 @@
                   </template>
                   <template #toolbar-right>
                     <Button
+                        v-if="can.newDevice"
                         @click="newDevice"
                         size="sm"
                         class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
@@ -39,7 +40,7 @@
                     <EmptyState
                         title="No Devices"
                         :description="`No devices have been added to the ${node.name} node yet.`"
-                        :button-text="`Add Device`"
+                        :button-text="can.newDevice ? 'Add Device' : null"
                         button-icon="plus"
                         @button-click="newDevice"/>
                   </template>
@@ -52,7 +53,7 @@
                   <EmptyState
                       title="No Connections"
                       :description="`No connections have been added to the ${node.name} node yet.`"
-                      :button-text="`Add Connection`"
+                      :button-text="can.newConnection ? 'Add Connection' : null"
                       button-icon="plus"
                       @button-click="newConnection"/>
                 </template>
@@ -70,6 +71,7 @@
                 </template>
                 <template #toolbar-right>
                   <Button
+                      v-if="can.newConnection"
                       @click="newConnection"
                       size="sm"
                       class="ml-auto hidden lg:flex items-center justify-center gap-1.5"
@@ -150,14 +152,14 @@
 </template>
 
 <script>
-import { computed } from 'vue'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { useEdgeClusterStore } from '@store/useEdgeClusterStore.js'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useISA95Store } from '@store/useISA95Store.js'
 import { placement_state } from '@/lib/isa95-placement.js'
 import { useConnectionStore } from '@store/useConnectionStore.js'
-import { useCanRebirth } from '@/composables/useCanRebirth.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_new_connection, can_new_device, can_rebirth } from '@/lib/access/perms-edge.js'
 import EdgeContainer from '@components/Containers/EdgeContainer.vue'
 import { Label } from '@components/ui/label/index.js'
 import { Input } from '@components/ui/input/index.js'
@@ -211,16 +213,14 @@ export default {
 
   setup () {
     const d = useDeviceStore()
-    const deviceUuids = computed(() => d.data?.map(e => e.uuid) ?? [])
-    const canRebirthMap = useCanRebirth(deviceUuids)
 
     return {
+      access: useAccessStore(),
       c: useEdgeClusterStore(),
       n: useNodeStore(),
       d,
       cn: useConnectionStore(),
       isa95: useISA95Store(),
-      canRebirthMap,
       inop,
       deviceColumns,
       connectionColumns,
@@ -244,6 +244,14 @@ export default {
   },
 
   computed: {
+    can () {
+      const c = this.access.check
+      return {
+        newDevice: can_new_device(c),
+        newConnection: can_new_connection(c),
+      }
+    },
+
     node () {
       return this.n.data.find(e => e.uuid === this.$route.params.nodeuuid)
     },
@@ -271,7 +279,7 @@ export default {
       return filtered.map(d => ({
         ...d,
         _nodeAddress: this.node.sparkplugAddress,
-        _canRebirth: this.canRebirthMap?.get(d.uuid) ?? false,
+        _canRebirth: can_rebirth(this.access.check, d.uuid),
         _placement: vocab ? placement_state(vocab, d.placement, d.uuid) : null,
       }))
     },

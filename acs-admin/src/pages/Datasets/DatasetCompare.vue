@@ -17,12 +17,12 @@
         <Button size="sm" variant="outline" @click="adding = true">
           <i class="fa-solid fa-plus mr-1.5"></i>Add runs
         </Button>
-        <span :title="groupWhy ?? ''">
+        <span v-if="may.create" :title="groupWhy ?? ''">
           <Button size="sm" variant="outline" :disabled="!!groupWhy" @click="saveDialog.open('part', ids)">
             <i class="fa-solid fa-cube mr-1.5"></i>Save as part
           </Button>
         </span>
-        <span :title="groupWhy ?? ''">
+        <span v-if="may.create" :title="groupWhy ?? ''">
           <Button size="sm" variant="outline" :disabled="!!groupWhy" @click="saveDialog.open('process', ids)">
             <i class="fa-solid fa-diagram-project mr-1.5"></i>Save as process
           </Button>
@@ -134,6 +134,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import TagChips from '@/components/Datasets/TagChips.vue'
 import SaveGroupDialog from '@/components/Datasets/list/SaveGroupDialog.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 import CompareChart from '@/components/Datasets/compare/CompareChart.vue'
 import LineSwatch from '@/components/Datasets/compare/LineSwatch.vue'
 import AddRunsDialog from '@/components/Datasets/compare/AddRunsDialog.vue'
@@ -151,6 +153,10 @@ import {
 const ds = useDatasetsStore()
 const route = useRoute()
 const router = useRouter()
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check))
 
 const adding = ref(false)
 const saveDialog = ref(null)

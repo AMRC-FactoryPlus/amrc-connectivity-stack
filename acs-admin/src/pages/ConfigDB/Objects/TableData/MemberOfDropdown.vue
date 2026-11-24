@@ -4,12 +4,15 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
+import {computed} from 'vue'
 import type {MemberOfMapping} from './objectMemberOfListColumns'
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
+import {useAccessStore} from '@store/useAccessStore.js'
+import {ConfigDB} from '@/lib/access/perms.js'
 import {UUIDs} from "@amrc-factoryplus/service-client";
 
 interface DataTableRowActionsProps {
@@ -20,6 +23,11 @@ const s = useServiceClientStore()
 const cdb = s.client.ConfigDB
 
 const props = defineProps<DataTableRowActionsProps>()
+const access = useAccessStore()
+
+// ConfigDB checks both ends of the relation.
+const canRemove = computed(() => access.check.can(ConfigDB.WriteMembers, props.row.original.uuid)
+    && access.check.can(ConfigDB.WriteMemberships, props.row.original.originalObject.uuid))
 
 function copy(id: string) {
     navigator.clipboard.writeText(id)
@@ -90,7 +98,7 @@ function handleDelete() {
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>
-      <div v-if="props.row.original.uuid !== props.row.original.originalObject.class.uuid">
+      <div v-if="props.row.original.uuid !== props.row.original.originalObject.class.uuid && access.check.patch_app(UUIDs.App.Registration)">
         <DropdownMenuSeparator/>
         <DropdownMenuGroup>
           <DropdownMenuItem @click="handlePrimaryClass" class="cursor-pointer">
@@ -101,7 +109,7 @@ function handleDelete() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </div>
-      <div v-if="props.row.original.direct === 'Direct'">
+      <div v-if="props.row.original.direct === 'Direct' && canRemove">
         <DropdownMenuSeparator/>
         <DropdownMenuGroup>
           <DropdownMenuItem @click="handleDelete" class="cursor-pointer">

@@ -15,7 +15,7 @@
         :limit-height="false"
         @row-click="e => objectClick(e.original)">
       <template #toolbar-right>
-        <CreateEntryDialog :objs="obj.data" :app="application?.uuid" />
+        <CreateEntryDialog v-if="application && access.check.write_apps(application.uuid)" :objs="obj.data" :app="application.uuid" />
       </template>
     </DataTableSearchable>
     <template #sidebar>
@@ -59,6 +59,7 @@ import CreateEntryDialog from "@pages/ConfigDB/Applications/CreateEntryDialog.vu
 import CreateObjectDialog from "@pages/ConfigDB/CreateObjectDialog.vue";
 import ConfigDBContainer from '@components/Containers/ConfigDBContainer.vue'
 import SidebarDetail from '@components/SidebarDetail.vue'
+import {useAccessStore} from "@store/useAccessStore.js";
 
 export default {
   emits: ['rowClick'],
@@ -71,6 +72,7 @@ export default {
       columns: columns,
       router: useRouter(),
       route: useRoute(),
+      access: useAccessStore(),
     }
   },
 

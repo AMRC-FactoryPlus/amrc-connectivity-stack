@@ -48,6 +48,7 @@ export class AuthNotify {
 
         notify.watch("v2/acl/:principal", this.get_acl.bind(this));
         notify.watch("v2/acl/kerberos/:upn", this.get_krb_acl.bind(this));
+        notify.watch("v2/whoami/acl", this.whoami_acl.bind(this));
 
         return notify;
     }
@@ -95,6 +96,18 @@ export class AuthNotify {
     get_acl (sess, principal) {
         if (!valid_uuid(principal)) return;
         return this._get_acl(sess, this.data.acl_for(principal));
+    }
+
+    /* The caller's own ACL needs no ReadACL. See track_own_acl. */
+    whoami_acl (sess) {
+        return rxx.rx(
+            this.data.track_own_acl(sess.principal),
+            /* The ACL seq emits on any grant or group change anywhere;
+             * only send this caller an update when theirs changed. */
+            rx.distinctUntilChanged((a, b) =>
+                JSON.stringify(a) == JSON.stringify(b)),
+            rx.map(own => rxx.Response.ok(own)),
+            rx.map((r, i) => r.toUpdate(i)));
     }
 
     get_krb_acl (sess, upn) {

@@ -11,7 +11,9 @@ import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparat
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
-import { inject } from 'vue'
+import {useAccessStore} from '@store/useAccessStore.js'
+import {Auth, ConfigDB} from '@/lib/access/perms.js'
+import { computed, inject } from 'vue'
 import {UUIDs} from "@amrc-factoryplus/service-client";
 
 const permissionMembershipUpdated = inject('permissionMembershipUpdated')
@@ -24,6 +26,10 @@ interface DataTableRowActionsProps {
 const s = useServiceClientStore()
 
 const props = defineProps<DataTableRowActionsProps>()
+const access = useAccessStore()
+
+// Auth checks WriteACL against the permission the grant gives.
+const canRemove = computed(() => access.check.can(Auth.WriteACL, props.row.original.permission.uuid))
 
 function copy(id: string) {
   navigator.clipboard.writeText(id)
@@ -100,8 +106,8 @@ function handleDelete() {
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>
-      <DropdownMenuSeparator/>
-      <DropdownMenuGroup>
+      <DropdownMenuSeparator v-if="canRemove"/>
+      <DropdownMenuGroup v-if="canRemove">
         <DropdownMenuItem @click="handleDelete" class="cursor-pointer">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-trash text-red-500"></i>

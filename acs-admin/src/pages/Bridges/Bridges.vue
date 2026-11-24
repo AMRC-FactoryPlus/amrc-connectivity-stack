@@ -16,7 +16,7 @@
       @row-click="e => bridgeClick(e.original)"
     >
       <template #toolbar-right>
-        <Button class="gap-2" @click="newBridge">
+        <Button v-if="canNew" class="gap-2" @click="newBridge">
           <i class="fa-solid fa-plus"></i>
           <span>New Bridge</span>
         </Button>
@@ -25,7 +25,7 @@
         <EmptyState
           title="No Bridges"
           description="No UNS bridges have been configured yet. Create a bridge to forward messages between your local MQTT broker and remote brokers."
-          button-text="New Bridge"
+          :button-text="canNew ? 'New Bridge' : null"
           button-icon="plus"
           @button-click="newBridge"/>
       </template>
@@ -45,7 +45,7 @@
             <Button v-if="selectedBridge.uuid" title="Edit Bridge" size="xs" class="flex gap-1" @click="editBridge" variant="ghost">
               <i class="fa-solid fa-pen text-gray-400"></i>
             </Button>
-            <Button v-if="selectedBridge.uuid" title="Delete Bridge" size="xs" class="flex gap-1" @click="deleteBridge" variant="ghost">
+            <Button v-if="selectedBridge.uuid && canDelete" title="Delete Bridge" size="xs" class="flex gap-1" @click="deleteBridge" variant="ghost">
               <i class="fa-solid fa-trash text-red-400"></i>
             </Button>
           </div>
@@ -124,6 +124,8 @@ import { useEdgeClusterStore } from "@store/useEdgeClusterStore.js";
 import { staleHostWarning } from "@utils/hosts.js";
 import SidebarDetail from "@components/SidebarDetail.vue";
 import MoveHostButton from "@components/EdgeManager/Nodes/MoveHostButton.vue";
+import { useAccessStore } from "@store/useAccessStore.js";
+import { can_delete_bridge, can_save_bridge } from "@/lib/access/perms-edge.js";
 import StaleHostPill from "@components/EdgeManager/Nodes/StaleHostPill.vue";
 import EmptyState from '@components/EmptyState.vue';
 import { ref } from "vue";
@@ -148,6 +150,7 @@ export default {
       router: useRouter(),
       moment,
       s: useServiceClientStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -157,6 +160,12 @@ export default {
   },
 
   computed: {
+    canNew() {
+      return can_save_bridge(this.access.check, false)
+    },
+    canDelete() {
+      return can_delete_bridge(this.access.check, this.selectedBridge.uuid)
+    },
     bridges() {
       return this.bridge.data;
     },

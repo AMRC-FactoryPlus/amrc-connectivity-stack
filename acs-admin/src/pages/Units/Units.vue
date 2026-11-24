@@ -34,7 +34,7 @@
             </TabsList>
           </template>
           <template #toolbar-right>
-            <Button class="gap-2" @click="addUnit()">
+            <Button v-if="canAdd" class="gap-2" @click="addUnit()">
               <i class="fa-solid fa-plus"></i>
               <span>Add Unit</span>
             </Button>
@@ -76,13 +76,13 @@
               <i class="fa-fw fa-solid fa-ruler"></i>
               <div class="font-semibold text-xl">Unit Details</div>
             </div>
-            <Button title="Edit Unit" size="xs" class="flex gap-1 ml-auto" @click="editUnit" variant="ghost">
+            <Button v-if="canEdit" title="Edit Unit" size="xs" class="flex gap-1 ml-auto" @click="editUnit" variant="ghost">
               <i class="fa-solid fa-pen text-gray-400"></i>
             </Button>
-            <Button title="Merge into..." size="xs" class="flex gap-1" @click="mergeUnit" variant="ghost">
+            <Button v-if="canEdit && canDelete" title="Merge into..." size="xs" class="flex gap-1" @click="mergeUnit" variant="ghost">
               <i class="fa-solid fa-code-merge text-gray-400"></i>
             </Button>
-            <Button title="Delete Unit" size="xs" class="flex gap-1" @click="deleteUnit" variant="ghost">
+            <Button v-if="canDelete" title="Delete Unit" size="xs" class="flex gap-1" @click="deleteUnit" variant="ghost">
               <i class="fa-solid fa-trash text-red-400"></i>
             </Button>
           </div>
@@ -122,6 +122,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useServiceClientStore } from '@store/serviceClientStore'
 import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useEngUnitStore } from '@store/useEngUnitStore.js'
+import { useAccessStore } from '@store/useAccessStore.js'
 import { unit_rows, unit_usage, unknown_units, with_alias } from '@/lib/eng-units.js'
 import { suggest_for } from '@/lib/eng-units-unece.js'
 import { unitColumns, unknownColumns } from './unitColumns.ts'
@@ -141,6 +142,7 @@ export default {
       s: useServiceClientStore(),
       d: useDeviceStore(),
       units: useEngUnitStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -157,6 +159,18 @@ export default {
   },
 
   computed: {
+    /* Hide what the user's ACL can't do. */
+    canAdd () {
+      const c = this.access.check
+      return c.create_in(UUIDs.Class.EngineeringUnit)
+        && c.write_apps(UUIDs.App.Info, UUIDs.App.EngineeringUnit)
+    },
+    canEdit () {
+      return this.access.check.write_apps(UUIDs.App.EngineeringUnit)
+    },
+    canDelete () {
+      return !!this.selected && this.access.check.delete_obj(this.selected.uuid)
+    },
     loaded () {
       return this.units.ready && this.d.ready
     },
@@ -173,7 +187,8 @@ export default {
       return this.unknown.map(u => ({ ...u, suggestion: suggest_for(u.string, this.units.data) }))
     },
     unknownColumns () {
-      return unknownColumns(row => this.addString(row))
+      return unknownColumns(row => this.addString(row),
+        row => row.suggestion?.kind === 'alias' ? this.canEdit : this.canAdd)
     },
     /* Resolve the selection from the rows so it stays live after edits. */
     selected () {

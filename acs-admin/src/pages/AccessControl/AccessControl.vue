@@ -29,8 +29,8 @@
         <div v-if="p.loading || ps.loading || g.loading || grants.loading"><i class="fa-solid fa-circle-notch animate-spin"></i></div>
       </div>
       <div v-if="activeTab==='principals'" class="flex gap-2">
-        <CreateUserDialog/>
-        <LinkUserDialog/>
+        <CreateUserDialog v-if="access.check.can_wild(UserAdmin.ManageUsers)"/>
+        <LinkUserDialog v-if="access.check.can_any(Auth.WriteKrb)"/>
       </div>
     </div>
     <TabsContent value="principals">
@@ -63,6 +63,8 @@ import {useGrantStore} from "@store/useGrantStore.js";
 import {useRoute, useRouter} from "vue-router";
 import {serviceClientReady} from "@store/useServiceClientReady.js";
 import {useObjectStore} from "@store/useObjectStore.js";
+import {useAccessStore} from "@store/useAccessStore.js";
+import {Auth, UserAdmin} from "@/lib/access/perms.js";
 
 export default {
   setup () {
@@ -74,7 +76,11 @@ export default {
       grants: useGrantStore(),
       obj: useObjectStore(),
       router: useRouter(),
-      route: useRoute()
+      route: useRoute(),
+      access: useAccessStore(),
+      // The user admin service accepts only a wildcard grant.
+      Auth,
+      UserAdmin,
     }
   },
 

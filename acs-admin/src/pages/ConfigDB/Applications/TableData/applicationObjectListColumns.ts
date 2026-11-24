@@ -7,6 +7,7 @@ import {h} from 'vue'
 import {useServiceClientStore} from "@store/serviceClientStore.js";
 import {usePrincipalStore} from "@store/usePrincipalStore.js"
 import {useDialog} from '@/composables/useDialog';
+import {useAccessStore} from "@store/useAccessStore.js";
 
 import DataTableColumnHeader from '@/components/ui/data-table/DataTableColumnHeader.vue'
 import {toast} from "vue-sonner";
@@ -58,6 +59,7 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
 }, {
     id: 'actions',
     cell: ({row}) => {
+        if (!useAccessStore().check.write_apps(row.original.application.uuid)) return null
         return h('div', {onClick: async (e) => {
             e.stopPropagation()
             useDialog({

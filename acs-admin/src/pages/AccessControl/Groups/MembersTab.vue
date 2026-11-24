@@ -20,6 +20,7 @@
     </template>
     <template #below-toolbar>
       <ObjectSelector
+          v-if="access.check.can(ConfigDB.WriteMembers, group.uuid) && access.check.can_any(ConfigDB.WriteMemberships)"
           v-model="membersToAdd"
           :store-data="availableMembers"
           title="Select Members"
@@ -59,6 +60,8 @@ import {Label} from "@components/ui/label/index.js";
 import {Input} from "@components/ui/input/index.js";
 import {toast} from "vue-sonner";
 import {defineAsyncComponent, provide} from "vue";
+import { useAccessStore } from "@store/useAccessStore.js";
+import { ConfigDB } from "@/lib/access/perms.js";
 import {usePermissionStore} from "@store/usePermissionStore.js";
 import {useObjectStore} from "@store/useObjectStore.js";
 
@@ -67,6 +70,8 @@ export default {
 
   setup () {
     return {
+      access: useAccessStore(),
+      ConfigDB,
       columns,
       p: usePrincipalStore(),
       g: useGroupStore(),

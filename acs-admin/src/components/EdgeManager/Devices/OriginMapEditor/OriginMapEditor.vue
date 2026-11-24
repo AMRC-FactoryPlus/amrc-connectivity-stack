@@ -65,7 +65,7 @@
             </SidebarGroupContent>
           </SidebarGroup>
           <!-- Save button fixed at the bottom -->
-          <Button variant="destructive" :disabled="loading" @click="save()" class="mt-2 shrink-0 mx-3 mb-1">
+          <Button v-if="canSave" variant="destructive" :disabled="loading" @click="save()" class="mt-2 shrink-0 mx-3 mb-1">
             <div v-if="!loading" class="flex items-center justify-center gap-1">
               <span>Save Changes</span>
               <i class="fa-sharp fa-solid fa-save ml-2"></i>
@@ -81,7 +81,7 @@
               <Download class="size-4 mr-1" />
               Download CSV
             </Button>
-            <Button variant="outline" class="shrink-0 mx-3 mt-1 mb-2" @click="$refs.csvFileInput.click()" :disabled="!schema">
+            <Button v-if="canSave" variant="outline" class="shrink-0 mx-3 mt-1 mb-2" @click="$refs.csvFileInput.click()" :disabled="!schema">
               <Upload class="size-4 mr-1" />
               Upload CSV
             </Button>
@@ -172,6 +172,8 @@ import addFormats from 'ajv-formats'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
 import { Download, File, TriangleAlert, Upload } from 'lucide-vue-next'
 import Tree from './Tree.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_edit_device_ea } from '@/lib/access/perms-edge.js'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 
@@ -184,6 +186,7 @@ export default {
       sch: useSchemaStore(),
       s: useServiceClientStore(),
       conn: useConnectionStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -254,6 +257,12 @@ export default {
   },
 
   computed: {
+    /* Saving patches DeviceInformation and rewrites the Edge Agent
+     * config. Without that the map is still there to read. */
+    canSave () {
+      return can_edit_device_ea(this.access.check)
+    },
+
     sparkplugMetricSchema () {
       return this.sch.data.find(e => e.uuid === SparkplugMetricUUID)
     },

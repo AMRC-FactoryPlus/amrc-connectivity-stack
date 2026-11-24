@@ -16,11 +16,11 @@
       @row-click="e => nodeClick(e.original)"
     >
       <template #toolbar-right>
-        <Button variant="outline" class="gap-2" @click="importPlacements">
+        <Button v-if="canPlace" variant="outline" class="gap-2" @click="importPlacements">
           <i class="fa-solid fa-file-import"></i>
           <span>Import placements</span>
         </Button>
-        <Button class="gap-2" @click="newNode">
+        <Button v-if="canCreate" class="gap-2" @click="newNode">
           <i class="fa-solid fa-plus"></i>
           <span>New Node</span>
         </Button>
@@ -29,7 +29,7 @@
         <EmptyState
           title="No ISA-95 Hierarchy"
           description="No ISA-95 hierarchy has been configured yet. Create an Enterprise to start building the hierarchy."
-          button-text="New Node"
+          :button-text="canCreate ? 'New Node' : ''"
           button-icon="plus"
           @button-click="newNode"/>
       </template>
@@ -43,13 +43,13 @@
               <i class="fa-fw fa-solid fa-sitemap"></i>
               <div class="font-semibold text-xl">Node Details</div>
             </div>
-            <Button title="Edit Node" size="xs" class="flex gap-1 ml-auto" @click="editNode" variant="ghost">
+            <Button v-if="canEdit" title="Edit Node" size="xs" class="flex gap-1 ml-auto" @click="editNode" variant="ghost">
               <i class="fa-solid fa-pen text-gray-400"></i>
             </Button>
-            <Button title="Merge into..." size="xs" class="flex gap-1" @click="mergeNode" variant="ghost">
+            <Button v-if="canEdit && canDelete" title="Merge into..." size="xs" class="flex gap-1" @click="mergeNode" variant="ghost">
               <i class="fa-solid fa-code-merge text-gray-400"></i>
             </Button>
-            <Button title="Delete Node" size="xs" class="flex gap-1" @click="deleteNode" variant="ghost">
+            <Button v-if="canEdit && canDelete" title="Delete Node" size="xs" class="flex gap-1" @click="deleteNode" variant="ghost">
               <i class="fa-solid fa-trash text-red-400"></i>
             </Button>
           </div>
@@ -105,7 +105,8 @@ import { Skeleton } from "@components/ui/skeleton/index.js";
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
 import BridgesContainer from '@components/Containers/BridgesContainer.vue';
 import { isa95Columns } from "./isa95Columns.ts";
-import { ISA95_LEVELS, useISA95Store } from "@store/useISA95Store.js";
+import { ISA95_LEVELS, ISA95_LEVEL_CLASSES, useISA95Store } from "@store/useISA95Store.js";
+import { useAccessStore } from "@store/useAccessStore.js";
 import SidebarDetail from "@components/SidebarDetail.vue";
 import EmptyState from '@components/EmptyState.vue';
 import { ref } from "vue";
@@ -129,6 +130,7 @@ export default {
       columns: isa95Columns,
       s: useServiceClientStore(),
       d: useDeviceStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -140,6 +142,21 @@ export default {
   },
 
   computed: {
+    /* Hide what the user's ACL can't do. */
+    canCreate() {
+      const c = this.access.check;
+      return Object.values(ISA95_LEVEL_CLASSES).some(k => c.create_in(k))
+        && c.write_apps(UUIDs.App.Info, UUIDs.App.ISA95Vocabulary);
+    },
+    canEdit() {
+      return this.access.check.write_apps(UUIDs.App.Info, UUIDs.App.ISA95Vocabulary);
+    },
+    canDelete() {
+      return !!this.selectedNode && this.access.check.delete_obj(this.selectedNode.uuid);
+    },
+    canPlace() {
+      return this.access.check.write_apps(UUIDs.App.ISA95Placement);
+    },
     rows() {
       return this.isa95.data.map(n => ({
         ...n,

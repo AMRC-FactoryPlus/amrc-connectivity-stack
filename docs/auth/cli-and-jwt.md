@@ -324,10 +324,11 @@ The JWT isn't reaching validation. Check, in order:
 
 ### `403 Forbidden`
 
-Auth succeeded; you don't have permission. Hit `/v2/whoami/uuid` on
-auth to confirm the principal UUID, then `/v2/acl/<that-uuid>` to see
-your grants. The principal exists but lacks the right grant for the
-resource you're hitting.
+Auth succeeded; you don't have permission. Hit `/v2/whoami/acl` on
+auth to see your principal UUID and every permission you hold, with
+groups and class grants expanded. It needs no extra permission. The
+principal exists but lacks the right grant for the resource you're
+hitting.
 
 ### Service has no `OIDC_DISCOVERY_URL`
 

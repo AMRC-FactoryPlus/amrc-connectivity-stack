@@ -41,6 +41,7 @@
             <template #actions>
                 <div class="flex gap-2">
                     <Button
+                        v-if="can.edit || device.deviceInformation.schema"
                         @click="changeSchema"
                         :disabled="device.deviceInformation.schema"
                         :variant="device.deviceInformation.schema ? 'outline' : 'default'"
@@ -50,6 +51,7 @@
                         <span>{{ device.deviceInformation.schema ? 'Schema Configured' : 'Choose Schema' }}</span>
                     </Button>
                     <Button
+                        v-if="can.editEa || device.deviceInformation.connection"
                         @click="changeConnection"
                         :disabled="device.deviceInformation.connection"
                         :variant="device.deviceInformation.connection ? 'outline' : 'default'"
@@ -116,7 +118,7 @@
                 </span>
                 <Switch
                   :model-value="recordToHistorian"
-                  :disabled="historianToggleBusy"
+                  :disabled="historianToggleBusy || !can.editEa"
                   @update:model-value="setRecordToHistorian"
                 />
               </div>
@@ -126,7 +128,7 @@
           <div class="flex items-center justify-between gap-2 p-4 border-b">
             <div class="font-semibold text-lg">Schema</div>
             <Button title="Change schema"
-                v-if="device.deviceInformation?.schema"
+                v-if="device.deviceInformation?.schema && can.edit"
                 @click="changeSchema"
                 size="sm"
                 variant="ghost"
@@ -161,7 +163,7 @@
           <div class="flex items-center justify-between gap-2 p-4 border-b">
             <div class="font-semibold text-lg">Connection</div>
             <Button title="Change connection"
-                v-if="device.deviceInformation?.connection"
+                v-if="device.deviceInformation?.connection && can.editEa"
                 @click="changeConnection"
                 size="sm"
                 variant="ghost"
@@ -213,6 +215,8 @@ import ISA95HierarchyPanel  from '@components/EdgeManager/Devices/ISA95Hierarchy
 import I3xAccessButton      from '@components/Access/I3xAccessButton.vue'
 import { useISA95Store }    from '@store/useISA95Store.js'
 import { placement_chain }  from '@/lib/isa95-placement.js'
+import { useAccessStore }   from '@store/useAccessStore.js'
+import { can_edit_device, can_edit_device_ea } from '@/lib/access/perms-edge.js'
 
 export default {
   components: {
@@ -243,6 +247,7 @@ export default {
       sch: useSchemaStore(),
       conn: useConnectionStore(),
       isa95: useISA95Store(),
+      access: useAccessStore(),
       inop,
       moment,
     }
@@ -279,6 +284,16 @@ export default {
   },
 
   computed: {
+    /* Every change here is a merge patch to the device's
+     * DeviceInformation; editEa ones also rewrite the Edge Agent config. */
+    can () {
+      const c = this.access.check
+      return {
+        edit: can_edit_device(c),
+        editEa: can_edit_device_ea(c),
+      }
+    },
+
     recordToHistorian () {
       return this.device?.deviceInformation?.recordToHistorian !== false
     },

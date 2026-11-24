@@ -30,6 +30,7 @@ self.MonacoEnvironment = {
 }
 
 import { createApp } from 'vue'
+import { useAccessStore } from '@store/useAccessStore.js'
 import { createPinia } from 'pinia'
 import piniaPersist from 'pinia-plugin-persist'
 import { createRouter, createWebHashHistory } from 'vue-router'
@@ -437,3 +438,6 @@ const pinia = createPinia()
 pinia.use(piniaPersist)
 
 createApp(App).use(router).use(pinia).mount('#app')
+
+// Follow the logged-in user's own permissions, to hide what they can't use.
+useAccessStore(pinia).start()

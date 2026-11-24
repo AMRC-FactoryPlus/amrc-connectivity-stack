@@ -22,11 +22,11 @@
           class="w-full"
           @update:modelValue="changeNewModel"
       >
-        <TabsList class="grid w-full grid-cols-2">
+        <TabsList class="grid w-full" :class="canCreateObject ? 'grid-cols-2' : 'grid-cols-1'">
           <TabsTrigger value="existing" class="text-xs">
             Existing Object
           </TabsTrigger>
-          <TabsTrigger value="new" class="text-xs">
+          <TabsTrigger v-if="canCreateObject" value="new" class="text-xs">
             New Object
           </TabsTrigger>
         </TabsList>
@@ -177,6 +177,8 @@ import { Switch } from '@/components/ui/switch'
 import MonacoEditor from 'vue-monaco'
 import yaml from 'yaml'
 import { useUserSettingsStore } from '@store/useUserSettingsStore.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { ConfigDB } from '@/lib/access/perms.js'
 
 MonacoEditor.render = () => h('div')
 
@@ -188,6 +190,7 @@ export default {
       s: useServiceClientStore(),
       router: useRouter(),
       settings: useUserSettingsStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -249,6 +252,16 @@ export default {
 
       const klass = val[0]
       this.classUuid = klass.uuid
+    },
+  },
+
+  computed: {
+    // A new object needs create on its class, which is picked in the
+    // dialog, and a merge-patch of its Info entry to name it.
+    canCreateObject () {
+      const c = this.access.check
+      return (c.can_any(ConfigDB.CreateObj) || c.can_any(ConfigDB.CreateSpecificObj))
+        && c.patch_app(UUIDs.App.Info)
     },
   },
 

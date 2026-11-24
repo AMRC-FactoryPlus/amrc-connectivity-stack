@@ -85,11 +85,12 @@
             <input id="kiosk-note" v-model="draftNote" type="text" placeholder="For example new insert fitted" :class="FIELD"/>
           </div>
         </div>
-        <button type="button" :class="BIG_START" :disabled="busy || !(operator || operatorDraft.trim())" @click="start()">
+        <p v-if="acl_ready && !may.record" class="text-center text-[15px] text-gray-500">This account can't record on this equipment. Ask an admin for access.</p>
+        <button v-if="may.record" type="button" :class="BIG_START" :disabled="busy || !(operator || operatorDraft.trim())" @click="start()">
           <i v-if="busy" class="fa-solid fa-circle-notch animate-spin text-2xl"></i>
           <i v-else class="fa-solid fa-circle text-xl text-red-400"></i>Start recording
         </button>
-        <p v-if="!operator && !operatorDraft.trim()" class="-mt-3 text-center text-sm text-gray-500">Enter your name to start.</p>
+        <p v-if="may.record && !operator && !operatorDraft.trim()" class="-mt-3 text-center text-sm text-gray-500">Enter your name to start.</p>
       </section>
 
       <!-- Recording -->
@@ -126,7 +127,8 @@
                    enterkeyhint="done" @focus="noteFocused = true" @blur="saveRecNote" @keydown.enter.prevent="e => e.target.blur()"/>
           </div>
         </div>
-        <button type="button" :class="BIG_STOP" :disabled="saving" @click="stop">
+        <p v-if="acl_ready && !may.stop_record" class="text-center text-[15px] text-gray-500">This account can't stop recordings on this equipment. Ask an admin for access.</p>
+        <button v-if="may.stop_record" type="button" :class="BIG_STOP" :disabled="saving" @click="stop">
           <i class="fa-solid fa-stop"></i>{{ recording.reference ? 'Stop reference' : 'Stop recording' }}
         </button>
       </section>
@@ -147,7 +149,7 @@
             <p class="text-[15px] text-gray-500">This tablet keeps the stop time and sends it when the connection returns. The recording is safe on the server.</p>
           </div>
         </div>
-        <Button variant="outline" class="h-[72px] gap-2 text-xl" @click="tryPending(true)">
+        <Button v-if="may.stop_record" variant="outline" class="h-[72px] gap-2 text-xl" @click="tryPending(true)">
           <i class="fa-solid fa-rotate"></i>Try now
         </Button>
       </section>
@@ -163,7 +165,7 @@
           </div>
         </div>
         <div class="grid grid-cols-[2fr_1fr] gap-4">
-          <button type="button" :class="BIG_PRIMARY" class="h-24 text-[26px]" :disabled="saving" @click="retry">
+          <button v-if="may.stop_record" type="button" :class="BIG_PRIMARY" class="h-24 text-[26px]" :disabled="saving" @click="retry">
             <i class="fa-solid fa-rotate"></i>Try again
           </button>
           <Button variant="outline" class="h-24 whitespace-normal rounded-lg text-lg" @click="leaveForAdmin">Leave it for an admin</Button>
@@ -211,10 +213,10 @@
           </div>
         </div>
         <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
-          <button type="button" :class="BIG_PRIMARY" class="h-24 text-[26px]" :disabled="busy" @click="startNext">
+          <button v-if="may.record" type="button" :class="BIG_PRIMARY" class="h-24 text-[26px]" :disabled="busy" @click="startNext">
             <i class="fa-solid fa-circle text-base text-red-400"></i>Start recording
           </button>
-          <Button variant="outline" class="h-24 flex-col gap-0.5 whitespace-normal rounded-lg" :disabled="!resumeMs || busy" @click="resume">
+          <Button v-if="may.record" variant="outline" class="h-24 flex-col gap-0.5 whitespace-normal rounded-lg" :disabled="!resumeMs || busy" @click="resume">
             <span class="text-lg font-semibold"><i class="fa-solid fa-rotate-left mr-1 text-[15px]"></i>Resume recording</span>
             <span class="text-[13px] font-normal text-gray-500">{{ resumeText }}</span>
           </Button>
@@ -224,18 +226,18 @@
       <!-- Footer -->
       <footer class="flex min-h-16 shrink-0 flex-wrap items-center justify-center gap-2 border-t border-slate-200 px-4 py-1.5">
         <template v-if="phase === 'recording'">
-          <Button variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openDialog('correct')">
+          <Button v-if="may.record" variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openDialog('correct')">
             <i class="fa-solid fa-clock-rotate-left"></i>Correct start time
           </Button>
-          <Button variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openDialog('void')">
+          <Button v-if="may.stop_record" variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openDialog('void')">
             <i class="fa-solid fa-ban"></i>Void this recording
           </Button>
         </template>
         <template v-else-if="phase === 'ready' || phase === 'saved'">
-          <Button variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openForgot(null)">
+          <Button v-if="may.create" variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openForgot(null)">
             <i class="fa-solid fa-clock-rotate-left"></i>Add a recording I forgot to start
           </Button>
-          <Button variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openDialog('reference')">
+          <Button v-if="may.record" variant="ghost" class="h-[52px] gap-2 px-5 text-base" @click="openDialog('reference')">
             <i class="fa-solid fa-ruler-horizontal"></i>Record a reference window
           </Button>
         </template>
@@ -285,6 +287,8 @@ import KioskForgotDialog from '@components/Datasets/kiosk/KioskForgotDialog.vue'
 import KioskCorrectDialog from '@components/Datasets/kiosk/KioskCorrectDialog.vue'
 import KioskVoidDialog from '@components/Datasets/kiosk/KioskVoidDialog.vue'
 import KioskReferenceDialog from '@components/Datasets/kiosk/KioskReferenceDialog.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 const PANEL = 'mx-auto grid w-full max-w-[920px] flex-1 auto-rows-max content-center gap-6 overflow-auto px-6 py-6 md:px-16'
 const FIELD = 'h-14 w-full rounded-md border border-slate-200 bg-white px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2'
@@ -297,6 +301,12 @@ const MARK = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded
 const route = useRoute()
 const router = useRouter()
 const ds = useDatasetsStore()
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check))
+/* Say "can't" only once we know, not while the ACL is loading. */
+const acl_ready = computed(() => access.check.status !== 'loading')
 const layout = useLayoutStore()
 const sc = useServiceClientStore()
 

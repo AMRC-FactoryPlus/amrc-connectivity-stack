@@ -15,7 +15,7 @@
     <Button variant="outline" size="sm" @click="router.push('/kiosk')">
       <i class="fa-solid fa-tablet-screen-button mr-1.5"></i>Kiosk
     </Button>
-    <Button size="sm" @click="router.push('/datasets/new')">
+    <Button v-if="may.create" size="sm" @click="router.push('/datasets/new')">
       <i class="fa-solid fa-plus mr-1.5"></i>New dataset
     </Button>
   </div>
@@ -25,8 +25,15 @@
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { computed } from 'vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 
 defineProps({ view: { type: String, required: true } })
 const emit = defineEmits(['update:view'])
 const router = useRouter()
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check))
 </script>

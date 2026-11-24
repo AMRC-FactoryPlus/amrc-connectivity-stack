@@ -30,7 +30,7 @@
       </CollapsibleContent>
     </Collapsible>
   </SidebarMenuItem>
-  <Button @click="newCluster" class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
+  <Button v-if="can_new_cluster(access.check)" @click="newCluster" class="flex items-center justify-center gap-1 text-gray-400 my-1" variant="ghost" size="sm">
     <i class="fa-solid fa-plus"></i>
     <span>New Cluster</span>
   </Button>
@@ -49,6 +49,8 @@ import { useObjectStore } from '@store/useObjectStore.js'
 import { useDriverStore } from '@store/useDriverStore.js'
 import { useDeploymentStore } from '@store/useDeploymentStore.js'
 import { useHelmChartStore } from '@store/useHelmChartStore.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { can_new_cluster } from '@/lib/access/perms-edge.js'
 
 export default {
 
@@ -61,6 +63,8 @@ export default {
       dr: useDriverStore(),
       dp: useDeploymentStore(),
       hc: useHelmChartStore(),
+      access: useAccessStore(),
+      can_new_cluster,
     }
   },
 

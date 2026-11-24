@@ -64,8 +64,12 @@ export const unitColumns: ColumnDef<UnitRow>[] = [
     },
 ]
 
-/* `act` is called with a row when its button is pressed. */
-export function unknownColumns (act: (row: UnknownRow) => void): ColumnDef<UnknownRow>[] {
+/* `act` is called with a row when its button is pressed. The button
+ * shows only where `allowed` says the user may take that action. */
+export function unknownColumns (
+    act: (row: UnknownRow) => void,
+    allowed: (row: UnknownRow) => boolean = () => true,
+): ColumnDef<UnknownRow>[] {
     return [
         {
             accessorKey: 'string',
@@ -92,6 +96,7 @@ export function unknownColumns (act: (row: UnknownRow) => void): ColumnDef<Unkno
             id: 'action',
             header: () => '',
             cell: ({ row }) => {
+                if (!allowed(row.original)) return null
                 const s = row.original.suggestion
                 const label = s?.kind === 'alias' ? `Add as alias of ${s.match.code}`
                     : s?.kind === 'create' ? `Add unit ${s.match.code}`

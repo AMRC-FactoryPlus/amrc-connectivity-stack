@@ -4,9 +4,8 @@
 
 <!-- Share: grant "Read dataset" on this dataset to a principal, and
      "Use for session" when ticked, which is all they need to make
-     session datasets from it. Only administrators can add grants
-     today, so there is no permission check first: it tries, and a
-     refusal says so. -->
+     session datasets from it. The form shows only to someone whose ACL
+     lets them make the grants; who it is shared with shows to everyone. -->
 <template>
   <Card class="flex flex-col gap-3 p-5">
     <div class="font-semibold"><i class="fa-solid fa-user-plus mr-2 text-slate-500"></i>Share</div>
@@ -15,6 +14,7 @@
       Tick Use for sessions to let them make session datasets from it too.
     </p>
 
+    <template v-if="may.share">
     <div class="flex flex-wrap items-start gap-2">
       <div class="relative w-full max-w-md">
         <input v-model="query" placeholder="Search accounts by name or username" aria-label="Account to share with"
@@ -34,7 +34,7 @@
         <i v-if="busy" class="fa-solid fa-circle-notch animate-spin mr-2"></i>Share
       </Button>
     </div>
-    <label class="flex w-fit cursor-pointer items-center gap-2 text-sm">
+    <label v-if="may.share_sessions" class="flex w-fit cursor-pointer items-center gap-2 text-sm">
       <input v-model="session" type="checkbox" class="accent-slate-900">
       Use for sessions
     </label>
@@ -42,6 +42,7 @@
       <i class="fa-solid fa-circle-notch animate-spin mr-1"></i>Loading accounts
     </div>
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+    </template>
 
     <div v-if="lists.some(l => l.grants.length)" class="flex flex-wrap gap-x-8 gap-y-3">
       <div v-for="l in lists.filter(l => l.grants.length)" :key="l.id" class="flex flex-col gap-1">
@@ -64,9 +65,15 @@ import { Button } from '@/components/ui/button'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { useObjectStore } from '@store/useObjectStore.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { dataset_access } from '@/lib/datasets/access.js'
 import { share_grants, share_lists, load_share_grants } from './share-logic.js'
 
 const props = defineProps({ record: { type: Object, required: true } })
+
+/* Hide what the user's ACL can't do. */
+const access = useAccessStore()
+const may = computed(() => dataset_access(access.check, props.record.uuid))
 
 const principals = usePrincipalStore()
 const query = ref('')

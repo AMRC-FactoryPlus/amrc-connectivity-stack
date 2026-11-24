@@ -13,7 +13,7 @@
             :class="filter === f ? 'bg-white text-slate-950 shadow-sm' : ''"
             @click="filter = f">{{ f }}</button>
         </div>
-        <Button size="sm" variant="outline" :disabled="!anyRunning" @click="engine.actions.stopAll">
+        <Button v-if="mayControlAny" size="sm" variant="outline" :disabled="!anyRunning" @click="engine.actions.stopAll">
           <i class="fa-solid fa-stop mr-1.5 text-[11px]"></i>Stop all
         </Button>
       </div>
@@ -86,6 +86,8 @@ import { useNodeStore } from '@store/useNodeStore.js'
 import { useSchemaStore } from '@store/useSchemaStore.js'
 import { useCassetteObjectStore, useCassetteMetaStore } from '@store/useCassetteStore.js'
 import { useCassetteDecks } from '@/composables/useCassetteDecks.js'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { EdgeSim } from '@/lib/edge-sim-uuids.js'
 
 export default {
   components: { Button, EmptyState, DeckCard, CassetteLibrary, UploadCassetteDialog },
@@ -94,6 +96,7 @@ export default {
     return {
       cassettes: useCassetteObjectStore(),
       meta: useCassetteMetaStore(),
+      access: useAccessStore(),
       now: Date.now(),
       filter: 'All',
       filters: ['All', 'Playing', 'Idle', 'Empty'],
@@ -113,6 +116,11 @@ export default {
   computed: {
     wallClockLabel () {
       return new Date(this.now).toLocaleTimeString('en-GB')
+    },
+    /* Stop all is hidden unless the user may command some deck. */
+    mayControlAny () {
+      return this.engine.decks.value
+        .some(d => this.access.check.can(EdgeSim.ControlPlayer, d.uuid))
     },
     anyRunning () {
       return this.engine.decks.value

@@ -7,7 +7,7 @@
 <template>
   <div class="flex items-center justify-between gap-2 p-4 border-b">
     <div class="font-semibold text-lg">ISA-95 Placement</div>
-    <Button v-if="device.placement?.node"
+    <Button v-if="device.placement?.node && canPlace"
         title="Clear placement"
         size="sm"
         variant="ghost"
@@ -41,7 +41,7 @@
       </div>
       <ISA95PlacementPicker
           :model-value="shown"
-          :disabled="busy"
+          :disabled="busy || !canPlace"
           @update:model-value="place"
       />
     </template>
@@ -56,6 +56,8 @@ import { Button } from '@/components/ui/button'
 import { useISA95Store } from '@/store/useISA95Store.js'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useDialog } from '@/composables/useDialog'
+import { useAccessStore } from '@/store/useAccessStore.js'
+import { can_place_device } from '@/lib/access/perms-edge.js'
 import {
     placement_chain, placement_explanation, placement_state,
 } from '@/lib/isa95-placement.js'
@@ -75,6 +77,7 @@ export default {
         return {
             isa95: useISA95Store(),
             s: useServiceClientStore(),
+            access: useAccessStore(),
         }
     },
 
@@ -98,6 +101,11 @@ export default {
     },
 
     computed: {
+        /* Placing and clearing both write ISA95Placement. */
+        canPlace () {
+            return can_place_device(this.access.check)
+        },
+
         status () {
             return placement_state(this.isa95.vocabulary, this.device.placement, this.device.uuid)
         },

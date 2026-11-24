@@ -4,12 +4,15 @@
 
 <script setup lang="ts">
 import type {Row} from '@tanstack/vue-table'
+import {computed} from 'vue'
 import type {SubclassOfMapping} from './objectSubclassOfListColumns'
 import {Button} from '@/components/ui/button'
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup} from '@/components/ui/dropdown-menu'
 import {toast} from "vue-sonner";
 import {useDialog} from '@/composables/useDialog';
 import {useServiceClientStore} from '@store/serviceClientStore.js'
+import {useAccessStore} from '@store/useAccessStore.js'
+import {ConfigDB} from '@/lib/access/perms.js'
 
 interface DataTableRowActionsProps {
     row: Row<SubclassOfMapping>
@@ -19,6 +22,11 @@ const s = useServiceClientStore()
 const cdb = s.client.ConfigDB
 
 const props = defineProps<DataTableRowActionsProps>()
+const access = useAccessStore()
+
+// ConfigDB checks both ends of the relation.
+const canRemove = computed(() => access.check.can(ConfigDB.WriteSubclasses, props.row.original.uuid)
+    && access.check.can(ConfigDB.WriteSuperclasses, props.row.original.originalObject.uuid))
 
 function copy(id: string) {
     navigator.clipboard.writeText(id)
@@ -73,8 +81,8 @@ function handleDelete() {
           </div>
         </DropdownMenuItem>
       </DropdownMenuGroup>
-      <DropdownMenuSeparator/>
-      <DropdownMenuGroup>
+      <DropdownMenuSeparator v-if="canRemove"/>
+      <DropdownMenuGroup v-if="canRemove">
         <DropdownMenuItem @click="handleDelete" class="cursor-pointer">
           <div class="flex items-center justify-center gap-2">
             <i class="fa-solid fa-fw fa-trash text-red-500"></i>

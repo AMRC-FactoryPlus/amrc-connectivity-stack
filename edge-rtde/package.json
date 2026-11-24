@@ -11,7 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.1.0",
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
     "dotenv": "^17.2.3",
     "node-int64": "^0.4.0",
     "ur-rtde": "^1.0.0"

@@ -11,7 +11,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.1.1",
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
     "basic-ftp": "^6.2.1",
     "ssh2-sftp-client": "^12.1.1"
   }

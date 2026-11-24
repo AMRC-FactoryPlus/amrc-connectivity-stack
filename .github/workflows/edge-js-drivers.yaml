@@ -1,0 +1,55 @@
+name: JS edge driver tests
+
+# Runs the tests of the JS split drivers in this repository that have
+# a test suite: edge-test (the Edge Scout conformance fixture), edge-sim
+# (the JS reference scouter), edge-ftp and edge-pathfindr. The edge-test
+# and edge-sim scouting tests check every message against
+# lib/edge-scout-schemas, which they read by relative path, so they need
+# the whole checkout. Every JS driver takes lib/js-edge-driver through a
+# file: dependency, and --install-links copies it in as their Docker
+# images do.
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'feature/**'
+    paths:
+      - 'edge-test/**'
+      - 'edge-sim/**'
+      - 'edge-ftp/**'
+      - 'edge-pathfindr/**'
+      - 'lib/js-edge-driver/**'
+      - 'lib/edge-scout-schemas/**'
+      - '.github/workflows/edge-js-drivers.yaml'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [edge-test, edge-sim, edge-ftp, edge-pathfindr]
+    defaults:
+      run:
+        working-directory: ${{ matrix.driver }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # The same major version as the driver images.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install dependencies
+        run: npm ci --install-links --no-audit --no-fund
+
+      - name: Lint
+        if: matrix.driver == 'edge-test'
+        run: npx eslint bin lib test
+
+      - name: Run the tests
+        run: npm test

@@ -85,7 +85,28 @@ impl Func {
     }
 }
 
+impl Func {
+    /// The name an address uses for this function.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Const => "const",
+            Self::Sin => "sin",
+            Self::Saw => "saw",
+        }
+    }
+}
+
 impl Packing {
+    /// The name an address uses for this packing.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::DoubleBE => "bd",
+            Self::DoubleLE => "ld",
+            Self::FloatBE => "bf",
+            Self::FloatLE => "lf",
+        }
+    }
+
     fn from_name(name: &str) -> Option<Self> {
         match name {
             "bd" => Some(Self::DoubleBE),
@@ -116,6 +137,39 @@ impl Addr {
             amplitude,
             packing,
         })
+    }
+}
+
+/// The canonical form of an address, which Edge Scout items use.
+///
+/// The numbers are written in Rust's shortest form that reads back to
+/// the same value, so parsing the printed address gives the same
+/// address. `sin:1000:2.5:bd` prints as itself, and `sin:1e3:2.50:bd`
+/// prints as `sin:1000:2.5:bd`. Infinity is written `Infinity`, as JS
+/// writes it.
+impl std::fmt::Display for Addr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}:{}",
+            self.func.name(),
+            Num(self.period),
+            Num(self.amplitude),
+            self.packing.name()
+        )
+    }
+}
+
+/// A number in an address, written so [`js_parse_float`] reads it back.
+struct Num(f64);
+
+impl std::fmt::Display for Num {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            v if v == f64::INFINITY => f.write_str("Infinity"),
+            v if v == f64::NEG_INFINITY => f.write_str("-Infinity"),
+            v => write!(f, "{v}"),
+        }
     }
 }
 
@@ -214,6 +268,37 @@ mod tests {
             Addr::parse("const:1:1:bf").unwrap().packing,
             Packing::FloatBE
         );
+    }
+
+    #[test]
+    fn prints_the_canonical_form() {
+        for (spec, canonical) in [
+            ("sin:1000:2.5:bd", "sin:1000:2.5:bd"),
+            ("sin:1e3:2.50:bd", "sin:1000:2.5:bd"),
+            ("saw: 10abc:-0:lf", "saw:10:-0:lf"),
+            ("const:.5:1e21:bf", "const:0.5:1000000000000000000000:bf"),
+            ("const:1:-Infinity:ld", "const:1:-Infinity:ld"),
+            ("const:1:1e999:ld", "const:1:Infinity:ld"),
+        ] {
+            let a = Addr::parse(spec).unwrap();
+            assert_eq!(a.to_string(), canonical, "{spec:?}");
+        }
+    }
+
+    /// Printing then parsing gives the same address.
+    #[test]
+    fn printed_addresses_read_back() {
+        for spec in [
+            "sin:1000:2.5:bd",
+            "saw:0.1:-7:lf",
+            "const:1e-7:123456789.125:bf",
+            "sin:5e-324:1.7976931348623157e308:ld",
+            "saw:-0:0:bd",
+            "const:Infinity:-Infinity:bd",
+        ] {
+            let a = Addr::parse(spec).unwrap();
+            assert_eq!(Addr::parse(&a.to_string()), Some(a), "{spec:?}");
+        }
     }
 
     #[test]

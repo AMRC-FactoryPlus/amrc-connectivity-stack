@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amrc-factoryplus/edge-driver": "^0.0.5",
+    "@amrc-factoryplus/edge-driver": "file:../lib/js-edge-driver",
     "node-bacnet": "^0.2.4"
   }
 }

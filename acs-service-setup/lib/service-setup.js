@@ -10,6 +10,7 @@ import { migrate_auth_groups }  from "./auth-group.js";
 import { DumpLoader }           from "./dumps.js";
 import { fixups }               from "./fixups.js";
 import { migrate_isa95_placement } from "./isa95-placement.js";
+import { migrate_eng_units }    from "./eng-units.js";
 import { setup_git_repos }      from "./git-repos.js";
 import { setup_local_uuids }    from "./local-uuids.js";
 import {migrate_edge_agent_config} from "./manager-devices.js";
@@ -90,6 +91,9 @@ export class ServiceSetup {
 
         this.log("Placing devices in the ISA-95 vocabulary");
         await migrate_isa95_placement(this);
+
+        this.log("Seeding the engineering unit vocabulary");
+        await migrate_eng_units(this);
 
         if (process.env.OPENID_URL) {
             this.log("Seeding Grafana role groups in F+");

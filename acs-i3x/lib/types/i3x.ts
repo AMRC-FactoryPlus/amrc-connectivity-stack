@@ -98,6 +98,10 @@ export interface I3xObjectMetadata {
     /* The ids at the other end of the object's edges, by relationship
      * type. */
     relationships?: Record<string, string | string[]>;
+    /* The UNECE Recommendation 20 code of the value's unit. */
+    engUnit?: string;
+    /* Vendor-defined values: strings, numbers and booleans only. */
+    system?: Record<string, string | number | boolean>;
 }
 
 export interface I3xObjectWithMetadata extends I3xObject {

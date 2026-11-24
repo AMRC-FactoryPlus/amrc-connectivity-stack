@@ -32,6 +32,7 @@ import {
     RelType,
 } from "./constants.js";
 import { I3xStore } from "./store.js";
+import type { UnitSource } from "./eng-units.js";
 
 // Namespace for generating synthetic UUIDs for metric path segments
 // that don't have their own Instance_UUID.
@@ -50,6 +51,9 @@ interface ObjectTreeOpts {
     /** The database to keep the tree in. Defaults to a new in-memory
      * database, which suits tests. */
     store?: I3xStore;
+    /** The engineering unit vocabulary, to give a metric's metadata
+     * the UNECE code of its Eng_Unit. Without it there is no engUnit. */
+    units?: UnitSource;
 }
 
 /**
@@ -72,6 +76,7 @@ export interface MetricMeta {
     metricName: string;      // e.g. "True_RMS_Current"
     sparkplugType: string;   // e.g. "FloatLE"
     typeSuffix: string;      // e.g. "d"
+    engUnit?: string;        // e.g. "kWh", the Eng_Unit as configured
 }
 
 /**
@@ -155,7 +160,13 @@ function toMeta(r: any): MetricMeta {
         metricName: r.metric_name,
         sparkplugType: r.sparkplug_type,
         typeSuffix: r.type_suffix,
+        engUnit: r.eng_unit ?? undefined,
     };
+}
+
+/** A metric's Eng_Unit, if it has one: a non-empty string. */
+function engUnitOf(unit: unknown): string | undefined {
+    return typeof unit === "string" && unit.trim() !== "" ? unit : undefined;
 }
 
 /** Map Sparkplug_Type to InfluxDB measurement type suffix. */
@@ -240,12 +251,14 @@ export class ObjectTree {
     /* Bumped by every change to where devices and levels sit. */
     private placementRev: number = 0;
     private placementCache: Placement | null = null;
+    private units: UnitSource | undefined;
 
     constructor(opts: ObjectTreeOpts) {
         this.namespaceName = opts.namespaceName;
         this.namespaceUri = opts.namespaceUri;
         this.log = opts.fplus?.debug?.bound("object-tree") ?? (() => {});
         this.store = opts.store ?? new I3xStore();
+        this.units = opts.units;
         this.buildNamespace();
         this.buildRelationshipTypes();
     }
@@ -279,6 +292,12 @@ export class ObjectTree {
      */
     revision(): string {
         return `${this.epoch}.${this.objectRev}`;
+    }
+
+    /** Changes whenever the tree or anything in an object's metadata
+     * does: the tree revision plus the unit vocabulary's. */
+    metadataRevision(): string {
+        return `${this.revision()}.${this.units?.revision() ?? 0}`;
     }
 
     /**
@@ -612,9 +631,10 @@ export class ObjectTree {
     private putMeta(id: string, m: MetricMeta): void {
         this.store.prepare(`
             insert or replace into metric_meta
-                (element_id, top_level, metric_path, metric_name, sparkplug_type, type_suffix)
-            values (?, ?, ?, ?, ?, ?)
-        `).run(id, m.topLevelInstanceUuid, m.metricPath, m.metricName, m.sparkplugType, m.typeSuffix);
+                (element_id, top_level, metric_path, metric_name, sparkplug_type, type_suffix, eng_unit)
+            values (?, ?, ?, ?, ?, ?, ?)
+        `).run(id, m.topLevelInstanceUuid, m.metricPath, m.metricName, m.sparkplugType, m.typeSuffix,
+            m.engUnit ?? null);
     }
 
     private putObjectType(schemaUuid: string, schema: any, info: any): void {
@@ -908,6 +928,28 @@ export class ObjectTree {
             typeNamespaceUri: this.namespaceUri,
             sourceTypeId: obj.typeElementId,
             relationships,
+            ...this.unitMetadata(obj),
+        };
+    }
+
+    /**
+     * A leaf metric's unit, for its metadata. `system.Eng_Unit` is the
+     * metric's Eng_Unit as configured, which is also the unit tag of
+     * its series in InfluxDB. `engUnit` is the UNECE code that string
+     * means in the unit vocabulary; the i3X specification requires a
+     * UNECE code there, so a string the vocabulary does not know gives
+     * no engUnit.
+     */
+    private unitMetadata(obj: I3xObject): Pick<I3xObjectMetadata, "engUnit" | "system"> {
+        if (obj.isComposition) return {};
+        const r = this.store.prepare("select eng_unit from metric_meta where element_id = ?")
+            .get(obj.elementId) as { eng_unit: string | null } | undefined;
+        const unit = r?.eng_unit;
+        if (!unit) return {};
+        const code = this.units?.code(unit);
+        return {
+            ...(code ? { engUnit: code } : {}),
+            system: { Eng_Unit: unit },
         };
     }
 
@@ -1136,19 +1178,20 @@ export class ObjectTree {
      * elementId (null when the device is not in the tree).
      *
      * `uns` carries what the message says beyond its path: the device
-     * segment of the topic and the metric's Type user property. With
-     * it, the device segment is recorded (see unsDeviceSegment) and a
-     * leaf without MetricMeta is given some, derived exactly as both
-     * historians tag the metric: measurement "<name>:<suffix of
-     * Type>", topLevelInstance the first instance UUID (the device),
-     * and path the segments between the device and the metric name.
+     * segment of the topic and the metric's Type and Unit user
+     * properties. With it, the device segment is recorded (see
+     * unsDeviceSegment) and a leaf without MetricMeta is given some,
+     * derived exactly as both historians tag the metric: measurement
+     * "<name>:<suffix of Type>", topLevelInstance the first instance
+     * UUID (the device), path the segments between the device and the
+     * metric name, and unit the Unit.
      */
     addCompositionFromUns(
         instanceUuidPath: string[],
         schemaUuidPath: string[],
         metricSegments: string[],
         isa95Segments?: string[],
-        uns?: { deviceSegment?: string; type?: string },
+        uns?: { deviceSegment?: string; type?: string; unit?: string },
     ): string | null {
         // Nodes added here are tagged source:"uns"; replaceDeviceSubtree
         // keeps them as long as their parent survives.
@@ -1225,7 +1268,7 @@ export class ObjectTree {
             if (uns) {
                 if (uns.deviceSegment)
                     this.putUnsDeviceSegment(deviceElementId, uns.deviceSegment, "uns");
-                this.ensureUnsLeafMeta(parentId, deviceElementId, metricSegments, uns.type);
+                this.ensureUnsLeafMeta(parentId, deviceElementId, metricSegments, uns.type, uns.unit);
             }
 
             // Return the leaf elementId (last in the chain)
@@ -1251,6 +1294,7 @@ export class ObjectTree {
         deviceElementId: string,
         metricSegments: string[],
         type: string | undefined,
+        unit?: string,
     ): void {
         if (metricSegments.length === 0) return;
         if (this.store.prepare("select 1 from metric_meta where element_id = ?").get(leafId)) return;
@@ -1264,6 +1308,7 @@ export class ObjectTree {
             metricName: metricSegments[metricSegments.length - 1],
             sparkplugType,
             typeSuffix: sparkplugTypeToSuffix(sparkplugType),
+            engUnit: engUnitOf(unit),
         });
     }
 
@@ -1356,6 +1401,7 @@ export class ObjectTree {
                     metricName,
                     sparkplugType: entry.Sparkplug_Type,
                     typeSuffix: sparkplugTypeToSuffix(entry.Sparkplug_Type),
+                    engUnit: engUnitOf(entry.Eng_Unit),
                 });
             }
 

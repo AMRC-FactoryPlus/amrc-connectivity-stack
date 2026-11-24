@@ -1,5 +1,5 @@
 # i3X northbound API service
-# Needs: ConfigDB read (schemas, registration, ISA-95 vocabulary),
+# Needs: ConfigDB read (schemas, registration, ISA-95 and unit vocabularies),
 # Directory read (devices, links), UNS MQTT read (live values), Auth ACL
 # read (incoming requests).
 #
@@ -52,6 +52,8 @@ grants:
       !u UUIDs.App.ISA95Vocabulary: false
       # Each device's ISA-95 placement: where i3X puts it in the tree.
       !u UUIDs.App.ISA95Placement: false
+      # The engineering unit vocabulary, for each metric's engUnit.
+      !u UUIDs.App.EngineeringUnit: false
       # Device originMap (Schema_UUID, Instance_UUID, ISA-95 hierarchy,
       # metric tree) — i3x reads this for every device in the Device
       # class to build the object tree.

@@ -163,6 +163,8 @@ import NewObjectOverlayForm from './NewObjectOverlayForm.vue'
 import { updateEdgeAgentConfig } from '@/utils/edgeAgentConfigUpdater'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { generateCsv, downloadCsv, parseCsv, applyCsvToModel } from '@/composables/useOriginMapCsv.js'
+import { csv_unit_problems } from '@/lib/eng-units.js'
+import { useEngUnitStore } from '@store/useEngUnitStore.js'
 import Papa from 'papaparse'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
@@ -246,6 +248,9 @@ export default {
 
     // Start the connection store
     this.conn.start()
+
+    // The unit vocabulary, to check units in a CSV import
+    useEngUnitStore().start()
   },
 
   computed: {
@@ -1058,6 +1063,22 @@ export default {
 
         if (rows.length === 0) {
           toast.error('No data rows found in CSV', { pauseOnHover: true })
+          return
+        }
+
+        /* Units come from the vocabulary: refuse ones it does not have. */
+        const units = useEngUnitStore()
+        if (!units.ready) {
+          toast.error('Units are still loading', { description: 'Try again in a moment.', pauseOnHover: true })
+          return
+        }
+        const badUnits = csv_unit_problems(rows, units.resolve, this.model)
+        if (badUnits.length > 0) {
+          const listed = badUnits.slice(0, 5).map(b => `${b.tagPath}: ${b.unit}`).join(', ')
+          toast.error(`${badUnits.length} row${badUnits.length === 1 ? ' has a unit' : 's have units'} not in the vocabulary`, {
+            description: `${listed}${badUnits.length > 5 ? ', ...' : ''}. Add them on the Units page, or fix the CSV.`,
+            pauseOnHover: true,
+          })
           return
         }
 

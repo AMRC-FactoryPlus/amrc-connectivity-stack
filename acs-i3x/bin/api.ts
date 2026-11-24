@@ -15,6 +15,7 @@ import { SubscriptionManager } from "../lib/subscriptions.js";
 import { Access } from "../lib/access.js";
 import { Isa95Vocabulary } from "../lib/isa95.js";
 import { Isa95Placements } from "../lib/placements.js";
+import { EngUnits } from "../lib/eng-units.js";
 import { Version } from "../lib/constants.js";
 import { GIT_VERSION } from "../lib/git-version.js";
 
@@ -48,12 +49,17 @@ const store = new I3xStore({
     log: fplus.debug.bound("store"),
 });
 
+// The engineering unit vocabulary, to give each metric's metadata the
+// UNECE code of its Eng_Unit.
+const units = new EngUnits({ log: fplus.debug.bound("units") }).run(fplus);
+
 // The object tree. ConfigSync (below) fills it from ConfigDB.
 const objectTree = await new ObjectTree({
     fplus,
     namespaceName,
     namespaceUri,
     store,
+    units,
 }).init();
 
 // The value cache. Last values go to the same database, in batches.

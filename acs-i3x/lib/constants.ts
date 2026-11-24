@@ -54,6 +54,9 @@ export const ISA95_LEVEL_CLASSES: Record<string, string> = {
 // Each device's place in the vocabulary: { node, instances? }.
 export const ISA95_PLACEMENT_APP_UUID     = "f9345c57-14e3-4027-b76d-2b0b67eb8fed";
 
+// The engineering unit vocabulary: { code, symbol, aliases? } per unit.
+export const ENGINEERING_UNIT_APP_UUID    = "8cd3bb74-c07f-46ed-8422-3d714c945cce";
+
 // i3X permissions (acs-service-setup/dumps/i3x.yaml).
 export const Perm = {
     ReadObject:    "d24495fd-72a3-41cd-8b9f-f4ebabdade44",

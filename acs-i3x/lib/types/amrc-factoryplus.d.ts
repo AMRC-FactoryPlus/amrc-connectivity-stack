@@ -32,6 +32,15 @@ declare module "@amrc-factoryplus/service-client" {
     export function isa95_chain(vocab: Isa95VocabIndex, node: string):
         { chain: Isa95VocabNode[]; error?: undefined } | { chain?: undefined; error: string };
     export function isa95_value_problem(value: string): string | null;
+
+    /* Engineering units (lib/js-service-client/lib/eng-units.js). */
+    export interface EngUnit {
+        code: string;
+        symbol: string;
+        aliases?: string[];
+    }
+    export function eng_unit_resolver(units: Iterable<EngUnit>):
+        (unit: unknown) => EngUnit | undefined;
 }
 
 declare module "@amrc-factoryplus/rx-client" {

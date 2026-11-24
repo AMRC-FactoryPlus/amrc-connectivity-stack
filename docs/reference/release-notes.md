@@ -222,6 +222,35 @@ to send to, the firewall rules and the host's receive buffer.
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.
 
+### Upgrading: engineering units come from a vocabulary
+
+Metrics keep their `Eng_Unit` strings, but a new vocabulary of units
+in ConfigDB now says which unit each string means, and i3X reports it.
+See [Engineering units](../services/engineering-units.md).
+
+- **service-setup fills the vocabulary during the upgrade.** Every
+  `Eng_Unit` in an origin map or a schema default that is a recognised
+  way of writing a UNECE unit becomes a unit, written the way your
+  metrics write it, with the OPC UA name as an alias (`kWh`, alias
+  `kW·h`). An empty vocabulary also gets about 60 common units. Origin
+  maps and schemas are not changed. The step logs each string it did
+  not recognise, with how many metrics use it.
+- **Review the strings that were not recognised.** The Manager UI has
+  a new **Units** page. Its **Not in the vocabulary** tab lists them;
+  add each as a unit or an alias, or fix the metrics that use a wrong
+  one. Changing a metric's unit starts a new series for it in
+  InfluxDB, so add spellings as aliases rather than rewriting them.
+- **i3X reports units.** An object's metadata has `engUnit`, the UNECE
+  code of the unit, when its `Eng_Unit` means one, and
+  `system.Eng_Unit`, the string as configured.
+- **The i3X database is rebuilt on first start** after the upgrade,
+  because its schema changed, so every metric gets its unit.
+- **Units are chosen from the vocabulary.** The unit fields in the
+  origin map editor and the schema editor are pickers. A metric whose
+  unit is not in the vocabulary keeps it until you choose another. An
+  origin map CSV import refuses units the vocabulary does not have,
+  apart from ones the device already uses.
+
 ### OPC UA metrics can read one element of an array
 
 An OPC UA address can end in an index to read part of an array node,

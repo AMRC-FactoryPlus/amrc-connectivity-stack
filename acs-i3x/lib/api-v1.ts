@@ -673,7 +673,10 @@ export class APIv1 {
          * client can revalidate without us reading the tree. res.json
          * hashed the whole body for its ETag; we no longer build the
          * body in one piece, so this replaces it. */
-        const rev = this.objectTree.revision?.();
+        /* Metadata also depends on the unit vocabulary. */
+        const rev = opts.includeMetadata
+            ? this.objectTree.metadataRevision?.()
+            : this.objectTree.revision?.();
         if (rev !== undefined) {
             const etag = objectsEtag(rev, opts, scopeKey(res.locals.grants));
             res.setHeader("ETag", etag);

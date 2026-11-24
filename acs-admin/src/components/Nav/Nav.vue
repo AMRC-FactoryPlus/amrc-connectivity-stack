@@ -83,6 +83,12 @@ const sidebarNavItems: Item[] = [
     auth: true
   },
   {
+    title: 'Units',
+    href: '/units',
+    icon: 'ruler',
+    auth: true
+  },
+  {
     title: 'Schemas',
     href: '/schemas',
     icon: 'shapes',

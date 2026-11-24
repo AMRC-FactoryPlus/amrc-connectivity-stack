@@ -85,7 +85,7 @@
       <div class="rounded-lg border border-gray-300 p-5 ">
         <div class="grid gap-3 2xl:grid-cols-2">
           <Control label="Unit" :help="schema.properties.Eng_Unit.description" class="col-span-2">
-            <Input v-model="localModel.Eng_Unit" placeholder="e.g. kWh, °C"/>
+            <EngUnitPicker v-model="localModel.Eng_Unit" placeholder="Choose a unit, e.g. kWh"/>
           </Control>
           <Control v-if="!isStatic" label="Low Limit" :help="schema.properties.Eng_Low.description">
             <Input
@@ -145,6 +145,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Control from './Control.vue'
+import EngUnitPicker from '@components/Units/EngUnitPicker.vue'
 import LinkUserDialog from '@pages/AccessControl/LinkUserDialog.vue'
 import GroupList from '@pages/AccessControl/Groups/GroupList.vue'
 import PrincipalList from '@pages/AccessControl/Principals/PrincipalList.vue'
@@ -169,6 +170,7 @@ export default {
 
   components: {
     DetailCard,
+    EngUnitPicker,
     Input,
     Checkbox,
     Select,

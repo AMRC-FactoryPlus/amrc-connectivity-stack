@@ -39,7 +39,7 @@ function isCorrupt(err: unknown): boolean {
  * type, where it was "unknown" or the Factory+ Metric schema, and an
  * ISA-95 level is no longer a composition. (6 was a test build that
  * kept a metric's Schema_UUID.) */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 const TABLES = `
     -- The object tree. seq gives Map insertion order: an upsert keeps
@@ -69,7 +69,9 @@ const TABLES = `
         metric_path     text not null,
         metric_name     text not null,
         sparkplug_type  text not null,
-        type_suffix     text not null
+        type_suffix     text not null,
+        -- The metric's Eng_Unit as configured or published, or null.
+        eng_unit        text
     ) without rowid;
 
     create table object_type (

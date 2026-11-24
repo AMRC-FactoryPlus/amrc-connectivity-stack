@@ -1,0 +1,12 @@
+{
+    "schema": "item",
+    "description": "Types carry no byte order. The UI adds it",
+    "data": {
+        "id": "x",
+        "parent": null,
+        "name": "x",
+        "kind": "value",
+        "address": "x",
+        "type": "Int16LE"
+    }
+}

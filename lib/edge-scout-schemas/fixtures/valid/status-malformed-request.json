@@ -1,0 +1,15 @@
+{
+    "schema": "status",
+    "description": "A request too malformed to read its UUID",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "supported": true,
+        "last_request": {
+            "request": null,
+            "code": "REQUEST",
+            "message": "The request is not valid JSON",
+            "at": "2026-11-24T10:41:00Z"
+        }
+    }
+}

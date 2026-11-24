@@ -1,0 +1,12 @@
+{
+    "schema": "found",
+    "description": "A scan stopped at the item cap",
+    "data": {
+        "seq": 40,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": true,
+        "reason": "items",
+        "excluded": []
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:snapshot-header",
+    "title": "Snapshot header line",
+    "description": "The first line of a snapshot's NDJSON.",
+    "type": "object",
+    "required": ["version", "scan", "connection", "driver", "started", "root", "folder_id", "options"],
+    "properties": {
+        "version": { "const": 1 },
+        "scan": { "$ref": "urn:edge-scout:common#/$defs/uuid" },
+        "connection": { "$ref": "urn:edge-scout:common#/$defs/uuid" },
+        "driver": { "type": ["string", "null"], "maxLength": 128 },
+        "started": { "$ref": "urn:edge-scout:common#/$defs/timestamp" },
+        "root": { "$ref": "urn:edge-scout:common#/$defs/root" },
+        "folder_id": { "$ref": "urn:edge-scout:common#/$defs/folder_id" },
+        "options": { "$ref": "urn:edge-scout:common#/$defs/options" }
+    }
+}

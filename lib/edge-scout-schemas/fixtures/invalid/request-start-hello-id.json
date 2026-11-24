@@ -1,0 +1,19 @@
+{
+    "schema": "request",
+    "description": "A scan id is never hello, which found/hello uses",
+    "data": {
+        "op": "start",
+        "id": "hello",
+        "version": 1,
+        "root": null,
+        "folder_id": null,
+        "options": {},
+        "limits": {
+            "items": 20000,
+            "depth": 8,
+            "seconds": 120,
+            "pace_ms": 20,
+            "samples": false
+        }
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "Progress while the scan runs",
+    "data": {
+        "seq": 2,
+        "type": "progress",
+        "visited": 3400,
+        "found": 1200,
+        "note": "ns=2;s=Line1"
+    }
+}

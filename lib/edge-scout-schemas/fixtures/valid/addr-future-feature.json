@@ -1,0 +1,12 @@
+{
+    "schema": "addr",
+    "description": "A later feature version and an unknown feature are allowed, so drivers must check the value",
+    "data": {
+        "version": 1,
+        "addrs": {},
+        "features": {
+            "scout": 2,
+            "other": 1
+        }
+    }
+}

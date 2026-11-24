@@ -1,0 +1,122 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:common",
+    "title": "Edge Scout shared definitions",
+    "description": "Types shared by the other Edge Scout schemas. It validates nothing on its own.",
+    "$defs": {
+        "uuid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "scan_id": {
+            "description": "A scan id on the driver topics: the scan UUID without dashes. Never 'hello'.",
+            "type": "string",
+            "pattern": "^\\w{1,64}$",
+            "not": { "const": "hello" }
+        },
+        "root": {
+            "description": "Where a scan starts, in the driver's terms, or null for the device's natural top.",
+            "type": ["string", "null"],
+            "maxLength": 1024
+        },
+        "folder_id": {
+            "description": "The id of the folder a branch scan replaces, or null.",
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 1024
+        },
+        "options": {
+            "description": "Driver-specific scan options. At most 8 KiB as JSON, which the agent checks.",
+            "type": "object"
+        },
+        "limits": {
+            "description": "The clamped caps the agent sends to a driver. All five are always present.",
+            "type": "object",
+            "required": ["items", "depth", "seconds", "pace_ms", "samples"],
+            "properties": {
+                "items": { "type": "integer", "minimum": 1, "maximum": 50000 },
+                "depth": { "type": "integer", "minimum": 1, "maximum": 32 },
+                "seconds": { "type": "integer", "minimum": 1, "maximum": 600 },
+                "pace_ms": { "type": "integer", "minimum": 0 },
+                "samples": { "type": "boolean" }
+            }
+        },
+        "requested_limits": {
+            "description": "Limits an operator asks for. The agent clamps them, so they are only checked for type.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "items": { "type": "integer", "minimum": 1 },
+                "depth": { "type": "integer", "minimum": 1 },
+                "seconds": { "type": "integer", "minimum": 1 },
+                "pace_ms": { "type": "integer", "minimum": 0 },
+                "samples": { "type": "boolean" }
+            }
+        },
+        "excluded_scope": {
+            "description": "A part of the device a scan did not visit on purpose.",
+            "type": "object",
+            "required": ["id", "reason"],
+            "properties": {
+                "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+                "reason": { "type": "string", "minLength": 1, "maxLength": 32 },
+                "prefixes": {
+                    "type": "array",
+                    "maxItems": 4,
+                    "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+                }
+            }
+        },
+        "excluded": {
+            "type": "array",
+            "maxItems": 8,
+            "items": { "$ref": "#/$defs/excluded_scope" }
+        },
+        "truncation_reason": {
+            "enum": ["items", "depth", "seconds", "size", "partial_access"]
+        },
+        "library_code": {
+            "description": "Codes a driver sends in the error of an end message.",
+            "enum": ["UNSUPPORTED", "OPTIONS", "CONN", "AUTH", "CANCELLED", "ERR"]
+        },
+        "refusal_code": {
+            "description": "Codes the agent writes to last_request when it refuses a request.",
+            "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING"]
+        },
+        "agent_code": {
+            "description": "Every code the agent sets.",
+            "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
+                     "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT"]
+        },
+        "code": {
+            "anyOf": [
+                { "$ref": "#/$defs/library_code" },
+                { "$ref": "#/$defs/agent_code" }
+            ]
+        },
+        "sparkplug_type": {
+            "description": "A Sparkplug B type name with no byte order.",
+            "enum": ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64",
+                     "Float", "Double", "Boolean", "String", "Text", "DateTime", "UUID",
+                     "Bytes", "File", "DataSet", "Template"]
+        },
+        "branch": {
+            "type": "object",
+            "required": ["folder_id", "finished"],
+            "additionalProperties": false,
+            "properties": {
+                "folder_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "finished": { "$ref": "#/$defs/timestamp" }
+            }
+        },
+        "branches": {
+            "type": "array",
+            "maxItems": 10,
+            "items": { "$ref": "#/$defs/branch" }
+        }
+    }
+}

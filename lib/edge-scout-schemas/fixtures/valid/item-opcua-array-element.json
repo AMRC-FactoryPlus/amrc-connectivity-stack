@@ -1,0 +1,13 @@
+{
+    "schema": "item",
+    "description": "An array element from expand_arrays",
+    "data": {
+        "id": "ns=2;s=Line1/Temps[3]",
+        "parent": "ns=2;s=Line1/Temps",
+        "name": "[3]",
+        "kind": "value",
+        "address": "ns=2;s=Line1/Temps[3]",
+        "type": "Float",
+        "access": "r"
+    }
+}

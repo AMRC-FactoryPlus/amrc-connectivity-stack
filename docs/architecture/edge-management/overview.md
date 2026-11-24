@@ -215,5 +215,6 @@ clusters do not have access to the Internet.
 
 - [Edge Deployments](edge-deployments.md) - Learn about deploying to edge clusters
 - [Edge Bootstrap](edge-bootstrap.md) - Learn about the bootstrap process for edge clusters
-- [Edge Scout](./edge-scout.md) - Learn about the edge scout mode
+- [Split Drivers](split-drivers.md) - Learn how Edge Agents talk to devices through drivers
+- [Scanning a device for addresses](edge-scout-scanning.md) - Learn how Edge Scout lists a device's addresses for the origin map editor
 - [Architecture Overview](../overview.md) - Return to the architecture overview

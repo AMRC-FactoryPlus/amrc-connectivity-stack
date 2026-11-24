@@ -1,0 +1,14 @@
+{
+    "schema": "ncmd",
+    "description": "A branch scan request",
+    "data": {
+        "version": 1,
+        "op": "start",
+        "request": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60",
+        "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a",
+        "root": "ns=2;s=Line1/Motor",
+        "folder_id": "ns=2;s=Line1/Motor",
+        "options": {},
+        "limits": {}
+    }
+}

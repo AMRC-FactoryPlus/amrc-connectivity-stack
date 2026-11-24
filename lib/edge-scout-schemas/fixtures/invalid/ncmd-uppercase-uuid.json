@@ -1,0 +1,10 @@
+{
+    "schema": "ncmd",
+    "description": "UUIDs are lowercase",
+    "data": {
+        "version": 1,
+        "op": "cancel",
+        "request": "C1D2E3F4-A5B6-4C7D-8E9F-0A1B2C3D4E5F",
+        "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a"
+    }
+}

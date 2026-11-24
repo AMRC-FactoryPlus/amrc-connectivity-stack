@@ -1,0 +1,14 @@
+{
+    "schema": "item",
+    "description": "A folder the server would not let the driver browse",
+    "data": {
+        "id": "ns=2;i=5001",
+        "parent": null,
+        "name": "Secure",
+        "kind": "folder",
+        "more": true,
+        "detail": {
+            "denied": true
+        }
+    }
+}

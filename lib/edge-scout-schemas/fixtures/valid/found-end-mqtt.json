@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "An MQTT scan, which is never exhaustive, with no excluded key",
+    "data": {
+        "seq": 5,
+        "type": "end",
+        "exhaustive": false,
+        "truncated": false,
+        "reason": null
+    }
+}

@@ -15,8 +15,9 @@ paragraph marked **Implementation** says what the code does. Drivers
 built outside this repository depend on that behaviour, so the
 Implementation notes are the contract for new drivers.
 
-Split drivers have no address browsing: see [Edge
-Scout](#edge-scout-address-browsing).
+A driver may also list the addresses its device offers, so an operator
+can pick them in the Admin UI. This is Edge Scout, and it is an
+optional part of the protocol: see [Scouting](#scouting).
 
 ### Summary for driver authors
 
@@ -35,6 +36,7 @@ Part|Driver must|Notes
 `err`|Optional. Report a failed write or an address problem.|The Edge Agent logs it and takes no other action.
 `result`|Required for a driver that subscribes to `write`. Answer a write.|The Edge Agent reports the written value only when the answer says it was written. See [Write results](#write-results).
 `req`/`rsp`|Optional.|Only for the request kinds the agent serves.
+`scout`/`found`|Optional. List the device's addresses.|Subscribe to `scout` only after an `addr` with `features.scout` on the same MQTT session. See [Scouting](#scouting).
 
 ## Definitions
 
@@ -71,6 +73,11 @@ JSON form and is an object with these properties:
       property.
     * `poll`: An integer giving the requested poll interval in
       milliseconds for this group.
+* `features`: Optional. An object naming the optional parts of the
+  protocol this Edge Agent serves, each with an integer version. The
+  only feature today is `scout`, with version `1`. See
+  [Scouting](#scouting). An Edge Agent from before November 2026 sends
+  no `features` key.
 
 **Implementation.** The Edge Agent makes one group per device, named
 after the device, with the device's polling interval. It sends `groups`
@@ -221,12 +228,19 @@ underscore:
 
 Direction|Topics allowed
 ---|---
-Driver publishes|`status`, `data/\w+`, `err/\w+`, `req/\w+`, `result/\w+`
-Driver subscribes|`active`, `conf`, `addr`, `cmd/#`, `write/#`, `poll`, `rsp/\w+`
+Driver publishes|`status`, `data/\w+`, `err/\w+`, `req/\w+`, `result/\w+`, `found/\w+`
+Driver subscribes|`active`, `conf`, `addr`, `cmd/#`, `write/#`, `poll`, `rsp/\w+`, `scout`
 
-The broker drops a driver's whole connection if it subscribes to
-anything else, so a driver that subscribes to `write/#` only works with
-an Edge Agent that allows it (November 2026 or later).
+The broker drops a driver's whole connection if it publishes or
+subscribes to anything else, so a driver that subscribes to `write/#`
+only works with an Edge Agent that allows it (November 2026 or later).
+`req/\w+` and `rsp/\w+` arrived in v6.8.0, and `scout` and `found/\w+`
+in the release that added [Scouting](#scouting). Every topic added to
+the protocol from now on comes with a feature in `addr`, and a driver
+uses the topic only after the Edge Agent has advertised that feature on
+the current MQTT session, so a new driver never breaks an older Edge
+Agent's ACL. `scout` and `found/\w+` are the first topics added this
+way.
 
 In these examples the connection name `Conn` will be used. Where
 necessary the data topic name `Data` will also be used.
@@ -679,11 +693,317 @@ split driver, the agent publishes 10 DDATA a second, as the built-in
 OPC UA connection does. With 1,000, a burst arrives in two or three
 socket reads, so it publishes 20 to 30 a second rather than 10,000.
 
-## Edge Scout (address browsing)
+## Scouting
 
-Edge Scout, which listed a device's addresses for the Admin UI, is not
-supported for split drivers. Only the built-in OPC UA and MQTT
-connections implemented it, and ACS 7 removed them and Scout with them.
-The protocol has no browse message. If browsing is needed for a split
-driver later, it can be added as a new `req`/`rsp` kind without
-changing the rest of the protocol (ACS-32).
+Scouting lets the Admin UI ask a running driver to list the addresses
+its device offers, so an operator can pick addresses instead of typing
+them. It is optional. A driver either implements it, answers that it
+can't, or is built on a library from before it existed, and the Edge
+Agent can tell the three apart. The design, the storage of results and
+the Admin UI are described in
+`docs/architecture/edge-management/edge-scout.md`. This section is the
+contract between the Edge Agent and a driver.
+
+The three driver libraries do all of this section for a driver: the
+gate, the hello, `seq`, batching, the window, the limits, the watchdog,
+cancel and error handling. A handler only produces items. A driver that does not
+use a library must follow it in full.
+
+Every message on these topics is UTF-8 JSON, published at QoS 0 and
+never retained. A reader MUST ignore keys it does not recognise. JSON
+Schemas for every message, and fixtures that every implementation
+tests against, are in `lib/edge-scout-schemas`.
+
+### The feature gate
+
+The Edge Agent puts `"features": {"scout": 1}` in every address
+configuration it publishes, alongside `version`, `addrs` and `groups`.
+`version` stays 1, because a driver already ignores keys it does not
+recognise.
+
+A driver that takes part in scouting:
+
+* MUST read `features` before anything else in an address
+  configuration, before it checks `version`, whether it has a handler,
+  or whether the addresses are valid. A driver with a bad configuration
+  or a bad address can then still answer that it cannot scan, instead
+  of looking like a driver built before scouting.
+* MUST subscribe to `fpEdge1/Conn/scout` when it sees `features.scout`
+  with a version it knows, and only then. It subscribes at most once
+  per MQTT session.
+* MUST forget that it saw the feature whenever it connects to the
+  broker, and MUST NOT subscribe to `scout` when it connects. After an
+  Edge Agent is rolled back to a release without scouting, its address
+  configuration has no `features` key, so the driver never asks for a
+  topic that the older Edge Agent's ACL refuses. (The broker drops the
+  whole connection of a driver that does, so a driver that subscribed
+  unconditionally would reconnect forever.)
+* MUST NOT publish on `found/<id>` unless it has subscribed to `scout`
+  on the current session.
+
+The only version of `features.scout` is 1. A breaking change later
+raises it to 2, and a driver scouts only when it recognises the value.
+
+### Topics
+
+    fpEdge1/Conn/scout
+
+The driver subscribes to this topic, under the gate above. The Edge
+Agent publishes `hello`, `start` and `cancel` messages to it.
+
+**Implementation.** The Edge Agent's broker notes each driver that
+subscribes to its own `scout`, and forgets it when the driver
+unsubscribes or disconnects, in the same way as for `write/#`.
+
+    fpEdge1/Conn/found/Id
+
+The driver publishes its answers here. `Id` is `hello` for the answer
+to a hello, and otherwise the id of the scan the message belongs to.
+
+### Edge Agent to driver
+
+```json
+{"op": "hello", "version": 1}
+{"op": "start", "id": "3f9c1a2b44e04d0c9a7e5b1f2c3d4e5f", "version": 1,
+ "root": null, "folder_id": null, "options": {},
+ "limits": {"items": 20000, "depth": 8, "seconds": 120, "pace_ms": 20, "samples": false},
+ "window": 4}
+{"op": "ack", "id": "3f9c1a2b44e04d0c9a7e5b1f2c3d4e5f", "seq": 12}
+{"op": "cancel", "id": "3f9c1a2b44e04d0c9a7e5b1f2c3d4e5f"}
+```
+
+* `hello` asks whether the driver can scan. The Edge Agent sends it
+  when it sees the driver subscribe to `scout`.
+* `start` starts a scan. `id` is 1 to 64 letters, digits and
+  underscores, and is never `hello`. The Edge Agent uses the scan's
+  UUID without dashes.
+* `root` is where to start, in the driver's own terms, or null for the
+  device's natural top. `folder_id` is the `id` of the folder that a
+  branch scan replaces, or null. Both are at most 1024 characters, and
+  `folder_id` is only set together with `root`.
+* `options` holds driver-specific options, at most 8 KiB, which the
+  driver validates.
+* `limits` holds the caps the driver MUST keep to. The Edge Agent has
+  already clamped them to the ceilings below, and always sends all
+  five.
+* `window` is the most `items` messages the driver may send ahead of
+  the Edge Agent's acks, from 1 to 64. The Edge Agent sends 4. A
+  driver that keeps to it says so in its `accept`. A driver that
+  leaves `window` out of its `accept` gets no acks.
+* `ack` says the Edge Agent has handled every message of the scan up
+  to and including `seq`. The Edge Agent sends one after it has
+  written each `items` message into the snapshot. A driver ignores an
+  `ack` for a scan it is not running.
+* `cancel` stops the scan with that `id`.
+
+Limit|Meaning|Default|Ceiling
+---|---|---|---
+`items`|Most items in the scan|20,000|50,000
+`depth`|Most levels below the root|8|32
+`seconds`|Longest the scan may run|120|600
+`pace_ms`|Pause between two southbound requests|20|none (minimum 0)
+`samples`|Whether to read each value's current value|false|
+
+### Driver to Edge Agent
+
+Every message has `seq` and `type`. `seq` is 0 for the first message
+on a topic and goes up by 1 for each message after it, so the Edge
+Agent can tell when a message was dropped.
+
+```json
+{"seq": 0, "type": "hello", "versions": [1], "supported": true, "library": "rs-edge-driver 0.1.0"}
+{"seq": 0, "type": "accept", "window": 4}
+{"seq": 1, "type": "items", "items": [ITEM, ...]}
+{"seq": 2, "type": "progress", "visited": 3400, "found": 1200, "note": "ns=2;s=Line1"}
+{"seq": 9, "type": "end", "exhaustive": true, "truncated": false, "reason": null,
+ "excluded": [{"id": "i=2253", "reason": "skipped", "prefixes": ["i="]}]}
+{"seq": 0, "type": "end", "error": {"code": "OPTIONS", "message": "Root ns=2;s=Nope does not exist"}}
+```
+
+* **`hello`** answers a hello on `found/hello`, with `seq` 0 every
+  time. `versions` lists the versions of this section the driver
+  speaks. `supported` says whether the driver can scan, and comes from
+  the driver's code, not its current state, so a driver whose
+  configuration failed still answers correctly. `library` is the
+  library's name and version, at most 128 characters.
+* **`accept`** is the first answer to a `start`, sent before the
+  driver touches its device. `window` repeats the start's window when
+  the driver keeps to it (see "Rules for a scan").
+* **`items`** carries 1 to 500 items, and at most 256 KiB.
+* **`progress`** reports counts while the scan runs, at least every
+  5 s. `note` is optional, a few words on where the scan has got to.
+* **`end`** is the last message of every scan, exactly once. It has
+  either the result keys or `error`, never both:
+    * `exhaustive` is true when the driver's discovery is complete by
+      nature within its caps. An OPC UA browse is, and an MQTT listen
+      never is.
+    * `truncated` is true when a cap stopped the scan, and then
+      `reason` is `items`, `depth`, `seconds`, `size` or
+      `partial_access`. Otherwise `reason` is null. A truncated scan
+      is not an error.
+    * `excluded` lists at most 8 parts of the device the scan did not
+      visit on purpose, such as the OPC UA Server object. Each has an
+      `id` and a `reason` such as `skipped`, and may have up to 4
+      `prefixes`: canonical address prefixes that fall inside it.
+    * `error` has a `code` from the library codes below and a
+      `message`.
+
+A scan that ends straight away, such as one refused with `OPTIONS`, may
+send `end` with `seq` 0 and no `accept`.
+
+#### Items
+
+```json
+{"id": "ns=2;s=Line1/Speed", "parent": "ns=2;s=Line1", "name": "Speed",
+ "kind": "value", "address": "ns=2;s=Line1/Speed", "path": null,
+ "type": "Double", "access": "rw", "unit": "rpm", "description": "Spindle speed",
+ "sample": null, "more": false, "root": null,
+ "detail": {"namespace_uri": "urn:plc:line1"}}
+```
+
+* `id` identifies the item, at most 512 characters, and is unique
+  within the scan. The driver MUST derive it from the device alone,
+  never from the scan's root, so a node has the same `id` in a full
+  scan and in every branch scan.
+* `parent` is the `id` of the item's parent, or null at the top.
+* `name` is what the operator sees, at most 256 characters.
+* `kind` is `folder`, for structure, or `value`, for something a
+  metric can read. A value may also have children.
+* `address` is required for a value. It MUST parse with the driver's
+  own address parser and MUST be in the driver's canonical form, the
+  form the driver prints from a parsed address, so the Admin UI can
+  compare it with a metric's address. `path` is the metric path within
+  the address's data packet, or null. Both are at most 1024
+  characters.
+* `type` is a Sparkplug B type name without a byte order: `Int8`,
+  `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`,
+  `Float`, `Double`, `Boolean`, `String`, `Text`, `DateTime`, `UUID`,
+  `Bytes`, `File`, `DataSet` or `Template`. It is null when the driver
+  cannot say.
+* `access` is `r`, `w`, `rw` or null. `unit` (at most 64 characters),
+  `description` (at most 1024) and `sample`, the current value written
+  as text (at most 256, and only when `limits.samples` is true), are
+  optional.
+* `more: true` on a folder means it has children the scan did not
+  list, for example because of the depth cap.
+* `root` is what to send as `root` to scan this folder on its own. It
+  defaults to the item's `id`.
+* `detail` is an object of driver-specific facts, at most 2 KiB as
+  JSON.
+
+Any key except `id`, `parent`, `name` and `kind` may be left out, and
+means null, or false for `more`. The Edge Agent truncates strings that
+are too long, drops items with no `id`, an `id` over 512 characters, a
+duplicate `id`, or any other fault, and counts what it dropped.
+
+### Rules for a scan
+
+* A driver runs one scan at a time. It answers a `start` that arrives
+  while a scan is running with `end` and `ERR` on the new id, which
+  only a faulty Edge Agent can cause.
+* A `cancel`, or a new driver configuration on `conf`, stops the
+  running scan, which ends with `CANCELLED` within 5 s.
+* The driver keeps to every limit. At the item cap it stops and ends
+  with `truncated` and reason `items`. A folder at the depth cap gets
+  `more: true`, and the scan ends with reason `depth`. At
+  `limits.seconds` the driver ends the scan with reason `seconds`,
+  even if its device has stopped answering.
+* The driver waits `pace_ms` between southbound requests, and keeps
+  collecting data while it scans. Data comes first: a driver MUST NOT
+  hold up `data` messages to send `found` messages.
+* When the `start` has a `window` and the driver's `accept` repeats
+  it, the driver MUST NOT publish an `items` message while `window`
+  of its `items` messages are not yet covered by an `ack`. It waits,
+  and stops waiting on a cancel, a new `conf` or the time limit, as
+  for `pace_ms`. `progress` and `end` messages are not counted. The
+  wait counts towards `limits.seconds`. The libraries cut a window
+  over 64 to 64 and treat a missing, zero or non-integer window as
+  none.
+* For a branch scan, the first item MUST have `id` equal to
+  `folder_id`.
+* A scan never changes the device.
+
+### Codes
+
+Every outcome has exactly one code. The driver codes are the only ones
+a driver sends, in `error.code` of an `end`. The Edge Agent sets the
+rest, which the Admin UI shows. It also sets `OPTIONS` and `CANCELLED`
+itself for a scan that never reaches the driver, as the table says.
+
+Code|Set by|Meaning
+---|---|---
+`UNSUPPORTED`|driver|The driver does not implement scouting
+`OPTIONS`|driver|Bad `root`, `folder_id` or `options`. The message says which. The Edge Agent sets it, without asking the driver, when a branch scan's `folder_id` is not in the current snapshot
+`CONN`|driver|The driver cannot reach its device, as for the `CONN` status
+`AUTH`|driver|The device refused the driver, as for the `AUTH` status
+`CANCELLED`|driver|Stopped by a `cancel` or a new `conf`. The Edge Agent sets it for a scan cancelled while still queued
+`ERR`|driver|Any other failure, with the message
+`REQUEST`|Edge Agent|The scan request was malformed
+`UNDEPLOYED`|Edge Agent|The connection is not in this Edge Agent's configuration, or is not a split driver
+`NODRIVER`|Edge Agent|The driver is not connected, its status is not `UP`, it has been `UP` for less than 10 s without subscribing to `scout`, or the Edge Agent is stopping
+`LIBRARY`|Edge Agent|The driver has been `UP` for 10 s and has not subscribed to `scout`, so it predates scouting
+`BUSY`|Edge Agent|A scan is already queued or running on this connection
+`LIMIT`|Edge Agent|The Edge Agent is running as many scans as it allows, and its queue is full
+`NOTRUNNING`|Edge Agent|A cancel named a connection with no scan
+`TIMEOUT`|Edge Agent|The scan passed `seconds` plus 15 s, or nothing arrived for 30 s
+`LOST`|Edge Agent|A gap in `seq` showed that a message was dropped
+`INTERRUPTED`|Edge Agent|The Edge Agent restarted, or the driver disconnected, left `UP` or sent a new hello during the scan
+`STORE`|Edge Agent|The Edge Agent could not save the result
+`AGENT`|Edge Agent|Any other Edge Agent failure, including a `found` message that is not JSON or does not match its schema
+
+**Implementation.** The Edge Agent does not hand `found` messages to
+the [data gathering](#gathering-data) flush, so a scan does not split
+DDATA groups. It keeps each scan's `found` messages in an inbox and
+handles them in slices of 2 ms, only while the whole agent process,
+data included, uses less than 60% of its CPU limit (`SCOUT_CPU_SHARE`
+changes the share). It reads the limit from its cgroup (`cpu.max`, or
+`cpu.cfs_quota_us` under cgroup v1), and takes one CPU when there is
+none. After 200 ms without room it handles a slice anyway, so a busy
+agent still finishes a scan. A driver that keeps to the window never
+has more than 4 messages (1 MiB) waiting. When more than 4 MiB from a
+driver is waiting, which only a driver without a window can cause, the
+Edge Agent stops the scan at its own size cap and keeps what it had
+handled. When `TIMEOUT`, `LOST` or `AGENT` ends a scan, or the
+Edge Agent's own item or size cap stops it, the Edge Agent also sends
+`cancel`.
+
+**Load on the Edge Agent.** Measured with the Edge Agent held to the
+edge-agent chart's 100m CPU and 200Mi, a 49,950-item edge-test-rs scan
+while edge-mqtt delivered a value every 50 ms:
+
+Scan|Scan time|DDATA latency p50 / p95 / max|Peak memory
+---|---|---|---
+No scan||14 / 26 / 52 ms|112 MiB
+`pace_ms` 0|47.5 s|p95 721 ms|120 to 131 MiB
+`pace_ms` 20 (the default)|50.5 s|94 / 347 / 1951 ms|131 MiB
+`pace_ms` 100|52.2 s|p95 155 ms|120 to 131 MiB
+`pace_ms` 200|102.5 s|p95 108 ms|120 to 131 MiB
+`pace_ms` 0, no CPU limit|1.6 s|p95 12 ms|152 MiB
+
+Memory stays well inside the limit. Latency does not: the scan uses
+the whole CPU quota while it runs, and CFS throttling then holds up the
+agent's event loop, so data from that agent reaches Sparkplug later
+until the scan ends. Without a CPU limit the same scan needs about 1.3
+CPU-seconds and does not change latency. The latency rule in
+the end-to-end load test (p95 at most twice the baseline) fails at
+every pace tried with the 100m limit, and the defaults are still under
+review.
+
+### Compatibility
+
+Edge Agent|Driver|Result
+---|---|---
+Before scouting|Before scouting|Unchanged
+Before scouting|With scouting|No `features` key, so the driver never subscribes to `scout`. Nothing changes, including after a rollback from a newer Edge Agent
+With scouting|Before scouting|The driver never subscribes. Once it has been `UP` for 10 s, scans fail with `LIBRARY`
+With scouting|With scouting, status not `UP`|Scans fail with `NODRIVER`, naming the status
+With scouting|With scouting, no scouting in the handler|The hello says `supported: false`, and scans fail with `UNSUPPORTED`
+With scouting|With scouting, scouting in the handler|Scans run
+
+edge-opcua and edge-mqtt first shipped with ACS 7.0.0 and subscribe to
+`write/#` when they connect, which Edge Agents before 7.0.0 refuse.
+That has nothing to do with scouting, but it means those two drivers
+cannot run on an Edge Agent older than 7.0.0 at all. The end-to-end
+tests check every driver against the ACS 7 Edge Agent from before
+scouting, this release, and a rollback, and check edge-test and
+edge-test-rs against the pre-v6.8.0 ACL as well.

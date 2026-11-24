@@ -1,0 +1,13 @@
+{
+    "schema": "found",
+    "description": "Hello answer from a library default handler",
+    "data": {
+        "seq": 0,
+        "type": "hello",
+        "versions": [
+            1
+        ],
+        "supported": false,
+        "library": "js-edge-driver 0.0.6"
+    }
+}

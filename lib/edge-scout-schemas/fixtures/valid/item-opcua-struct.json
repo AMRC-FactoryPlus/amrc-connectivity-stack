@@ -1,0 +1,15 @@
+{
+    "schema": "item",
+    "description": "A structure the driver cannot type",
+    "data": {
+        "id": "ns=3;i=77",
+        "parent": "ns=3;i=70",
+        "name": "Recipe",
+        "kind": "value",
+        "address": "ns=3;i=77",
+        "type": null,
+        "detail": {
+            "ua_type": "ns=3;i=3001"
+        }
+    }
+}

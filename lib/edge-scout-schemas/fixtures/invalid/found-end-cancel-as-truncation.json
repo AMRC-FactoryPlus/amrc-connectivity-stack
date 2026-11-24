@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "Cancellation is an error, never a truncation reason",
+    "data": {
+        "seq": 4,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": true,
+        "reason": "cancelled"
+    }
+}

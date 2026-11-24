@@ -1,0 +1,114 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:found",
+    "title": "Driver to Edge Agent scout message",
+    "description": "A message a driver publishes on fpEdge1/<Conn>/found/<id>. Each entry of an items message is checked on its own against item.schema.json. The 256 KiB cap on an items message is checked in code.",
+    "type": "object",
+    "required": ["seq", "type"],
+    "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "type": { "enum": ["hello", "accept", "items", "progress", "end"] }
+    },
+    "oneOf": [
+        { "$ref": "#/$defs/hello" },
+        { "$ref": "#/$defs/accept" },
+        { "$ref": "#/$defs/items" },
+        { "$ref": "#/$defs/progress" },
+        { "$ref": "#/$defs/end_result" },
+        { "$ref": "#/$defs/end_error" }
+    ],
+    "$defs": {
+        "hello": {
+            "type": "object",
+            "required": ["type", "versions", "supported"],
+            "properties": {
+                "type": { "const": "hello" },
+                "seq": { "const": 0 },
+                "versions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "integer", "minimum": 1 }
+                },
+                "supported": { "type": "boolean" },
+                "library": { "type": ["string", "null"], "maxLength": 128 }
+            }
+        },
+        "accept": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+                "type": { "const": "accept" },
+                "window": {
+                    "description": "The window from the start, which the driver keeps to. Left out by a driver that does not.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                }
+            }
+        },
+        "items": {
+            "type": "object",
+            "required": ["type", "items"],
+            "properties": {
+                "type": { "const": "items" },
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "items": { "type": "object" }
+                }
+            }
+        },
+        "progress": {
+            "type": "object",
+            "required": ["type", "visited", "found"],
+            "properties": {
+                "type": { "const": "progress" },
+                "visited": { "type": "integer", "minimum": 0 },
+                "found": { "type": "integer", "minimum": 0 },
+                "note": { "type": ["string", "null"] }
+            }
+        },
+        "end_result": {
+            "type": "object",
+            "required": ["type", "exhaustive", "truncated", "reason"],
+            "not": { "required": ["error"] },
+            "properties": {
+                "type": { "const": "end" },
+                "exhaustive": { "type": "boolean" },
+                "truncated": { "type": "boolean" },
+                "reason": {
+                    "anyOf": [
+                        { "$ref": "urn:edge-scout:common#/$defs/truncation_reason" },
+                        { "type": "null" }
+                    ]
+                },
+                "excluded": { "$ref": "urn:edge-scout:common#/$defs/excluded" }
+            },
+            "if": { "properties": { "truncated": { "const": true } } },
+            "then": { "properties": { "reason": { "$ref": "urn:edge-scout:common#/$defs/truncation_reason" } } },
+            "else": { "properties": { "reason": { "type": "null" } } }
+        },
+        "end_error": {
+            "type": "object",
+            "required": ["type", "error"],
+            "not": {
+                "anyOf": [
+                    { "required": ["exhaustive"] },
+                    { "required": ["truncated"] }
+                ]
+            },
+            "properties": {
+                "type": { "const": "end" },
+                "error": {
+                    "type": "object",
+                    "required": ["code"],
+                    "properties": {
+                        "code": { "$ref": "urn:edge-scout:common#/$defs/library_code" },
+                        "message": { "type": ["string", "null"] }
+                    }
+                }
+            }
+        }
+    }
+}

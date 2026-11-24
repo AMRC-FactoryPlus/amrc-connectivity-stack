@@ -1,0 +1,12 @@
+{
+    "schema": "found",
+    "description": "A driver may only send library codes",
+    "data": {
+        "seq": 4,
+        "type": "end",
+        "error": {
+            "code": "TIMEOUT",
+            "message": "slow"
+        }
+    }
+}

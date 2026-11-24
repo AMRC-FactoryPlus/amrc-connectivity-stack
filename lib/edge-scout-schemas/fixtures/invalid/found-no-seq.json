@@ -1,0 +1,7 @@
+{
+    "schema": "found",
+    "description": "Every message has seq",
+    "data": {
+        "type": "accept"
+    }
+}

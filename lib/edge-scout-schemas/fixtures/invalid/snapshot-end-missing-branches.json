@@ -1,0 +1,15 @@
+{
+    "schema": "snapshot-end",
+    "description": "The end line has every key",
+    "data": {
+        "end": {
+            "finished": "2026-11-24T10:42:13Z",
+            "exhaustive": true,
+            "truncated": false,
+            "reason": null,
+            "excluded": [],
+            "rejected": 0,
+            "items": 0
+        }
+    }
+}

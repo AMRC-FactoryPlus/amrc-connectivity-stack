@@ -1,0 +1,8 @@
+{
+    "schema": "found",
+    "description": "First answer to a start",
+    "data": {
+        "seq": 0,
+        "type": "accept"
+    }
+}

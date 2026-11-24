@@ -1,0 +1,45 @@
+{
+    "schema": "status",
+    "description": "A scan the agent's restart interrupted",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "supported": true,
+        "scan": "3f9c1a2b-44e0-4d0c-9a7e-5b1f2c3d4e5f",
+        "request": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "state": "failed",
+        "code": "INTERRUPTED",
+        "message": "The Edge Agent restarted during the scan",
+        "started": "2026-11-24T10:41:00Z",
+        "updated": "2026-11-24T10:42:13Z",
+        "finished": "2026-11-24T10:42:13Z",
+        "current": {
+            "file": "e3f4a5b6-c7d8-4e9f-8a1b-2c3d4e5f6071",
+            "items": 9812,
+            "bytes_gz": 402113,
+            "exhaustive": true,
+            "truncated": false,
+            "reason": null,
+            "finished": "2026-11-24T10:42:13Z",
+            "root": null,
+            "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "config_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "excluded": [
+                {
+                    "id": "i=2253",
+                    "reason": "skipped",
+                    "prefixes": [
+                        "i="
+                    ]
+                }
+            ],
+            "branches": [
+                {
+                    "folder_id": "ns=2;s=Line1/Motor",
+                    "finished": "2026-11-24T10:42:15.500Z"
+                }
+            ]
+        },
+        "previous": null
+    }
+}

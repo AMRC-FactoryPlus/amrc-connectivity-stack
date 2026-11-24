@@ -1,0 +1,13 @@
+{
+    "schema": "found",
+    "description": "Hello answer from a driver that scans",
+    "data": {
+        "seq": 0,
+        "type": "hello",
+        "versions": [
+            1
+        ],
+        "supported": true,
+        "library": "rs-edge-driver 0.1.0"
+    }
+}

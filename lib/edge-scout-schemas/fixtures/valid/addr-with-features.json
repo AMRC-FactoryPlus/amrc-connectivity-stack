@@ -1,0 +1,21 @@
+{
+    "schema": "addr",
+    "description": "An addr packet from an Edge Agent with scouting",
+    "data": {
+        "version": 1,
+        "addrs": {
+            "40123": "ns=2;s=Line1/Speed"
+        },
+        "groups": {
+            "Line1": {
+                "poll": 1000,
+                "addrs": [
+                    "40123"
+                ]
+            }
+        },
+        "features": {
+            "scout": 1
+        }
+    }
+}

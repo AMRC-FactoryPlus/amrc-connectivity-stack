@@ -1,0 +1,18 @@
+{
+    "schema": "item",
+    "description": "The MQTT topic plant/line1, which also has child topics",
+    "data": {
+        "id": "plant/line1",
+        "parent": "plant/",
+        "name": "line1",
+        "kind": "value",
+        "address": "plant/line1",
+        "path": null,
+        "detail": {
+            "count": 12,
+            "rate_hz": 1.2,
+            "retained": false,
+            "format": "json"
+        }
+    }
+}

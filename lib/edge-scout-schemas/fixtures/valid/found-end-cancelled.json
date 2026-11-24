@@ -1,0 +1,12 @@
+{
+    "schema": "found",
+    "description": "A cancelled scan",
+    "data": {
+        "seq": 12,
+        "type": "end",
+        "error": {
+            "code": "CANCELLED",
+            "message": null
+        }
+    }
+}

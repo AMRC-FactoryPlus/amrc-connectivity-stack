@@ -1,0 +1,12 @@
+{
+    "schema": "found",
+    "description": "A scan refused straight away, with no accept",
+    "data": {
+        "seq": 0,
+        "type": "end",
+        "error": {
+            "code": "OPTIONS",
+            "message": "Root ns=2;s=Nope does not exist"
+        }
+    }
+}

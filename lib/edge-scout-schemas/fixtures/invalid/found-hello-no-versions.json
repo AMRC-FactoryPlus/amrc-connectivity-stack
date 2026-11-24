@@ -1,0 +1,9 @@
+{
+    "schema": "found",
+    "description": "A hello answer lists its versions",
+    "data": {
+        "seq": 0,
+        "type": "hello",
+        "supported": true
+    }
+}

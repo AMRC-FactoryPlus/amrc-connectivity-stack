@@ -1,0 +1,10 @@
+{
+    "schema": "found",
+    "description": "Progress without a note",
+    "data": {
+        "seq": 3,
+        "type": "progress",
+        "visited": 0,
+        "found": 0
+    }
+}

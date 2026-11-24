@@ -1,0 +1,142 @@
+{
+    "description": "Re-scanning the MQTT folder plant/line1/ leaves the topic plant/line1 and its JSON leaf alone, because the folder id ends in a slash",
+    "base": {
+        "root": null,
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": false,
+        "truncated": false,
+        "reason": null,
+        "excluded": [],
+        "branches": [],
+        "items": [
+            {
+                "id": "plant/",
+                "parent": null,
+                "name": "plant",
+                "kind": "folder",
+                "root": "plant/#"
+            },
+            {
+                "id": "plant/line1/",
+                "parent": "plant/",
+                "name": "line1",
+                "kind": "folder",
+                "root": "plant/line1/#"
+            },
+            {
+                "id": "plant/line1",
+                "parent": "plant/",
+                "name": "line1",
+                "kind": "value",
+                "address": "plant/line1"
+            },
+            {
+                "id": "plant/line1\u0000$.speed",
+                "parent": "plant/line1",
+                "name": "speed",
+                "kind": "value",
+                "address": "plant/line1",
+                "path": "$.speed"
+            },
+            {
+                "id": "plant/line1/temp",
+                "parent": "plant/line1/",
+                "name": "temp",
+                "kind": "value",
+                "address": "plant/line1/temp"
+            }
+        ]
+    },
+    "scan": {
+        "root": "plant/line1/#",
+        "folder_id": "plant/line1/",
+        "finished": "2026-11-24T10:42:15.500Z",
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": false,
+        "truncated": false,
+        "reason": null,
+        "excluded": [],
+        "items": [
+            {
+                "id": "plant/line1/",
+                "parent": null,
+                "name": "line1",
+                "kind": "folder",
+                "root": "plant/line1/#"
+            },
+            {
+                "id": "plant/line1/temp",
+                "parent": "plant/line1/",
+                "name": "temp",
+                "kind": "value",
+                "address": "plant/line1/temp"
+            },
+            {
+                "id": "plant/line1/pressure",
+                "parent": "plant/line1/",
+                "name": "pressure",
+                "kind": "value",
+                "address": "plant/line1/pressure"
+            }
+        ]
+    },
+    "expected": {
+        "root": null,
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": false,
+        "truncated": false,
+        "reason": null,
+        "excluded": [],
+        "branches": [
+            {
+                "folder_id": "plant/line1/",
+                "finished": "2026-11-24T10:42:15.500Z"
+            }
+        ],
+        "items": [
+            {
+                "id": "plant/",
+                "parent": null,
+                "name": "plant",
+                "kind": "folder",
+                "root": "plant/#"
+            },
+            {
+                "id": "plant/line1",
+                "parent": "plant/",
+                "name": "line1",
+                "kind": "value",
+                "address": "plant/line1"
+            },
+            {
+                "id": "plant/line1\u0000$.speed",
+                "parent": "plant/line1",
+                "name": "speed",
+                "kind": "value",
+                "address": "plant/line1",
+                "path": "$.speed"
+            },
+            {
+                "id": "plant/line1/",
+                "parent": "plant/",
+                "name": "line1",
+                "kind": "folder",
+                "root": "plant/line1/#"
+            },
+            {
+                "id": "plant/line1/temp",
+                "parent": "plant/line1/",
+                "name": "temp",
+                "kind": "value",
+                "address": "plant/line1/temp"
+            },
+            {
+                "id": "plant/line1/pressure",
+                "parent": "plant/line1/",
+                "name": "pressure",
+                "kind": "value",
+                "address": "plant/line1/pressure"
+            }
+        ]
+    }
+}

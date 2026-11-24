@@ -1,0 +1,22 @@
+{
+    "schema": "snapshot-line",
+    "description": "An item line",
+    "data": {
+        "id": "ns=2;s=Line1/Speed",
+        "parent": "ns=2;s=Line1",
+        "name": "Speed",
+        "kind": "value",
+        "address": "ns=2;s=Line1/Speed",
+        "path": null,
+        "type": "Double",
+        "access": "rw",
+        "unit": "rpm",
+        "description": "Spindle speed",
+        "sample": null,
+        "more": false,
+        "root": null,
+        "detail": {
+            "namespace_uri": "urn:plc:line1"
+        }
+    }
+}

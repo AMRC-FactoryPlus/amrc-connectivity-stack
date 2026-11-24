@@ -1,0 +1,11 @@
+{
+    "schema": "addr",
+    "description": "features.scout must be an integer",
+    "data": {
+        "version": 1,
+        "addrs": {},
+        "features": {
+            "scout": "1"
+        }
+    }
+}

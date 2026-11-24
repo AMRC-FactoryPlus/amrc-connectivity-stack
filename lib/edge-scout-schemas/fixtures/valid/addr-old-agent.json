@@ -1,0 +1,11 @@
+{
+    "schema": "addr",
+    "description": "An addr packet from an Edge Agent before scouting, with no features key",
+    "data": {
+        "version": 1,
+        "addrs": {
+            "40123": "ns=2;s=Line1/Speed"
+        },
+        "groups": {}
+    }
+}

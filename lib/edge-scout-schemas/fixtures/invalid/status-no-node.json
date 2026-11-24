@@ -1,0 +1,8 @@
+{
+    "schema": "status",
+    "description": "The node that wrote the entry is required, so the UI can check it",
+    "data": {
+        "version": 1,
+        "supported": true
+    }
+}

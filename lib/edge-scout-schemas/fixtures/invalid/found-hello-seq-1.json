@@ -1,0 +1,12 @@
+{
+    "schema": "found",
+    "description": "A hello answer always has seq 0",
+    "data": {
+        "seq": 1,
+        "type": "hello",
+        "versions": [
+            1
+        ],
+        "supported": true
+    }
+}

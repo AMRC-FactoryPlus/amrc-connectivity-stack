@@ -1,0 +1,114 @@
+{
+    "description": "A node listed under a first parent in the base and again under the re-scanned folder keeps only its outside copy",
+    "base": {
+        "root": null,
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "excluded": [],
+        "branches": [],
+        "items": [
+            {
+                "id": "ns=2;i=1",
+                "parent": null,
+                "name": "Area",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;i=100",
+                "parent": "ns=2;i=1",
+                "name": "Shared",
+                "kind": "value",
+                "address": "ns=2;i=100"
+            },
+            {
+                "id": "ns=2;i=2",
+                "parent": null,
+                "name": "Cell",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;i=102",
+                "parent": "ns=2;i=2",
+                "name": "Old",
+                "kind": "value",
+                "address": "ns=2;i=102"
+            }
+        ]
+    },
+    "scan": {
+        "root": "ns=2;i=2",
+        "folder_id": "ns=2;i=2",
+        "finished": "2026-11-24T10:42:15.500Z",
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "excluded": [],
+        "items": [
+            {
+                "id": "ns=2;i=2",
+                "parent": null,
+                "name": "Cell",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;i=100",
+                "parent": "ns=2;i=2",
+                "name": "Shared",
+                "kind": "value",
+                "address": "ns=2;i=100"
+            },
+            {
+                "id": "ns=2;i=101",
+                "parent": "ns=2;i=2",
+                "name": "New",
+                "kind": "value",
+                "address": "ns=2;i=101"
+            }
+        ]
+    },
+    "expected": {
+        "root": null,
+        "options_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "excluded": [],
+        "branches": [
+            {
+                "folder_id": "ns=2;i=2",
+                "finished": "2026-11-24T10:42:15.500Z"
+            }
+        ],
+        "items": [
+            {
+                "id": "ns=2;i=1",
+                "parent": null,
+                "name": "Area",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;i=100",
+                "parent": "ns=2;i=1",
+                "name": "Shared",
+                "kind": "value",
+                "address": "ns=2;i=100"
+            },
+            {
+                "id": "ns=2;i=2",
+                "parent": null,
+                "name": "Cell",
+                "kind": "folder"
+            },
+            {
+                "id": "ns=2;i=101",
+                "parent": "ns=2;i=2",
+                "name": "New",
+                "kind": "value",
+                "address": "ns=2;i=101"
+            }
+        ]
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "schema": "item",
+    "description": "A value needs an address",
+    "data": {
+        "id": "x",
+        "parent": null,
+        "name": "x",
+        "kind": "value"
+    }
+}

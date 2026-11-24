@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "A truncated scan names its reason",
+    "data": {
+        "seq": 4,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": true,
+        "reason": null
+    }
+}

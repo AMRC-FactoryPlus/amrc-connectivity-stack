@@ -1,0 +1,24 @@
+{
+    "schema": "found",
+    "description": "An excluded scope has at most 4 prefixes",
+    "data": {
+        "seq": 4,
+        "type": "end",
+        "exhaustive": true,
+        "truncated": false,
+        "reason": null,
+        "excluded": [
+            {
+                "id": "i=2253",
+                "reason": "skipped",
+                "prefixes": [
+                    "a",
+                    "b",
+                    "c",
+                    "d",
+                    "e"
+                ]
+            }
+        ]
+    }
+}

@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:addr",
+    "title": "Address configuration",
+    "description": "The addr packet the Edge Agent publishes on fpEdge1/<Conn>/addr, with the optional features key.",
+    "type": "object",
+    "required": ["version", "addrs"],
+    "properties": {
+        "version": { "const": 1 },
+        "addrs": {
+            "type": "object",
+            "propertyNames": { "pattern": "^\\w+$" },
+            "additionalProperties": { "type": "string" }
+        },
+        "groups": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "addrs": { "type": "array", "items": { "type": "string" } },
+                    "poll": { "type": "integer", "minimum": 0 }
+                }
+            }
+        },
+        "features": {
+            "description": "Optional parts of the protocol this Edge Agent serves, each with an integer version.",
+            "type": "object",
+            "properties": {
+                "scout": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+    }
+}

@@ -29,7 +29,8 @@
           <RouterLink to="/isa95" class="underline hover:text-gray-900" @click="close">ISA-95 page</RouterLink>
           first.
         </div>
-        <ISA95PlacementPicker v-else v-model="placement" :disabled="submitting" required class="mt-2"/>
+        <ISA95PlacementPicker v-else v-model="placement" :disabled="submitting" required class="mt-2"
+            @settling="v => settling = v"/>
       </div>
       <DialogFooter :title="problem">
         <Button :disabled="!!problem || submitting" @click="formSubmit">
@@ -101,6 +102,7 @@ export default {
       const invalid = this.v$?.$silentErrors[0]?.$message
       if (invalid) return invalid
       if (!this.placement.length) return 'Choose at least an Enterprise'
+      if (this.settling) return 'Settle the placement first'
       return null
     },
   },
@@ -115,6 +117,7 @@ export default {
       this.v$.name.$model = null
       this.v$.name.$reset()
       this.placement = []
+      this.settling = false
       this.node = null
     },
 
@@ -172,6 +175,8 @@ export default {
       name: null,
       /* The chosen ISA-95 nodes, Enterprise first. */
       placement: [],
+      /* A duplicate warning is open in the placement picker. */
+      settling: false,
       submitting: false,
     }
   },

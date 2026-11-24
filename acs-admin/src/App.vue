@@ -78,6 +78,7 @@
         <NewISA95NodeDialog/>
         <BulkPlacementImportDialog/>
         <MergeISA95NodeDialog/>
+        <MoveISA95NodeDialog/>
         <RouterView/>
         <!-- Kept from the first visit to the Explorer page until
              sign-out, and hidden on other pages, so the Explorer keeps
@@ -116,6 +117,7 @@ import NewBridgeDialog from '@components/Bridges/NewBridgeDialog.vue'
 import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 import BulkPlacementImportDialog from '@components/ISA95/BulkPlacementImportDialog.vue'
 import MergeISA95NodeDialog from '@components/ISA95/MergeISA95NodeDialog.vue'
+import MoveISA95NodeDialog from '@components/ISA95/MoveISA95NodeDialog.vue'
 import { ACS_VERSION } from '@/lib/version.js'
 
 export default {
@@ -198,6 +200,7 @@ export default {
     NewISA95NodeDialog,
     BulkPlacementImportDialog,
     MergeISA95NodeDialog,
+    MoveISA95NodeDialog,
   },
 
   watch: {

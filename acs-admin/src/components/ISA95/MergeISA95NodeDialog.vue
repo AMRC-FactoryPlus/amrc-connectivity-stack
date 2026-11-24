@@ -99,9 +99,13 @@ export default {
   },
 
   mounted() {
-    window.events.on('show-isa95-merge-dialog', (node) => {
+    /* The payload is the node, or `{ node, into }` to preselect the node
+     * to merge into, for a possible duplicate whose likely original is
+     * known. */
+    window.events.on('show-isa95-merge-dialog', (arg) => {
+      const node = arg?.node ?? arg
       this.uuid = node?.uuid ?? null
-      this.target = null
+      this.target = arg?.into ?? null
       this.isa95.start()
       if (!this.d.rxsub) this.d.start()
       this.isOpen = true

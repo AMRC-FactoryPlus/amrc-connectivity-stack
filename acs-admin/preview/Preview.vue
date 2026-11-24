@@ -53,6 +53,26 @@
 
       <ISA95 v-else-if="surface === 'i3x-isa95'"/>
 
+      <div v-else-if="surface === 'isa95'" class="flex min-h-0 flex-1 flex-col p-4">
+        <ISA95/>
+        <MergeISA95NodeDialog/>
+        <MoveISA95NodeDialog/>
+        <NewISA95NodeDialog/>
+      </div>
+
+      <div v-else-if="surface === 'isa95-picker'" class="flex gap-8 overflow-auto p-6">
+        <div class="shrink-0 space-y-2" style="width: 352px">
+          <div class="text-sm font-semibold">Device sidebar (352px)</div>
+          <ISA95PlacementPicker v-model="placementA" compact/>
+          <div class="text-xs text-slate-500 break-all">{{ placementA }}</div>
+        </div>
+        <div class="shrink-0 space-y-2" style="width: 552px">
+          <div class="text-sm font-semibold">New device dialog (552px)</div>
+          <ISA95PlacementPicker v-model="placementB" required @settling="v => settling = v"/>
+          <div class="text-xs text-slate-500">Create is {{ settling ? 'held: settle the placement first' : 'allowed' }}</div>
+        </div>
+      </div>
+
       <div v-else class="p-10">
         <p class="text-sm text-gray-500">Unknown surface: {{ surface }}</p>
       </div>
@@ -72,6 +92,10 @@ import RawSchemaDialog from '@components/Schemas/RawSchemaDialog.vue'
 
 import I3xAccessButton from '@components/Access/I3xAccessButton.vue'
 import ISA95 from '@pages/ISA95/ISA95.vue'
+import ISA95PlacementPicker from '@components/ISA95/ISA95PlacementPicker.vue'
+import MergeISA95NodeDialog from '@components/ISA95/MergeISA95NodeDialog.vue'
+import MoveISA95NodeDialog from '@components/ISA95/MoveISA95NodeDialog.vue'
+import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 
 import { devices, drafts, schemas } from './fixtures.js'
 import { target as i3xTarget } from './i3x-fixtures.js'
@@ -81,11 +105,15 @@ export default {
 
   components: {
     ComponentPickerDialog, I3xAccessButton, ISA95, PublishSchema,
+    ISA95PlacementPicker, MergeISA95NodeDialog, MoveISA95NodeDialog, NewISA95NodeDialog,
     RawSchemaDialog, SchemaPicker, Schemas, SchemaEditor, Toaster,
   },
 
   data () {
-    return { drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null }
+    return {
+      drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
+      placementA: [], placementB: [], settling: false,
+    }
   },
 
   computed: {
@@ -94,7 +122,8 @@ export default {
     },
 
     title () {
-      if (this.surface === 'i3x-isa95') return 'ISA-95 Hierarchy'
+      if (this.surface === 'i3x-isa95' || this.surface === 'isa95') return 'ISA-95 Hierarchy'
+      if (this.surface === 'isa95-picker') return 'ISA-95 Placement'
       if (this.surface === 'i3x-device') return 'Devices'
       return 'Schemas'
     },

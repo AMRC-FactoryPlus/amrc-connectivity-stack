@@ -169,8 +169,9 @@ grants:
       !u Briefcase.FileType.Briefcase: true
 
   # What a person needs to release datasets and pass the briefcases on.
-  # Administrators grant this role to people by hand. Neither Data
-  # Access role, Dataset maker or Dataset manager, can change Published.
+  # Administrators grant this role to people by hand. The Dataset
+  # manager role cannot change Published, and nor can anyone through
+  # the grants every principal holds.
   !u Briefcase.Group.Releaser:
     # See the datasets, and their data, to decide what to release. The
     # Admin UI lists only the datasets a person can read.

@@ -139,13 +139,57 @@ describe("structure_create owner", () => {
     expect(calls.create[0].owner).toBe(OWNER);
   });
 
-  test("a 403 from CreateDataset never looks up the owner", async () => {
+  test("the source permission alone allows a create", async () => {
     const { api, calls } = make_api({
       denied: [[Constants.Perm.CreateDataset, SESSION_APP]],
+    });
+    const res = await create(api, UPN);
+
+    expect(res.code).toBe(200);
+    expect(calls.create[0].owner).toBe(OWNER);
+  });
+
+  test("CreateDataset alone does not allow a create", async () => {
+    const { api, calls } = make_api({
+      denied: [[Constants.Perm.UseForSession, SOURCE]],
     });
 
     await expect(create(api, UPN)).rejects.toMatchObject({ status: 403 });
     expect(calls.resolve).toEqual([]);
+  });
+
+  test("a 403 on the source never looks up the owner", async () => {
+    const { api, calls } = make_api({
+      denied: [
+        [Constants.Perm.CreateDataset, SESSION_APP],
+        [Constants.Perm.UseForSession, SOURCE],
+      ],
+    });
+
+    await expect(create(api, UPN)).rejects.toMatchObject({ status: 403 });
+    expect(calls.resolve).toEqual([]);
+  });
+
+  test("an empty union needs CreateDataset", async () => {
+    const union = { structure: Constants.App.UnionComponents, config: [] };
+    const denied = make_api({
+      denied: [[Constants.Perm.CreateDataset, Constants.App.UnionComponents]],
+    });
+    await expect(create(denied.api, UPN, union)).rejects.toMatchObject({ status: 403 });
+    expect(denied.calls.create).toEqual([]);
+
+    const allowed = make_api();
+    expect((await create(allowed.api, UPN, union)).code).toBe(200);
+  });
+
+  test("a union of datasets the caller may include needs no CreateDataset", async () => {
+    const { api } = make_api({
+      denied: [[Constants.Perm.CreateDataset, Constants.App.UnionComponents]],
+    });
+    const res = await create(api, UPN,
+      { structure: Constants.App.UnionComponents, config: [SOURCE] });
+
+    expect(res.code).toBe(200);
   });
 
   test("an invalid config never looks up the owner", async () => {

@@ -62,17 +62,3 @@ configs:
             format: uuid
           description: "Instance_UUIDs to reuse, by object path, so a device keeps its history keys"
       additionalProperties: false
----
-service: !u UUIDs.Service.Authentication
-version: 2
-grants:
-  # Any authenticated principal can read the vocabulary (needed by the
-  # Manager UI to populate ISA-95 dropdowns for device configurers).
-  # Administrators already have full ConfigDB access via ACS.PermGroup.ConfigDB,
-  # which covers WriteConfig and ManageObjects on ISA-95 objects.
-  !u Auth.Class.Principal:
-    !u UUIDs.Permission.ConfigDB.ReadConfig:
-      !u UUIDs.App.ISA95Vocabulary: false
-      # Placements are no more sensitive than the vocabulary, and the
-      # Manager UI shows them beside every device.
-      !u UUIDs.App.ISA95Placement: false

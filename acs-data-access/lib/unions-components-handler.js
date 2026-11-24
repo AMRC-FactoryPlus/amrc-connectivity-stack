@@ -29,6 +29,11 @@ export class UnionComponentsHandler extends BaseStructureHandler {
     }
   }
 
+  /* An empty union reads nothing, so it proves no permission. */
+  names_a_source(config) {
+    return Array.isArray(config) && config.length > 0;
+  }
+
   async check_sources_permissions(principal, config) {
     if(!Array.isArray(config)) return fail(this.log, 422, `Dataset def of structure ${this.structure} must be an Array.`);
     

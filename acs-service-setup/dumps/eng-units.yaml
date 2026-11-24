@@ -42,14 +42,3 @@ configs:
             pattern: "^\\S(.*\\S)?$"
           description: "Other Eng_Unit strings that mean this unit, e.g. kWh"
       additionalProperties: false
----
-service: !u UUIDs.Service.Authentication
-version: 2
-grants:
-  # Any authenticated principal can read the vocabulary: the Manager UI
-  # offers it when editing metrics, and i3X resolves units through it.
-  # Administrators already have full ConfigDB access through
-  # ACS.PermGroup.ConfigDB, which covers writing units.
-  !u Auth.Class.Principal:
-    !u UUIDs.Permission.ConfigDB.ReadConfig:
-      !u UUIDs.App.EngineeringUnit: false

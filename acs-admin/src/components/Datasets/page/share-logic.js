@@ -6,8 +6,7 @@
 // the dataset, by what they allow. Pure, so the Share card's rules can
 // be tested without the Auth service.
 
-import { DA } from '@/lib/datasets/constants.js'
-import { CREATE_DATASET, USE_FOR_SESSION } from '@/lib/access/device-data.js'
+import { USE_FOR_SESSION } from '@/lib/access/device-data.js'
 import { READ_DATASET } from './page-logic.js'
 
 // The permissions the Share card lists, in display order.
@@ -51,17 +50,4 @@ export async function load_share_grants (auth, dataset) {
     const grants = await Promise.all([...new Set(ids ?? [])].map(id =>
         auth.get_grant(id).then(g => ({ ...g, uuid: id })).catch(() => null)))
     return grants.filter(Boolean)
-}
-
-// The grant that lets a principal make session datasets: Create dataset
-// on the Session structure only.
-export function session_maker_grant (principal) {
-    return { principal, permission: CREATE_DATASET, target: DA.App.SessionLimits, plural: false }
-}
-
-// Whether a principal can make session datasets: true, false, or null
-// when their ACL cannot be read.
-export async function can_make_sessions (auth, principal) {
-    return auth.check_acl(principal, CREATE_DATASET, DA.App.SessionLimits, true)
-        .catch(() => null)
 }

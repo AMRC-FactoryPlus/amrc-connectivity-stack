@@ -3,10 +3,9 @@
   -->
 
 <!-- Share: grant "Read dataset" on this dataset to a principal, and
-     "Use for session" when ticked. Making a session dataset also needs
-     "Create dataset" on the Session structure, so once someone is picked
-     the card checks for it and offers it. Only administrators can add
-     grants today, so there is no permission check first: it tries, and a
+     "Use for session" when ticked, which is all they need to make
+     session datasets from it. Only administrators can add grants
+     today, so there is no permission check first: it tries, and a
      refusal says so. -->
 <template>
   <Card class="flex flex-col gap-3 p-5">
@@ -39,27 +38,6 @@
       <input v-model="session" type="checkbox" class="accent-slate-900">
       Use for sessions
     </label>
-    <div v-if="picked && session" class="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-      <template v-if="sessionMaker === undefined">
-        <i class="fa-solid fa-circle-notch animate-spin text-slate-400"></i>
-        Checking whether {{ label(picked) }} can make session datasets
-      </template>
-      <template v-else-if="sessionMaker === true">
-        <i class="fa-solid fa-check text-slate-500"></i>
-        {{ label(picked) }} can make session datasets.
-      </template>
-      <template v-else-if="sessionMaker === false">
-        <i class="fa-solid fa-circle-info text-slate-500"></i>
-        {{ label(picked) }} can't make session datasets yet.
-        <Button size="sm" variant="outline" :disabled="busy" @click="allowSessions">
-          Let them make session datasets
-        </Button>
-      </template>
-      <template v-else>
-        <i class="fa-solid fa-circle-info text-slate-500"></i>
-        You can't check whether {{ label(picked) }} can make session datasets.
-      </template>
-    </div>
     <div v-if="principals.loading && !principals.data.length" class="text-xs text-slate-500">
       <i class="fa-solid fa-circle-notch animate-spin mr-1"></i>Loading accounts
     </div>
@@ -86,9 +64,7 @@ import { Button } from '@/components/ui/button'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { usePrincipalStore } from '@store/usePrincipalStore.js'
 import { useObjectStore } from '@store/useObjectStore.js'
-import {
-  share_grants, share_lists, load_share_grants, session_maker_grant, can_make_sessions,
-} from './share-logic.js'
+import { share_grants, share_lists, load_share_grants } from './share-logic.js'
 
 const props = defineProps({ record: { type: Object, required: true } })
 
@@ -100,9 +76,6 @@ const busy = ref(false)
 const error = ref(null)
 const grants = ref([])
 const session = ref(false)
-// Whether the picked account can make session datasets: undefined while
-// checking, then true, false, or null when their ACL cannot be read.
-const sessionMaker = ref(undefined)
 const lists = computed(() => share_lists(grants.value, props.record.uuid))
 
 // The principal store's start is not idempotent, and for people who
@@ -129,13 +102,6 @@ const suggestions = computed(() => {
 })
 
 watch(query, q => { if (picked.value && q !== label(picked.value)) picked.value = null })
-
-watch(picked, async p => {
-  sessionMaker.value = undefined
-  if (!p) return
-  const ok = await can_make_sessions(useServiceClientStore().client.Auth, p.uuid)
-  if (picked.value === p) sessionMaker.value = ok
-})
 
 function pick (p) {
   picked.value = p
@@ -171,25 +137,6 @@ async function share () {
   finally {
     busy.value = false
     loadGrants()
-  }
-}
-
-// Lets the picked account make session datasets, from any dataset they
-// may use for sessions.
-async function allowSessions () {
-  busy.value = true
-  error.value = null
-  const p = picked.value
-  try {
-    await useServiceClientStore().client.Auth.add_grant(session_maker_grant(p.uuid))
-    if (picked.value === p) sessionMaker.value = true
-    toast.success(`${label(p)} can now make session datasets`)
-  }
-  catch (err) {
-    failed(err)
-  }
-  finally {
-    busy.value = false
   }
 }
 

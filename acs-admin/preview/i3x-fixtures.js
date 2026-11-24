@@ -9,7 +9,7 @@
 import { UUIDs } from '@amrc-factoryplus/service-client'
 
 import { I3X_PERM_ALL, READ_OBJECT } from '../src/lib/access/i3x-access.js'
-import { BUILD_DATASETS, DATASET_MAKER, DATASET_MANAGER, DEVICE_DATA }
+import { DATASET_MANAGER, DEVICE_DATA }
   from '../src/lib/access/device-data.js'
 
 const id = n => `a1a1a1a1-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -87,15 +87,14 @@ export const principals = [
   { uuid: OEE, name: 'OEE dashboard', kerberos: 'sv1oee@EXAMPLE.COM' },
 ]
 
-/* The dataset roles are groups too, but the dialog never offers them. */
-export const groups = [SUPERVISORS, DATA_SCIENCE, ADMINS, DATASET_MAKER, DATASET_MANAGER]
+/* The dataset role is a group too, but the dialog never offers it. */
+export const groups = [SUPERVISORS, DATA_SCIENCE, ADMINS, DATASET_MANAGER]
 
 export const objects = [
   { uuid: SUPERVISORS, name: 'Line supervisors' },
   { uuid: DATA_SCIENCE, name: 'Data science team' },
   { uuid: ADMINS, name: 'Administrators' },
   { uuid: CNC_CLASS, name: 'CNC machines' },
-  { uuid: DATASET_MAKER, name: 'Dataset maker' },
   { uuid: DATASET_MANAGER, name: 'Dataset manager' },
   { uuid: UUIDs.Class.Device, name: 'Device' },
   ...isa95.map(n => ({ uuid: n.uuid, name: n.name })),
@@ -120,20 +119,16 @@ export const grants = [
   grant(7, ADMINS, UUIDs.Special.Null, { permission: I3X_PERM_ALL }),
   grant(8, PRIYA, F2050),
   grant(9, CHRIS, CNC_01, { permission: DEVICE_DATA }),
-  grant(10, DATASET_MAKER, UUIDs.Class.Device, { plural: true, permission: BUILD_DATASETS }),
-  grant(11, DATASET_MAKER, UUIDs.Class.Device, { plural: true }),
 ]
 
 const classMembers = {
   [CNC_CLASS]: [CNC_01, CNC_02],
   [UUIDs.Class.Device]: i3xDevices.map(d => d.uuid),
-  [DATASET_MAKER]: [CHRIS],
 }
 
 /* Just enough of the Auth and ConfigDB clients for the access dialog.
  * Writes change the fixture grants, so giving and removing access can be
- * walked through. Members of Dataset maker can create datasets, so
- * picking anyone else for Build offers the role. */
+ * walked through. */
 export const i3xClient = {
   Auth: {
     find_grants: async pattern => grants
@@ -156,7 +151,6 @@ export const i3xClient = {
       const i = grants.findIndex(g => g.uuid === uuid)
       if (i >= 0) grants.splice(i, 1)
     },
-    check_acl: async principal => classMembers[DATASET_MAKER].includes(principal),
   },
   ConfigDB: {
     class_subclasses: async () => groups,

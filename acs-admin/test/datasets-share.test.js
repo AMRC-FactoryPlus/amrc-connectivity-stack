@@ -5,18 +5,16 @@
 /**
  * The Share card on a dataset's Use tab: the grants a share adds, and
  * the grants it lists. "Use for sessions" must add a second grant on
- * the dataset only, and session making must be one grant on the
- * Session structure, never on every structure.
+ * the dataset only, which is all making session datasets from it needs.
  */
 
 import { describe, it, expect } from 'vitest'
 
 import {
-  SHARE_PERMS, share_grants, share_lists, load_share_grants, session_maker_grant, can_make_sessions,
+  SHARE_PERMS, share_grants, share_lists, load_share_grants,
 } from '../src/components/Datasets/page/share-logic.js'
 import { READ_DATASET } from '../src/components/Datasets/page/page-logic.js'
 import { CREATE_DATASET, USE_FOR_SESSION } from '../src/lib/access/device-data.js'
-import { DA } from '../src/lib/datasets/constants.js'
 
 const DS = 'dddddddd-0000-4000-8000-000000000001'
 const OTHER = 'dddddddd-0000-4000-8000-000000000002'
@@ -82,28 +80,5 @@ describe('load_share_grants', () => {
     }
     const out = await load_share_grants(auth, DS)
     expect(out.map(x => x.uuid)).toEqual(['g1', 'g2'])
-  })
-})
-
-describe('session making', () => {
-  it('grants Create dataset on the Session structure only', () => {
-    expect(session_maker_grant('pat')).toEqual({
-      principal: 'pat', permission: CREATE_DATASET, target: DA.App.SessionLimits, plural: false,
-    })
-  })
-
-  it('checks Create dataset on the Session structure, and gives null when it cannot', async () => {
-    const calls = []
-    const auth = {
-      async check_acl (...args) {
-        calls.push(args)
-        if (args[0] === 'hidden') throw Object.assign(new Error('Forbidden'), { status: 403 })
-        return args[0] === 'maker'
-      },
-    }
-    expect(await can_make_sessions(auth, 'maker')).toBe(true)
-    expect(await can_make_sessions(auth, 'pat')).toBe(false)
-    expect(await can_make_sessions(auth, 'hidden')).toBe(null)
-    expect(calls[0]).toEqual(['maker', CREATE_DATASET, DA.App.SessionLimits, true])
   })
 })

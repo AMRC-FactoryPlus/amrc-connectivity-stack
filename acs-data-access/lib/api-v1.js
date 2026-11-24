@@ -1504,13 +1504,22 @@ export class APIv1 {
     if(!config) return fail(this.log, 422, `Config not provided in request body.`);
     this._getHandler(structure).validate_config(config);
 
-    const ok = await this.auth.check_acl(
-      req.auth,
-      Constants.Perm.CreateDataset,
-      structure,
-      true
-    );
-    if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
+    /* Holding the source permission on everything a dataset reads is
+     * enough to make it: Build datasets from device on a device,
+     * Include in union on a union's parts, Use for session on a
+     * session's source. _check_dataset_config checks those. A config
+     * that names no source (an empty union) checks nothing, so it
+     * needs CreateDataset on the structure, which still allows any
+     * create on its own. */
+    if (!this._getHandler(structure).names_a_source(config)) {
+      const ok = await this.auth.check_acl(
+        req.auth,
+        Constants.Perm.CreateDataset,
+        structure,
+        true
+      );
+      if (!ok) return fail(this.log, 403, `You don't have Create permission for structure ${structure}`);
+    }
 
     const checked = await this._check_dataset_config(req.auth, structure, config);
     if (structure == Constants.App.UNSDevice)
@@ -1528,7 +1537,8 @@ export class APIv1 {
   }
 
 
-  /** PUT. Updates dataset definition. Principal should have CreateDataset permission
+  /** PUT. Updates dataset definition. Needs EditDataset on the dataset,
+   * and the source permission on everything the new config reads.
    * 
    * @param {*} req.body must be object (structure, config) and UUID (optional)
    * @param {*} res 

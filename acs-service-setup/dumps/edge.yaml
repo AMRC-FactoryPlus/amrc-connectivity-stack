@@ -1,4 +1,4 @@
-#-REQUIRE: auth sparkplug
+#-REQUIRE: auth sparkplug acs-v2 files
 ---
 service: !u UUIDs.Service.ConfigDB
 version: 2
@@ -15,6 +15,15 @@ objects:
     # XXX I'm not certain a Driver shouldn't be a class of connections?
     !u Edge.Class.Driver:
       name: "Edge Agent driver"
+    # Edge Scout snapshots. The Edge Agent creates one File object of
+    # this class per scan and uploads the snapshot to the Files
+    # service. Its grants in helm.yaml are limited to this class.
+    !u Edge.Class.ScoutResult:
+      name: "Edge scout result"
+      memberOf:
+        - !u Files.Class.FileGroup
+      subclassOf:
+        - !u Files.Class.File
 
   # Not currently used. This would be difficult to implement with the
   # current implementation of composite perms as classes; we don't
@@ -50,6 +59,17 @@ objects:
       name: "Driver definition"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    # Edge Scout: the scan status of a connection, keyed by the
+    # connection UUID and written only by the Edge Agent.
+    !u Edge.App.ScoutStatus:
+      name: "Edge scout status"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
+
+  # Edge Scout: permission to send Node Control/Scout. Administrators
+  # hold the whole CmdEsc group, so they can scan.
+  !u ACS.PermGroup.CmdEsc:
+    !u Edge.Perm.Scout: { name: "Scan device addresses" }
 
   !u Edge.Class.Driver:
     !u ACS.Driver.Bacnet:           { name: "Bacnet" }
@@ -99,6 +119,22 @@ configs:
   #       icon: "code"
   #       placeholder: "e.g. temperature"
   #       hidden: false
+  #
+  # Edge Scout is set by the 'scout' key. A driver with no 'scout' key
+  # shows the Addresses panel, and the driver's hello says whether it
+  # can scan. This covers external drivers and drivers outside this
+  # repo. 'scout: false' hides the panel.
+  #
+  # scout:
+  #   title: "Scan the server's address space"   # Text on the panel
+  #   address_form: opcua    # How the UI compares a metric's address
+  #                          # with a scanned one: opcua, mqtt or exact
+  #                          # (the default)
+  #   options:               # JSON Schema for the scan options form,
+  #     type: object         # passed to the driver as they are
+  #     properties:
+  #       root: { type: string }
+  #   share_samples: false   # Let a custom driver UI see item samples
   !u Edge.App.DriverDef:
     !u ACS.Driver.Bacnet:
       polled: true
@@ -219,6 +255,46 @@ configs:
           title: "Path"
           description: "Set this to 0"
           placeholder: "e.g. 0 (must be set to 0)"
+      scout: &test_scout
+        title: "List the test addresses"
+        address_form: exact
+        # A made-up tree of addresses, for testing the scan itself.
+        options:
+          type: object
+          properties:
+            size:
+              title: "Items"
+              description: "How many value items to list"
+              type: integer
+              minimum: 0
+              default: 100
+            depth:
+              title: "Depth"
+              description: "How many folder levels to list them in"
+              type: integer
+              minimum: 0
+              default: 2
+            fail:
+              title: "Fail with"
+              description: "End the scan with this error code instead of a result"
+              type: string
+            hang:
+              title: "Hang"
+              description: "Stop sending without ending the scan"
+              type: boolean
+              default: false
+            delay_ms:
+              title: "Delay (ms)"
+              description: "Wait this long between batches"
+              type: integer
+              minimum: 0
+              default: 0
+            duplicates:
+              title: "Duplicates"
+              description: "Send some items twice"
+              type: boolean
+              default: false
+        share_samples: false
       image:
         repository: edge-test
       schema: &test_schema
@@ -232,6 +308,7 @@ configs:
       hidden: true
       polled: true
       presentation: *test_presentation
+      scout: *test_scout
       image:
         repository: edge-test-rs
       schema: *test_schema
@@ -1026,6 +1103,45 @@ configs:
           description: "JSONPath notation to extract specific values from the message payload (e.g. $.data.temperature)"
           icon: "code"
           placeholder: "e.g. $.value"
+      # Edge Scout listens on a second, short-lived client for a few
+      # seconds. A quiet topic is not found, so a scan never says a
+      # topic has gone.
+      scout:
+        title: "Listen for topics on the broker"
+        address_form: mqtt
+        options:
+          type: object
+          properties:
+            filters:
+              title: "Topic filters"
+              description: "The filters to listen on. Topics starting with $ are skipped unless a filter names them."
+              type: array
+              minItems: 1
+              items:
+                type: string
+                minLength: 1
+              default: ["#"]
+            seconds:
+              title: "Listen for (seconds)"
+              type: integer
+              minimum: 1
+              maximum: 120
+              default: 10
+            inspect_bytes:
+              title: "Inspect payloads up to (bytes)"
+              description: "JSON payloads up to this size are split into one address per leaf"
+              type: integer
+              minimum: 0
+              default: 65536
+            json_leaves:
+              title: "List JSON leaves"
+              type: boolean
+              default: true
+            client_id:
+              title: "Client ID"
+              description: "The scan's MQTT client ID. Leave empty to derive one from the connection's client ID."
+              type: string
+        share_samples: false
       image:
         repository: edge-mqtt
       schema:
@@ -1115,6 +1231,33 @@ configs:
           placeholder: "e.g. ns=2;s=/Channel/Spindle/actSpeed"
         path:
           hidden: true
+      # Edge Scout browses from Objects (i=85) and skips the Server
+      # object (i=2253) unless include_server is set, so mapped
+      # CurrentTime and ServerStatus metrics are never called missing.
+      scout:
+        title: "Scan the server's address space"
+        address_form: opcua
+        options:
+          type: object
+          properties:
+            root:
+              title: "Start at"
+              description: "The node to browse from, e.g. ns=2;s=Line1. Leave empty to start at Objects."
+              type: string
+            include_server:
+              title: "Include the Server object"
+              type: boolean
+              default: false
+            units:
+              title: "Read engineering units"
+              type: boolean
+              default: false
+            expand_arrays:
+              title: "List array elements"
+              description: "List each element of an array of up to 64 elements as its own address"
+              type: boolean
+              default: false
+        share_samples: false
       image:
         repository: edge-opcua
       # Its client certificate lives here, for as long as the pod, as
@@ -1249,6 +1392,157 @@ configs:
           icon: "folder-tree"
           placeholder: "Enter path"
       external: true
+
+  # Edge Scout: the status entry's schema. This is a copy of
+  # lib/edge-scout-schemas/schemas/status.schema.json, written as JSON,
+  # which is also YAML. test/edge-scout.test.js fails when they differ,
+  # so copy the file here whenever it changes.
+  !u UUIDs.App.ConfigSchema:
+    !u Edge.App.ScoutStatus:
+      {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "urn:edge-scout:status",
+          "title": "Edge scout status",
+          "description": "The scan status of one connection, kept in ConfigDB under the Edge scout status app and keyed by the connection's UUID. Only the Edge Agent writes it. This schema is self-contained because ConfigDB loads it as the app's ConfigSchema.",
+          "type": "object",
+          "required": ["version", "node", "supported"],
+          "additionalProperties": false,
+          "properties": {
+              "version": { "const": 1 },
+              "node": { "$ref": "#/$defs/uuid" },
+              "supported": { "enum": [true, false, "library", null] },
+              "scan": { "$ref": "#/$defs/uuid_or_null" },
+              "request": { "$ref": "#/$defs/uuid_or_null" },
+              "state": { "enum": ["queued", "running", "done", "failed", "cancelled", null] },
+              "code": {
+                  "enum": ["UNSUPPORTED", "OPTIONS", "CONN", "AUTH", "CANCELLED", "ERR",
+                           "REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
+                           "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT", null]
+              },
+              "message": { "type": ["string", "null"], "maxLength": 512 },
+              "started": { "$ref": "#/$defs/timestamp_or_null" },
+              "updated": { "$ref": "#/$defs/timestamp_or_null" },
+              "finished": { "$ref": "#/$defs/timestamp_or_null" },
+              "root": { "type": ["string", "null"], "maxLength": 1024 },
+              "folder_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+              "options_hash": { "$ref": "#/$defs/hash_or_null" },
+              "config_hash": { "$ref": "#/$defs/hash_or_null" },
+              "progress": {
+                  "oneOf": [
+                      { "type": "null" },
+                      {
+                          "type": "object",
+                          "required": ["visited", "found"],
+                          "additionalProperties": false,
+                          "properties": {
+                              "visited": { "type": "integer", "minimum": 0 },
+                              "found": { "type": "integer", "minimum": 0 },
+                              "note": { "type": ["string", "null"], "maxLength": 512 }
+                          }
+                      }
+                  ]
+              },
+              "last_request": {
+                  "oneOf": [
+                      { "type": "null" },
+                      {
+                          "type": "object",
+                          "required": ["request", "code", "at"],
+                          "additionalProperties": false,
+                          "properties": {
+                              "request": { "$ref": "#/$defs/uuid_or_null" },
+                              "code": {
+                                  "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY",
+                                           "LIMIT", "NOTRUNNING", null]
+                              },
+                              "message": { "type": ["string", "null"], "maxLength": 512 },
+                              "at": { "$ref": "#/$defs/timestamp" }
+                          }
+                      }
+                  ]
+              },
+              "current": { "$ref": "#/$defs/snapshot_ref" },
+              "previous": { "$ref": "#/$defs/snapshot_ref" }
+          },
+          "$defs": {
+              "uuid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              },
+              "uuid_or_null": {
+                  "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }]
+              },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "timestamp_or_null": {
+                  "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timestamp" }]
+              },
+              "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "hash_or_null": {
+                  "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/hash" }]
+              },
+              "excluded_scope": {
+                  "type": "object",
+                  "required": ["id", "reason"],
+                  "additionalProperties": false,
+                  "properties": {
+                      "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+                      "reason": { "type": "string", "minLength": 1, "maxLength": 32 },
+                      "prefixes": {
+                          "type": "array",
+                          "maxItems": 4,
+                          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+                      }
+                  }
+              },
+              "snapshot_ref": {
+                  "oneOf": [
+                      { "type": "null" },
+                      {
+                          "type": "object",
+                          "required": ["file", "items", "bytes_gz", "exhaustive", "truncated", "reason",
+                                       "finished", "root", "options_hash", "config_hash", "excluded", "branches"],
+                          "additionalProperties": false,
+                          "properties": {
+                              "file": { "$ref": "#/$defs/uuid" },
+                              "items": { "type": "integer", "minimum": 0 },
+                              "bytes_gz": { "type": "integer", "minimum": 0 },
+                              "exhaustive": { "type": "boolean" },
+                              "truncated": { "type": "boolean" },
+                              "reason": { "enum": ["items", "depth", "seconds", "size", "partial_access", null] },
+                              "finished": { "$ref": "#/$defs/timestamp" },
+                              "root": { "type": ["string", "null"], "maxLength": 1024 },
+                              "options_hash": { "$ref": "#/$defs/hash" },
+                              "config_hash": { "$ref": "#/$defs/hash_or_null" },
+                              "excluded": {
+                                  "type": "array",
+                                  "maxItems": 8,
+                                  "items": { "$ref": "#/$defs/excluded_scope" }
+                              },
+                              "branches": {
+                                  "type": "array",
+                                  "maxItems": 10,
+                                  "items": {
+                                      "type": "object",
+                                      "required": ["folder_id", "finished"],
+                                      "additionalProperties": false,
+                                      "properties": {
+                                          "folder_id": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                                          "finished": { "$ref": "#/$defs/timestamp" }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  ]
+              }
+          }
+      }
+
+  # Edge Scout: the command the Addresses panel sends through cmdesc.
+  !u CmdEsc.App.CmdDef:
+    !u Edge.Perm.Scout:
+      - name: Node Control/Scout
+        type: String
 ---
 service: !u UUIDs.Service.Authentication
 version: 2

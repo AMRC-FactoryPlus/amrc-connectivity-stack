@@ -266,10 +266,35 @@ grants:
       # The agent proxies cassette fetches for the edge-sim driver
       # (drivers hold no credentials of their own).
       !u EdgeSim.App.Cassette: false
+      # Edge Scout: the agent keeps each connection's scan status.
+      !u Edge.App.ScoutStatus: false
+    # ConfigDB checks WriteConfig against the app, not the object, so
+    # any agent can write any connection's status entry. The entry's
+    # node is written by the agent itself, so the Admin UI's check that
+    # it hosts the connection is not a security boundary.
+    !u ConfigDB.Perm.WriteConfig:
+      !u Edge.App.ScoutStatus: false
+    # Edge Scout: one File object per scan snapshot, which the agent
+    # deletes when it drops out of a connection's current and previous.
+    # The agent picks the snapshot's UUID, so ConfigDB checks
+    # CreateSpecificObject. ConfigDB makes the agent the object's owner,
+    # and every other snapshot grant is on Special.Mine, so an agent
+    # can fill, read and delete only the snapshots it created. Today
+    # the agent creates no other objects.
+    !u ConfigDB.Perm.CreateSpecificObject:
+      !u Edge.Class.ScoutResult: false
+    !u ConfigDB.Perm.DeleteObject:
+      !u UUIDs.Special.Mine: true
+    !u Files.Perm.Upload:
+      !u UUIDs.Special.Mine: true
     # The agent fetches files from the Files service for drivers' write
-    # commands (edge-ftp), but only members of the delivery class.
+    # commands (edge-ftp), but only members of the delivery class. It
+    # also reads back and deletes its own scan snapshots.
     !u Files.Perm.Download:
       !u Edge.Class.DeliveryFile: true
+      !u UUIDs.Special.Mine: true
+    !u Files.Perm.Delete:
+      !u UUIDs.Special.Mine: true
   !u Local.Role.EdgeSync:
     !u ConfigDB.Perm.ReadConfig:
       !u Clusters.App.K8sTemplate: false

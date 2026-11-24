@@ -17,6 +17,15 @@ export class BaseStructureHandler {
   validate_config(config) {}
   check_source_permission(principal, config) {}
 
+  /** Does this config name anything for check_sources_permissions to
+   * check? Every structure but a union always does: a config without
+   * a source fails validation. A config that names nothing proves no
+   * permission, so creating it needs CreateDataset.
+   *
+   * @param config A config that has passed validate_config.
+   */
+  names_a_source(config) { return true; }
+
   /** Checks a new or changed source beyond the caller's permission.
    *
    * Called on create and update after the source permission check, so

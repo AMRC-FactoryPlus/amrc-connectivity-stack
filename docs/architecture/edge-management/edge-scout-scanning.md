@@ -88,8 +88,8 @@ already running and can choose **Follow the running scan**.
 ## Find an address
 
 The tree shows each address's name, its address, its type, whether it
-can be read or written (`r`, `w` or `rw`), and which metric already
-uses it. The "mapped to" chip covers every device on the same
+can be read or written (`r`, `w` or `rw`), its value, and which metric
+already uses it. The "mapped to" chip covers every device on the same
 connection, because they share one scan. Under each folder, folders
 come first and then addresses, each sorted by name, so a folder keeps
 its place after you scan one branch again.
@@ -113,6 +113,65 @@ its place after you scan one branch again.
 
 Every name and description in the tree comes from the device, so the
 panel shows it as plain text.
+
+## See values
+
+The value column helps you check that an address is the one you want
+before you use it.
+
+**Value at scan.** Each scan records the value of every address as the
+driver read it during the scan, and the tree shows it in grey. Hold the
+pointer over it to see when the scan ran. The column is empty for an
+address the driver could not read, and for drivers that do not read
+values during a scan.
+
+**Live values.** Turn on **Live values** above the tree to see the
+values as they are now. The panel asks first, because the Edge Agent
+then reads the addresses on screen from the device every 5 seconds,
+which adds a small load to the device and the Edge Agent. Press
+**Turn on** to go ahead. While it is on:
+
+- The rows on screen show the value the Edge Agent last read, in normal
+  colour, in place of the grey value at scan. Hold the pointer over a
+  value to see how long ago it was read.
+- A warning sign in place of a value means the read failed, and its
+  tooltip gives the reason the device or driver gave, such as
+  `BadNodeIdUnknown` or "No message yet" for an MQTT topic that has not
+  published since the read started.
+- Scroll, open folders or search to read other addresses. The panel
+  asks for the new rows about a second after they stop moving.
+- The Edge Agent reads at most 40 addresses on a connection at once,
+  shared between everyone with live values on for it. When it leaves
+  some out, the line beside the switch says how many.
+- For an MQTT JSON field, the Edge Agent reads the whole message on the
+  topic and the panel picks the field out of it, so every field of a
+  topic counts as one address.
+
+Live values are off each time you open the panel, and they stop when
+you turn the switch off, close the panel, leave the page, switch to
+another browser tab, or the Edge Agent goes offline. Turn them on again
+when you need them.
+
+The switch is greyed out, with the reason in its tooltip, when the Edge
+Agent is offline, when you don't have the Scan device addresses
+permission, or when the driver can't read values. Only some drivers
+read values, starting with OPC UA, MQTT and the simulator, and an Edge
+Agent or driver from before this release can't either.
+
+If the Edge Agent refuses, the panel turns live values off and says
+why:
+
+Code|What the panel says|What to do
+---|---|---
+`NOREADS`|"Live values stopped because this driver can't read values."|Use the value at scan instead
+`LIMIT`|"Live values stopped because four other panels already have live values on for this connection, which is the most the Edge Agent allows. Try again when one of them turns live values off."|Wait, or ask the others to turn theirs off
+
+Other codes say "Live values stopped." followed by the text from the
+[codes table](#codes).
+
+Live values go only to the panel. They never go into Sparkplug, so the
+historians, the UNS and anyone who reads the device's data never see
+them.
 
 ## Use an address for a metric
 

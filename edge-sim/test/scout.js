@@ -16,12 +16,12 @@ import { AsyncDriver } from "@amrc-factoryplus/edge-driver";
 import { validateCassette } from "../lib/cassette.js";
 import { Player } from "../lib/player.js";
 import {
-    PLAYER_FOLDER, PlayerItems, build_tree, plain_type, scout_cassette,
+    PLAYER_FOLDER, PlayerItems, build_tree, plain_type, read_cassette, scout_cassette,
 } from "../lib/scout.js";
 import { SimHandler } from "../lib/sim.js";
 
 import {
-    assert_tree, fake_out, found, items_of, ready_driver, scan,
+    assert_tree, check_value, fake_out, found, items_of, ready_driver, scan,
 } from "./lib/harness.js";
 
 const DOC = {
@@ -270,5 +270,59 @@ test("a loaded cassette scans validly on the wire", async () => {
 
     const bad = await scan(driver, "bad", { options: { x: 1 } });
     assert.equal(bad.at(-1).error.code, "OPTIONS");
+    await driver.handler.close();
+});
+
+/* Live values */
+
+test("a read gives what the cassette is playing for each channel", () => {
+    const player = loaded_player();
+    player.play({ start_time: 1_000_000, rate: 1 });
+    player.pause();
+    player.seek(1500);
+
+    const values = read_cassette({ cassette: player.cassette, player }, [
+        "Axes/X/Position", "Status", "Spindle/Speed", "Nope",
+        "player:position", "player:status", "player:load",
+    ]);
+    /* Raw values: the library turns them into text. */
+    const by = new Map(values.map(v => [v.address, v]));
+
+    assert.deepEqual(by.get("Axes/X/Position"),
+        { address: "Axes/X/Position", value: 2.5, type: "Double", ts: 1_001_000, error: null });
+    assert.deepEqual(by.get("Status"),
+        { address: "Status", value: "Running", type: "String", ts: 1_001_000, error: null });
+    /* Nothing played yet on this channel. */
+    assert.deepEqual(by.get("Spindle/Speed"),
+        { address: "Spindle/Speed", value: null, type: "Float", ts: null, error: null });
+    assert.equal(by.get("Nope").error, "Not a channel of the loaded cassette");
+    assert.equal(by.get("player:position").value, 1500);
+    assert.equal(by.get("player:status").value, "PAUSED");
+    assert.equal(by.get("player:load").error, "This player address can only be written");
+    player.stop();
+});
+
+test("a read with no cassette loaded says so", () => {
+    const player = new Player({ emit: () => {}, onState: () => {} });
+    const [ch, st] = read_cassette({ cassette: null, player }, ["Status", "player:status"]);
+    assert.equal(ch.error, "No cassette is loaded");
+    assert.equal(st.value, "EMPTY");
+});
+
+test("the driver reads through the library, as text", async () => {
+    const driver = await ready_driver(AsyncDriver, SimHandler);
+    await driver.handleMessage("fpEdge1/Conn/scout",
+        Buffer.from(JSON.stringify({ op: "hello", version: 1 })));
+    assert.equal(found(driver, "hello")[0].reads, true);
+
+    driver.handler.player.load(validateCassette(structuredClone(DOC)));
+    driver.handler.player.seek(1000);
+    await driver.scouter.handle(Buffer.from(JSON.stringify({
+        op: "read", id: "r1", version: 1, addresses: ["Axes/X/Position", "player:status"],
+    })));
+    const [msg] = found(driver, "r1");
+    assert.equal(msg.type, "values");
+    for (const v of msg.values) assert.ok(check_value(v), JSON.stringify(v));
+    assert.deepEqual(msg.values.map(v => v.value), ["2.5", "LOADED"]);
     await driver.handler.close();
 });

@@ -244,6 +244,7 @@ import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useAccessStore } from '@store/useAccessStore.js'
 import { can_save_bridge } from '@/lib/access/perms-edge.js'
 import { random_uuid } from '@/lib/random-uuid.js'
+import { read_manager_config } from '@/lib/manager-config.js'
 
 // Sanitize name for Kubernetes
 function sanitizeName(name) {
@@ -285,25 +286,18 @@ export default {
     AlertTitle,
   },
 
-  async mounted() {
-    this.c.start()
-
+  mounted() {
+    /* The dialog is mounted on every page for every user, so it reads
+     * nothing until it opens: most users can read neither the clusters
+     * nor the Manager's config. */
     window.events.on('show-new-bridge-dialog', (bridge) => {
+      if (!this.c.rxsub) this.c.start()
+      this.loadChart()
       if (bridge) {
         this.loadBridge(bridge)
       }
       this.isOpen = true
     })
-
-    await serviceClientReady()
-
-    // Fetch the UNS Bridge chart UUID from Service Config
-    try {
-      const managerConfig = await this.s.client.ConfigDB.get_config(UUIDs.App.ServiceConfig, UUIDs.Service.Manager)
-      this.unsChartUuid = managerConfig?.helm?.unsBridge
-    } catch (err) {
-      console.error('Failed to fetch Manager config:', err)
-    }
   },
 
   computed: {
@@ -353,6 +347,14 @@ export default {
   },
 
   methods: {
+    /* The UNS Bridge chart UUID, from the Manager's Service config. */
+    async loadChart() {
+      if (this.unsChartUuid) return
+      await serviceClientReady()
+      const managerConfig = await read_manager_config(this.s.client, this.access.check)
+      this.unsChartUuid = managerConfig.helm?.unsBridge ?? null
+    },
+
     addTopic() {
       this.topics.push('')
     },

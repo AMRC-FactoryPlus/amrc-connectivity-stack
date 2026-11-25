@@ -427,7 +427,7 @@ Each library adds an opt-in read beside `scout`, which the hello's `reads` repor
 - **Python:** `reads: ClassVar[bool] = False` and `async def read_values(self, addresses) -> list[ReadValue]`.
 - **Rust:** `const READS: bool = false` and `fn reader(&self) -> Option<Arc<dyn Reader>>`, with `async fn read(&self, addresses: Vec<String>) -> Vec<ReadValue>` on `Reader`, asked for after each connect, like `scouter()`.
 
-The library turns the handler's values into text: strings as they are, numbers and booleans as JSON writes them, and anything else as JSON.
+The library turns the handler's values into text: strings as they are, numbers and booleans as JSON writes them, and anything else as JSON. A number JSON cannot write is sent as the text `NaN`, `Infinity` or `-Infinity`, so a device reporting NaN shows as NaN.
 
 ### Drivers
 

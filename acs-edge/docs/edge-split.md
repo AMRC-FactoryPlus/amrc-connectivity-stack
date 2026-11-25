@@ -36,7 +36,7 @@ Part|Driver must|Notes
 `err`|Optional. Report a failed write or an address problem.|The Edge Agent logs it and takes no other action.
 `result`|Required for a driver that subscribes to `write`. Answer a write.|The Edge Agent reports the written value only when the answer says it was written. See [Write results](#write-results).
 `req`/`rsp`|Optional.|Only for the request kinds the agent serves.
-`scout`/`found`|Optional. List the device's addresses.|Subscribe to `scout` only after an `addr` with `features.scout` on the same MQTT session. See [Scouting](#scouting).
+`scout`/`found`|Optional. List the device's addresses, and read their live values.|Subscribe to `scout` only after an `addr` with `features.scout` on the same MQTT session. See [Scouting](#scouting).
 
 ## Definitions
 
@@ -749,7 +749,8 @@ raises it to 2, and a driver scouts only when it recognises the value.
     fpEdge1/Conn/scout
 
 The driver subscribes to this topic, under the gate above. The Edge
-Agent publishes `hello`, `start` and `cancel` messages to it.
+Agent publishes `hello`, `start`, `ack`, `cancel` and `read` messages
+to it.
 
 **Implementation.** The Edge Agent's broker notes each driver that
 subscribes to its own `scout`, and forgets it when the driver
@@ -758,7 +759,8 @@ unsubscribes or disconnects, in the same way as for `write/#`.
     fpEdge1/Conn/found/Id
 
 The driver publishes its answers here. `Id` is `hello` for the answer
-to a hello, and otherwise the id of the scan the message belongs to.
+to a hello, and otherwise the id of the scan or read the message
+belongs to.
 
 ### Edge Agent to driver
 
@@ -811,7 +813,8 @@ on a topic and goes up by 1 for each message after it, so the Edge
 Agent can tell when a message was dropped.
 
 ```json
-{"seq": 0, "type": "hello", "versions": [1], "supported": true, "library": "rs-edge-driver 0.1.0"}
+{"seq": 0, "type": "hello", "versions": [1], "supported": true, "reads": true,
+ "library": "rs-edge-driver 0.1.0"}
 {"seq": 0, "type": "accept", "window": 4}
 {"seq": 1, "type": "items", "items": [ITEM, ...]}
 {"seq": 2, "type": "progress", "visited": 3400, "found": 1200, "note": "ns=2;s=Line1"}
@@ -824,8 +827,11 @@ Agent can tell when a message was dropped.
   time. `versions` lists the versions of this section the driver
   speaks. `supported` says whether the driver can scan, and comes from
   the driver's code, not its current state, so a driver whose
-  configuration failed still answers correctly. `library` is the
-  library's name and version, at most 128 characters.
+  configuration failed still answers correctly. `reads` says whether
+  the driver answers `read` (see "Reading values"), and also comes
+  from the driver's code. A hello without `reads` means false.
+  `library` is the library's name and version, at most 128
+  characters.
 * **`accept`** is the first answer to a `start`, sent before the
   driver touches its device. `window` repeats the start's window when
   the driver keeps to it (see "Rules for a scan").
@@ -923,6 +929,69 @@ duplicate `id`, or any other fault, and counts what it dropped.
   `folder_id`.
 * A scan never changes the device.
 
+### Reading values
+
+While an operator has Live values turned on in the Admin UI, the Edge
+Agent reads the current values of the addresses on screen, through the
+driver, every few seconds. Values never go into Sparkplug. A driver
+whose hello says `reads: false` never gets a `read`.
+
+```json
+{"op": "read", "id": "9d1e7c0a5b3f4e2d8c6a1b0f9e8d7c6b", "version": 1,
+ "addresses": ["ns=2;s=Line1.Speed", "plant/line1/temp"]}
+```
+
+* `id` follows the same rule as a scan id, and the Edge Agent makes a
+  new one for each read.
+* `addresses` holds 1 to 40 unique addresses of at most 1024
+  characters, in the driver's canonical form.
+
+The driver answers once on `found/<id>`, with `seq` 0:
+
+```json
+{"seq": 0, "type": "values", "values": [
+  {"address": "ns=2;s=Line1.Speed", "value": "1450.5", "type": "Double", "ts": 1795600000000, "error": null},
+  {"address": "plant/line1/temp", "value": "{\"t\":21.4}", "type": "String", "ts": 1795599998000, "error": null},
+  {"address": "ns=2;s=Gone", "value": null, "type": null, "ts": null, "error": "BadNodeIdUnknown"}]}
+{"seq": 0, "type": "end", "error": {"code": "UNSUPPORTED", "message": "This driver can't read values"}}
+```
+
+* `values` has one entry for each address asked for, in any order.
+  `value` is the value written as text, at most 1024 characters, or
+  null: a string as it is, a number or boolean as JSON writes it, and
+  anything else as JSON. A number JSON can't write is `NaN`,
+  `Infinity` or `-Infinity`. `type` is a Sparkplug B type name without
+  a byte order, or null. `ts` is the value's source timestamp in ms
+  since the epoch, or null. `error` is null or a short reason the
+  address could not be read, at most 256 characters.
+* A driver that can't answer sends `end` with `UNSUPPORTED` when it
+  does not read values, `CONN` when it is not connected to its device,
+  and `ERR` for any other failure.
+
+Rules for a read:
+
+* A read runs beside a scan, never inside it, and does not count as a
+  scan. A driver answers a `read` while a scan is running.
+* The driver reads on the connection to the device it already has. It
+  never opens a session, a subscription or a client for a read.
+* A driver that has not answered in 4 s gives up and sends nothing.
+  The Edge Agent then records `TIMEOUT` against every address of that
+  read.
+* The Edge Agent sends at most one read at a time to a driver.
+* A read never changes the device.
+
+**Implementation.** The Edge Agent reads for leases, which the Admin
+UI makes with the `watch` op of `Node Control/Scout` and ends with
+`unwatch`. A connection holds at most 4 leases, each ending 60 s after
+its last `watch`, and the agent reads the union of their addresses,
+at most 40, in the order the leases were made. It reads every
+`SCOUT_READ_INTERVAL_MS` (default 5000, at least 2000), and only while
+the CPU budget below allows, so data still comes first. It checks
+each answer, drops entries for addresses it did not ask for, cuts
+`value` at 1024 characters, and writes the values to the Edge scout
+values entry in ConfigDB only when something changed, and at least
+every 30 s while a lease is live.
+
 ### Codes
 
 Every outcome has exactly one code. The driver codes are the only ones
@@ -943,9 +1012,10 @@ Code|Set by|Meaning
 `NODRIVER`|Edge Agent|The driver is not connected, its status is not `UP`, it has been `UP` for less than 10 s without subscribing to `scout`, or the Edge Agent is stopping
 `LIBRARY`|Edge Agent|The driver has been `UP` for 10 s and has not subscribed to `scout`, so it predates scouting
 `BUSY`|Edge Agent|A scan is already queued or running on this connection
-`LIMIT`|Edge Agent|The Edge Agent is running as many scans as it allows, and its queue is full
+`LIMIT`|Edge Agent|The Edge Agent is running as many scans as it allows, and its queue is full. For a `watch`, the connection already has 4 leases
+`NOREADS`|Edge Agent|A `watch` named a connection whose driver's hello says `reads: false`
 `NOTRUNNING`|Edge Agent|A cancel named a connection with no scan
-`TIMEOUT`|Edge Agent|The scan passed `seconds` plus 15 s, or nothing arrived for 30 s
+`TIMEOUT`|Edge Agent|The scan passed `seconds` plus 15 s, or nothing arrived for 30 s. For a read, no answer arrived in 4 s
 `LOST`|Edge Agent|A gap in `seq` showed that a message was dropped
 `INTERRUPTED`|Edge Agent|The Edge Agent restarted, or the driver disconnected, left `UP` or sent a new hello during the scan
 `STORE`|Edge Agent|The Edge Agent could not save the result
@@ -995,6 +1065,7 @@ With scouting|Before scouting|The driver never subscribes. Once it has been `UP`
 With scouting|With scouting, status not `UP`|Scans fail with `NODRIVER`, naming the status
 With scouting|With scouting, no scouting in the handler|The hello says `supported: false`, and scans fail with `UNSUPPORTED`
 With scouting|With scouting, scouting in the handler|Scans run
+With live values|Without live values|The hello has no `reads`, so a `watch` is refused with `NOREADS` and the driver never gets a `read`
 
 edge-opcua and edge-mqtt first shipped with ACS 7.0.0 and subscribe to
 `write/#` when they connect, which Edge Agents before 7.0.0 refuse.

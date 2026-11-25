@@ -143,6 +143,14 @@ describe('live_value', () => {
     expect(live_value(value('x', { address: 'plant/long', path: '$.t' }), entry).error).toMatch(/too long/)
   })
 
+  it('shows the value as it is for a driver path that is not a JSONPath', () => {
+    /* edge-test gives its items the metric path "0". Found on a dev
+     * cluster, where every edge-test row said "Not in the latest
+     * message". */
+    expect(live_value(value('t', { address: 'ns=2;s=Speed', path: '0' }), entry))
+      .toEqual({ text: '1450.5', error: null, read, type: 'Double' })
+  })
+
   it('has nothing for an address the entry does not hold', () => {
     expect(live_value(value('other'), entry)).toBeNull()
     expect(live_value(value('ns=2;s=Speed'), null)).toBeNull()

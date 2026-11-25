@@ -260,6 +260,9 @@ export default {
 
   watch: {
     async '$route.params.deviceuuid' (newUuid) {
+      /* Another device's editor starts with its Addresses panel shut,
+       * so give the sidebar back. */
+      this.scoutOpen = false
       await this.getDeviceDetails(newUuid)
     },
 

@@ -26,6 +26,8 @@ The basic structure of any driver using this library looks like this:
         async close () { }
         static scouts;
         async scout (req, out) { }
+        static reads;
+        async read_values (addresses, signal) { }
     }
     
     /* Don't use Driver directly, use a subclass */
@@ -357,3 +359,47 @@ one still ends the scan correctly:
 
 After the scan has stopped, `scout` has 2 s to return before the
 library ends the scan without it. Only one scan runs at a time.
+
+### `reads`
+
+    class MyHandler {
+        static reads = true;
+        ...
+    }
+
+This property is optional, and needs an Edge Agent with Edge Scout live
+values.
+
+If a handler class sets this static property to `true`, the driver
+tells the Edge Agent that it can read live values, and calls
+`read_values` while an operator has Live values turned on in the Admin
+UI's Addresses panel. Without it the driver answers every read with
+`UNSUPPORTED`.
+
+### `read_values`
+
+    const values = await handler.read_values(addresses, signal);
+
+This method is called only when the handler class sets `reads`, and
+only while the driver is `UP`. `addresses` is a list of 1 to 40 unique
+addresses in the driver's own form. Read them on the connection the
+handler already has, never on a new session or client, and return a
+list of objects:
+
+Property|Meaning
+---|---
+`address`|One of the addresses asked for
+`value`|The value. Strings are sent as they are, numbers and booleans as JSON writes them, and anything else as JSON. Use `null` for no value
+`type`|A Sparkplug type name with no byte order, such as `Double`, or null
+`ts`|The source timestamp, as ms since the epoch or a `Date`, or null
+`error`|A short reason the address couldn't be read, or null
+
+The order does not matter. An address left out of the list is answered
+with the error "The driver gave no value". Values are cut to 1024
+characters and errors to 256.
+
+Reads run beside a scan, never inside it. A handler that hasn't
+answered in 4 s is abandoned and `signal` aborts, and the Edge Agent
+records a timeout for that round. Throw `ScoutError` with `CONN` when
+the device can't be reached. Anything else thrown answers the read
+with `ERR` and its message.

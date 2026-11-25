@@ -354,6 +354,14 @@ upstream, so they are not tied to the Manager UI.
     when some fail the rest are still subscribed and the failures are
     listed together. The level itself is not registered, so its button
     does not turn green. Tests in `src/acs/levelSubscribe.test.ts`.
+21. **Subscribing on a site served over plain HTTP**
+    (`src/api/client.ts`, `createSubscription`): the client id comes
+    from `src/acs/randomUuid.ts` instead of `crypto.randomUUID()`.
+    Browsers offer `crypto.randomUUID` only in a secure context (HTTPS
+    or localhost), so on an ACS served over plain HTTP every subscribe
+    failed with "crypto.randomUUID is not a function". The fallback
+    makes a v4 UUID from `crypto.getRandomValues`, which every browser
+    offers. Tests in `src/acs/randomUuid.test.ts`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

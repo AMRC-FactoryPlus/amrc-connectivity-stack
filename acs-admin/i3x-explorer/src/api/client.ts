@@ -20,6 +20,7 @@ import {
   type AuthProvider,
 } from './authProvider'
 import { HttpStatusError } from './subscription'
+import { randomUuid } from '../acs/randomUuid' // ACS
 import {
   bulkOutcome,
   extractV1BulkResults,
@@ -797,7 +798,8 @@ export class I3XClient {
   async createSubscription(): Promise<CreateSubscriptionResponse> {
     // Auto-unwrapped from {success, result: {clientId, subscriptionId, displayName}}
     // The client MUST supply a cryptographically random clientId; store it for all subsequent ops
-    const clientId = crypto.randomUUID()
+    // ACS: randomUUID is missing on plain-HTTP sites, so use a fallback there.
+    const clientId = randomUuid()
     const response = await this.request<Record<string, unknown>>('POST', '/subscriptions', { clientId })
     const subscriptionId = String(response.subscriptionId)
     this.clientIds.set(subscriptionId, clientId)

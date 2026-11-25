@@ -350,10 +350,15 @@ upstream, so they are not tied to the Manager UI.
     device), and subscribes to each one as if it were clicked, at the
     whole-tree depth. A metric that sits in a level outside any device is
     subscribed on its own. With more than 25 to subscribe to it asks
-    first. A level with nothing under it says so instead of waiting, and
-    when some fail the rest are still subscribed and the failures are
-    listed together. The level itself is not registered, so its button
-    does not turn green. Tests in `src/acs/levelSubscribe.test.ts`.
+    first, in the Explorer's own dialog (`src/acs/levelConfirm.ts`,
+    `LevelConfirmDialog.tsx`, mounted in `src/App.tsx`). It used
+    `window.confirm` at first, but a browser that blocks native dialogs
+    answers that with no at once, so subscribing to a big level such as
+    the enterprise did nothing at all. A level with nothing under it says
+    so instead of waiting, and when some fail the rest are still
+    subscribed and the failures are listed together. The level itself is not registered, so its button
+    does not turn green. Tests in `src/acs/levelSubscribe.test.ts` and
+    `src/acs/levelConfirmDialog.test.tsx`.
 21. **Subscribing on a site served over plain HTTP**
     (`src/api/client.ts`, `createSubscription`): the client id comes
     from `src/acs/randomUuid.ts` instead of `crypto.randomUUID()`.

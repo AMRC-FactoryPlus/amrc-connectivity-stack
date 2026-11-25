@@ -14,6 +14,7 @@ import { ConnectionDialog } from './components/connection/ConnectionDialog'
 import { UpdateChecker } from './components/updater/UpdateChecker'
 import { TooltipLayer } from './components/common/TooltipLayer'
 import { PerfProfiler } from './diagnostics/PerfProfiler'
+import { LevelConfirmDialog } from './acs/LevelConfirmDialog' // ACS
 
 function App() {
   const showConnectionDialog = useConnectionStore(s => s.showConnectionDialog)
@@ -75,6 +76,8 @@ function App() {
         </PerfProfiler>
 
         {showConnectionDialog && <ConnectionDialog />}
+        {/* ACS: asked before subscribing to a large ISA-95 level. */}
+        <LevelConfirmDialog />
         {/* Desktop-only: the web build has no installer to nag users toward. */}
         {window.electronAPI && <UpdateChecker />}
       </div>

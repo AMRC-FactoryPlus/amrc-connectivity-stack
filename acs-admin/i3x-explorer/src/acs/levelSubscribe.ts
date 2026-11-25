@@ -72,8 +72,8 @@ export function countLabel(targets: readonly Pick<ObjectInstance, 'isComposition
   return `${targets.length} ${noun}${targets.length === 1 ? '' : 's'}`
 }
 
-/** The question asked before subscribing to many at once. */
+/** What is said before subscribing to many at once. The dialog's title asks the question. */
 export function confirmMessage(levelName: string, targets: readonly Pick<ObjectInstance, 'isComposition'>[]): string {
   return `${levelName} has ${countLabel(targets)} under it. Subscribing to it subscribes to every one of them, ` +
-    'which can be a lot of live data. Subscribe to all of them?'
+    'which can be a lot of live data.'
 }

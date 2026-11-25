@@ -2,116 +2,33 @@
   - Copyright (c) University of Sheffield AMRC 2026.
   -->
 
-<script setup lang="ts">
-import {Button} from '@components/ui/button'
-import {useServiceClientStore} from '@/store/serviceClientStore.js'
-import {SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem} from '@/components/ui/sidebar'
+<!-- The main menu. Each item shows only when the user's permissions
+     let them read something on its page (lib/access/sections.js).
+     While their permissions load, Home shows with placeholders below
+     it, so items appear rather than flash up and vanish. -->
+<script setup>
+import { computed } from 'vue'
+import { Button } from '@components/ui/button'
+import { useServiceClientStore } from '@/store/serviceClientStore.js'
+import { useAccessStore } from '@/store/useAccessStore.js'
+import { Status } from '@/lib/access/acl.js'
+import { nav_sections } from '@/lib/access/sections.js'
+import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuSkeleton } from '@/components/ui/sidebar'
 
-interface Item {
-    title: string
-    href: string,
-    icon?: string,
-    auth: boolean
-    admin?: boolean
-}
+const s = useServiceClientStore()
+const access = useAccessStore()
 
-const sidebarNavItems: Item[] = [
-    {
-        title: 'Home',
-        href: '/',
-        icon: 'home',
-        auth: false
-    },
-    {
-        title: 'Explorer',
-        href: '/explorer',
-        icon: 'compass',
-        auth: true
-    },
-    {
-        title: 'Live Activity',
-        href: '/activity',
-        icon: 'table-cells',
-        auth: true
-    },
-    {
-        title: 'Alerts',
-        href: '/alerts',
-        icon: 'bell',
-        auth: true
-    },
-    {
-        title: 'Cassettes',
-        href: '/cassette-decks',
-        icon: 'cassette-tape',
-        auth: true
-    },
-    {
-      title: 'Access Control',
-      href: '/access-control',
-      icon: 'user-shield',
-      auth: true
-    },
-    {
-      title: 'ConfigDB',
-      href: '/configdb',
-      icon: 'gears',
-      auth: true
-    },
-  {
-    title: 'Files',
-    href: '/files',
-    icon: 'file',
-    auth: true
-  },
-  {
-    title: 'Bridges',
-    href: '/bridges',
-    icon: 'arrow-down-up-across-line',
-    auth: true
-  },
-  {
-    title: 'Gateway Depot',
-    href: '/gateway-depot',
-    icon: 'warehouse',
-    auth: true
-  },
-  {
-    title: 'ISA-95',
-    href: '/isa95',
-    icon: 'sitemap',
-    auth: true
-  },
-  {
-    title: 'Units',
-    href: '/units',
-    icon: 'ruler',
-    auth: true
-  },
-  {
-    title: 'Schemas',
-    href: '/schemas',
-    icon: 'shapes',
-    auth: true
-  },
-  {
-    title: 'Datasets',
-    href: '/datasets',
-    icon: 'database',
-    auth: true
-  }
-]
+const items = computed(() => nav_sections(access.check))
+const loading = computed(() => s.loaded && access.check.status === Status.Loading)
 </script>
 
 <template>
   <SidebarGroup>
     <SidebarGroupContent>
       <SidebarMenu>
-        <SidebarMenuItem v-for="item in sidebarNavItems" :key="item.href">
-          <RouterLink v-if="!item.auth || (item.auth && useServiceClientStore().loaded)" :to="item.href">
+        <SidebarMenuItem v-for="item in items" :key="item.href">
+          <RouterLink :to="item.href">
             <Button
-                v-if="!item.auth || (item.auth && useServiceClientStore().loaded)"
-                :key="item.title"
                 :variant="$route.path === item.href || $route.meta.name === item.title ? 'default' : 'ghost'"
                 class="w-full text-left justify-start"
             >
@@ -122,6 +39,11 @@ const sidebarNavItems: Item[] = [
             </Button>
           </RouterLink>
         </SidebarMenuItem>
+        <template v-if="loading">
+          <SidebarMenuItem v-for="n in 4" :key="`loading-${n}`" aria-hidden="true">
+            <SidebarMenuSkeleton show-icon class="h-9 px-4"/>
+          </SidebarMenuItem>
+        </template>
       </SidebarMenu>
     </SidebarGroupContent>
   </SidebarGroup>

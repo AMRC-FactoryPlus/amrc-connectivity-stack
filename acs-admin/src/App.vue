@@ -24,14 +24,7 @@
 
       <SidebarContent>
         <Nav/>
-        <SidebarGroup>
-          <SidebarGroupLabel class="mb-2">Edge Clusters & Devices</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <EdgeClusterList/>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <EdgeNav/>
         <div class="mt-auto p-4">
           <Card>
             <CardHeader class="p-2 pt-0 md:p-4">
@@ -79,12 +72,18 @@
         <BulkPlacementImportDialog/>
         <MergeISA95NodeDialog/>
         <MoveISA95NodeDialog/>
-        <RouterView/>
+        <!-- A page the user can't read says so, rather than loading
+             for ever. See lib/access/sections.js. -->
+        <RouterView v-slot="{ Component, route }">
+          <PageGate :section="route.meta.section">
+            <component :is="Component"/>
+          </PageGate>
+        </RouterView>
         <!-- Kept from the first visit to the Explorer page until
              sign-out, and hidden on other pages, so the Explorer keeps
              its subscriptions and pop-out window while you look
              elsewhere. See ExplorerFrame.vue. -->
-        <ExplorerFrame v-if="explorer_kept && s.loaded" v-show="$route.path === '/explorer'"/>
+        <ExplorerFrame v-if="explorer_kept && s.loaded && can_explore" v-show="$route.path === '/explorer'"/>
       </main>
     </SidebarInset>
   </SidebarProvider>
@@ -98,13 +97,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Nav from '@/components/Nav/Nav.vue'
-import EdgeClusterList from '@/components/Nav/EdgeClusterList.vue'
+import EdgeNav from '@/components/Nav/EdgeNav.vue'
+import PageGate from '@/components/PageGate.vue'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { oidc_session } from '@/lib/oidc.js'
 import { useLayoutStore } from '@/store/layoutStore.js'
+import { useAccessStore } from '@/store/useAccessStore.js'
+import { can_see } from '@/lib/access/sections.js'
 import { useEventListener, useMagicKeys } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { is_search_shortcut, request_explorer_search } from '@/lib/explorer-search.js'
 import { Toaster } from '@/components/ui/sonner'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar'
@@ -146,9 +148,15 @@ export default {
       if (!loaded) explorer_kept.value = router.currentRoute.value.path === '/explorer'
     })
 
+    /* The Explorer's frame is not made for someone who can't read
+     * anything through i3X: its page says so instead. */
+    const access = useAccessStore()
+    const can_explore = computed(() => can_see(access.check, 'explorer'))
+
     return {
       acs_version: ACS_VERSION,
       explorer_kept,
+      can_explore,
       s,
       l: useLayoutStore(),
       escape,
@@ -193,7 +201,8 @@ export default {
     SheetContent,
     SheetTrigger,
     Nav,
-    EdgeClusterList,
+    EdgeNav,
+    PageGate,
     Toaster,
     NewConnectionDialog,
     NewBridgeDialog,

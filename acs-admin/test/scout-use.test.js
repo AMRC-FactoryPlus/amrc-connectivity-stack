@@ -267,6 +267,27 @@ describe('useScout states', () => {
     s.stop()
   })
 
+  it('clears a send error once the agent writes a newer status', async () => {
+    const w = world()
+    w.status.next(entry({ scan: 's1', request: 'r0', state: 'done', current: { file: 'f1', items: 1 } }))
+    w.deps.send.mockRejectedValueOnce(Object.assign(new Error('no'), { status: 0 }))
+    const s = make(w)
+    await flush()
+    expect(await s.start()).toBe(false)
+    expect(s.send_error.value).toBe('The request did not reach the Edge Agent (0).')
+
+    /* The same entry again, such as a watch reconnecting, keeps it. */
+    w.status.next(entry({ scan: 's1', request: 'r0', state: 'done', current: { file: 'f1', items: 1 } }))
+    await flush()
+    expect(s.send_error.value).not.toBeNull()
+
+    /* A later scan, started from elsewhere, finishes. */
+    w.status.next(entry({ scan: 's2', request: 'r9', state: 'done', current: { file: 'f2', items: 1 } }))
+    await flush()
+    expect(s.send_error.value).toBeNull()
+    s.stop()
+  })
+
   it('shows failed, cancelled and interrupted with the previous snapshot', async () => {
     const w = world()
     const s = make(w)

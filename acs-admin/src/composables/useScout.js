@@ -161,6 +161,16 @@ export function create_scout ({ deps, node, connection, address, driver, active 
     else if (p.refused) pending.value = null
   })
 
+  /* A send error is about one request. When the agent writes a newer
+   * status (another request, a new state or a new scan) the panel has
+   * moved on, so the error goes. */
+  watch(() => {
+    const e = entry.value
+    return [e?.request, e?.scan, e?.state, e?.current?.file, e?.last_request?.request]
+  }, (next, prev) => {
+    if (send_error.value && next.some((v, i) => v !== prev?.[i])) send_error.value = null
+  })
+
   /* Keep the clock running while something on screen depends on it. */
   watch(() => [pending.value, status.value?.state], ([p, s]) => {
     const live = !!p || s === 'queued' || s === 'running'

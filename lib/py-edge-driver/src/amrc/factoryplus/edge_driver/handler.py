@@ -1,9 +1,9 @@
 # Copyright (c) University of Sheffield AMRC 2025.
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Optional, Set, Any, Dict, Callable, Union, Awaitable
+from typing import TYPE_CHECKING, ClassVar, List, Optional, Set, Any, Dict, Callable, Union, Awaitable
 
-from .scout import ScoutEnd, ScoutError, ScoutRequest, ScoutSink
+from .scout import ReadValue, ScoutEnd, ScoutError, ScoutRequest, ScoutSink
 
 if TYPE_CHECKING:
     from .driver import Driver
@@ -24,6 +24,11 @@ class Handler(ABC):
     """Set this to True in a handler class that implements scout. The
     driver tells the Edge Agent so in its hello, from the class, so a
     driver whose configuration failed still answers correctly."""
+
+    reads: ClassVar[bool] = False
+    """Set this to True in a handler class that implements read_values,
+    so the Admin UI can show live values. The hello reports it from the
+    class, as for `scouts`."""
 
     def parseAddr(self, addr: Any) -> Any:
         """
@@ -123,3 +128,25 @@ class Handler(ABC):
             the scan with that code. Anything else raised becomes ERR.
         """
         raise ScoutError("UNSUPPORTED", "This driver can't list its addresses")
+
+    async def read_values(self, addresses: List[str]) -> List[ReadValue]:
+        """
+        Read the current value of each address (Edge Scout live values).
+
+        This is only called when the handler class sets `reads = True`
+        and the driver is UP. Read on the connection the handler already
+        has: never open a session, a subscription or a client per call.
+        A read runs beside a running scan, and is abandoned if it has
+        not returned in 4 s.
+
+        Args:
+            addresses: 1 to 40 addresses in the driver's canonical form
+
+        Returns:
+            One ReadValue, or a dict with the same keys, per address.
+            `value` may be any value: the library writes it as text. Put
+            a short reason in `error` for an address that can't be read.
+            Raise ScoutError("CONN") when the device can't be reached.
+            Anything else raised answers the whole read with ERR.
+        """
+        raise ScoutError("UNSUPPORTED", "This driver can't read values")

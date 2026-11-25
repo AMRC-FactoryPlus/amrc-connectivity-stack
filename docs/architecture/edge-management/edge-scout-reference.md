@@ -191,14 +191,15 @@ Code|Set by|Meaning
 `BUSY`|Edge Agent|A scan is already queued or running on this connection
 `LIMIT`|Edge Agent|The agent runs as many scans as it allows and 4 more are queued
 `NOTRUNNING`|Edge Agent|A cancel named a connection with no queued or running scan
+`NOREADS`|Edge Agent|A `watch` named a connection whose driver says in its hello that it cannot read live values
 `TIMEOUT`|Edge Agent|Nothing arrived from the driver for 30 s, or the scan passed `seconds` plus 15 s
 `LOST`|Edge Agent|A gap in `seq`
 `INTERRUPTED`|Edge Agent|The agent restarted, or the driver disconnected, left `UP` or sent a new hello during the scan
 `STORE`|Edge Agent|An upload, download or status write failed. The message names the Files or ConfigDB answer
 `AGENT`|Edge Agent|Any other agent failure, including a `found` message that is not JSON or fails its schema
 
-`REQUEST`, `UNDEPLOYED`, `NODRIVER`, `LIBRARY`, `BUSY`, `LIMIT` and
-`NOTRUNNING` are refusals. They go only in the status entry's
+`REQUEST`, `UNDEPLOYED`, `NODRIVER`, `LIBRARY`, `BUSY`, `LIMIT`,
+`NOTRUNNING` and `NOREADS` are refusals. They go only in the status entry's
 `last_request` and never touch the scan fields, so a refused request
 never disturbs a scan that is already running.
 
@@ -322,6 +323,7 @@ entries.
 Constant|UUID|What
 ---|---|---
 `Edge.App.ScoutStatus`|`ad73fae4-a3b9-457a-8c36-12a2019bff2c`|App "Edge scout status", a subclass of `MetaDB.Class.ConfigEntry`
+`Edge.App.ScoutValues`|`399a86cf-9bc6-4681-b568-b45fc650dacb`|App "Edge scout values", a subclass of `MetaDB.Class.ConfigEntry`. Live values, written only by the Edge Agent
 `Edge.Class.ScoutResult`|`10916e96-f6fe-44cc-8c01-16a775426038`|R1 class "Edge scout result", a subclass of `Files.Class.File` and a member of `Files.Class.FileGroup`
 `Edge.Perm.Scout`|`41443382-ecad-439b-999f-cb611bc11f7c`|Permission "Scan device addresses", a member of `ACS.PermGroup.CmdEsc`. The CmdDef for `Node Control/Scout` is keyed by it
 `Files.Perm.Delete`|`82a2206b-b9d8-4eee-bc0e-63fb8785019e`|Permission "Delete", a member of `Files.Perm.All`
@@ -345,6 +347,8 @@ Permission|Target|Wild|Why
 ---|---|---|---
 `ConfigDB.Perm.ReadConfig`|`Edge.App.ScoutStatus`|no|Read the status entries
 `ConfigDB.Perm.WriteConfig`|`Edge.App.ScoutStatus`|no|Write the status entries
+`ConfigDB.Perm.ReadConfig`|`Edge.App.ScoutValues`|no|Read the live values entries
+`ConfigDB.Perm.WriteConfig`|`Edge.App.ScoutValues`|no|Write the live values entries
 `ConfigDB.Perm.CreateObject`|`Edge.Class.ScoutResult`|no|Create one File object per scan
 `ConfigDB.Perm.DeleteObject`|`Edge.Class.ScoutResult`|yes|Delete snapshots that drop out
 `Files.Perm.Upload`|`UUIDs.Special.Null`|no|Upload a snapshot. Files checks Upload against the null UUID, not the file
@@ -353,7 +357,35 @@ Permission|Target|Wild|Why
 
 The Admin UI reads results with the operator's own credentials, so an
 operator needs `Files.Perm.Download` on the snapshots and ConfigDB read
-access to the status app, which administrators have.
+access to the status and values apps, which administrators have.
+
+## Live values
+
+The Addresses panel can read the value addresses on screen every few
+seconds. The design is in the "Values" section of
+[the Edge Scout design](edge-scout.md#values-added-25-nov-2026).
+
+- **Command.** `Node Control/Scout` with `op` `watch` (a `lease` UUID and
+  1 to 40 `addresses`) or `unwatch` (the `lease`). A lease lasts 60 s
+  unless the panel sends `watch` again. A connection holds at most 4
+  leases, and the agent reads at most 40 addresses for it across them.
+  An accepted `watch` writes nothing to the status entry.
+- **Driver exchange.** The agent sends `{"op":"read","id","version":1,"addresses"}`
+  on `scout`, at most one at a time per connection, and the driver
+  answers once on `found/<id>` with `{"seq":0,"type":"values","values":[...]}`.
+  A read with no answer after 4 s counts as `TIMEOUT` for every address,
+  and the agent keeps each address's last value with only its `error`
+  set.
+- **Driver support.** The hello's `reads` says whether the driver reads,
+  and the agent copies it to the status entry. OPC UA, MQTT, the
+  simulator and the two test drivers read. Every other driver answers
+  `reads: false`, and the panel's switch is disabled for it.
+- **Values entry.** ConfigDB app `Edge.App.ScoutValues`, keyed by the
+  connection UUID and checked against `values.schema.json`. The agent
+  writes it after a read only when something changed, and at least
+  every 30 s while a lease is live. It stays under 64 KiB. When the last
+  lease ends, when the agent stops and when it starts, the agent writes
+  the entry with `leases` 0 and no values.
 
 ## Files DELETE route
 
@@ -377,6 +409,7 @@ Variable|Default|Meaning
 `SCOUT_MAX_CONCURRENT`|1|Scans the agent runs at once. One per connection at most, and 4 more may queue
 `SCOUT_MAX_BYTES`|33554432 (32 MiB)|Largest snapshot before compression. A scan that reaches it ends truncated with reason `size`
 `SCOUT_MAX_GZ_BYTES`|8388608 (8 MiB)|Largest snapshot after compression, with the same effect
+`SCOUT_READ_INTERVAL_MS`|5000|How often the agent reads live values while a lease is live. Values below 2000 are raised to 2000
 `SCOUT_SCHEMA_DIR`|the installed `@amrc-factoryplus/edge-scout-schemas`|Where the agent reads the JSON Schemas from. Only for testing
 
 There is no setting that turns scanning off. The edge-agent Helm chart

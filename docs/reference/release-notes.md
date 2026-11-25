@@ -314,6 +314,14 @@ collection carries on during a scan, and nothing changes in the origin
 map until you press Save. See
 [Scanning a device for addresses](../architecture/edge-management/edge-scout-scanning.md).
 
+- **Values.** Every value in the tree shows its reading from the scan,
+  in grey. A **Live values** switch reads the values on screen from the
+  device every 5 seconds instead, after a warning, and stops on its own
+  when the panel closes or the tab is hidden. The values go to a new
+  ConfigDB app that only administrators read, never to Sparkplug.
+  `SCOUT_READ_INTERVAL_MS` on the Edge Agent sets the rate, and no
+  lower than every 2 seconds. OPC UA, MQTT and the simulator read live
+  values, and the switch is disabled for other drivers.
 - **Who can scan.** Only administrators, through a new "Scan device
   addresses" permission in the command escalation group, which
   administrators already hold. No grant is needed.

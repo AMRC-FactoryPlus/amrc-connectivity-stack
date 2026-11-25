@@ -112,16 +112,26 @@
           />
         </div>
 
-        <!-- Host paths - only for drivers deployed as their own container -->
-        <div v-if="selectedDriver?.definition?.image" class="flex flex-col gap-2.5 pt-3 border-t">
-          <div class="flex items-baseline justify-between gap-3">
-            <span class="text-[13px] font-semibold">Host Paths</span>
-            <span class="text-xs text-gray-400">Applies to whichever host runs this node</span>
+        <!-- Host paths - only for drivers deployed as their own container.
+           - Few connections need them, so they sit behind a disclosure
+           - that starts open only when this connection already has some. -->
+        <div v-if="selectedDriver?.definition?.image" class="flex flex-col gap-2.5">
+          <button
+            type="button"
+            class="self-start flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600"
+            :aria-expanded="showHostPaths"
+            @click="showHostPaths = !showHostPaths"
+          >
+            <i :class="['fa-solid text-[10px] w-2.5', showHostPaths ? 'fa-chevron-down' : 'fa-chevron-right']"></i>
+            Host paths<span v-if="hostPaths.length"> ({{hostPaths.length}})</span>
+          </button>
+          <div v-if="showHostPaths" class="flex flex-col gap-2.5">
+            <p class="text-xs leading-relaxed text-gray-500">
+              Hardware on the host machine passed through to the driver, such as a serial port.
+              This applies to whichever host runs this node.
+            </p>
+            <HostPathsEditor v-model="hostPaths"/>
           </div>
-          <p class="text-xs leading-relaxed text-gray-500">
-            Hardware on the host machine passed through to the driver, such as a serial port.
-          </p>
-          <HostPathsEditor v-model="hostPaths"/>
         </div>
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
@@ -291,6 +301,7 @@ export default {
           payloadFormat: existingConfig.source?.payloadFormat || "Defined by Protocol",
         }
         this.hostPaths = (existingConfig.deployment?.hostPaths ?? []).map(p => ({ ...p }))
+        this.showHostPaths = this.hostPaths.length > 0
       }
 
       this.node = node
@@ -628,6 +639,7 @@ export default {
         payloadFormat: "Defined by Protocol"
       }
       this.hostPaths = []
+      this.showHostPaths = false
       this.isSubmitting = false
       this.existingConnection = null
     },
@@ -846,6 +858,7 @@ export default {
       name: null,
       selectedDriverId: null,
       hostPaths: [],
+      showHostPaths: false,
       pollInt: 1000, // Default to 1000ms (1 second)
       formData: {
         payloadFormat: "Defined by Protocol"

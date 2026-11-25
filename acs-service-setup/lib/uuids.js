@@ -387,6 +387,8 @@ export const Edge = {
         DriverDef:          "454e5bec-de4a-11ef-bfea-4bc400f636a5",
         /* Edge Scout: the scan status of a connection */
         ScoutStatus:        "ad73fae4-a3b9-457a-8c36-12a2019bff2c",
+        /* Edge Scout: the live values of a connection's addresses */
+        ScoutValues:        "399a86cf-9bc6-4681-b568-b45fc650dacb",
     },
     Perm: {
         ReloadConfig:       "6335f100-e68e-4e4d-b46d-85b42f85a036",

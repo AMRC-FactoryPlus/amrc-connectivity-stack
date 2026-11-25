@@ -19,6 +19,7 @@ on:
       - 'lib/js-rx-util/**'
       - 'deploy/values.yaml'
       - 'lib/edge-scout-schemas/schemas/status.schema.json'
+      - 'lib/edge-scout-schemas/schemas/values.schema.json'
       - 'acs-edge/tests/fixtures/drivers/samples/rest-*/**'
       - 'acs-edge/tests/fixtures/drivers/samples/opcua/**'
       - '.github/workflows/service-setup-tests.yaml'

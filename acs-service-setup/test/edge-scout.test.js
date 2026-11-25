@@ -20,10 +20,13 @@ const { ACS, ConfigDB, CmdEsc, Edge, Files, MetaDB } = ss_UUIDs;
 const DUMPS = new URL("../dumps/", import.meta.url);
 const STATUS_SCHEMA = new URL(
     "../../lib/edge-scout-schemas/schemas/status.schema.json", import.meta.url);
+const VALUES_SCHEMA = new URL(
+    "../../lib/edge-scout-schemas/schemas/values.schema.json", import.meta.url);
 
 /* The UUIDs the design fixed, by constant name. */
 const New = {
     "Edge.App.ScoutStatus":     "ad73fae4-a3b9-457a-8c36-12a2019bff2c",
+    "Edge.App.ScoutValues":     "399a86cf-9bc6-4681-b568-b45fc650dacb",
     "Edge.Class.ScoutResult":   "10916e96-f6fe-44cc-8c01-16a775426038",
     "Edge.Perm.Scout":          "41443382-ecad-439b-999f-cb611bc11f7c",
     "Files.Perm.Delete":        "82a2206b-b9d8-4eee-bc0e-63fb8785019e",
@@ -104,6 +107,12 @@ describe("Edge Scout dumps", () => {
         assert.deepEqual(app.subclassOf, [MetaDB.Class.ConfigEntry]);
     });
 
+    test("the values app is a config entry app", () => {
+        const app = objects_of("edge.yaml", UUIDs.Class.App)[Edge.App.ScoutValues];
+        assert.equal(app?.name, "Edge scout values");
+        assert.deepEqual(app.subclassOf, [MetaDB.Class.ConfigEntry]);
+    });
+
     test("the result class is an R1 class of Files", () => {
         const klass = objects_of("edge.yaml", ConfigDB.Class.R1Class)[Edge.Class.ScoutResult];
         assert.equal(klass?.name, "Edge scout result");
@@ -143,11 +152,19 @@ describe("Edge Scout dumps", () => {
             "dumps/edge.yaml is out of date: copy status.schema.json into it");
     });
 
-    test("only edge.yaml sets the status ConfigSchema", () => {
+    test("the values ConfigSchema is a copy of lib/edge-scout-schemas", () => {
+        const schema = configs_of("edge.yaml", UUIDs.App.ConfigSchema)[Edge.App.ScoutValues];
+        const file = JSON.parse(fs.readFileSync(VALUES_SCHEMA, "utf8"));
+        assert.deepEqual(schema, file,
+            "dumps/edge.yaml is out of date: copy values.schema.json into it");
+    });
+
+    test("only edge.yaml sets the status and values ConfigSchemas", () => {
         for (const file of dumps.keys()) {
             if (file == "edge.yaml") continue;
             const s = configs_of(file, UUIDs.App.ConfigSchema);
             assert.equal(s[Edge.App.ScoutStatus], undefined, file);
+            assert.equal(s[Edge.App.ScoutValues], undefined, file);
         }
     });
 });
@@ -228,6 +245,8 @@ describe("Edge Scout grants", () => {
         const want = [
             [Perm.ReadConfig,           Edge.App.ScoutStatus,       false],
             [Perm.WriteConfig,          Edge.App.ScoutStatus,       false],
+            [Perm.ReadConfig,           Edge.App.ScoutValues,       false],
+            [Perm.WriteConfig,          Edge.App.ScoutValues,       false],
             [Perm.CreateSpecificObject, Edge.Class.ScoutResult,     false],
             [Perm.DeleteObject,         Mine,                       true],
             [Files.Perm.Upload,         Mine,                       true],

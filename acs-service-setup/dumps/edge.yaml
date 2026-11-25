@@ -65,6 +65,13 @@ objects:
       name: "Edge scout status"
       subclassOf:
         - !u MetaDB.Class.ConfigEntry
+    # Edge Scout: the live values of a connection's addresses, keyed by
+    # the connection UUID and written only by the Edge Agent while the
+    # Addresses panel holds a lease.
+    !u Edge.App.ScoutValues:
+      name: "Edge scout values"
+      subclassOf:
+        - !u MetaDB.Class.ConfigEntry
 
   # Edge Scout: permission to send Node Control/Scout. Administrators
   # hold the whole CmdEsc group, so they can scan.
@@ -1393,10 +1400,11 @@ configs:
           placeholder: "Enter path"
       external: true
 
-  # Edge Scout: the status entry's schema. This is a copy of
-  # lib/edge-scout-schemas/schemas/status.schema.json, written as JSON,
-  # which is also YAML. test/edge-scout.test.js fails when they differ,
-  # so copy the file here whenever it changes.
+  # Edge Scout: the status and values entries' schemas. These are
+  # copies of status.schema.json and values.schema.json in
+  # lib/edge-scout-schemas/schemas, written as JSON, which is also YAML.
+  # test/edge-scout.test.js fails when they differ, so copy each file
+  # here whenever it changes.
   !u UUIDs.App.ConfigSchema:
     !u Edge.App.ScoutStatus:
       {
@@ -1411,13 +1419,14 @@ configs:
               "version": { "const": 1 },
               "node": { "$ref": "#/$defs/uuid" },
               "supported": { "enum": [true, false, "library", null] },
+              "reads": { "enum": [true, false, null] },
               "scan": { "$ref": "#/$defs/uuid_or_null" },
               "request": { "$ref": "#/$defs/uuid_or_null" },
               "state": { "enum": ["queued", "running", "done", "failed", "cancelled", null] },
               "code": {
                   "enum": ["UNSUPPORTED", "OPTIONS", "CONN", "AUTH", "CANCELLED", "ERR",
                            "REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
-                           "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT", null]
+                           "NOREADS", "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT", null]
               },
               "message": { "type": ["string", "null"], "maxLength": 512 },
               "started": { "$ref": "#/$defs/timestamp_or_null" },
@@ -1453,7 +1462,7 @@ configs:
                               "request": { "$ref": "#/$defs/uuid_or_null" },
                               "code": {
                                   "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY",
-                                           "LIMIT", "NOTRUNNING", null]
+                                           "LIMIT", "NOTRUNNING", "NOREADS", null]
                               },
                               "message": { "type": ["string", "null"], "maxLength": 512 },
                               "at": { "$ref": "#/$defs/timestamp" }
@@ -1535,6 +1544,70 @@ configs:
                       }
                   ]
               }
+          }
+      }
+    !u Edge.App.ScoutValues:
+      {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "urn:edge-scout:values",
+          "title": "Edge scout values",
+          "description": "The live values of one connection, kept in ConfigDB under the Edge scout values app and keyed by the connection's UUID. Only the Edge Agent writes it, while the Admin UI holds a lease. An entry with leases 0 and no values means nobody is watching. This schema is self-contained because ConfigDB loads it as the app's ConfigSchema.",
+          "type": "object",
+          "required": ["version", "node", "updated", "leases", "values"],
+          "additionalProperties": false,
+          "properties": {
+              "version": { "const": 1 },
+              "node": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              },
+              "updated": { "$ref": "#/$defs/timestamp" },
+              "interval_ms": {
+                  "description": "How often the agent reads, in ms.",
+                  "type": "integer",
+                  "minimum": 0
+              },
+              "leases": {
+                  "description": "The live leases on the connection.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4
+              },
+              "dropped": {
+                  "description": "Addresses left out because the leases asked for more than 40.",
+                  "type": "integer",
+                  "minimum": 0
+              },
+              "values": {
+                  "type": "object",
+                  "maxProperties": 40,
+                  "propertyNames": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                  "additionalProperties": {
+                      "type": "object",
+                      "required": ["value", "type", "ts", "read", "error"],
+                      "additionalProperties": false,
+                      "properties": {
+                          "value": { "type": ["string", "null"], "maxLength": 1024 },
+                          "type": {
+                              "enum": ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64",
+                                       "Float", "Double", "Boolean", "String", "Text", "DateTime", "UUID",
+                                       "Bytes", "File", "DataSet", "Template", null]
+                          },
+                          "ts": {
+                              "description": "The source timestamp in ms since the epoch, or null.",
+                              "type": ["integer", "null"]
+                          },
+                          "read": {
+                              "description": "When the agent got the value.",
+                              "$ref": "#/$defs/timestamp"
+                          },
+                          "error": { "type": ["string", "null"], "maxLength": 256 }
+                      }
+                  }
+              }
+          },
+          "$defs": {
+              "timestamp": { "type": "string", "format": "date-time" }
           }
       }
 

@@ -91,6 +91,7 @@ const routes = [
     path: '/explorer',
     component: () => import('@pages/Explorer/Explorer.vue'),
     meta: {
+      section: 'explorer',
       name: 'Explorer',
       icon: 'compass',
     },
@@ -108,6 +109,7 @@ const routes = [
     path: '/activity',
     component: Activity,
     meta: {
+      section: 'activity',
       name: 'Live Device Activity',
       icon: 'table-cells',
     },
@@ -115,6 +117,7 @@ const routes = [
     path: '/alerts',
     component: Alerts,
     meta: {
+      section: 'alerts',
       name: 'Alerts',
       icon: 'bell',
     },
@@ -122,6 +125,7 @@ const routes = [
     path: '/cassette-decks',
     component: () => import('@pages/CassetteDecks/CassetteDecks.vue'),
     meta: {
+      section: 'cassettes',
       name: 'Cassettes',
       icon: 'cassette-tape',
     },
@@ -129,6 +133,7 @@ const routes = [
     path: '/access-control/:tab?/:selected?',
     component: AccessControl,
     meta: {
+      section: 'access',
       name: 'Access Control',
       icon: 'user-shield',
     },
@@ -137,6 +142,7 @@ const routes = [
     path: '/edge-clusters/:clusteruuid',
     component: EdgeCluster,
     meta: {
+      section: 'edge_cluster',
       name: 'Edge Cluster',
     },
   }, {
@@ -144,6 +150,7 @@ const routes = [
     path: '/edge-clusters/:clusteruuid/nodes/:nodeuuid',
     component: Node,
     meta: {
+      section: 'edge_node',
       name: 'Node',
     },
   }, {
@@ -158,6 +165,7 @@ const routes = [
     path: '/configdb/:tab?',
     component: ConfigDB,
     meta: {
+      section: 'configdb',
       name: 'ConfigDB',
       icon: 'gears'
     },
@@ -169,6 +177,7 @@ const routes = [
     path: '/configdb/applications/:application',
     component: ApplicationEditor,
     meta: {
+      section: 'configdb',
       name: 'ConfigDB',
       icon: 'gears'
     }
@@ -178,6 +187,7 @@ const routes = [
     path: '/configdb/applications/:application/:object',
     component: ApplicationObjectEditor,
     meta: {
+      section: 'configdb',
       name: 'ConfigDB',
       icon: 'gears'
     }
@@ -186,6 +196,7 @@ const routes = [
     path: '/configdb/objects/:object',
     component: ObjectPage,
     meta: {
+      section: 'configdb',
       name: 'ConfigDB',
       icon: 'gears'
     }
@@ -194,6 +205,7 @@ const routes = [
     path: '/files',
     component: Files,
     meta: {
+      section: 'files',
       name: 'Files',
       icon: 'file'
     }
@@ -202,6 +214,7 @@ const routes = [
     path: '/bridges',
     component: Bridges,
     meta: {
+      section: 'bridges',
       name: 'Bridges',
       icon: 'arrow-down-up-across-line'
     }
@@ -210,6 +223,7 @@ const routes = [
     path: '/isa95',
     component: ISA95,
     meta: {
+      section: 'isa95',
       name: 'ISA-95',
       icon: 'sitemap'
     }
@@ -219,6 +233,7 @@ const routes = [
     path: '/units',
     component: () => import('@pages/Units/Units.vue'),
     meta: {
+      section: 'units',
       name: 'Units',
       icon: 'ruler'
     }
@@ -227,6 +242,7 @@ const routes = [
     path: '/schemas',
     component: () => import('@pages/Schemas/Schemas.vue'),
     meta: {
+      section: 'schemas',
       name: 'Schemas',
       icon: 'shapes'
     }
@@ -235,6 +251,7 @@ const routes = [
     path: '/schemas/new',
     component: () => import('@pages/Schemas/SchemaEditor.vue'),
     meta: {
+      section: 'schemas',
       name: 'Schemas',
       icon: 'shapes',
       schemaMode: 'new'
@@ -244,6 +261,7 @@ const routes = [
     path: '/schemas/draft/:id',
     component: () => import('@pages/Schemas/SchemaEditor.vue'),
     meta: {
+      section: 'schemas',
       name: 'Schemas',
       icon: 'shapes',
       schemaMode: 'draft'
@@ -253,6 +271,7 @@ const routes = [
     path: '/schemas/draft/:id/publish',
     component: () => import('@pages/Schemas/PublishSchema.vue'),
     meta: {
+      section: 'schemas',
       name: 'Schemas',
       icon: 'shapes'
     }
@@ -261,6 +280,7 @@ const routes = [
     path: '/schemas/:id',
     component: () => import('@pages/Schemas/SchemaEditor.vue'),
     meta: {
+      section: 'schemas',
       name: 'Schemas',
       icon: 'shapes',
       schemaMode: 'schema'
@@ -282,6 +302,7 @@ const routes = [
     path: '/datasets/new',
     component: DatasetBuilder,
     meta: {
+      section: 'datasets',
       name: 'Datasets',
       icon: 'database'
     }
@@ -290,6 +311,7 @@ const routes = [
     path: '/datasets/compare',
     component: DatasetCompare,
     meta: {
+      section: 'datasets',
       name: 'Datasets',
       icon: 'database'
     }
@@ -298,6 +320,7 @@ const routes = [
     path: '/datasets/add-ons',
     component: DatasetAddons,
     meta: {
+      section: 'datasets',
       name: 'Datasets',
       icon: 'database'
     }
@@ -306,6 +329,7 @@ const routes = [
     path: '/datasets/:uuid/edit',
     component: DatasetBuilder,
     meta: {
+      section: 'datasets',
       name: 'Datasets',
       icon: 'database'
     }
@@ -314,6 +338,7 @@ const routes = [
     path: '/datasets/:uuid/:tab?',
     component: DatasetPage,
     meta: {
+      section: 'datasets',
       name: 'Datasets',
       icon: 'database'
     }
@@ -322,6 +347,7 @@ const routes = [
     path: '/gateway-depot',
     component: () => import('@pages/GatewayDepot/GatewayDepot.vue'),
     meta: {
+      section: 'gateway_depot',
       name: 'Gateway Depot',
       icon: 'warehouse'
     }
@@ -331,6 +357,7 @@ const routes = [
     path: '/gateway-depot/:id',
     component: () => import('@pages/GatewayDepot/Gateway.vue'),
     meta: {
+      section: 'gateway_depot',
       name: 'Gateway Depot',
       icon: 'warehouse'
     }

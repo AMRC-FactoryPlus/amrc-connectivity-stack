@@ -38,6 +38,9 @@ export function merge_datasets (metadata = [], structures = [], owners = {}) {
             meta:      m.metadata ?? {},
             parts:     m.parts ?? [],
             readable:  true,
+            // A default dataset whose device has been deleted. Data
+            // Access keeps it for its history and says so here.
+            device_deleted: m.device_deleted === true,
         })
     }
     for (const s of structures) {
@@ -69,7 +72,18 @@ function base_record (uuid) {
         editable: false,
         invalid: false,
         is_default: false,
+        device_deleted: false,
     }
+}
+
+/**
+ * The datasets the pages list: every one but the default datasets of
+ * deleted devices. Those stay in `byUuid`, so a direct link to one
+ * still opens it, and the unions and sessions that use one still
+ * resolve through it.
+ */
+export function listed_datasets (byUuid) {
+    return Object.values(byUuid).filter(r => !r.device_deleted)
 }
 
 /**

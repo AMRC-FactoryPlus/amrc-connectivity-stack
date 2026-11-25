@@ -222,6 +222,16 @@ to send to, the firewall rules and the host's receive buffer.
 See [Split Drivers](../architecture/edge-management/split-drivers.md)
 for the full detail.
 
+### Datasets of deleted devices are kept but hidden
+
+Data Access makes a default dataset for every placed device. When the
+device is deleted, its default dataset stays, so its history can still
+be read, but the admin UI no longer lists it anywhere: the dataset
+list, search, the timeline and the pickers leave it out. A link to it
+still opens it, with a note that its device has been deleted. Data
+Access marks these datasets with `device_deleted: true` in its metadata
+answers, and `GET v1/metadata?include=device_deleted` asks for it.
+
 ### Upgrading: the Dataset maker role is gone
 
 **Dataset maker** used to hold **Build datasets from device** and

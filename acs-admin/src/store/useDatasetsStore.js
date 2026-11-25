@@ -14,7 +14,7 @@ import { useDeviceStore } from '@store/useDeviceStore.js'
 import { useNodeStore } from '@store/useNodeStore.js'
 import { useISA95Store } from '@store/useISA95Store.js'
 import { placement_path } from '@/lib/isa95-placement.js'
-import { merge_datasets, historised_metrics, display_name, resolve_devices } from '@/lib/datasets/model.js'
+import { merge_datasets, listed_datasets, historised_metrics, display_name, resolve_devices } from '@/lib/datasets/model.js'
 import { DA } from '@/lib/datasets/constants.js'
 import { devices_from_tree, merge_device_index, ISA95_LEVEL_TYPE, HAS_CHILDREN } from '@/lib/datasets/i3x-devices.js'
 import { useI3xClient } from '@composables/useI3xClient.js'
@@ -74,8 +74,10 @@ export const useDatasetsStore = defineStore('datasets', {
             return out
         },
 
-        /** Every dataset, device datasets included. */
-        all () { return Object.values(this.byUuid) },
+        /** Every dataset the pages list, device datasets included.
+         * The default datasets of deleted devices are left out; they
+         * are still in byUuid, for a direct link. */
+        all () { return listed_datasets(this.byUuid) },
 
         /** Datasets people work with: everything but bare device datasets. */
         visible () { return this.all.filter(r => r.kind !== 'device') },

@@ -745,14 +745,16 @@ describe.each([
          * gains a member, and Data Access reads it once. */
         const member_elements = growing(before.members, n);
         expect(after.scanned - before.scanned).toBe(member_elements);
-        /* The maker reads the Device members and the placements once,
-         * as it starts. */
-        expect(report.member_elements).toBe(member_elements + opts.devices);
-        /* One new WATCH a dataset, for its parts. The maker's two, and
-         * no other. */
+        /* The maker reads the placements once, as it starts. The open
+         * metadata views already watch the Device members, to mark the
+         * default datasets of deleted devices, so the maker's read of
+         * them opens no WATCH and sends no list again. */
+        expect(report.member_elements).toBe(member_elements);
+        /* One new WATCH a dataset, for its parts. The maker's search of
+         * the placements, and no other. */
         expect(report).toMatchObject({
             subclass_watches: n, subclass_subscribes: n,
-            member_watches: 1, search_subscribes: 1,
+            member_watches: 0, search_subscribes: 1,
         });
 
         /* A list WATCH sends its whole list each time it gains a

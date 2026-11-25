@@ -109,6 +109,16 @@
         </div>
       </Alert>
 
+      <!-- Data Access keeps a deleted device's dataset for its history.
+           Lists leave it out, so only a direct link reaches it. -->
+      <Alert v-if="rec.device_deleted" class="flex items-start gap-3">
+        <i class="fa-solid fa-circle-info mt-0.5 text-slate-500"></i>
+        <div>
+          <AlertTitle>Device deleted</AlertTitle>
+          <AlertDescription class="text-gray-700">The device this dataset reads has been deleted. Its history is kept here, but the dataset is no longer listed.</AlertDescription>
+        </div>
+      </Alert>
+
       <Alert v-if="rec.voided" class="flex flex-wrap items-start gap-3">
         <i class="fa-solid fa-ban mt-0.5 text-slate-500"></i>
         <div class="min-w-0 flex-1">

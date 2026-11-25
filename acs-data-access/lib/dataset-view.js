@@ -35,6 +35,8 @@ const REMOVED = "removed";
  *  - `check`: `DataFlow#watch_allowed_check`, the permission rule.
  *  - `info`, `meta`, `ftypes`: `info_changes`, `metadata_changes` and
  *    `functional_changes`.
+ *  - `orphans`: `orphan_changes`, the default datasets of deleted
+ *    devices.
  *  - `parts`: `parts_changes`, or `dataset_parts_changes` for a view
  *    of one dataset.
  *
@@ -293,10 +295,12 @@ export function member_body (state, uuid) {
  * valid and the principal may read it.
  *
  * The keys are in the order clients have always had: uuid, name, from,
- * to, function, metadata, parts. A key with no value is undefined, so
- * it is left out of the JSON. `parts` lists the dataset's parts the
- * principal may read, whether or not a part is a valid dataset, and is
- * empty while the parts are not known.
+ * to, function, metadata, parts, then device_deleted. A key with no
+ * value is undefined, so it is left out of the JSON. `parts` lists the
+ * dataset's parts the principal may read, whether or not a part is a
+ * valid dataset, and is empty while the parts are not known.
+ * `device_deleted` is true for the default dataset of a device that
+ * has been deleted, and absent otherwise.
  */
 export function metadata_body (state, uuid) {
     const { data, check } = state;
@@ -316,6 +320,7 @@ export function metadata_body (state, uuid) {
         "function": state.ftypes?.map.get(uuid),
         metadata: state.meta?.map.get(uuid),
         parts: parts ? parts.filter(part => allowed(state, part)) : [],
+        device_deleted: state.orphans?.set.has(uuid) || undefined,
     };
 }
 

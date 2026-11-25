@@ -120,6 +120,7 @@ export class DataAccessNotify {
         info: this.data.info_changes,
         meta: this.data.metadata_changes,
         ftypes: this.data.functional_changes,
+        orphans: this.data.orphan_changes,
         parts,
       },
     });

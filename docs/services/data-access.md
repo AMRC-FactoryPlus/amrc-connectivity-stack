@@ -90,6 +90,11 @@ the only one:
 - **It outlives the placement.** A device that loses its placement
   keeps its default dataset, because unions and sessions may use it.
   A device placed again uses the same one.
+- **It outlives the device.** A deleted device's default dataset stays,
+  so its history can still be read and the unions and sessions that use
+  it keep working. Its metadata then has `"device_deleted": true`, so a
+  client can leave it out of its lists. The flag goes away if the
+  device comes back.
 
 Use the default dataset wherever a device goes into a union or a
 session. People who share a device then share one dataset for it.
@@ -340,6 +345,7 @@ Field | Meaning
 `from` / `to` | The dataset's time window. Each is omitted where the dataset is unbounded
 `function` | The functional classes the dataset belongs to. The kind the Admin UI sets (`MES equipment`, `Run`, `MES operation` or `MES product`) is one of these
 `metadata` | Config entries keyed by Application UUID, for every application in `Dataset metadata`
+`device_deleted` | `true` for the default dataset of a device that has been deleted, omitted otherwise
 
 `parts` is not available here. Finding a dataset's parts costs a
 ConfigDB watch for each dataset, so it comes only from
@@ -377,9 +383,9 @@ A field the service does not know returns `422`:
 ```json
 {
   "error": "invalid_include",
-  "message": "Unknown include field colour. The fields are name, from, to, function, metadata.",
+  "message": "Unknown include field colour. The fields are name, from, to, function, metadata, device_deleted.",
   "unknown": ["colour"],
-  "fields": ["name", "from", "to", "function", "metadata"]
+  "fields": ["name", "from", "to", "function", "metadata", "device_deleted"]
 }
 ```
 
@@ -429,6 +435,7 @@ Property | Type | Meaning
 `function` | array | Functional classes the dataset belongs to
 `metadata` | object | Config entries keyed by Application UUID, for every application in `Dataset metadata`
 `parts` | array | Direct subclasses of this dataset that are themselves Datasets and that the caller has `Read dataset` on
+`device_deleted` | boolean | `true` for the [default dataset](#default-device-datasets) of a device that has been deleted; omitted otherwise. The notify `v2/metadata` answers carry it too
 
 
 The `function` array returned by `GET v1/metadata/:uuid` is every class

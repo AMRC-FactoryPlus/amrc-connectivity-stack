@@ -62,6 +62,21 @@ function grant_changes (before, now) {
   return changed;
 }
 
+/** The default datasets whose device is not in `devices`.
+ *
+ * @param defaults Default dataset UUID -> the device it reads; anything
+ * that iterates as `[dataset, device]` pairs.
+ * @param devices The Device members, anything with `has`, or null
+ * while they are not known: then no device counts as deleted.
+ * @returns A native Set of dataset UUIDs. */
+export function orphaned_defaults (defaults, devices) {
+  const set = new Set();
+  if (!defaults || !devices) return set;
+  for (const [dataset, device] of defaults)
+    if (!devices.has(device)) set.add(dataset);
+  return set;
+}
+
 /* How long a write waits for the held maps to show it, in ms. ConfigDB
  * sends the notification of a write within a few milliseconds, so this
  * is reached only when a notification is lost or very late. */
@@ -112,6 +127,12 @@ export class DataFlow {
     /* Default dataset UUID -> the device it reads, as an Immutable
      * Map. */
     this.default_devices = this.changes.pipe(field("defaults"));
+    /* The default datasets whose device has been deleted, as
+     * `{ set, changed }`. Data Access keeps such a dataset for its
+     * history, and says in its metadata that the device is gone, so
+     * clients can leave it out of their lists. */
+    this.orphan_changes = this._build_orphan_changes();
+    this.orphans = this.orphan_changes.pipe(field("set"));
 
     this.info_changes = this._build_info_changes();
     this.general_infos = this.info_changes.pipe(field("map"));
@@ -152,6 +173,7 @@ export class DataFlow {
       hold("General information", this.info_changes),
       hold("Dataset metadata", this.metadata_changes),
       hold("Functional types", this.functional_changes),
+      hold("Deleted devices", this.orphan_changes),
     ];
   }
 
@@ -712,6 +734,47 @@ export class DataFlow {
           return change;
         }),
         rx.finalize(() => this.held.delete("definitions")),
+        rx.filter(change => change != null)
+      );
+    }).pipe(
+      rxu.shareLatest()
+    );
+  }
+
+  /*
+   * --------------------------------------------------
+   * Default datasets of deleted devices
+   * --------------------------------------------------
+   */
+
+  /* The default datasets whose device is no longer a member of the
+   * Device class, as `{ set, changed }`: a native Set of dataset UUIDs,
+   * and the datasets that joined or left it. The set is worked out
+   * again only when a default dataset or the Device members change,
+   * and a value is sent only when the set itself changes.
+   *
+   * Until ConfigDB has listed the devices, no device counts as
+   * deleted, so this answers as soon as the dataset map does and
+   * nothing waits for it. */
+  _build_orphan_changes() {
+    return rx.defer(() => {
+      let held = null;
+
+      const devices = this.cdb.watch_members(UUIDs.Class.Device).pipe(
+        rx.startWith(null));
+
+      return rx.combineLatest([this.default_devices, devices]).pipe(
+        rx.map(([defaults, devices]) => {
+          const set = orphaned_defaults(defaults, devices);
+          if (held == null) {
+            held = set;
+            return { set, changed: null };
+          }
+          const changed = set_changes(held, set);
+          if (changed.size == 0) return null;
+          held = set;
+          return { set, changed };
+        }),
         rx.filter(change => change != null)
       );
     }).pipe(

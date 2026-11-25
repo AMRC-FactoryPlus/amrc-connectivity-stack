@@ -183,7 +183,7 @@ import { toast } from 'vue-sonner'
 import { useDialog } from '@/composables/useDialog'
 import { useServiceClientStore } from '@store/serviceClientStore.js'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
-import { delete_lines, delete_node, node_delete_plan } from '@/lib/node-delete.js'
+import { delete_message, delete_node, node_delete_plan } from '@/lib/node-delete.js'
 
 export default {
   components: {
@@ -381,8 +381,7 @@ export default {
       }
       useDialog({
         title: 'Delete this node?',
-        message: `${name} on ${this.cluster ?? 'its cluster'}. You cannot undo this.`,
-        details: delete_lines(this.deletePlan),
+        message: delete_message(name, this.cluster, this.deletePlan),
         confirmText: 'Delete node',
         onConfirm: async () => {
           this.deleting = true

@@ -1,0 +1,14 @@
+{
+    "schema": "found",
+    "description": "Hello answer from a driver that scans and reads",
+    "data": {
+        "seq": 0,
+        "type": "hello",
+        "versions": [
+            1
+        ],
+        "supported": true,
+        "reads": true,
+        "library": "js-edge-driver 0.3.0"
+    }
+}

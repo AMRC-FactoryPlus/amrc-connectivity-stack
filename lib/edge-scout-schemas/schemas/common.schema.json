@@ -85,12 +85,13 @@
         },
         "refusal_code": {
             "description": "Codes the agent writes to last_request when it refuses a request.",
-            "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING"]
+            "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
+                     "NOREADS"]
         },
         "agent_code": {
             "description": "Every code the agent sets.",
             "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
-                     "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT"]
+                     "NOREADS", "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT"]
         },
         "code": {
             "anyOf": [
@@ -103,6 +104,42 @@
             "enum": ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64",
                      "Float", "Double", "Boolean", "String", "Text", "DateTime", "UUID",
                      "Bytes", "File", "DataSet", "Template"]
+        },
+        "lease": {
+            "description": "The UUID of a live values lease, which the Admin UI makes.",
+            "$ref": "#/$defs/uuid"
+        },
+        "read_addresses": {
+            "description": "The addresses a watch or a read asks for: 1 to 40 unique strings in the driver's canonical form.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 40,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        },
+        "read_value": {
+            "description": "One address's value in a driver's values answer.",
+            "type": "object",
+            "required": ["address", "value", "type", "ts", "error"],
+            "properties": {
+                "address": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "value": {
+                    "description": "The value written as text, or null.",
+                    "type": ["string", "null"],
+                    "maxLength": 1024
+                },
+                "type": {
+                    "anyOf": [
+                        { "$ref": "#/$defs/sparkplug_type" },
+                        { "type": "null" }
+                    ]
+                },
+                "ts": {
+                    "description": "The source timestamp in ms since the epoch, or null.",
+                    "type": ["integer", "null"]
+                },
+                "error": { "type": ["string", "null"], "maxLength": 256 }
+            }
         },
         "branch": {
             "type": "object",

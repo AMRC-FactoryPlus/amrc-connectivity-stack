@@ -1,0 +1,12 @@
+{
+    "schema": "found",
+    "description": "A driver that can't read answers a read with UNSUPPORTED",
+    "data": {
+        "seq": 0,
+        "type": "end",
+        "error": {
+            "code": "UNSUPPORTED",
+            "message": "This driver can't read values"
+        }
+    }
+}

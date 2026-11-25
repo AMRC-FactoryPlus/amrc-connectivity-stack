@@ -2,12 +2,12 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "urn:edge-scout:ncmd",
     "title": "Node Control/Scout request",
-    "description": "The JSON string the Admin UI sends as the value of the Node Control/Scout NCMD, through the Command Escalation service.",
+    "description": "The JSON string the Admin UI sends as the value of the Node Control/Scout NCMD, through the Command Escalation service: start or cancel a scan, or watch or unwatch live values.",
     "type": "object",
     "required": ["version", "op", "request", "connection"],
     "properties": {
         "version": { "const": 1 },
-        "op": { "enum": ["start", "cancel"] },
+        "op": { "enum": ["start", "cancel", "watch", "unwatch"] },
         "request": { "$ref": "urn:edge-scout:common#/$defs/uuid" },
         "connection": { "$ref": "urn:edge-scout:common#/$defs/uuid" }
     },
@@ -31,6 +31,23 @@
         },
         {
             "properties": { "op": { "const": "cancel" } }
+        },
+        {
+            "description": "Make a live values lease, or replace its addresses, for 60 s.",
+            "required": ["lease", "addresses"],
+            "properties": {
+                "op": { "const": "watch" },
+                "lease": { "$ref": "urn:edge-scout:common#/$defs/lease" },
+                "addresses": { "$ref": "urn:edge-scout:common#/$defs/read_addresses" }
+            }
+        },
+        {
+            "description": "End a live values lease at once.",
+            "required": ["lease"],
+            "properties": {
+                "op": { "const": "unwatch" },
+                "lease": { "$ref": "urn:edge-scout:common#/$defs/lease" }
+            }
         }
     ]
 }

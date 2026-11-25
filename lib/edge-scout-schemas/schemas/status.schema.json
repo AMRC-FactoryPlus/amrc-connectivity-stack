@@ -10,13 +10,14 @@
         "version": { "const": 1 },
         "node": { "$ref": "#/$defs/uuid" },
         "supported": { "enum": [true, false, "library", null] },
+        "reads": { "enum": [true, false, null] },
         "scan": { "$ref": "#/$defs/uuid_or_null" },
         "request": { "$ref": "#/$defs/uuid_or_null" },
         "state": { "enum": ["queued", "running", "done", "failed", "cancelled", null] },
         "code": {
             "enum": ["UNSUPPORTED", "OPTIONS", "CONN", "AUTH", "CANCELLED", "ERR",
                      "REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY", "LIMIT", "NOTRUNNING",
-                     "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT", null]
+                     "NOREADS", "TIMEOUT", "LOST", "INTERRUPTED", "STORE", "AGENT", null]
         },
         "message": { "type": ["string", "null"], "maxLength": 512 },
         "started": { "$ref": "#/$defs/timestamp_or_null" },
@@ -52,7 +53,7 @@
                         "request": { "$ref": "#/$defs/uuid_or_null" },
                         "code": {
                             "enum": ["REQUEST", "UNDEPLOYED", "NODRIVER", "LIBRARY", "BUSY",
-                                     "LIMIT", "NOTRUNNING", null]
+                                     "LIMIT", "NOTRUNNING", "NOREADS", null]
                         },
                         "message": { "type": ["string", "null"], "maxLength": 512 },
                         "at": { "$ref": "#/$defs/timestamp" }

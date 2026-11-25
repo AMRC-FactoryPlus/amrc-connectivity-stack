@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:edge-scout:values",
+    "title": "Edge scout values",
+    "description": "The live values of one connection, kept in ConfigDB under the Edge scout values app and keyed by the connection's UUID. Only the Edge Agent writes it, while the Admin UI holds a lease. An entry with leases 0 and no values means nobody is watching. This schema is self-contained because ConfigDB loads it as the app's ConfigSchema.",
+    "type": "object",
+    "required": ["version", "node", "updated", "leases", "values"],
+    "additionalProperties": false,
+    "properties": {
+        "version": { "const": 1 },
+        "node": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "updated": { "$ref": "#/$defs/timestamp" },
+        "interval_ms": {
+            "description": "How often the agent reads, in ms.",
+            "type": "integer",
+            "minimum": 0
+        },
+        "leases": {
+            "description": "The live leases on the connection.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+        },
+        "dropped": {
+            "description": "Addresses left out because the leases asked for more than 40.",
+            "type": "integer",
+            "minimum": 0
+        },
+        "values": {
+            "type": "object",
+            "maxProperties": 40,
+            "propertyNames": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "additionalProperties": {
+                "type": "object",
+                "required": ["value", "type", "ts", "read", "error"],
+                "additionalProperties": false,
+                "properties": {
+                    "value": { "type": ["string", "null"], "maxLength": 1024 },
+                    "type": {
+                        "enum": ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64",
+                                 "Float", "Double", "Boolean", "String", "Text", "DateTime", "UUID",
+                                 "Bytes", "File", "DataSet", "Template", null]
+                    },
+                    "ts": {
+                        "description": "The source timestamp in ms since the epoch, or null.",
+                        "type": ["integer", "null"]
+                    },
+                    "read": {
+                        "description": "When the agent got the value.",
+                        "$ref": "#/$defs/timestamp"
+                    },
+                    "error": { "type": ["string", "null"], "maxLength": 256 }
+                }
+            }
+        }
+    },
+    "$defs": {
+        "timestamp": { "type": "string", "format": "date-time" }
+    }
+}

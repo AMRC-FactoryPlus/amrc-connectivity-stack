@@ -1,0 +1,21 @@
+{
+    "schema": "values",
+    "description": "Types carry no byte order",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "updated": "2026-11-25T10:00:05.123Z",
+        "interval_ms": 5000,
+        "leases": 2,
+        "dropped": 0,
+        "values": {
+            "a": {
+                "value": "1",
+                "type": "Int16BE",
+                "ts": null,
+                "read": "2026-11-25T10:00:05Z",
+                "error": null
+            }
+        }
+    }
+}

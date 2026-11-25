@@ -1,0 +1,13 @@
+{
+    "schema": "request",
+    "description": "A read's id is never hello",
+    "data": {
+        "op": "read",
+        "id": "hello",
+        "version": 1,
+        "addresses": [
+            "ns=2;s=Line1.Speed",
+            "plant/line1/temp"
+        ]
+    }
+}

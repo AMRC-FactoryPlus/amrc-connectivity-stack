@@ -2,12 +2,12 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "urn:edge-scout:found",
     "title": "Driver to Edge Agent scout message",
-    "description": "A message a driver publishes on fpEdge1/<Conn>/found/<id>. Each entry of an items message is checked on its own against item.schema.json. The 256 KiB cap on an items message is checked in code.",
+    "description": "A message a driver publishes on fpEdge1/<Conn>/found/<id>, about a scan or a read. Each entry of an items message is checked on its own against item.schema.json. The 256 KiB cap on an items message is checked in code.",
     "type": "object",
     "required": ["seq", "type"],
     "properties": {
         "seq": { "type": "integer", "minimum": 0 },
-        "type": { "enum": ["hello", "accept", "items", "progress", "end"] }
+        "type": { "enum": ["hello", "accept", "items", "progress", "end", "values"] }
     },
     "oneOf": [
         { "$ref": "#/$defs/hello" },
@@ -15,7 +15,8 @@
         { "$ref": "#/$defs/items" },
         { "$ref": "#/$defs/progress" },
         { "$ref": "#/$defs/end_result" },
-        { "$ref": "#/$defs/end_error" }
+        { "$ref": "#/$defs/end_error" },
+        { "$ref": "#/$defs/values" }
     ],
     "$defs": {
         "hello": {
@@ -30,6 +31,10 @@
                     "items": { "type": "integer", "minimum": 1 }
                 },
                 "supported": { "type": "boolean" },
+                "reads": {
+                    "description": "Whether the driver answers read. A driver that leaves it out does not.",
+                    "type": "boolean"
+                },
                 "library": { "type": ["string", "null"], "maxLength": 128 }
             }
         },
@@ -55,6 +60,20 @@
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 500,
+                    "items": { "type": "object" }
+                }
+            }
+        },
+        "values": {
+            "description": "The answer to a read: one entry for each address asked for, in any order. Each entry is checked on its own against read_value in common.schema.json, after the Edge Agent has cut over-long values.",
+            "type": "object",
+            "required": ["type", "values"],
+            "properties": {
+                "type": { "const": "values" },
+                "seq": { "const": 0 },
+                "values": {
+                    "type": "array",
+                    "maxItems": 40,
                     "items": { "type": "object" }
                 }
             }

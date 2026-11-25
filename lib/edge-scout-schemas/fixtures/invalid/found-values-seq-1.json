@@ -1,0 +1,31 @@
+{
+    "schema": "found",
+    "description": "A values answer is the only message of its read, so its seq is 0",
+    "data": {
+        "seq": 1,
+        "type": "values",
+        "values": [
+            {
+                "address": "ns=2;s=Line1.Speed",
+                "value": "1450.5",
+                "type": "Double",
+                "ts": 1795600000000,
+                "error": null
+            },
+            {
+                "address": "plant/line1/temp",
+                "value": "{\"t\":21.4}",
+                "type": "String",
+                "ts": 1795599998000,
+                "error": null
+            },
+            {
+                "address": "ns=2;s=Gone",
+                "value": null,
+                "type": null,
+                "ts": null,
+                "error": "BadNodeIdUnknown"
+            }
+        ]
+    }
+}

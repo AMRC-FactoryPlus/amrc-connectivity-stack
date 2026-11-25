@@ -134,7 +134,7 @@ public class FactoryPlusUserStorageProviderFactory
                 .helpText("Realm appended to usernames entered without an "
                     + "@realm suffix on the login form, so local users can "
                     + "log in with just their short name "
-                    + "(e.g. me1alice -> me1alice@FACTORYPLUS.LOCAL). Inputs "
+                    + "(e.g. alice -> alice@FACTORYPLUS.LOCAL). Inputs "
                     + "that already contain @ are passed through verbatim, "
                     + "preserving cross-realm logins. Leave blank to disable "
                     + "the affordance and require the full UPN.")

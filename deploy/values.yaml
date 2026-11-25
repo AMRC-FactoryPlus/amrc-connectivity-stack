@@ -372,7 +372,7 @@ openid:
   # of landing with nothing. To compute one:
   #
   #   python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(
-  #     'cb3714c4-c85c-482a-987b-408293aa141e'), 'me1ago@AMRC-FP.SHEF.AC.UK'))"
+  #     'cb3714c4-c85c-482a-987b-408293aa141e'), 'alice@HOME.EXAMPLE.ORG'))"
   #
   # (Realm in CAPITALS, username as the person types it, usually lower
   # case. See the SPI README for the exact rule.)
@@ -393,7 +393,7 @@ openid:
   #
   # Default empty: no realm is trusted and the feature is inert.
   trustedRealms: []
-  #  - realm: AMRC-FP.SHEF.AC.UK
+  #  - realm: HOME.EXAMPLE.ORG
   #  # - realm: PARTNER.EXAMPLE.ORG
   #  #   authUrl: https://auth.partner.example.org
   image:

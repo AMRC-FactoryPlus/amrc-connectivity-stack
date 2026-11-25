@@ -72,12 +72,12 @@ you can run it repeatedly against the same database.
 ## Run the benchmark
 
 The benchmark needs a populated database. The figures in the pull
-request used a `pg_dump` of the fpd-ago `configdb` database (2,861
+request used a `pg_dump` of a dev cluster's `configdb` database (2,861
 objects, 2,120 Devices, 161 classes), restored and then migrated with
 `sql/migrate.sql`:
 
 ```sh
-kubectl --kubeconfig ~/.kube/fpd-ago.yaml -n factory-plus \
+kubectl --kubeconfig ~/.kube/<cluster>.yaml -n factory-plus \
     exec -i postgres-1-0 -- su postgres -c "pg_dump -d configdb" > configdb.sql
 docker exec -i cdb-bench-pg psql -q -U postgres \
     -c "create role op1pgadmin" -c "create role sv1configdb" \

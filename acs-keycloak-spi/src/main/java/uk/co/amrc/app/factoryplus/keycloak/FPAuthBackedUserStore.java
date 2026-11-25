@@ -226,8 +226,8 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
     /** The UPNs to try against F+, in order.
      *
      *  <p>Keycloak lower-cases the whole username before it reaches the
-     *  provider, so a user typing {@code me1ago@AMRC-FP.SHEF.AC.UK}
-     *  arrives as {@code me1ago@amrc-fp.shef.ac.uk}. F+ Auth compares
+     *  provider, so a user typing {@code alice@HOME.EXAMPLE.ORG}
+     *  arrives as {@code alice@home.example.org}. F+ Auth compares
      *  identity names with exact string equality, so the lookup misses
      *  even though the principal exists. We therefore retry with the
      *  realm portion (everything after the LAST {@code @}) upper-cased.
@@ -239,7 +239,7 @@ public class FPAuthBackedUserStore implements FactoryPlusUserStore {
      *  unaffected and pay no extra request.
      *
      *  <p>Known limitation: only the realm is touched. An F+ identity
-     *  stored with capitals in the user portion ({@code Me1ago@...})
+     *  stored with capitals in the user portion ({@code Alice@...})
      *  will still not match, because Keycloak has already folded the
      *  case and the original is unrecoverable. Store user portions in
      *  lower case. */

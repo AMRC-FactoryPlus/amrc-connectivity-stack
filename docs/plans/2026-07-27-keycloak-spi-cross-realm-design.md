@@ -12,8 +12,8 @@ users.
 Keycloak lower-cases the username before it reaches a user storage
 provider. `FPAuthBackedUserStore.applyDefaultRealm` passed anything
 containing an `@` straight through, so a user typing
-`me1ago@AMRC-FP.SHEF.AC.UK` arrived at Factory+ Auth as
-`me1ago@amrc-fp.shef.ac.uk`. Factory+ Auth compares identity names with
+`alice@HOME.EXAMPLE.ORG` arrived at Factory+ Auth as
+`alice@home.example.org`. Factory+ Auth compares identity names with
 exact string equality (`acs-auth/lib/dataflow.js`, `i.name == upn`), so
 the lookup 410s and Keycloak reports `error="user_not_found"`.
 
@@ -65,7 +65,7 @@ the original pass-through-verbatim comment. Trying the verbatim form
 first preserves that behaviour exactly.
 
 **Known limitation:** only the realm portion is touched. An F+ identity
-stored with capitals in the *user* portion (`Me1ago@REALM`) will still
+stored with capitals in the *user* portion (`Alice@REALM`) will still
 not match, because Keycloak has already folded the case and the original
 is unrecoverable. Store user portions in lower case.
 
@@ -161,7 +161,7 @@ Two properties fall out of this that random minting cannot give:
 
 1. **Every cluster agrees.** Compass, Wales, and anything stood up in
    five years' time all independently derive the same UUID for
-   `me1ago@AMRC-FP.SHEF.AC.UK`, with no coordination and no outbound
+   `alice@HOME.EXAMPLE.ORG`, with no coordination and no outbound
    calls. The far cluster does not even have to exist.
 2. **Admins can pre-grant.** The UUID can be computed and permissions
    attached *before* the user's first login, so they land with the
@@ -193,8 +193,8 @@ string written into the F+ identity record:
   any provider sees it.
 - Encoded UTF-8. No trailing whitespace, no other transformation.
 
-So a user typing `Me1ago@amrc-fp.shef.ac.uk` is hashed as
-`me1ago@AMRC-FP.SHEF.AC.UK`.
+So a user typing `Alice@home.example.org` is hashed as
+`alice@HOME.EXAMPLE.ORG`.
 
 **Nothing local feeds into the input.** Not the default realm, not the
 auth URL, not the cluster name. That is deliberate and load bearing: if
@@ -207,11 +207,11 @@ To pre-grant, or to check what the cluster will derive:
 
 ```sh
 python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(
-  'cb3714c4-c85c-482a-987b-408293aa141e'), 'me1ago@AMRC-FP.SHEF.AC.UK'))"
+  'cb3714c4-c85c-482a-987b-408293aa141e'), 'alice@HOME.EXAMPLE.ORG'))"
 ```
 
 ```
-12bb7b35-16c8-572d-af5f-c1f312ec4ae8
+8f9990d2-ce64-5952-905d-382d25852a80
 ```
 
 That exact pair is pinned as a known-answer test in
@@ -296,7 +296,7 @@ and are never granted anything. No reaper is planned.
 ```yaml
 openid:
   trustedRealms: []
-  #  - realm: AMRC-FP.SHEF.AC.UK
+  #  - realm: HOME.EXAMPLE.ORG
   #  # - realm: PARTNER.EXAMPLE.ORG
   #  #   authUrl: https://auth.partner.example.org
 ```

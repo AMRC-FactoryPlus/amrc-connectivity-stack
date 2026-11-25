@@ -18,7 +18,7 @@ v5.1.0 and by local `helm template`.
   `files.<baseUrl>` / `influxdb.<baseUrl>` (already uncovered in v5.1.0).
   The notes must tell LE operators to add these to
   `acs.letsEncrypt.additionalDnsNames` or issuance/renewal silently
-  skips them. (Does not affect internal-cert sites like ago/jahx.)
+  skips them. (Does not affect internal-cert sites such as our dev clusters.)
 
 - **Grafana permissions instructions are wrong at the mechanism level.**
   Roles are F+ Permission OBJECTS surfaced via the `fp_permissions` JWT
@@ -32,7 +32,7 @@ v5.1.0 and by local `helm template`.
   get Grafana Admin with no manual action.
 
 - **Account continuity: rewrite the "may get a fresh Viewer account"
-  warning.** PROVEN on jahx today: pre-existing v5 auth.proxy users are
+  warning.** PROVEN on a dev cluster today: pre-existing v5 auth.proxy users are
   adopted into generic_oauth at first login with permissions retained
   across dashboards (the #677 fix: `email_attribute_path:
   preferred_username` + `oauth_allow_insecure_email_lookup` now in the

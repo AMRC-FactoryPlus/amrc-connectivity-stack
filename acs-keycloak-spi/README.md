@@ -69,7 +69,7 @@ the usual uppercase realms and deployments whose realm genuinely is
 lower case.
 
 Only the realm is touched. An F+ identity stored with capitals in the
-**user** portion (`Me1ago@REALM`) cannot be matched, because the
+**user** portion (`Alice@REALM`) cannot be matched, because the
 original casing is gone by the time we see it. Store user portions in
 lower case.
 
@@ -111,11 +111,11 @@ cluster*, so grants made there do not follow them here.
 
 ```sh
 python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(
-  'cb3714c4-c85c-482a-987b-408293aa141e'), 'me1ago@AMRC-FP.SHEF.AC.UK'))"
+  'cb3714c4-c85c-482a-987b-408293aa141e'), 'alice@HOME.EXAMPLE.ORG'))"
 ```
 
 ```
-12bb7b35-16c8-572d-af5f-c1f312ec4ae8
+8f9990d2-ce64-5952-905d-382d25852a80
 ```
 
 The name you hash is the **canonicalised UPN**: realm portion in

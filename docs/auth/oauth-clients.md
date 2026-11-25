@@ -408,7 +408,7 @@ go into the JupyterHub values in step 5. Pick any UUID generator
 
 The user who should be a hub admin needs the JupyterHub admin
 Permission with target Wildcard. ACS Admin -> **Access Control** ->
-**Principals** -> click the user (e.g. `admin@AMRC-FPD-AGO.SHEF.AC.UK`)
+**Principals** -> click the user (e.g. `admin@EXAMPLE.ORG`)
 -> add a grant:
 
 | Field | Value |

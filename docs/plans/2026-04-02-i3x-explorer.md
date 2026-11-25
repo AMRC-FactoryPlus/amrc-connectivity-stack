@@ -20,7 +20,7 @@
 **Step 1: Install new packages**
 
 ```bash
-cd /Users/me1ago/code/amrc-connectivity-stack/acs-admin
+cd acs-admin
 npm install cytoscape echarts vue-echarts @microsoft/fetch-event-source
 ```
 

@@ -3,6 +3,10 @@
  */
 
 const animate = require("tailwindcss-animate")
+/* @container and @md/name: variants, for panes that change width
+ * without the viewport changing, such as the origin map editor with
+ * the Addresses panel open. */
+const container_queries = require("@tailwindcss/container-queries")
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -50,5 +54,5 @@ module.exports = {
   		colors: {}
   	}
   },
-  plugins: [animate, require("tailwindcss-animate")],
+  plugins: [animate, require("tailwindcss-animate"), container_queries],
 }

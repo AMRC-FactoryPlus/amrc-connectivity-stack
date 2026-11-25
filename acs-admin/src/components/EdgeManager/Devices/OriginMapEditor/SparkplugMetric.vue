@@ -21,7 +21,10 @@
       @use-standard="useStandardFields = true"
       @unavailable="on_ui_unavailable"
   />
-  <template v-else>
+  <!-- Breakpoints here are container queries on this pane, not the
+     - viewport, because the Addresses panel and the schema tree take
+     - width from it without the window changing size. -->
+  <div v-else class="@container">
   <div class="flex flex-col mb-3">
     <div class="flex items-end justify-between gap-2 w-full mb-2 h-6">
       <div class="flex items-center gap-2 text-gray-500">
@@ -45,16 +48,17 @@
       </div>
     </div>
     <div class="rounded-lg border border-gray-300 p-5 bg-gray-100">
-      <div class="grid gap-3 2xl:grid-cols-3">
+      <div class="grid gap-3 @4xl:grid-cols-[2fr_1fr_1fr]">
         <Control v-if="!isStatic" :label="addressLabel" :help="addressHelp">
           <div class="flex items-center gap-2">
-            <Input v-model="localModel.Address" :placeholder="addressPlaceholder" :icon="addressIcon" class="flex-1"/>
+            <Input v-model="localModel.Address" :placeholder="addressPlaceholder" :icon="addressIcon" class="flex-1 min-w-0"/>
             <!-- Only when a scan of this connection is loaded. -->
             <Button v-if="canPick" variant="outline" size="sm" class="shrink-0 gap-1.5"
                 title="Choose this metric's address from the last scan"
+                aria-label="Pick from scan"
                 @click="$emit('pick-from-scan')">
               <i class="fa-solid fa-sitemap text-xs"></i>
-              <span>Pick from scan</span>
+              <span class="hidden @lg:inline">Pick from scan</span>
             </Button>
           </div>
         </Control>
@@ -85,7 +89,7 @@
       </div>
     </div>
   </div>
-  <div class="grid 2xl:grid-cols-2 gap-3">
+  <div class="grid @4xl:grid-cols-2 gap-3">
     <div class="flex flex-col">
       <div class="flex items-end justify-between gap-2 w-full mb-2 h-6">
         <div class="flex items-center gap-2 text-gray-500">
@@ -94,8 +98,8 @@
         </div>
       </div>
       <div class="rounded-lg border border-gray-300 p-5 ">
-        <div class="grid gap-3 2xl:grid-cols-2">
-          <Control label="Unit" :help="schema.properties.Eng_Unit.description" class="col-span-2">
+        <div class="grid gap-3 @md:grid-cols-2">
+          <Control label="Unit" :help="schema.properties.Eng_Unit.description" class="@md:col-span-2">
             <EngUnitPicker v-model="localModel.Eng_Unit" placeholder="Choose a unit, e.g. kWh"/>
           </Control>
           <Control v-if="!isStatic" label="Low Limit" :help="schema.properties.Eng_Low.description">
@@ -148,7 +152,7 @@
       </div>
     </div>
   </div>
-  </template>
+  </div>
 </template>
 
 <script>

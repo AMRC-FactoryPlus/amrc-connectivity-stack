@@ -66,13 +66,16 @@
         <OriginMapEditor :device="device" :device-schema="schema" v-else>
           <!-- Who can read this device through i3X -->
           <template #actions>
+            <!-- The labels hide on a narrow metric pane, leaving the icons
+                 with the label as a tooltip. -->
             <I3xAccessButton v-if="device.uuid" :target="device.uuid" device :via="isa95Via" noun="device"
-                             :name="device.name" :path="isa95Path"/>
+                             :name="device.name" :path="isa95Path" label-class="hidden @3xl/pane:inline"/>
             <!-- Opens the dataset builder with this device picked. -->
             <Button v-if="device.uuid" variant="outline" size="sm" class="gap-2"
+                    title="Build dataset" aria-label="Build dataset"
                     @click="$router.push({ path: '/datasets/new', query: { devices: device.uuid } })">
               <i class="fa-solid fa-database text-sm"></i>
-              <span>Build dataset</span>
+              <span class="hidden @3xl/pane:inline">Build dataset</span>
             </Button>
           </template>
         </OriginMapEditor>

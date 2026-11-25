@@ -104,19 +104,26 @@
         <SidebarRail/>
       </Sidebar>
       <!-- Main content with fixed height and independent scrolling -->
-      <SidebarInset class="flex flex-col flex-1 overflow-auto px-6 py-4 h-full">
-        <!-- Fixed header -->
-        <header class="flex shrink-0 items-center justify-between gap-2 px-1 mb-3">
+      <!-- The metric pane is a size container named `pane`, so the header
+         - and the metric fields follow its width and not the window's. The
+         - Addresses panel takes width from it without the window changing. -->
+      <SidebarInset class="@container/pane flex flex-col flex-1 overflow-auto px-6 py-4 h-full">
+        <!-- Fixed header. The description sits under the metric name, and
+           - on a narrow pane the buttons show only their icons, with the
+           - label as a tooltip. Buttons in the actions slot do the same
+           - with `hidden @3xl/pane:inline` on their label. -->
+        <header class="flex shrink-0 items-start justify-between gap-3 px-1 mb-3">
+          <div class="min-w-0 flex-1">
             <Breadcrumb>
               <BreadcrumbList>
                 <template v-if="selectedMetric">
                   <template v-for="(segment, index) in selectedMetric.path.slice(0, -1)" :key="index">
-                    <BreadcrumbItem class="hidden md:block">
+                    <BreadcrumbItem class="hidden @2xl/pane:block">
                       <BreadcrumbLink>
                         {{segment}}
                       </BreadcrumbLink>
                     </BreadcrumbItem>
-                    <BreadcrumbSeparator class="hidden md:block"/>
+                    <BreadcrumbSeparator class="hidden @2xl/pane:block"/>
                   </template>
                   <BreadcrumbItem>
                     <BreadcrumbPage>{{selectedMetric.path.slice(-1)[0]}}</BreadcrumbPage>
@@ -124,15 +131,20 @@
                 </template>
               </BreadcrumbList>
             </Breadcrumb>
-          <div class="flex items-center gap-3">
-            <div class="text-xs text-gray-400/90">{{selectedMetric?.model.Documentation}}</div>
+            <p v-if="selectedMetric?.model.Documentation"
+                class="mt-1 text-xs text-gray-400 line-clamp-2"
+                :title="selectedMetric.model.Documentation">{{selectedMetric.model.Documentation}}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
             <slot name="actions"/>
             <!-- Edge Scout: the discovered addresses of this connection -->
             <Button v-if="scoutVisible" variant="outline" size="sm" class="gap-2"
                 :aria-pressed="scoutOpen" :aria-expanded="scoutOpen"
+                title="Addresses: the device's addresses from the last scan"
+                aria-label="Addresses"
                 @click="toggleScout()">
               <i class="fa-solid fa-sitemap text-sm"></i>
-              <span>Addresses</span>
+              <span class="hidden @3xl/pane:inline">Addresses</span>
               <span v-if="scoutCount != null" class="rounded-full bg-gray-100 px-1.5 text-xs text-gray-600">
                 {{ scoutCount.toLocaleString('en-GB') }}
               </span>

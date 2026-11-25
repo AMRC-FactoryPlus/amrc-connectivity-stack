@@ -376,9 +376,10 @@ test("each address reads the same value every time", async () => {
         { address: "const:1000:2.5:ld", value: "2.5", type: "Double", error: null },
         { address: "nope", value: null, type: null, error: "Not a test address" },
     ]);
-    assert.deepEqual(strip(again), strip(first));
-    assert.ok(Number.isInteger(first.values[0].ts));
-    assert.equal(first.values[3].ts, null);
+    /* Two reads answer exactly the same, timestamps included, so the
+     * Edge Agent sees no change and writes nothing. */
+    assert.deepEqual(again.values, first.values);
+    assert.ok(first.values.every(v => v.ts === null));
 });
 
 test("read_fail fails every read with its code", async () => {

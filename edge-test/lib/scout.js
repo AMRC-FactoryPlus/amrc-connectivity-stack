@@ -273,7 +273,10 @@ export async function scout_test (handler, req, out) {
  * only on the address: a sine wave reads its amplitude, a sawtooth a
  * quarter of it and a constant its value. The driver configuration's
  * `read_fail` (a library code) fails every read with that code, and
- * `read_hang: true` never answers, for testing the Edge Agent. */
+ * `read_hang: true` never answers, for testing the Edge Agent. The
+ * values are fixed and have no source time, so `ts` is null, as in
+ * edge-test-rs. A timestamp that moved on every read would make the
+ * Edge Agent rewrite the values entry every round. */
 export async function read_test (handler, addresses, signal) {
     const { read_fail, read_hang } = handler.conf;
     if (read_hang)
@@ -281,7 +284,6 @@ export async function read_test (handler, addresses, signal) {
     if (read_fail)
         throw new ScoutError(String(read_fail), `read_fail is set to ${read_fail}`);
 
-    const ts = Date.now();
     return addresses.map(address => {
         const spec = handler.parseAddr(address);
         if (!spec)
@@ -292,7 +294,7 @@ export async function read_test (handler, addresses, signal) {
             address,
             value:  spec.func(period / 4),
             type:   PACK_INFO[pack].type,
-            ts,
+            ts:     null,
             error:  null,
         };
     });

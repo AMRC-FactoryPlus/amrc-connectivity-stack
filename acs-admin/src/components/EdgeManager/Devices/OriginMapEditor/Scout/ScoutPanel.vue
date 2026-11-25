@@ -9,6 +9,11 @@
   - metric in the schema tree, or ticks several and maps them together.
   - Nothing here writes the origin map. The editor does, and only Save
   - stores it.
+  -
+  - The Live values switch above the tree is off each time the panel
+  - opens. It asks first, then has the Edge Agent read the values on
+  - screen until it is turned off, the panel closes, the browser tab is
+  - hidden, the page changes or the agent goes offline.
   -->
 
 <template>
@@ -185,6 +190,18 @@
         </div>
       </div>
 
+      <!-- Live values -->
+      <div class="flex items-center gap-2 text-xs" data-test="live">
+        <span class="inline-flex items-center gap-2" :title="liveTitle">
+          <Switch :model-value="live" :disabled="!live && !!liveBlocked"
+              aria-label="Live values"
+              @update:model-value="set_live"/>
+          <span :class="!live && liveBlocked ? 'text-gray-400' : 'text-gray-700'">Live values</span>
+        </span>
+        <span v-if="live" class="min-w-0 flex-1 text-gray-500" role="status">{{ liveStatus }}</span>
+      </div>
+      <div v-if="liveError" class="rounded-md border px-3 py-2 text-xs" :class="tone_class('error')" role="status">{{ liveError }}</div>
+
       <ScoutTree ref="tree" class="border border-gray-200 bg-white"
           :index="index" :rows="rows" :usage="usageMap" :changes="changes"
           :checked="checked" :highlight="highlight" :focus="focus"
@@ -193,6 +210,10 @@
           :can-branch="branchable"
           :use-title="pickFor ? `Use this address for ${pickFor}` : 'Use this address for the selected metric'"
           :empty-text="searchActive ? 'Nothing matches.' : 'The scan found no addresses.'"
+          :scan-time="status?.current?.finished ?? null"
+          :live-values="scout.live_values.value"
+          :now="scout.tick.value"
+          @visible="items => scout.set_live_items(items)"
           @toggle="toggle" @check="check" @focus="id => focus = id"
           @select="on_select" @use="use" @branch="branch"/>
       <p class="text-[11px] text-gray-400">
@@ -208,6 +229,8 @@
 
 <script>
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { useDialog } from '@/composables/useDialog.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -217,7 +240,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import ScoutTree from './ScoutTree.vue'
 import ScoutChangeBar from './ScoutChangeBar.vue'
-import { UNTRUSTED_TEXT, state_banner } from '@/lib/scout/text.js'
+import {
+  LIVE_CONFIRM,
+  UNTRUSTED_TEXT,
+  live_blocked_text,
+  live_status_text,
+  state_banner,
+} from '@/lib/scout/text.js'
+import { live_counts } from '@/lib/scout/live.js'
 import {
   ancestors,
   can_start,
@@ -256,6 +286,7 @@ export default {
     DropdownMenuTrigger,
     ScoutTree,
     ScoutChangeBar,
+    Switch,
   },
 
   props: {
@@ -308,6 +339,25 @@ export default {
     loading () { return this.scout.loading.current },
     loadError () { return this.scout.load_error.value },
     sendError () { return this.scout.send_error.value },
+    live () { return this.scout.live.value },
+    liveBlocked () { return this.scout.live_blocked.value },
+    liveError () { return this.scout.live_error.value },
+
+    liveTitle () {
+      if (this.live) return 'Turn off live values'
+      return live_blocked_text(this.liveBlocked) ?? 'Read the values on screen from the device every 5 seconds'
+    },
+
+    liveStatus () {
+      const entry = this.scout.live_values.value
+      const wanted = this.scout.live_addresses.value
+      const counts = live_counts(entry, wanted)
+      return live_status_text({
+        started: (entry?.leases ?? 0) > 0,
+        wanted: wanted.length,
+        ...counts,
+      })
+    },
     form () { return this.driver?.scout?.address_form ?? 'exact' },
 
     banner () {
@@ -468,6 +518,11 @@ export default {
       if (this.highlight) this.reveal(this.highlight)
     },
 
+    /* Live values stop when the page changes. */
+    '$route.fullPath' () {
+      this.scout.live_off()
+    },
+
     'driver.scout.options': {
       handler () { this.reset_options() },
       immediate: true,
@@ -476,6 +531,7 @@ export default {
 
   beforeUnmount () {
     clearTimeout(this.debounceTimer)
+    this.scout.live_off()
   },
 
   methods: {
@@ -513,6 +569,24 @@ export default {
 
     start () {
       this.scout.start({ options: { ...this.options } })
+    },
+
+    /* Turning live values on asks first, because it adds load to the
+     * device. Turning them off does not. */
+    set_live (on) {
+      if (!on) {
+        this.scout.live_off()
+        return
+      }
+      if (this.liveBlocked) return
+      this.ask_live()
+    },
+
+    ask_live () {
+      useDialog({
+        ...LIVE_CONFIRM,
+        onConfirm: () => this.scout.live_on(),
+      })
     },
 
     toggle (id) {

@@ -6,6 +6,11 @@
   - window a matter of arithmetic on the scroll position.
   -
   - Every string comes from the device, so it is rendered as text only.
+  -
+  - The value column shows each value as it was at the scan, in grey.
+  - While live values are on, the value the Edge Agent last read replaces
+  - it, and the tree reports which value rows are on screen so the panel
+  - knows what to ask for.
   -->
 
 <template>
@@ -76,7 +81,15 @@
 
         <span class="w-16 shrink-0 text-gray-500 truncate">{{ item(row.id).type ?? '' }}</span>
         <span class="w-6 shrink-0 text-gray-500">{{ item(row.id).access ?? '' }}</span>
-        <span class="w-20 shrink-0 text-gray-400 font-mono truncate" :title="item(row.id).sample ?? ''">{{ item(row.id).sample ?? '' }}</span>
+        <span class="w-20 shrink-0 flex items-center gap-1 min-w-0 font-mono"
+            :class="cells.get(row.id).live ? 'text-gray-900' : 'text-gray-400'"
+            :title="cells.get(row.id).title"
+            data-test="value">
+          <i v-if="cells.get(row.id).error"
+              class="fa-solid fa-triangle-exclamation shrink-0 text-[10px] text-amber-600"
+              role="img" :aria-label="cells.get(row.id).error"></i>
+          <span class="truncate">{{ cells.get(row.id).text }}</span>
+        </span>
 
         <!-- Mapped-to chip -->
         <span v-if="mapped(row.id).length"
@@ -120,7 +133,9 @@
 
 <script>
 import { ROW_HEIGHT } from '@/lib/scout/constants.js'
-import { item_key } from '@/lib/scout/model.js'
+import { item_key, when_text } from '@/lib/scout/model.js'
+import { live_value } from '@/lib/scout/live.js'
+import { read_age_text } from '@/lib/scout/text.js'
 
 /* Rows rendered beyond the visible area, so scrolling stays smooth. */
 const OVERSCAN = 10
@@ -166,9 +181,15 @@ export default {
     useTitle:   { type: String, default: 'Use this address for the selected metric' },
     label:      { type: String, default: 'Discovered addresses' },
     emptyText:  { type: String, default: 'Nothing to show.' },
+    /* When the scan finished, for the value at scan's tooltip. */
+    scanTime:   { type: String, default: null },
+    /* The trusted live values entry while live values are on, or null. */
+    liveValues: { type: Object, default: null },
+    /* The time now, in ms, for the age of a live value. */
+    now:        { type: Number, default: 0 },
   },
 
-  emits: ['toggle', 'check', 'use', 'branch', 'focus', 'select'],
+  emits: ['toggle', 'check', 'use', 'branch', 'focus', 'select', 'visible'],
 
   data () {
     return { ROW_HEIGHT, NAME_MIN, ADDRESS_MIN, top: 0, height: 400, nameWidth: NAME_MIN, addressWidth: ADDRESS_MIN }
@@ -185,6 +206,33 @@ export default {
       const out = []
       for (let i = first; i < last; i++) out.push({ ...this.rows[i], index: i })
       return out
+    },
+
+    /* The value column of each rendered row. */
+    cells () {
+      return new Map(this.window.map(r => [r.id, this.value_cell(r.id)]))
+    },
+
+    /* The value items whose rows are on screen, without the overscan. */
+    on_screen () {
+      const first = Math.max(0, Math.floor(this.top / ROW_HEIGHT))
+      const last = Math.min(this.rows.length, Math.ceil((this.top + this.height) / ROW_HEIGHT))
+      const out = []
+      for (let i = first; i < last; i++) {
+        const it = this.item(this.rows[i].id)
+        if (it?.kind === 'value') out.push(it)
+      }
+      return out
+    },
+  },
+
+  watch: {
+    on_screen: {
+      handler (items, prev) {
+        if (prev && items.length === prev.length && items.every((it, i) => it === prev[i])) return
+        this.$emit('visible', items)
+      },
+      immediate: true,
     },
   },
 
@@ -250,6 +298,40 @@ export default {
       const first = list[0]
       const name = first.path.at(-1)
       return list.length > 1 ? `${name} +${list.length - 1}` : name
+    },
+
+    /* The value column: the live value when there is one, else the
+     * value at scan. */
+    value_cell (id) {
+      const it = this.item(id)
+      const lv = this.liveValues && it?.kind === 'value' ? live_value(it, this.liveValues) : null
+      const sample = it?.sample ?? null
+      const at_scan = this.scanTime ? `Value at scan, ${when_text(this.scanTime)}` : 'Value at scan'
+      if (lv?.error) {
+        const age = read_age_text(lv.read, this.now)
+        return {
+          live: false,
+          error: lv.error,
+          text: sample ?? '',
+          title: [`Live value: ${lv.error}`, age, sample != null ? `${at_scan}: ${sample}` : null]
+            .filter(Boolean).join('\n'),
+        }
+      }
+      if (lv) {
+        const age = read_age_text(lv.read, this.now)
+        return {
+          live: true,
+          error: null,
+          text: lv.text ?? '',
+          title: [lv.text ?? '', [age, lv.type].filter(Boolean).join(', ')].filter(Boolean).join('\n'),
+        }
+      }
+      return {
+        live: false,
+        error: null,
+        text: sample ?? '',
+        title: sample != null ? `${sample}\n${at_scan}` : '',
+      }
     },
 
     change (id) {

@@ -157,7 +157,15 @@ export class MqttCli {
 
         if (!req) return;
         const [to, cmd] = req;
-        const stat = await this.cmdesc.execute_command(from, to, cmd);
+        let stat;
+        try {
+            stat = await this.cmdesc.execute_command(from, to, cmd);
+        }
+        catch (e) {
+            this.log("cmdesc", "Command request from %s failed: %s",
+                from, e?.message ?? e);
+            stat = 503;
+        }
 
         const resp = MetricBuilder.cmd.command_escalation_response(
             to, cmd.name, stat);

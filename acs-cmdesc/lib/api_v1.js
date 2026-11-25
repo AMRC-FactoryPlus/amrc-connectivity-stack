@@ -36,8 +36,17 @@ export default class ApiV1 {
         const to = new Address(
             req.params.group, req.params.node, req.params.device);
 
-        const st = await this.cmdesc.execute_command(
-            req.auth, to, req.body);
+        /* This router is express 4, which does not catch a rejected
+         * handler. An unhandled rejection would stop the process, so
+         * any failure here must end as a response. */
+        let st;
+        try {
+            st = await this.cmdesc.execute_command(req.auth, to, req.body);
+        }
+        catch (e) {
+            console.log("Command request failed: %s", e?.stack ?? e);
+            st = 503;
+        }
         res.status(st).end();
     }
 }

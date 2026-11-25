@@ -19,7 +19,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "start": "node bin/cmdescd.js"
+    "start": "node bin/cmdescd.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@amrc-factoryplus/rx-client": "file:../lib/js-rx-client",

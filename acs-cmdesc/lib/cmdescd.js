@@ -14,6 +14,19 @@ import { MqttCli }          from "./mqttcli.js";
 const CCL_Perms = "9584ee09-a35a-4278-bc13-21a8be1f007c";
 const CCL_Template = "60e99f28-67fe-4344-a6ab-b1edb8b8e810";
 
+/* A caller who signed in with a Keycloak JWT reaches us as their
+ * principal UUID, not as a Kerberos UPN. */
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/* Thrown when we could not read a caller's ACL from the Auth service.
+ * The request is refused, but the failure is ours, not the caller's. */
+export class AclUnavailable extends Error {
+    constructor (message, opts) {
+        super(message, opts);
+        this.name = "AclUnavailable";
+    }
+}
+
 export default class CmdEscD {
     constructor(opts) {
         this.fplus = opts.fplus;
@@ -39,8 +52,10 @@ export default class CmdEscD {
     run () { this.mqtt.run(); }
 
     decode_principal (princ, addrs) {
+        if (typeof princ == "string")
+            return [UUID_RX.test(princ) ? "uuid" : "kerberos", princ];
         if (!(princ instanceof Address))
-            return ["kerberos", princ];
+            return this.log("cmdesc", "Unrecognised principal %o", princ);
 
         if (princ.isDevice()) {
             this.log("cmdesc", "Cannot authorise request from a Device");
@@ -59,6 +74,9 @@ export default class CmdEscD {
         return ["uuid", uuids.first()];
     }
 
+    /* Returns the commands `princ` may send. Throws AclUnavailable if
+     * the Auth service could not give us an answer. A principal Auth
+     * does not know (404) has an empty ACL. */
     async expand_acl(princ) {
         const addrs = await rx.firstValueFrom(this.addresses);
         const tmpls = await rx.firstValueFrom(this.templates);
@@ -66,7 +84,19 @@ export default class CmdEscD {
         const query = this.decode_principal(princ, addrs);
         if (!query) return [];
 
-        const acl = await this.fplus.Auth.fetch_auth_acl(...query);
+        let acl;
+        try {
+            acl = await this.fplus.Auth.fetch_auth_acl(...query);
+        }
+        catch (e) {
+            if (e?.status == 404) {
+                this.log("acl", "Auth has no ACL for %s", princ);
+                return [];
+            }
+            throw new AclUnavailable(
+                `Can't read ACL for ${princ}: ${e?.message ?? e}`,
+                { cause: e });
+        }
 
         const res_targ = t => t == UUIDs.Null ? true : addrs.get(t);
 
@@ -77,6 +107,13 @@ export default class CmdEscD {
         });
     }
 
+    /* The sender identity we put in the body of the CMD. */
+    sender (from) {
+        if (from instanceof Address)
+            return `sparkplug:${from}`;
+        return UUID_RX.test(from) ? `uuid:${from}` : `kerberos:${from}`;
+    }
+
     /* Potential return values:
      * 200: OK
      * 403: Forbidden
@@ -85,7 +122,8 @@ export default class CmdEscD {
      * 503: Device offline / not responding, or we have no connection
      *      to the MQTT broker
      *
-     * from can be an Address or a Kerberos principal string.
+     * from can be an Address, a Kerberos principal string, or a
+     * principal UUID string (a caller who signed in with a JWT).
      * to must be an Address.
      * cmd is { name, type?, value }
      */
@@ -107,7 +145,16 @@ export default class CmdEscD {
             this.log("acl", `Granting root rights to ${from}`);
         }
         else {
-            const acl = await this.expand_acl(from);
+            let acl;
+            try {
+                acl = await this.expand_acl(from);
+            }
+            catch (e) {
+                /* Never let one caller's ACL take the process down. */
+                this.log("acl", "ACL check failed for %s: %s",
+                    from, e?.message ?? e);
+                return log(503);
+            }
             this.log("acl", "ACL for %s: %o", from, acl);
 
             const type_ok = cmd.type == undefined
@@ -132,9 +179,7 @@ export default class CmdEscD {
             address:    to,
             type:       "CMD",
             metrics:    [cmd],
-            from:       from instanceof Address 
-                ? `sparkplug:${from}`
-                : `kerberos:${from}`,
+            from:       this.sender(from),
         });
         return log(sent ? 200 : 503);
     }

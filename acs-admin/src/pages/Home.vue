@@ -14,33 +14,19 @@
           </Copyable>
         </CardHeader>
       </Card>
-      <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-        <Card class="sm:col-span-2">
+      <div v-if="cards.length" class="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+        <Card v-for="card in cards" :key="card.key" class="sm:col-span-2">
           <CardHeader class="pb-3">
-            <CardTitle>Graph</CardTitle>
+            <CardTitle>{{ card.title }}</CardTitle>
             <CardDescription class="max-w-lg text-balance leading-relaxed">
-              Visualise real-time data flow across the infrastructure in a graph view.
+              {{ card.text }}
             </CardDescription>
           </CardHeader>
           <CardFooter>
             <Button as-child>
-              <a :href="`${s.scheme}://visualiser.${s.baseUrl}`">View</a>
+              <RouterLink v-if="card.to" :to="card.to">View</RouterLink>
+              <a v-else :href="card.href(s)">View</a>
             </Button>
-          </CardFooter>
-        </Card>
-        <Card class="sm:col-span-2">
-          <CardHeader class="pb-3">
-            <CardTitle>Activity</CardTitle>
-            <CardDescription class="max-w-lg text-balance leading-relaxed">
-              Visualise real-time data changes across the infrastructure in a table view.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <RouterLink to="/activity">
-              <Button as-child>
-                <a :href="`${s.scheme}://activity.${s.baseUrl}`">View</a>
-              </Button>
-            </RouterLink>
           </CardFooter>
         </Card>
       </div>
@@ -53,6 +39,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card/index.js'
 import Copyable from '@components/Copyable.vue'
+import { useAccessStore } from '@store/useAccessStore.js'
+import { home_cards } from '@/lib/access/home-cards.js'
 
 export default {
 
@@ -61,6 +49,7 @@ export default {
   setup () {
     return {
       s: useServiceClientStore(),
+      access: useAccessStore(),
     }
   },
 
@@ -79,6 +68,11 @@ export default {
   computed: {
     mqttUrl () {
       return this.s.urls?.MQTT?.[0] ?? null
+    },
+
+    /* Only the cards that lead somewhere the user can read. */
+    cards () {
+      return home_cards(this.access.check)
     },
   },
 

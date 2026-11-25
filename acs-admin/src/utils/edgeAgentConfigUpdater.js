@@ -463,9 +463,10 @@ async function buildEdgeAgentConfig({
     debug_log('Devices:', devices)
     debug_log('Connections:', connections)
 
-    // If we don't have any devices or connections, return
+    // If we don't have any devices or connections, return. A new
+    // connection has no devices yet, so this is normal, not an error.
     if (devices.length === 0 || connections.length === 0) {
-      console.error('No devices or connections found')
+      debug_log('No devices or connections found')
       return
     }
 

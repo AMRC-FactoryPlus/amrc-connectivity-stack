@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use rs_edge_driver::{
-    ConnectError, DEFAULT_MAX_PACKET_SIZE, DriverHandle, Handler, HandlerError, Scouter,
+    ConnectError, DEFAULT_MAX_PACKET_SIZE, DriverHandle, Handler, HandlerError, Reader, Scouter,
     WriteError, WriteValue,
 };
 use rumqttc::{
@@ -29,6 +29,7 @@ use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 use crate::config::{Conf, Protocol, WS_PATH};
+use crate::live::{Live, MqttReader, Subscriber};
 use crate::scout::MqttScouter;
 use crate::{topics, write};
 
@@ -45,6 +46,10 @@ pub const FORWARD_MAX: usize = DEFAULT_MAX_PACKET_SIZE - 64 * 1024;
 /// Requests (subscriptions and writes) the client queues before
 /// `subscribe` or `write` waits.
 const REQUEST_QUEUE: usize = 64;
+
+/// How often the driver looks for live-values topics no read has asked
+/// for in a minute.
+const EXPIRE_EVERY: Duration = Duration::from_secs(1);
 
 /// How long a write may wait for room in the client's queue.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -83,6 +88,45 @@ struct Session {
     pending: Arc<Mutex<VecDeque<Vec<String>>>>,
     /// Set when this connection is lost, so a scan can stop.
     lost: Arc<Lost>,
+    /// The topics live values read on this connection. See
+    /// [`crate::live`].
+    live: Arc<Live>,
+    /// Sends this connection's SUBSCRIBEs, noting each for its SUBACK.
+    sub: Arc<ClientSub>,
+    /// The task that unsubscribes from live-values topics nobody reads.
+    expiry: JoinHandle<()>,
+}
+
+/// The data connection's client as a [`Subscriber`] for live values.
+struct ClientSub {
+    client: AsyncClient,
+    pending: Arc<Mutex<VecDeque<Vec<String>>>>,
+}
+
+#[async_trait]
+impl Subscriber for ClientSub {
+    async fn subscribe(&self, topics: Vec<String>) -> Result<(), String> {
+        let filters: Vec<_> = topics
+            .iter()
+            .map(|t| SubscribeFilter::new(t.clone(), QoS::AtMostOnce))
+            .collect();
+        // Never waits, so a read the library abandons can't leave a
+        // SUBACK noted for a SUBSCRIBE that was never sent. The caller
+        // holds the order lock, so nothing else is noted in between.
+        let mut pending = self.pending.lock().unwrap();
+        pending.push_back(topics);
+        self.client.try_subscribe_many(filters).map_err(|e| {
+            pending.pop_back();
+            e.to_string()
+        })
+    }
+
+    async fn unsubscribe(&self, topic: String) -> Result<(), String> {
+        self.client
+            .unsubscribe(topic)
+            .await
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Whether the driver's own connection has been lost. A scan watches
@@ -138,6 +182,14 @@ impl MqttHandler {
             return;
         };
         s.stopping.store(true, Ordering::SeqCst);
+        s.expiry.abort();
+        // A broker keeps the subscriptions of a session that is not
+        // clean, so drop the ones only live values wanted.
+        if !self.conf.clean_session {
+            for t in s.live.own_topics() {
+                let _ = s.client.try_unsubscribe(t);
+            }
+        }
         let _ = s.client.try_disconnect();
         // Give the task a moment to send the DISCONNECT. It may be
         // waiting for the Edge Agent, so don't wait long.
@@ -210,10 +262,16 @@ async fn read_loop(
     stopping: Arc<AtomicBool>,
     pending: Arc<Mutex<VecDeque<Vec<String>>>>,
     lost: Arc<Lost>,
+    live: Arc<Live>,
 ) {
     loop {
         match eventloop.poll().await {
             Ok(Event::Incoming(Incoming::Publish(p))) => {
+                // Kept for live values when a read wants the topic. A
+                // topic only a read wants goes no further.
+                if !live.record(&p.topic, &p.payload) {
+                    continue;
+                }
                 if p.payload.len() > FORWARD_MAX {
                     tracing::warn!(
                         topic = %p.topic,
@@ -235,6 +293,7 @@ async fn read_loop(
                     .collect();
                 if !refused.is_empty() {
                     tracing::warn!(?refused, "broker refused subscriptions");
+                    live.refused(&refused);
                 }
             }
             Ok(_) => {}
@@ -265,6 +324,10 @@ impl Handler for MqttHandler {
     /// [`crate::scout`].
     const SCOUTS: bool = true;
 
+    /// Live values subscribe to the topics on screen on the driver's
+    /// own connection. See [`crate::live`].
+    const READS: bool = true;
+
     fn create(
         handle: DriverHandle<String>,
         config: serde_json::Value,
@@ -288,6 +351,12 @@ impl Handler for MqttHandler {
     }
 
     async fn connect(&mut self) -> Result<(), ConnectError> {
+        // Live-values topics of a connection that was lost, which a
+        // broker keeps for a session that is not clean.
+        let leftover = match &self.session {
+            Some(s) if !self.conf.clean_session && s.lost.is_set() => s.live.own_topics(),
+            _ => Vec::new(),
+        };
         self.stop().await;
         let url = self.conf.url();
         let opts = self.options().map_err(|e| {
@@ -320,9 +389,17 @@ impl Handler for MqttHandler {
         }
         tracing::info!(%url, "connected to the MQTT server");
 
+        // Sent before `subscribe` makes the address map's
+        // subscriptions, so a mapped topic among them is subscribed to
+        // again after.
+        for t in leftover {
+            let _ = client.try_unsubscribe(t);
+        }
+
         let stopping = Arc::new(AtomicBool::new(false));
         let pending = Arc::new(Mutex::new(VecDeque::new()));
         let lost = Arc::new(Lost::default());
+        let live = Arc::new(Live::default());
         let task = tokio::spawn(read_loop(
             eventloop,
             self.handle.clone(),
@@ -330,7 +407,21 @@ impl Handler for MqttHandler {
             stopping.clone(),
             pending.clone(),
             lost.clone(),
+            live.clone(),
         ));
+        let sub = Arc::new(ClientSub {
+            client: client.clone(),
+            pending: pending.clone(),
+        });
+        let expiry = tokio::spawn({
+            let (live, sub) = (live.clone(), sub.clone());
+            async move {
+                loop {
+                    tokio::time::sleep(EXPIRE_EVERY).await;
+                    live.expire(&*sub).await;
+                }
+            }
+        });
         self.session = Some(Session {
             client,
             task,
@@ -338,6 +429,9 @@ impl Handler for MqttHandler {
             subscribed: BTreeSet::new(),
             pending,
             lost,
+            live,
+            sub,
+            expiry,
         });
         Ok(())
     }
@@ -360,54 +454,33 @@ impl Handler for MqttHandler {
         )))
     }
 
+    /// Live values subscribe to topics on this connection too. See
+    /// [`crate::live`].
+    fn reader(&self) -> Option<Arc<dyn Reader>> {
+        let s = self.session.as_ref()?;
+        Some(Arc::new(MqttReader {
+            live: s.live.clone(),
+            sub: s.sub.clone(),
+            lost: s.lost.clone(),
+        }))
+    }
+
     /// Called with every address after each connect and each new
     /// address map. Subscribes at QoS 0, as the built-in does.
+    ///
+    /// Live values subscribe on the same connection, so the whole
+    /// change is made under their order lock, and a filter a live read
+    /// still wants is not unsubscribed. See [`crate::live`].
     async fn subscribe(&mut self, addrs: &[String]) -> bool {
-        let Some(s) = self.session.as_mut() else {
+        let Some(live) = self.session.as_ref().map(|s| s.live.clone()) else {
             return false;
         };
-        // The read loop reports a lost connection, but the driver
-        // ignores that report while `connect` is still in progress, as
-        // a duplicate from the old connection. A broker that closes
-        // straight after CONNACK can therefore end the read loop
-        // unheard, leaving the status UP with nothing connected. The
-        // driver calls this as soon as the connection is up, so report
-        // it again here, where it is heard.
-        if s.task.is_finished() && !s.stopping.load(Ordering::SeqCst) {
-            tracing::warn!(url = %self.conf.url(), "the MQTT server closed the connection");
-            self.handle.disconnected(ConnectError::ConnectionFailed);
-            return false;
+        let _order = live.order.lock().await;
+        let ok = self.subscribe_locked(addrs).await;
+        if let Some(s) = &self.session {
+            live.set_mapped(&s.subscribed);
         }
-        let plan = topics::plan(&s.subscribed, addrs.iter().map(String::as_str));
-        for a in &plan.invalid {
-            tracing::warn!(address = %a, "not a valid MQTT topic, not subscribed");
-        }
-
-        for f in plan.unsubscribe {
-            if let Err(e) = s.client.unsubscribe(&f).await {
-                tracing::error!(%e, filter = %f, "could not unsubscribe");
-                return false;
-            }
-            s.subscribed.remove(&f);
-        }
-
-        if plan.subscribe.is_empty() {
-            return true;
-        }
-        let filters = plan
-            .subscribe
-            .iter()
-            .map(|f| SubscribeFilter::new(f.clone(), QoS::AtMostOnce))
-            .collect::<Vec<_>>();
-        s.pending.lock().unwrap().push_back(plan.subscribe.clone());
-        if let Err(e) = s.client.subscribe_many(filters).await {
-            s.pending.lock().unwrap().pop_back();
-            tracing::error!(%e, "could not subscribe");
-            return false;
-        }
-        tracing::info!(count = plan.subscribe.len(), "subscribed");
-        s.subscribed.extend(plan.subscribe);
-        true
+        ok
     }
 
     /// Publish the value as text to the address's topic, at QoS 0 and
@@ -429,5 +502,60 @@ impl Handler for MqttHandler {
             Ok(Err(e)) => Err(WriteError::Failed(e.to_string())),
             Err(_) => Err(WriteError::Failed("the MQTT client is busy".into())),
         }
+    }
+}
+
+impl MqttHandler {
+    /// [`Handler::subscribe`], under the live-values order lock.
+    async fn subscribe_locked(&mut self, addrs: &[String]) -> bool {
+        let Some(s) = self.session.as_mut() else {
+            return false;
+        };
+        // The read loop reports a lost connection, but the driver
+        // ignores that report while `connect` is still in progress, as
+        // a duplicate from the old connection. A broker that closes
+        // straight after CONNACK can therefore end the read loop
+        // unheard, leaving the status UP with nothing connected. The
+        // driver calls this as soon as the connection is up, so report
+        // it again here, where it is heard.
+        if s.task.is_finished() && !s.stopping.load(Ordering::SeqCst) {
+            tracing::warn!(url = %self.conf.url(), "the MQTT server closed the connection");
+            self.handle.disconnected(ConnectError::ConnectionFailed);
+            return false;
+        }
+        let plan = topics::plan(&s.subscribed, addrs.iter().map(String::as_str));
+        for a in &plan.invalid {
+            tracing::warn!(address = %a, "not a valid MQTT topic, not subscribed");
+        }
+
+        for f in plan.unsubscribe {
+            if s.live.may_unsubscribe(&f) {
+                if let Err(e) = s.client.unsubscribe(&f).await {
+                    tracing::error!(%e, filter = %f, "could not unsubscribe");
+                    return false;
+                }
+            } else {
+                tracing::debug!(filter = %f, "kept for live values");
+            }
+            s.subscribed.remove(&f);
+        }
+
+        if plan.subscribe.is_empty() {
+            return true;
+        }
+        let filters = plan
+            .subscribe
+            .iter()
+            .map(|f| SubscribeFilter::new(f.clone(), QoS::AtMostOnce))
+            .collect::<Vec<_>>();
+        s.pending.lock().unwrap().push_back(plan.subscribe.clone());
+        if let Err(e) = s.client.subscribe_many(filters).await {
+            s.pending.lock().unwrap().pop_back();
+            tracing::error!(%e, "could not subscribe");
+            return false;
+        }
+        tracing::info!(count = plan.subscribe.len(), "subscribed");
+        s.subscribed.extend(plan.subscribe);
+        true
     }
 }

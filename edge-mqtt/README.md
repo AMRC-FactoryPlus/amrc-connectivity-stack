@@ -179,6 +179,39 @@ off for the driver's user or don't scan. A broker with a limit on
 connections per user may also refuse the scan's connection, which gives
 `CONN` or `AUTH`.
 
+## Live values (Edge Scout)
+
+MQTT has no way to read a topic's current value, so for the Edge Scout
+panel's live values the driver subscribes to the topics on screen on
+its own connection, the one it collects data with, and answers each
+read with the last message it holds for each topic: the payload as
+text, cut at 1024 characters, with `ts` set to when the message
+arrived. A topic not heard from yet answers `No message yet`, and a
+payload that is not UTF-8 answers `Binary payload of N bytes`. A read
+waits up to a second for the first message on a topic it has just
+subscribed to, so a retained message answers the first read.
+
+The driver keeps this out of the way of the data:
+
+- It never subscribes again to a topic the address map already has,
+  so the broker does not send that topic's retained message to the
+  Edge Agent a second time. Such a topic answers `No message yet`
+  until its next message arrives.
+- Messages on a topic only a read wants are kept for the read and
+  never passed to the Edge Agent.
+- It unsubscribes from a read's topic 60 seconds after the last read
+  that asked for it, and never from a topic the address map has. A new
+  address map that drops a topic a read still wants leaves it
+  subscribed until then. Subscriptions from the address map and from
+  reads are sent in one order, under one lock, so they can't overtake
+  each other.
+- A read of a filter with `+` or `#` is refused, because it could
+  subscribe the data connection to the whole broker.
+- With `cleanSession` false, the broker keeps subscriptions across
+  connections, so the driver unsubscribes from read-only topics when it
+  closes the connection, or straight after it reconnects when the
+  connection was lost.
+
 ## Layout
 
 ```
@@ -189,11 +222,14 @@ src/topics.rs      which filters to subscribe to, with unit tests
 src/write.rs       the payload for a write, with unit tests
 src/survey.rs      what a scan heard, turned into scout items, with unit tests
 src/scout.rs       a scan's own connection to the broker
+src/live.rs        live values on the driver's own connection, with unit tests
 src/handler.rs     the rs-edge-driver Handler: the broker connection
 tests/driver.rs    the driver between a fake Edge Agent and a fake broker
 tests/scout.rs     scans between a fake Edge Agent and a fake broker
+tests/live.rs      live values between a fake Edge Agent and a fake broker
 tests/mosquitto.rs the driver against a real mosquitto, with passwords
 tests/scout_mosquitto.rs  scans against a real mosquitto, with and without ACLs
+tests/live_mosquitto.rs   live values against a real mosquitto
 tests/tls.rs       the driver against mosquitto over TLS
 ```
 

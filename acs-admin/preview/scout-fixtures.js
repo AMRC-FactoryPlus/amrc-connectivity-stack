@@ -114,7 +114,11 @@ export function preview_scout (state) {
 export const scout_model = {
   Schema_UUID: 'device', Instance_UUID: 'i',
   Spindle: {
-    Speed: { Address: 'ns=2;s=Plant.Line1.Cell1.Spindle_Speed', Sparkplug_Type: 'DoubleBE' },
+    Speed: {
+      Address: 'ns=2;s=Plant.Line1.Cell1.Spindle_Speed', Sparkplug_Type: 'DoubleBE',
+      Documentation: 'The measured rotational speed of the main spindle, as the controller reports it, before any override is applied.',
+      Record_To_Historian: true,
+    },
     Load: { Address: 'ns=2;s=Plant.Line1.Cell1.Spindle_Load', Sparkplug_Type: 'FloatBE' },
     Old_Tag: { Address: 'ns=2;s=Plant.Line1.Cell1.Removed', Sparkplug_Type: 'DoubleBE' },
   },
@@ -132,5 +136,28 @@ export const scout_driver = {
         units: { type: 'boolean', title: 'Read engineering units', default: false },
       },
     },
+  },
+}
+
+/* The selected metric, as OriginMapEditor hands it to SparkplugMetric. */
+export const scout_metric = {
+  path: ['Spindle', 'Speed'],
+  model: scout_model.Spindle.Speed,
+  schema: { Sparkplug_Type: { enum: ['DoubleBE', 'FloatBE', 'Int32BE'] } },
+}
+
+/* The Sparkplug metric schema's field descriptions, for the help icons. */
+const describe = d => ({ description: d })
+export const SPARKPLUG_METRIC = {
+  properties: {
+    Address: describe('Where the driver reads the value.'),
+    Path: describe('Where the value sits inside what the address returns.'),
+    Value: describe('A fixed value.'),
+    Sparkplug_Type: describe('The type the value is published as.'),
+    Eng_Unit: describe('The unit of the value.'),
+    Eng_Low: describe('The lowest value expected.'),
+    Eng_High: describe('The highest value expected.'),
+    Deadband: describe('The change needed before a new value is published.'),
+    Record_To_Historian: describe('Whether the historians record this metric.'),
   },
 }

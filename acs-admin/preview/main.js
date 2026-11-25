@@ -26,6 +26,9 @@ import { usePrincipalStore } from '../src/store/usePrincipalStore.js'
 import * as i3x from './i3x-fixtures.js'
 import * as isa95fx from './isa95-fixtures.js'
 import { useAccessStore } from '../src/store/useAccessStore.js'
+import { useConnectionStore } from '../src/store/useConnectionStore.js'
+import { useDriverStore } from '../src/store/useDriverStore.js'
+import { useEngUnitStore } from '../src/store/useEngUnitStore.js'
 import { Status, make_checker } from '../src/lib/access/acl.js'
 
 window.events = mitt()
@@ -116,6 +119,14 @@ const seed = () => {
     usePrincipalStore().rxsub = { unsubscribe () {} }
     s.client = i3x.i3xClient
     return
+  }
+
+  /* The Edge Scout surface mounts the real metric fields, which read
+   * connections, drivers and units. */
+  if (surface === 'scout') {
+    stub(useConnectionStore(), [])
+    stub(useDriverStore(), [])
+    stub(useEngUnitStore(), [])
   }
 
   s.client = {

@@ -24,8 +24,9 @@ Surfaces are selected by query parameter, after the hash:
 | `#/?surface=raw` | the raw JSON escape hatch |
 | `#/?surface=i3x-device` | a device with its i3X access button; click it for the dialog |
 | `#/?surface=i3x-isa95` | the ISA-95 page, with the i3X access column |
-| `#/?surface=scout` | the Edge Scout Addresses panel with a scan and a previous scan |
+| `#/?surface=scout` | the Edge Scout Addresses panel with a scan and a previous scan, beside the real metric fields |
 | `#/?surface=scout&state=running` | the same, mid-scan. Also `never`, `offline`, `noperm`, `refused`, `failed`, `unsupported`, `empty` and `truncated` |
+| `#/?surface=scout&open=0` | the metric pane with the Addresses panel closed. `&popout=1` starts the panel popped out into the large view |
 | `#/?surface=driver-ui` | the driver custom UI contract version 2 test document in a real sandboxed frame, with the Manager's picker. Add `&scan=none` for no scan, `&samples=1` to share samples, or `&v=1` to declare it as version 1, so the host ignores its version 2 messages and falls back to the standard fields |
 
 The fixtures are real schemas from the AMRC library, plus a local fork

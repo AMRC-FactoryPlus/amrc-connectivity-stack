@@ -14,6 +14,8 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import mitt from 'mitt'
 
 import Preview from './Preview.vue'
+import NavPreview from './NavPreview.vue'
+import * as navfx from './nav-fixtures.js'
 import { devices, drafts, schemas } from './fixtures.js'
 
 import { useSchemaStore } from '../src/store/useSchemaStore.js'
@@ -30,6 +32,10 @@ import { useConnectionStore } from '../src/store/useConnectionStore.js'
 import { useDriverStore } from '../src/store/useDriverStore.js'
 import { useEngUnitStore } from '../src/store/useEngUnitStore.js'
 import { Status, make_checker } from '../src/lib/access/acl.js'
+import { useEdgeClusterStore } from '../src/store/useEdgeClusterStore.js'
+import { useNodeStore } from '../src/store/useNodeStore.js'
+import { useDeploymentStore } from '../src/store/useDeploymentStore.js'
+import { useHelmChartStore } from '../src/store/useHelmChartStore.js'
 
 window.events = mitt()
 
@@ -63,11 +69,18 @@ const router = createRouter({
       component: Preview,
       meta: { name: 'Schemas', schemaMode: 'schema' },
     },
+    {
+      path: '/edge-clusters/:clusteruuid/nodes/:nodeuuid/devices/:deviceuuid',
+      component: Preview,
+    },
+    /* The nav surface's links go nowhere. */
+    { path: '/:any(.*)*', component: Preview },
   ],
 })
 
+const query = new URL(window.location.hash.slice(1), window.location.origin).searchParams
 const pinia = createPinia()
-const app = createApp(Preview).use(router).use(pinia)
+const app = createApp(query.get('surface') === 'nav' ? NavPreview : Preview).use(router).use(pinia)
 
 /* Stores have to be seeded after Pinia is installed but before the
  * components mount, so their mounted() hooks find data already there. */
@@ -98,6 +111,20 @@ const seed = () => {
 
   const surface = new URL(window.location.hash.slice(1), window.location.origin)
     .searchParams.get('surface') ?? ''
+
+  /* The sidebar for one user: `acl` is none, empty, device, root or
+   * loading (nav-fixtures.js). Root also sees the cluster tree. */
+  if (surface === 'nav') {
+    const user = navfx.USERS[query.get('acl') ?? 'none'] ?? navfx.USERS.none
+    useAccessStore().check = user.check()
+    useAccessStore().start = async () => {}
+    stub(useEdgeClusterStore(), navfx.clusters)
+    stub(useObjectStore(), navfx.objects)
+    for (const store of [useNodeStore(), useDriverStore(), useDeploymentStore(), useHelmChartStore()])
+      stub(store, [])
+    s.client = {}
+    return
+  }
   /* The ISA-95 hierarchy surfaces write to an in-memory ConfigDB.
    * `ro=1` shows them to someone with no edit rights. */
   if (surface.startsWith('isa95')) {

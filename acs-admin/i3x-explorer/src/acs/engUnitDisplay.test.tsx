@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /*
  * ACS: tests for showing engineering units after values: the Current value
- * table, a leaf's current value, and the subscriptions table.
+ * table, a leaf's current value and its components, and the subscriptions table.
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -116,6 +116,24 @@ describe('a leaf value', () => {
 
     rerender(<ValueDisplay value={vqt('power', 12.5)} unit={unit} view="raw" />)
     expect(container.querySelector('[data-eng-unit]')).toBeNull()
+  })
+
+  it('puts each component\'s unit after its value, looked up together', async () => {
+    const server = fakeServer()
+    const value = {
+      ...vqt('press-3', null),
+      components: { temp: vqt('temp', 21.5), mode: vqt('mode', 'Idle'), gearbox: vqt('gearbox', { ratio: 3 }) },
+    } as LastKnownValue
+    render(<ValueDisplay value={value} />)
+    const rowOf = (id: string) => screen.getByTitle(id).closest('button') as HTMLElement
+
+    const unit = await within(rowOf('temp')).findByText('°C')
+    expect(unit.getAttribute('title')).toBe('°C: UNECE code CEL')
+    // A structured component asks for no unit.
+    expect(server.details).toHaveBeenCalledTimes(1)
+    expect(server.details).toHaveBeenCalledWith(['temp', 'mode'])
+    expect(rowOf('mode').querySelector('[data-eng-unit]')).toBeNull()
+    expect(rowOf('gearbox').querySelector('[data-eng-unit]')).toBeNull()
   })
 })
 

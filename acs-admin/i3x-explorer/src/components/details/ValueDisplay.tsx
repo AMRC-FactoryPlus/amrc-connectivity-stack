@@ -6,7 +6,7 @@ import { JsonViewer } from './JsonViewer'
 import { StatusFacets } from './ElementStatus'
 import { WarningIcon } from '../common/icons'
 import { Chevron } from '../common/Chevron'
-import { EngUnitText } from '../../acs/EngUnitText' // ACS
+import { ElementEngUnit, EngUnitText } from '../../acs/EngUnitText' // ACS
 import type { EngUnit } from '../../acs/engUnit' // ACS
 
 interface ValueDisplayProps {
@@ -168,6 +168,10 @@ function ComponentList({ components }: { components: [string, ComponentVqt][] })
                 <code className="text-i3x-text truncate max-w-[40%]" title={formatComponentValue(vqt.value)}>
                   {formatComponentValueShort(vqt.value)}
                 </code>
+                {/* ACS: a component's unit, after a scalar value. */}
+                {structured === undefined && vqt.value !== null && vqt.value !== undefined && (
+                  <ElementEngUnit elementId={childId} className="-ml-2 flex-shrink-0 whitespace-nowrap" />
+                )}
                 {vqt.quality && <StatusFacets code={vqt.quality} variant="dot" />}
                 {vqt.timestamp && (
                   <span className="text-i3x-text-muted whitespace-nowrap" title={new Date(vqt.timestamp).toLocaleString()}>

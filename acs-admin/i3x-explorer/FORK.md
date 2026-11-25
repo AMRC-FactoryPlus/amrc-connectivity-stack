@@ -372,8 +372,8 @@ upstream, so they are not tied to the Manager UI.
     `ChildValues.tsx`, `ObjectDetailView.tsx`, `HistoryTab.tsx`,
     `MonitoredItemRow.tsx`, `ComponentTrends.tsx`,
     `services/catalog.ts`): a metric's unit is shown after its value in
-    the Current value panel, in each row of the Current value table and
-    the subscriptions table, and in the captions of a composition's
+    the Current value panel, in each row of the Current value table, the
+    Current value panel's Components list and the subscriptions table, and in the captions of a composition's
     component trends, and the History tab says "Values in" the unit above
     its chart or table. i3X 1.0 gives the unit as `metadata.engUnit`, a
     UNECE code ("KWH"); ACS's server also gives

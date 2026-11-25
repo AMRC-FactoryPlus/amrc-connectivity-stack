@@ -341,13 +341,15 @@ export function real_deps (client) {
       return st === 200 ? !!info?.online : null
     },
 
-    /* The same ACL read useCanRebirth.js makes. */
+    /* Ask Auth for our own ACL, as useAccessStore does. Building a
+     * Kerberos UPN from the username guessed the realm, and a
+     * Keycloak sign-in has no UPN to build. */
     can_scout: async node => {
-      const s = useServiceClientStore()
-      const principal = `${s.username}@${s.baseUrl.toUpperCase()}`
-      const [st, acl] = await client.Auth.fetch(`v2/acl/kerberos/${principal}`)
-      if (st !== 200) return null
-      return has_permission(acl, Scout.Perm, node)
+      const [st, body] = await client.Auth.fetch('v2/whoami/acl')
+      if (st !== 200 || !Array.isArray(body?.acl)) return null
+      /* Root's access does not show in its ACL. */
+      if (body.root) return true
+      return has_permission(body.acl, Scout.Perm, node)
     },
 
     send: (addr, body) => client.CmdEsc.request_cmd({

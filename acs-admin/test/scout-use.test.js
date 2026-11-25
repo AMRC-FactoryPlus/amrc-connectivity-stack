@@ -12,8 +12,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { nextTick } from 'vue'
 import * as rx from 'rxjs'
 
-import { create_scout } from '../src/composables/useScout.js'
-import { SCOUT_METRIC, WAIT_MS } from '../src/lib/scout/constants.js'
+import { create_scout, real_deps } from '../src/composables/useScout.js'
+import { Scout, SCOUT_METRIC, WAIT_MS } from '../src/lib/scout/constants.js'
 import { build_index } from '../src/lib/scout/model.js'
 
 const NODE = '9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e'
@@ -341,5 +341,36 @@ describe('useScout while the panel is closed', () => {
     expect(w.deps.can_scout).toHaveBeenCalledWith(NODE)
     expect(w.loads).toEqual(['f1'])
     s.stop()
+  })
+})
+
+describe('can_scout with the real services', () => {
+  const NODE_UUID = '6b1d2a3c-4d5e-4f60-8a7b-9c0d1e2f3a4b'
+  const deps = answer => {
+    const fetch = vi.fn(async () => answer)
+    return { fetch, can: real_deps({ Auth: { fetch } }).can_scout }
+  }
+
+  it('reads our own ACL, which works for a Keycloak sign-in', async () => {
+    const { fetch, can } = deps([200, { principal: 'p', root: false,
+      acl: [{ permission: Scout.Perm, target: NODE_UUID }] }])
+    expect(await can(NODE_UUID)).toBe(true)
+    expect(fetch).toHaveBeenCalledWith('v2/whoami/acl')
+  })
+
+  it('says no without the permission on that node', async () => {
+    const { can } = deps([200, { root: false,
+      acl: [{ permission: Scout.Perm, target: 'another-node' }] }])
+    expect(await can(NODE_UUID)).toBe(false)
+  })
+
+  it('lets root scout', async () => {
+    const { can } = deps([200, { root: true, acl: [] }])
+    expect(await can(NODE_UUID)).toBe(true)
+  })
+
+  it('does not know when Auth does not answer', async () => {
+    const { can } = deps([503, undefined])
+    expect(await can(NODE_UUID)).toBe(null)
   })
 })

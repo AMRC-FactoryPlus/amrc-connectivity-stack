@@ -1,15 +1,18 @@
 # Factory+ User Admin service
-# Inbound HTTP auth: SPNEGO, and Bearer tokens minted from it
+# Inbound HTTP auth: SPNEGO, Keycloak JWTs, and Bearer tokens minted from them
 # Copyright 2026 University of Sheffield
 
 import  base64
 import  logging
 import  secrets
 import  time
+from    uuid     import UUID
 
 import  gssapi
 import  krb5
 from    flask    import g, jsonify, request
+
+from    .oidc    import AuthUnavailable, JwtVerifier, looks_like_jwt
 
 log = logging.getLogger(__name__)
 
@@ -18,14 +21,23 @@ DATE_FUZZ = 60
 
 class FplusHttpAuth:
     """Inbound HTTP auth for acs-user-admin. Accepts Basic and Negotiate
-    (SPNEGO) against our Kerberos keytab, and issues opaque Bearer
-    tokens from POST /token which are accepted on subsequent calls.
-    Modeled on lib/js-service-api/lib/auth.js's FplusHttpAuth, trimmed
-    to the three schemes this service needs - no Keycloak JWT."""
+    (SPNEGO) against our Kerberos keytab, Keycloak JWTs as Bearer
+    tokens, and issues opaque Bearer tokens from POST /token which are
+    accepted on subsequent calls. Modeled on lib/js-service-api/lib/
+    auth.js's FplusHttpAuth.
 
-    def __init__ (self, session_length=SESSION_LENGTH):
+    Every scheme leaves the caller's Factory+ principal UUID in g.auth.
+    A JWT carries it in the `fp_principal_uuid` claim, which the
+    acs-keycloak-spi mapper adds to every token our realm issues.
+
+    JWTs are accepted only when `oidc_discovery_url` is set (from
+    OIDC_DISCOVERY_URL). Without it the other schemes work unchanged."""
+
+    def __init__ (self, session_length=SESSION_LENGTH, oidc_discovery_url=None):
         self.session_length = session_length
         self.tokens = {}
+        self.jwt = JwtVerifier(oidc_discovery_url) \
+            if oidc_discovery_url else None
 
     def setup (self, app):
         self.fplus = app.fplus
@@ -58,6 +70,12 @@ class FplusHttpAuth:
                 client = self.auth_bearer(creds)
             else:
                 raise ValueError(f"Unknown authentication scheme {scheme}")
+        except AuthUnavailable as e:
+            # A 401 tells the client its credentials are bad, and it
+            # throws good ones away. We just couldn't check them.
+            log.warning(f"Auth unavailable: {e}")
+            return "Authentication is temporarily unavailable", 503, \
+                {"Content-Type": "text/plain"}
         except Exception as e:
             log.info(f"Auth failed: {e}")
             return self._unauthorized()
@@ -106,6 +124,10 @@ class FplusHttpAuth:
         return uuid
 
     def auth_bearer (self, token):
+        # Keycloak JWT? A structural test, no network call.
+        if self.jwt is not None and looks_like_jwt(token):
+            return self.auth_jwt(token)
+
         client = self.tokens.get(token)
         if client is None:
             raise ValueError("Bad token")
@@ -113,6 +135,19 @@ class FplusHttpAuth:
             del self.tokens[token]
             raise ValueError("Expired token")
         return client["principal"]
+
+    def auth_jwt (self, token):
+        payload = self.jwt.verify(token)
+
+        # A JWT without this claim isn't one of ours, even if the
+        # signature is good.
+        principal = payload.get("fp_principal_uuid")
+        if not isinstance(principal, str) or not principal:
+            raise ValueError("JWT missing fp_principal_uuid claim")
+        try:
+            return UUID(principal)
+        except ValueError:
+            raise ValueError(f"JWT fp_principal_uuid is not a UUID: {principal}")
 
     def token (self):
         token = secrets.token_urlsafe(66)

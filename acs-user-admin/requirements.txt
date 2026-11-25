@@ -3,6 +3,8 @@ flask-cors
 gssapi
 gunicorn
 krb5
+# Keycloak JWT validation (RS256 needs the crypto extra)
+pyjwt[crypto]
 
 # Local patched version
 /acs-lib/py-python-kadmv

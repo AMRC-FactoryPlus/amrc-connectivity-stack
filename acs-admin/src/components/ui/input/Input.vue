@@ -57,7 +57,12 @@ const props = defineProps({
     type: Boolean,
     required: false,
     default: false
-  }
+  },
+  /* Helper text under the field, shown before anyone types. */
+  info: {
+    type: String,
+    required: false,
+  },
 })
 
 const emits = defineEmits(['update:modelValue'])

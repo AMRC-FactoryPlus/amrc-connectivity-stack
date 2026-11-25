@@ -17,6 +17,7 @@
               placeholder="e.g. Machine Connection"
               v-model="v$.name.$model"
               :v="v$.name"
+              :info="nameHint"
               required
           />
         </div>
@@ -218,6 +219,7 @@ import { hostPortClash } from '@utils/hostPorts.js'
 import { useAccessStore } from '@store/useAccessStore.js'
 import { can_delete_connection, can_edit_connection, can_new_connection } from '@/lib/access/perms-edge.js'
 import { driverByUuid, driverChoices } from '@utils/driverChoices.js'
+import { connection_name_hint, connection_name_problem } from '@/lib/edge-names.js'
 
 const PAYLOAD_FORMATS = [
   "Defined by Protocol",
@@ -331,6 +333,9 @@ export default {
     selectedDriver () {
       return driverByUuid(this.dr.data, this.selectedDriverId)
     },
+    nameHint () {
+      return connection_name_hint(this.selectedDriver?.definition)
+    },
     /* Drop any rows the user started and left blank. */
     cleanHostPaths () {
       return this.hostPaths.filter(p => p.hostPath && p.mountPath)
@@ -381,16 +386,10 @@ export default {
       selectedDriverId: { required },
       name: {
         required,
-        // Only allow characters that are valid for Kubernetes resource names
-        // This will prevent issues with LocalSecret resources
-        kubernetesNameSafe: helpers.withMessage(
-          'Only letters, numbers, hyphens, and dots are allowed. Must start and end with an alphanumeric character.',
-          (value) => {
-            if (!value) return true; // Skip validation if empty (required will catch this)
-            // RFC 1123 subdomain pattern - lowercase alphanumeric, hyphens and dots
-            // Must start and end with alphanumeric
-            return /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(value.toLowerCase());
-          }
+        /* The rule depends on the driver: see lib/edge-names.js. */
+        allowedName: helpers.withMessage(
+          ({ $model }) => connection_name_problem($model, this.selectedDriver?.definition) ?? '',
+          value => !connection_name_problem(value, this.selectedDriver?.definition)
         ),
       },
       pollInt: {

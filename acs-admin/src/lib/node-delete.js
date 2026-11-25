@@ -59,14 +59,35 @@ export async function delete_node (client, cluster, node) {
   throw new Error(`The Cluster Manager could not delete this node (status ${status}).`)
 }
 
-/** The lines that say what a delete takes with it. */
-export function delete_lines (plan) {
-  const lines = []
-  const list = items => items.map(i => i.name || i.uuid).join(', ')
-  if (plan.connections.length)
-    lines.push(`${plan.connections.length === 1 ? 'Its connection' : `Its ${plan.connections.length} connections`} (${list(plan.connections)}) and their stored passwords are deleted too.`)
-  if (plan.devices.length)
-    lines.push(`${plan.devices.length === 1 ? 'Its device' : `Its ${plan.devices.length} devices`} (${list(plan.devices)}) ${plan.devices.length === 1 ? 'is' : 'are'} deleted too.`)
-  lines.push('The edge agent is removed from the cluster, with its account and any permissions granted on it. The cluster itself is not changed.')
-  return lines
+/* Names joined for a sentence: "A", "A and B", "A, B and C". Long
+ * lists name the first few and count the rest. */
+const MAX_NAMES = 3
+
+function name_list (items) {
+  const names = items.map(i => i.name || i.uuid)
+  if (names.length > MAX_NAMES) {
+    const shown = names.slice(0, MAX_NAMES)
+    return `${shown.join(', ')} and ${names.length - MAX_NAMES} more`
+  }
+  if (names.length < 2) return names.join('')
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+}
+
+function things (items, one, many) {
+  return items.length === 1 ? `${one} ${name_list(items)}` : `${items.length} ${many} ${name_list(items)}`
+}
+
+/**
+ * The subtitle of the delete dialog: the node, its cluster, and the
+ * connections and devices that go with it.
+ */
+export function delete_message (name, cluster, plan) {
+  const conns = plan?.connections ?? []
+  const devs = plan?.devices ?? []
+  const parts = []
+  if (conns.length) parts.push(`its ${things(conns, 'connection', 'connections')}`)
+  if (devs.length) parts.push(`${conns.length ? '' : 'its '}${things(devs, 'device', 'devices')}`)
+  const plural = conns.length > 1 || devs.length > 1
+  const goes_with = parts.length ? `, with ${parts.join(plural ? ', and ' : ' and ')}` : ''
+  return `${name} on ${cluster ?? 'its cluster'}${goes_with}. You cannot undo this.`
 }

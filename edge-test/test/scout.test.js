@@ -18,7 +18,7 @@ import { FANOUT, find_folder, parse_options, value_addr } from "../lib/scout.js"
 import { NoScoutTestHandler, TestHandler } from "../lib/test.js";
 
 import {
-    assert_tree, fake_out, found, items_of, ready_driver, scan,
+    assert_tree, check_value, fake_out, found, items_of, ready_driver, scan,
 } from "./harness.js";
 
 async function run (options = {}, limits = {}, extra = {}) {
@@ -340,4 +340,68 @@ test("parseAddr and poll still pack values", async () => {
     const f = handler.parseAddr("const:1000:2.5:lf");
     assert.equal(f.size, 4);
     assert.equal((await handler.poll(f)).readFloatLE(0), 2.5);
+});
+
+/* Live values */
+
+/* Send a read to the library's scout handler, wait for it, and return
+ * its answers, each checked against the schemas. */
+async function read (driver, id, addresses) {
+    await driver.scouter.handle(Buffer.from(JSON.stringify({
+        op: "read", id, version: 1, addresses,
+    })));
+    const msgs = found(driver, id);
+    for (const v of msgs.filter(m => m.type == "values").flatMap(m => m.values))
+        assert.ok(check_value(v), `${JSON.stringify(v)} ${JSON.stringify(check_value.errors)}`);
+    return msgs;
+}
+
+test("the driver answers hello with reads", async () => {
+    const driver = await ready_driver(PolledDriver, TestHandler);
+    await driver.handleMessage("fpEdge1/Conn/scout",
+        Buffer.from(JSON.stringify({ op: "hello", version: 1 })));
+    assert.equal(found(driver, "hello")[0].reads, true);
+});
+
+test("each address reads the same value every time", async () => {
+    const driver = await ready_driver(PolledDriver, TestHandler);
+    const addresses = ["sin:4000:50:bd", "saw:1000:8:lf", "const:1000:2.5:ld", "nope"];
+    const [first] = await read(driver, "r1", addresses);
+    const [again] = await read(driver, "r2", addresses);
+
+    const strip = m => m.values.map(({ ts, ...v }) => v);
+    assert.deepEqual(strip(first), [
+        { address: "sin:4000:50:bd", value: "50", type: "Double", error: null },
+        { address: "saw:1000:8:lf", value: "2", type: "Float", error: null },
+        { address: "const:1000:2.5:ld", value: "2.5", type: "Double", error: null },
+        { address: "nope", value: null, type: null, error: "Not a test address" },
+    ]);
+    assert.deepEqual(strip(again), strip(first));
+    assert.ok(Number.isInteger(first.values[0].ts));
+    assert.equal(first.values[3].ts, null);
+});
+
+test("read_fail fails every read with its code", async () => {
+    for (const code of ["CONN", "ERR"]) {
+        const driver = await ready_driver(PolledDriver, TestHandler, { read_fail: code });
+        const msgs = await read(driver, "r1", ["const:1000:1:bd"]);
+        assert.deepEqual(msgs, [{ seq: 0, type: "end",
+            error: { code, message: `read_fail is set to ${code}` } }]);
+    }
+});
+
+test("read_hang never answers, and the library gives up", async () => {
+    const driver = await ready_driver(PolledDriver, TestHandler, { read_hang: true });
+    driver.scouter.read_ms = 30;
+    const msgs = await read(driver, "r1", ["const:1000:1:bd"]);
+    assert.deepEqual(msgs, []);
+});
+
+test("NoScoutTestHandler answers reads with UNSUPPORTED", async () => {
+    const driver = await ready_driver(PolledDriver, NoScoutTestHandler);
+    await driver.handleMessage("fpEdge1/Conn/scout",
+        Buffer.from(JSON.stringify({ op: "hello", version: 1 })));
+    assert.equal(found(driver, "hello")[0].reads, false);
+    const msgs = await read(driver, "r1", ["const:1000:1:bd"]);
+    assert.equal(msgs[0].error.code, "UNSUPPORTED");
 });

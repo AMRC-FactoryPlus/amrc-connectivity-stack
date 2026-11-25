@@ -1,0 +1,29 @@
+{
+    "schema": "values",
+    "description": "The entry allows no other keys",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "updated": "2026-11-25T10:00:05.123Z",
+        "interval_ms": 5000,
+        "leases": 2,
+        "dropped": 0,
+        "values": {
+            "ns=2;s=Line1.Speed": {
+                "value": "1450.5",
+                "type": "Double",
+                "ts": 1795600000000,
+                "read": "2026-11-25T10:00:05.100Z",
+                "error": null
+            },
+            "ns=2;s=Gone": {
+                "value": null,
+                "type": null,
+                "ts": null,
+                "read": "2026-11-25T10:00:05.100Z",
+                "error": "BadNodeIdUnknown"
+            }
+        },
+        "extra": 1
+    }
+}

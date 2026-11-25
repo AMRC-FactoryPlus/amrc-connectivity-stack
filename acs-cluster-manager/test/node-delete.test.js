@@ -62,6 +62,29 @@ class FakeConfigDB {
     }
 }
 
+/* A ConfigDB behind an HTTP cache, as the service client sees it: a
+ * read answers from the first answer it got unless it asks for
+ * `cache: "no-cache"`. */
+class CachedConfigDB extends FakeConfigDB {
+    constructor () {
+        super();
+        this.cache = new Map();
+    }
+    cached (key, opts, read) {
+        if (opts?.cache == "no-cache" || !this.cache.has(key))
+            this.cache.set(key, read());
+        return this.cache.get(key);
+    }
+    async get_config (app, obj, opts) {
+        return this.cached(`get ${app}/${obj}`, opts,
+            () => super.get_config(app, obj));
+    }
+    async search (opts) {
+        return this.cached(`search ${opts.app} ${JSON.stringify(opts.query)}`,
+            opts, () => super.search(opts));
+    }
+}
+
 class FakeAuth {
     constructor () {
         this.identities = new Map();
@@ -94,8 +117,8 @@ class FakeCheckout {
 /* A node with two connections, one with a device, and a device made
  * on the node before any connection. Krbkeys removes the account when
  * the deployment goes, unless `offline`. */
-function world ({ offline = false } = {}) {
-    const cdb = new FakeConfigDB();
+function world ({ offline = false, cached = false } = {}) {
+    const cdb = cached ? new CachedConfigDB() : new FakeConfigDB();
     const auth = new FakeAuth();
 
     cdb.put(App.Registration, NODE, { class: Class.EdgeAgent });
@@ -146,6 +169,32 @@ describe("planning a node delete", () => {
         assert.equal(plan.name, "Signals");
         assert.deepEqual(plan.connections.map(c => c.name).sort(), ["Meter", "PLC"]);
         assert.deepEqual(plan.devices.map(d => d.uuid).sort(), ["dev-1", "dev-2"]);
+    });
+
+    test("sees connections and devices added since the last plan", async () => {
+        const { cdb, nd } = world({ cached: true });
+        const before = await nd.plan(CLUSTER, NODE);
+        assert.equal(before.connections.length, 2);
+
+        cdb.put(App.ConnectionConfiguration, "conn-3", { edgeAgent: NODE });
+        cdb.put(App.Info, "conn-3", { name: "Robot" });
+        cdb.put(App.DeviceInformation, "dev-3", { node: NODE, connection: "conn-3" });
+        cdb.put(App.DeviceInformation, "dev-4", { node: null, connection: "conn-3" });
+
+        const after = await nd.plan(CLUSTER, NODE);
+        assert.deepEqual(after.connections.map(c => c.name).sort(),
+            ["Meter", "PLC", "Robot"]);
+        assert.deepEqual(after.devices.map(d => d.uuid).sort(),
+            ["dev-1", "dev-2", "dev-3", "dev-4"]);
+    });
+
+    test("the fake cache does hide changes from a cached read", async () => {
+        const { cdb } = world({ cached: true });
+        const query = { app: App.ConnectionConfiguration, query: { edgeAgent: NODE } };
+        assert.equal((await cdb.search(query)).length, 2);
+        cdb.put(App.ConnectionConfiguration, "conn-3", { edgeAgent: NODE });
+        assert.equal((await cdb.search(query)).length, 2);
+        assert.equal((await cdb.search({ ...query, cache: "no-cache" })).length, 3);
     });
 
     test("refuses a node on another cluster, and something that is not a node", async () => {

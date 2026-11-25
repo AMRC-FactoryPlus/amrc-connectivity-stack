@@ -33,7 +33,7 @@ describe('state_banner', () => {
   })
 
   it('says what the spec table says', () => {
-    expect(state_banner({ state: 'offline' }).text).toBe("The Edge Agent is offline, so it can't scan.")
+    expect(state_banner({ state: 'offline' }).text).toBe('Unable to scan because the Edge Agent is offline.')
     expect(state_banner({ state: 'agent_old' }).text)
       .toBe("This Edge Agent can't scan. Upgrade it to the current ACS release.")
     expect(state_banner({ state: 'undeployed' }).text).toBe('Save and deploy this connection before scanning it.')

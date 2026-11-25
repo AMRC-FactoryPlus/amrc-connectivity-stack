@@ -75,7 +75,8 @@ export class FakeAcs {
     /* Forget everything but the agent configs, between tests. */
     reset_scans () {
         for (const k of [...this.configs.keys()])
-            if (k.startsWith(`${UUIDs.App.ScoutStatus}/`)) this.configs.delete(k);
+            if (k.startsWith(`${UUIDs.App.ScoutStatus}/`) || k.startsWith(`${UUIDs.App.ScoutValues}/`))
+                this.configs.delete(k);
         for (const [o, c] of [...this.objects])
             if (c == UUIDs.Class.ScoutResult) this.objects.delete(o);
         this.files.clear();
@@ -89,6 +90,11 @@ export class FakeAcs {
 
     status (conn: string) {
         return this.configs.get(`${UUIDs.App.ScoutStatus}/${conn}`);
+    }
+
+    /* The connection's live values entry. */
+    values (conn: string) {
+        return this.configs.get(`${UUIDs.App.ScoutValues}/${conn}`);
     }
 
     /* The states a connection's status passed through, without

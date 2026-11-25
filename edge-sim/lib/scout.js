@@ -243,3 +243,58 @@ export async function scout_cassette (opts, req, out) {
         excluded:   [],
     };
 }
+
+/* The latest sample of each channel at a position in the cassette, as
+ * [offset, value]. */
+function samples_at (cassette, position) {
+    const latest = new Map();
+    for (const [off, ch, value] of cassette.samples) {
+        if (off > position) break;
+        latest.set(ch, [off, value]);
+    }
+    return latest;
+}
+
+function no_value (address, error) {
+    return { address, value: null, type: null, ts: null, error };
+}
+
+/* The read_values method of SimHandler, for live values. A channel
+ * reads the value the cassette is playing for it, stamped as the
+ * player stamps that sample. A readable player address reads the
+ * player's state now. */
+export function read_cassette (opts, addresses) {
+    const { cassette, player } = opts;
+    const verbs = new Map(PlayerItems.map(p => [`player:${p.verb}`, p]));
+    const paths = new Map((cassette?.channels ?? []).map(ch => [ch.path, ch]));
+    const latest = cassette ? samples_at(cassette, player?.position ?? 0) : null;
+    const state = player?.state();
+    const now = Date.now();
+
+    return addresses.map(address => {
+        const p = verbs.get(address);
+        if (p) {
+            if (p.access != "r")
+                return no_value(address, "This player address can only be written");
+            const value = p.verb == "rate_actual" ? state?.rate : state?.[p.verb];
+            return { address, value: value ?? null, type: p.type, ts: now, error: null };
+        }
+
+        if (!cassette)
+            return no_value(address, "No cassette is loaded");
+        const ch = paths.get(address);
+        if (!ch)
+            return no_value(address, "Not a channel of the loaded cassette");
+        const type = plain_type(ch.type);
+        const got = latest.get(ch.id);
+        if (!got)
+            return { address, value: null, type, ts: null, error: null };
+        const [off, value] = got;
+        const start = state?.start_time;
+        return {
+            address, value, type,
+            ts: Number.isFinite(start) ? start + off : null,
+            error: null,
+        };
+    });
+}

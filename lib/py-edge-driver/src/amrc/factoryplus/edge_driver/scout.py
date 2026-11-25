@@ -5,6 +5,8 @@
 # The protocol is the "Scouting" section of acs-edge/docs/edge-split.md.
 # The library does everything in it except produce items: the hello,
 # seq, batching, the limits, pacing, the watchdog, cancel and errors.
+# It also answers the Edge Agent's reads of live values, from the
+# "Values" section of docs/architecture/edge-management/edge-scout.md.
 
 from __future__ import annotations
 
@@ -13,9 +15,11 @@ import collections
 import inspect
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from importlib import metadata
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -53,6 +57,17 @@ MAX_NOTE = 256
 MAX_EXCLUDED = 8
 MAX_PREFIXES = 4
 MAX_SCOPE_STRING = 256
+
+# Reads of live values. A handler that has not answered in READ_TIMEOUT_S
+# is abandoned, and the Edge Agent records TIMEOUT for that round. A
+# value is sent as text of at most MAX_VALUE characters, and an error as
+# at most MAX_READ_ERROR.
+READ_TIMEOUT_S = 4.0
+READ_CODES = {"UNSUPPORTED", "CONN", "AUTH", "ERR"}
+MAX_ADDRESS = 1024
+MAX_VALUE = 1024
+MAX_READ_ERROR = 256
+MAX_TYPE = 32
 
 
 class ScoutError(Exception):
@@ -96,6 +111,22 @@ class ScoutEnd:
     truncated: bool = False
     reason: Optional[str] = None
     excluded: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class ReadValue:
+    """One address's value, as a handler's read_values returns it.
+    `value` may be any Python value: the library writes it as text.
+    `type` is a Sparkplug type name or None, `ts` the source timestamp
+    in ms since the epoch (or a datetime) or None, and `error` None or a
+    short reason the value could not be read. A dict with the same keys
+    is accepted too."""
+
+    address: str
+    value: Any = None
+    type: Optional[str] = None
+    ts: Optional[Any] = None
+    error: Optional[str] = None
 
 
 def _library_name() -> str:
@@ -148,6 +179,56 @@ def clamp_window(window: Any) -> Optional[int]:
 
 def _dumps(value) -> str:
     return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+
+
+def value_text(value) -> Optional[str]:
+    """Write a value as text, as the Edge Agent shows it: a string as it
+    is, a number or a boolean as JSON writes it, bytes decoded as UTF-8,
+    and anything else as JSON. Cut at MAX_VALUE characters."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value
+    elif isinstance(value, (bytes, bytearray, memoryview)):
+        text = bytes(value).decode("utf-8", errors="replace")
+    else:
+        try:
+            text = json.dumps(value, separators=(",", ":"), ensure_ascii=False,
+                              default=str)
+        except (TypeError, ValueError):
+            text = str(value)
+    return text[:MAX_VALUE]
+
+
+def _read_ts(ts) -> Optional[int]:
+    if isinstance(ts, datetime):
+        return int(ts.timestamp() * 1000)
+    if isinstance(ts, (int, float)) and not isinstance(ts, bool) \
+            and math.isfinite(ts) and ts >= 0:
+        return int(ts)
+    return None
+
+
+def _read_entry(raw) -> Optional[Dict[str, Any]]:
+    """Turn one entry a handler returned into a values entry, or None if
+    it has no address."""
+    if isinstance(raw, ReadValue):
+        raw = {"address": raw.address, "value": raw.value, "type": raw.type,
+               "ts": raw.ts, "error": raw.error}
+    if not isinstance(raw, dict) or not isinstance(raw.get("address"), str):
+        return None
+    error = raw.get("error")
+    if error is not None:
+        error = (error if isinstance(error, str) else str(error))[:MAX_READ_ERROR] \
+            or "Error"
+    kind = raw.get("type")
+    return {
+        "address": raw["address"],
+        "value": value_text(raw.get("value")),
+        "type": kind[:MAX_TYPE] if isinstance(kind, str) and kind else None,
+        "ts": _read_ts(raw.get("ts")),
+        "error": error,
+    }
 
 
 def _clean_excluded(excluded, log) -> List[Dict[str, Any]]:
@@ -554,6 +635,7 @@ class Scouter:
         self.progress_s = 4.0
         self.grace_s = 2.0
         self.flush_s = 0.1
+        self.read_timeout_s = READ_TIMEOUT_S
 
     @property
     def supported(self) -> bool:
@@ -561,6 +643,12 @@ class Scouter:
         so a driver whose configuration failed still answers
         correctly."""
         return getattr(self.driver.HandlerClass, "scouts", False) is True
+
+    @property
+    def reads(self) -> bool:
+        """Whether the handler class reads live values, from the class
+        as for `supported`."""
+        return getattr(self.driver.HandlerClass, "reads", False) is True
 
     def publish(self, scan_id: str, body: str, session: Optional[int] = None) -> bool:
         """Publish on found/<id>. Nothing goes out unless the driver has
@@ -596,6 +684,8 @@ class Scouter:
             self.cancel_id(msg.get("id"))
         elif op == "ack":
             self.ack(msg.get("id"), msg.get("seq"))
+        elif op == "read":
+            await self.read(msg)
         else:
             self.log.warning("Unknown scout message: %r", msg)
 
@@ -605,6 +695,7 @@ class Scouter:
             "type": "hello",
             "versions": list(SCOUT_VERSIONS),
             "supported": self.supported,
+            "reads": self.reads,
             "library": LIBRARY_NAME,
         }))
 
@@ -669,6 +760,87 @@ class Scouter:
         finally:
             if self.scan is scan:
                 self.scan = None
+
+    async def read(self, msg: Dict[str, Any]) -> None:
+        """Answer a read of live values with one values message, or an
+        end with an error. A read runs as its own task, beside a running
+        scan, on the connection the handler already has."""
+        read_id = msg.get("id")
+        if not isinstance(read_id, str) or not SCAN_ID.match(read_id) \
+                or read_id == "hello":
+            self.log.warning("Ignoring a read with a bad id: %r", read_id)
+            return
+        session = self.driver.scout_session
+
+        def refuse(code, message):
+            self.log.info("Refusing read %s: %s %s", read_id, code, message)
+            self.publish(read_id, _dumps({
+                "seq": 0, "type": "end",
+                "error": {"code": code, "message": _clip(message, MAX_MESSAGE)},
+            }), session)
+
+        version = msg.get("version")
+        if version != 1 or not _is_int(version):
+            return refuse("ERR", f"Unknown read request version {version}")
+        if not self.reads:
+            return refuse("UNSUPPORTED", "This driver can't read values")
+        addresses = msg.get("addresses")
+        if not isinstance(addresses, list) or not addresses or not all(
+                isinstance(a, str) and 0 < len(a) <= MAX_ADDRESS for a in addresses):
+            return refuse("ERR", "addresses must be a list of 1 to 1024 character strings")
+        # Each address once, in the order asked.
+        addresses = list(dict.fromkeys(addresses))
+
+        handler = self.driver.handler
+        if handler is None or self.driver.status != "UP":
+            return refuse("CONN", "The driver is not connected to its device")
+        if not callable(getattr(handler, "read_values", None)):
+            return refuse("UNSUPPORTED", "The handler sets reads but has no read_values method")
+
+        async def call():
+            result = handler.read_values(list(addresses))
+            if inspect.isawaitable(result):
+                result = await result
+            return result
+
+        work = asyncio.ensure_future(call())
+        await asyncio.wait({work}, timeout=self.read_timeout_s)
+        if not work.done():
+            # Abandon it, without waiting for it to stop. The Edge Agent
+            # records TIMEOUT for this round.
+            work.cancel()
+            self.log.warning("Abandoned read %s: no answer in %ss",
+                             read_id, self.read_timeout_s)
+            return
+
+        if work.cancelled():
+            return refuse("ERR", "The handler's read was cancelled")
+        e = work.exception()
+        if isinstance(e, ScoutError):
+            return refuse(e.code if e.code in READ_CODES else "ERR", e.message)
+        if e is not None:
+            self.log.error("Read handler failed: %r", e)
+            return refuse("ERR", str(e) or type(e).__name__)
+
+        result = work.result()
+        if not isinstance(result, (list, tuple)):
+            return refuse("ERR", "The handler's read_values returned something that is not a list")
+
+        # One entry per address asked for: the first the handler gave
+        # for each, and an error for any it left out.
+        wanted = set(addresses)
+        got: Dict[str, Dict[str, Any]] = {}
+        for raw in result:
+            entry = _read_entry(raw)
+            if entry is None or entry["address"] not in wanted \
+                    or entry["address"] in got:
+                continue
+            got[entry["address"]] = entry
+        values = [got.get(a) or {"address": a, "value": None, "type": None,
+                                 "ts": None, "error": "The driver returned no value"}
+                  for a in addresses]
+        self.publish(read_id, _dumps({"seq": 0, "type": "values", "values": values}),
+                     session)
 
     def ack(self, scan_id, seq) -> None:
         if self.scan is None or self.scan.id != scan_id or not _is_int(seq) or seq < 0:

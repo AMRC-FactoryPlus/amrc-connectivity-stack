@@ -9,7 +9,8 @@
         { "$ref": "#/$defs/hello" },
         { "$ref": "#/$defs/start" },
         { "$ref": "#/$defs/cancel" },
-        { "$ref": "#/$defs/ack" }
+        { "$ref": "#/$defs/ack" },
+        { "$ref": "#/$defs/read" }
     ],
     "$defs": {
         "hello": {
@@ -47,6 +48,17 @@
             "properties": {
                 "op": { "const": "cancel" },
                 "id": { "$ref": "urn:edge-scout:common#/$defs/scan_id" }
+            }
+        },
+        "read": {
+            "description": "Read the current values of some addresses. The driver answers once on found/<id>, with values or an end with an error. It runs beside a scan, never inside it.",
+            "type": "object",
+            "required": ["op", "id", "version", "addresses"],
+            "properties": {
+                "op": { "const": "read" },
+                "id": { "$ref": "urn:edge-scout:common#/$defs/scan_id" },
+                "version": { "const": 1 },
+                "addresses": { "$ref": "urn:edge-scout:common#/$defs/read_addresses" }
             }
         },
         "ack": {

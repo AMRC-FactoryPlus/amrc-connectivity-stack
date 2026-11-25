@@ -18,7 +18,7 @@ const PACKAGE = "@amrc-factoryplus/edge-scout-schemas";
  * that uses import.meta, which the jest build of this agent can't
  * load, so the agent reads the schema files itself. */
 const NAMES = [
-    "common", "addr", "ncmd", "request", "found", "item", "status",
+    "common", "addr", "ncmd", "request", "found", "item", "status", "values",
     "snapshot-header", "snapshot-end", "snapshot-line",
 ];
 

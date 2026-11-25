@@ -22,24 +22,31 @@ Schema|What it checks
 ---|---
 `common`|Shared definitions: UUIDs, limits, excluded scopes, codes, Sparkplug type names. It checks nothing on its own
 `addr`|The `addr` packet, with its optional `features` key
-`ncmd`|The JSON value of the `Node Control/Scout` NCMD that the Admin UI sends
-`request`|The Edge Agent's `hello`, `start` and `cancel` on `fpEdge1/<Conn>/scout`
-`found`|A driver's `hello`, `accept`, `items`, `progress` and `end` on `fpEdge1/<Conn>/found/<id>`
+`ncmd`|The JSON value of the `Node Control/Scout` NCMD that the Admin UI sends: `start`, `cancel`, `watch` or `unwatch`
+`request`|The Edge Agent's `hello`, `start`, `cancel`, `ack` and `read` on `fpEdge1/<Conn>/scout`
+`found`|A driver's `hello`, `accept`, `items`, `progress`, `end` and `values` on `fpEdge1/<Conn>/found/<id>`
 `item`|One discovered item, as a driver sends it and as a snapshot stores it
 `status`|The ConfigDB entry under the Edge scout status app
+`values`|The ConfigDB entry under the Edge scout values app, which holds live values
 `snapshot-header`, `snapshot-end`|The first and last lines of a snapshot
 `snapshot-line`|Any one line of a snapshot
 `merge-fixture`|The format of the files in `fixtures/merge`
 
-`status.schema.json` is self-contained, because ConfigDB loads it on
-its own as the app's ConfigSchema. `acs-service-setup` keeps a copy in
-its `edge.yaml` dump and has a test that fails when the copy and this
-file differ.
+`status.schema.json` and `values.schema.json` are self-contained,
+because ConfigDB loads each on its own as its app's ConfigSchema.
+`acs-service-setup` keeps a copy of each in its `edge.yaml` dump and
+has a test that fails when a copy and its file differ.
 
 Some rules can't be written as JSON Schema, so each implementation
 checks them in code:
 
 * `options` is at most 8 KiB as JSON.
+* Each entry of a `values` message is checked on its own against
+  `read_value` in `common`, after the Edge Agent has cut a `value` over
+  1024 characters, and entries for addresses the read did not ask for
+  are dropped.
+* The Edge Agent writes a values entry of at most 64 KiB, dropping the
+  largest values first.
 * An `items` message is at most 256 KiB, and an item's `detail` at most
   2 KiB as JSON.
 * `seq` goes up by 1 for each message of a scan.

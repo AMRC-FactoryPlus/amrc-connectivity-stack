@@ -1,0 +1,11 @@
+{
+    "schema": "found",
+    "description": "values is a list",
+    "data": {
+        "seq": 0,
+        "type": "values",
+        "values": {
+            "a": "1"
+        }
+    }
+}

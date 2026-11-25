@@ -15,6 +15,7 @@ import { registerItem } from '../components/subscriptions/registerItem'
 import { useOptionalSubscriptionTransport } from '../components/subscriptions/SubscriptionTransport'
 import { objectPath } from '../components/main/navigation'
 import { confirmMessage, countLabel, isLevel, LEVEL_CONFIRM_DEVICES, targetsUnder } from './levelSubscribe'
+import { askLevelConfirm } from './levelConfirm'
 
 type SubscribeTarget = Pick<ObjectInstance, 'elementId' | 'displayName' | 'isComposition'>
 
@@ -144,7 +145,8 @@ async function subscribeLevel(
   if (targets.length === 0) {
     throw new Error(`${level.displayName} has no devices under it to subscribe to`)
   }
-  if (targets.length > LEVEL_CONFIRM_DEVICES && !window.confirm(confirmMessage(level.displayName, targets))) {
+  if (targets.length > LEVEL_CONFIRM_DEVICES &&
+      !await askLevelConfirm(`Subscribe to ${level.displayName}?`, confirmMessage(level.displayName, targets))) {
     return
   }
 

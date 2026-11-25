@@ -266,14 +266,17 @@ grants:
       # The agent proxies cassette fetches for the edge-sim driver
       # (drivers hold no credentials of their own).
       !u EdgeSim.App.Cassette: false
-      # Edge Scout: the agent keeps each connection's scan status.
+      # Edge Scout: the agent keeps each connection's scan status and
+      # live values.
       !u Edge.App.ScoutStatus: false
+      !u Edge.App.ScoutValues: false
     # ConfigDB checks WriteConfig against the app, not the object, so
-    # any agent can write any connection's status entry. The entry's
-    # node is written by the agent itself, so the Admin UI's check that
-    # it hosts the connection is not a security boundary.
+    # any agent can write any connection's status and values entries.
+    # An entry's node is written by the agent itself, so the Admin UI's
+    # check that it hosts the connection is not a security boundary.
     !u ConfigDB.Perm.WriteConfig:
       !u Edge.App.ScoutStatus: false
+      !u Edge.App.ScoutValues: false
     # Edge Scout: one File object per scan snapshot, which the agent
     # deletes when it drops out of a connection's current and previous.
     # The agent picks the snapshot's UUID, so ConfigDB checks

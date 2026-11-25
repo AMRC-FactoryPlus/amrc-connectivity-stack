@@ -38,16 +38,29 @@ You need all of these:
 
 1. Open the device in the Admin UI and open its origin map editor.
 2. Press **Addresses** in the editor's header. The Addresses panel
-   opens on the right, beside the schema tree and the metric pane. The
-   number on the button is how many addresses the last scan found. On a
-   narrow screen the panel opens over the metric pane. On a wide screen
-   you can drag its left edge to resize it, and the browser remembers
-   the width.
-3. If the driver has scan options, press **Options** to see them. Each
-   driver's options are in [the driver notes](edge-scout-driver-notes.md).
-   The defaults suit most devices.
+   opens on the right, beside the schema tree and the metric pane, and
+   takes the place of the device's details sidebar (name, UUID, schema,
+   connection and ISA-95) until you close it. The number on the button
+   is how many addresses the last scan found. On a narrow screen the
+   panel opens over the metric pane. On a wide screen you can drag its
+   left edge to resize it, and the browser remembers the width. When
+   the metric pane gets narrow, the buttons in its header show only
+   their icons, and hovering over one shows its name.
+3. Before the first scan, the panel says "Not scanned yet" and explains
+   what a scan does, with a **Scan** button under the text. If the
+   driver has scan options, the button beside Scan shows them. After
+   the first scan they are under **Options**. Each driver's options are
+   in [the driver notes](edge-scout-driver-notes.md). The defaults suit
+   most devices.
 4. Press **Scan**. The button's tooltip says what the driver does, such
    as "Scan the server's address space".
+
+To read a deep tree, press the pop-out button beside the panel's close
+button. The panel opens in a large view over the page, with the same
+search, filters and open folders, and the name column widens to show
+long names in full. You can't drag an address onto the schema tree from
+the large view, so select the metric first and use **Use** or Enter.
+Press the button again, or Escape, to put the panel back at the side.
 
 While the scan runs, the panel shows how many addresses it has found
 and for how long it has been running, such as "Found 3,420 addresses,
@@ -75,16 +88,24 @@ already running and can choose **Follow the running scan**.
 ## Find an address
 
 The tree shows each address's name, its address, its type, whether it
-can be read or written (`r`, `w` or `rw`), and which metric already
-uses it. The "mapped to" chip covers every device on the same
-connection, because they share one scan.
+can be read or written (`r`, `w` or `rw`), its value, and which metric
+already uses it. The "mapped to" chip covers every device on the same
+connection, because they share one scan. Under each folder, folders
+come first and then addresses, each sorted by name, so a folder keeps
+its place after you scan one branch again.
 
-- **Search** with the box above the tree. It matches names, addresses,
-  paths, descriptions and units, and shows each match with the folders
-  above it and a count of matches.
+- **Search** with the box above the tree. It matches any part of a
+  name, address, path, description, unit or id, ignoring case, so part
+  of a serial number inside a topic such as
+  `shellies/shellyhtg3-0a1b2c3d4e5f/online` finds it. Each word you
+  type must match, and separators such as `-`, `/` and `:` are
+  optional. The tree shows each match with the folders above it and a
+  count of matches. A folder that matches stays in the tree even with
+  the value filters on, so you can open it.
 - **Filter** with the buttons under the search box: **Values only**,
   **Not mapped** (not used by any device on this connection), **New
-  since last scan**, **Writable**, and a type list.
+  since last scan**, **Writable**, and **Any type**, which opens a list
+  of the types in the scan.
 - **Use the keyboard.** The arrow keys move up and down, Home and End
   jump to the first and last row, Right and Left open and close a
   folder, Space ticks a row for bulk mapping, and Enter uses the
@@ -92,6 +113,65 @@ connection, because they share one scan.
 
 Every name and description in the tree comes from the device, so the
 panel shows it as plain text.
+
+## See values
+
+The value column helps you check that an address is the one you want
+before you use it.
+
+**Value at scan.** Each scan records the value of every address as the
+driver read it during the scan, and the tree shows it in grey. Hold the
+pointer over it to see when the scan ran. The column is empty for an
+address the driver could not read, and for drivers that do not read
+values during a scan.
+
+**Live values.** Turn on **Live values** above the tree to see the
+values as they are now. The panel asks first, because the Edge Agent
+then reads the addresses on screen from the device every 5 seconds,
+which adds a small load to the device and the Edge Agent. Press
+**Turn on** to go ahead. While it is on:
+
+- The rows on screen show the value the Edge Agent last read, in normal
+  colour, in place of the grey value at scan. Hold the pointer over a
+  value to see how long ago it was read.
+- A warning sign in place of a value means the read failed, and its
+  tooltip gives the reason the device or driver gave, such as
+  `BadNodeIdUnknown` or "No message yet" for an MQTT topic that has not
+  published since the read started.
+- Scroll, open folders or search to read other addresses. The panel
+  asks for the new rows about a second after they stop moving.
+- The Edge Agent reads at most 40 addresses on a connection at once,
+  shared between everyone with live values on for it. When it leaves
+  some out, the line beside the switch says how many.
+- For an MQTT JSON field, the Edge Agent reads the whole message on the
+  topic and the panel picks the field out of it, so every field of a
+  topic counts as one address.
+
+Live values are off each time you open the panel, and they stop when
+you turn the switch off, close the panel, leave the page, switch to
+another browser tab, or the Edge Agent goes offline. Turn them on again
+when you need them.
+
+The switch is greyed out, with the reason in its tooltip, when the Edge
+Agent is offline, when you don't have the Scan device addresses
+permission, or when the driver can't read values. Only some drivers
+read values, starting with OPC UA, MQTT and the simulator, and an Edge
+Agent or driver from before this release can't either.
+
+If the Edge Agent refuses, the panel turns live values off and says
+why:
+
+Code|What the panel says|What to do
+---|---|---
+`NOREADS`|"Live values stopped because this driver can't read values."|Use the value at scan instead
+`LIMIT`|"Live values stopped because four other panels already have live values on for this connection, which is the most the Edge Agent allows. Try again when one of them turns live values off."|Wait, or ask the others to turn theirs off
+
+Other codes say "Live values stopped." followed by the text from the
+[codes table](#codes).
+
+Live values go only to the panel. They never go into Sparkplug, so the
+historians, the UNS and anyone who reads the device's data never see
+them.
 
 ## Use an address for a metric
 
@@ -234,15 +314,15 @@ driver and the last scan, and shows the first of these that applies.
 State|What the panel says|What to do
 ---|---|---
 No panel|The Addresses button is missing|The driver's definition turns scanning off. Type addresses in the metric pane
-Edge Agent offline|"The Edge Agent is offline, so it can't scan."|Bring the Edge Agent back. A previous scan stays browsable
-Edge Agent too old|"This Edge Agent can't scan. Upgrade it to the current ACS release."|Upgrade the Edge Agent
+Edge Agent offline|"Unable to scan because the Edge Agent is offline." There is no Scan button, and the scan options are under the button beside the message|Bring the Edge Agent back. A previous scan stays browsable
+Edge Agent too old|"This Edge Agent can't scan. Upgrade it to the current ACS release." There is no Scan button|Upgrade the Edge Agent
 Untrusted status|"The scan status for this connection was written by an Edge Agent that does not host it, so the panel ignores it."|Check that the device's connection is on the Edge Agent you expect. A scan from the right Edge Agent replaces the entry
 Not deployed|"Save and deploy this connection before scanning it."|Save the device and wait for the Edge Agent to load its configuration, then press Scan
-Driver cannot scan|"The REST driver can't list its addresses. Type them in the metric panel."|Type addresses in the metric pane
+Driver cannot scan|"The REST driver can't list its addresses. Type them in the metric panel." There is no Scan button|Type addresses in the metric pane
 Driver too old|"This driver was built before scouting. Update the driver image."|Deploy the driver image from this ACS release. For a driver from outside ACS, deploy an image built on the driver library from this release
 Driver not running|"The driver isn't ready." with the reason it reported, such as a configuration problem, an address it could not read, or that it cannot reach the device|Fix the driver's problem, which the device's status and the driver's log show, then press Try again
-No permission|Scan is greyed out, with "Scanning needs the Scan device addresses permission."|Ask an administrator to scan. You can still browse a scan that exists
-Never scanned|"A scan asks the driver to list the addresses its device offers, so you can pick them instead of typing them. Data collection carries on while it runs."|Press Scan
+No permission|"Scanning needs the Scan device addresses permission." There is no Scan button|Ask an administrator to scan. You can still browse a scan that exists
+Never scanned|"Not scanned yet" and "A scan asks the driver to list the addresses its device offers, so you can pick them instead of typing them. Data collection carries on while it runs.", with a Scan button under it|Press Scan
 Sending|"Sending the request to the Edge Agent."|Wait a moment
 Waiting|"The Edge Agent didn't record the request. Its log says why, and a missing grant is the usual cause."|The Edge Agent had not recorded the request 15 s after it was sent. Check its log and that service-setup has run for this release, then press Try again
 Refused|A reason from the codes table below|See the table

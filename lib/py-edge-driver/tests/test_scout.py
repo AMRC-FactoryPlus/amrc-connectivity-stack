@@ -15,10 +15,12 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from amrc.factoryplus.edge_driver import (
-    Handler, PolledDriver, ScoutEnd, ScoutError, ScoutStopped,
+    Handler, PolledDriver, ReadValue, ScoutEnd, ScoutError, ScoutStopped,
 )
 from amrc.factoryplus.edge_driver.driver import Driver
-from amrc.factoryplus.edge_driver.scout import LIBRARY_NAME, clamp_limits
+from amrc.factoryplus.edge_driver.scout import (
+    LIBRARY_NAME, READ_TIMEOUT_S, clamp_limits, value_text,
+)
 
 SCHEMAS = Path(__file__).resolve().parents[2] / "edge-scout-schemas"
 
@@ -82,7 +84,7 @@ class FakeMqtt:
         return (0, 1)
 
 
-def scout_handler(scout_fn, valid_addrs=None, scouts=True):
+def scout_handler(scout_fn, valid_addrs=None, scouts=True, read_fn=None):
     class ScoutHandler(Handler):
         validAddrs = valid_addrs
 
@@ -100,7 +102,11 @@ def scout_handler(scout_fn, valid_addrs=None, scouts=True):
         def scout(self, request, out):
             return scout_fn(request, out)
 
+        def read_values(self, addresses):
+            return read_fn(addresses)
+
     ScoutHandler.scouts = scouts
+    ScoutHandler.reads = read_fn is not None
     return ScoutHandler
 
 
@@ -279,7 +285,7 @@ async def test_hello_comes_from_the_handler_class():
     for driver, supported in ((yes, True), (no, False)):
         assert found(driver, "hello") == [{
             "seq": 0, "type": "hello", "versions": [1],
-            "supported": supported, "library": LIBRARY_NAME,
+            "supported": supported, "reads": False, "library": LIBRARY_NAME,
         }]
     assert LIBRARY_NAME.startswith("py-edge-driver ")
 
@@ -878,6 +884,11 @@ async def test_every_valid_request_fixture_is_handled():
         elif data["op"] == "start":
             assert [m["type"] for m in found(driver, data["id"])] == \
                 ["accept", "items", "end"], name
+        elif data["op"] == "read":
+            # This handler doesn't read values, so the read is refused.
+            [end] = found(driver, data["id"])
+            assert end["type"] == "end", name
+            assert end["error"]["code"] == "UNSUPPORTED", name
         else:
             assert found(driver, data["id"]) == [], name
 
@@ -890,3 +901,314 @@ async def test_invalid_request_fixtures_never_crash_the_driver():
         for t, p in driver.mqtt.published:
             if "/found/" in t:
                 VALIDATORS["found"].validate(json.loads(p))
+
+
+# Reads of live values
+
+def answer(driver, read_id):
+    """The messages published for a read. An end is checked against
+    the found schema. A values message is checked here, because the
+    schema does not list it yet."""
+    msgs = []
+    for t, p in driver.mqtt.published:
+        if t != f"fpEdge1/Conn/found/{read_id}":
+            continue
+        msg = json.loads(p)
+        if msg["type"] == "values":
+            assert msg["seq"] == 0
+            assert set(msg) == {"seq", "type", "values"}
+            for v in msg["values"]:
+                assert set(v) == {"address", "value", "type", "ts", "error"}
+                assert v["value"] is None or len(v["value"]) <= 1024
+                assert v["error"] is None or len(v["error"]) <= 256
+        else:
+            VALIDATORS["found"].validate(msg)
+        msgs.append(msg)
+    return msgs
+
+
+async def read(driver, read_id, addresses, **extra):
+    msg = {"op": "read", "id": read_id, "version": 1, "addresses": addresses, **extra}
+    await driver.scouter.handle(json.dumps(msg))
+    return answer(driver, read_id)
+
+
+def reader(fn=None, scouts=False):
+    return scout_handler(nothing, scouts=scouts,
+                         read_fn=fn or (lambda addresses: []))
+
+
+async def test_hello_says_whether_the_handler_reads():
+    driver = make_driver(reader())
+    await driver.set_addrs({"version": 1, "addrs": {}, "features": FEATURES})
+    await driver.scouter.handle('{"op":"hello","version":1}')
+    assert found(driver, "hello")[0]["reads"] is True
+    assert Handler.reads is False
+
+
+async def test_a_read_answers_once_with_values():
+    asked = []
+
+    async def fn(addresses):
+        asked.append(addresses)
+        return [
+            ReadValue("ns=2;s=Speed", 1450.5, "Double", 1795600000000),
+            {"address": "plant/temp", "value": {"t": 21.4}, "type": "String",
+             "ts": 1795599998000},
+            ReadValue("ns=2;s=Gone", error="BadNodeIdUnknown"),
+        ]
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+    msgs = await read(driver, "v1", ["ns=2;s=Speed", "plant/temp", "ns=2;s=Gone"])
+
+    assert asked == [["ns=2;s=Speed", "plant/temp", "ns=2;s=Gone"]]
+    assert msgs == [{"seq": 0, "type": "values", "values": [
+        {"address": "ns=2;s=Speed", "value": "1450.5", "type": "Double",
+         "ts": 1795600000000, "error": None},
+        {"address": "plant/temp", "value": '{"t":21.4}', "type": "String",
+         "ts": 1795599998000, "error": None},
+        {"address": "ns=2;s=Gone", "value": None, "type": None, "ts": None,
+         "error": "BadNodeIdUnknown"},
+    ]}]
+
+
+async def test_one_entry_per_address_asked_for():
+    def fn(addresses):
+        # Sync is fine too. Extra, duplicate and addressless entries go,
+        # and a missing address gets an error.
+        return [{"address": "a", "value": 1}, {"address": "a", "value": 2},
+                {"address": "zzz", "value": 3}, {"value": 4}, None]
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+    msgs = await read(driver, "v2", ["a", "b", "a"])
+    assert msgs[0]["values"] == [
+        {"address": "a", "value": "1", "type": None, "ts": None, "error": None},
+        {"address": "b", "value": None, "type": None, "ts": None,
+         "error": "The driver returned no value"},
+    ]
+
+
+def test_values_as_text():
+    assert value_text("plain text") == "plain text"
+    assert value_text("") == ""
+    assert value_text(None) is None
+    assert value_text(True) == "true"
+    assert value_text(False) == "false"
+    assert value_text(42) == "42"
+    assert value_text(-1.5) == "-1.5"
+    assert value_text(1e21) == "1e+21"
+    assert value_text([1, "a", None]) == '[1,"a",null]'
+    assert value_text({"t": 21.4, "ok": True}) == '{"t":21.4,"ok":true}'
+    assert value_text({"é": "ü"}) == '{"é":"ü"}'
+    assert value_text(b"{\"t\":1}") == '{"t":1}'
+    assert value_text({"at": object}) == '{"at":"<class \'object\'>"}'
+    assert value_text("x" * 5000) == "x" * 1024
+    assert value_text(list(range(1000))) == json.dumps(
+        list(range(1000)), separators=(",", ":"))[:1024]
+
+
+async def test_entries_are_cut_to_the_limits():
+    from datetime import datetime, timezone
+
+    def fn(addresses):
+        return [
+            {"address": "a", "value": "v" * 2000, "error": None,
+             "ts": datetime(2026, 11, 25, tzinfo=timezone.utc)},
+            {"address": "b", "error": "e" * 400, "ts": True, "type": 7},
+            {"address": "c", "error": ValueError("bad"), "ts": 1.5e12, "type": ""},
+        ]
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+    a, b, c = (await read(driver, "v3", ["a", "b", "c"]))[0]["values"]
+    assert a["value"] == "v" * 1024
+    assert a["ts"] == 1795564800000
+    assert b["error"] == "e" * 256
+    assert b["ts"] is None and b["type"] is None
+    assert c["error"] == "bad" and c["ts"] == 1500000000000 and c["type"] is None
+
+
+async def test_a_handler_that_does_not_read_answers_unsupported():
+    driver = make_driver(scout_handler(nothing))
+    await ready(driver)
+    assert await read(driver, "w1", ["a"]) == [{"seq": 0, "type": "end", "error": {
+        "code": "UNSUPPORTED", "message": "This driver can't read values"}}]
+
+    # A class that sets reads but keeps the default method.
+    class Plain(Handler):
+        reads = True
+
+        @classmethod
+        def create(cls, driver, conf):
+            return cls()
+
+        def close(self, callback=None):
+            if callback:
+                callback()
+
+        async def connect(self):
+            return "UP"
+
+    driver = make_driver(Plain)
+    await ready(driver)
+    msgs = await read(driver, "w2", ["a"])
+    assert msgs[0]["error"]["code"] == "UNSUPPORTED"
+
+
+async def test_a_driver_that_is_not_connected_answers_conn():
+    def fn(addresses):
+        raise AssertionError("must not run")
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+    driver.set_status("CONN")
+    assert await read(driver, "c1", ["a"]) == [{"seq": 0, "type": "end", "error": {
+        "code": "CONN", "message": "The driver is not connected to its device"}}]
+
+    # No working configuration at all.
+    Handler_ = reader(fn)
+    Handler_.create = classmethod(lambda cls, driver, conf: None)
+    driver = make_driver(Handler_)
+    await ready(driver)
+    assert (await read(driver, "c2", ["a"]))[0]["error"]["code"] == "CONN"
+
+
+@pytest.mark.parametrize("raise_it,code,message", [
+    (RuntimeError("boom"), "ERR", "boom"),
+    (Weird(), "ERR", "Weird"),
+    (ScoutError("CONN", "PLC unreachable"), "CONN", "PLC unreachable"),
+    (ScoutError("OPTIONS", "odd"), "ERR", "odd"),
+])
+async def test_a_raise_answers_the_read_with_an_error(raise_it, code, message):
+    async def fn(addresses):
+        raise raise_it
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+    assert await read(driver, "e1", ["a"]) == [{"seq": 0, "type": "end", "error": {
+        "code": code, "message": message}}]
+
+
+async def test_a_bad_return_answers_err():
+    driver = make_driver(reader(lambda addresses: {"a": 1}))
+    await ready(driver)
+    assert (await read(driver, "e2", ["a"]))[0]["error"] == {
+        "code": "ERR",
+        "message": "The handler's read_values returned something that is not a list"}
+
+
+async def test_a_hung_read_is_abandoned_after_4_s():
+    assert READ_TIMEOUT_S == 4.0
+    cancelled = asyncio.Event()
+
+    async def fn(addresses):
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    driver = make_driver(reader(fn))
+    driver.scouter.read_timeout_s = 0.05
+    await ready(driver)
+    start = time.monotonic()
+    assert await read(driver, "h1", ["a"]) == []
+    assert time.monotonic() - start < 1
+    await asyncio.wait_for(cancelled.wait(), 1)
+
+    # The driver still answers the next read.
+    driver.HandlerClass.read_values = lambda self, addresses: [{"address": "a", "value": 1}]
+    assert (await read(driver, "h2", ["a"]))[0]["type"] == "values"
+
+
+async def test_a_read_runs_beside_a_running_scan():
+    release = asyncio.Event()
+
+    async def scout_fn(request, out):
+        await out.add(tree(1))
+        await release.wait()
+        await out.add(tree(1, prefix="m"))
+        return {"exhaustive": True}
+
+    driver = make_driver(scout_handler(
+        scout_fn, read_fn=lambda addresses: [{"address": "n0", "value": 7}]))
+    await ready(driver)
+    scanning = asyncio.ensure_future(scan(driver, "s1"))
+    await asyncio.sleep(0.03)
+    assert driver.scouter.scan is not None
+
+    msgs = await read(driver, "r1", ["n0"])
+    assert msgs[0]["values"][0]["value"] == "7"
+    assert driver.scouter.scan is not None and not scanning.done()
+
+    release.set()
+    scan_msgs = await scanning
+    seqs_ok(scan_msgs)
+    assert [m["type"] for m in scan_msgs] == ["accept", "items", "items", "end"]
+    assert scan_msgs[-1]["exhaustive"] is True
+
+
+async def test_a_read_through_the_mqtt_callback_does_not_wait_for_a_scan():
+    release = asyncio.Event()
+
+    async def scout_fn(request, out):
+        await release.wait()
+
+    driver = make_driver(scout_handler(
+        scout_fn, read_fn=lambda addresses: [{"address": "a", "value": "x"}]))
+    await ready(driver)
+    start = json.dumps({"op": "start", "id": "s2", "version": 1, "root": None,
+                        "folder_id": None, "options": {}, "limits": LIMITS})
+    driver.handle_message(None, None, Message("fpEdge1/Conn/scout", start.encode()))
+    await asyncio.sleep(0.02)
+    msg = json.dumps({"op": "read", "id": "r2", "version": 1, "addresses": ["a"]})
+    driver.handle_message(None, None, Message("fpEdge1/Conn/scout", msg.encode()))
+    await asyncio.sleep(0.05)
+    assert answer(driver, "r2")[0]["values"][0]["value"] == "x"
+    release.set()
+    await asyncio.sleep(0.05)
+    assert found(driver, "s2")[-1]["type"] == "end"
+
+
+async def test_bad_read_requests():
+    def fn(addresses):
+        raise AssertionError("must not run")
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+
+    async def error(read_id, addresses, **extra):
+        return (await read(driver, read_id, addresses, **extra))[0]["error"]["code"]
+
+    assert await error("b1", []) == "ERR"
+    assert await error("b2", "a") == "ERR"
+    assert await error("b3", ["a", 5]) == "ERR"
+    assert await error("b4", [""]) == "ERR"
+    assert await error("b5", ["x" * 1025]) == "ERR"
+    assert await error("b6", ["a"], version=2) == "ERR"
+
+    # A read with a bad id has no topic to answer on.
+    before = len(driver.mqtt.published)
+    for read_id in ["hello", "has-dash", "", 7, "x" * 65]:
+        await read(driver, read_id, ["a"])
+    assert len(driver.mqtt.published) == before
+
+
+async def test_a_read_after_a_reconnect_is_not_published():
+    gate = asyncio.Event()
+
+    async def fn(addresses):
+        await gate.wait()
+        return [{"address": "a", "value": 1}]
+
+    driver = make_driver(reader(fn))
+    await ready(driver)
+    task = asyncio.ensure_future(read(driver, "q1", ["a"]))
+    await asyncio.sleep(0.01)
+    # A new MQTT session: the answer belongs to the old one.
+    driver.connected()
+    await ready(driver)
+    gate.set()
+    assert await task == []

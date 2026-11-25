@@ -375,7 +375,12 @@ async fn a_connection_closed_after_connack_is_retried() {
     for _ in 0..5 {
         let mut broker = FakeBroker::start().await;
         broker.drop_after_connack(1);
-        let (mut agent, _driver) = up(broker.conf(), &[("1", "a")]).await;
+        // Not `up`: the loss can be seen while `connect` is still
+        // running, and then the driver reports CONN without UP first,
+        // which `up` would take as its own.
+        let mut agent = FakeAgent::start("MQTT").await;
+        let _driver = spawn_driver::<MqttHandler>(agent.config());
+        agent.handshake(broker.conf(), &[("1", "a")]).await;
 
         agent.wait_status("CONN", secs(5)).await;
         agent.wait_status("UP", secs(5)).await;

@@ -31,6 +31,10 @@ export const TIMING: ScoutTiming = {
     retry_ms:           30,
     retry_max_ms:       100,
     drain_ms:           300,
+    lease_ms:           400,
+    read_timeout_ms:    150,
+    values_refresh_ms:  300,
+    read_min_ms:        20,
 };
 
 /* One set of validators for every test. */
@@ -64,6 +68,8 @@ export class FakeServices {
     /* Every call, in order, as text. */
     calls: string[] = []
     puts: { obj: string, entry: any }[] = []
+    /* Writes of the values entry. */
+    value_puts: { obj: string, entry: any }[] = []
     /* Knobs for failure tests. */
     upload_status = 201
     create_fails = false
@@ -90,6 +96,8 @@ export class FakeServices {
                     svc.configs.set(`${app}/${obj}`, copy);
                     if (app == UUIDs.App.ScoutStatus)
                         svc.puts.push({ obj, entry: copy });
+                    if (app == UUIDs.App.ScoutValues)
+                        svc.value_puts.push({ obj, entry: copy });
                 },
                 async create_object (klass: string, obj: string, excl: boolean) {
                     svc.calls.push(`create_object ${obj}`);
@@ -144,6 +152,14 @@ export class FakeServices {
 
     set_status (conn: string, entry: any) {
         this.configs.set(`${UUIDs.App.ScoutStatus}/${conn}`, entry);
+    }
+
+    values (conn: string) {
+        return this.configs.get(`${UUIDs.App.ScoutValues}/${conn}`);
+    }
+
+    set_values (conn: string, entry: any) {
+        this.configs.set(`${UUIDs.App.ScoutValues}/${conn}`, entry);
     }
 
     /* A stored snapshot as parsed lines. */
@@ -226,8 +242,9 @@ export interface Rig {
     broker: FakeBroker,
     mgr:    ScoutManager,
     conns:  FakeConn[],
-    /* Make the connection's driver UP, subscribed and supported. */
-    ready:  (i?: number) => Promise<void>,
+    /* Make the connection's driver UP, subscribed and supported. The
+     * hello carries `hello` as well. */
+    ready:  (i?: number, hello?: any) => Promise<void>,
     /* Send a start request and wait for the start to reach the driver. */
     start:  (req?: any, i?: number) => Promise<any>,
     request: (req: any, i?: number) => void,
@@ -265,13 +282,13 @@ export async function rig (opts: {
         connection: conn_uuid(i), ...req,
     });
 
-    const ready = async (i = 0) => {
+    const ready = async (i = 0, hello: any = {}) => {
         const c = conns[i];
         c.set_status("UP");
         broker.subscribe(c.id);
         await until(() => broker.scout(c.id).some(m => m.op == "hello"), "hello");
         c.found("hello", { seq: 0, type: "hello", versions: [1], supported: true,
-            library: "test-driver 1.0.0" });
+            library: "test-driver 1.0.0", ...hello });
         await until(() => svc.status(conn_uuid(i))?.supported === true, "hello to be recorded");
     };
 

@@ -49,6 +49,11 @@ samples turned on, each channel's sample is its value at the player's
 position. The scan takes no options. `lib/scout.js` is the reference
 scouter for JavaScript drivers.
 
+The driver also answers live value reads. A channel reads the value
+the cassette is playing for it at the player's position, stamped as the
+player stamps that sample, and a readable `player:` address reads the
+player's state. A channel with nothing played yet reads null.
+
 ## Development
 
 ```sh

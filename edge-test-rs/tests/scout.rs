@@ -75,12 +75,17 @@ const SCAN: &str = "3f9c1a2b44e04d0c9a7e5b1f2c3d4e5f";
 /// Start the driver, bring it UP with the scouting feature, and wait
 /// for its `scout` subscription.
 async fn up() -> (FakeAgent, RunningDriver) {
+    up_with(json!({})).await
+}
+
+/// As [`up`], with this connection config.
+async fn up_with(conf: Value) -> (FakeAgent, RunningDriver) {
     clock::start();
     let mut agent = FakeAgent::start("Test").await;
     agent.stats.set_acl(Some(Acl::with_scout()));
     let driver = spawn_driver::<TestHandler>(agent.config());
     agent.wait_status("READY", secs(5)).await;
-    agent.send("conf", "{}");
+    agent.send("conf", conf.to_string());
     agent.send_addrs_features(&[("a", "const:1000:1:bd")], json!({ "scout": 1 }));
     agent.wait_status("UP", secs(5)).await;
 
@@ -200,6 +205,7 @@ async fn hello_says_supported() {
                 let v: Value = serde_json::from_slice(&payload).unwrap();
                 check_found(&v);
                 assert_eq!(v["supported"], true);
+                assert_eq!(v["reads"], true);
                 assert_eq!(v["seq"], 0);
                 return;
             }
@@ -478,4 +484,88 @@ async fn large_scan() {
             .count(),
         n
     );
+}
+
+// ---------------------------------------------------------------
+// Live values
+
+/// Send a read and wait for its answer, or `None` within `within`.
+async fn read(
+    agent: &mut FakeAgent,
+    id: &str,
+    addresses: &[&str],
+    within: Duration,
+) -> Option<Value> {
+    let msg = json!({ "op": "read", "id": id, "version": 1, "addresses": addresses });
+    agent.send("scout", msg.to_string());
+    let topic = format!("fpEdge1/{}/found/{id}", agent.id);
+    let deadline = Instant::now() + within;
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match agent.next(left).await {
+            Some(FromDriver::Other { topic: t, payload }) if t == topic => {
+                let v: Value = serde_json::from_slice(&payload).unwrap();
+                assert_eq!(v["seq"], 0);
+                return Some(v);
+            }
+            Some(FromDriver::Disconnected) => panic!("the driver was disconnected"),
+            Some(_) => {}
+            None => return None,
+        }
+    }
+}
+
+/// Every address gets the same value on every read.
+#[tokio::test]
+async fn reads_give_fixed_values() {
+    let (mut agent, _driver) = up().await;
+    let addresses = ["const:1000:7:bd", "sin:1000:2:bf", "sin:0:1:ld", "nope"];
+    let first = read(&mut agent, "r1", &addresses, secs(5)).await.unwrap();
+    assert_eq!(first["type"], "values");
+    assert_eq!(
+        first["values"],
+        json!([
+            { "address": "const:1000:7:bd", "value": "7.0", "type": "Double", "ts": null, "error": null },
+            { "address": "sin:1000:2:bf", "value": "2.0", "type": "Float", "ts": null, "error": null },
+            { "address": "sin:0:1:ld", "value": "NaN", "type": "Double", "ts": null, "error": null },
+            { "address": "nope", "value": null, "type": null, "ts": null,
+              "error": "Not an address of this driver" },
+        ])
+    );
+    tokio::time::sleep(ms(300)).await;
+    let second = read(&mut agent, "r2", &addresses, secs(5)).await.unwrap();
+    assert_eq!(first["values"], second["values"]);
+}
+
+#[tokio::test]
+async fn read_fail_conn_and_err() {
+    let (mut agent, _driver) = up_with(json!({ "read_fail": "CONN" })).await;
+    let v = read(&mut agent, "r1", &["const:1000:7:bd"], secs(5))
+        .await
+        .unwrap();
+    assert_eq!(code(&v), "CONN");
+
+    let (mut agent, _driver) = up_with(json!({ "read_fail": "ERR" })).await;
+    let v = read(&mut agent, "r1", &["const:1000:7:bd"], secs(5))
+        .await
+        .unwrap();
+    assert_eq!(code(&v), "ERR");
+    // Scans are not affected.
+    let (items, end) = scan(&mut agent, None, None, json!({ "size": 5 }), limits()).await;
+    assert_eq!(code(&end), "none");
+    assert!(!items.is_empty());
+}
+
+/// A hung read gets no answer, and the library abandons it after 4 s.
+#[tokio::test]
+async fn read_hang_gets_no_answer() {
+    let (mut agent, _driver) = up_with(json!({ "read_hang": true })).await;
+    assert!(
+        read(&mut agent, "r1", &["const:1000:7:bd"], secs(5))
+            .await
+            .is_none()
+    );
+    // The driver still polls.
+    agent.send("poll", "a");
+    assert_eq!(agent.collect_data(1, secs(5)).await.len(), 1);
 }

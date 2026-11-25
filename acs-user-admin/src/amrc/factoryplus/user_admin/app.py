@@ -38,7 +38,9 @@ def create_app (env=None):
     # own explicit OPTIONS bypass (see lib/auth.py).
     CORS(app, supports_credentials=True, max_age=86400)
 
-    app.auth = FplusHttpAuth()
+    # Unset or empty: no Keycloak JWT acceptance, as in the JS services.
+    app.auth = FplusHttpAuth(
+        oidc_discovery_url=env.get("OIDC_DISCOVERY_URL") or None)
     app.auth.setup(app)
     app.register_blueprint(bp)
 

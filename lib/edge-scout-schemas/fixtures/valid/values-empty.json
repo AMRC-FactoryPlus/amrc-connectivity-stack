@@ -1,0 +1,11 @@
+{
+    "schema": "values",
+    "description": "The entry the agent writes when the last lease ends",
+    "data": {
+        "version": 1,
+        "node": "9b2e4c6d-1f3a-4b5c-8d7e-6f5a4b3c2d1e",
+        "updated": "2026-11-25T10:01:00Z",
+        "leases": 0,
+        "values": {}
+    }
+}

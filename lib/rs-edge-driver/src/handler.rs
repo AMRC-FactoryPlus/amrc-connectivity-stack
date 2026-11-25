@@ -6,6 +6,7 @@ use bytes::Bytes;
 
 use crate::driver::DriverHandle;
 use crate::error::{ConnectError, HandlerError, WriteError};
+use crate::read::Reader;
 use crate::scout::Scouter;
 use crate::write::WriteValue;
 
@@ -130,6 +131,15 @@ pub trait Handler: Send + Sized {
     /// The driver takes part in scouting only when the Edge Agent
     /// advertises it, so this is safe with any Edge Agent.
     const SCOUTS: bool = false;
+
+    /// Whether this handler can read the current values of addresses
+    /// through a [`Reader`], for the Edge Scout panel's live values.
+    ///
+    /// The driver sends this as `reads` in its scouting hello. With
+    /// `false`, the default, every read ends with `UNSUPPORTED` and
+    /// [`reader`](Handler::reader) is never called. It is independent
+    /// of [`SCOUTS`](Handler::SCOUTS).
+    const READS: bool = false;
 
     /// Construct a new handler from the configuration object sent
     /// by the edge agent.
@@ -293,6 +303,22 @@ pub trait Handler: Send + Sized {
     /// Return `None` when the handler has no connection to scan with.
     /// A scan then ends with `CONN`. The default returns `None`.
     fn scouter(&self) -> Option<Arc<dyn Scouter>> {
+        None
+    }
+
+    /// **Live values, optional**: hand out a [`Reader`] that reads the
+    /// current values of addresses. Only called when
+    /// [`READS`](Handler::READS) is `true`.
+    ///
+    /// The driver asks for it after each successful
+    /// [`connect`](Handler::connect), as it does for
+    /// [`scouter`](Handler::scouter), and runs reads without taking the
+    /// handler's lock, beside a running scan. It must use the
+    /// connection the handler already has.
+    ///
+    /// Return `None` when the handler has no connection to read with.
+    /// A read then ends with `CONN`. The default returns `None`.
+    fn reader(&self) -> Option<Arc<dyn Reader>> {
         None
     }
 }

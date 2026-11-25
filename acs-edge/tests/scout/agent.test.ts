@@ -54,7 +54,8 @@ class FakeDriver {
     scout_msgs: any[] = []
     subscribed_scout = 0
 
-    constructor (public port: number, public opts: { scouts: boolean, items?: any[] }) {}
+    constructor (public port: number,
+        public opts: { scouts: boolean, items?: any[], reads?: boolean }) {}
 
     async connect () {
         const c = this.client = mqtt.connect(`mqtt://localhost:${this.port}`, {
@@ -96,7 +97,10 @@ class FakeDriver {
             this.client.publish(`fpEdge1/${ID}/found/${id}`, JSON.stringify(body));
         if (m.op == "hello")
             return send("hello", { seq: 0, type: "hello", versions: [1], supported: true,
-                library: "fake-driver 1.0.0" });
+                reads: this.opts.reads ?? false, library: "fake-driver 1.0.0" });
+        if (m.op == "read")
+            return send(m.id, { seq: 0, type: "values", values: m.addresses.map((a: string) =>
+                ({ address: a, value: `value of ${a}`, type: "String", ts: 1795600000000, error: null })) });
         if (m.op == "start" && this.opts.items) {
             send(m.id, { seq: 0, type: "accept" });
             send(m.id, { seq: 1, type: "items", items: this.opts.items });
@@ -229,6 +233,34 @@ describe("Edge Scout in the agent", () => {
         await until(() => drv!.scout_msgs.some(m => m.op == "cancel"), "cancel at the driver");
         await sleep(20);
         expect([...svc.objects]).toEqual([]);
+    }, 20_000);
+
+    it("reads live values over MQTT while a scan runs, and clears them on unwatch", async () => {
+        await start_agent();
+        drv = new FakeDriver(port, { scouts: true, reads: true });
+        await drv.connect();
+        await until(() => status()?.reads === true, "hello");
+
+        /* This driver never ends a scan by itself. */
+        ncmd({ op: "start", request: "00000000-0000-4000-9000-000000000004" });
+        await until(() => status()?.state == "running", "running");
+
+        const lease = "00000000-0000-4000-a000-000000000001";
+        ncmd({ op: "watch", request: "00000000-0000-4000-9000-000000000005",
+            lease, addresses: ["a", "b"] });
+        await until(() => svc.values(CONN)?.values?.b, "values");
+        expect(svc.values(CONN)).toMatchObject({ node: NODE, leases: 1, interval_ms: 5000,
+            values: { a: { value: "value of a", type: "String", ts: 1795600000000, error: null } } });
+        const read = drv.scout_msgs.find(m => m.op == "read");
+        expect(read).toMatchObject({ version: 1, addresses: ["a", "b"] });
+        expect(status()).toMatchObject({ state: "running" });
+        /* An accepted watch is not recorded in last_request. */
+        expect(status().last_request.request).toBe("00000000-0000-4000-9000-000000000004");
+
+        ncmd({ op: "unwatch", request: "00000000-0000-4000-9000-000000000006", lease });
+        await until(() => svc.values(CONN).leases == 0, "empty entry");
+        expect(svc.values(CONN).values).toEqual({});
+        expect(status().state).toBe("running");
     }, 20_000);
 
     it("sends a new hello when the driver reconnects, and subscribes once per session", async () => {

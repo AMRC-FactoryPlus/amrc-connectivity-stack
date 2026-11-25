@@ -35,6 +35,7 @@ import { createPinia } from 'pinia'
 import piniaPersist from 'pinia-plugin-persist'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import mitt from 'mitt'
+import { close_dialogs } from '@composables/useDialog.js'
 
 import App from './App.vue'
 
@@ -397,6 +398,15 @@ router.beforeEach(async (to, from, next) => {
     next({ path: "/login" })
     return
   }
+})
+
+// Confirmation dialogs live outside the router view, so they would
+// stay open on the next page. Close them once a move to another page
+// has happened. A change to the query string alone (a filter, a tab)
+// keeps them, and so does a move a guard stopped.
+router.afterEach((to, from, failure) => {
+  if (failure || to.path === from.path) return
+  close_dialogs()
 })
 
 async function oidc_guard (to, next) {

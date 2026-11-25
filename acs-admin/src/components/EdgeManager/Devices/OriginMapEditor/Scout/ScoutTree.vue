@@ -6,6 +6,11 @@
   - window a matter of arithmetic on the scroll position.
   -
   - Every string comes from the device, so it is rendered as text only.
+  -
+  - The value column shows each value as it was at the scan, in grey.
+  - While live values are on, the value the Edge Agent last read replaces
+  - it, and the tree reports which value rows are on screen so the panel
+  - knows what to ask for.
   -->
 
 <template>
@@ -19,7 +24,7 @@
       @scroll="on_scroll"
       @keydown="on_key"
   >
-    <div :style="{ height: `${rows.length * ROW_HEIGHT}px`, minWidth: '760px' }" class="relative">
+    <div :style="{ height: `${rows.length * ROW_HEIGHT}px`, minWidth: `${760 + nameWidth - NAME_MIN + addressWidth - ADDRESS_MIN}px` }" class="relative">
       <div
           v-for="row in window"
           :key="row.id"
@@ -45,8 +50,11 @@
         />
         <span v-else-if="selectable" class="ml-1 w-3.5 shrink-0"></span>
 
-        <!-- Name, indented by depth -->
-        <div class="flex items-center gap-1 min-w-0 w-56 shrink-0" :style="{ paddingLeft: `${row.depth * 14}px` }">
+        <!-- Name, indented by depth. The column widens with the tree, so a
+           - wide or popped-out panel shows deep names in full, and every
+           - row keeps the same width so the columns line up. -->
+        <div class="flex items-center gap-1 min-w-0 shrink-0"
+            :style="{ width: `${nameWidth}px`, paddingLeft: `${row.depth * 14}px` }">
           <button v-if="row.has_children"
               type="button"
               tabindex="-1"
@@ -66,14 +74,25 @@
               aria-label="Not fully listed"></i>
         </div>
 
+        <!-- Value: at scan in grey, live in black. Next to the name so it
+           - stays in view in the docked panel. -->
+        <span class="w-24 shrink-0 flex items-center gap-1 min-w-0 font-mono"
+            :class="cells.get(row.id).live ? 'text-gray-900' : 'text-gray-400'"
+            :title="cells.get(row.id).title"
+            data-test="value">
+          <i v-if="cells.get(row.id).error"
+              class="fa-solid fa-triangle-exclamation shrink-0 text-[10px] text-amber-600"
+              role="img" :aria-label="cells.get(row.id).error"></i>
+          <span class="truncate">{{ cells.get(row.id).text }}</span>
+        </span>
+
         <!-- Address -->
-        <span class="font-mono truncate w-56 shrink-0 text-gray-600" :title="address_text(row.id)">
+        <span class="font-mono truncate shrink-0 text-gray-600" :style="{ width: `${addressWidth}px` }" :title="address_text(row.id)">
           {{ address_text(row.id) }}
         </span>
 
         <span class="w-16 shrink-0 text-gray-500 truncate">{{ item(row.id).type ?? '' }}</span>
         <span class="w-6 shrink-0 text-gray-500">{{ item(row.id).access ?? '' }}</span>
-        <span class="w-20 shrink-0 text-gray-400 font-mono truncate" :title="item(row.id).sample ?? ''">{{ item(row.id).sample ?? '' }}</span>
 
         <!-- Mapped-to chip -->
         <span v-if="mapped(row.id).length"
@@ -117,10 +136,31 @@
 
 <script>
 import { ROW_HEIGHT } from '@/lib/scout/constants.js'
-import { item_key } from '@/lib/scout/model.js'
+import { item_key, when_text } from '@/lib/scout/model.js'
+import { live_value } from '@/lib/scout/live.js'
+import { read_age_text } from '@/lib/scout/text.js'
 
 /* Rows rendered beyond the visible area, so scrolling stays smooth. */
 const OVERSCAN = 10
+
+/* The name and address columns' width ranges. Width beyond what every
+ * column needs at its minimum is shared between them, 40% to the name
+ * and 60% to the address, because addresses are the longer of the two
+ * (an OPC UA string node id carries the whole path). Each stops at its
+ * maximum, so a popped-out panel shows both in full. */
+const NAME_MIN = 224
+const NAME_MAX = 480
+const ADDRESS_MIN = 224
+const ADDRESS_MAX = 720
+const OTHER_COLUMNS = 352
+
+/** The name and address columns' widths for a tree this wide. */
+export function column_widths (tree_width) {
+  const spare = Math.max(0, (tree_width || 0) - NAME_MIN - ADDRESS_MIN - OTHER_COLUMNS)
+  const name = Math.min(NAME_MAX, NAME_MIN + spare * 0.4)
+  const address = Math.min(ADDRESS_MAX, ADDRESS_MIN + spare - (name - NAME_MIN))
+  return { name: Math.round(name), address: Math.round(address) }
+}
 
 export default {
   name: 'ScoutTree',
@@ -144,12 +184,18 @@ export default {
     useTitle:   { type: String, default: 'Use this address for the selected metric' },
     label:      { type: String, default: 'Discovered addresses' },
     emptyText:  { type: String, default: 'Nothing to show.' },
+    /* When the scan finished, for the value at scan's tooltip. */
+    scanTime:   { type: String, default: null },
+    /* The trusted live values entry while live values are on, or null. */
+    liveValues: { type: Object, default: null },
+    /* The time now, in ms, for the age of a live value. */
+    now:        { type: Number, default: 0 },
   },
 
-  emits: ['toggle', 'check', 'use', 'branch', 'focus', 'select'],
+  emits: ['toggle', 'check', 'use', 'branch', 'focus', 'select', 'visible'],
 
   data () {
-    return { ROW_HEIGHT, top: 0, height: 400 }
+    return { ROW_HEIGHT, NAME_MIN, ADDRESS_MIN, top: 0, height: 400, nameWidth: NAME_MIN, addressWidth: ADDRESS_MIN }
   },
 
   computed: {
@@ -163,6 +209,33 @@ export default {
       const out = []
       for (let i = first; i < last; i++) out.push({ ...this.rows[i], index: i })
       return out
+    },
+
+    /* The value column of each rendered row. */
+    cells () {
+      return new Map(this.window.map(r => [r.id, this.value_cell(r.id)]))
+    },
+
+    /* The value items whose rows are on screen, without the overscan. */
+    on_screen () {
+      const first = Math.max(0, Math.floor(this.top / ROW_HEIGHT))
+      const last = Math.min(this.rows.length, Math.ceil((this.top + this.height) / ROW_HEIGHT))
+      const out = []
+      for (let i = first; i < last; i++) {
+        const it = this.item(this.rows[i].id)
+        if (it?.kind === 'value') out.push(it)
+      }
+      return out
+    },
+  },
+
+  watch: {
+    on_screen: {
+      handler (items, prev) {
+        if (prev && items.length === prev.length && items.every((it, i) => it === prev[i])) return
+        this.$emit('visible', items)
+      },
+      immediate: true,
     },
   },
 
@@ -179,6 +252,9 @@ export default {
   methods: {
     measure () {
       this.height = this.$refs.scroller?.clientHeight || 400
+      const widths = column_widths(this.$refs.scroller?.clientWidth)
+      this.nameWidth = widths.name
+      this.addressWidth = widths.address
     },
 
     on_scroll () {
@@ -225,6 +301,40 @@ export default {
       const first = list[0]
       const name = first.path.at(-1)
       return list.length > 1 ? `${name} +${list.length - 1}` : name
+    },
+
+    /* The value column: the live value when there is one, else the
+     * value at scan. */
+    value_cell (id) {
+      const it = this.item(id)
+      const lv = this.liveValues && it?.kind === 'value' ? live_value(it, this.liveValues) : null
+      const sample = it?.sample ?? null
+      const at_scan = this.scanTime ? `Value at scan, ${when_text(this.scanTime)}` : 'Value at scan'
+      if (lv?.error) {
+        const age = read_age_text(lv.read, this.now)
+        return {
+          live: false,
+          error: lv.error,
+          text: sample ?? '',
+          title: [`Live value: ${lv.error}`, age, sample != null ? `${at_scan}: ${sample}` : null]
+            .filter(Boolean).join('\n'),
+        }
+      }
+      if (lv) {
+        const age = read_age_text(lv.read, this.now)
+        return {
+          live: true,
+          error: null,
+          text: lv.text ?? '',
+          title: [lv.text ?? '', [age, lv.type].filter(Boolean).join(', ')].filter(Boolean).join('\n'),
+        }
+      }
+      return {
+        live: false,
+        error: null,
+        text: sample ?? '',
+        title: sample != null ? `${sample}\n${at_scan}` : '',
+      }
     },
 
     change (id) {

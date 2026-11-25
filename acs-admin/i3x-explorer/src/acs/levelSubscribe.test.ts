@@ -13,6 +13,20 @@ import { useSubscriptionsStore } from '../stores/subscriptions'
 import { useExplorerStore } from '../stores/explorer'
 import { resetSubscribeState, subscribeElement, useSubscribeStatus } from './useSubscribe'
 import { isLevel, LEVEL_CONFIRM_DEVICES, targetsUnder } from './levelSubscribe'
+import { useLevelConfirm } from './levelConfirm'
+
+/** Answers the level dialog as soon as it asks; the spy records what it asked. */
+function answerLevelConfirm(yes: boolean) {
+  const asked = vi.fn()
+  const stop = useLevelConfirm.subscribe(({ request }) => {
+    if (!request) return
+    asked(request.title, request.message)
+    request.answer(yes)
+  })
+  stopAnswering.push(stop)
+  return asked
+}
+const stopAnswering: Array<() => void> = []
 
 function obj(elementId: string, parentId: string | null, isComposition: boolean, typeId = 't'): ObjectInstance {
   return { elementId, displayName: elementId, typeId, parentId, isComposition, namespaceUri: 'urn:x' }
@@ -108,6 +122,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  stopAnswering.splice(0).forEach(stop => stop())
+  useLevelConfirm.setState({ request: null })
   destroyClient()
   vi.restoreAllMocks()
 })
@@ -145,14 +161,31 @@ describe('subscribeElement on an ISA-95 level', () => {
     for (let i = 0; i <= LEVEL_CONFIRM_DEVICES; i++) many.push(obj(`dev-${i}`, 'big', true))
     loadTree(many)
     const server = fakeServer()
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const asked = answerLevelConfirm(false)
 
     await expect(subscribeElement({ elementId: 'big', displayName: 'Big', isComposition: false }, null, server.startStream))
       .resolves.toBe(true)
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining(`${LEVEL_CONFIRM_DEVICES + 1} devices`))
+    expect(asked).toHaveBeenCalledWith('Subscribe to Big?', expect.stringContaining(`${LEVEL_CONFIRM_DEVICES + 1} devices`))
     expect(server.register).not.toHaveBeenCalled()
     expect(useSubscriptionsStore.getState().subscriptions.size).toBe(0)
+  })
+
+  it('asks in its own dialog, not window.confirm, and subscribes to all when told to', async () => {
+    const many = [obj('big', null, false)]
+    for (let i = 0; i <= LEVEL_CONFIRM_DEVICES; i++) many.push(obj(`dev-${i}`, 'big', true))
+    loadTree(many)
+    const server = fakeServer()
+    // A browser that blocks native dialogs answers window.confirm with false at once.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    answerLevelConfirm(true)
+
+    await expect(subscribeElement({ elementId: 'big', displayName: 'Big', isComposition: false }, null, server.startStream))
+      .resolves.toBe(true)
+
+    expect(confirm).not.toHaveBeenCalled()
+    expect(useSubscriptionsStore.getState().subscriptions.get('sub-1')?.monitoredItems).toHaveLength(LEVEL_CONFIRM_DEVICES + 1)
+    expect(useLevelConfirm.getState().request).toBeNull()
   })
 
   it('does not ask at the limit', async () => {
@@ -160,11 +193,11 @@ describe('subscribeElement on an ISA-95 level', () => {
     for (let i = 0; i < LEVEL_CONFIRM_DEVICES; i++) some.push(obj(`dev-${i}`, 'mid', true))
     loadTree(some)
     const server = fakeServer()
-    const confirm = vi.spyOn(window, 'confirm')
+    const asked = answerLevelConfirm(true)
 
     await subscribeElement({ elementId: 'mid', displayName: 'Mid', isComposition: false }, null, server.startStream)
 
-    expect(confirm).not.toHaveBeenCalled()
+    expect(asked).not.toHaveBeenCalled()
     expect(useSubscriptionsStore.getState().subscriptions.get('sub-1')?.monitoredItems).toHaveLength(LEVEL_CONFIRM_DEVICES)
   })
 

@@ -1,0 +1,13 @@
+{
+    "schema": "found",
+    "description": "reads is a boolean",
+    "data": {
+        "seq": 0,
+        "type": "hello",
+        "versions": [
+            1
+        ],
+        "supported": true,
+        "reads": "yes"
+    }
+}

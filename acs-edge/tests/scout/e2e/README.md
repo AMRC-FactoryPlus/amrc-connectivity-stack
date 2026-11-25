@@ -19,6 +19,7 @@
 - Three MQTT scans with edge-mqtt: the change list after topics change, and the oldest snapshot deleted from Files before ConfigDB.
 - `BUSY` for a second scan, cancel, and `NOTRUNNING`, with edge-test.
 - `UNSUPPORTED` from edge-test with `SCOUT_UNSUPPORTED=1`, and `LIBRARY` from a driver that never subscribes to `scout`.
+- Live values from edge-test while a scan runs on the same connection: watch, the values entry, no write while values stay the same, unwatch and the empty entry, and `NOREADS` from edge-test with `SCOUT_UNSUPPORTED=1`.
 - `INTERRUPTED` after the agent stops (SIGTERM) or is killed (SIGKILL) during a scan.
 - Each of edge-test, edge-test-rs, edge-opcua and edge-mqtt against an older agent, this release and a rollback, never disconnected and never subscribing to `scout` where the ACL refuses it.
 - The agent's size cap (`SCOUT_MAX_BYTES`) and the item cap.

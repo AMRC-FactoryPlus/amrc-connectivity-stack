@@ -1,0 +1,12 @@
+{
+    "schema": "ncmd",
+    "description": "A watch needs at least one address",
+    "data": {
+        "version": 1,
+        "op": "watch",
+        "request": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "connection": "5d0c7f3e-8a21-4c55-9a7e-0f6b1d2c3e4a",
+        "lease": "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+        "addresses": []
+    }
+}

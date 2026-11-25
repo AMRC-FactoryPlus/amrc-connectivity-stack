@@ -901,3 +901,138 @@ fn gzip(data: &[u8]) -> usize {
     assert!(out.status.success());
     out.stdout.len()
 }
+
+// ---------------------------------------------------------------
+// Live values
+
+/// Send a `read` and wait for its one answer, skipping other messages.
+async fn read(agent: &mut FakeAgent, id: &str, addresses: &[&str], within: Duration) -> Value {
+    agent.send(
+        "scout",
+        json!({ "op": "read", "id": id, "version": 1, "addresses": addresses }).to_string(),
+    );
+    let topic = format!("fpEdge1/OPCUA/found/{id}");
+    let deadline = tokio::time::Instant::now() + within;
+    loop {
+        let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match agent.next(left).await {
+            Some(FromDriver::Other { topic: t, payload }) if t == topic => {
+                let msg: Value = serde_json::from_slice(&payload).unwrap();
+                assert_eq!(msg["seq"], 0, "{msg}");
+                return msg;
+            }
+            Some(_) => {}
+            None => panic!("read {id} got no answer within {within:?}"),
+        }
+    }
+}
+
+fn entry<'a>(msg: &'a Value, address: &str) -> &'a Value {
+    msg["values"]
+        .as_array()
+        .unwrap_or_else(|| panic!("not a values message: {msg}"))
+        .iter()
+        .find(|v| v["address"] == address)
+        .unwrap_or_else(|| panic!("no entry for {address} in {msg}"))
+}
+
+/// One read of real nodes, array elements in both forms, a node the
+/// server does not have and an address that is not a node id.
+#[tokio::test(flavor = "multi_thread")]
+async fn live_values_read_the_server() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start_with(&[SCOUT]).await;
+    let (mut agent, _driver) = scout_driver(anon(&server), &[node("Counter")]).await;
+
+    agent.send("scout", json!({ "op": "hello", "version": 1 }).to_string());
+    let hello = loop {
+        match agent.next(secs(5)).await {
+            Some(FromDriver::Other { topic, payload }) if topic == "fpEdge1/OPCUA/found/hello" => {
+                break serde_json::from_slice::<Value>(&payload).unwrap();
+            }
+            Some(_) => {}
+            None => panic!("no hello answer"),
+        }
+    };
+    check(&FOUND, "found", &hello);
+    assert_eq!(hello["reads"], true);
+
+    let double = node("Double");
+    let string = node("String");
+    let boolean = node("Boolean");
+    let addresses = [
+        double.as_str(),
+        string.as_str(),
+        boolean.as_str(),
+        "ns=1;s=T/Temps[3]",
+        "ns=1;s=T/Grid[1,2]",
+        "ns=1;s=T/Elem[3]",
+        "ns=1;s=Nope",
+        "not a node",
+    ];
+    let msg = read(&mut agent, "live1", &addresses, secs(5)).await;
+    assert_eq!(msg["type"], "values");
+    assert_eq!(msg["values"].as_array().unwrap().len(), addresses.len());
+    let d = entry(&msg, &double);
+    assert_eq!(d["value"], "2.2");
+    assert_eq!(d["type"], "Double");
+    assert_eq!(d["error"], Value::Null);
+    assert!(d["ts"].is_i64(), "a source timestamp: {d}");
+    assert_eq!(entry(&msg, &string)["value"], "hello");
+    assert_eq!(entry(&msg, &string)["type"], "String");
+    assert_eq!(entry(&msg, &boolean)["value"], "true");
+    assert_eq!(entry(&msg, "ns=1;s=T/Temps[3]")["value"], "13.5");
+    assert_eq!(entry(&msg, "ns=1;s=T/Grid[1,2]")["value"], "6");
+    assert_eq!(entry(&msg, "ns=1;s=T/Elem[3]")["error"], Value::Null);
+    assert_eq!(entry(&msg, "ns=1;s=Nope")["error"], "BadNodeIdUnknown");
+    assert_eq!(entry(&msg, "ns=1;s=Nope")["value"], Value::Null);
+    assert_eq!(entry(&msg, "not a node")["error"], "Not an OPC UA node id");
+
+    // The data subscription carries on: T/Counter counts.
+    assert!(!agent.collect_data(10, secs(5)).await.is_empty());
+}
+
+/// A read runs beside a running scan, on the same session, and is
+/// answered while the scan goes on.
+#[tokio::test(flavor = "multi_thread")]
+async fn live_values_during_a_scan() {
+    if !enabled() {
+        return;
+    }
+    let server = Server::start_with(&[
+        SCOUT,
+        ("MAX_REFS_PER_NODE", "10"),
+        ("BROWSE_DELAY_MS", "50"),
+    ])
+    .await;
+    let (mut agent, _driver) = scout_driver(anon(&server), &[node("Double")]).await;
+    // Scout/Big needs 250 BrowseNexts of 10 references.
+    start(
+        &agent,
+        "slow",
+        Some("ns=1;s=Scout/Big"),
+        json!({}),
+        limits(50000, 8),
+    );
+    tokio::time::sleep(ms(500)).await;
+    let double = node("Double");
+    for id in ["during1", "during2"] {
+        let asked = Instant::now();
+        let msg = read(&mut agent, id, &[double.as_str()], secs(4)).await;
+        assert_eq!(entry(&msg, &double)["value"], "2.2");
+        eprintln!("a read during a scan took {:?}", asked.elapsed());
+    }
+    agent.send(
+        "scout",
+        json!({ "op": "cancel", "id": "slow", "version": 1 }).to_string(),
+    );
+    let s = collect(&mut agent, "slow", None, secs(5)).await;
+    assert_eq!(
+        s.error(),
+        Some("CANCELLED"),
+        "the scan was still running: {}",
+        s.end
+    );
+}

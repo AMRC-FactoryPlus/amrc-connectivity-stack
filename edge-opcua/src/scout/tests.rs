@@ -452,6 +452,12 @@ impl Fake {
 /// A one-dimensional array value cut to an index range `a:b`, as a
 /// server does. Other values and ranges are left as they are.
 fn in_range(v: &Variant, range: &NumericRange) -> Option<Variant> {
+    // One element, as a live read of `node[i]` asks for: an array of
+    // one.
+    if let (Variant::Array(a), NumericRange::Index(i)) = (v, range) {
+        let e = a.values.get(*i as usize)?.clone();
+        return Some(Variant::from((a.value_type, vec![e])));
+    }
     let (Variant::Array(a), NumericRange::Range(lo, hi)) = (v, range) else {
         return Some(v.clone());
     };
@@ -1671,4 +1677,192 @@ async fn an_aborted_scan_still_releases_its_points() {
     assert!(scan.await.unwrap_err().is_cancelled());
     tokio::time::sleep(Duration::from_millis(1000)).await;
     assert_eq!(fake.open_points(), 0);
+}
+
+// ---------------------------------------------------------------
+// Live values (src/read.rs), against the same fake server
+
+mod live {
+    use super::*;
+    use crate::read::{NOT_A_NODE, OpcuaReader, entry};
+    use opcua::types::DateTime;
+    use rs_edge_driver::{ReadData, ReadValue, Reader};
+
+    /// The plant with values on some of its variables, and an array.
+    fn valued() -> Fake {
+        plant().with(|f| {
+            let arr = s(1, "Arr");
+            f.add(
+                arr,
+                FakeNode {
+                    rank: 1,
+                    value: Some(Variant::from(vec![10i32, 20, 30])),
+                    ..FakeNode::var("Arr", DataTypeId::Int32)
+                },
+            );
+            let mut st = f.state.lock().unwrap();
+            let mut set = |id: &str, v: Variant| {
+                st.nodes.get_mut(id).unwrap().1.value = Some(v);
+            };
+            set("ns=1;s=Line1/Speed", Variant::Double(1450.5));
+            set("ns=1;s=Line2/Speed", Variant::Double(f64::NAN));
+            set("ns=1;s=Line1/Count", Variant::String("ten".into()));
+            set("ns=1;s=Shared", Variant::Int32(-3));
+        })
+    }
+
+    fn by_address(values: &[ReadValue], a: &str) -> ReadValue {
+        values
+            .iter()
+            .find(|v| v.address == a)
+            .unwrap_or_else(|| panic!("no entry for {a}"))
+            .clone()
+    }
+
+    fn reads(fake: &Fake) -> Vec<String> {
+        fake.log()
+            .into_iter()
+            .filter(|l| l.starts_with("read"))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn one_read_for_every_address() {
+        let fake = valued();
+        let reader = OpcuaReader::with_service(Arc::new(fake.clone()));
+        let addresses: Vec<String> = [
+            "ns=1;s=Line1/Speed",
+            "ns=1;s=Line2/Speed",
+            "ns=1;s=Line1/Count",
+            "ns=1;s=Shared",
+            "ns=1;s=Gone",
+            "not a node",
+        ]
+        .map(String::from)
+        .to_vec();
+        let values = reader.read(addresses.clone()).await;
+        assert_eq!(values.len(), 6);
+
+        let speed = by_address(&values, "ns=1;s=Line1/Speed");
+        assert_eq!(speed.value, Some(ReadData::Float(1450.5)));
+        assert_eq!(speed.r#type, Some(ScoutType::Double));
+        assert_eq!(speed.error, None);
+        let nan = by_address(&values, "ns=1;s=Line2/Speed");
+        assert!(matches!(nan.value, Some(ReadData::Float(f)) if f.is_nan()));
+        let count = by_address(&values, "ns=1;s=Line1/Count");
+        assert_eq!(count.value, Some(ReadData::Json(json!("ten"))));
+        assert_eq!(count.r#type, Some(ScoutType::String));
+        let shared = by_address(&values, "ns=1;s=Shared");
+        assert_eq!(shared.value, Some(ReadData::Json(json!(-3))));
+        assert_eq!(shared.r#type, Some(ScoutType::Int32));
+        let gone = by_address(&values, "ns=1;s=Gone");
+        assert_eq!(gone.value, None);
+        assert_eq!(gone.error.as_deref(), Some("BadNodeIdUnknown"));
+        assert_eq!(
+            by_address(&values, "not a node").error.as_deref(),
+            Some(NOT_A_NODE)
+        );
+
+        // OperationLimits once, then one Read of the five nodes.
+        assert_eq!(reads(&fake), vec!["read 1", "read 5"]);
+        reader.read(addresses).await;
+        assert_eq!(reads(&fake), vec!["read 1", "read 5", "read 5"]);
+    }
+
+    /// Batches keep to MaxNodesPerRead, and halve on
+    /// BadTooManyOperations when the server does not say.
+    #[tokio::test]
+    async fn batches_keep_to_the_servers_limits() {
+        let addresses: Vec<String> = (0..5).map(|_| "ns=1;s=Shared".to_owned()).collect();
+
+        let mut fake = valued();
+        fake.advertised = Some((50, 2));
+        let reader = OpcuaReader::with_service(Arc::new(fake.clone()));
+        let values = reader.read(addresses.clone()).await;
+        assert_eq!(values.len(), 5);
+        assert_eq!(reads(&fake), vec!["read 1", "read 2", "read 2", "read 1"]);
+
+        let mut fake = valued();
+        fake.max_read = 2;
+        let reader = OpcuaReader::with_service(Arc::new(fake.clone()));
+        let values = reader.read(addresses).await;
+        assert!(values.iter().all(|v| v.error.is_none()), "{values:?}");
+        assert_eq!(
+            reads(&fake),
+            vec!["read 1", "read 5", "read 2", "read 2", "read 1"]
+        );
+    }
+
+    /// An element address whose node does not exist is read again as
+    /// the array node with the index range.
+    #[tokio::test]
+    async fn element_addresses_fall_back_to_the_index_range() {
+        let fake = valued();
+        let reader = OpcuaReader::with_service(Arc::new(fake.clone()));
+        let values = reader
+            .read(vec!["ns=1;s=Arr[1]".into(), "ns=1;s=Arr".into()])
+            .await;
+        let one = by_address(&values, "ns=1;s=Arr[1]");
+        assert_eq!(one.value, Some(ReadData::Json(json!(20))));
+        assert_eq!(one.r#type, Some(ScoutType::Int32));
+        let all = by_address(&values, "ns=1;s=Arr");
+        assert_eq!(all.value, Some(ReadData::Json(json!([10, 20, 30]))));
+        assert_eq!(all.r#type, None, "an array has no Sparkplug type");
+        assert_eq!(reads(&fake), vec!["read 1", "read 2", "read 1"]);
+        let tail: Vec<_> = fake.value_reads().into_iter().rev().take(2).collect();
+        assert!(tail.contains(&"ns=1;s=Arr 1".to_owned()), "{tail:?}");
+    }
+
+    /// A failed request gives every address in it the status.
+    #[tokio::test]
+    async fn a_failed_read_names_its_status() {
+        let mut fake = valued();
+        fake.fail_after = Some(1);
+        let reader = OpcuaReader::with_service(Arc::new(fake));
+        let values = reader
+            .read(vec!["ns=1;s=Shared".into(), "ns=1;s=Line1/Speed".into()])
+            .await;
+        assert_eq!(values.len(), 2);
+        for v in values {
+            assert_eq!(v.error.as_deref(), Some("BadConnectionClosed"));
+            assert_eq!(v.value, None);
+        }
+    }
+
+    #[test]
+    fn statuses_and_timestamps() {
+        let ts =
+            DateTime::from(chrono::DateTime::from_timestamp_millis(1_795_600_000_000).unwrap());
+        let ok = entry(
+            "a",
+            DataValue {
+                value: Some(Variant::Float(0.1)),
+                source_timestamp: Some(ts),
+                ..Default::default()
+            },
+            false,
+        );
+        assert_eq!(ok.value, Some(ReadData::Float32(0.1)));
+        assert_eq!(ok.r#type, Some(ScoutType::Float));
+        assert_eq!(ok.ts, Some(1_795_600_000_000));
+
+        let uncertain = entry(
+            "a",
+            DataValue {
+                value: Some(Variant::Int16(4)),
+                status: Some(StatusCode::UncertainLastUsableValue),
+                ..Default::default()
+            },
+            false,
+        );
+        assert_eq!(uncertain.value, Some(ReadData::Json(json!(4))));
+        assert_eq!(uncertain.error.as_deref(), Some("UncertainLastUsableValue"));
+
+        let bad = entry("a", super::bad(StatusCode::BadNotReadable), false);
+        assert_eq!(bad.value, None);
+        assert_eq!(bad.error.as_deref(), Some("BadNotReadable"));
+
+        let empty = entry("a", DataValue::null(), false);
+        assert_eq!(empty.error.as_deref(), Some("No value"));
+    }
 }

@@ -9,9 +9,10 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use rs_edge_driver::{ConnectError, DriverHandle, Handler, HandlerError, Poller, Scouter};
+use rs_edge_driver::{ConnectError, DriverHandle, Handler, HandlerError, Poller, Reader, Scouter};
 
 use crate::addr::Addr;
+use crate::read::{ReadOptions, TestReader};
 use crate::scout::TestScouter;
 use crate::wave;
 
@@ -37,9 +38,11 @@ pub mod clock {
     }
 }
 
-/// The handler. It has no device and no config: every address is
-/// worked out from the clock.
-pub struct TestHandler;
+/// The handler. It has no device: every address is worked out from the
+/// clock. Its only config is the read keys in [`crate::read`].
+pub struct TestHandler {
+    reads: ReadOptions,
+}
 
 /// Reads addresses without the handler's lock, so a poll request for
 /// many addresses is answered at once, as the JS driver's
@@ -61,12 +64,19 @@ impl Handler for TestHandler {
     /// [`crate::scout`].
     const SCOUTS: bool = true;
 
-    /// Any config is accepted and ignored, as in the JS driver.
+    /// Live values give each address a fixed value. See
+    /// [`crate::read`].
+    const READS: bool = true;
+
+    /// Any config is accepted, as in the JS driver, except a bad
+    /// `read_fail` or `read_hang`. Other keys are ignored.
     fn create(
         _handle: DriverHandle<Addr>,
-        _config: serde_json::Value,
+        config: serde_json::Value,
     ) -> Result<Self, HandlerError> {
-        Ok(Self)
+        Ok(Self {
+            reads: ReadOptions::parse(&config)?,
+        })
     }
 
     fn parse_addr(&self, addr: &str) -> Option<Addr> {
@@ -91,6 +101,10 @@ impl Handler for TestHandler {
 
     fn scouter(&self) -> Option<Arc<dyn Scouter>> {
         Some(TestScouter::new())
+    }
+
+    fn reader(&self) -> Option<Arc<dyn Reader>> {
+        TestReader::for_options(self.reads)
     }
 
     async fn close(&mut self) {}

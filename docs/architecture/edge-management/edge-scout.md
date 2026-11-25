@@ -67,7 +67,7 @@ A scan belongs to a **connection**, not a device, because the driver discovers o
 1. The agent's `addr` packet carries `"features": {"scout": 1}` on every `READY`. A new library that sees it subscribes to `fpEdge1/<Conn>/scout` for the current MQTT session.
 2. The agent's broker sees the subscription, and the agent sends a hello on `scout`. The library answers on `found/hello` with `supported` true or false. The agent keeps the answer in memory and writes it to the status entry only when it differs from what the entry holds, so a fleet restart writes nothing. If the driver has been `UP` for 10 s without subscribing, the agent records `"library"` in the same way. A request in the first 10 s, before the driver has subscribed, is refused `NODRIVER` with "The driver has only just started", because the driver may still subscribe.
 3. The operator opens the Addresses panel in the origin map editor. The panel reads the status entry, whether the connection is in the agent's saved config, the node's online state (from the Directory until a birth or death arrives) and its NBIRTH, sets options from the DriverDef `scout.options` schema, and the operator clicks **Scan**. The panel never asks the agent for a rebirth, because a rebirth republishes every device and opening a page must not cost that.
-4. The UI calls `CmdEsc.request_cmd` with the node address, name `Node Control/Scout`, type `String`, and `{"version":1,"op":"start","request":"<uuid>","connection":"<conn uuid>","root":null,"folder_id":null,"options":{...}}`. The UI sends no `limits`, so the agent's defaults apply. cmdesc checks the CmdDef permission and publishes NCMD (`acs-cmdesc/lib/cmdescd.js:93-140`). cmdesc answers 200 once the NCMD is published, whether or not the node is up (`cmdescd.js:131-139`), so the UI never treats that answer as acceptance.
+4. The UI calls `CmdEsc.request_cmd` with the node address, name `Node Control/Scout`, type `String`, and `{"version":1,"op":"start","request":"<uuid>","connection":"<conn uuid>","root":null,"folder_id":null,"options":{...}}`. The UI sends `"limits":{"samples":true}` and nothing else, so the agent's defaults apply to the other limits. cmdesc checks the CmdDef permission and publishes NCMD (`acs-cmdesc/lib/cmdescd.js:93-140`). cmdesc answers 200 once the NCMD is published, whether or not the node is up (`cmdescd.js:131-139`), so the UI never treats that answer as acceptance.
 5. The agent's NCMD switch (`acs-edge/lib/sparkplugNode.ts:383-394`) hands the request to the `ScoutManager`, which checks the request shape, checks the connection is deployed to this agent, clamps limits and checks concurrency. It then writes the scan fields with state `queued`, or writes only `last_request` with a refusal code and leaves the scan fields alone.
 6. When the slot is free, the agent creates the snapshot File object, publishes `start` on `scout`, and writes state `running`. The scan UUID is in the status entry, as `scan` with state `queued`, before the object exists, so the service-setup sweep never deletes an object in flight.
 7. The driver streams `found/<id>` messages: `items` batches, `progress` at least every 5 s, and one `end`. The agent validates each item, writes it as one NDJSON line into a gzip stream, and rewrites progress at most every 2 s, so the panel shows "Found 3,420 addresses, 41 s" and Stop.
@@ -353,6 +353,90 @@ Every JS driver in the repo (edge-ads, edge-bacnet, edge-ftp, edge-modbus, edge-
 - **Memory and CPU.** The edge-agent chart limits the agent to 100m CPU and 200Mi (`edge-helm-charts/charts/edge-agent/values.yaml:65-67`). A scan holds at most the gzip buffer (8 MiB) and, during a branch merge, the id map (a few MB for 50,000 items). Measured in the end-to-end load case, peak memory stays at about 113 MiB, well inside the limit, and DDATA latency does not change, because the agent handles scan work only with spare CPU. The numbers are in "Risks" item 2 and in the "Scouting" section of `edge-split.md`.
 - **Logging.** Every state change and failure goes to stderr at the default level, not only to DEBUG.
 
+## Values (added 25 Nov 2026)
+
+The panel shows each value address's value in two ways.
+
+**Value at scan.** The panel's `start` request now sends `"limits":{"samples":true}`, so every scan records each value's `sample` (up to 256 characters) as it was during the scan. The panel always shows it, in grey, with the scan's time in its tooltip. Drivers that cannot read a value leave `sample` null. Nothing else about scans changes.
+
+**Live values.** Off each time the panel opens. A **Live values** switch in the panel's toolbar asks first, in a dialog with **Cancel** and **Turn on**: "The Edge Agent will read the addresses on screen from the device every 5 seconds while this panel is open. This adds a small load to the device and the Edge Agent. Turn it off when you have finished." When it is on, the panel reads the value addresses whose rows are on screen, at most 40, and shows each value with its age. It stops when the switch is turned off, the panel closes, the browser tab is hidden, the page changes or the agent goes offline. The switch is disabled, with the reason in its tooltip, when the node is offline, the operator cannot scan, or the driver's hello says `reads` is false.
+
+The whole exchange is admin-only, like a scan. Values never go into Sparkplug, so the historians, the UNS and anyone who can read the node's data never see them.
+
+### NCMD
+
+Two more ops on `Node Control/Scout`, version 1, sent with the same permission as `start`:
+
+```json
+{"version":1,"op":"watch","request":"<uuid>","connection":"<conn uuid>","lease":"<uuid>",
+ "addresses":["ns=2;s=Line1.Speed", "plant/line1/temp"]}
+{"version":1,"op":"unwatch","request":"<uuid>","connection":"<conn uuid>","lease":"<uuid>"}
+```
+
+- `watch` creates the lease, or replaces an existing lease's addresses, and sets it to expire 60 s later. The panel sends it when live values turn on, every 20 s while on, and when the rows on screen change, debounced by 1 s. `addresses` holds 1 to 40 unique strings of up to 1024 characters, in the driver's canonical form, from items whose `kind` is `value`. A JSON leaf shares its topic's address, so the panel sends the address once.
+- `unwatch` ends the lease at once. Ending a lease that does not exist is not an error.
+- A connection holds at most 4 leases, and the union of their addresses is capped at 40, filled in the order the leases were made. Addresses over the cap are left out, and the entry says so.
+- Refusals go in the status entry's `last_request` as for `start`, with the codes `REQUEST`, `UNDEPLOYED`, `NODRIVER`, `LIBRARY`, `LIMIT` (a fifth lease) and the new `NOREADS` (the driver's hello says `reads` is false). An accepted `watch` writes nothing to the status entry, so renewing every 20 s costs no ConfigDB write.
+
+### Agent and driver
+
+The hello answer gains `"reads": true|false`, and the agent records it in the status entry as `reads`. A library sends false unless the handler opts in.
+
+While a connection has a live lease, the agent sends a read every `SCOUT_READ_INTERVAL_MS` (default 5000, minimum 2000) on the `scout` topic, never more than one at a time per connection:
+
+```json
+{"op":"read","id":"<\\w{1,64}>","version":1,"addresses":["ns=2;s=Line1.Speed", "..."]}
+```
+
+The driver answers once on `found/<id>`:
+
+```json
+{"seq":0,"type":"values","values":[
+  {"address":"ns=2;s=Line1.Speed","value":"1450.5","type":"Double","ts":1795600000000,"error":null},
+  {"address":"plant/line1/temp","value":"{\"t\":21.4}","type":"String","ts":1795599998000,"error":null},
+  {"address":"ns=2;s=Gone","value":null,"type":null,"ts":null,"error":"BadNodeIdUnknown"}]}
+{"seq":0,"type":"end","error":{"code":"UNSUPPORTED","message":"..."}}
+```
+
+- One entry per requested address, in any order. `value` is the value written as text, at most 1024 characters, or null. `type` is a Sparkplug type name or null. `ts` is the source timestamp in ms since the epoch, or null. `error` is null or a short reason of at most 256 characters.
+- Reads run beside a scan, never inside it, and use the same connection the handler already has. A read never opens a session, a subscription or a client per request.
+- The library answers `UNSUPPORTED` when the handler does not read, `CONN` when it is not connected, and `ERR` when the handler throws. A handler that has not answered in 4 s is abandoned, and the agent records `TIMEOUT` against every address for that round.
+- The agent validates the answer, drops entries for addresses it did not ask for, and cuts `value` at 1024 characters.
+- Reads count against the scan CPU budget, so data still comes first.
+
+### The values entry
+
+A new ConfigDB app, `Edge.App.ScoutValues` (`399a86cf-9bc6-4681-b568-b45fc650dacb`), keyed by the connection UUID and written only by the agent, with `lib/edge-scout-schemas/schemas/values.schema.json` as its ConfigSchema:
+
+```json
+{"version":1, "node":"<agent node uuid>", "updated":"...", "interval_ms":5000,
+ "leases":2, "dropped":0,
+ "values":{"ns=2;s=Line1.Speed":{"value":"1450.5","type":"Double","ts":1795600000000,"read":"...","error":null}}}
+```
+
+- `read` is when the agent got the value. `dropped` counts addresses left out by the cap of 40.
+- The agent writes the entry after a read only when a value, type, `ts` or error changed, and at least every 30 s while a lease is live, so the panel can tell the reads are still going. Serialised, it stays under 64 KiB, and the agent drops the largest values first, with `error` set to "Too large to show", if it would not.
+- When the last lease ends or expires, the agent writes `{"version":1,"node":...,"updated":...,"leases":0,"values":{}}` once. It also writes that for any connection whose entry it finds with `leases` above 0 on `init()`.
+- The Edge Agent role gets `ReadConfig` and `WriteConfig` on the app, as for `Edge.App.ScoutStatus`. The panel watches the entry through ConfigDB notify, as it watches the status entry.
+
+### Driver library API
+
+Each library adds an opt-in read beside `scout`, which the hello's `reads` reports:
+
+- **JavaScript:** `static reads = true` and `async read_values(addresses, signal)`, returning an array of `{address, value, type, ts, error}`.
+- **Python:** `reads: ClassVar[bool] = False` and `async def read_values(self, addresses) -> list[ReadValue]`.
+- **Rust:** `const READS: bool = false` and `fn reader(&self) -> Option<Arc<dyn Reader>>`, with `async fn read(&self, addresses: Vec<String>) -> Vec<ReadValue>` on `Reader`, asked for after each connect, like `scouter()`.
+
+The library turns the handler's values into text: strings as they are, numbers and booleans as JSON writes them, and anything else as JSON. A number JSON cannot write is sent as the text `NaN`, `Infinity` or `-Infinity`, so a device reporting NaN shows as NaN.
+
+### Drivers
+
+- **edge-opcua.** One `Read` of the `Value` attribute for all the addresses, split by `MaxNodesPerRead`, on the handler's existing session. A bad status code goes in `error` by name.
+- **edge-mqtt.** The handler subscribes to the requested topics on its own data client while a read lease is live. It answers each read with the last payload it holds for each topic, as text cut at 1024 characters, with `ts` as when it arrived and `error` "No message yet" for a topic not heard from. It unsubscribes from a topic 60 s after the last read that asked for it, and never from a topic a device is mapped to. The panel applies an item's JSONPath to the payload itself.
+- **edge-sim.** The value the cassette is playing for each channel.
+- **edge-test and edge-test-rs.** A deterministic value per address, and the options `read_fail` and `read_hang` for the conformance tests.
+- Every other driver answers `reads: false`.
+
 ## Result storage, size limits and retention
 
 **Why Files.** ConfigDB caps bodies at 100kb (`deploy/values.yaml:177`, `lib/js-service-api/lib/webapi.js:28`), which holds a few hundred plain items. Files allows 3gb (`deploy/values.yaml:218`), needs an existing object of class File before upload, and refuses to overwrite (`acs-files/lib/api-v1.js:155-161`), which suits immutable snapshots.
@@ -474,7 +558,7 @@ The panel works out its state in this order, and the first match wins.
 | State | When | What the operator sees |
 |---|---|---|
 | Hidden | DriverDef `scout: false` | No panel |
-| Agent offline | No NBIRTH since the last NDEATH | "The Edge Agent is offline, so it can't scan." Any previous snapshot stays browsable |
+| Agent offline | No NBIRTH since the last NDEATH | "Unable to scan because the Edge Agent is offline." Any previous snapshot stays browsable |
 | Agent too old | Online, and an NBIRTH seen since the page loaded has no `Node Control/Scout` | "This Edge Agent can't scan. Upgrade it to the current ACS release." Without a forced rebirth, an old agent that has not reborn since the page loaded shows as Waiting after a Scan instead |
 | Untrusted | The status entry's `node` is not this connection's node | "The scan status for this connection was written by an Edge Agent that does not host it, so the panel ignores it." |
 | Not deployed | `UNDEPLOYED` in `last_request`, or the connection is not in the agent's saved config | "Save and deploy this connection before scanning it." |

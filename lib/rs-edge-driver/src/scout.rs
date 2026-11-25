@@ -815,7 +815,7 @@ impl Wire {
             .map_err(|_| Stop::Cancelled)
     }
 
-    fn send_json(&self, v: &Value, end: bool) -> Result<(), Stop> {
+    pub(crate) fn send_json(&self, v: &Value, end: bool) -> Result<(), Stop> {
         // Every message is a JSON object: strip its braces so `seq`
         // can go first.
         let s = v.to_string();
@@ -1028,7 +1028,7 @@ impl ScoutSink {
 }
 
 /// Cut `s` to at most `max` characters.
-fn cut(s: &str, max: usize) -> String {
+pub(crate) fn cut(s: &str, max: usize) -> String {
     match s.char_indices().nth(max) {
         Some((i, _)) => s[..i].to_owned(),
         None => s.to_owned(),
@@ -1058,13 +1058,15 @@ pub(crate) fn valid_scan_id(id: &str) -> bool {
         && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
 
-/// The answer to a hello.
-pub(crate) fn hello_answer(supported: bool) -> String {
+/// The answer to a hello. `supported` says whether the handler scans
+/// and `reads` whether it reads values.
+pub(crate) fn hello_answer(supported: bool, reads: bool) -> String {
     json!({
         "seq": 0,
         "type": "hello",
         "versions": [SCOUT_VERSION],
         "supported": supported,
+        "reads": reads,
         "library": LIBRARY,
     })
     .to_string()
@@ -1085,6 +1087,11 @@ pub(crate) enum ScoutOp {
     Ack {
         id: String,
         seq: u64,
+    },
+    Read {
+        id: String,
+        version: Option<u64>,
+        addresses: Vec<String>,
     },
 }
 
@@ -1130,6 +1137,14 @@ pub(crate) fn parse_op(payload: &[u8]) -> Result<ScoutOp, (Option<String>, Strin
                 },
             })
         }
+        "read" => match crate::read::read_addresses(v.get("addresses")) {
+            Ok(addresses) => Ok(ScoutOp::Read {
+                version: v.get("version").and_then(Value::as_u64),
+                id,
+                addresses,
+            }),
+            Err(why) => Err((Some(id), why)),
+        },
         other => Err((Some(id), format!("unknown scout op {other:?}"))),
     }
 }
@@ -1258,20 +1273,29 @@ fn finish(
             "the scan was cancelled",
         )),
         Ok(Err(e)) => Err(e),
-        Err(join) if join.is_panic() => {
-            let panic = join.into_panic();
-            let msg = panic
-                .downcast_ref::<&str>()
-                .map(|s| (*s).to_owned())
-                .or_else(|| panic.downcast_ref::<String>().cloned())
-                .unwrap_or_else(|| "unknown panic".into());
-            Err(ScoutError::err(format!("the scouter panicked: {msg}")))
-        }
+        Err(join) if join.is_panic() => Err(ScoutError::err(format!(
+            "the scouter panicked: {}",
+            panic_message(join)
+        ))),
         Err(_) => Err(ScoutError::new(
             ScoutCode::Cancelled,
             "the scan was cancelled",
         )),
     }
+}
+
+/// What a task that failed said: the panic message, or that it was
+/// cancelled.
+pub(crate) fn panic_message(join: tokio::task::JoinError) -> String {
+    if !join.is_panic() {
+        return "it was cancelled".into();
+    }
+    let panic = join.into_panic();
+    panic
+        .downcast_ref::<&str>()
+        .map(|s| (*s).to_owned())
+        .or_else(|| panic.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "unknown panic".into())
 }
 
 #[cfg(test)]
@@ -1356,6 +1380,33 @@ mod tests {
             Some("ab")
         );
         assert!(parse_op(b"not json").is_err());
+    }
+
+    #[test]
+    fn parse_reads() {
+        assert_eq!(
+            parse_op(br#"{"op":"read","id":"r1","version":1,"addresses":["a","b"]}"#),
+            Ok(ScoutOp::Read {
+                id: "r1".into(),
+                version: Some(1),
+                addresses: vec!["a".into(), "b".into()],
+            })
+        );
+        // A read with bad addresses is answered on its own topic.
+        assert_eq!(
+            parse_op(br#"{"op":"read","id":"r1","version":1,"addresses":[3]}"#)
+                .unwrap_err()
+                .0
+                .as_deref(),
+            Some("r1")
+        );
+        // A read with a bad id has nowhere to be answered.
+        assert!(
+            parse_op(br#"{"op":"read","id":"r/1","addresses":["a"]}"#)
+                .unwrap_err()
+                .0
+                .is_none()
+        );
     }
 
     #[test]

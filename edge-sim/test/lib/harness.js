@@ -16,6 +16,8 @@ add_formats(ajv);
 export const validator = add_schemas(ajv);
 const check_found = validator("found");
 const check_item = validator("item");
+/* One entry of a values answer. */
+export const check_value = ajv.getSchema("urn:edge-scout:common#/$defs/read_value");
 
 export const LIMITS = { items: 20000, depth: 8, seconds: 120, pace_ms: 0, samples: false };
 

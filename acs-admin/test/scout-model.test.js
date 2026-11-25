@@ -32,6 +32,7 @@ import {
   has_permission,
   identity,
   item_key,
+  keep_items,
   mapped_but_missing,
   metric_key,
   metric_slots,
@@ -41,6 +42,7 @@ import {
   object_name,
   object_name_problem,
   existing_objects,
+  panel_layout,
   panel_state,
   parse_snapshot,
   place_type,
@@ -267,11 +269,35 @@ describe('index, tree and search', () => {
     expect(visible_rows(index).map(r => r.id)).toEqual(['A', 'orphan'])
   })
 
-  it('shows children of open folders', () => {
+  it('shows children of open folders, folders first', () => {
     const rows = visible_rows(index, { expanded: new Set(['A', 'A/B']) })
     expect(rows.map(r => [r.id, r.depth])).toEqual([
-      ['A', 0], ['A/speed', 1], ['A/B', 1], ['A/B/temp', 2], ['orphan', 0],
+      ['A', 0], ['A/B', 1], ['A/B/temp', 2], ['A/speed', 1], ['orphan', 0],
     ])
+  })
+
+  it('keeps folders in place when a branch scan is appended', () => {
+    /* A merged snapshot after a branch scan of Line1: the branch comes
+     * last in the file, but the tree must not move it. */
+    const merged = build_index([
+      folder('P'),
+      folder('P/Line2', 'P', { name: 'Line2' }),
+      value('P/Energy', 'P', { name: 'Energy' }),
+      folder('P/Line10', 'P', { name: 'Line10' }),
+      folder('P/Line1', 'P', { name: 'Line1' }),
+      value('P/Line1/speed', 'P/Line1', { name: 'speed' }),
+    ])
+    const fresh = build_index([
+      folder('P'),
+      folder('P/Line1', 'P', { name: 'Line1' }),
+      value('P/Line1/speed', 'P/Line1', { name: 'speed' }),
+      folder('P/Line2', 'P', { name: 'Line2' }),
+      folder('P/Line10', 'P', { name: 'Line10' }),
+      value('P/Energy', 'P', { name: 'Energy' }),
+    ])
+    const order = ['P/Line1', 'P/Line2', 'P/Line10', 'P/Energy']
+    expect(merged.children.get('P')).toEqual(order)
+    expect(fresh.children.get('P')).toEqual(order)
   })
 
   it('searches name, address, description and unit', () => {
@@ -734,6 +760,7 @@ describe('permissions, requests and the custom UI', () => {
       .toEqual(Object.keys(ncmd).sort())
     expect(start_request({ request: 'r', connection: 'c' })).toEqual({
       version: 1, op: 'start', request: 'r', connection: 'c', root: null, folder_id: null, options: {},
+      limits: { samples: true },
     })
   })
 
@@ -757,5 +784,73 @@ describe('permissions, requests and the custom UI', () => {
     const e = { state: 'done', current: { finished: 't', items: 4 } }
     expect(scout_summary(e)).toEqual({ available: true, state: 'done', finished: 't', items: 4 })
     expect(scout_summary(e, false)).toEqual({ available: false, state: null, finished: null, items: 0 })
+  })
+})
+
+describe('search inside names and addresses', () => {
+  const index = build_index([
+    folder('shellies/', null, { name: 'shellies' }),
+    folder('shellies/shellyhtg3-0a1b2c3d4e5f/', 'shellies/', { name: 'shellyhtg3-0a1b2c3d4e5f' }),
+    value('shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0', 'shellies/shellyhtg3-0a1b2c3d4e5f/',
+      { name: 'humidity:0', address: 'shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0', type: 'Double' }),
+    value('shellies/shellyplug-a1b2c3/power', 'shellies/', { name: 'power', address: 'shellies/shellyplug-a1b2c3/power' }),
+  ])
+  const found = q => [...search(index, q).matches].sort()
+
+  it('finds a serial after a dash in a folder name and inside addresses', () => {
+    expect(found('0a1b2c3d4e5f')).toEqual([
+      'shellies/shellyhtg3-0a1b2c3d4e5f/',
+      'shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0',
+    ])
+  })
+
+  it('finds parts of a name after a slash or colon, ignoring case', () => {
+    expect(found('0A1B')).toHaveLength(2)
+    expect(found('humidity:0')).toEqual(['shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0'])
+    expect(found(':0')).toEqual(['shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0'])
+    expect(found('status/hum')).toEqual(['shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0'])
+  })
+
+  it('matches every word, and ignores separators and invisible characters', () => {
+    expect(found('shellyhtg3 humidity')).toEqual(['shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0'])
+    expect(found('shellyhtg30a1b')).toHaveLength(2)
+    expect(found('shellyhtg3_0a1b')).toHaveLength(2)
+    expect(found('\u200b0a1b2c3d4e5f\u00a0')).toHaveLength(2)
+    expect(found('shellyhtg3 nothere')).toEqual([])
+  })
+
+  it('keeps a matching folder under the value filters, and its matching values', () => {
+    const { matches } = search(index, '0a1b2c3d4e5f')
+    const keep = keep_items(index, { matches, filters: { values: true } })
+    expect([...keep].sort()).toEqual([
+      'shellies/shellyhtg3-0a1b2c3d4e5f/',
+      'shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0',
+    ])
+    const rows = visible_rows(index, { keep }).map(r => r.id)
+    expect(rows).toEqual([
+      'shellies/',
+      'shellies/shellyhtg3-0a1b2c3d4e5f/',
+      'shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0',
+    ])
+  })
+
+  it('keeps nothing extra with no search or filter', () => {
+    expect(keep_items(index, {})).toBeNull()
+    expect([...keep_items(index, { type: 'Double' })])
+      .toEqual(['shellies/shellyhtg3-0a1b2c3d4e5f/status/humidity:0'])
+  })
+})
+
+describe('panel_layout', () => {
+  it('has no Scan button where nobody can scan', () => {
+    for (const st of ['offline', 'agent_old', 'unsupported', 'no_permission'])
+      expect(panel_layout(st, { scanned: true })).toBe('blocked')
+  })
+
+  it('shows the empty state only before the first scan', () => {
+    expect(panel_layout('never')).toBe('empty')
+    expect(panel_layout('never', { scanned: true })).toBe('normal')
+    expect(panel_layout('done', { scanned: true })).toBe('normal')
+    expect(panel_layout('failed')).toBe('normal')
   })
 })

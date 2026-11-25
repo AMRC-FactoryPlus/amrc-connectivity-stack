@@ -243,6 +243,7 @@ import { UUIDs } from '@amrc-factoryplus/service-client'
 import { serviceClientReady } from '@store/useServiceClientReady.js'
 import { useAccessStore } from '@store/useAccessStore.js'
 import { can_save_bridge } from '@/lib/access/perms-edge.js'
+import { random_uuid } from '@/lib/random-uuid.js'
 
 // Sanitize name for Kubernetes
 function sanitizeName(name) {
@@ -318,7 +319,7 @@ export default {
       return this.c.data.find(c => c.uuid === this.selectedClusterUuid)
     },
     sanitizedName() {
-      return sanitizeName(this.name) || crypto.randomUUID()
+      return sanitizeName(this.name) || random_uuid()
     },
     realm() {
       // Extract realm from baseUrl by uppercasing it. Bad practice but will do for now.
@@ -410,13 +411,6 @@ export default {
           this.caFile = values.remote.caFile || null
         }
       }
-    },
-
-    random() {
-      if (crypto.randomUUID) return crypto.randomUUID();
-      const buf = new Uint8Array(16);
-      crypto.getRandomValues(buf);
-      return buf.toHex();
     },
 
     async encryptSensitiveInfo(secretName, key, value) {

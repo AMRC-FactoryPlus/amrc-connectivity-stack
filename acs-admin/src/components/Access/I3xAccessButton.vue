@@ -13,9 +13,10 @@
      no button: the parent opens the dialog through v-model:open, as the
      Explorer page does for the framed i3X Explorer's own button. -->
 <template>
-  <Button v-if="!headless && canGive" variant="outline" size="sm" class="gap-2" :title="title" @click.stop="open = true">
+  <Button v-if="!headless && canGive" variant="outline" size="sm" class="gap-2"
+          :title="buttonTitle" :aria-label="buttonTitle" @click.stop="open = true">
     <i class="fa-solid fa-shield-halved text-sm"></i>
-    <span>Manage access</span>
+    <span :class="labelClass">Manage access</span>
     <Badge variant="secondary" class="min-w-5 justify-center px-1.5" :aria-label="title">
       <i v-if="count === null && loading" class="fa-solid fa-circle-notch animate-spin text-[10px]"></i>
       <template v-else>{{ count ?? '?' }}</template>
@@ -53,6 +54,8 @@ const props = defineProps({
   path: { type: String, default: '' },
   /* No button: only the dialog, opened by the parent with v-model:open. */
   headless: { type: Boolean, default: false },
+  /* Classes for the label, so a narrow header can show the icon only. */
+  labelClass: { type: String, default: '' },
 })
 
 /* No button for a viewer who can give none of the access it manages. */
@@ -74,6 +77,10 @@ const count = computed(() => {
 const title = computed(() => count.value === null
   ? 'Access'
   : `${count.value} ${count.value === 1 ? 'person or group' : 'people and groups'} ${props.device ? (count.value === 1 ? 'has access to this device' : 'have access to this device') : 'granted on this node'}`)
+
+/* The label leads, so the tooltip still names the button when only its
+ * icon shows. */
+const buttonTitle = computed(() => count.value === null ? 'Manage access' : `Manage access. ${title.value}.`)
 
 async function load () {
   loading.value = true

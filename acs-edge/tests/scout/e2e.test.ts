@@ -23,6 +23,7 @@ import zlib from "zlib";
 
 import * as mqtt from "mqtt";
 
+import * as UUIDs from "../../lib/uuids";
 import type { RunningDriver } from "../golden/driver";
 import { check_snapshot } from "../lib/scout/harness";
 
@@ -40,7 +41,7 @@ const e2e = RUN ? describe : describe.skip;
 /* The cases that must pass for the marker to be written. */
 const CASES = [
     "nbirth", "hello", "opcua full", "opcua branch", "mqtt rescan",
-    "cancel and busy", "unsupported", "library", "restart sigterm",
+    "cancel and busy", "unsupported", "library", "live values", "noreads", "restart sigterm",
     "restart sigkill", "acl test_js", "acl test_rs", "acl opcua", "acl mqtt",
     "size cap", "item cap", "load",
 ];
@@ -442,6 +443,70 @@ e2e("Edge Scout end to end", () => {
             expect(status.last_request).toMatchObject({ request, code: "LIBRARY" });
             expect(status.scan ?? null).toBeNull();
             passed.add("library");
+        }, 60_000);
+
+        function watch (conn: string, lease: string, addresses: string[]) {
+            const request = uuid();
+            w.sp.scout({ version: 1, op: "watch", request, connection: conn, lease, addresses });
+            return request;
+        }
+
+        function unwatch (conn: string, lease: string) {
+            const request = uuid();
+            w.sp.scout({ version: 1, op: "unwatch", request, connection: conn, lease });
+            return request;
+        }
+
+        it("reads live values from edge-test while a scan runs, and clears them on unwatch", async () => {
+            expect(w.acs.status(TEST).reads).toBe(true);
+            const slow = await request_scan(w, TEST,
+                { options: { size: 5000, depth: 2, delay_ms: 500 } });
+            await until(() => w.acs.status(TEST)?.request == slow
+                && w.acs.status(TEST).state == "running", "the slow scan to run");
+            const before = w.acs.status(TEST).last_request;
+
+            const lease = uuid();
+            const SIN = "sin:4000:50:bd", CONST = "const:1000:2.5:lf";
+            watch(TEST, lease, [SIN, CONST, "nope"]);
+            await until(() => w.acs.values(TEST)?.values?.[CONST], "the first values", 20_000);
+            const entry = w.acs.values(TEST);
+            expect(entry).toMatchObject({ version: 1, node: AGENT.uuid, interval_ms: 5000,
+                leases: 1, dropped: 0, values: {
+                    [SIN]: { value: "50", type: "Double", error: null },
+                    [CONST]: { value: "2.5", type: "Float", error: null },
+                    nope: { value: null, error: "Not a test address" },
+                } });
+            /* The scan carries on, and the accepted watch wrote no
+             * status. */
+            expect(w.acs.status(TEST)).toMatchObject({ request: slow, state: "running",
+                last_request: before });
+
+            /* A second round reads the same values, so nothing is
+             * written until the 30 s refresh. */
+            const value_writes = () => w.acs.calls.filter(c => c.startsWith("PUT ")
+                && c.includes(UUIDs.App.ScoutValues) && c.includes(TEST)).length;
+            const writes = value_writes();
+            expect(writes).toBe(1);
+            await sleep(6_000);
+            expect(w.acs.values(TEST).values[SIN].value).toBe("50");
+            expect(value_writes()).toBe(writes);
+
+            unwatch(TEST, lease);
+            await until(() => w.acs.values(TEST).leases == 0, "the empty entry");
+            expect(w.acs.values(TEST).values).toEqual({});
+
+            cancel(w, TEST);
+            await until(() => w.acs.status(TEST).state == "cancelled", "the cancel", 15_000);
+            passed.add("live values");
+        }, 120_000);
+
+        it("refuses a watch with NOREADS on a driver that can't read", async () => {
+            expect(w.acs.status(UNSUP).reads).toBe(false);
+            const request = watch(UNSUP, uuid(), ["sin:1000:1:bd"]);
+            await until(() => w.acs.status(UNSUP)?.last_request?.request == request, "the refusal");
+            expect(w.acs.status(UNSUP).last_request.code).toBe("NOREADS");
+            expect(w.acs.values(UNSUP)).toBeUndefined();
+            passed.add("noreads");
         }, 60_000);
 
         async function restart_mid_scan (signal: NodeJS.Signals) {

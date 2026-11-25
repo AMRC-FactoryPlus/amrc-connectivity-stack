@@ -14,7 +14,9 @@ import { createApp, nextTick, reactive, ref, computed } from 'vue'
 import ScoutPanel from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPanel.vue'
 import ScoutMapDialog from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutMapDialog.vue'
 import ScoutChangeBar from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutChangeBar.vue'
+import { column_widths } from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutTree.vue'
 import { build_index, diff } from '../src/lib/scout/model.js'
+import { close_dialogs } from '../src/composables/useDialog.js'
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class { observe () {} disconnect () {} }
@@ -29,6 +31,7 @@ const ITEMS = [
 function fake (state, extra = {}, { items = ITEMS, entry = undefined } = {}) {
   const index = build_index(items)
   const calls = []
+  const visible = []
   const status = ref({
     version: 1, node: 'n', supported: true, scan: 's', state: 'done',
     started: '2026-11-24T10:41:00Z',
@@ -40,6 +43,7 @@ function fake (state, extra = {}, { items = ITEMS, entry = undefined } = {}) {
   const raw = ref(entry === undefined ? status.value : entry)
   return {
     calls,
+    visible,
     scout: {
       state: computed(() => ({ state, code: state === 'refused' ? 'BUSY' : null })),
       status,
@@ -57,6 +61,14 @@ function fake (state, extra = {}, { items = ITEMS, entry = undefined } = {}) {
       cancel: () => calls.push(['cancel']),
       scan_branch: i => calls.push(['branch', i.id]),
       forget: () => calls.push(['forget']),
+      live: ref(false),
+      live_error: ref(null),
+      live_blocked: ref(null),
+      live_values: ref(null),
+      live_addresses: ref([]),
+      live_on: () => calls.push(['live_on']),
+      live_off: () => calls.push(['live_off']),
+      set_live_items: items => visible.push(items.map(i => i.id)),
     },
   }
 }
@@ -112,11 +124,54 @@ describe('ScoutPanel', () => {
     expect(calls).toEqual([['cancel']])
   })
 
-  it('disables Scan without the permission', async () => {
+  it('shows why without a Scan button when the operator lacks the permission', async () => {
     const { scout } = fake('no_permission')
     const { el } = await mount(ScoutPanel, { scout })
     expect(el.textContent).toContain('Scan device addresses permission')
-    expect(button(el, 'Re-scan').disabled).toBe(true)
+    expect(button(el, 'Re-scan')).toBeUndefined()
+    expect(button(el, 'Scan')).toBeUndefined()
+  })
+
+  it('says why it cannot scan while offline, with Options beside it and no Scan', async () => {
+    const { scout } = fake('offline')
+    const driver = { scout: { options: { properties: { units: { type: 'boolean', title: 'Read units' } } } } }
+    const { el } = await mount(ScoutPanel, { scout, driver })
+    expect(el.textContent).toContain('Unable to scan because the Edge Agent is offline.')
+    expect(button(el, 'Re-scan')).toBeUndefined()
+    expect(button(el, 'Options')).toBeUndefined()
+    const options = el.querySelector('[aria-label="Scan options"]')
+    expect(options.textContent.trim()).toBe('')
+    options.click()
+    await nextTick()
+    expect(el.textContent).toContain('Read units')
+  })
+
+  it('explains a scan before the first one, with Scan under the text', async () => {
+    const { scout, calls } = fake('never', {}, { entry: null })
+    scout.status.value = null
+    scout.current_index.value = null
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(el.textContent).toContain('Not scanned yet')
+    expect(el.textContent).toContain('A scan asks the driver to list the addresses')
+    button(el, 'Scan').click()
+    expect(calls[0][0]).toBe('start')
+  })
+
+  it('filters by type from a pill like the other filters', async () => {
+    const { scout } = fake('done')
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(el.querySelector('select')).toBeNull()
+    const pill = el.querySelector('[aria-label="Type: any"]')
+    expect(pill.className).toContain('rounded-full')
+    expect(pill.textContent).toContain('Any type')
+  })
+
+  it('pops out and back', async () => {
+    const { scout } = fake('done')
+    const events = []
+    const { el } = await mount(ScoutPanel, { scout, onPopOut: v => events.push(v) })
+    el.querySelector('[aria-label="Pop out into a large view"]').click()
+    expect(events).toEqual([true])
   })
 
   it('offers to follow a running scan after BUSY', async () => {
@@ -145,7 +200,7 @@ describe('ScoutPanel', () => {
     const { el, events } = await mount(ScoutPanel, { scout })
     el.querySelector('[role="treeitem"] button').click()
     await nextTick()
-    el.querySelector('input[type="checkbox"]').click()
+    el.querySelector('input[type="checkbox"][aria-label="Select Speed"]').click()
     await nextTick()
     button(el, 'Map selected').click()
     expect(events).toEqual([['map', ['L/speed']]])
@@ -239,7 +294,8 @@ describe('ScoutTree branch scans', () => {
     ]
     const { scout, calls } = fake('done', {}, { items })
     const { el } = await mount(ScoutPanel, { scout })
-    el.querySelector('[role="treeitem"] button').click()
+    const line = [...el.querySelectorAll('[role="treeitem"]')].find(r => r.textContent.includes('Line'))
+    line.querySelector('button[aria-label="Open"]').click()
     await nextTick()
     const rows = [...el.querySelectorAll('[role="treeitem"]')]
     const row = name => rows.find(r => r.textContent.includes(name))
@@ -260,5 +316,144 @@ describe('ScoutChangeBar', () => {
     }
     const { el } = await mount(ScoutChangeBar, { changes, missing: null })
     expect(el.textContent).toMatch(/Changed\s*3/)
+  })
+})
+
+
+describe('ScoutTree column widths', () => {
+  it('keeps both columns at their minimum in a narrow panel', () => {
+    expect(column_widths(640)).toEqual({ name: 224, address: 224 })
+  })
+
+  it('gives the address more of the spare width than the name', () => {
+    const w = column_widths(1100)
+    expect(w.address).toBeGreaterThan(w.name)
+    expect(w.name).toBeGreaterThan(224)
+  })
+
+  it('shows long addresses in full when popped out', () => {
+    expect(column_widths(1350).address).toBeGreaterThanOrEqual(450)
+    expect(column_widths(3000)).toEqual({ name: 480, address: 720 })
+  })
+})
+
+describe('ScoutPanel live values', () => {
+  afterEach(() => close_dialogs())
+
+  const LIVE_ITEMS = [
+    { id: 'S', parent: null, name: 'Speed', kind: 'value', address: 'ns=2;s=Speed', path: null, type: 'Double', sample: '1440' },
+    { id: 'G', parent: null, name: 'Gone', kind: 'value', address: 'ns=2;s=Gone', path: null, type: 'Double', sample: '7' },
+    { id: 'T', parent: null, name: 'temp', kind: 'value', address: 'plant/temp', path: null, type: null },
+    { id: 'T\u0000$.t', parent: 'T', name: 't', kind: 'value', address: 'plant/temp', path: '$.t', type: 'Double' },
+  ]
+
+  const cell = (el, name) => [...el.querySelectorAll('[role="treeitem"]')]
+    .find(r => r.textContent.includes(name)).querySelector('[data-test="value"]')
+  const toggle = el => el.querySelector('[data-test="live"] button[role="switch"]')
+
+  it('shows the value at scan in grey, with the scan time in its tooltip', async () => {
+    const { scout } = fake('done', {}, { items: LIVE_ITEMS })
+    const { el } = await mount(ScoutPanel, { scout })
+    const c = cell(el, 'Speed')
+    expect(c.textContent.trim()).toBe('1440')
+    expect(c.className).toContain('text-gray-400')
+    expect(c.title).toMatch(/^1440\nValue at scan, 24 Nov/)
+  })
+
+  it('reports the value rows on screen', async () => {
+    const { scout, visible } = fake('done', {}, { items: LIVE_ITEMS })
+    await mount(ScoutPanel, { scout })
+    expect(visible.at(-1)).toEqual(['G', 'S', 'T'])
+  })
+
+  it('asks before turning on, with the spec wording', async () => {
+    const { scout, calls } = fake('done', {}, { items: LIVE_ITEMS })
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(toggle(el).getAttribute('aria-checked')).toBe('false')
+    toggle(el).click()
+    await nextTick()
+    await nextTick()
+    const dialog = document.querySelector('[role="alertdialog"]')
+    expect(dialog.textContent).toContain('The Edge Agent will read the addresses on screen from the device every 5 seconds while this panel is open.')
+    const buttons = [...dialog.querySelectorAll('button')].map(b => b.textContent.trim())
+    expect(buttons).toEqual(['Cancel', 'Turn on'])
+    expect(calls).toEqual([])
+    ;[...dialog.querySelectorAll('button')].find(b => b.textContent.trim() === 'Turn on').click()
+    await nextTick()
+    expect(calls).toEqual([['live_on']])
+  })
+
+  it('does nothing when the operator cancels', async () => {
+    const { scout, calls } = fake('done', {}, { items: LIVE_ITEMS })
+    const { el } = await mount(ScoutPanel, { scout })
+    toggle(el).click()
+    await nextTick()
+    await nextTick()
+    ;[...document.querySelectorAll('[role="alertdialog"] button')].find(b => b.textContent.trim() === 'Cancel').click()
+    await nextTick()
+    expect(calls).toEqual([])
+  })
+
+  it('is disabled with the reason in its tooltip', async () => {
+    const { scout } = fake('done', {}, { items: LIVE_ITEMS })
+    scout.live_blocked.value = 'noreads'
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(toggle(el).disabled).toBe(true)
+    expect(toggle(el).parentElement.title).toBe("This driver can't read live values.")
+  })
+
+  it('shows live values in normal colour with their age, and errors as a warning', async () => {
+    const { scout, calls } = fake('done', {}, { items: LIVE_ITEMS })
+    scout.live.value = true
+    scout.live_addresses.value = ['ns=2;s=Speed', 'ns=2;s=Gone', 'plant/temp']
+    scout.tick.value = Date.parse('2026-11-25T10:00:04Z')
+    const read = '2026-11-25T10:00:00Z'
+    scout.live_values.value = {
+      version: 1, node: 'n', leases: 1, dropped: 2,
+      values: {
+        'ns=2;s=Speed': { value: '1450.5', type: 'Double', ts: 1, read, error: null },
+        'ns=2;s=Gone': { value: null, type: null, ts: null, read, error: 'BadNodeIdUnknown' },
+        'plant/temp': { value: '{"t":21.4}', type: 'String', ts: 1, read, error: null },
+      },
+    }
+    const { el } = await mount(ScoutPanel, { scout })
+    el.querySelector('[role="treeitem"] button[aria-label="Open"]')?.click()
+    await nextTick()
+
+    const speed = cell(el, 'Speed')
+    expect(speed.textContent.trim()).toBe('1450.5')
+    expect(speed.className).toContain('text-gray-900')
+    expect(speed.title).toBe('1450.5\nRead 4 s ago, Double')
+
+    const gone = cell(el, 'Gone')
+    const icon = gone.querySelector('.fa-triangle-exclamation')
+    expect(icon.getAttribute('aria-label')).toBe('BadNodeIdUnknown')
+    expect(gone.title).toContain('Live value: BadNodeIdUnknown')
+
+    const leaf = [...el.querySelectorAll('[role="treeitem"]')].find(r => r.getAttribute('aria-level') === '2')
+    expect(leaf.querySelector('[data-test="value"]').textContent.trim()).toBe('21.4')
+
+    expect(el.querySelector('[data-test="live"]').textContent)
+      .toContain('Showing live values for 3 addresses. The Edge Agent reads at most 40 addresses on this connection, so it left out 2 addresses.')
+
+    toggle(el).click()
+    await nextTick()
+    expect(calls).toEqual([['live_off']])
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+
+  it('turns live values off when it closes', async () => {
+    const { scout, calls } = fake('done', {}, { items: LIVE_ITEMS })
+    await mount(ScoutPanel, { scout })
+    app.unmount()
+    app = null
+    expect(calls).toEqual([['live_off']])
+  })
+
+  it('shows why live values stopped', async () => {
+    const { scout } = fake('done', {}, { items: LIVE_ITEMS })
+    scout.live_error.value = "Live values stopped because this driver can't read values."
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(el.textContent).toContain("Live values stopped because this driver can't read values.")
   })
 })

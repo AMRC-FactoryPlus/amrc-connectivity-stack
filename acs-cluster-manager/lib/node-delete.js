@@ -56,37 +56,44 @@ export class NodeDelete {
     }
 
     /* What deleting a node would remove. Returns null if the node is not
-     * an edge node, or false if it belongs to another cluster. */
+     * an edge node, or false if it belongs to another cluster.
+     *
+     * The delete works from this plan, so it must see the ConfigDB as
+     * it is now. The service client caches ConfigDB reads for the
+     * ConfigDB's max-age, and a connection or device added since the
+     * last read would otherwise be missed and left behind. */
     async plan (cluster, node) {
         const cdb = this.fplus.ConfigDB;
+        const fresh = { cache: "no-cache" };
+        const get = (app, obj) => cdb.get_config(app, obj, fresh);
+        const search = (app, query) => cdb.search({ app, query, ...fresh });
 
-        const deployment = await cdb.get_config(App.EdgeAgentDeployment, node);
+        const deployment = await get(App.EdgeAgentDeployment, node);
         if (deployment) {
             if (deployment.cluster != cluster) return false;
         }
         else {
             /* A delete that stopped part way has removed the deployment
              * already. The object still says what it is. */
-            const reg = await cdb.get_config(App.Registration, node);
+            const reg = await get(App.Registration, node);
             if (reg?.class != Class.EdgeAgent) return null;
         }
 
-        const connections = await cdb.search({
-            app: App.ConnectionConfiguration, query: { edgeAgent: node } });
-        const by_node = await cdb.search({
-            app: App.DeviceInformation, query: { node } });
+        const connections = await search(App.ConnectionConfiguration,
+            { edgeAgent: node });
+        const by_node = await search(App.DeviceInformation, { node });
         const by_conn = await Promise.all(connections.map(connection =>
-            cdb.search({ app: App.DeviceInformation, query: { connection } })));
+            search(App.DeviceInformation, { connection })));
         const devices = [...new Set([...by_node, ...by_conn.flat()])];
 
         const named = uuids => Promise.all(uuids.map(async uuid => ({
             uuid,
-            name: (await cdb.get_config(App.Info, uuid))?.name ?? uuid,
+            name: (await get(App.Info, uuid))?.name ?? uuid,
         })));
 
         return {
             node,
-            name:           (await cdb.get_config(App.Info, node))?.name ?? node,
+            name:           (await get(App.Info, node))?.name ?? node,
             cluster,
             deployment:     deployment ?? null,
             connections:    await named(connections),

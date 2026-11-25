@@ -17,7 +17,7 @@ export const buttonVariants = cva(
           "bg-red-500 text-slate-50 hover:bg-red-500/90 dark:bg-red-900 dark:text-slate-50 dark:hover:bg-red-900/90",
         outline: "ring-1 ring-slate-200 bg-white hover:bg-slate-100 hover:text-slate-900 dark:ring-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800 dark:hover:text-slate-50",
         destructiveOutline:
-          "border border-red-500 bg-white hover:bg-red-500 hover:text-slate-50 dark:border-red-900 dark:bg-slate-950 dark:hover:bg-red-900 dark:hover:text-slate-50",
+          "border border-red-500 bg-white text-red-600 hover:bg-red-500 hover:text-white dark:border-red-900 dark:bg-slate-950 dark:text-red-400 dark:hover:bg-red-900 dark:hover:text-white",
         destructiveGhost:
           "text-red-500 hover:bg-red-500 hover:text-white",
         secondary:

@@ -283,7 +283,24 @@ client called `admin`. Every service must be able to resolve the
 services fetch Keycloak's keys from it; if a service logs "Auth
 unavailable: OIDC discovery failed", fix the cluster's DNS for that
 name. The services' notify websockets now accept a Keycloak token, so
-an older admin UI or client keeps working against new services.
+an older admin UI or client keeps working against new services. The
+User Admin service, which creates users from the Access Control page,
+accepts Keycloak tokens too, and fetches Keycloak's keys the same way.
+Service setup lets each Keycloak client it manages send people back to
+any page under its own address after signing out, so the admin UI's
+Logout and the visualiser's sign-out return to the page you were on.
+
+### Devices show online again after the Directory restarts
+
+When the Directory sees data from a device it has no birth for, it
+waits a few seconds and then asks the device's edge node to send its
+birth again. It used to wait inside the queue it handles every MQTT
+message with, one at a time, so on a site with a few hundred devices a
+restart of the Directory filled that queue with waits. The births the
+nodes sent back sat behind them and were never recorded, and the admin
+UI showed those devices offline until the Directory caught up, which
+could take hours or never happen. The wait now runs outside the queue,
+and each edge node is asked at most once a minute.
 
 ### Scan a device for its addresses (Edge Scout)
 
@@ -297,6 +314,14 @@ collection carries on during a scan, and nothing changes in the origin
 map until you press Save. See
 [Scanning a device for addresses](../architecture/edge-management/edge-scout-scanning.md).
 
+- **Values.** Every value in the tree shows its reading from the scan,
+  in grey. A **Live values** switch reads the values on screen from the
+  device every 5 seconds instead, after a warning, and stops on its own
+  when the panel closes or the tab is hidden. The values go to a new
+  ConfigDB app that only administrators read, never to Sparkplug.
+  `SCOUT_READ_INTERVAL_MS` on the Edge Agent sets the rate, and no
+  lower than every 2 seconds. OPC UA, MQTT and the simulator read live
+  values, and the switch is disabled for other drivers.
 - **Who can scan.** Only administrators, through a new "Scan device
   addresses" permission in the command escalation group, which
   administrators already hold. No grant is needed.

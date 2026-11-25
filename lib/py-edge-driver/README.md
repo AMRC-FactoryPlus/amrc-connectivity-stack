@@ -73,6 +73,65 @@ reason `depth`. At `limits["seconds"]` the scan ends truncated with
 reason `seconds`, and a handler that has not returned 2 s after the
 scan stopped is cancelled.
 
+## Adding live values
+
+The Edge Scout panel can show the current value of the addresses on
+screen, read every 5 s while an operator has live values turned on.
+The protocol is the "Values" section of
+`docs/architecture/edge-management/edge-scout.md`. It is separate from
+scouting, so a driver can read values without scanning, or scan
+without reading.
+
+Set `reads = True` on the handler class and implement `read_values`:
+
+```python
+from amrc.factoryplus.edge_driver import Handler, ReadValue, ScoutError
+
+class MyHandler(Handler):
+    reads = True
+
+    async def read_values(self, addresses):
+        if not self.session.connected:
+            raise ScoutError("CONN", "The PLC is not answering")
+        out = []
+        for address in addresses:
+            try:
+                v = await self.session.read(address)
+                out.append(ReadValue(address, v.value, "Double", v.source_ms))
+            except LookupError as e:
+                out.append(ReadValue(address, error=str(e)))
+        return out
+```
+
+`addresses` holds 1 to 40 addresses in the driver's canonical form.
+Return one `ReadValue`, or a dict with the keys `address`, `value`,
+`type`, `ts` and `error`, for each one. `type` is a Sparkplug type name
+or `None`, `ts` is the source timestamp in ms since the epoch (or a
+`datetime`) or `None`, and `error` is a short reason for an address
+that can't be read.
+
+`value` can be any value, because the library writes it as text: a
+string as it is, a number or a boolean as JSON writes it (`1450.5`,
+`true`), bytes decoded as UTF-8, and anything else as JSON. The text is
+cut at 1024 characters and an error at 256.
+
+Read on the connection the handler already has. Never open a session,
+a subscription or a client for each read. Reads run beside a running
+scan, and only while the driver is `UP`.
+
+The library answers the read for you when the handler can't:
+
+* `UNSUPPORTED` when the handler class does not set `reads = True`.
+* `CONN` when the driver is not `UP` or has no working configuration,
+  or when `read_values` raises `ScoutError("CONN", ...)`.
+* `ERR` when `read_values` raises anything else or does not return a
+  list.
+
+A `read_values` that has not returned in 4 s is cancelled and the
+library sends nothing, so the Edge Agent records a timeout for that
+round. The library drops entries for addresses it did not ask for, and
+adds an error entry for any address the handler left out.
+
 ## Tests
 
 ```sh

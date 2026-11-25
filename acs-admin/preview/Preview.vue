@@ -73,18 +73,59 @@
         </div>
       </div>
 
-      <!-- Edge Scout: the Addresses panel beside a stand-in metric pane -->
-      <div v-else-if="surface === 'scout'" class="flex gap-4 p-4 h-[calc(100vh-4rem)]">
-        <div class="flex-1 rounded-lg border p-4 text-sm text-gray-500">
-          <div class="font-semibold text-gray-700 mb-2">Spindle / Speed</div>
-          <div class="font-mono text-xs">{{ scoutModel.Spindle.Speed.Address }}</div>
+      <!-- Edge Scout: the Addresses panel beside the real metric fields,
+           laid out as OriginMapEditor lays them out: a stand-in schema
+           tree, the metric pane as a size container named `pane`, and the
+           panel, which pops out into a large view. `open=0` closes the
+           panel and `popout=1` starts it popped out. -->
+      <div v-else-if="surface === 'scout'" class="relative flex min-h-0 flex-1 overflow-hidden">
+        <div class="m-3 w-64 shrink-0 rounded-lg border bg-gray-100/50 p-3 text-xs text-gray-500">
+          <div class="font-semibold text-gray-700">Spindle</div>
+          <div class="ml-3 mt-1 rounded bg-gray-200 px-1">Speed</div>
+          <div class="ml-3 mt-1 px-1">Load</div>
         </div>
-        <div class="min-w-0 shrink-0 flex flex-col border rounded-lg p-3 bg-gray-50" style="width: 640px">
-          <ScoutPanel :scout="scout" :driver="scoutDriver" :driver-name="$route.query.driver ?? 'OPC-UA'"
-              :model="scoutModel" :devices="[{ name: 'Mill 1', model: scoutModel }]"
-              :selected-metric="{ path: ['Spindle', 'Speed'], model: scoutModel.Spindle.Speed }"
-              @map="items => { mapItems = items; mapOpen = true }"/>
+        <div class="@container/pane flex min-w-0 flex-1 flex-col overflow-auto px-6 py-4">
+          <header class="mb-3 flex shrink-0 items-start justify-between gap-3 px-1">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm text-slate-500">
+                <span class="hidden @2xl/pane:inline">Spindle &gt; </span><span class="text-slate-950">Speed</span>
+              </div>
+              <p class="mt-1 text-xs text-gray-400 line-clamp-2" :title="scoutDoc">{{ scoutDoc }}</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <Button variant="outline" size="sm" class="gap-2" title="Manage access" aria-label="Manage access">
+                <i class="fa-solid fa-shield-halved text-sm"></i>
+                <span class="hidden @3xl/pane:inline">Manage access</span>
+              </Button>
+              <Button variant="outline" size="sm" class="gap-2" title="Build dataset" aria-label="Build dataset">
+                <i class="fa-solid fa-database text-sm"></i>
+                <span class="hidden @3xl/pane:inline">Build dataset</span>
+              </Button>
+              <Button variant="outline" size="sm" class="gap-2" title="Addresses" aria-label="Addresses"
+                  :aria-pressed="scoutOpen" @click="scoutOpen = !scoutOpen; scoutPoppedOut = false">
+                <i class="fa-solid fa-sitemap text-sm"></i>
+                <span class="hidden @3xl/pane:inline">Addresses</span>
+              </Button>
+            </div>
+          </header>
+          <SparkplugMetric :selected-metric="scoutMetric" :model="scoutModel" :schema="SPARKPLUG_METRIC"
+              connection="preview" can-pick/>
         </div>
+        <Teleport to="body" :disabled="!scoutPoppedOut">
+          <div v-if="scoutOpen && scoutPoppedOut" class="fixed inset-0 z-50 bg-black/40" @click="scoutPoppedOut = false"></div>
+          <aside v-if="scoutOpen"
+              :class="scoutPoppedOut ? 'fixed inset-4 z-50 flex shadow-2xl md:inset-8' : 'my-3 mr-3 flex shrink-0'"
+              :style="scoutPoppedOut ? null : { width: '640px', maxWidth: 'max(20rem, calc(100% - 41rem))' }">
+            <div class="flex min-w-0 flex-1 flex-col rounded-lg border p-3" :class="scoutPoppedOut ? 'bg-white' : 'bg-gray-50'">
+              <ScoutPanel ref="scoutPanel" :scout="scout" :driver="scoutDriver" :driver-name="$route.query.driver ?? 'OPC-UA'"
+                  :model="scoutModel" :devices="[{ name: 'Mill 1', model: scoutModel }]"
+                  :selected-metric="{ path: ['Spindle', 'Speed'], model: scoutModel.Spindle.Speed }"
+                  :popped-out="scoutPoppedOut"
+                  @pop-out="v => scoutPoppedOut = v" @close="scoutOpen = false"
+                  @map="items => { mapItems = items; mapOpen = true }"/>
+            </div>
+          </aside>
+        </Teleport>
         <ScoutMapDialog :open="mapOpen" :items="mapItems" :schema="scoutSchema" :index="scout.current_index.value"
             @close="mapOpen = false" @apply="mapOpen = false"/>
       </div>
@@ -137,6 +178,8 @@ import MoveISA95NodeDialog from '@components/ISA95/MoveISA95NodeDialog.vue'
 import NewISA95NodeDialog from '@components/ISA95/NewISA95NodeDialog.vue'
 
 import ScoutPanel from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPanel.vue'
+import SparkplugMetric from '@components/EdgeManager/Devices/OriginMapEditor/SparkplugMetric.vue'
+import { Button } from '@components/ui/button'
 import ScoutMapDialog from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutMapDialog.vue'
 import ScoutPicker from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPicker.vue'
 import DriverCustomUI from '@components/EdgeManager/Devices/OriginMapEditor/DriverCustomUI.vue'
@@ -145,7 +188,9 @@ import scoutV2Document from '../test/fixtures/driver-ui/scout-v2.html?raw'
 import { devices, drafts, schemas } from './fixtures.js'
 import { target as i3xTarget } from './i3x-fixtures.js'
 import { nodes as isa95Nodes } from './isa95-fixtures.js'
-import { preview_scout, preview_index, scout_driver, scout_model } from './scout-fixtures.js'
+import {
+  SPARKPLUG_METRIC, preview_scout, preview_index, scout_driver, scout_metric, scout_model,
+} from './scout-fixtures.js'
 
 const metric = t => ({ allOf: [{}, { properties: { Sparkplug_Type: { enum: [t] } } }] })
 const SCOUT_SCHEMA = {
@@ -164,7 +209,7 @@ export default {
     ComponentPickerDialog, I3xAccessButton, ISA95, PublishSchema,
     ISA95PlacementPicker, MergeISA95NodeDialog, MoveISA95NodeDialog, NewISA95NodeDialog,
     RawSchemaDialog, SchemaPicker, Schemas, SchemaEditor, Toaster,
-    ScoutPanel, ScoutMapDialog, ScoutPicker, DriverCustomUI,
+    ScoutPanel, ScoutMapDialog, ScoutPicker, DriverCustomUI, SparkplugMetric, Button,
   },
 
   /* What DriverCustomUI injects for a version 2 document. The functions
@@ -184,11 +229,15 @@ export default {
      * deeply reactive, which unwraps refs inside objects, so the panel
      * would read `.value` of plain values. OriginMapEditor returns the
      * same object from setup(), which leaves it alone. */
-    const scout = this.$route.query.surface === 'scout' ? markRaw(preview_scout(this.$route.query.state)) : null
+    const scout = this.$route.query.surface === 'scout' ? markRaw(preview_scout(this.$route.query.state, this.$route.query)) : null
     return {
       drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
       placementA: [], placementB: [], settling: false,
       scout, scoutModel: scout_model, scoutDriver: scout_driver, scoutSchema: SCOUT_SCHEMA,
+      scoutMetric: scout_metric, SPARKPLUG_METRIC,
+      scoutDoc: scout_metric.model.Documentation,
+      scoutOpen: this.$route.query.open !== '0',
+      scoutPoppedOut: this.$route.query.popout === '1',
       mapOpen: false, mapItems: [],
       uiDocument: scoutV2Document,
       uiVersion: this.$route.query.v === '1' ? 1 : 2,
@@ -206,6 +255,11 @@ export default {
    *   isa95&demo=add           adding an Area that already exists
    *   isa95-picker&demo=warning  the picker's duplicate warning */
   async mounted () {
+    /* `live=ask` opens the Live values dialog, `live=on` turns live
+     * values on without it. */
+    if (this.scout && this.$route.query.live === 'ask') this.$refs.scoutPanel?.ask_live()
+    if (this.scout && this.$route.query.live === 'on') this.scout.live_on()
+
     const demo = this.$route.query.demo
     if (!demo) return
     const wait = ms => new Promise(r => setTimeout(r, ms))

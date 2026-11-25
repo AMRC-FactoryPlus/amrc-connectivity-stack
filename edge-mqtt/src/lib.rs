@@ -13,10 +13,13 @@
 //! - [`write`] makes the payload for a write;
 //! - [`survey`] turns what a scan heard into scout items;
 //! - [`scout`] runs a scan on its own connection to the broker;
+//! - [`live`] keeps the last message on the topics the Edge Scout
+//!   panel reads;
 //! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait.
 
 pub mod config;
 pub mod handler;
+pub mod live;
 pub mod scout;
 pub mod survey;
 pub mod topics;

@@ -667,6 +667,7 @@ export default {
           ? `Remove "${node.key}" and the ${node.children.length} items inside it?`
           : `Remove "${node.key}"?`,
         confirmText: 'Remove',
+        destructive: true,
         onConfirm: () => {
           const found = findNode(this.doc, node.id)
           if (!found) return

@@ -17,6 +17,7 @@
               placeholder="e.g. Machine Connection"
               v-model="v$.name.$model"
               :v="v$.name"
+              :info="nameHint"
               required
           />
         </div>
@@ -28,14 +29,14 @@
           <Select :disabled="existingConnection" name="host" v-model="v$.selectedDriverId.$model">
             <SelectTrigger :class="{'border-red-500': v$.selectedDriverId.$error}">
               <SelectValue>
-                {{selectedDriver?.name ?? 'Select a Driver...'}}
+                {{selectedDriver ? driverLabel(selectedDriver) : 'Select a Driver...'}}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectItem v-for="driver in sortedDrivers" :value="driver.uuid" :key="driver.uuid">
                   <div class="flex items-center justify-between gap-2">
-                    <div class="font-medium">{{driver.name}}</div>
+                    <div class="font-medium">{{driverLabel(driver)}}</div>
                     <div v-if="driver.definition?.hidden" class="text-gray-400">Retired</div>
                     <div v-else-if="driver.definition?.image" class="flex items-center justify-center gap-1.5 text-gray-400">
                       <i class="fa-solid fa-cube text-sm"></i>
@@ -217,7 +218,8 @@ import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
 import { hostPortClash } from '@utils/hostPorts.js'
 import { useAccessStore } from '@store/useAccessStore.js'
 import { can_delete_connection, can_edit_connection, can_new_connection } from '@/lib/access/perms-edge.js'
-import { driverByUuid, driverChoices } from '@utils/driverChoices.js'
+import { driverByUuid, driverChoices, driverLabel } from '@utils/driverChoices.js'
+import { connection_name_hint, connection_name_problem } from '@/lib/edge-names.js'
 
 const PAYLOAD_FORMATS = [
   "Defined by Protocol",
@@ -331,6 +333,9 @@ export default {
     selectedDriver () {
       return driverByUuid(this.dr.data, this.selectedDriverId)
     },
+    nameHint () {
+      return connection_name_hint(this.selectedDriver?.definition)
+    },
     /* Drop any rows the user started and left blank. */
     cleanHostPaths () {
       return this.hostPaths.filter(p => p.hostPath && p.mountPath)
@@ -380,17 +385,11 @@ export default {
     const rules = {
       selectedDriverId: { required },
       name: {
-        required,
-        // Only allow characters that are valid for Kubernetes resource names
-        // This will prevent issues with LocalSecret resources
-        kubernetesNameSafe: helpers.withMessage(
-          'Only letters, numbers, hyphens, and dots are allowed. Must start and end with an alphanumeric character.',
-          (value) => {
-            if (!value) return true; // Skip validation if empty (required will catch this)
-            // RFC 1123 subdomain pattern - lowercase alphanumeric, hyphens and dots
-            // Must start and end with alphanumeric
-            return /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(value.toLowerCase());
-          }
+        required: helpers.withMessage('Give the connection a name', required),
+        /* The rule depends on the driver: see lib/edge-names.js. */
+        allowedName: helpers.withMessage(
+          ({ $model }) => connection_name_problem($model, this.selectedDriver?.definition) ?? '',
+          value => !connection_name_problem(value, this.selectedDriver?.definition)
         ),
       },
       pollInt: {
@@ -496,6 +495,8 @@ export default {
   },
 
   methods: {
+    driverLabel,
+
     /* A v4-shaped identifier for a secret placeholder.
      *
      * The Edge Agent finds these by pattern, so the shape matters. This used
@@ -581,26 +582,8 @@ export default {
           this.formData[key] = prop.default
         }
       })
-
-      // After setting defaults, touch all fields to trigger validation
-      this.$nextTick(() => {
-        if (this.v$.formData) {
-          Object.keys(this.formData).forEach(key => {
-            if (this.v$.formData[key]) {
-              // For boolean fields with default values, we need to mark them as dirty and valid
-              const prop = properties[key];
-              if (prop.type === 'boolean' && 'default' in prop) {
-                this.v$.formData[key].$touch();
-                // Force the field to be considered valid
-                this.v$.formData[key].$commit();
-              } else {
-                // For other fields, just touch them
-                this.v$.formData[key].$touch();
-              }
-            }
-          })
-        }
-      })
+      /* Nothing is touched here: a field shows its errors once someone
+       * changes it, or on save, which validates every field. */
     },
 
     handleFormChange(event) {
@@ -628,12 +611,11 @@ export default {
     },
 
     resetForm() {
-      // First reset the validation state
-      this.v$.$reset()
-
-      // Reset all form fields
-      this.v$.selectedDriverId.$model = null
-      this.v$.name.$model = null
+      /* Set the fields directly rather than through $model, which
+       * would mark them touched and show "required" errors on a form
+       * nobody has typed in yet. The validation state is reset last. */
+      this.selectedDriverId = null
+      this.name = null
       this.pollInt = 1000 // Reset to default 1000ms
       this.formData = {
         payloadFormat: "Defined by Protocol"
@@ -642,6 +624,7 @@ export default {
       this.showHostPaths = false
       this.isSubmitting = false
       this.existingConnection = null
+      this.v$.$reset()
     },
 
     async save() {

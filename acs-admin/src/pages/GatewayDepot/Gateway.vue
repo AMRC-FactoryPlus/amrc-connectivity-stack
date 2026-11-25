@@ -265,6 +265,7 @@ function remove () {
     message: name_of(gw) + ' · ' + (serial_of(gw) ? 'serial ' + serial_of(gw) : 'no serial number'),
     details,
     confirmText: pending ? 'Reject' : 'Remove',
+    destructive: true,
     onConfirm: async () => {
       removing.value = true
       try {

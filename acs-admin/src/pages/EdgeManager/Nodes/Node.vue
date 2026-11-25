@@ -383,6 +383,7 @@ export default {
         title: 'Delete this node?',
         message: delete_message(name, this.cluster, this.deletePlan),
         confirmText: 'Delete node',
+        destructive: true,
         onConfirm: async () => {
           this.deleting = true
           try {

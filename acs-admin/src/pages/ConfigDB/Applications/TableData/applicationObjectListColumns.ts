@@ -66,6 +66,7 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
                 title: 'Remove Config Entry?',
                 message: `Are you sure you want to delete the config entry for "${row.getValue('name')}" from ${row.original.application.name}`,
                 confirmText: 'Remove',
+                destructive: true,
                 onConfirm: async () => {
                     try {
                         await useServiceClientStore().client.ConfigDB.delete_config(row.original.application.uuid, row.original.uuid)

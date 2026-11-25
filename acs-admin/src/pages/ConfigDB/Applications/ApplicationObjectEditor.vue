@@ -221,6 +221,7 @@ export default {
             title: 'Update From Remote?',
             message: `The remote config entry for this object has changed. Do you wish to overwrite your local changes with the remote version?`,
             confirmText: 'Use Remote',
+            destructive: true,
             onConfirm: () => {
               this.code = this.settings.useYaml ? this.formats.yaml.stringify(this.formats.json.parse(this.incomingBufferJson)) : this.incomingBufferJson
               this.v$.$reset()
@@ -302,6 +303,7 @@ export default {
             title: 'Leave Without Saving?',
             message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
             confirmText: 'Leave',
+            destructive: true,
             onConfirm: () => {
               this.stopObjectSync();
               this.startObjectSync();
@@ -339,6 +341,7 @@ export default {
             title: 'Leave Without Saving?',
             message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
             confirmText: 'Leave',
+            destructive: true,
             onConfirm: () => {
               this.stopObjectSync();
               this.startObjectSync();
@@ -377,6 +380,7 @@ export default {
         title: 'Leave Without Saving?',
         message: `You have unsaved changes to this config entry, if you leave you will lose your changes.`,
         confirmText: 'Leave',
+        destructive: true,
         onConfirm: () => {
           next();
         },

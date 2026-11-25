@@ -431,6 +431,7 @@ export default {
         title: 'Delete draft',
         message: `Delete the draft "${draft.name}"? It has not been published, so nothing is using it.`,
         confirmText: 'Delete',
+        destructive: true,
         onConfirm: async () => {
           try {
             await deleteDraft(this.s.client, draft.uuid)

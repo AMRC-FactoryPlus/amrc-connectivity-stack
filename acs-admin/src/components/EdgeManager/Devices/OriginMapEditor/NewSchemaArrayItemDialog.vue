@@ -16,9 +16,6 @@
             v-model="v$.name.$model"
             :v="v$.name"
         />
-        <div v-if="v$.$invalid && v$.$dirty" class="text-xs text-red-500">
-          {{v$.$silentErrors[0]?.$message}}
-        </div>
       </div>
       <DialogFooter :title="v$?.$silentErrors[0]?.$message">
         <Button :disabled="v$.$invalid" @click="formSubmit">

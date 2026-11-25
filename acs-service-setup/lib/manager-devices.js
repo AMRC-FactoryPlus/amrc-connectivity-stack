@@ -21,6 +21,34 @@ const StockDriver = new Map([
     ["tplink-smartplug",    Driver.TPlinkSmartPlug],
 ]);
 
+/* Keys of an old edge-agent chart's `values.image` that are not
+ * drivers: `default` holds the registry, tag and pull policy every
+ * image shares, and `edgeAgent` is the Edge Agent itself. */
+const NotDriverImages = new Set(["default", "edgeAgent"]);
+
+/** Whether an entry of an old edge-agent chart's `values.image` is a
+ * driver image. Only an entry with a repository can run as a driver.
+ * @arg key The entry's key.
+ * @arg image The entry.
+ */
+export function is_driver_image (key, image) {
+    return !NotDriverImages.has(key)
+        && typeof image?.repository == "string" && image.repository != "";
+}
+
+/** Whether a DriverDef was made by an earlier version of this
+ * migration from a `values.image` entry that is not a driver: one with
+ * an image but no repository (the chart's `default` entry, registered
+ * as "(unknown driver)"), or one for the Edge Agent's own image. These
+ * can never run, so they are hidden from the Manager's driver list.
+ * @arg def A DriverDefinition config.
+ */
+export function is_bogus_driver (def) {
+    if (!def?.image || def.internal || def.hidden === true) return false;
+    const repo = def.image.repository;
+    return typeof repo != "string" || repo == "" || repo == "acs-edge";
+}
+
 function image_tag (img) {
     return util.format("%s/%s:%s",
         img?.registry ?? "",
@@ -38,6 +66,7 @@ class MigrateAgents {
 
     async run () {
         await this.fetch_existing_configs();
+        await this.hide_bogus_drivers();
         await this.register_drivers();
         await this.migrate_agents();
         this.log("Manager migration complete");
@@ -84,11 +113,12 @@ class MigrateAgents {
         for (const dep of this.deployments.values()) {
             if (!dep?.values?.image)
                 continue;
-            for (const image of Object.values(dep.values.image)) {
+            for (const [key, image] of Object.entries(dep.values.image)) {
+                if (!is_driver_image(key, image)) continue;
                 const tag = image_tag(image);
                 if (tags.has(tag)) continue;
 
-                const name = image.repository ?? "(unknown driver)";
+                const name = image.repository;
                 const drv = await cdb.create_object(Edge.Class.Driver);
                 await cdb.put_config(App.Info, drv, { name });
                 await cdb.put_config(App.DriverDefinition, drv, { image });
@@ -96,6 +126,28 @@ class MigrateAgents {
                 tags.set(tag, drv);
 
                 this.log("Registered driver %s as %s", tag, drv);
+            }
+        }
+    }
+
+    /* Hide the DriverDefs an earlier version of register_drivers made
+     * for `values.image` entries that are not drivers. They are hidden
+     * rather than deleted, as retired-drivers.js does, so a connection
+     * that somehow uses one still shows it. A failure is logged and
+     * setup carries on. */
+    async hide_bogus_drivers () {
+        const { cdb, drivers } = this;
+
+        for (const [uuid, def] of drivers.entries()) {
+            if (!is_bogus_driver(def)) continue;
+            try {
+                this.log("Hiding DriverDef %s, which is not a driver", uuid);
+                const hidden = { ...def, hidden: true };
+                await cdb.put_config(App.DriverDefinition, uuid, hidden);
+                drivers.set(uuid, hidden);
+            }
+            catch (e) {
+                this.log("ERROR: can't hide DriverDef %s: %s", uuid, e);
             }
         }
     }

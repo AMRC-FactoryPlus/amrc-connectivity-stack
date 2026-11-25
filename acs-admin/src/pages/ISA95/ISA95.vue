@@ -427,6 +427,7 @@ export default {
         title: 'Delete Node',
         message: `Delete "${node.name}" from the ISA-95 vocabulary? No devices are placed on it. You cannot undo this.`,
         confirmText: 'Delete',
+        destructive: true,
         onConfirm: async () => {
           try {
             const cdb = this.s.client.ConfigDB;

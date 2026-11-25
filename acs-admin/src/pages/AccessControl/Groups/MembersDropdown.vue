@@ -42,6 +42,7 @@ function handleDelete() {
         title: 'Remove from group?',
         message: `Are you sure that you want to remove ${props.row.original.name} from ${props.row.original.group.name}? The user will lose all permissions associated with the group.`,
         confirmText: 'Remove from Group',
+        destructive: true,
         onConfirm: () => {
             s.client.ConfigDB.class_remove_member(props.row.original.group.uuid, props.row.original.uuid).then(async () => {
                 toast.success(`${props.row.original.name} has been removed from ${props.row.original.group.name}`)

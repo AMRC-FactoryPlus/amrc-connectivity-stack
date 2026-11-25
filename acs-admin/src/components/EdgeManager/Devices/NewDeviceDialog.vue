@@ -15,9 +15,8 @@
             placeholder="e.g. My CNC Machine"
             v-model="v$.name.$model"
             :v="v$.name"
+            :info="nameHint"
         />
-            <div v-if="v$.$invalid && v$.$dirty" class="text-xs text-red-500">
-              {{v$.$silentErrors[0]?.$message}}</div>
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-sm font-medium">ISA-95 Placement</label>
@@ -58,6 +57,7 @@ import { useISA95Store } from '@store/useISA95Store.js'
 import { UUIDs } from '@amrc-factoryplus/service-client'
 import { sparkplug_safe_string } from '@amrc-factoryplus/service-client/lib/sparkplug/util.js'
 import ISA95PlacementPicker from '@components/ISA95/ISA95PlacementPicker.vue'
+import { DEVICE_NAME_HINT, name_problem } from '@/lib/edge-names.js'
 
 export default {
 
@@ -171,6 +171,7 @@ export default {
 
   data () {
     return {
+      nameHint: DEVICE_NAME_HINT,
       node: null,
       name: null,
       /* The chosen ISA-95 nodes, Enterprise first. */
@@ -183,10 +184,11 @@ export default {
 
   validations: {
     name: {
-      required,
-      alphaNumUnderscoreSpace: helpers.withMessage('Letters, numbers, spaces and underscores are valid', (value) => {
-        return /^[a-zA-Z0-9_ ]*$/.test(value)
-      }),
+      required: helpers.withMessage('Give the device a name', required),
+      /* The name is the device's Sparkplug ID: see lib/edge-names.js. */
+      allowedName: helpers.withMessage(
+        ({ $model }) => name_problem($model) ?? '',
+        value => !name_problem(value)),
       unique: helpers.withMessage('This device name already exists', (value, vm) => {
         if (!value) return true
         return !vm.d.data.find(device => (device.name === value && device.deviceInformation.node === vm.node.uuid))

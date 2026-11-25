@@ -38,6 +38,7 @@ function handleDelete() {
     title: 'Remove Classification?',
     message: `Are you sure you want to remove the classification of ${props.row.original.name}`,
     confirmText: 'Remove',
+    destructive: true,
     onConfirm: async () => {
       try {
         await cdb.class_remove_subclass(props.row.original.uuid, props.row.original.originalObject.uuid)

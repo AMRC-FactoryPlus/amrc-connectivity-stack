@@ -520,6 +520,9 @@ export default {
   },
 
   beforeUnmount () {
+    /* The page hides its sidebar while the panel is open, and this
+     * editor won't be here to say it closed. */
+    if (this.scoutOpen) this.$emit('scout-open', false)
     this.scout.stop()
     this.closePicker(null)
     this.stopResize()

@@ -124,6 +124,12 @@ export function unwatch_request ({ request, connection, lease }) {
 
 const as_text = v => (typeof v === 'string' ? v : JSON.stringify(v))
 
+/* An item's `path` is its driver's metric path. Only MQTT's JSON
+ * leaves carry a JSONPath, which always starts with `$`. Other drivers
+ * use the path for their own purposes (edge-test's is "0"), and their
+ * read value is already the item's value. */
+const is_json_path = path => typeof path === 'string' && path.startsWith('$')
+
 /**
  * The live value for an item, from the values entry.
  *
@@ -145,7 +151,7 @@ export function live_value (item, entry) {
     read: typeof v.read === 'string' ? v.read : null,
     type: typeof v.type === 'string' ? v.type : null,
   }
-  if (out.error || !item.path) return out
+  if (out.error || !is_json_path(item.path)) return out
 
   /* A JSON leaf: the driver sends the topic's whole payload, and the
    * panel picks the leaf out of it. */

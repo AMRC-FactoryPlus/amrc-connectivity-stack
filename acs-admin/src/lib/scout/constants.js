@@ -14,6 +14,8 @@ export const Scout = {
   ResultClass: '10916e96-f6fe-44cc-8c01-16a775426038',
   /* "Scan device addresses", in ACS.PermGroup.CmdEsc. */
   Perm: '41443382-ecad-439b-999f-cb611bc11f7c',
+  /* ConfigDB app holding one live values entry per connection. */
+  ValuesApp: '399a86cf-9bc6-4681-b568-b45fc650dacb',
 }
 
 /* The NBIRTH metric and NCMD name the Edge Agent understands. */
@@ -28,8 +30,19 @@ export const WAIT_MS = 15000
 
 /* Agent refusal codes, which go in last_request only. */
 export const REFUSAL_CODES = [
-  'REQUEST', 'UNDEPLOYED', 'NODRIVER', 'LIBRARY', 'BUSY', 'LIMIT', 'NOTRUNNING',
+  'REQUEST', 'UNDEPLOYED', 'NODRIVER', 'LIBRARY', 'BUSY', 'LIMIT', 'NOTRUNNING', 'NOREADS',
 ]
+
+/* Most addresses one live values lease asks for. */
+export const LIVE_MAX = 40
+
+/* How often the panel renews its lease. The agent lets one lapse 60 s
+ * after the last watch. */
+export const LIVE_RENEW_MS = 20000
+
+/* How long the rows on screen must stay put before the panel asks for
+ * the new set. */
+export const LIVE_DEBOUNCE_MS = 1000
 
 /* The plain Sparkplug B type names an item may carry. */
 export { ITEM_TYPES } from './snapshot.js'

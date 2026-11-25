@@ -6,6 +6,7 @@
  */
 
 import { code_text, count_text, elapsed_text } from './model.js'
+import { LIVE_MAX } from './constants.js'
 
 /* What a driver status from `fpEdge1/<Conn>/status` means. */
 const DRIVER_STATUS = {
@@ -123,4 +124,77 @@ export function comparable_text (reason) {
     default:
       return null
   }
+}
+
+/* ---------------------------------------------------------------------
+ * Live values
+ * ------------------------------------------------------------------- */
+
+/* What the confirmation dialog says before live values turn on. */
+export const LIVE_CONFIRM = {
+  title: 'Turn on live values?',
+  message: 'The Edge Agent will read the addresses on screen from the device every 5 seconds while this panel is open. This adds a small load to the device and the Edge Agent. Turn it off when you have finished.',
+  confirmText: 'Turn on',
+  cancelText: 'Cancel',
+}
+
+/** Why the Live values switch is disabled, for its tooltip. */
+export function live_blocked_text (reason) {
+  switch (reason) {
+    case 'offline': return 'Live values need the Edge Agent to be online.'
+    case 'no_permission': return 'Live values need the Scan device addresses permission.'
+    case 'noreads': return "This driver can't read live values."
+    case 'unknown': return "This Edge Agent or driver can't read live values yet. Update them to the current ACS release."
+    default: return null
+  }
+}
+
+/**
+ * Why live values stopped after the Edge Agent refused a watch.
+ *
+ * @param {string} code The refusal code from `last_request`.
+ * @param {object} [ctx]
+ * @param {string|null} [ctx.message]
+ */
+export function watch_refusal_text (code, { message = null } = {}) {
+  switch (code) {
+    case 'NOREADS':
+      return "Live values stopped because this driver can't read values."
+    case 'LIMIT':
+      return 'Live values stopped because four other panels already have live values on for this connection, which is the most the Edge Agent allows. Try again when one of them turns live values off.'
+    default:
+      return `Live values stopped. ${code_text(code, { message })}`
+  }
+}
+
+/** Why live values stopped when the request did not reach the agent. */
+export function watch_send_error_text (err) {
+  return err?.status === 403
+    ? 'Live values stopped because the Command Escalation service refused the request. It needs the Scan device addresses permission on this Edge Agent.'
+    : `Live values stopped because the request did not reach the Edge Agent (${err?.status ?? err?.message ?? err}).`
+}
+
+/**
+ * The line beside the switch while live values are on.
+ *
+ * @param {object} ctx
+ * @param {boolean} ctx.started The agent has written values for a lease.
+ * @param {number} ctx.wanted Addresses this panel asked for.
+ * @param {number} ctx.shown Of those, how many have a value.
+ * @param {number} ctx.dropped Addresses the agent left out at its cap.
+ */
+export function live_status_text ({ started, wanted, shown, dropped }) {
+  if (!wanted) return 'Scroll to some values to read them.'
+  if (!started) return 'Waiting for the first values.'
+  const left_out = dropped > 0
+    ? ` The Edge Agent reads at most ${LIVE_MAX} addresses on this connection, so it left out ${count_text(dropped)}.`
+    : ''
+  return `Showing live values for ${count_text(shown)}.${left_out}`
+}
+
+/** "Read 3 s ago" for a value's tooltip. */
+export function read_age_text (read, now) {
+  const t = read ? Date.parse(read) : NaN
+  if (!Number.isFinite(t) || !now) return null
+  return `Read ${elapsed_text(Math.max(0, now - t))} ago`
 }

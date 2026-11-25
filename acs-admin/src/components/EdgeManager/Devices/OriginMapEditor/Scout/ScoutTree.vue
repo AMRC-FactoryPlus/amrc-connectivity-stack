@@ -74,14 +74,9 @@
               aria-label="Not fully listed"></i>
         </div>
 
-        <!-- Address -->
-        <span class="font-mono truncate shrink-0 text-gray-600" :style="{ width: `${addressWidth}px` }" :title="address_text(row.id)">
-          {{ address_text(row.id) }}
-        </span>
-
-        <span class="w-16 shrink-0 text-gray-500 truncate">{{ item(row.id).type ?? '' }}</span>
-        <span class="w-6 shrink-0 text-gray-500">{{ item(row.id).access ?? '' }}</span>
-        <span class="w-20 shrink-0 flex items-center gap-1 min-w-0 font-mono"
+        <!-- Value: at scan in grey, live in black. Next to the name so it
+           - stays in view in the docked panel. -->
+        <span class="w-24 shrink-0 flex items-center gap-1 min-w-0 font-mono"
             :class="cells.get(row.id).live ? 'text-gray-900' : 'text-gray-400'"
             :title="cells.get(row.id).title"
             data-test="value">
@@ -90,6 +85,14 @@
               role="img" :aria-label="cells.get(row.id).error"></i>
           <span class="truncate">{{ cells.get(row.id).text }}</span>
         </span>
+
+        <!-- Address -->
+        <span class="font-mono truncate shrink-0 text-gray-600" :style="{ width: `${addressWidth}px` }" :title="address_text(row.id)">
+          {{ address_text(row.id) }}
+        </span>
+
+        <span class="w-16 shrink-0 text-gray-500 truncate">{{ item(row.id).type ?? '' }}</span>
+        <span class="w-6 shrink-0 text-gray-500">{{ item(row.id).access ?? '' }}</span>
 
         <!-- Mapped-to chip -->
         <span v-if="mapped(row.id).length"
@@ -149,7 +152,7 @@ const NAME_MIN = 224
 const NAME_MAX = 480
 const ADDRESS_MIN = 224
 const ADDRESS_MAX = 720
-const OTHER_COLUMNS = 336
+const OTHER_COLUMNS = 352
 
 /** The name and address columns' widths for a tree this wide. */
 export function column_widths (tree_width) {

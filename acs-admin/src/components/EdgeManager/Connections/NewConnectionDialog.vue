@@ -385,7 +385,7 @@ export default {
     const rules = {
       selectedDriverId: { required },
       name: {
-        required,
+        required: helpers.withMessage('Give the connection a name', required),
         /* The rule depends on the driver: see lib/edge-names.js. */
         allowedName: helpers.withMessage(
           ({ $model }) => connection_name_problem($model, this.selectedDriver?.definition) ?? '',
@@ -580,26 +580,8 @@ export default {
           this.formData[key] = prop.default
         }
       })
-
-      // After setting defaults, touch all fields to trigger validation
-      this.$nextTick(() => {
-        if (this.v$.formData) {
-          Object.keys(this.formData).forEach(key => {
-            if (this.v$.formData[key]) {
-              // For boolean fields with default values, we need to mark them as dirty and valid
-              const prop = properties[key];
-              if (prop.type === 'boolean' && 'default' in prop) {
-                this.v$.formData[key].$touch();
-                // Force the field to be considered valid
-                this.v$.formData[key].$commit();
-              } else {
-                // For other fields, just touch them
-                this.v$.formData[key].$touch();
-              }
-            }
-          })
-        }
-      })
+      /* Nothing is touched here: a field shows its errors once someone
+       * changes it, or on save, which validates every field. */
     },
 
     handleFormChange(event) {
@@ -627,12 +609,11 @@ export default {
     },
 
     resetForm() {
-      // First reset the validation state
-      this.v$.$reset()
-
-      // Reset all form fields
-      this.v$.selectedDriverId.$model = null
-      this.v$.name.$model = null
+      /* Set the fields directly rather than through $model, which
+       * would mark them touched and show "required" errors on a form
+       * nobody has typed in yet. The validation state is reset last. */
+      this.selectedDriverId = null
+      this.name = null
       this.pollInt = 1000 // Reset to default 1000ms
       this.formData = {
         payloadFormat: "Defined by Protocol"
@@ -641,6 +622,7 @@ export default {
       this.showHostPaths = false
       this.isSubmitting = false
       this.existingConnection = null
+      this.v$.$reset()
     },
 
     async save() {

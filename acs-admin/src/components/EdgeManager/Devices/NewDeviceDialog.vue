@@ -184,7 +184,7 @@ export default {
 
   validations: {
     name: {
-      required,
+      required: helpers.withMessage('Give the device a name', required),
       /* The name is the device's Sparkplug ID: see lib/edge-names.js. */
       allowedName: helpers.withMessage(
         ({ $model }) => name_problem($model) ?? '',

@@ -15,6 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::config::{DriverConfig, DriverOptions, PUBLISH_QUEUE_OVERHEAD};
 use crate::error::{ConnectError, Error, WriteError};
 use crate::handler::{AddrGroup, Handler, Poller};
+use crate::read::{self, Reader};
 use crate::redact::{redact, redact_url};
 use crate::scout::{self, ScoutError, ScoutOp, Scouter, Wire};
 use crate::status::State as Status;
@@ -177,6 +178,7 @@ pub(crate) enum DriverEvent<A> {
         result: Result<(), ConnectError>,
         poller: Option<Arc<dyn Poller<A>>>,
         scouter: Option<Arc<dyn Scouter>>,
+        reader: Option<Arc<dyn Reader>>,
     },
     /// An address map has been parsed, as (data topic, address,
     /// parsed address). `None` if the handler rejected an address.
@@ -441,6 +443,9 @@ pub struct Driver<H: Handler> {
     /// The current handler's scouter, asked for after each successful
     /// connect, as `poller` is.
     scouter: Option<Arc<dyn Scouter>>,
+    /// The current handler's reader, asked for after each successful
+    /// connect, as `scouter` is.
+    reader: Option<Arc<dyn Reader>>,
     /// Whether the Edge Agent has advertised scouting on this MQTT
     /// session, so the driver has subscribed to `scout`. Cleared on
     /// every connect to the broker.
@@ -511,6 +516,7 @@ impl<H: Handler + 'static> Driver<H> {
             connected: false,
             poller: None,
             scouter: None,
+            reader: None,
             scout_seen: false,
             control_acked: false,
             scan: None,
@@ -1120,6 +1126,11 @@ impl<H: Handler + 'static> Driver<H> {
             } else {
                 None
             };
+            let reader = if result.is_ok() && H::READS {
+                h.reader()
+            } else {
+                None
+            };
             drop(h);
 
             let _ = tx.send(DriverEvent::Connected {
@@ -1128,6 +1139,7 @@ impl<H: Handler + 'static> Driver<H> {
                 result,
                 poller,
                 scouter,
+                reader,
             });
         }));
     }
@@ -1292,7 +1304,7 @@ impl<H: Handler + 'static> Driver<H> {
                 let _ = session.outbound.send((
                     self.topic_with("found", "hello"),
                     QoS::AtMostOnce,
-                    Bytes::from(scout::hello_answer(H::SCOUTS)),
+                    Bytes::from(scout::hello_answer(H::SCOUTS, H::READS)),
                     None,
                     None,
                 ));
@@ -1313,6 +1325,11 @@ impl<H: Handler + 'static> Driver<H> {
                 req,
                 window,
             }) => self.on_scout_start(session, version, req, window),
+            Ok(ScoutOp::Read {
+                id,
+                version,
+                addresses,
+            }) => self.on_read(session, id, version, addresses),
             Err((Some(id), why)) => {
                 tracing::warn!(id, why, "bad scout request");
                 self.scout_wire(session, &id).end(Err(ScoutError::err(why)));
@@ -1377,6 +1394,49 @@ impl<H: Handler + 'static> Driver<H> {
             cancel,
             task,
         });
+    }
+
+    /// Read values for the Edge Scout panel, or end the read at once
+    /// with the reason it can't run. A read runs on its own task beside
+    /// any scan, never takes the handler's lock, and is answered once.
+    fn on_read(
+        &mut self,
+        session: &Session<H>,
+        id: String,
+        version: Option<u64>,
+        addresses: Vec<String>,
+    ) {
+        let wire = self.scout_wire(session, &id);
+        if !H::READS {
+            wire.end(Err(ScoutError::new(
+                scout::ScoutCode::Unsupported,
+                "this driver can't read values",
+            )));
+            return;
+        }
+        if version != Some(scout::SCOUT_VERSION) {
+            wire.end(Err(ScoutError::err(format!(
+                "read request version {version:?} is not supported"
+            ))));
+            return;
+        }
+        let reader = match &self.reader {
+            Some(r) if self.connected => r.clone(),
+            _ => {
+                wire.end(Err(ScoutError::conn(
+                    "the driver is not connected to its device",
+                )));
+                return;
+            }
+        };
+        tracing::debug!(id, count = addresses.len(), "reading values");
+        tokio::spawn(read::run_read(
+            reader,
+            id,
+            addresses,
+            wire,
+            read::READ_TIMEOUT,
+        ));
     }
 
     /// An address map has been parsed: store it, then handle the
@@ -1626,6 +1686,7 @@ impl<H: Handler + 'static> Driver<H> {
                 tracing::warn!(%status, "handler lost its connection, reconnecting");
                 self.connected = false;
                 self.scouter = None;
+                self.reader = None;
                 self.set_status(session, status);
                 self.start_connect(self.config.reconnect_delay);
             }
@@ -1635,6 +1696,7 @@ impl<H: Handler + 'static> Driver<H> {
                 result,
                 poller,
                 scouter,
+                reader,
             } => {
                 if generation != self.generation {
                     return;
@@ -1654,6 +1716,7 @@ impl<H: Handler + 'static> Driver<H> {
                         self.connected = true;
                         self.poller = poller;
                         self.scouter = scouter;
+                        self.reader = reader;
                         if self.addr_rejected {
                             self.set_status(session, Status::Addr);
                         } else {
@@ -1720,6 +1783,7 @@ impl<H: Handler + 'static> Driver<H> {
         self.connected = false;
         self.poller = None;
         self.scouter = None;
+        self.reader = None;
         // A new conf, OFFLINE or the end of the session stops a scan,
         // which ends with CANCELLED if it still can.
         if let Some(scan) = &self.scan {

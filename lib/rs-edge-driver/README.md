@@ -289,6 +289,38 @@ driver prints from a parsed address. List the parts of the device the
 scan skipped on purpose with `ScoutEnd::exclude`, so the Admin UI does
 not call their addresses missing.
 
+### Live values
+
+The Edge Scout panel can show the current value of the addresses on
+screen. While an operator has live values turned on, the Edge Agent
+sends a `read` on the `scout` topic every few seconds, and the driver
+answers once with a `values` message. The protocol is the "Values"
+section of
+[`docs/architecture/edge-management/edge-scout.md`](../../docs/architecture/edge-management/edge-scout.md).
+
+1. Set `const READS: bool = true` on the handler. The hello sends it as
+   `reads`, and without it every read ends with `UNSUPPORTED`.
+2. Return a `Reader` from `Handler::reader`. The driver asks for it
+   after each successful `connect`, as it does for `scouter`, and runs
+   reads on their own task without the handler's lock, beside any
+   scan. Return `None` when there is no connection, and the read ends
+   with `CONN`. A reader must use the connection the handler already
+   has.
+3. In `Reader::read`, return a `ReadValue` for each address:
+   `ReadValue::new(address, value)` with `with_type` and `with_ts`, or
+   `ReadValue::error(address, "BadNodeIdUnknown")`.
+
+The library writes each value as text: a string as it is, a number or
+boolean as JSON writes it, a NaN or infinite float as `NaN`,
+`Infinity` or `-Infinity`, and anything else as JSON, cut at 1024
+characters. It sends one entry per requested address in the order
+asked for, gives an address the reader left out an error, and drops
+entries for addresses nobody asked for. A panic in the reader ends the
+read with `ERR`. A reader that has not answered in 4 s is abandoned
+with no answer, and the Edge Agent records `TIMEOUT`. A read with more
+than 40 addresses, or one that is not a list of strings, ends with
+`ERR`.
+
 The tests check every message against the JSON Schemas in
 [`lib/edge-scout-schemas`](../edge-scout-schemas). `tests/scout_mosquitto.rs`
 runs the feature gate against a real mosquitto broker when `mosquitto`
@@ -302,7 +334,8 @@ this directory, or read the doc comments directly in
 [`src/handler.rs`](./src/handler.rs) (the `Handler` trait — the
 interface driver authors implement) and
 [`src/driver.rs`](./src/driver.rs) (`Driver` and `DriverHandle` — the
-library's own runtime) and [`src/scout.rs`](./src/scout.rs) (scouting). Any method or property not documented there
+library's own runtime), [`src/scout.rs`](./src/scout.rs) (scouting) and
+[`src/read.rs`](./src/read.rs) (live values). Any method or property not documented there
 must not be relied on.
 
 ## Environment variables

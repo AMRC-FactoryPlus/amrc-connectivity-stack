@@ -56,6 +56,7 @@ mod driver;
 mod error;
 mod handler;
 mod logging;
+mod read;
 mod redact;
 mod scout;
 mod status;
@@ -69,6 +70,7 @@ pub use driver::{Driver, DriverHandle};
 pub use error::{ConnectError, Error, HandlerError, WriteError};
 pub use handler::{AddrGroup, Handler, Poller};
 pub use logging::{init_logging, log_filter};
+pub use read::{ReadData, ReadValue, Reader};
 pub use redact::redact;
 pub use scout::{
     Access, Excluded, Item, ItemKind, LIBRARY, Progress, SCOUT_VERSION, ScoutCode, ScoutEnd,

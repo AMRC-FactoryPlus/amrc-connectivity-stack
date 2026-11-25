@@ -15,8 +15,8 @@ use bytes::Bytes;
 use common::handler::{Ctl, FakeHandler};
 use common::{Acl, FakeAgent, FromDriver, lookup, ms, register, secs, spawn_driver};
 use rs_edge_driver::{
-    ConnectError, DriverHandle, Excluded, Handler, HandlerError, Item, Progress, ScoutEnd,
-    ScoutError, ScoutRequest, ScoutSink, ScoutType, Scouter,
+    ConnectError, DriverHandle, Excluded, Handler, HandlerError, Item, Progress, ReadValue, Reader,
+    ScoutEnd, ScoutError, ScoutRequest, ScoutSink, ScoutType, Scouter,
 };
 use serde_json::{Value, json};
 use tokio::time::Instant;
@@ -61,8 +61,38 @@ static SCHEMAS: LazyLock<Schemas> = LazyLock::new(|| Schemas {
     request: compile("request"),
 });
 
+/// Whether found.schema.json in this checkout knows the `values`
+/// message yet. The library's tests check a `values` message against
+/// it when it does, and against the shape in the spec always.
+fn schema_knows_values() -> bool {
+    SCHEMAS
+        .found
+        .is_valid(&json!({ "seq": 0, "type": "values", "values": [] }))
+}
+
+/// Check a `values` message against the shape in the "Values" section
+/// of the Edge Scout spec.
+fn check_values(msg: &Value) {
+    assert_eq!(msg["seq"], 0, "{msg}");
+    for v in msg["values"].as_array().expect("values array") {
+        let keys: Vec<_> = v.as_object().unwrap().keys().cloned().collect();
+        assert_eq!(keys.len(), 5, "{v}");
+        assert!(v["address"].is_string(), "{v}");
+        assert!(v["value"].is_null() || v["value"].as_str().unwrap().chars().count() <= 1024);
+        assert!(v["type"].is_null() || v["type"].is_string(), "{v}");
+        assert!(v["ts"].is_null() || v["ts"].is_i64(), "{v}");
+        assert!(v["error"].is_null() || v["error"].as_str().unwrap().chars().count() <= 256);
+    }
+}
+
 /// Check a found message, and each item in it, against the schemas.
 fn check_found(msg: &Value) {
+    if msg["type"] == "values" {
+        check_values(msg);
+        if !schema_knows_values() {
+            return;
+        }
+    }
     let errors: Vec<_> = SCHEMAS
         .found
         .iter_errors(msg)
@@ -109,8 +139,24 @@ enum Mode {
     Progress,
 }
 
+/// What the scouting handler's reader does.
+#[derive(Clone, Debug, PartialEq)]
+enum ReadMode {
+    /// Answers `value of <address>` for each address, except `missing`
+    /// which it leaves out, and adds one it was not asked for.
+    Answer,
+    /// `reader()` returns `None`.
+    NoReader,
+    /// Panics.
+    Panic,
+    /// Never answers.
+    Hang,
+}
+
 struct ScoutCtl {
     mode: Mutex<Mode>,
+    read_mode: Mutex<ReadMode>,
+    reads: AtomicUsize,
     connect_fails: Mutex<bool>,
     scans: AtomicUsize,
     stopped: AtomicUsize,
@@ -122,6 +168,8 @@ impl ScoutCtl {
     fn new(mode: Mode) -> Arc<Self> {
         Arc::new(Self {
             mode: Mutex::new(mode),
+            read_mode: Mutex::new(ReadMode::Answer),
+            reads: AtomicUsize::new(0),
             connect_fails: Mutex::new(false),
             scans: AtomicUsize::new(0),
             stopped: AtomicUsize::new(0),
@@ -219,10 +267,43 @@ impl Scouter for TestScouter {
     }
 }
 
+struct TestReader {
+    ctl: Arc<ScoutCtl>,
+}
+
+#[async_trait]
+impl Reader for TestReader {
+    async fn read(&self, addresses: Vec<String>) -> Vec<ReadValue> {
+        self.ctl.reads.fetch_add(1, Ordering::SeqCst);
+        let mode = self.ctl.read_mode.lock().unwrap().clone();
+        match mode {
+            ReadMode::Panic => panic!("the PLC caught fire"),
+            ReadMode::Hang => std::future::pending().await,
+            ReadMode::NoReader => unreachable!(),
+            ReadMode::Answer => {
+                let mut out: Vec<_> = addresses
+                    .into_iter()
+                    .filter(|a| a != "missing")
+                    .map(|a| match a.as_str() {
+                        "nan" => ReadValue::new(a, f64::NAN).with_type(ScoutType::Double),
+                        "gone" => ReadValue::error(a, "BadNodeIdUnknown"),
+                        _ => ReadValue::new(a.clone(), format!("value of {a}"))
+                            .with_type(ScoutType::String)
+                            .with_ts(1_795_600_000_000),
+                    })
+                    .collect();
+                out.push(ReadValue::new("not asked for", 1));
+                out
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl Handler for ScoutHandler {
     type Addr = String;
     const SCOUTS: bool = true;
+    const READS: bool = true;
 
     fn create(_: DriverHandle<String>, config: Value) -> Result<Self, HandlerError> {
         let ctl = lookup(&config).ok_or_else(|| HandlerError::new("no ctl key"))?;
@@ -248,6 +329,19 @@ impl Handler for ScoutHandler {
 
     async fn cmd(&mut self, command: &str, _payload: Bytes) {
         self.ctl.cmds.lock().unwrap().push(command.to_owned());
+        if command == "block" {
+            // Hold the handler's lock for good.
+            std::future::pending::<()>().await;
+        }
+    }
+
+    fn reader(&self) -> Option<Arc<dyn Reader>> {
+        if *self.ctl.read_mode.lock().unwrap() == ReadMode::NoReader {
+            return None;
+        }
+        Some(Arc::new(TestReader {
+            ctl: self.ctl.clone(),
+        }))
     }
 
     fn scouter(&self) -> Option<Arc<dyn Scouter>> {
@@ -332,8 +426,9 @@ async fn found_until_end(
             Some(FromDriver::Other { topic: t, payload }) if t == topic => {
                 let v: Value = serde_json::from_slice(&payload).unwrap();
                 check_found(&v);
-                // A hello answer is the only message on its topic.
-                let end = v["type"] == "end" || v["type"] == "hello";
+                // A hello or values answer is the only message on its
+                // topic.
+                let end = v["type"] == "end" || v["type"] == "hello" || v["type"] == "values";
                 out.push(v);
                 if end {
                     return out;
@@ -525,6 +620,7 @@ async fn hello_says_whether_the_handler_scouts() {
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["seq"], 0);
     assert_eq!(msgs[0]["supported"], false);
+    assert_eq!(msgs[0]["reads"], false);
     assert_eq!(msgs[0]["versions"], json!([1]));
     assert_eq!(
         msgs[0]["library"],
@@ -537,10 +633,9 @@ async fn hello_says_whether_the_handler_scouts() {
     let (mut agent, _driver) =
         up_with_scouting::<ScoutHandler>(ScoutCtl::new(Mode::Tree { n: 1, batch: 1 }).conf()).await;
     agent.send("scout", r#"{"op":"hello","version":1}"#);
-    assert_eq!(
-        found(&mut agent, "hello", secs(5)).await[0]["supported"],
-        true
-    );
+    let hello = &found(&mut agent, "hello", secs(5)).await[0];
+    assert_eq!(hello["supported"], true);
+    assert_eq!(hello["reads"], true);
 }
 
 /// A handler that does not scout ends every scan with UNSUPPORTED,
@@ -1021,4 +1116,162 @@ fn library_messages_match_fixtures() {
         let back = serde_json::to_value(&item).unwrap();
         assert!(SCHEMAS.item.is_valid(&back), "{name} round trip: {back}");
     }
+}
+
+// ---------------------------------------------------------------
+// Reads
+
+const READ: &str = "r1";
+
+fn read_msg(id: &str, addresses: &[&str]) -> String {
+    json!({ "op": "read", "id": id, "version": 1, "addresses": addresses }).to_string()
+}
+
+/// One `values` answer with an entry per requested address, values as
+/// text, and the reader's extra entry dropped.
+#[tokio::test]
+async fn a_read_answers_once_with_values() {
+    let ctl = ScoutCtl::new(Mode::Tree { n: 1, batch: 1 });
+    let (mut agent, _driver) = up_with_scouting::<ScoutHandler>(ctl.conf()).await;
+    agent.send(
+        "scout",
+        read_msg(READ, &["a", "nan", "gone", "missing", "a"]),
+    );
+    let msgs = found(&mut agent, READ, secs(5)).await;
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0]["type"], "values");
+    let values = msgs[0]["values"].as_array().unwrap();
+    let addrs: Vec<_> = values
+        .iter()
+        .map(|v| v["address"].as_str().unwrap())
+        .collect();
+    assert_eq!(addrs, vec!["a", "nan", "gone", "missing"]);
+    assert_eq!(
+        values[0],
+        json!({ "address": "a", "value": "value of a", "type": "String",
+                "ts": 1_795_600_000_000_i64, "error": null })
+    );
+    assert_eq!(values[1]["value"], "NaN");
+    assert_eq!(values[1]["type"], "Double");
+    assert_eq!(values[2]["value"], Value::Null);
+    assert_eq!(values[2]["error"], "BadNodeIdUnknown");
+    assert!(
+        values[3]["error"].is_string(),
+        "a left out address gets an error"
+    );
+    assert_eq!(ctl.reads.load(Ordering::SeqCst), 1);
+    let more = agent.drain(ms(300)).await;
+    assert!(
+        !more
+            .iter()
+            .any(|e| matches!(e, FromDriver::Other { topic, .. } if topic.ends_with("/found/r1"))),
+        "answered twice: {more:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_handler_that_does_not_read_answers_unsupported() {
+    let (mut agent, _driver) = up_with_scouting::<FakeHandler>(Ctl::new().conf()).await;
+    agent.send("scout", read_msg(READ, &["a"]));
+    let msgs = found(&mut agent, READ, secs(5)).await;
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0]["seq"], 0);
+    assert_eq!(error_code(&msgs), "UNSUPPORTED");
+}
+
+#[tokio::test]
+async fn no_reader_gives_conn() {
+    let ctl = ScoutCtl::new(Mode::Tree { n: 1, batch: 1 });
+    *ctl.read_mode.lock().unwrap() = ReadMode::NoReader;
+    let (mut agent, _driver) = up_with_scouting::<ScoutHandler>(ctl.conf()).await;
+    agent.send("scout", read_msg(READ, &["a"]));
+    assert_eq!(error_code(&found(&mut agent, READ, secs(5)).await), "CONN");
+
+    // So does a handler that hasn't connected.
+    let mut agent = FakeAgent::start("Conn").await;
+    let _driver = spawn_driver::<ScoutHandler>(agent.config());
+    let ctl = ScoutCtl::new(Mode::Tree { n: 1, batch: 1 });
+    *ctl.connect_fails.lock().unwrap() = true;
+    agent.wait_status("READY", secs(5)).await;
+    agent.send("conf", ctl.conf().to_string());
+    agent.send_addrs_features(&[("1", "a")], json!({ "scout": 1 }));
+    agent.wait_status("CONN", secs(5)).await;
+    wait_scout_subs(&agent, 1).await;
+    agent.send("scout", read_msg(READ, &["a"]));
+    assert_eq!(error_code(&found(&mut agent, READ, secs(5)).await), "CONN");
+}
+
+#[tokio::test]
+async fn a_reader_panic_gives_err() {
+    let ctl = ScoutCtl::new(Mode::Tree { n: 1, batch: 1 });
+    *ctl.read_mode.lock().unwrap() = ReadMode::Panic;
+    let (mut agent, _driver) = up_with_scouting::<ScoutHandler>(ctl.conf()).await;
+    agent.send("scout", read_msg(READ, &["a"]));
+    let msgs = found(&mut agent, READ, secs(5)).await;
+    assert_eq!(error_code(&msgs), "ERR");
+    let message = end_of(&msgs)["error"]["message"].as_str().unwrap();
+    assert!(message.contains("caught fire"), "{message}");
+}
+
+/// Bad reads are answered with ERR on their own topic.
+#[tokio::test]
+async fn a_bad_read_gives_err() {
+    let ctl = ScoutCtl::new(Mode::Tree { n: 1, batch: 1 });
+    let (mut agent, _driver) = up_with_scouting::<ScoutHandler>(ctl.conf()).await;
+    agent.send(
+        "scout",
+        json!({ "op": "read", "id": READ, "version": 2, "addresses": ["a"] }).to_string(),
+    );
+    assert_eq!(error_code(&found(&mut agent, READ, secs(5)).await), "ERR");
+    agent.send(
+        "scout",
+        json!({ "op": "read", "id": "r2", "version": 1, "addresses": [1] }).to_string(),
+    );
+    assert_eq!(error_code(&found(&mut agent, "r2", secs(5)).await), "ERR");
+    assert_eq!(ctl.reads.load(Ordering::SeqCst), 0);
+}
+
+/// A reader that hangs is abandoned after 4 s with no answer, and the
+/// next read still works.
+#[tokio::test]
+async fn a_hung_read_is_abandoned() {
+    let ctl = ScoutCtl::new(Mode::Tree { n: 1, batch: 1 });
+    *ctl.read_mode.lock().unwrap() = ReadMode::Hang;
+    let (mut agent, _driver) = up_with_scouting::<ScoutHandler>(ctl.conf()).await;
+    agent.send("scout", read_msg(READ, &["a"]));
+    let seen = agent.drain(secs(5)).await;
+    assert!(
+        !seen
+            .iter()
+            .any(|e| matches!(e, FromDriver::Other { topic, .. } if topic.contains("/found/"))),
+        "a hung read was answered: {seen:?}"
+    );
+    *ctl.read_mode.lock().unwrap() = ReadMode::Answer;
+    agent.send("scout", read_msg("r2", &["a"]));
+    let msgs = found(&mut agent, "r2", secs(5)).await;
+    assert_eq!(msgs[0]["type"], "values");
+}
+
+/// A read runs beside a scan, and never takes the handler's lock, so it
+/// answers while a command holds it.
+#[tokio::test]
+async fn reads_run_beside_a_scan_without_the_lock() {
+    let ctl = ScoutCtl::new(Mode::Hang);
+    let (mut agent, _driver) = up_with_scouting::<ScoutHandler>(ctl.conf()).await;
+    agent.send("scout", start_msg(SCAN, limits(100, 30)));
+    agent.send("cmd/block", "1");
+    tokio::time::sleep(ms(300)).await;
+    assert_eq!(*ctl.cmds.lock().unwrap(), vec!["block".to_owned()]);
+    for id in ["r1", "r2"] {
+        agent.send("scout", read_msg(id, &["a"]));
+        let mut others = Vec::new();
+        let msgs = found_until_end(&mut agent, id, secs(5), &mut others).await;
+        assert_eq!(msgs[0]["values"][0]["value"], "value of a");
+    }
+    agent.send(
+        "scout",
+        json!({ "op": "cancel", "id": SCAN, "version": 1 }).to_string(),
+    );
+    let msgs = found(&mut agent, SCAN, secs(5)).await;
+    assert_eq!(error_code(&msgs), "CANCELLED");
 }

@@ -118,7 +118,7 @@ requested.
     content:
       responseTo: 0fb4fd72-60dd-4b31-862f-92ae834e4e3e
       device: be7c6ed7-fa1b-4f24-bc0d-b94d787c40da
-      address: AMRC-F2050/Power_Monitoring/me1xxx
+      address: AMRC-F2050/Power_Monitoring/user1
       metric: Dynamic/a54fe
 
 The device identified will normally use the `Schema_UUID` _Dynamic_ 

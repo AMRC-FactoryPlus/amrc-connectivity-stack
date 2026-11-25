@@ -228,7 +228,7 @@ devices created by a reconciliation service. This now looks more like
 
     # Users can (where permitted) deploy Devices on their own account.
     Cluster1Admins ⊂ DeploymentUsers
-    me1xxx ∈ Cluster1Admins
+    user1 ∈ Cluster1Admins
 
     # The Manager can generate new UUIDs, but can't choose what they
     # are. It must use the UUIDs it's given.

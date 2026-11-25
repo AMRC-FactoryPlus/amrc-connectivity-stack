@@ -37,6 +37,11 @@ spec:
         - name: backups
           persistentVolumeClaim:
             claimName: configdb-backups
+      # The KDC can be restarting when an upgrade starts, and k5start
+      # gives up at once with "Cannot contact any KDC", which aborts the
+      # whole upgrade. Wait for it first, as the services do.
+      initContainers:
+{{ include "amrc-connectivity-stack.wait-for-kdc" . | indent 8 }}
       containers:
         - name: pg-backup
 {{ include "amrc-connectivity-stack.image" (list . .Values.configdb) | indent 10 }}
@@ -69,5 +74,7 @@ spec:
               name: krb5-keytabs-dbinit
             - mountPath: /backups
               name: backups
-  backoffLimit: 0
+  # A KDC that is listening but not yet answering also fails k5start.
+  # Two more tries cover that, and pg_dump is safe to repeat.
+  backoffLimit: 2
 {{- end }}

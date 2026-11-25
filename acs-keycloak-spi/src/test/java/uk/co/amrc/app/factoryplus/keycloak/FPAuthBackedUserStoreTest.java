@@ -453,12 +453,12 @@ class FPAuthBackedUserStoreTest {
         // Pinned against the RFC 4122 reference implementation:
         //   python3 -c "import uuid; print(uuid.uuid5(
         //       uuid.UUID('cb3714c4-c85c-482a-987b-408293aa141e'),
-        //       'me1ago@AMRC-FP.SHEF.AC.UK'))"
+        //       'alice@HOME.EXAMPLE.ORG'))"
         // If a refactor changes this value it has silently orphaned
         // every principal ever minted on the cross-realm path, so this
         // assertion must never be "updated to match" - fix the code.
-        assertThat(FPAuthBackedUserStore.mintedUuid("me1ago@AMRC-FP.SHEF.AC.UK"))
-            .isEqualTo("12bb7b35-16c8-572d-af5f-c1f312ec4ae8");
+        assertThat(FPAuthBackedUserStore.mintedUuid("alice@HOME.EXAMPLE.ORG"))
+            .isEqualTo("8f9990d2-ce64-5952-905d-382d25852a80");
         assertThat(FPAuthBackedUserStore.mintedUuid(UPN_BOB))
             .isEqualTo("5bd38a45-a07c-5606-b10a-b997b05f275b");
     }

@@ -38,7 +38,7 @@
               autofocus
               id="username"
               type="text"
-              placeholder="e.g. me1ago"
+              placeholder="e.g. jane.smith"
               required
               v-model="username"
               @keydown.enter="login"

@@ -236,7 +236,7 @@ test("rapid changes with an abandoned slow HEAD converge", async t => {
     assert.equal(h.reloads.length, 1, "no reloads once in sync");
 });
 
-/* This is the loop seen on fpd-ago. The ConfigDB does not answer the
+/* This is the loop seen on a dev cluster. The ConfigDB does not answer the
  * monitor's rebirth request, so the monitor's ConfigDB device never
  * sees a BIRTH. SparkplugDevice drops every DATA packet until it has
  * seen a BIRTH, so every Last_Changed/Application notification is

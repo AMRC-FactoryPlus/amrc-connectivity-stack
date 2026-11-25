@@ -292,6 +292,13 @@ Logout and the visualiser's sign-out return to the page you were on. The admin U
 both `admin.<acs-base>` and the bare `<acs-base>`, and signing in works
 from either.
 
+### Upgrades no longer fail when the KDC is restarting
+
+The ConfigDB backup that runs before every upgrade signs in to Kerberos
+first, and gave up at once if the KDC was restarting at that moment,
+which stopped the whole upgrade with "pre-upgrade hooks failed". It now
+waits for the KDC, as the services do, and tries up to three times.
+
 ### Devices show online again after the Directory restarts
 
 When the Directory sees data from a device it has no birth for, it

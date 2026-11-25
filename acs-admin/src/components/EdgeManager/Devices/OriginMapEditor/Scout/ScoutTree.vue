@@ -19,7 +19,7 @@
       @scroll="on_scroll"
       @keydown="on_key"
   >
-    <div :style="{ height: `${rows.length * ROW_HEIGHT}px`, minWidth: `${760 + nameWidth - NAME_MIN}px` }" class="relative">
+    <div :style="{ height: `${rows.length * ROW_HEIGHT}px`, minWidth: `${760 + nameWidth - NAME_MIN + addressWidth - ADDRESS_MIN}px` }" class="relative">
       <div
           v-for="row in window"
           :key="row.id"
@@ -70,7 +70,7 @@
         </div>
 
         <!-- Address -->
-        <span class="font-mono truncate w-56 shrink-0 text-gray-600" :title="address_text(row.id)">
+        <span class="font-mono truncate shrink-0 text-gray-600" :style="{ width: `${addressWidth}px` }" :title="address_text(row.id)">
           {{ address_text(row.id) }}
         </span>
 
@@ -125,15 +125,23 @@ import { item_key } from '@/lib/scout/model.js'
 /* Rows rendered beyond the visible area, so scrolling stays smooth. */
 const OVERSCAN = 10
 
-/* The name column's width range. Above the minimum it takes the tree's
- * width less what the other columns need. */
+/* The name and address columns' width ranges. Width beyond what every
+ * column needs at its minimum is shared between them, 40% to the name
+ * and 60% to the address, because addresses are the longer of the two
+ * (an OPC UA string node id carries the whole path). Each stops at its
+ * maximum, so a popped-out panel shows both in full. */
 const NAME_MIN = 224
-const NAME_MAX = 640
-const OTHER_COLUMNS = 560
+const NAME_MAX = 480
+const ADDRESS_MIN = 224
+const ADDRESS_MAX = 720
+const OTHER_COLUMNS = 336
 
-/** The name column's width for a tree this wide. */
-export function name_width (tree_width) {
-  return Math.round(Math.min(NAME_MAX, Math.max(NAME_MIN, (tree_width || 0) - OTHER_COLUMNS)))
+/** The name and address columns' widths for a tree this wide. */
+export function column_widths (tree_width) {
+  const spare = Math.max(0, (tree_width || 0) - NAME_MIN - ADDRESS_MIN - OTHER_COLUMNS)
+  const name = Math.min(NAME_MAX, NAME_MIN + spare * 0.4)
+  const address = Math.min(ADDRESS_MAX, ADDRESS_MIN + spare - (name - NAME_MIN))
+  return { name: Math.round(name), address: Math.round(address) }
 }
 
 export default {
@@ -163,7 +171,7 @@ export default {
   emits: ['toggle', 'check', 'use', 'branch', 'focus', 'select'],
 
   data () {
-    return { ROW_HEIGHT, NAME_MIN, top: 0, height: 400, nameWidth: NAME_MIN }
+    return { ROW_HEIGHT, NAME_MIN, ADDRESS_MIN, top: 0, height: 400, nameWidth: NAME_MIN, addressWidth: ADDRESS_MIN }
   },
 
   computed: {
@@ -193,7 +201,9 @@ export default {
   methods: {
     measure () {
       this.height = this.$refs.scroller?.clientHeight || 400
-      this.nameWidth = name_width(this.$refs.scroller?.clientWidth)
+      const widths = column_widths(this.$refs.scroller?.clientWidth)
+      this.nameWidth = widths.name
+      this.addressWidth = widths.address
     },
 
     on_scroll () {

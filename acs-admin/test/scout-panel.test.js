@@ -14,6 +14,7 @@ import { createApp, nextTick, reactive, ref, computed } from 'vue'
 import ScoutPanel from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPanel.vue'
 import ScoutMapDialog from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutMapDialog.vue'
 import ScoutChangeBar from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutChangeBar.vue'
+import { column_widths } from '../src/components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutTree.vue'
 import { build_index, diff } from '../src/lib/scout/model.js'
 
 beforeAll(() => {
@@ -304,5 +305,23 @@ describe('ScoutChangeBar', () => {
     }
     const { el } = await mount(ScoutChangeBar, { changes, missing: null })
     expect(el.textContent).toMatch(/Changed\s*3/)
+  })
+})
+
+
+describe('ScoutTree column widths', () => {
+  it('keeps both columns at their minimum in a narrow panel', () => {
+    expect(column_widths(640)).toEqual({ name: 224, address: 224 })
+  })
+
+  it('gives the address more of the spare width than the name', () => {
+    const w = column_widths(1100)
+    expect(w.address).toBeGreaterThan(w.name)
+    expect(w.name).toBeGreaterThan(224)
+  })
+
+  it('shows long addresses in full when popped out', () => {
+    expect(column_widths(1350).address).toBeGreaterThanOrEqual(450)
+    expect(column_widths(3000)).toEqual({ name: 480, address: 720 })
   })
 })

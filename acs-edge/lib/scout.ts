@@ -17,6 +17,9 @@
  * inside the budget in scout-budget.ts. The agent asks the driver to
  * keep at most WINDOW items messages ahead of the agent's acks, so a
  * driver slows down to the agent's pace and the inbox stays small.
+ *
+ * Live values, the watch and unwatch ops, are in scout-reads.ts. The
+ * manager checks those requests and routes the driver's answers.
  */
 
 import crypto from "crypto";
@@ -26,6 +29,9 @@ import util from "util";
 import type { DriverBroker } from "./driverBroker.js";
 import type { DriverConnection } from "./devices/driver.js";
 import { cgroup_cpu, CpuBudget, throttle_reader } from "./scout-budget.js";
+import {
+    ConnReads, DEFAULT_READ_TIMING, read_interval, ReadTiming,
+} from "./scout-reads.js";
 import { scout_schemas, ScoutSchemas } from "./scout-schemas.js";
 import {
     index_snapshot, MAX_BRANCHES, MAX_EXCLUDED, merge_flags, merged_items,
@@ -77,7 +83,7 @@ const ITEM_KEYS = [
  * waits, unless SCOUT_CPU_SHARE says otherwise. */
 export const CPU_SHARE = 0.6;
 
-export interface ScoutTiming {
+export interface ScoutTiming extends ReadTiming {
     /* No message from the driver for this long ends a scan. */
     silence_ms:         number,
     /* Added to limits.seconds for the scan's deadline. */
@@ -108,6 +114,7 @@ export const DEFAULT_TIMING: ScoutTiming = {
     retry_ms:           1_000,
     retry_max_ms:       60_000,
     drain_ms:           5_000,
+    ...DEFAULT_READ_TIMING,
 };
 
 export interface ScoutOpts {
@@ -193,6 +200,10 @@ interface ScoutConn {
     loaded:     boolean,
     load:       Promise<void>,
     library:    string | null,
+    /* Whether the driver's hello on this run said it reads values, or
+     * null before the hello. */
+    can_read:   boolean | null,
+    reads:      ConnReads,
     scan:       Scan | null,
     chain:      Promise<void>,
     write_timer?: NodeJS.Timeout,
@@ -272,6 +283,7 @@ export class ScoutManager {
     max_concurrent: number
     max_bytes:  number
     max_gz_bytes: number
+    read_interval: number
     budget:     CpuBudget
 
     /* Registered connections, by connection UUID and by driver id. */
@@ -296,6 +308,7 @@ export class ScoutManager {
         this.max_concurrent = env_int(env, "SCOUT_MAX_CONCURRENT", 1);
         this.max_bytes = env_int(env, "SCOUT_MAX_BYTES", 32 * 1024 * 1024);
         this.max_gz_bytes = env_int(env, "SCOUT_MAX_GZ_BYTES", 8 * 1024 * 1024);
+        this.read_interval = read_interval(env, this.timing.read_min_ms);
 
         if (opts.budget)
             this.budget = opts.budget;
@@ -338,7 +351,15 @@ export class ScoutManager {
             config_hash: opts.config_hash ?? null,
             entry: null, written: null, loaded: false,
             load: Promise.resolve(),
-            library: null, scan: null,
+            library: null, can_read: null, scan: null,
+            reads: new ConnReads({
+                uuid, node: this.node, fplus: this.fplus,
+                schemas: this.schemas, budget: this.budget,
+                timing: this.timing, interval_ms: this.read_interval,
+                log: this.log.bind(this),
+                publish: msg => this.#publish_scout(sc, msg),
+                problem: () => this.#read_problem(sc),
+            }),
             chain: Promise.resolve(),
             retry_wait: 0, unwanted: new Set(), stored_files: new Set(),
             draining: null,
@@ -358,7 +379,8 @@ export class ScoutManager {
     /* Wait until every connection's status entry has been read and any
      * scan left over from before a restart recorded as interrupted. */
     async init () {
-        await Promise.all([...this.#conns.values()].map(sc => sc.load));
+        await Promise.all([...this.#conns.values()]
+            .flatMap(sc => [sc.load, sc.reads.reset()]));
         return this;
     }
 
@@ -373,8 +395,11 @@ export class ScoutManager {
             this.#interrupt(scan, "The Edge Agent restarted during the scan");
 
         /* A scan that is saving finishes, then its status write. */
-        const settled = Promise.all([...this.#active].map(s => s.work))
-            .then(() => Promise.all([...this.#conns.values()].map(sc => sc.chain)));
+        const settled = Promise.all([
+            ...[...this.#conns.values()].map(sc => sc.reads.stop()),
+            Promise.all([...this.#active].map(s => s.work))
+                .then(() => Promise.all([...this.#conns.values()].map(sc => sc.chain))),
+        ]);
         let timer: NodeJS.Timeout | undefined;
         await Promise.race([
             settled,
@@ -595,8 +620,11 @@ export class ScoutManager {
             return;
         }
 
-        if (req.op == "cancel")
-            return this.#cancel(sc, request);
+        switch (req.op) {
+        case "cancel":  return this.#cancel(sc, request);
+        case "watch":   return this.#watch(sc, req);
+        case "unwatch": return sc.reads.unwatch(req.lease);
+        }
         return this.#start_request(sc, req);
     }
 
@@ -642,6 +670,40 @@ export class ScoutManager {
             return ["NODRIVER", "The driver has only just started. Try again in a few seconds."];
         }
         return null;
+    }
+
+    /* Whether the driver reads values: from its hello on this run, or
+     * as last recorded. */
+    #can_read (sc: ScoutConn): boolean | null {
+        return sc.can_read ?? this.#entry(sc).reads ?? null;
+    }
+
+    /* Why a read can't go to the driver now, as text, or null. */
+    #read_problem (sc: ScoutConn): string | null {
+        const problem = this.#driver_problem(sc);
+        if (problem) return problem[1];
+        if (sc.can_read === false)
+            return "The driver can't read values";
+        return null;
+    }
+
+    /* A live values lease. An accepted watch writes nothing, so
+     * renewing a lease costs no ConfigDB write. */
+    async #watch (sc: ScoutConn, req: any) {
+        const problem = this.#driver_problem(sc);
+        if (problem)
+            return this.#refuse(sc.uuid, req.request, ...problem);
+        const can = this.#can_read(sc);
+        if (can === false)
+            return this.#refuse(sc.uuid, req.request, "NOREADS",
+                "The driver can't read values. Update the driver image, or use a driver that can.");
+        if (can == null)
+            return this.#refuse(sc.uuid, req.request, "NODRIVER",
+                "The driver hasn't said yet whether it can read values. Try again in a few seconds.");
+        if (sc.reads.full(req.lease))
+            return this.#refuse(sc.uuid, req.request, "LIMIT",
+                "This connection already has as many live values leases as it allows. Close another Addresses panel.");
+        sc.reads.watch(req.lease, req.addresses);
     }
 
     async #start_request (sc: ScoutConn, req: any) {
@@ -901,6 +963,9 @@ export class ScoutManager {
 
         if (id == "hello")
             return this.#hello(sc, parse(payload));
+        /* A read's answer, which may arrive while a scan runs. */
+        if (sc.reads.found(id, payload))
+            return;
 
         if (sc.draining == id) {
             const msg = parse(payload);
@@ -1089,17 +1154,20 @@ export class ScoutManager {
             return;
         }
         const supported = msg.supported && msg.versions.includes(1);
+        const reads = msg.reads === true && msg.versions.includes(1);
         sc.library = msg.library ?? null;
-        this.log("Connection %s: the driver (%s) %s", sc.uuid, sc.library ?? "unknown library",
-            supported ? "can scan" : "can't scan");
+        sc.can_read = reads;
+        this.log("Connection %s: the driver (%s) %s and %s", sc.uuid, sc.library ?? "unknown library",
+            supported ? "can scan" : "can't scan", reads ? "can read values" : "can't read values");
 
         if (sc.scan?.state == "running")
             this.#interrupt(sc.scan, "The driver sent a new hello during the scan");
 
         this.#ready(sc).then(ok => {
             const entry = this.#entry(sc);
-            if (!ok || entry.supported === supported) return;
+            if (!ok || (entry.supported === supported && entry.reads === reads)) return;
             entry.supported = supported;
+            entry.reads = reads;
             this.#write(sc).catch(() => {});
         });
     }

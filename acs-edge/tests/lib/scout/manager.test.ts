@@ -55,7 +55,7 @@ describe("hello and support", () => {
 
     it("writes nothing after a restart when the answer is unchanged", async () => {
         const r = await make({ before: (svc: any) =>
-            svc.set_status(C0, { version: 1, node: NODE, supported: true }) });
+            svc.set_status(C0, { version: 1, node: NODE, supported: true, reads: false }) });
         r.conns[0].set_status("UP");
         r.broker.subscribe("drv0");
         await until(() => r.broker.scout("drv0").length > 0, "hello");

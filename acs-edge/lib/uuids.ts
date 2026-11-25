@@ -15,6 +15,9 @@ export const App = {
     /* Edge Scout status, one entry per connection; must match
      * acs-service-setup Edge.App.ScoutStatus */
     ScoutStatus:      "ad73fae4-a3b9-457a-8c36-12a2019bff2c",
+    /* Edge Scout live values, one entry per connection; must match
+     * acs-service-setup Edge.App.ScoutValues */
+    ScoutValues:      "399a86cf-9bc6-4681-b568-b45fc650dacb",
 };
 export const Class = {
     /* An Edge Scout snapshot File object; Edge.Class.ScoutResult */

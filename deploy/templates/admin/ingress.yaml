@@ -1,4 +1,22 @@
 {{ if .Values.admin.enabled }}
+{{- $base := .Values.acs.baseUrl | required "values.acs.baseUrl is required" }}
+{{- $scheme := .Values.acs.secure | ternary "https" "http" }}
+# The Admin lives at admin.<baseUrl>. The bare <baseUrl> redirects there,
+# so there is one Admin address with one sign-in: the Admin keeps its
+# Keycloak session per address, and signing out on one address used to
+# leave the other signed in. A temporary redirect, so browsers don't
+# cache it for ever if the address changes again.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: admin-to-sub
+  namespace: {{ .Release.Namespace }}
+spec:
+  redirectRegex:
+    regex: '^https?://{{ $base | replace "." "\\." }}(:[0-9]+)?(/.*)?$'
+    replacement: '{{ $scheme }}://admin.{{ $base }}${2}'
+    permanent: false
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -8,8 +26,11 @@ spec:
   entryPoints:
     - {{ .Values.acs.secure | ternary "websecure" "web" }}
   routes:
-    - match: Host(`{{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}`)
+    - match: Host(`{{ $base }}`)
       kind: Rule
+      middlewares:
+        - name: admin-to-sub
+          namespace: {{ .Release.Namespace }}
       services:
         - name: admin
           port: 80
@@ -18,6 +39,6 @@ spec:
   tls:
     secretName: {{ coalesce .Values.admin.tlsSecretName .Values.acs.tlsSecretName }}
     domains:
-      - main: {{.Values.acs.baseUrl | required "values.acs.baseUrl is required"}}
+      - main: {{ $base }}
   {{- end -}}
 {{- end -}}

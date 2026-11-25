@@ -29,14 +29,14 @@
           <Select :disabled="existingConnection" name="host" v-model="v$.selectedDriverId.$model">
             <SelectTrigger :class="{'border-red-500': v$.selectedDriverId.$error}">
               <SelectValue>
-                {{selectedDriver?.name ?? 'Select a Driver...'}}
+                {{selectedDriver ? driverLabel(selectedDriver) : 'Select a Driver...'}}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectItem v-for="driver in sortedDrivers" :value="driver.uuid" :key="driver.uuid">
                   <div class="flex items-center justify-between gap-2">
-                    <div class="font-medium">{{driver.name}}</div>
+                    <div class="font-medium">{{driverLabel(driver)}}</div>
                     <div v-if="driver.definition?.hidden" class="text-gray-400">Retired</div>
                     <div v-else-if="driver.definition?.image" class="flex items-center justify-center gap-1.5 text-gray-400">
                       <i class="fa-solid fa-cube text-sm"></i>
@@ -218,7 +218,7 @@ import { updateEdgeAgentConfig } from '@utils/edgeAgentConfigUpdater.js'
 import { hostPortClash } from '@utils/hostPorts.js'
 import { useAccessStore } from '@store/useAccessStore.js'
 import { can_delete_connection, can_edit_connection, can_new_connection } from '@/lib/access/perms-edge.js'
-import { driverByUuid, driverChoices } from '@utils/driverChoices.js'
+import { driverByUuid, driverChoices, driverLabel } from '@utils/driverChoices.js'
 import { connection_name_hint, connection_name_problem } from '@/lib/edge-names.js'
 
 const PAYLOAD_FORMATS = [
@@ -495,6 +495,8 @@ export default {
   },
 
   methods: {
+    driverLabel,
+
     /* A v4-shaped identifier for a secret placeholder.
      *
      * The Edge Agent finds these by pattern, so the shape matters. This used

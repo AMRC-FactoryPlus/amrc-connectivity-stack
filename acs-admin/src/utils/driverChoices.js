@@ -16,10 +16,41 @@
  * quietly move it to the other driver of the same name.
  */
 
+/* The label of a driver with no Info name. */
+export const UNNAMED_DRIVER = 'Unnamed driver'
+
 /**
- * The drivers to offer for a connection, sorted by name. A hidden
- * driver is offered only to a connection that already uses it, so it
- * still shows as that connection's driver.
+ * Whether a driver can be offered for a new connection. It must have a
+ * name to be picked by, a DriverDef to give it a form, and not be
+ * hidden. A DriverDef with an image but no repository can never run:
+ * an older service-setup made one, named "(unknown driver)", from the
+ * shared image settings of an old edge-agent chart, and now hides it.
+ *
+ * @param {Object} driver - A driver store entry
+ * @returns {boolean}
+ */
+export function offerable (driver) {
+  const def = driver?.definition
+  if (!def || def.hidden) return false
+  if (typeof driver.name !== 'string' || !driver.name.trim()) return false
+  if (def.image && !def.image.repository) return false
+  return true
+}
+
+/**
+ * The name to show for a driver.
+ *
+ * @param {Object} [driver] - A driver store entry
+ * @returns {string}
+ */
+export function driverLabel (driver) {
+  return driver?.name?.trim() || UNNAMED_DRIVER
+}
+
+/**
+ * The drivers to offer for a connection, sorted by name. A driver that
+ * can't be offered (see `offerable`) is still listed for a connection
+ * that already uses it, so it shows as that connection's driver.
  *
  * @param {Array} drivers - The driver store entries
  * @param {string} [current] - The UUID of the driver the connection uses, if it exists already
@@ -27,8 +58,8 @@
  */
 export function driverChoices (drivers, current) {
   return (drivers ?? [])
-    .filter(d => !d.definition?.hidden || d.uuid === current)
-    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+    .filter(d => offerable(d) || (current && d.uuid === current))
+    .sort((a, b) => driverLabel(a).localeCompare(driverLabel(b)))
 }
 
 /**

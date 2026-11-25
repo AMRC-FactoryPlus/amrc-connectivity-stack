@@ -397,8 +397,9 @@ export default {
         connections: can_read_connections(c),
         isa95: can_read_isa95(c),
         explore: can_see(c, 'explorer'),
-        /* Data Access checks this on the device itself. */
-        build: c.can(DataAccess.UseDevice, this.deviceUuid),
+        /* A grant on the device or on an ISA-95 node above it. */
+        build: [this.deviceUuid, ...this.isa95Via.map(n => n.uuid)]
+          .some(t => c.can(DataAccess.UseDevice, t)),
       }
     },
 

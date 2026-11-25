@@ -8,6 +8,30 @@ chronological order.
 These changes have not been released yet, but are likely to appear in
 the next release.
 
+### Dataset access follows the ISA-95 hierarchy
+
+A **Device data** grant, or a **Build datasets from device** grant, on
+an ISA-95 level (an Enterprise, Site, Area, Work Center or Work Unit)
+now lets people build datasets from every device placed at or under
+that level, including devices placed there later. Before, Data Access
+used only grants on the device itself, so a grant on a level gave i3X
+access and no datasets, and a large site needed one grant per device.
+i3X already worked this way, so both halves of **Device data** now
+reach the same devices.
+
+The **Manage access** dialog on the ISA-95 page now offers **Build
+datasets from it**, and on a device it no longer greys the option out
+when a level above the device is chosen.
+
+**Check after the upgrade.** Anyone who already holds **Device data**
+on an ISA-95 level gains dataset access to the devices under it. Until
+now that grant gave them i3X only. Look at the **Manage access** lists
+on the ISA-95 page if that is not what you want.
+
+The v7.6.0 note below says to give **Device data** "from **Manage
+access** on the device or ISA-95 page". On v7.6.0 itself only the
+device page works for datasets.
+
 These changes are aimed at installations with tens of thousands of
 devices. Most of them are internal, but a few need you to act during
 the upgrade, and some change what clients see.

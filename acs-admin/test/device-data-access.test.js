@@ -51,13 +51,13 @@ describe('route_halves', () => {
       expect(route_halves(row(DEVICE_DATA, reason), true)).toEqual(['i3x', 'datasets'])
   })
 
-  it('never gives Datasets through an ISA-95 node, which Data Access does not use', () => {
-    expect(route_halves(row(DEVICE_DATA, 'node'), true)).toEqual(['i3x'])
-    expect(route_halves(row(BUILD_DATASETS, 'node'), true)).toEqual([])
+  it('gives Datasets through an ISA-95 node, which Data Access follows as i3X does', () => {
+    expect(route_halves(row(DEVICE_DATA, 'node'), true)).toEqual(['i3x', 'datasets'])
+    expect(route_halves(row(BUILD_DATASETS, 'node'), true)).toEqual(['datasets'])
   })
 
-  it('never gives Datasets when the target is not a device', () => {
-    expect(route_halves(row(DEVICE_DATA, 'direct'), false)).toEqual(['i3x'])
+  it('gives both halves for a grant on an ISA-95 node itself', () => {
+    expect(route_halves(row(DEVICE_DATA, 'direct'), false)).toEqual(['i3x', 'datasets'])
   })
 })
 
@@ -131,10 +131,14 @@ describe('remove_half', () => {
     expect(auth.calls).toEqual([['delete', 'g1']])
   })
 
-  it('deletes the composite on an ISA-95 node, where Datasets does nothing', async () => {
+  it('keeps the Datasets half of the composite on an ISA-95 node', async () => {
     const auth = fake_auth()
-    await remove_half(auth, { grant: g, reason: 'direct' }, 'i3x', false)
-    expect(auth.calls).toEqual([['delete', 'g1']])
+    const node = { ...g, target: 'area' }
+    const out = await remove_half(auth, { grant: node, reason: 'direct' }, 'i3x', false)
+    expect(out).toEqual({ set: BUILD_DATASETS })
+    expect(auth.calls).toEqual([
+      ['set', 'g1', { principal: 'pat', permission: BUILD_DATASETS, target: 'area', plural: false }],
+    ])
   })
 
   it('writes nothing for a half the grant does not give', async () => {
@@ -187,7 +191,7 @@ describe('read_access with Device data', () => {
     expect(halves('pat')).toEqual([['i3x', 1, false, true], ['datasets', 1, false, true]])
     expect(halves('lee')).toEqual([['datasets', 1, false, true]])
     expect(halves('kim')).toEqual([['i3x', 1, false, true]])
-    expect(halves('area-team')).toEqual([['i3x', 0, true, false]])
+    expect(halves('area-team')).toEqual([['i3x', 0, true, false], ['datasets', 0, true, false]])
     expect(halves('admins')).toEqual([['datasets', 0, true, false]])
     expect(halves(DATASET_MANAGER)).toEqual([['i3x', 0, true, false], ['datasets', 0, true, false]])
   })
@@ -225,7 +229,7 @@ describe('halves_on and missing_halves', () => {
 
   it('counts only grants on the chosen scope', () => {
     expect([...halves_on(rows, 'pat', 'dev', 'dev', true)]).toEqual(['i3x'])
-    expect([...halves_on(rows, 'pat', 'area', 'dev', true)]).toEqual(['i3x'])
+    expect([...halves_on(rows, 'pat', 'area', 'dev', true)]).toEqual(['i3x', 'datasets'])
     expect([...halves_on(rows, 'lee', 'dev', 'dev', true)]).toEqual([])
   })
 

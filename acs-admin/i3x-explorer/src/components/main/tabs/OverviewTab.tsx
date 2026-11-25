@@ -14,6 +14,8 @@ import { LiveBadge } from '../../subscriptions/LiveBadge'
 import { Card, Field, SegmentedControl } from '../primitives'
 import { ChildValues } from '../ChildValues' // ACS
 import { RelationshipsTab } from './RelationshipsTab' // ACS
+import { engUnitOf } from '../../../acs/engUnit' // ACS
+import { EngUnitText } from '../../../acs/EngUnitText' // ACS
 
 interface OverviewTabProps {
   object: ObjectInstance
@@ -48,6 +50,8 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const sourceTypeId =
     object.metadata?.sourceTypeId != null ? String(object.metadata.sourceTypeId) : null
+  // ACS: the engineering unit, once the full object has arrived.
+  const unit = useMemo(() => engUnitOf(object.metadata), [object.metadata])
 
   const requestTabs = useMemo(
     () => buildObjectRequestTabs(object),
@@ -125,7 +129,10 @@ export function OverviewTab({
           <div className="space-y-3">
             {ownValue !== null && (
               <p className="flex flex-wrap items-baseline gap-3 text-[13px]">
-                <span className="font-mono text-i3x-text break-all">{formatComponentValue(ownValue)}</span>
+                <span className="font-mono text-i3x-text break-all">
+                  {formatComponentValue(ownValue)}
+                  <EngUnitText unit={unit} className="ml-1.5" />
+                </span>
                 {shownValue?.quality && <StatusFacets code={shownValue.quality} variant="dot" />}
               </p>
             )}
@@ -137,7 +144,7 @@ export function OverviewTab({
           </div>
         ) : shownValue ? (
           <div className="relative">
-            <ValueDisplay value={shownValue} view={valueView} />
+            <ValueDisplay value={shownValue} view={valueView} unit={unit} />
             {/* Re-keyed on each change, so the flash replays over the value. */}
             {flashKey > 0 && (
               <span

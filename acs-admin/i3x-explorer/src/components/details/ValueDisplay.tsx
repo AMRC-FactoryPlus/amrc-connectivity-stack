@@ -6,11 +6,15 @@ import { JsonViewer } from './JsonViewer'
 import { StatusFacets } from './ElementStatus'
 import { WarningIcon } from '../common/icons'
 import { Chevron } from '../common/Chevron'
+import { EngUnitText } from '../../acs/EngUnitText' // ACS
+import type { EngUnit } from '../../acs/engUnit' // ACS
 
 interface ValueDisplayProps {
   value: LastKnownValue
   /** 'parsed' (default) shows the formatted value; 'raw' shows the full HTTP response body. */
   view?: 'parsed' | 'raw'
+  /** ACS: the element's engineering unit, shown after a scalar value. */
+  unit?: EngUnit | null
 }
 
 export function formatComponentValue(v: unknown): string {
@@ -36,7 +40,7 @@ export function formatComponentValueShort(v: unknown): string {
 // distinguishing part). The full id is in the row tooltip.
 const COMPONENT_ID_TAIL = 14
 
-export function ValueDisplay({ value, view = 'parsed' }: ValueDisplayProps) {
+export function ValueDisplay({ value, view = 'parsed', unit = null }: ValueDisplayProps) {
   const components = value.components ? Object.entries(value.components) : []
 
   // Objects and arrays render as a tree; a value delivered as a JSON string is
@@ -96,7 +100,11 @@ export function ValueDisplay({ value, view = 'parsed' }: ValueDisplayProps) {
         {jsonValue !== undefined ? (
           <JsonViewer data={jsonValue} initialExpanded={true} />
         ) : (
-          <code className="text-sm text-i3x-text">{String(value.value)}</code>
+          <>
+            <code className="text-sm text-i3x-text">{String(value.value)}</code>
+            {/* ACS: the unit, after a scalar that has one. */}
+            {value.value !== null && value.value !== undefined && <EngUnitText unit={unit} className="ml-1.5 text-sm" />}
+          </>
         )}
       </div>
 

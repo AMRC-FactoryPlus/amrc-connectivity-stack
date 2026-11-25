@@ -10,6 +10,7 @@ import { BroadcastIcon, ShieldIcon, DatabaseIcon, ChartLineIcon } from '../commo
 import { FormattedText } from '../common/FormattedText' // ACS
 import { useIsContainer } from '../../data/childValues' // ACS
 import { acsHost, useHostActions } from '../../acs/host' // ACS
+import { engUnitOf } from '../../acs/engUnit' // ACS
 import { Spinner } from '../common/Spinner'
 import { useObjectDetails } from '../../data/useObjectDetails'
 import { errorText, useObjectValue } from '../../data/queries'
@@ -168,7 +169,8 @@ export function ObjectDetailView({ object: catalogObject }: { object: ObjectInst
           )}
           {activeTab === 'history' && (
             <PerfProfiler id="History tab">
-              <HistoryTab object={catalogObject} />
+              {/* ACS: the unit comes from the full object; the catalog's has no metadata. */}
+              <HistoryTab object={catalogObject} unit={engUnitOf(object.metadata)} />
             </PerfProfiler>
           )}
         </div>

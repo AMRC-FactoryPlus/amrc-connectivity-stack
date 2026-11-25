@@ -179,6 +179,11 @@ A metric known only from the UNS takes the `Unit` property of its
 messages. i3X follows the vocabulary as it changes, and a listing with
 metadata gets a new ETag when it does.
 
+The Manager UI's Explorer shows a metric's unit after its values, in
+the current value, the tables of child values and subscriptions, and
+above its history. It shows `system.Eng_Unit`, with the UNECE code in
+the tooltip.
+
 ## Fixing a metric's unit
 
 Changing a metric's `Eng_Unit` changes the `unit` tag of its series, so

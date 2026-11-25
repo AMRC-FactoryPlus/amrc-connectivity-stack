@@ -14,6 +14,8 @@ import { StatusFacets } from '../details/ElementStatus'
 import { formatComponentValue, formatComponentValueShort } from '../details/ValueDisplay'
 import { useElementNavigation } from './navigation'
 import { RowSubscribeButton } from '../../acs/RowSubscribeButton'
+import { useEngUnit } from '../../acs/engUnit'
+import { EngUnitText } from '../../acs/EngUnitText'
 
 /** Rows shown per level before "Show more". */
 export const CHILD_ROWS_PAGE = 50
@@ -123,6 +125,8 @@ function ChildRow({
     ? { value: live.value, quality: live.quality ?? undefined, timestamp: live.timestamp ?? undefined }
     : value
   const hasValue = shown != null && shown.value !== null && shown.value !== undefined
+  // The unit, looked up only for a row with a value to put it after.
+  const unit = useEngUnit(object.elementId, hasValue)
 
   return (
     <>
@@ -155,7 +159,10 @@ function ChildRow({
         </div>
         <div role="cell" className="min-w-0 max-w-[24rem] text-right font-mono font-semibold text-[12px] text-i3x-text break-words tabular-nums">
           {hasValue ? (
-            <span title={formatComponentValue(shown.value)}>{formatComponentValueShort(shown.value)}</span>
+            <>
+              <span title={formatComponentValue(shown.value)}>{formatComponentValueShort(shown.value)}</span>
+              <EngUnitText unit={unit} className="ml-1 text-[12px]" />
+            </>
           ) : valuesPending && !useLive ? (
             <Spinner size={11} />
           ) : container ? null : shown ? (

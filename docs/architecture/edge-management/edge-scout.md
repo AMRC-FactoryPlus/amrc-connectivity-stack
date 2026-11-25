@@ -474,7 +474,7 @@ The panel works out its state in this order, and the first match wins.
 | State | When | What the operator sees |
 |---|---|---|
 | Hidden | DriverDef `scout: false` | No panel |
-| Agent offline | No NBIRTH since the last NDEATH | "The Edge Agent is offline, so it can't scan." Any previous snapshot stays browsable |
+| Agent offline | No NBIRTH since the last NDEATH | "Unable to scan because the Edge Agent is offline." Any previous snapshot stays browsable |
 | Agent too old | Online, and an NBIRTH seen since the page loaded has no `Node Control/Scout` | "This Edge Agent can't scan. Upgrade it to the current ACS release." Without a forced rebirth, an old agent that has not reborn since the page loaded shows as Waiting after a Scan instead |
 | Untrusted | The status entry's `node` is not this connection's node | "The scan status for this connection was written by an Edge Agent that does not host it, so the panel ignores it." |
 | Not deployed | `UNDEPLOYED` in `last_request`, or the connection is not in the agent's saved config | "Save and deploy this connection before scanning it." |

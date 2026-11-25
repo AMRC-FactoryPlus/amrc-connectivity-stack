@@ -17,9 +17,14 @@ import { DA } from './constants.js'
  */
 export function dataset_access (check, uuid = null) {
     const has = (perm) => uuid != null && check.can(perm, uuid)
+    const may_create = check.can_any(DataAccess.CreateDataset)
+        || check.can_any(DataAccess.UseDevice)
     return {
-        /* The structure to create in is picked later, so any grant. */
-        create:         check.can_any(DataAccess.CreateDataset),
+        /* Data Access lets anyone create a dataset from the sources
+         * they hold permission on, so Device data on any device is
+         * enough. Include in union and Use for session don't count
+         * here: every account holds them on its own datasets. */
+        create:         may_create,
         edit:           has(DataAccess.EditDataset),
         delete:         has(DataAccess.DeleteDataset),
         /* Sharing makes grants of these permissions on the dataset. */
@@ -34,7 +39,6 @@ export function dataset_access (check, uuid = null) {
         release_policy: check.write_apps(DA.App.ReleasePolicy),
         /* Equipment recording: a Recording entry, then a session run. */
         record:         check.write_apps(DA.App.Recording),
-        stop_record:    check.write_apps(DA.App.Recording)
-            && check.can_any(DataAccess.CreateDataset),
+        stop_record:    check.write_apps(DA.App.Recording) && may_create,
     }
 }

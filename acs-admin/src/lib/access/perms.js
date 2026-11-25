@@ -41,6 +41,8 @@ export const DataAccess = {
     EditDataset:        "af06b9e5-456a-43e4-b636-5b17de28fc7f",
     DeleteDataset:      "6f301df8-0ad1-496f-8391-8de92c43ad8e",
     UseForSession:      "c089b9a9-06cd-4211-94fc-9ad52a759987",
+    /* "Build datasets from device" (Device data). */
+    UseDevice:          "788b049c-2831-11f1-99fd-2b0bf86d6f77",
 };
 
 export const GatewayDepot = {

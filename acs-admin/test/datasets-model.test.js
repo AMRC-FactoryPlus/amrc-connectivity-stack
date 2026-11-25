@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest'
 import { DA, STRUCTURE, kind_info, is_other_kind, is_device_structure, is_metrics_structure } from '../src/lib/datasets/constants.js'
 import {
     merge_datasets, resolve_devices, included_in, device_dataset_for,
-    default_dataset_uuid, is_default_dataset,
+    default_dataset_uuid, is_default_dataset, listed_datasets,
     overlapping_devices, dataset_status, structure_tree,
     to_iso, validate_window, quick_window, fmt_duration, fmt_elapsed, fmt_window,
     london_local_to_ms, ms_to_london_local, london_offset_min,
@@ -80,6 +80,39 @@ describe('merge_datasets', () => {
         expect(by[EQ].created_by).toBe('Partner user')
         // Run details win: they name who pressed the button.
         expect(by[RUN].created_by).toBe('op1')
+    })
+})
+
+describe('default datasets of deleted devices', () => {
+    const gone = default_dataset_uuid(D2)
+    const kept = default_dataset_uuid(D1)
+    const by = merge_datasets(
+        [
+            { uuid: kept, name: 'Meter', function: [] },
+            { uuid: gone, name: 'Old meter', function: [], device_deleted: true },
+            { uuid: EQ, name: 'Lathe', function: [DA.Class.Equipment] },
+        ],
+        [
+            { uuid: kept, structure: STRUCTURE.UNS_DEVICE, config: { source: D1 } },
+            { uuid: gone, structure: STRUCTURE.UNS_DEVICE, config: { source: D2 } },
+            { uuid: EQ, structure: STRUCTURE.UNION, config: [kept, gone] },
+        ],
+    )
+
+    it('takes the mark from Data Access', () => {
+        expect(by[gone].device_deleted).toBe(true)
+        expect(by[gone].is_default).toBe(true)
+        expect(by[kept].device_deleted).toBe(false)
+        expect(by[EQ].device_deleted).toBe(false)
+    })
+
+    it('leaves them out of the lists', () => {
+        expect(listed_datasets(by).map(r => r.uuid).sort()).toEqual([kept, EQ].sort())
+    })
+
+    it('keeps them for a direct link and for what uses them', () => {
+        expect(by[gone].name).toBe('Old meter')
+        expect(resolve_devices(EQ, by).devices.sort()).toEqual([D1, D2].sort())
     })
 })
 

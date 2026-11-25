@@ -367,6 +367,28 @@ upstream, so they are not tied to the Manager UI.
     failed with "crypto.randomUUID is not a function". The fallback
     makes a v4 UUID from `crypto.getRandomValues`, which every browser
     offers. Tests in `src/acs/randomUuid.test.ts`.
+22. **Engineering units** (`src/acs/engUnit.ts`,
+    `src/acs/EngUnitText.tsx`, `ValueDisplay.tsx`, `OverviewTab.tsx`,
+    `ChildValues.tsx`, `ObjectDetailView.tsx`, `HistoryTab.tsx`,
+    `MonitoredItemRow.tsx`, `ComponentTrends.tsx`,
+    `services/catalog.ts`): a metric's unit is shown after its value in
+    the Current value panel, in each row of the Current value table, the
+    Current value panel's Components list and the subscriptions table, and in the captions of a composition's
+    component trends, and the History tab says "Values in" the unit above
+    its chart or table. i3X 1.0 gives the unit as `metadata.engUnit`, a
+    UNECE code ("KWH"); ACS's server also gives
+    `metadata.system.Eng_Unit`, the string the metric is configured with
+    ("kWh"). The Explorer shows that string, with the code in the
+    tooltip, and shows the code when a server sends only that. Upstream
+    showed neither. The catalog and the related-object batches are listed
+    without metadata, so the table rows look their units up: the lookups
+    made in one tick go to the server as one `POST /objects/list`, only
+    rows with a value ask, an object already held with its metadata
+    answers at once, and each unit is cached for five minutes and read
+    again when the catalog refreshes. The hook names the shared query
+    client, so the subscriptions panel still needs no query provider.
+    Tests in `src/acs/engUnit.test.ts` and
+    `src/acs/engUnitDisplay.test.tsx`.
 
 The first commit on the branch that brought this in has the upstream
 files unchanged, so `git diff <that commit> -- i3x-explorer/src` shows

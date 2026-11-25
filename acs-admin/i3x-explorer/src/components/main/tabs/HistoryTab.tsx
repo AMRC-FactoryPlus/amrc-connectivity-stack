@@ -7,6 +7,8 @@ import { Card } from '../primitives'
 import { Spinner } from '../../common/Spinner'
 import { CardCodeSample } from '../../details/CodeSamplePanel'
 import { buildObjectRequestTabs } from '../../details/requestTabs'
+import { EngUnitText } from '../../../acs/EngUnitText' // ACS
+import type { EngUnit } from '../../../acs/engUnit' // ACS
 
 interface HistoryDataPoint {
   timestamp: string
@@ -63,7 +65,8 @@ function historyPoints(result: HistoricalValue | undefined): HistoryDataPoint[] 
   return points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 }
 
-export function HistoryTab({ object }: { object: ObjectInstance }) {
+// ACS: `unit` is the element's engineering unit, named above the chart or table.
+export function HistoryTab({ object, unit = null }: { object: ObjectInstance; unit?: EngUnit | null }) {
   const [selectedTimespan, setSelectedTimespan] = useState<TimespanPreset>('1h')
   const [customStartTime, setCustomStartTime] = useState('')
   const [customEndTime, setCustomEndTime] = useState('')
@@ -231,6 +234,11 @@ export function HistoryTab({ object }: { object: ObjectInstance }) {
 
       {!error && historyData.length > 0 && (
         <>
+          {unit && (
+            <p className="mb-1 text-[11px] text-i3x-text-muted">
+              Values in <EngUnitText unit={unit} className="!text-i3x-text" />
+            </p>
+          )}
           {dataType === 'numeric' && <HistoryTrendChart data={historyData} />}
           {dataType !== 'numeric' && <HistoryTable data={historyData} />}
         </>

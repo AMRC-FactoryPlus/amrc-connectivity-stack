@@ -16,6 +16,8 @@ import { rowLabel } from '../../acs/rowLabel' // ACS
 import { formatHeld } from '../../acs/heldDecimals' // ACS
 import { ComponentTrends, trendGridClass } from '../../acs/ComponentTrends' // ACS
 import { ChangeHint, ChangeList } from './ValueChanges'
+import { useEngUnit, type EngUnit } from '../../acs/engUnit' // ACS
+import { EngUnitText } from '../../acs/EngUnitText' // ACS
 
 export const MONITORED_ROW_COLUMNS = 6
 
@@ -85,6 +87,8 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
   const value = liveValue?.value
   const structured = useMemo(() => asStructured(value), [value])
   const numeric = liveValue && structured === undefined ? toFiniteNumber(value) : undefined
+  // ACS: the unit of a scalar value.
+  const unit = useEngUnit(elementId, liveValue !== undefined && structured === undefined)
   const ownDetail = structured !== undefined || numeric !== undefined
   // ACS: a composition opens to its components' trends even before, or without, a value of its own.
   const hasComponentTrends = (componentIds?.length ?? 0) > 0
@@ -144,16 +148,16 @@ export const MonitoredItemRow = memo(forwardRef<HTMLTableSectionElement, Monitor
                 <StructuredSummary liveValue={liveValue} summary={describeStructure(structured)} />
               ) : numeric !== undefined ? (
                 <>
-                  <ScalarValue liveValue={liveValue} numeric />
+                  <ScalarValue liveValue={liveValue} unit={unit} numeric />
                   <Sparkline elementId={elementId} />
                 </>
               ) : (
-                <ScalarValue liveValue={liveValue} />
+                <ScalarValue liveValue={liveValue} unit={unit} />
               )}
             </button>
           ) : (
             <span className="flex items-baseline gap-2 min-w-0 max-w-[18rem]">
-              {liveValue && <ScalarValue liveValue={liveValue} />}
+              {liveValue && <ScalarValue liveValue={liveValue} unit={unit} />}
             </span>
           )}
         </td>
@@ -377,7 +381,7 @@ function ElementName({
 }
 
 /** The value, flashing when it changes, with what it changed from. */
-function ScalarValue({ liveValue, numeric = false }: { liveValue: LiveValue; numeric?: boolean }) {
+function ScalarValue({ liveValue, unit = null, numeric = false }: { liveValue: LiveValue; unit?: EngUnit | null; numeric?: boolean }) {
   // ACS: a number keeps its width: held decimal places, tabular digits and, for a numeric metric,
   // right-aligned slots of a set minimum width for the value and its delta, so the sparkline after
   // them stays put while the value changes.
@@ -392,6 +396,8 @@ function ScalarValue({ liveValue, numeric = false }: { liveValue: LiveValue; num
         title={formatComponentValue(liveValue.value)}
       >
         {formatHeld(liveValue.value, liveValue.decimals, formatComponentValueShort)}
+        {/* ACS: the unit sits in the value's slot, so the sparkline still stays put. */}
+        {liveValue.value !== null && liveValue.value !== undefined && <EngUnitText unit={unit} className="ml-1" />}
       </code>
       {liveValue.changes[0] ? (
         <ChangeHint

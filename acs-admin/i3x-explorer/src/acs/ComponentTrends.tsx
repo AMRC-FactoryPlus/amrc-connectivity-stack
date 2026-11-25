@@ -13,6 +13,7 @@ import { useSubscriptionsStore } from '../stores/subscriptions'
 import { objectPathSegments, PATH_SEPARATOR } from '../components/main/navigation'
 import { TrendView } from '../components/subscriptions/TrendView'
 import { rowLabel } from './rowLabel'
+import { ElementEngUnit } from './EngUnitText'
 
 /** More graphs than this are left to the component rows, each of which opens to its own trend. */
 export const MAX_COMPONENT_TRENDS = 24
@@ -58,6 +59,7 @@ export function ComponentTrends({ rootId, componentIds }: { rootId: string; comp
                 )}
                 {label.lead && <span aria-hidden="true" className="flex-shrink-0 whitespace-pre text-i3x-text-muted">{PATH_SEPARATOR}</span>}
                 <span className="flex-shrink-0 whitespace-nowrap text-i3x-text">{label.leaf}</span>
+                <ElementEngUnit elementId={id} className="flex-shrink-0 ml-1.5 whitespace-nowrap" />
               </figcaption>
               <TrendView elementId={id} />
             </figure>

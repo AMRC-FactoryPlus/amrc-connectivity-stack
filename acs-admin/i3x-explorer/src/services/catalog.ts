@@ -179,6 +179,8 @@ async function loadCatalog(client: I3XClient): Promise<void> {
   allObjectsFetchedAt.set(client, Date.now())
   // The listing carries no metadata, so an unchanged catalog says nothing about the details on screen.
   void queryClient.invalidateQueries({ queryKey: ['objectDetails', ...serverScope()] })
+  // ACS: the same goes for the engineering units looked up for rows (acs/engUnit.ts).
+  void queryClient.invalidateQueries({ queryKey: ['engUnit', ...serverScope()] })
 }
 
 /** The ETag to revalidate with, only while the store and the engine both hold the catalog it names. */

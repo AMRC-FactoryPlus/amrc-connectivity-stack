@@ -884,6 +884,11 @@ async def test_every_valid_request_fixture_is_handled():
         elif data["op"] == "start":
             assert [m["type"] for m in found(driver, data["id"])] == \
                 ["accept", "items", "end"], name
+        elif data["op"] == "read":
+            # This handler doesn't read values, so the read is refused.
+            [end] = found(driver, data["id"])
+            assert end["type"] == "end", name
+            assert end["error"]["code"] == "UNSUPPORTED", name
         else:
             assert found(driver, data["id"]) == [], name
 

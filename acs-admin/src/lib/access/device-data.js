@@ -38,12 +38,11 @@ export function allows (grant) {
   return []
 }
 
-/* The halves a read_access row gives its target. Data Access checks
- * the device itself, so a grant on an ISA-95 node, or on a target that
- * is not a device, never lets anyone build datasets. */
-export function route_halves (row, device) {
-  const useful = device && row.reason !== 'node' ? HALVES : ['i3x']
-  return allows(row.grant).filter(h => useful.includes(h))
+/* The halves a read_access row gives its target. i3X and Data Access
+ * both follow the ISA-95 hierarchy, so a grant on a node above a
+ * device gives the device everything it gives the node. */
+export function route_halves (row) {
+  return allows(row.grant)
 }
 
 /* The permission to grant for the halves ticked, or null for none. */

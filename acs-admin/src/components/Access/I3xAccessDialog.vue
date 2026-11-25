@@ -195,14 +195,11 @@
               <span class="text-xs text-slate-500">Read its values and history through i3X.</span>
             </span>
           </label>
-          <label v-if="device" class="flex items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5"
-                 :class="buildBlocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'">
-            <input v-model="build" type="checkbox" class="mt-1 accent-slate-900" :disabled="buildBlocked">
+          <label class="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 px-3 py-2.5">
+            <input v-model="build" type="checkbox" class="mt-1 accent-slate-900">
             <span class="flex flex-1 flex-col gap-0.5">
               <span class="text-sm font-medium">Build datasets from it</span>
-              <span class="text-xs text-slate-500">{{ buildBlocked
-                ? 'Datasets only use grants on the device itself. Choose the device above to allow this.'
-                : 'Make datasets from its data in Data Access.' }}</span>
+              <span class="text-xs text-slate-500">{{ buildText }}</span>
             </span>
           </label>
         </fieldset>
@@ -518,10 +515,12 @@ const scopeName = computed(() => scope.value === props.target
   ? (props.name || props.target)
   : props.via.find(n => n.uuid === scope.value)?.name ?? scope.value)
 
-/* Datasets use grants on the device itself only, so Build is off for
- * an ISA-95 node and for a scope above the device. */
-const buildBlocked = computed(() => !props.device || scope.value !== props.target)
-const want = computed(() => ({ browse: browse.value, build: build.value && !buildBlocked.value }))
+/* Data Access follows the ISA-95 hierarchy as i3X does, so Build works
+ * on a node as well as on a device. */
+const buildText = computed(() => props.device && scope.value === props.target
+  ? 'Make datasets from its data in Data Access.'
+  : 'Make datasets from the data of every device under it, and any added later.')
+const want = computed(() => ({ browse: browse.value, build: build.value }))
 
 /* What each picked principal still needs on the chosen scope. Halves
  * they already hold there are skipped. People with another route are

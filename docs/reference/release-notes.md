@@ -288,9 +288,10 @@ User Admin service, which creates users from the Access Control page,
 accepts Keycloak tokens too, and fetches Keycloak's keys the same way.
 Service setup lets each Keycloak client it manages send people back to
 any page under its own address after signing out, so the admin UI's
-Logout and the visualiser's sign-out return to the page you were on. The admin UI is served at
-both `admin.<acs-base>` and the bare `<acs-base>`, and signing in works
-from either.
+Logout and the visualiser's sign-out return to the page you were on. The admin UI lives at
+`admin.<acs-base>`, and the bare `<acs-base>` now redirects there, so
+there is one address with one sign-in. Before, each address kept its
+own sign-in, and signing out on one left the other signed in.
 
 ### Upgrades no longer fail when the KDC is restarting
 

@@ -1128,7 +1128,7 @@ Permission | UUID | Targets | Grants
 `Edit dataset` | `af06b9e5-456a-43e4-b636-5b17de28fc7f` | Dataset | `v1/structure/:uuid` (GET/PUT), the `v1/metadata/:uuid/<field>` writes, and inclusion in the `v1/structure` list
 `Create dataset` | `2d666b41-7a0d-4845-ad59-3113f25b469a` | A structural app (`UNS device` / `UNS device metrics` / `Union components` / `Session limits`), or `Dataset definition` as a plural grant for all of them | Creating an empty union via `POST v1/structure`. Any other create needs only the source permissions
 `Delete dataset` | `6f301df8-0ad1-496f-8391-8de92c43ad8e` | Dataset | `GET v1/delete/:uuid`
-`Build datasets from device` (`UseDevice`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Device | Referencing it as the source of a device structure, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
+`Build datasets from device` (`UseDevice`) | `788b049c-2831-11f1-99fd-2b0bf86d6f77` | Device, or an ISA-95 node for every device under it | Referencing it as the source of a device structure, reading it through `v1/series`, and `v1/sparkplug-sources/:uuid/metrics`
 `Use for session` (`UseForSession`) | `c089b9a9-06cd-4211-94fc-9ad52a759987` | Dataset | Referencing it as a `Session limits` source
 `Include in union` (`IncludeInUnion`) | `94d51085-af83-4796-8059-fcd578e3f572` | Dataset | Referencing it as a `Union components` member
 
@@ -1142,6 +1142,16 @@ The **Device data** composite permission
 a device lets a person browse the device in i3X and build datasets from
 it. Each service sees its own half. The Admin UI's **Manage access**
 dialog gives either half, or both as `Device data`.
+
+A grant of `Build datasets from device`, or of `Device data`, on an
+ISA-95 vocabulary node covers every device placed at or under that
+node, including devices placed there later, as `Read i3X objects` does
+in i3X. Data Access reads each device's node from the ISA-95 Placement
+app and the nodes above it from the ISA-95 Vocabulary app, and follows
+a device that moves. One grant on a Site therefore lets a person browse
+every device in the Site in i3X and build datasets from each of them.
+Only `Build datasets from device` follows the hierarchy. A grant of any
+other Data Access permission on a node does nothing.
 
 On a device's [default dataset](#default-device-datasets),
 `Build datasets from device` on the device also counts as

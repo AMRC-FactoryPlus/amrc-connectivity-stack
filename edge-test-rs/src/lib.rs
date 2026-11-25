@@ -15,10 +15,13 @@
 //! - [`wave`] is the device side, here a pure function of the address
 //!   and the time;
 //! - [`handler`] joins them to `rs-edge-driver`'s `Handler` trait;
-//! - [`scout`] lists a made-up address tree for Edge Scout tests.
+//! - [`scout`] lists a made-up address tree for Edge Scout tests;
+//! - [`read`] gives each address a fixed value for Edge Scout live
+//!   values.
 
 pub mod addr;
 pub mod handler;
+pub mod read;
 pub mod scout;
 pub mod wave;
 

@@ -32,7 +32,8 @@ gives NaN for `sin` and `saw`.
 An address that does not have four parts, or has an unknown function or
 packing, or a period or amplitude with no number at the start, is
 rejected and the connection reports `ADDR`. The driver takes no
-connection details and accepts any config.
+connection details and accepts any config, except a bad `read_fail`
+or `read_hang` (see [Live values](#live-values)), which reports `CONF`.
 
 ## Scanning
 
@@ -90,6 +91,24 @@ moment of the scan.
 The largest scan the library allows, 50,000 items, needs `size` 45,000
 with `depth` 2, which gives 45,000 values in 4,950 folders.
 
+## Live values
+
+The driver answers the Edge Scout panel's live values. Each address
+gets the value its wave has 250 ms after the clock starts, which never
+changes, so tests get the same value every time: `const:1000:7:bd`
+reads `7.0`, `sin:1000:2:bf` reads `2.0` and `sin:0:1:ld` reads `NaN`.
+A `bf` or `lf` address is a `Float` and the rest are `Double`, `ts` is
+null, and an address that does not parse gets the error
+`Not an address of this driver`.
+
+A read has no options of its own, so two keys of the connection's
+config make reads misbehave for the conformance tests:
+
+Key|Default|Meaning
+---|---|---
+`read_fail`|null|`CONN` gives the library no reader, so every read ends with `CONN`. `ERR` panics in the reader, which the library reports as `ERR`
+`read_hang`|false|The reader never answers, so the library abandons each read after 4 s and the Edge Agent records `TIMEOUT`
+
 ## Layout
 
 ```
@@ -99,8 +118,9 @@ src/addr.rs        address parsing, with unit tests
 src/wave.rs        the device side: the bytes for an address at a time
 src/handler.rs     the rs-edge-driver Handler and a lock-free Poller
 src/scout.rs       the made-up tree that scans list, with unit tests
+src/read.rs        the fixed values live reads give, with unit tests
 tests/driver.rs    the driver end to end against a fake Edge Agent
-tests/scout.rs     scans end to end against a fake Edge Agent
+tests/scout.rs     scans and reads end to end against a fake Edge Agent
 tests/equivalence.rs   every value checked against the JS driver
 ```
 

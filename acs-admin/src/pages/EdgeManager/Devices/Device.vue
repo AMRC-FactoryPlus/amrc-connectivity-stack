@@ -63,7 +63,8 @@
                 </div>
             </template>
         </EmptyState>
-        <OriginMapEditor :device="device" :device-schema="schema" v-else>
+        <OriginMapEditor :device="device" :device-schema="schema" v-else
+            @scout-open="open => scoutOpen = open">
           <!-- Who can read this device through i3X -->
           <template #actions>
             <!-- The labels hide on a narrow metric pane, leaving the icons
@@ -81,8 +82,9 @@
         </OriginMapEditor>
       </div>
 
-      <!-- Sidebar -->
-      <div class="w-96 border-l border-border hidden xl:block overflow-y-auto">
+      <!-- Sidebar. The Addresses panel replaces it while open, and takes
+           its width. -->
+      <div v-if="!scoutOpen" class="w-96 border-l border-border hidden xl:block overflow-y-auto">
         <div>
           <div class="flex items-center justify-start gap-2 p-4 border-b">
             <i :class="`fa-fw fa-solid fa-microchip`"></i>
@@ -429,6 +431,8 @@ export default {
 
   data () {
     return {
+      /* The origin map editor's Addresses panel is open. */
+      scoutOpen: false,
       historianToggleBusy: false,
       showSchemaDialog: false,
       showConnectionDialog: false,

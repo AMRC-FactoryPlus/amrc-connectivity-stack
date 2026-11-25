@@ -185,26 +185,42 @@
     </SidebarInset>
 
     <!-- Edge Scout: the Addresses panel. Resizable on wide screens, and a
-       - sheet over the metric pane below lg. -->
+       - sheet over the metric pane below lg. On wide screens it never
+       - takes so much that the schema tree (16rem) and a 24rem metric pane
+       - no longer fit beside it. Pop out moves the same panel
+       - into a large dialog over the page, for deep trees. Teleport moves
+       - it without remounting, so the open folders and search stay. -->
+    <Teleport to="body" :disabled="!scoutExpanded">
+    <div v-if="scoutVisible && scoutOpen && scoutExpanded"
+        class="fixed inset-0 z-50 bg-black/40" aria-hidden="true" @click="scoutExpanded = false"></div>
     <aside v-if="scoutVisible && scoutOpen"
-        class="absolute inset-y-0 right-0 z-20 flex shadow-xl lg:static lg:z-auto lg:shadow-none my-3 mr-3"
-        :style="{ width: `${scoutWidth}px`, maxWidth: 'calc(100% - 1.5rem)' }"
-        aria-label="Addresses">
-      <div class="hidden lg:block w-1.5 shrink-0 cursor-col-resize hover:bg-gray-300 rounded"
+        :class="scoutExpanded
+          ? 'fixed inset-4 z-50 flex shadow-2xl md:inset-8'
+          : 'absolute inset-y-0 right-0 z-20 flex shadow-xl lg:static lg:z-auto lg:shadow-none my-3 mr-3 shrink-0 max-w-[calc(100%-1.5rem)] lg:max-w-[max(20rem,calc(100%-41rem))]'"
+        :style="scoutExpanded ? null : { width: `${scoutWidth}px` }"
+        :role="scoutExpanded ? 'dialog' : null"
+        :aria-modal="scoutExpanded ? 'true' : null"
+        aria-label="Addresses"
+        @keydown.esc="scoutExpanded = false">
+      <div v-if="!scoutExpanded" class="hidden lg:block w-1.5 shrink-0 cursor-col-resize hover:bg-gray-300 rounded"
           role="separator" aria-orientation="vertical" aria-label="Resize the Addresses panel"
           tabindex="0"
           @mousedown.prevent="startResize"
           @keydown.left.prevent="resizeBy(24)" @keydown.right.prevent="resizeBy(-24)"></div>
-      <div class="flex-1 min-w-0 flex flex-col border rounded-lg p-3 bg-white lg:bg-gray-50">
+      <div class="flex-1 min-w-0 flex flex-col border rounded-lg p-3"
+          :class="scoutExpanded ? 'bg-white' : 'bg-white lg:bg-gray-50'">
         <ScoutPanel ref="scoutPanel"
             :scout="scout" :driver="driverDef" :driver-name="driverName" :kind="scoutKind"
             :model="model" :devices="scoutDevices" :selected-metric="selectedMetric"
             :pick-for="scoutPickFor ? scoutPickFor.join(' / ') : null"
-            @use="useScoutItem" @map="openScoutMap" @close="scoutOpen = false; scoutPickFor = null"
+            :popped-out="scoutExpanded"
+            @use="useScoutItem" @map="openScoutMap" @close="toggleScout(false)"
+            @pop-out="v => scoutExpanded = v"
             @cancel-pick="scoutPickFor = null"
             @select-metric="selectMetricByPath"/>
       </div>
     </aside>
+    </Teleport>
   </SidebarProvider>
   </div>
 </template>
@@ -254,7 +270,7 @@ import { computed, ref } from 'vue'
 /* Width of the Addresses panel, remembered per browser. */
 const SCOUT_WIDTH_KEY = 'scoutPanelWidth'
 const SCOUT_WIDTH_MIN = 320
-const SCOUT_WIDTH_MAX = 900
+const SCOUT_WIDTH_MAX = 1400
 
 const SparkplugMetricUUID = 'b16275f1-e443-4c41-a482-fcbdfbd20769'
 export default {
@@ -452,7 +468,15 @@ export default {
       return when_text(this.scout.status.value?.current?.finished)
     },
   },
+  /* `scout-open` tells the device page the Addresses panel opened or
+   * closed, so the page can give the panel its info sidebar's width. */
+  emits: ['scout-open'],
+
   watch: {
+    scoutOpen (open) {
+      this.$emit('scout-open', open && this.scoutVisible)
+    },
+
     // If the schema changes (including on load), build up the schema
     // and load the existing config
     'deviceSchema.uuid': {
@@ -986,7 +1010,10 @@ export default {
 
     toggleScout (open = !this.scoutOpen) {
       this.scoutOpen = open
-      if (!open) this.scoutPickFor = null
+      if (!open) {
+        this.scoutPickFor = null
+        this.scoutExpanded = false
+      }
     },
 
     pickFromScan () {
@@ -1098,7 +1125,9 @@ export default {
 
     startResize (event) {
       const startX = event.clientX
-      const startWidth = this.scoutWidth
+      /* Start from the width on screen, which max-width may hold below
+       * the stored width, so the edge moves with the pointer at once. */
+      const startWidth = event.currentTarget?.parentElement?.offsetWidth || this.scoutWidth
       this.onResizeMove = e => this.setScoutWidth(startWidth + (startX - e.clientX))
       this.onResizeEnd = () => this.stopResize()
       document.addEventListener('mousemove', this.onResizeMove)
@@ -1559,7 +1588,10 @@ export default {
       csvParsedData: null,
 
       /* Edge Scout */
-      scoutWidth: 420,
+      /* The panel replaces the device page's info sidebar while it is
+       * open, so it starts wide enough for an address and its name. */
+      scoutWidth: 640,
+      scoutExpanded: false,
       /* The metric path Pick from scan fills, while it waits. */
       scoutPickFor: null,
       mapOpen: false,

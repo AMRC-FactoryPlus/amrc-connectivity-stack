@@ -26,6 +26,8 @@ Surfaces are selected by query parameter, after the hash:
 | `#/?surface=i3x-isa95` | the ISA-95 page, with the i3X access column |
 | `#/?surface=scout` | the Edge Scout Addresses panel with a scan and a previous scan, beside the real metric fields |
 | `#/?surface=scout&state=running` | the same, mid-scan. Also `never`, `offline`, `noperm`, `refused`, `failed`, `unsupported`, `empty` and `truncated` |
+| `#/?surface=scout&live=ask` | the panel with the Live values dialog open. `&live=on` turns live values on without the dialog, and a fake Edge Agent reads the rows on screen every 5 s, with one address that fails. Add `&dropped=7` for an agent that left 7 addresses out at its cap of 40 |
+| `#/?surface=scout&reads=0` | the Live values switch disabled because the driver can't read values. `&reads=none` is an Edge Agent or driver that does not say, as before live values. `state=offline` and `state=noperm` disable it too |
 | `#/?surface=scout&open=0` | the metric pane with the Addresses panel closed. `&popout=1` starts the panel popped out into the large view |
 | `#/?surface=driver-ui` | the driver custom UI contract version 2 test document in a real sandboxed frame, with the Manager's picker. Add `&scan=none` for no scan, `&samples=1` to share samples, or `&v=1` to declare it as version 1, so the host ignores its version 2 messages and falls back to the standard fields |
 

@@ -117,7 +117,7 @@
               :class="scoutPoppedOut ? 'fixed inset-4 z-50 flex shadow-2xl md:inset-8' : 'my-3 mr-3 flex shrink-0'"
               :style="scoutPoppedOut ? null : { width: '640px', maxWidth: 'max(20rem, calc(100% - 41rem))' }">
             <div class="flex min-w-0 flex-1 flex-col rounded-lg border p-3" :class="scoutPoppedOut ? 'bg-white' : 'bg-gray-50'">
-              <ScoutPanel :scout="scout" :driver="scoutDriver" :driver-name="$route.query.driver ?? 'OPC-UA'"
+              <ScoutPanel ref="scoutPanel" :scout="scout" :driver="scoutDriver" :driver-name="$route.query.driver ?? 'OPC-UA'"
                   :model="scoutModel" :devices="[{ name: 'Mill 1', model: scoutModel }]"
                   :selected-metric="{ path: ['Spindle', 'Speed'], model: scoutModel.Spindle.Speed }"
                   :popped-out="scoutPoppedOut"
@@ -229,7 +229,7 @@ export default {
      * deeply reactive, which unwraps refs inside objects, so the panel
      * would read `.value` of plain values. OriginMapEditor returns the
      * same object from setup(), which leaves it alone. */
-    const scout = this.$route.query.surface === 'scout' ? markRaw(preview_scout(this.$route.query.state)) : null
+    const scout = this.$route.query.surface === 'scout' ? markRaw(preview_scout(this.$route.query.state, this.$route.query)) : null
     return {
       drafts, schemas, devices, i3xTarget, pickerValue: schemas[0]?.uuid ?? null,
       placementA: [], placementB: [], settling: false,
@@ -255,6 +255,11 @@ export default {
    *   isa95&demo=add           adding an Area that already exists
    *   isa95-picker&demo=warning  the picker's duplicate warning */
   async mounted () {
+    /* `live=ask` opens the Live values dialog, `live=on` turns live
+     * values on without it. */
+    if (this.scout && this.$route.query.live === 'ask') this.$refs.scoutPanel?.ask_live()
+    if (this.scout && this.$route.query.live === 'on') this.scout.live_on()
+
     const demo = this.$route.query.demo
     if (!demo) return
     const wait = ms => new Promise(r => setTimeout(r, ms))

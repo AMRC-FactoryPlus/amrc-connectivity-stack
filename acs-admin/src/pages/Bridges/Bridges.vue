@@ -221,6 +221,7 @@ export default {
         title: 'Delete Bridge',
         message: `Are you sure you want to delete the bridge "${this.selectedBridge.name}"? This action cannot be undone.`,
         confirmText: 'Delete',
+        destructive: true,
         onConfirm: async () => {
           try {
             await this.s.client.ConfigDB.delete_object(this.selectedBridge.uuid)

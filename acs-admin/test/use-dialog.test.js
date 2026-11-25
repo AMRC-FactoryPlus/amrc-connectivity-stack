@@ -45,4 +45,21 @@ describe('useDialog', () => {
     expect(dialogs()).toHaveLength(0)
     expect(() => close_dialogs()).not.toThrow()
   })
+
+  it('shows a destructive confirm button in red', async () => {
+    useDialog({ title: 'Delete this node?', confirmText: 'Delete node', destructive: true })
+    await nextTick()
+    const button = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Delete node'))
+    expect(button.className).toContain('bg-red-500')
+    expect(button.className).toContain('text-white')
+    expect(button.className).not.toContain('bg-slate-900')
+  })
+
+  it('keeps an ordinary confirm button dark', async () => {
+    useDialog({ title: 'Turn on live values?', confirmText: 'Turn on' })
+    await nextTick()
+    const button = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Turn on'))
+    expect(button.className).toContain('bg-slate-900')
+    expect(button.className).not.toContain('bg-red-500')
+  })
 })

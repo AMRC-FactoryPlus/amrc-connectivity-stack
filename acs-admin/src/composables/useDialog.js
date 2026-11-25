@@ -10,6 +10,12 @@ import GlobalDialog from '@/components/GlobalDialog.vue'
  * open ones are kept here so a route change can close them. */
 const open_dialogs = new Set()
 
+/**
+ * Ask a question in a modal dialog. The options are title, message,
+ * details, confirmText, cancelText, hideCancel, onConfirm, onCancel and
+ * destructive. Set destructive for a question whose yes deletes,
+ * removes or throws away something, so the confirm button is red.
+ */
 export function useDialog(options) {
   const container = document.createElement('div');
   document.body.appendChild(container);

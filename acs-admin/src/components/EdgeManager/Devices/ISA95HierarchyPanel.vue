@@ -176,6 +176,7 @@ export default {
                 title: 'Clear placement',
                 message: `Remove the ISA-95 placement from ${this.device.name}? The device leaves the UNS until you place it again.`,
                 confirmText: 'Clear',
+                destructive: true,
                 onConfirm: () => this.clear(),
             })
         },

@@ -91,6 +91,7 @@ export const columns: ColumnDef<PrincipalMapping>[] = [{
                 title: 'Remove Principal Mapping?',
                 message: `Are you sure you want to delete the principal mapping for ${row.getValue('uuid')}`,
                 confirmText: 'Remove',
+                destructive: true,
                 onConfirm: async () => {
                     try {
                         await useServiceClientStore().client.Auth.delete_principal(row.getValue('uuid'))

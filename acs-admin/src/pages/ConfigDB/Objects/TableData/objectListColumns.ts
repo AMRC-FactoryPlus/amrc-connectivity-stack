@@ -62,6 +62,7 @@ export const columns: ColumnDef<ApplicationMapping>[] = [{
                     title: 'Remove Object?',
                     message: `Are you sure you want to delete ${row.getValue('name')} (${row.original.uuid})`,
                     confirmText: 'Remove',
+                    destructive: true,
                     onConfirm: async () => {
                         try {
                             await useServiceClientStore().client.ConfigDB.delete_object(row.original.uuid)

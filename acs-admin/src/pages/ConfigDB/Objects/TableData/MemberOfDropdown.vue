@@ -55,6 +55,7 @@ function handleDelete() {
     title: 'Remove Membership?',
     message: `Are you sure you want to remove the membership of ${props.row.original.name}`,
     confirmText: 'Remove',
+    destructive: true,
     onConfirm: async () => {
       try {
         await cdb.class_remove_member(props.row.original.uuid, props.row.original.originalObject.uuid)

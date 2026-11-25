@@ -17,7 +17,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel v-if="!hideCancel" @click="cancel">{{cancelText}}</AlertDialogCancel>
-        <AlertDialogAction @click="confirm">{{confirmText}}</AlertDialogAction>
+        <AlertDialogAction :variant="destructive ? 'destructive' : 'default'" @click="confirm">{{confirmText}}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -63,6 +63,12 @@ export default {
       default: () => [],
     },
     hideCancel: {
+      type: Boolean,
+      default: false,
+    },
+    /* Show the confirm button in red, for an answer that deletes,
+     * removes or throws away something. */
+    destructive: {
       type: Boolean,
       default: false,
     },

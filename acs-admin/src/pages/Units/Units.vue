@@ -247,6 +247,7 @@ export default {
         title: 'Delete Unit',
         message: `Delete ${unit.symbol}, ${unit.name} (${unit.code}), from the vocabulary?${used} You cannot undo this.`,
         confirmText: 'Delete',
+        destructive: true,
         onConfirm: async () => {
           try {
             await this.s.client.ConfigDB.delete_object(unit.uuid)

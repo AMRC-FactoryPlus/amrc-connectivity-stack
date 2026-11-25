@@ -48,6 +48,7 @@ function handleDelete() {
     title: 'Revoke this permission?',
     message: `Are you sure that you want to revoke ${props.row.original.permission.name} on ${props.row.original.target.name} from ${props.row.original.group.name}?`,
     confirmText: 'Revoke Permission',
+    destructive: true,
     onConfirm: async () => {
       try {
         await s.client.Auth.delete_grant(props.row.original.uuid)

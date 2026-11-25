@@ -20,12 +20,22 @@
           <i class="fa-solid fa-sitemap text-xs"></i>
           <div class="text-xs font-bold uppercase tracking-wide">Addresses</div>
         </div>
-        <div class="text-xs text-gray-500 mt-0.5 truncate" :title="subtitle">{{ subtitle }}</div>
+        <div v-if="subtitle" class="text-xs text-gray-500 mt-0.5 truncate" :title="subtitle">{{ subtitle }}</div>
       </div>
-      <Button variant="ghost" size="plain" class="size-7 shrink-0 text-gray-500" title="Close the Addresses panel"
-          @click="$emit('close')">
-        <i class="fa-solid fa-xmark"></i>
-      </Button>
+      <div class="flex shrink-0 items-center gap-0.5">
+        <Button variant="ghost" size="plain" class="size-7 text-gray-500"
+            :title="poppedOut ? 'Return the panel to the side' : 'Pop out into a large view'"
+            :aria-label="poppedOut ? 'Return the panel to the side' : 'Pop out into a large view'"
+            :aria-pressed="poppedOut"
+            @click="$emit('pop-out', !poppedOut)">
+          <i class="fa-solid" :class="poppedOut ? 'fa-down-left-and-up-right-to-center' : 'fa-up-right-and-down-left-from-center'"></i>
+        </Button>
+        <Button variant="ghost" size="plain" class="size-7 text-gray-500"
+            title="Close the Addresses panel" aria-label="Close the Addresses panel"
+            @click="$emit('close')">
+          <i class="fa-solid fa-xmark"></i>
+        </Button>
+      </div>
     </div>
 
     <!-- Pick mode -->
@@ -34,42 +44,76 @@
       <button type="button" class="underline" @click="$emit('cancel-pick')">Cancel</button>
     </div>
 
-    <!-- State banner -->
-    <div v-if="banner" class="rounded-md border px-3 py-2 text-xs" :class="tone_class(banner.tone)" role="status">
-      <div class="flex items-start gap-2">
-        <i v-if="banner.tone === 'busy'" class="fa-solid fa-circle-notch fa-spin mt-0.5"></i>
-        <span class="flex-1">{{ banner.text }}</span>
-      </div>
-      <div v-if="st.state === 'refused' && st.code === 'BUSY'" class="mt-1.5">
-        <button type="button" class="underline" @click="scout.forget()">Follow the running scan</button>
+    <!-- Not scanned yet: what a scan does, and the Scan button under it -->
+    <div v-if="layout === 'empty'" class="flex flex-col items-center gap-3 px-4 py-8 text-center"
+        :class="showOptions ? '' : 'flex-1 justify-center'">
+      <i class="fa-solid fa-sitemap text-2xl text-gray-300" aria-hidden="true"></i>
+      <div class="font-medium text-gray-700">Not scanned yet</div>
+      <p class="max-w-sm text-xs text-gray-500">{{ banner.text }}</p>
+      <div class="flex items-center gap-2">
+        <Button size="sm" class="gap-1.5" :disabled="!startable" :title="scanTitle" @click="start()">
+          <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          Scan
+        </Button>
+        <Button v-if="optionFields.length" size="plain" variant="outline" class="size-8 text-gray-600"
+            title="Scan options" aria-label="Scan options"
+            :aria-expanded="showOptions" @click="showOptions = !showOptions">
+          <i class="fa-solid fa-sliders text-xs"></i>
+        </Button>
       </div>
     </div>
-    <div v-if="untrusted" class="rounded-md border px-3 py-2 text-xs" :class="tone_class('warn')" role="status">{{ UNTRUSTED_TEXT }}</div>
-    <div v-if="sendError" class="rounded-md border px-3 py-2 text-xs" :class="tone_class('error')">{{ sendError }}</div>
 
-    <!-- Actions -->
-    <div class="flex flex-wrap items-center gap-2">
-      <Button v-if="!stoppable" size="xs" class="gap-1.5"
-          :disabled="!startable"
-          :title="startable ? scanTitle : (st.state === 'no_permission' ? 'Needs the Scan device addresses permission.' : '')"
-          @click="start()">
-        <i class="fa-solid fa-magnifying-glass text-xs"></i>
-        {{ scanLabel }}
-      </Button>
-      <Button v-else size="xs" variant="outline" class="gap-1.5" @click="scout.cancel()">
-        <i class="fa-solid fa-stop text-xs"></i>
-        Stop
-      </Button>
-      <Button v-if="optionFields.length" size="xs" variant="outline" class="gap-1.5"
+    <!-- A state where nobody can scan from here: the reason, and no Scan
+       - button. Offline is the one that passes, so it keeps Options
+       - beside the reason, to set them up for when the agent is back. -->
+    <div v-else-if="layout === 'blocked'" class="flex items-start gap-2 rounded-md border px-3 py-2 text-xs"
+        :class="tone_class(banner.tone)" role="status">
+      <span class="flex-1 self-center">{{ banner.text }}</span>
+      <Button v-if="optionFields.length && st.state === 'offline'" size="plain" variant="ghost" class="size-6 shrink-0 text-current"
+          title="Scan options" aria-label="Scan options"
           :aria-expanded="showOptions" @click="showOptions = !showOptions">
         <i class="fa-solid fa-sliders text-xs"></i>
-        Options
-      </Button>
-      <Button v-if="checked.size" size="xs" variant="outline" class="gap-1.5 ml-auto"
-          @click="$emit('map', checked_items)">
-        Map selected ({{ checked.size }})
       </Button>
     </div>
+
+    <template v-else>
+      <!-- State banner -->
+      <div v-if="banner" class="rounded-md border px-3 py-2 text-xs" :class="tone_class(banner.tone)" role="status">
+        <div class="flex items-start gap-2">
+          <i v-if="banner.tone === 'busy'" class="fa-solid fa-circle-notch fa-spin mt-0.5"></i>
+          <span class="flex-1">{{ banner.text }}</span>
+        </div>
+        <div v-if="st.state === 'refused' && st.code === 'BUSY'" class="mt-1.5">
+          <button type="button" class="underline" @click="scout.forget()">Follow the running scan</button>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap items-center gap-2">
+        <Button v-if="!stoppable" size="xs" class="gap-1.5"
+            :disabled="!startable"
+            :title="scanTitle"
+            @click="start()">
+          <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          {{ scanLabel }}
+        </Button>
+        <Button v-else size="xs" variant="outline" class="gap-1.5" @click="scout.cancel()">
+          <i class="fa-solid fa-stop text-xs"></i>
+          Stop
+        </Button>
+        <Button v-if="optionFields.length" size="xs" variant="outline" class="gap-1.5"
+            :aria-expanded="showOptions" @click="showOptions = !showOptions">
+          <i class="fa-solid fa-sliders text-xs"></i>
+          Options
+        </Button>
+        <Button v-if="checked.size" size="xs" variant="outline" class="gap-1.5 ml-auto"
+            @click="$emit('map', checked_items)">
+          Map selected ({{ checked.size }})
+        </Button>
+      </div>
+    </template>
+    <div v-if="untrusted" class="rounded-md border px-3 py-2 text-xs" :class="tone_class('warn')" role="status">{{ UNTRUSTED_TEXT }}</div>
+    <div v-if="sendError" class="rounded-md border px-3 py-2 text-xs" :class="tone_class('error')">{{ sendError }}</div>
 
     <!-- Scan options, from the DriverDef's scout.options schema -->
     <div v-if="showOptions && optionFields.length" class="grid gap-2 rounded-md border border-gray-200 bg-gray-50 p-2">
@@ -118,10 +162,25 @@
               :aria-pressed="filters[f.key]"
               :disabled="f.key === 'new' && !changes"
               @click="filters[f.key] = !filters[f.key]">{{ f.label }}</button>
-          <select v-model="typeFilter" class="h-6 rounded border border-gray-300 px-1 text-xs" aria-label="Type">
-            <option value="">Any type</option>
-            <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
-          </select>
+          <!-- A pill like the filters beside it, opening a menu of types -->
+          <DropdownMenu v-if="types.length">
+            <DropdownMenuTrigger as-child>
+              <button type="button"
+                  class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"
+                  :class="typeFilter ? 'border-gray-800 bg-gray-800 text-white' : 'border-gray-300 text-gray-600 hover:border-gray-400'"
+                  :aria-label="typeFilter ? `Type: ${typeFilter}` : 'Type: any'">
+                {{ typeFilter || 'Any type' }}
+                <i class="fa-solid fa-chevron-down text-[8px]" aria-hidden="true"></i>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" class="max-h-72 overflow-y-auto">
+              <DropdownMenuRadioGroup :model-value="typeFilter || ANY_TYPE"
+                  @update:model-value="v => typeFilter = v === ANY_TYPE ? '' : v">
+                <DropdownMenuRadioItem :value="ANY_TYPE" class="text-xs">Any type</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem v-for="t in types" :key="t" :value="t" class="text-xs">{{ t }}</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <span v-if="searchActive" class="ml-auto text-gray-500">{{ matchText }}</span>
         </div>
       </div>
@@ -137,7 +196,8 @@
           @toggle="toggle" @check="check" @focus="id => focus = id"
           @select="on_select" @use="use" @branch="branch"/>
       <p class="text-[11px] text-gray-400">
-        Drag an address onto a metric in the schema tree, or press Enter to use it for the selected metric.
+        <template v-if="poppedOut">Press Enter or Use to use an address for the selected metric.</template>
+        <template v-else>Drag an address onto a metric in the schema tree, or press Enter to use it for the selected metric.</template>
       </p>
     </template>
     <div v-else-if="loading" class="flex items-center gap-2 text-xs text-gray-500 py-4">
@@ -148,6 +208,13 @@
 
 <script>
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import ScoutTree from './ScoutTree.vue'
 import ScoutChangeBar from './ScoutChangeBar.vue'
 import { UNTRUSTED_TEXT, state_banner } from '@/lib/scout/text.js'
@@ -156,7 +223,8 @@ import {
   can_start,
   can_stop,
   count_text,
-  item_key,
+  keep_items,
+  panel_layout,
   mapped_but_missing,
   metric_key,
   search,
@@ -173,10 +241,22 @@ const FILTERS = [
   { key: 'writable', label: 'Writable' },
 ]
 
+/* The menu's value for no type filter, since a menu item needs one. */
+const ANY_TYPE = '\u0000any'
+
 export default {
   name: 'ScoutPanel',
 
-  components: { Button, ScoutTree, ScoutChangeBar },
+  components: {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger,
+    ScoutTree,
+    ScoutChangeBar,
+  },
 
   props: {
     /* From useScout. */
@@ -194,13 +274,16 @@ export default {
     selectedMetric: { type: Object, default: null },
     /* The metric's name while Pick from scan is waiting. */
     pickFor:        { type: String, default: null },
+    /* The panel is popped out into the large view. */
+    poppedOut:      { type: Boolean, default: false },
   },
 
-  emits: ['use', 'map', 'close', 'select-metric', 'cancel-pick'],
+  emits: ['use', 'map', 'close', 'pop-out', 'select-metric', 'cancel-pick'],
 
   data () {
     return {
       FILTERS,
+      ANY_TYPE,
       UNTRUSTED_TEXT,
       query: '',
       debounced: '',
@@ -239,8 +322,15 @@ export default {
 
     subtitle () {
       const cur = this.status?.current
-      if (!cur) return this.driver?.scout?.title ?? 'Not scanned yet'
+      /* The empty state says "Not scanned yet" itself. */
+      if (!cur) return this.driver?.scout?.title ?? (this.layout === 'empty' ? '' : 'Not scanned yet')
       return `${count_text(cur.items)}, scanned ${when_text(cur.finished)}`
+    },
+
+    /* `empty` before the first scan, `blocked` when nobody can scan from
+     * here, `normal` otherwise. */
+    layout () {
+      return panel_layout(this.st.state, { scanned: !!this.status?.current })
     },
 
     startable () {
@@ -327,29 +417,17 @@ export default {
       return `${n.toLocaleString('en-GB')} match${n === 1 ? '' : 'es'}`
     },
 
-    filtering () {
-      return this.searchActive || this.typeFilter
-        || Object.values(this.filters).some(Boolean)
-        || this.changeFilter === 'new' || this.changeFilter === 'changed'
-    },
-
     /* The items to keep when any search or filter is on. */
     keep () {
-      if (!this.index || !this.filtering) return null
-      const f = this.filters
-      const c = this.changes
-      const out = new Set()
-      for (const it of this.index.items) {
-        if (this.searchActive && !this.found.matches.has(it.id)) continue
-        if (f.values && it.kind !== 'value') continue
-        if (f.writable && !(it.access ?? '').includes('w')) continue
-        if (this.typeFilter && it.type !== this.typeFilter) continue
-        if (f.unmapped && (it.kind !== 'value' || this.usageMap.has(item_key(it)))) continue
-        if ((f.new || this.changeFilter === 'new') && !c?.added.has(it.id)) continue
-        if (this.changeFilter === 'changed' && !c?.changed.has(it.id) && !c?.renamed.has(it.id)) continue
-        out.add(it.id)
-      }
-      return out
+      if (!this.index) return null
+      return keep_items(this.index, {
+        matches: this.searchActive ? this.found.matches : null,
+        filters: this.filters,
+        type: this.typeFilter,
+        change: this.changeFilter,
+        changes: this.changes,
+        usage: this.usageMap,
+      })
     },
 
     rows () {

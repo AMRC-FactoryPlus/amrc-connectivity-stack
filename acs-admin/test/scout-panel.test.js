@@ -112,11 +112,54 @@ describe('ScoutPanel', () => {
     expect(calls).toEqual([['cancel']])
   })
 
-  it('disables Scan without the permission', async () => {
+  it('shows why without a Scan button when the operator lacks the permission', async () => {
     const { scout } = fake('no_permission')
     const { el } = await mount(ScoutPanel, { scout })
     expect(el.textContent).toContain('Scan device addresses permission')
-    expect(button(el, 'Re-scan').disabled).toBe(true)
+    expect(button(el, 'Re-scan')).toBeUndefined()
+    expect(button(el, 'Scan')).toBeUndefined()
+  })
+
+  it('says why it cannot scan while offline, with Options beside it and no Scan', async () => {
+    const { scout } = fake('offline')
+    const driver = { scout: { options: { properties: { units: { type: 'boolean', title: 'Read units' } } } } }
+    const { el } = await mount(ScoutPanel, { scout, driver })
+    expect(el.textContent).toContain('Unable to scan because the Edge Agent is offline.')
+    expect(button(el, 'Re-scan')).toBeUndefined()
+    expect(button(el, 'Options')).toBeUndefined()
+    const options = el.querySelector('[aria-label="Scan options"]')
+    expect(options.textContent.trim()).toBe('')
+    options.click()
+    await nextTick()
+    expect(el.textContent).toContain('Read units')
+  })
+
+  it('explains a scan before the first one, with Scan under the text', async () => {
+    const { scout, calls } = fake('never', {}, { entry: null })
+    scout.status.value = null
+    scout.current_index.value = null
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(el.textContent).toContain('Not scanned yet')
+    expect(el.textContent).toContain('A scan asks the driver to list the addresses')
+    button(el, 'Scan').click()
+    expect(calls[0][0]).toBe('start')
+  })
+
+  it('filters by type from a pill like the other filters', async () => {
+    const { scout } = fake('done')
+    const { el } = await mount(ScoutPanel, { scout })
+    expect(el.querySelector('select')).toBeNull()
+    const pill = el.querySelector('[aria-label="Type: any"]')
+    expect(pill.className).toContain('rounded-full')
+    expect(pill.textContent).toContain('Any type')
+  })
+
+  it('pops out and back', async () => {
+    const { scout } = fake('done')
+    const events = []
+    const { el } = await mount(ScoutPanel, { scout, onPopOut: v => events.push(v) })
+    el.querySelector('[aria-label="Pop out into a large view"]').click()
+    expect(events).toEqual([true])
   })
 
   it('offers to follow a running scan after BUSY', async () => {

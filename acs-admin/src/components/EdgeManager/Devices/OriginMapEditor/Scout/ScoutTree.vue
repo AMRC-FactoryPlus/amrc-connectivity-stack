@@ -19,7 +19,7 @@
       @scroll="on_scroll"
       @keydown="on_key"
   >
-    <div :style="{ height: `${rows.length * ROW_HEIGHT}px`, minWidth: '760px' }" class="relative">
+    <div :style="{ height: `${rows.length * ROW_HEIGHT}px`, minWidth: `${760 + nameWidth - NAME_MIN}px` }" class="relative">
       <div
           v-for="row in window"
           :key="row.id"
@@ -45,8 +45,11 @@
         />
         <span v-else-if="selectable" class="ml-1 w-3.5 shrink-0"></span>
 
-        <!-- Name, indented by depth -->
-        <div class="flex items-center gap-1 min-w-0 w-56 shrink-0" :style="{ paddingLeft: `${row.depth * 14}px` }">
+        <!-- Name, indented by depth. The column widens with the tree, so a
+           - wide or popped-out panel shows deep names in full, and every
+           - row keeps the same width so the columns line up. -->
+        <div class="flex items-center gap-1 min-w-0 shrink-0"
+            :style="{ width: `${nameWidth}px`, paddingLeft: `${row.depth * 14}px` }">
           <button v-if="row.has_children"
               type="button"
               tabindex="-1"
@@ -122,6 +125,17 @@ import { item_key } from '@/lib/scout/model.js'
 /* Rows rendered beyond the visible area, so scrolling stays smooth. */
 const OVERSCAN = 10
 
+/* The name column's width range. Above the minimum it takes the tree's
+ * width less what the other columns need. */
+const NAME_MIN = 224
+const NAME_MAX = 640
+const OTHER_COLUMNS = 560
+
+/** The name column's width for a tree this wide. */
+export function name_width (tree_width) {
+  return Math.round(Math.min(NAME_MAX, Math.max(NAME_MIN, (tree_width || 0) - OTHER_COLUMNS)))
+}
+
 export default {
   name: 'ScoutTree',
 
@@ -149,7 +163,7 @@ export default {
   emits: ['toggle', 'check', 'use', 'branch', 'focus', 'select'],
 
   data () {
-    return { ROW_HEIGHT, top: 0, height: 400 }
+    return { ROW_HEIGHT, NAME_MIN, top: 0, height: 400, nameWidth: NAME_MIN }
   },
 
   computed: {
@@ -179,6 +193,7 @@ export default {
   methods: {
     measure () {
       this.height = this.$refs.scroller?.clientHeight || 400
+      this.nameWidth = name_width(this.$refs.scroller?.clientWidth)
     },
 
     on_scroll () {

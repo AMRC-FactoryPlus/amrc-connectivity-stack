@@ -96,26 +96,82 @@ export function ancestor_path (index, id) {
   return ancestors(index, id).map(a => index.by_id.get(a).name).join(' / ')
 }
 
+/* Case, compatibility forms and invisible characters do not count, so a
+ * serial copied from another page still matches. */
+const fold = s => String(s).normalize('NFKC').replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, '').toLowerCase()
+
+/* Separators do not count either, so `shellyhtg3_0a1b` and `shellyhtg30a1b`
+ * both find `shellyhtg3-0a1b2c3d4e5f`. A word left with fewer than three
+ * characters once its separators go, such as `:0`, must match as typed,
+ * or it would match nearly everything. */
+const squash = s => s.replace(/[\s\-_/\\:.;,=#$[\]()'"]+/g, '')
+
 /**
- * Search the snapshot. Covers name, address, path, description and unit,
- * ignoring case.
+ * Search the snapshot. Covers name, address, path, description, unit and
+ * id, ignoring case and separators. Each word of the query must appear
+ * somewhere in the item, anywhere in a word, so part of a serial number
+ * inside a topic or node id matches.
  *
  * @returns {{matches: Set<string>, ancestors: Set<string>}}
  */
 export function search (index, query) {
-  const q = String(query ?? '').trim().toLowerCase()
+  const terms = fold(query ?? '').split(/\s+/).filter(Boolean)
+    .map(t => ({ t, s: squash(t).length >= 3 ? squash(t) : '' }))
   const matches = new Set()
   const anc = new Set()
-  if (!q) return { matches, ancestors: anc }
+  if (!terms.length) return { matches, ancestors: anc }
 
   for (const item of index.items) {
-    const hay = [item.name, item.address, item.path, item.description, item.unit]
-    if (hay.some(s => typeof s === 'string' && s.toLowerCase().includes(q))) {
+    const fields = [item.name, item.address, item.path, item.description, item.unit, item.id]
+      .filter(s => typeof s === 'string' && s !== '')
+      .map(fold)
+    const flat = fields.map(squash)
+    const hit = ({ t, s }) => fields.some(f => f.includes(t)) || (s !== '' && flat.some(f => f.includes(s)))
+    if (terms.every(hit)) {
       matches.add(item.id)
       for (const a of ancestors(index, item.id)) anc.add(a)
     }
   }
   return { matches, ancestors: anc }
+}
+
+/**
+ * The items the panel keeps while a search or filter is on, or null when
+ * none is.
+ *
+ * A folder the search matches stays even under Values only, Not mapped,
+ * Writable or a type, because those filters describe values and the
+ * operator searched for the folder by name.
+ *
+ * @param {object} index
+ * @param {object} opts
+ * @param {Set<string>} [opts.matches] Search matches, or null for no search.
+ * @param {object} [opts.filters] `values`, `unmapped`, `new`, `writable`.
+ * @param {string} [opts.type] Keep only this type.
+ * @param {string} [opts.change] `new` or `changed`, from the change bar.
+ * @param {object} [opts.changes] The re-scan diff.
+ * @param {Map} [opts.usage] Item key to the metrics that use it.
+ * @returns {Set<string>|null}
+ */
+export function keep_items (index, { matches = null, filters = {}, type = '', change = null, changes = null, usage = new Map() } = {}) {
+  const f = filters
+  const by_change = change === 'new' || change === 'changed'
+  if (!matches && !type && !Object.values(f).some(Boolean) && !by_change) return null
+
+  const out = new Set()
+  for (const it of index.items) {
+    if (matches && !matches.has(it.id)) continue
+    if ((f.new || change === 'new') && !changes?.added.has(it.id)) continue
+    if (change === 'changed' && !changes?.changed.has(it.id) && !changes?.renamed.has(it.id)) continue
+    if (!(matches && it.kind === 'folder')) {
+      if (f.values && it.kind !== 'value') continue
+      if (f.writable && !(it.access ?? '').includes('w')) continue
+      if (type && it.type !== type) continue
+      if (f.unmapped && (it.kind !== 'value' || usage.has(item_key(it)))) continue
+    }
+    out.add(it.id)
+  }
+  return out
 }
 
 /**
@@ -724,6 +780,27 @@ export function panel_state (s) {
 export function can_start (state) {
   return ['never', 'done', 'done_empty', 'failed', 'cancelled', 'interrupted',
     'refused', 'waiting', 'undeployed', 'driver_down', 'driver_old'].includes(state)
+}
+
+/* States where nobody can scan from the panel: the Edge Agent or driver
+ * cannot, or the operator may not. */
+const BLOCKED = ['offline', 'agent_old', 'unsupported', 'no_permission']
+
+/**
+ * How the panel lays out its top for a state.
+ *
+ * `empty` is the first visit, with what a scan does and a Scan button
+ * under it. `blocked` is the reason nobody can scan, with no Scan
+ * button. `normal` is the banner with Scan, Re-scan or Stop.
+ *
+ * @param {string} state From `panel_state`.
+ * @param {object} [opts]
+ * @param {boolean} [opts.scanned] There is a previous scan to show.
+ */
+export function panel_layout (state, { scanned = false } = {}) {
+  if (BLOCKED.includes(state)) return 'blocked'
+  if (state === 'never' && !scanned) return 'empty'
+  return 'normal'
 }
 
 /** Whether a state shows Stop. */

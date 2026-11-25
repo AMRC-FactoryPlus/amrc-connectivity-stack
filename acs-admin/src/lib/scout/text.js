@@ -36,7 +36,7 @@ export function state_banner (st, ctx = {}) {
     case 'hidden':
       return null
     case 'offline':
-      return { tone: 'warn', text: "The Edge Agent is offline, so it can't scan." }
+      return { tone: 'warn', text: 'Unable to scan because the Edge Agent is offline.' }
     case 'agent_old':
       return { tone: 'warn', text: "This Edge Agent can't scan. Upgrade it to the current ACS release." }
     case 'undeployed':

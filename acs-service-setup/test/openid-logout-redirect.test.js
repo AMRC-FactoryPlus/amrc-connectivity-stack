@@ -85,3 +85,38 @@ test("an existing client's logout URIs are updated on the next run", async () =>
     assert.ok(keycloak_allows(put[2].attributes[ATTR], `${ROOT}/`));
     assert.equal(put[2].protocolMappers, undefined);
 });
+
+/* The Admin is served at admin.<baseUrl> and at the bare <baseUrl>.
+ * Keycloak refuses a sign-in whose redirect_uri the client doesn't
+ * list, with "Invalid parameter: redirect_uri", so a client served at
+ * both must list both. */
+const BARE = "http://example.test";
+
+test("a client also at the base URL accepts sign-ins from both hosts", async () => {
+    const { setup, calls } = harness(undefined);
+    await setup.ensure_client("admin", { publicClient: true, alsoAtBaseUrl: true });
+    const [, , body] = calls.find(([m]) => m == "POST");
+
+    assert.deepEqual(body.redirectUris, [`${ROOT}/*`, `${BARE}/*`]);
+    assert.deepEqual(body.webOrigins, [ROOT, BARE]);
+    for (const uri of [ROOT, `${ROOT}/`, BARE, `${BARE}/`, `${BARE}/index.html`])
+        assert.ok(keycloak_allows(body.attributes[ATTR], uri), uri);
+    assert.equal(body.rootUrl, ROOT);
+});
+
+test("a client not at the base URL accepts only its own host", async () => {
+    const { setup, calls } = harness(undefined);
+    await setup.ensure_client("grafana", { publicClient: true });
+    const [, , body] = calls.find(([m]) => m == "POST");
+
+    assert.deepEqual(body.redirectUris, ["http://grafana.example.test/*"]);
+    assert.ok(!keycloak_allows(body.attributes[ATTR], `${BARE}/`));
+});
+
+test("the chart's admin client is also at the base URL", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const values = await readFile(new URL("../../deploy/values.yaml", import.meta.url), "utf8");
+    const admin = values.match(/\n      admin:\n((?: {8}.*\n|\s*\n)+)/);
+    assert.ok(admin, "openidClients.admin in values.yaml");
+    assert.match(admin[1], /alsoAtBaseUrl: true/);
+});

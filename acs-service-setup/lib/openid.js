@@ -32,7 +32,20 @@ export function remember_me_from (env) {
     };
 }
 
-class OpenIDSetup {
+/** The post-logout redirect URIs for a client, as Keycloak's
+ * `post.logout.redirect.uris` attribute: entries joined by `##`.
+ *
+ * Keycloak matches these exactly, except that a trailing `*` matches
+ * any rest of the URI. Grafana sends the bare root, and the Admin and
+ * the visualiser send the page they were on (`<root>/`, or a path
+ * below it), so by default we allow the root and anything under it.
+ * That is the same reach the default `redirectUris` (`<root>/*`)
+ * already gives. A client that lists its own URIs gets only those. */
+export function post_logout_redirect_uris (root, spec) {
+    return (spec.postLogoutRedirectUris ?? [root, `${root}/*`]).join("##");
+}
+
+export class OpenIDSetup {
     constructor (ss) {
         const { fplus } = ss;
         this.fplus = fplus;
@@ -297,9 +310,9 @@ class OpenIDSetup {
         // any application served at that canonical host. Apps served
         // elsewhere - external domains, partner integrations, multiple
         // environments behind one realm - declare the corresponding
-        // field in values.yaml to replace the default. Keycloak's
-        // post.logout.redirect.uris attribute is a single string with
-        // entries joined by `##`.
+        // field in values.yaml to replace the default. An existing
+        // client is updated to these on every run, so a change here
+        // reaches sites on their next upgrade.
         const desired = {
             clientId: name,
             name: spec.name ?? name,
@@ -323,7 +336,7 @@ class OpenIDSetup {
             webOrigins: spec.webOrigins ?? [root],
             attributes: {
                 "post.logout.redirect.uris":
-                    (spec.postLogoutRedirectUris ?? [root]).join("##"),
+                    post_logout_redirect_uris(root, spec),
                 // When an admin force-logs-out a user in Keycloak,
                 // backchannel.logout.session.required tells Keycloak to
                 // POST a session-end notification to the client so it

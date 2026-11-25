@@ -120,7 +120,7 @@ Keys:
 | `baseUrl` | no | same as `rootUrl` | Override the client's Home URL (where Keycloak sends the user from the account console). |
 | `redirectUris` | no | `[<root><redirectPath>]` | Override the full list of valid redirect URIs. Each entry is a full URL (or a Keycloak wildcard like `https://example.com/*`). When set, `redirectPath` is ignored. |
 | `webOrigins` | no | `[<root>]` | Override the CORS web origins. Each entry is an origin (`https://host[:port]`). |
-| `postLogoutRedirectUris` | no | `[<root>]` | Override the list of allowed post-logout redirect URIs. Each entry is a full URL. |
+| `postLogoutRedirectUris` | no | `[<root>, <root>/*]` | Override the list of allowed post-logout redirect URIs. Each entry is a full URL, and a trailing `*` matches any rest of the URI. |
 
 > **Override behaviour.** When any of the override fields above is
 > set, the value flows straight through to Keycloak and **replaces**

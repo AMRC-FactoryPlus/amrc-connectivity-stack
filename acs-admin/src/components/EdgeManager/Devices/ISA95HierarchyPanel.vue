@@ -19,7 +19,10 @@
     </Button>
   </div>
   <div class="space-y-4 p-4">
-    <div v-if="!isa95.ready" class="text-sm text-gray-500">
+    <div v-if="!canRead" class="text-sm text-gray-500">
+      You don't have access to the ISA-95 hierarchy.
+    </div>
+    <div v-else-if="!isa95.ready" class="text-sm text-gray-500">
       Loading the ISA-95 vocabulary...
     </div>
     <div v-else-if="isa95.enterprises.length === 0" class="text-sm text-gray-500">
@@ -59,6 +62,7 @@ import { useServiceClientStore } from '@/store/serviceClientStore.js'
 import { useDialog } from '@/composables/useDialog'
 import { useAccessStore } from '@/store/useAccessStore.js'
 import { can_place_device } from '@/lib/access/perms-edge.js'
+import { can_read_isa95 } from '@/lib/access/sections.js'
 import {
     placement_chain, placement_explanation, placement_state,
 } from '@/lib/isa95-placement.js'
@@ -97,11 +101,21 @@ export default {
         }
     },
 
-    mounted () {
-        this.isa95.start()
+    watch: {
+        /* The vocabulary never loads for someone who can't read it. */
+        canRead: {
+            immediate: true,
+            handler (can) {
+                if (can) this.isa95.start()
+            },
+        },
     },
 
     computed: {
+        canRead () {
+            return can_read_isa95(this.access.check)
+        },
+
         /* Placing and clearing both write ISA95Placement. */
         canPlace () {
             return can_place_device(this.access.check)

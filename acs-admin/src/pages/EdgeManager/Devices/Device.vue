@@ -19,7 +19,37 @@
       :current-connection-uuid="device?.deviceInformation.connection"
   />
   <EdgeContainer padding="p-0">
-    <EdgePageSkeleton v-if="loadingDetails"/>
+    <EdgePageSkeleton v-if="reads.loading"/>
+    <!-- Someone who can't read device configuration, such as a user
+         with only Device data on this device, gets what they can use. -->
+    <div v-else-if="!reads.device" class="flex flex-col flex-1 h-full">
+      <div class="flex items-center justify-start gap-2 p-4 border-b">
+        <i class="fa-fw fa-solid fa-microchip"></i>
+        <div class="font-semibold text-xl">{{ objectName }}</div>
+      </div>
+      <NoAccess noun="this device's configuration">
+        <template #actions>
+          <div v-if="reads.explore || reads.build" class="flex gap-2">
+            <Button v-if="reads.explore" variant="outline" class="gap-2"
+                @click="$router.push('/explorer')">
+              <i class="fa-solid fa-compass text-sm"></i>
+              <span>Open the Explorer</span>
+            </Button>
+            <Button v-if="reads.build" variant="outline" class="gap-2"
+                @click="$router.push({ path: '/datasets/new', query: { devices: deviceUuid } })">
+              <i class="fa-solid fa-database text-sm"></i>
+              <span>Build dataset</span>
+            </Button>
+          </div>
+        </template>
+      </NoAccess>
+    </div>
+    <EdgePageSkeleton v-else-if="loadingDetails"/>
+    <EmptyState v-else-if="!device.deviceInformation"
+        icon="microchip"
+        title="Device not found"
+        description="There is no device configured with this UUID."
+    />
     <div v-else class="flex flex-1 h-full">
       <!-- Main content -->
       <div class="flex-1 flex flex-col gap-4 relative">
@@ -63,6 +93,15 @@
                 </div>
             </template>
         </EmptyState>
+        <NoAccess v-else-if="!reads.schemas" noun="this device's schema">
+          <template #actions>
+            <Button v-if="reads.build" variant="outline" class="gap-2"
+                @click="$router.push({ path: '/datasets/new', query: { devices: device.uuid } })">
+              <i class="fa-solid fa-database text-sm"></i>
+              <span>Build dataset</span>
+            </Button>
+          </template>
+        </NoAccess>
         <OriginMapEditor :device="device" :device-schema="schema" v-else
             @scout-open="open => scoutOpen = open">
           <!-- Who can read this device through i3X -->
@@ -143,16 +182,21 @@
             </Button>
           </div>
           <div class="space-y-4 p-4">
-            <SidebarDetail
-                icon="fas fa-code"
-                label="Schema Type"
-                :value="schema?.schemaInformation?.name"
-            />
-            <SidebarDetail
-                icon="fas fa-square-v"
-                label="Schema Version"
-                :value="schema?.schemaInformation?.version"
-            />
+            <div v-if="!reads.schemas" class="text-sm text-gray-500">
+              You don't have access to schemas.
+            </div>
+            <template v-else>
+              <SidebarDetail
+                  icon="fas fa-code"
+                  label="Schema Type"
+                  :value="schema?.schemaInformation?.name"
+              />
+              <SidebarDetail
+                  icon="fas fa-square-v"
+                  label="Schema Version"
+                  :value="schema?.schemaInformation?.version"
+              />
+            </template>
             <!-- Lineage flag only. Moving a device between versions is a
                  deliberate origin map edit, not something to offer here.
                  A slate glyph and three words: worth knowing on a scan,
@@ -178,7 +222,11 @@
             </Button>
           </div>
           <div class="space-y-4 p-4">
+            <div v-if="!reads.connections" class="text-sm text-gray-500">
+              You don't have access to connections.
+            </div>
             <SidebarDetail
+                v-else
                 icon="fas fa-plug"
                 label="Connection"
                 :value="connection?.name"
@@ -221,12 +269,20 @@ import I3xAccessButton      from '@components/Access/I3xAccessButton.vue'
 import { useISA95Store }    from '@store/useISA95Store.js'
 import { placement_chain }  from '@/lib/isa95-placement.js'
 import { useAccessStore }   from '@store/useAccessStore.js'
+import { useObjectStore }   from '@store/useObjectStore.js'
+import NoAccess             from '@components/NoAccess.vue'
 import { can_edit_device, can_edit_device_ea } from '@/lib/access/perms-edge.js'
+import { Status }           from '@/lib/access/acl.js'
+import { DataAccess }       from '@/lib/access/perms.js'
+import {
+  can_read_connections, can_read_devices, can_read_isa95, can_read_schemas, can_see,
+} from '@/lib/access/sections.js'
 
 export default {
   components: {
     OriginMapEditor,
     EmptyState,
+    NoAccess,
     EdgePageSkeleton,
     Button,
     CardContent,
@@ -253,6 +309,7 @@ export default {
       conn: useConnectionStore(),
       isa95: useISA95Store(),
       access: useAccessStore(),
+      obj: useObjectStore(),
       inop,
       moment,
     }
@@ -263,7 +320,32 @@ export default {
       /* Another device's editor starts with its Addresses panel shut,
        * so give the sidebar back. */
       this.scoutOpen = false
-      await this.getDeviceDetails(newUuid)
+      if (this.reads.device) await this.getDeviceDetails(newUuid)
+    },
+
+    /* Each store starts once the user's permissions show they can read
+     * it. One they can't read would never finish loading. The device
+     * store is usually started by the cluster tree, which a user who
+     * can't read clusters doesn't have. */
+    'reads.device': {
+      immediate: true,
+      handler (can) {
+        if (!can) return
+        if (!this.d.rxsub) this.d.start()
+        this.getDeviceDetails(this.$route.params.deviceuuid)
+      },
+    },
+    'reads.schemas': {
+      immediate: true,
+      handler (can) { if (can && !this.sch.rxsub) this.sch.start() },
+    },
+    'reads.connections': {
+      immediate: true,
+      handler (can) { if (can && !this.conn.rxsub) this.conn.start() },
+    },
+    'reads.isa95': {
+      immediate: true,
+      handler (can) { if (can) this.isa95.start() },
     },
 
     // Stop beeping when both schema and connection are assigned
@@ -280,11 +362,8 @@ export default {
   },
 
   mounted () {
-    this.getDeviceDetails(this.$route.params.deviceuuid)
     this.startRobotBeep()
-    this.sch.start()
-    this.conn.start()
-    this.isa95.start()
+    this.obj.start()
   },
 
   beforeUnmount() {
@@ -300,6 +379,32 @@ export default {
         edit: can_edit_device(c),
         editEa: can_edit_device_ea(c),
       }
+    },
+
+    deviceUuid () {
+      return this.$route.params.deviceuuid
+    },
+
+    /* What the user's permissions let this page read. ConfigDB checks
+     * reads on the Application, never on the device, so a grant on
+     * this device alone can't show its configuration. */
+    reads () {
+      const c = this.access.check
+      return {
+        loading: c.status === Status.Loading,
+        device: can_read_devices(c),
+        schemas: can_read_schemas(c),
+        connections: can_read_connections(c),
+        isa95: can_read_isa95(c),
+        explore: can_see(c, 'explorer'),
+        /* Data Access checks this on the device itself. */
+        build: c.can(DataAccess.UseDevice, this.deviceUuid),
+      }
+    },
+
+    /* The device's name from Info, which everyone may read. */
+    objectName () {
+      return this.obj.data.find(o => o.uuid === this.deviceUuid)?.name ?? this.deviceUuid
     },
 
     recordToHistorian () {

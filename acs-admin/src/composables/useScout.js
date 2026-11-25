@@ -11,6 +11,10 @@
  * service, the way RebirthButton.vue sends a rebirth, and loads snapshots
  * from the Files service through a worker.
  *
+ * While live values are on it holds a lease on the agent, with `watch`
+ * and `unwatch` through the same service, and follows the connection's
+ * values entry in ConfigDB.
+ *
  * `create_scout` takes its I/O as functions, so the tests drive every
  * state with fakes. `useScout` wires the real services.
  */
@@ -22,8 +26,15 @@ import { SparkplugApp } from '@amrc-factoryplus/sparkplug-app'
 import { Address, UUIDs } from '@amrc-factoryplus/service-client'
 
 import { useServiceClientStore } from '@store/serviceClientStore.js'
-import { Scout, SCOUT_METRIC } from '@/lib/scout/constants.js'
+import {
+  LIVE_DEBOUNCE_MS,
+  LIVE_RENEW_MS,
+  Scout,
+  SCOUT_METRIC,
+} from '@/lib/scout/constants.js'
 import { load_snapshot } from '@/lib/scout/load.js'
+import { unwatch_request, watch_addresses, watch_request } from '@/lib/scout/live.js'
+import { watch_refusal_text, watch_send_error_text } from '@/lib/scout/text.js'
 import {
   birth_has_scout,
   cancel_request,
@@ -64,6 +75,10 @@ export function create_scout ({ deps, node, connection, address, driver, active 
   const snapshots = reactive({ current: null, previous: null })
   const loading = reactive({ current: false, previous: false })
   const load_error = ref(null)
+  const live = ref(false)
+  const live_error = ref(null)
+  const live_entry = ref(null)
+  const live_addresses = ref([])
 
   const subs = []
   const unsubs = {}
@@ -172,10 +187,10 @@ export function create_scout ({ deps, node, connection, address, driver, active 
   })
 
   /* Keep the clock running while something on screen depends on it. */
-  watch(() => [pending.value, status.value?.state], ([p, s]) => {
-    const live = !!p || s === 'queued' || s === 'running'
-    if (live && !timer) timer = setInterval(() => { tick.value = now() }, 1000)
-    if (!live && timer) { clearInterval(timer); timer = null }
+  watch(() => [pending.value, status.value?.state, live.value], ([p, s, l]) => {
+    const ticking = !!p || s === 'queued' || s === 'running' || l
+    if (ticking && !timer) timer = setInterval(() => { tick.value = now() }, 1000)
+    if (!ticking && timer) { clearInterval(timer); timer = null }
   }, { immediate: true })
 
   /* ---- Snapshots ---- */
@@ -237,6 +252,139 @@ export function create_scout ({ deps, node, connection, address, driver, active 
 
   const summary = computed(() => scout_summary(entry.value, trusted.value))
 
+
+  /* ---- Live values ---- */
+
+  /* One lease per time the switch is turned on. `held` is whether the
+   * agent may hold it now, so turning off only sends unwatch when there
+   * is something to end. */
+  const lease = { id: null, held: false, sent: null, renew: null, debounce: null, hidden: null }
+  /* The watch requests of this lease, so a refusal in last_request can
+   * be told apart from one for a scan or another panel. */
+  const watch_ids = new Set()
+
+  /** Why the switch is disabled, or null when it can be turned on. */
+  const live_blocked = computed(() => {
+    if (online.value === false) return 'offline'
+    if (can_scout.value === false) return 'no_permission'
+    const reads = status.value?.reads
+    if (reads === false) return 'noreads'
+    if (reads !== true) return 'unknown'
+    return null
+  })
+
+  /* The entry the panel may show. One written by an agent that does not
+   * host this connection is ignored, as for the status entry. */
+  const live_values = computed(() => {
+    const e = live_entry.value
+    return live.value && e && e.node === toValue(node) ? e : null
+  })
+
+  async function send_live (body) {
+    try {
+      await deps.send(toValue(address), body)
+    }
+    catch (err) {
+      if (body.op === 'watch' && body.lease === lease.id) {
+        live_error.value = watch_send_error_text(err)
+        live_off()
+      }
+    }
+  }
+
+  /* Ask for the addresses on screen. A renewal sends them again even
+   * when they have not changed, which keeps the lease alive. */
+  function send_watch (renew = false) {
+    if (!live.value) return
+    const list = live_addresses.value
+    const key = JSON.stringify(list)
+    if (!renew && key === lease.sent) return
+    lease.sent = key
+    if (!list.length) {
+      /* Nothing on screen to read. A watch needs at least one address,
+       * so end the lease until there is. */
+      if (lease.held) {
+        lease.held = false
+        send_live(unwatch_request({ request: deps.uuid(), connection: toValue(connection), lease: lease.id }))
+      }
+      return
+    }
+    const body = watch_request({
+      request: deps.uuid(),
+      connection: toValue(connection),
+      lease: lease.id,
+      addresses: list,
+    })
+    watch_ids.add(body.request)
+    lease.held = true
+    send_live(body)
+  }
+
+  /** Turn live values on, after the operator has confirmed. */
+  function live_on () {
+    if (live.value || live_blocked.value) return false
+    live_error.value = null
+    watch_ids.clear()
+    live.value = true
+    lease.id = deps.uuid()
+    lease.held = false
+    lease.sent = null
+    live_entry.value = null
+    resub('values', () => deps.watch_values(toValue(connection)).subscribe({
+      next: v => { live_entry.value = v ?? null },
+      error: e => console.warn('Edge Scout: values watch failed', e),
+    }))
+    lease.renew = setInterval(() => send_watch(true), LIVE_RENEW_MS)
+    lease.hidden = deps.on_hidden?.(() => live_off()) ?? null
+    send_watch()
+    return true
+  }
+
+  /** Turn live values off and end the lease. */
+  function live_off () {
+    if (!live.value) return
+    live.value = false
+    clearInterval(lease.renew)
+    clearTimeout(lease.debounce)
+    lease.hidden?.()
+    lease.renew = lease.debounce = lease.hidden = null
+    unsubs.values?.unsubscribe?.()
+    delete unsubs.values
+    live_entry.value = null
+    if (lease.held)
+      send_live(unwatch_request({ request: deps.uuid(), connection: toValue(connection), lease: lease.id }))
+    lease.held = false
+    lease.id = null
+  }
+
+  /**
+   * Tell the composable which value items are on screen, in screen
+   * order. While live values are on, a change is sent after 1 s.
+   */
+  function set_live_items (items) {
+    const next = watch_addresses(items)
+    if (JSON.stringify(next) === JSON.stringify(live_addresses.value)) return
+    live_addresses.value = next
+    if (!live.value) return
+    clearTimeout(lease.debounce)
+    lease.debounce = setTimeout(() => send_watch(), LIVE_DEBOUNCE_MS)
+  }
+
+  /* A refused watch stops live values and says why. An accepted one
+   * writes nothing, so only refusals show up here. */
+  watch(() => entry.value?.last_request, last => {
+    if (!live.value || !last?.code || !watch_ids.has(last.request)) return
+    live_error.value = watch_refusal_text(last.code, { message: last.message ?? null })
+    lease.held = false
+    live_off()
+  })
+
+  /* Live values stop when the agent goes offline, the panel closes or
+   * the connection changes. */
+  watch(online, up => { if (up === false) live_off() })
+  watch(() => toValue(active), on => { if (!on) live_off() })
+  watch(() => toValue(connection), () => live_off())
+
   /* ---- Actions ---- */
 
   async function send (body, op) {
@@ -290,6 +438,7 @@ export function create_scout ({ deps, node, connection, address, driver, active 
   }
 
   function stop () {
+    live_off()
     for (const s of Object.values(unsubs)) s?.unsubscribe?.()
     for (const s of subs) s?.unsubscribe?.()
     if (timer) clearInterval(timer)
@@ -321,6 +470,14 @@ export function create_scout ({ deps, node, connection, address, driver, active 
     cancel,
     forget,
     stop,
+    live,
+    live_error,
+    live_blocked,
+    live_values,
+    live_addresses,
+    live_on,
+    live_off,
+    set_live_items,
   }
 }
 
@@ -338,6 +495,15 @@ export function real_deps (client) {
 
   return {
     watch_status: conn => client.ConfigDB.watch_config(Scout.StatusApp, conn),
+    watch_values: conn => client.ConfigDB.watch_config(Scout.ValuesApp, conn),
+
+    /* Calls `fn` when the browser tab is hidden, and returns a function
+     * that stops listening. */
+    on_hidden: fn => {
+      const handler = () => { if (document.visibilityState === 'hidden') fn() }
+      document.addEventListener('visibilitychange', handler)
+      return () => document.removeEventListener('visibilitychange', handler)
+    },
     watch_agent_config: node => client.ConfigDB.watch_config(UUIDs.App.EdgeAgentConfig, node),
 
     /* Births and deaths only. Asking for a rebirth would make the

@@ -40,8 +40,25 @@ An unknown option, or a `root` that is not a folder of the tree, ends
 the scan with `OPTIONS`.
 
 Set the environment variable `SCOUT_UNSUPPORTED=1` to make the driver
-answer that it can't scan, for testing the Edge Agent's `UNSUPPORTED`
-answer against a real driver.
+answer that it can't scan or read, for testing the Edge Agent's
+`UNSUPPORTED` and `NOREADS` answers against a real driver.
+
+## Live values
+
+The driver answers the Edge Agent's reads with a value that depends
+only on the address: each address's function a quarter of a period in.
+So `sin:4000:50:bd` reads `50`, `saw:1000:8:lf` reads `2` and
+`const:1000:2.5:ld` reads `2.5`, with type `Double` or `Float` from the
+packing. An address that is not a test address reads as the error "Not
+a test address".
+
+Reads have no options of their own, so these keys in the connection's
+driver configuration control them:
+
+Key|Effect
+---|---
+`read_fail`|A library code, such as `CONN` or `ERR`. Every read ends with it
+`read_hang`|`true` makes every read go unanswered, so the library gives up after 4 s and the Edge Agent records `TIMEOUT`
 
 ## Development
 

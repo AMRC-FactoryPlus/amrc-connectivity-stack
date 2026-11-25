@@ -16,7 +16,7 @@
 
 import { ScoutError } from "@amrc-factoryplus/edge-driver";
 
-import { canonical_addr } from "./addr.js";
+import { canonical_addr, split_addr } from "./addr.js";
 
 /* How many sub-folders each folder splits into. */
 export const FANOUT = 4;
@@ -266,4 +266,34 @@ export async function scout_test (handler, req, out) {
         reason:     depth_cut ? "depth" : null,
         excluded:   [],
     };
+}
+
+/* The read_values method of TestHandler, for live values. Each address
+ * reads as its function a quarter of a period in, so the value depends
+ * only on the address: a sine wave reads its amplitude, a sawtooth a
+ * quarter of it and a constant its value. The driver configuration's
+ * `read_fail` (a library code) fails every read with that code, and
+ * `read_hang: true` never answers, for testing the Edge Agent. */
+export async function read_test (handler, addresses, signal) {
+    const { read_fail, read_hang } = handler.conf;
+    if (read_hang)
+        return never();
+    if (read_fail)
+        throw new ScoutError(String(read_fail), `read_fail is set to ${read_fail}`);
+
+    const ts = Date.now();
+    return addresses.map(address => {
+        const spec = handler.parseAddr(address);
+        if (!spec)
+            return { address, value: null, type: null, ts: null,
+                error: "Not a test address" };
+        const { period, pack } = split_addr(address);
+        return {
+            address,
+            value:  spec.func(period / 4),
+            type:   PACK_INFO[pack].type,
+            ts,
+            error:  null,
+        };
+    });
 }

@@ -76,10 +76,14 @@ export function bound_sources(resolved, window) {
 
 /* The fields GET /metadata?include= can add to each dataset. Each is
  * the key of the same name in the answer of GET /metadata/:uuid. The
- * kind the Admin UI sets is one of the classes in `function`. `parts`
- * is left out: following a dataset's parts costs a ConfigDB WATCH for
- * each dataset, so a list of every dataset cannot give it cheaply. */
-export const METADATA_FIELDS = ["name", "from", "to", "function", "metadata"];
+ * kind the Admin UI sets is one of the classes in `function`.
+ * `device_deleted` is true for the default dataset of a deleted
+ * device, and absent otherwise. `parts` is left out: following a
+ * dataset's parts costs a ConfigDB WATCH for each dataset, so a list
+ * of every dataset cannot give it cheaply. */
+export const METADATA_FIELDS = [
+  "name", "from", "to", "function", "metadata", "device_deleted",
+];
 
 /** The metadata of one dataset, with the keys GET /metadata/:uuid
  * answers except `parts`, in the same order. A key whose value is
@@ -94,6 +98,7 @@ export function metadata_entry(uuid, dataset, maps) {
     to: dataset.to ? dataset.to : undefined,
     function: maps.functional.get(uuid),
     metadata: maps.metadata.get(uuid),
+    device_deleted: maps.orphans?.has(uuid) || undefined,
   };
 }
 
@@ -529,12 +534,13 @@ export class APIv1 {
 
   /** The held maps a metadata answer is built from. */
   async metadata_maps() {
-    const [infos, functional, metadata] = await Promise.all([
+    const [infos, functional, metadata, orphans] = await Promise.all([
       rx.firstValueFrom(this.data.general_infos),
       rx.firstValueFrom(this.data.functional_types),
       rx.firstValueFrom(this.data.metadata),
+      rx.firstValueFrom(this.data.orphans),
     ]);
-    return { infos, functional, metadata };
+    return { infos, functional, metadata, orphans };
   }
 
   /** GET. Accepts Dataset UUID and returns metadata about a Published dataset.
@@ -548,6 +554,7 @@ export class APIv1 {
                     * function {array} - Array of Functional classes - UUIDs of classes dataset belongs to (only members of Functional dataset type)
                     * metadata {object} - Map of metadata configs keyed by Application UUID - contains all config entries for dataset which use applications in the Dataset metadata class
                     * parts {array} - Subset datasets - contains UUIDs of all subclasses of dataset the client has READ access to.
+                    * device_deleted {boolean} - true for the default dataset of a device that has been deleted; absent otherwise
     * Returns 404 if dataset is invalid.
    */
   async metadata_uuid(req, res){    
@@ -571,7 +578,9 @@ export class APIv1 {
     const dataset = datasets.get(dataset_uuid);
     if(!dataset) return fail(this.log, 404, `Dataset ${dataset_uuid} is not found or invalid.`);
 
-    const meta = { ...metadata_entry(dataset_uuid, dataset, maps), parts };
+    /* device_deleted goes after parts, as in the notify answer. */
+    const { device_deleted, ...entry } = metadata_entry(dataset_uuid, dataset, maps);
+    const meta = { ...entry, parts, device_deleted };
     return res.status(200).json(meta);
   }
 

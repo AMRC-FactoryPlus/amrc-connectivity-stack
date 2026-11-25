@@ -71,9 +71,12 @@ export const DataAccess = {
 
     /* Apps of other services that Data Access reads. The ISA-95
      * Placement app belongs to the ISA-95 placement work: each device's
-     * placement, `{ node }`. See has_placement in api-v1.js. */
+     * placement, `{ node }`. See has_placement in api-v1.js. The
+     * Vocabulary app gives each ISA-95 node's children, `{ children }`.
+     * See isa95-hierarchy.js. */
     External: {
         ISA95Placement: "f9345c57-14e3-4027-b76d-2b0b67eb8fed",
+        ISA95Vocabulary: "11096075-acc6-4eae-b682-9b27d776384d",
     },
 
     Perm: {

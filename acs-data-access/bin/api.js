@@ -19,6 +19,8 @@ import { Coverage, InfluxAdmin } from '../lib/coverage-service.js';
 import { COVERAGE_DEFAULTS } from '../lib/coverage.js';
 import { body_errors } from '../lib/utils.js';
 import { DefaultDatasets } from '../lib/default-datasets.js';
+import { DeviceAuth } from '../lib/device-auth.js';
+import { Isa95Hierarchy } from '../lib/isa95-hierarchy.js';
 
 const { env } = process;
 
@@ -45,11 +47,16 @@ const buckets = {
 };
 
 
+// Build datasets from device, granted on an ISA-95 node, covers the
+// devices under it. Every permission check goes through this.
+const isa95 = new Isa95Hierarchy({ debug, cdb: fplus.ConfigDB });
+const auth = new DeviceAuth({ auth: fplus.Auth, isa95 });
+
 // the dataflow object is full of sequences that does most of the work of this service. Sequence means an RX observable.
 const data = new DataFlow({
   debug,
   cdb: fplus.ConfigDB,
-  auth: fplus.Auth,
+  auth,
   // How long a write waits for the index to show it before it answers.
   write_wait_ms: env.WRITE_WAIT_MS,
 });
@@ -137,7 +144,7 @@ const apiv1 = new APIv1({
   defaults,
   data,
   debug,
-  auth: fplus.Auth,
+  auth,
   cdb: fplus.ConfigDB,
   influxReader,
   seriesReader,
@@ -173,9 +180,10 @@ const api = await new WebAPI({
 
 const notify = new DataAccessNotify({
   api, data, debug,
-  auth: fplus.Auth
+  auth
 });
 
+isa95.run();
 debug.log("app", "Running Data Access DataFlow");
 data.run();
 

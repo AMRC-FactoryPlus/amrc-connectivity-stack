@@ -38,11 +38,14 @@ export function remember_me_from (env) {
  * Keycloak matches these exactly, except that a trailing `*` matches
  * any rest of the URI. Grafana sends the bare root, and the Admin and
  * the visualiser send the page they were on (`<root>/`, or a path
- * below it), so by default we allow the root and anything under it.
+ * below it), so by default we allow each root and anything under it.
  * That is the same reach the default `redirectUris` (`<root>/*`)
- * already gives. A client that lists its own URIs gets only those. */
-export function post_logout_redirect_uris (root, spec) {
-    return (spec.postLogoutRedirectUris ?? [root, `${root}/*`]).join("##");
+ * already gives. A client that lists its own URIs gets only those.
+ * `roots` is one root or a list of them. */
+export function post_logout_redirect_uris (roots, spec) {
+    const all = [roots].flat();
+    return (spec.postLogoutRedirectUris
+        ?? all.flatMap(r => [r, `${r}/*`])).join("##");
 }
 
 export class OpenIDSetup {
@@ -297,8 +300,22 @@ export class OpenIDSetup {
         return `${this.acs.secure ? "https" : "http"}://${name}.${this.acs.domain}`;
     }
 
+    /* The roots a client is served at: `<name>.<acs.baseUrl>`, and also
+     * the bare `<acs.baseUrl>` for a client whose spec sets
+     * `alsoAtBaseUrl`. The Admin is served at both (the `admin` and
+     * `admin-sub` routes), so its client must accept both, or signing
+     * in from the bare domain fails with "Invalid parameter:
+     * redirect_uri". */
+    client_roots (name, spec) {
+        const roots = [this.redirect_root(name)];
+        if (spec.alsoAtBaseUrl)
+            roots.push(`${this.acs.secure ? "https" : "http"}://${this.acs.domain}`);
+        return roots;
+    }
+
     async ensure_client (name, spec) {
-        const root = this.redirect_root(name);
+        const roots = this.client_roots(name, spec);
+        const root = roots[0];
         // Public clients have no client secret. Used by Postman, CLI
         // tools and any other native/SPA flow that can't keep one.
         // Such clients MUST use PKCE; we enforce S256 on the client
@@ -332,11 +349,11 @@ export class OpenIDSetup {
             rootUrl: spec.rootUrl ?? root,
             baseUrl: spec.baseUrl ?? root,
             redirectUris: spec.redirectUris
-                ?? [`${root}${spec.redirectPath ?? "/*"}`],
-            webOrigins: spec.webOrigins ?? [root],
+                ?? roots.map(r => `${r}${spec.redirectPath ?? "/*"}`),
+            webOrigins: spec.webOrigins ?? roots,
             attributes: {
                 "post.logout.redirect.uris":
-                    post_logout_redirect_uris(root, spec),
+                    post_logout_redirect_uris(roots, spec),
                 // When an admin force-logs-out a user in Keycloak,
                 // backchannel.logout.session.required tells Keycloak to
                 // POST a session-end notification to the client so it

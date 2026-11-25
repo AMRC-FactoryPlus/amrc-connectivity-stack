@@ -81,6 +81,8 @@ export default class MQTTCli {
         this.rebirths = {
             pending: {},
             sent: {},
+            /* When we last asked each node to rebirth. */
+            nodes: {},
         };
         this.alerts = new Map();
     }
@@ -560,10 +562,29 @@ export default class MQTTCli {
         this.handle_alert_updates(addr, payload);
 
         if (this.silent) return;
+
+        /* Don't await this either. Messages are handled one at a time,
+         * and do_we_rebirth waits 5-10s for the device to rebirth on
+         * its own. Waiting here held up every message behind it, so
+         * after a restart with a few hundred unknown devices the queue
+         * never drained and BIRTHs were never recorded. */
+        this.maybe_rebirth(addr)
+            .catch(e => this.log("rebirth", "Rebirth of %s failed: %o",
+                addr, e));
+    }
+
+    async maybe_rebirth(addr) {
         if (!await this.do_we_rebirth(addr)) return;
 
         /* XXX always rebirth the whole edge node? */
         const node = addr.parent_node();
+
+        /* The checks for a node's devices run side by side and all
+         * end at about the same time, so ask each node once. */
+        const {nodes} = this.rebirths;
+        const key = node.toString();
+        if (nodes[key] > Date.now() - 60000) return;
+        nodes[key] = Date.now();
 
         this.log("rebirth", `Sending (escalated) rebirth request to ${node}`);
         await this.fplus.CmdEsc.rebirth(node);

@@ -330,6 +330,12 @@ export default {
   },
 
   computed: {
+    /* The scan options schema as text, so a new object with the same
+     * schema doesn't count as a change. */
+    optionsSchemaKey () {
+      return JSON.stringify(this.driver?.scout?.options ?? null)
+    },
+
     st () { return this.scout.state.value },
     /* A status entry exists but another Edge Agent wrote it. */
     untrusted () { return !!this.scout.entry.value && !this.scout.trusted.value },
@@ -523,7 +529,11 @@ export default {
       this.scout.live_off()
     },
 
-    'driver.scout.options': {
+    /* The parent rebuilds the DriverDef object whenever its data
+     * refreshes, which happens when a scan starts. Reset the options
+     * only when the schema itself changes, or Try again would throw
+     * away what the user typed and scan with the defaults. */
+    optionsSchemaKey: {
       handler () { this.reset_options() },
       immediate: true,
     },

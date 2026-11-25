@@ -162,7 +162,7 @@ describe('useScout states', () => {
     expect(w.sent).toEqual([{
       addr: ADDR,
       body: { version: 1, op: 'start', request: 'req-1', connection: CONN,
-        root: null, folder_id: null, options: { include_server: false } },
+        root: null, folder_id: null, options: { include_server: false }, limits: { samples: true } },
     }])
     expect(s.state.value.state).toBe('sending')
 

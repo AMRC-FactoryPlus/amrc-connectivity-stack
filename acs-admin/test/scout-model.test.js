@@ -760,6 +760,7 @@ describe('permissions, requests and the custom UI', () => {
       .toEqual(Object.keys(ncmd).sort())
     expect(start_request({ request: 'r', connection: 'c' })).toEqual({
       version: 1, op: 'start', request: 'r', connection: 'c', root: null, folder_id: null, options: {},
+      limits: { samples: true },
     })
   })
 

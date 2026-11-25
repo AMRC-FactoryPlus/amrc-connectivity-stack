@@ -923,9 +923,10 @@ export function scout_summary (entry, trusted = true) {
  * Requests
  * ------------------------------------------------------------------- */
 
-/** The NCMD value that starts a scan. */
+/** The NCMD value that starts a scan. It asks for each value's sample,
+ * so the panel can show the value at scan. */
 export function start_request ({ request, connection, root = null, folder_id = null, options = {} }) {
-  return { version: 1, op: 'start', request, connection, root, folder_id, options }
+  return { version: 1, op: 'start', request, connection, root, folder_id, options, limits: { samples: true } }
 }
 
 /** The NCMD value that stops a scan. */

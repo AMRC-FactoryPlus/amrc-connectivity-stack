@@ -267,11 +267,35 @@ describe('index, tree and search', () => {
     expect(visible_rows(index).map(r => r.id)).toEqual(['A', 'orphan'])
   })
 
-  it('shows children of open folders', () => {
+  it('shows children of open folders, folders first', () => {
     const rows = visible_rows(index, { expanded: new Set(['A', 'A/B']) })
     expect(rows.map(r => [r.id, r.depth])).toEqual([
-      ['A', 0], ['A/speed', 1], ['A/B', 1], ['A/B/temp', 2], ['orphan', 0],
+      ['A', 0], ['A/B', 1], ['A/B/temp', 2], ['A/speed', 1], ['orphan', 0],
     ])
+  })
+
+  it('keeps folders in place when a branch scan is appended', () => {
+    /* A merged snapshot after a branch scan of Line1: the branch comes
+     * last in the file, but the tree must not move it. */
+    const merged = build_index([
+      folder('P'),
+      folder('P/Line2', 'P', { name: 'Line2' }),
+      value('P/Energy', 'P', { name: 'Energy' }),
+      folder('P/Line10', 'P', { name: 'Line10' }),
+      folder('P/Line1', 'P', { name: 'Line1' }),
+      value('P/Line1/speed', 'P/Line1', { name: 'speed' }),
+    ])
+    const fresh = build_index([
+      folder('P'),
+      folder('P/Line1', 'P', { name: 'Line1' }),
+      value('P/Line1/speed', 'P/Line1', { name: 'speed' }),
+      folder('P/Line2', 'P', { name: 'Line2' }),
+      folder('P/Line10', 'P', { name: 'Line10' }),
+      value('P/Energy', 'P', { name: 'Energy' }),
+    ])
+    const order = ['P/Line1', 'P/Line2', 'P/Line10', 'P/Energy']
+    expect(merged.children.get('P')).toEqual(order)
+    expect(fresh.children.get('P')).toEqual(order)
   })
 
   it('searches name, address, description and unit', () => {

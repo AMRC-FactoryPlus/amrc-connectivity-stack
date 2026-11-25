@@ -226,5 +226,24 @@ export function build_index (items) {
     if (item.kind === 'folder' && (item.more || item.detail?.denied)) incomplete = true
   }
 
+  for (const list of children.values()) list.sort((a, b) => child_order(by_id.get(a), by_id.get(b)))
+
   return { items, by_id, by_key, addresses, children, incomplete }
+}
+
+/* Names compare as people read them, so Cell2 comes before Cell10. */
+const COLLATOR = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
+
+/**
+ * The order of the items under one parent: folders first, then by name,
+ * then by id. The tree follows this and not the snapshot's line order,
+ * because a branch scan's merged snapshot appends the branch at the end
+ * and the folder would otherwise jump to the bottom.
+ */
+export function child_order (a, b) {
+  const fa = a.kind === 'folder' ? 0 : 1
+  const fb = b.kind === 'folder' ? 0 : 1
+  if (fa !== fb) return fa - fb
+  return COLLATOR.compare(a.name ?? '', b.name ?? '')
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 }

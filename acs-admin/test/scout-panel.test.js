@@ -145,7 +145,7 @@ describe('ScoutPanel', () => {
     const { el, events } = await mount(ScoutPanel, { scout })
     el.querySelector('[role="treeitem"] button').click()
     await nextTick()
-    el.querySelector('input[type="checkbox"]').click()
+    el.querySelector('input[type="checkbox"][aria-label="Select Speed"]').click()
     await nextTick()
     button(el, 'Map selected').click()
     expect(events).toEqual([['map', ['L/speed']]])
@@ -239,7 +239,8 @@ describe('ScoutTree branch scans', () => {
     ]
     const { scout, calls } = fake('done', {}, { items })
     const { el } = await mount(ScoutPanel, { scout })
-    el.querySelector('[role="treeitem"] button').click()
+    const line = [...el.querySelectorAll('[role="treeitem"]')].find(r => r.textContent.includes('Line'))
+    line.querySelector('button[aria-label="Open"]').click()
     await nextTick()
     const rows = [...el.querySelectorAll('[role="treeitem"]')]
     const row = name => rows.find(r => r.textContent.includes(name))

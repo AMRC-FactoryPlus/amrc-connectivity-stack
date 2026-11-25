@@ -20,6 +20,7 @@ import { stamped_value } from './ensure-metric.js'
 
 export {
   build_index,
+  child_order,
   decode_snapshot,
   identity,
   item_key,

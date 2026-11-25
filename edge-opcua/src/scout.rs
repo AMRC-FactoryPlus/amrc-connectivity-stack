@@ -152,6 +152,36 @@ pub trait Service: Send + Sync {
         points: &[ByteString],
     ) -> Result<Vec<BrowseResult>, StatusCode>;
     async fn read(&self, ids: &[ReadValueId]) -> Result<Vec<DataValue>, StatusCode>;
+    /// A Read for live values: current values with their source
+    /// timestamps. A fake server answers it as `read`.
+    async fn read_live(&self, ids: &[ReadValueId]) -> Result<Vec<DataValue>, StatusCode> {
+        self.read(ids).await
+    }
+}
+
+/// The `maxAge` of a live read, in ms. Live values are read every 5 s
+/// by default, so a server may answer from a cache up to a second old
+/// rather than ask the device each time.
+const LIVE_MAX_AGE: f64 = 1000.0;
+
+/// `MaxNodesPerRead` from the server's OperationLimits, at most
+/// [`READ_BATCH`], as a scan reads it. A server that does not say, or
+/// says 0, gets [`READ_BATCH`].
+pub async fn max_nodes_per_read(service: &dyn Service) -> usize {
+    let id = read_id(&NodeId::new(0, MAX_NODES_PER_READ), AttributeId::Value);
+    match service.read(&[id]).await {
+        Ok(v) if v.len() == 1 => op_limit(&v[0], READ_BATCH),
+        _ => READ_BATCH,
+    }
+}
+
+/// An OperationLimits value as a batch size, at most `most`. Missing
+/// or 0 means no limit, so `most`.
+fn op_limit(v: &DataValue, most: usize) -> usize {
+    match good(v).and_then(as_u64) {
+        Some(n) if n > 0 => (n as usize).min(most),
+        _ => most,
+    }
 }
 
 /// A live session as a [`Service`].
@@ -186,6 +216,27 @@ impl Service for SessionService {
             .read(ids, TimestampsToReturn::Neither, MAX_AGE)
             .await
             .map_err(|e| e.status())
+    }
+
+    async fn read_live(&self, ids: &[ReadValueId]) -> Result<Vec<DataValue>, StatusCode> {
+        let values = self
+            .0
+            .read(ids, TimestampsToReturn::Source, LIVE_MAX_AGE)
+            .await
+            .map_err(|e| e.status())?;
+        // async-opcua moves every DateTime it decodes onto our clock
+        // when it allows for a server clock that is out, so put values
+        // and their timestamps back as the server sent them, as the
+        // subscriptions do.
+        let offset = self.0.context().read().options().client_offset;
+        Ok(values
+            .into_iter()
+            .map(|mut dv| {
+                dv.value = dv.value.map(|v| value::undo_clock_offset(v, offset));
+                dv.source_timestamp = dv.source_timestamp.map(|t| t + offset);
+                dv
+            })
+            .collect())
     }
 }
 
@@ -906,12 +957,8 @@ impl<'a> Walk<'a> {
                 })
                 .collect();
         }
-        let limit = |v: &DataValue, most: usize| match good(v).and_then(as_u64) {
-            Some(n) if n > 0 => (n as usize).min(most),
-            _ => most,
-        };
-        self.browse_batch = limit(&values[1], BROWSE_BATCH);
-        self.read_batch = limit(&values[2], READ_BATCH);
+        self.browse_batch = op_limit(&values[1], BROWSE_BATCH);
+        self.read_batch = op_limit(&values[2], READ_BATCH);
         tracing::debug!(
             browse = self.browse_batch,
             read = self.read_batch,

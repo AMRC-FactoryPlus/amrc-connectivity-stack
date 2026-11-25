@@ -36,13 +36,15 @@ use opcua::types::{
     WriteValue as UaWriteValue,
 };
 use rs_edge_driver::{
-    AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, Scouter, WriteError, WriteValue,
+    AddrGroup, ConnectError, DriverHandle, Handler, HandlerError, Reader, Scouter, WriteError,
+    WriteValue,
 };
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 use crate::addr::Addr;
 use crate::config::Config;
+use crate::read::OpcuaReader;
 use crate::scout::OpcuaScouter;
 use crate::subs::{self, Dropped, Plan, Sink, Subs};
 use crate::value::{self, WriteFailure};
@@ -525,6 +527,9 @@ impl Handler for OpcuaHandler {
     /// Scans browse the server with the handler's own session (see
     /// `scout.rs`).
     const SCOUTS: bool = true;
+    /// Live values are read on the handler's own session too (see
+    /// `read.rs`).
+    const READS: bool = true;
 
     fn create(handle: DriverHandle<Addr>, config: serde_json::Value) -> Result<Self, HandlerError> {
         let config = Config::from_json(config).map_err(HandlerError::new)?;
@@ -582,6 +587,13 @@ impl Handler for OpcuaHandler {
     fn scouter(&self) -> Option<Arc<dyn Scouter>> {
         let conn = self.conn.as_ref()?;
         Some(Arc::new(OpcuaScouter::new(conn.session.clone())))
+    }
+
+    /// A reader on the current session, for the Edge Scout panel's live
+    /// values. Without a session a read ends with `CONN`.
+    fn reader(&self) -> Option<Arc<dyn Reader>> {
+        let conn = self.conn.as_ref()?;
+        Some(Arc::new(OpcuaReader::new(conn.session.clone())))
     }
 
     async fn close(&mut self) {

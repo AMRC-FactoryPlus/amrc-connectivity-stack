@@ -383,6 +383,30 @@ than the test server's, so expect a larger gzipped size. Each variable
 costs one Browse slot and five attributes, so a server's own limits
 decide how many requests a scan takes.
 
+## Live values
+
+While an operator has live values turned on in the Edge Scout panel,
+the Edge Agent asks the driver for the current value of up to 40
+addresses every few seconds. The driver reads them on its own session,
+as a scan does, so it opens no session or subscription for them:
+
+- One Read of the `Value` attribute for every address, split into
+  batches of the server's `MaxNodesPerRead` (read once a session, at
+  most 100). On `BadTooManyOperations` the batch halves. The Read asks
+  for source timestamps and allows a value up to 1 s old (`maxAge`), so
+  a server may answer from its cache.
+- An address that ends in an array index is read as the node it names
+  first, as the subscriptions read it. When the server says that node
+  does not exist, a second Read asks for the node without the suffix
+  with the index range, and a single element is shown as a scalar.
+- A bad status goes in the entry's `error` by name, such as
+  `BadNodeIdUnknown`, with no value. An uncertain status keeps the
+  value and names the status in `error`. An address that is not a node
+  id gets `Not an OPC UA node id`.
+- The value goes as text: numbers, booleans and strings as they are,
+  NaN as `NaN`, and arrays and other values as JSON. `type` is the
+  Sparkplug type of a scalar and null for an array or a structure.
+
 ## Layout
 
 ```
@@ -398,8 +422,11 @@ src/handler.rs     the rs-edge-driver Handler: session, reconnects
                    and writes
 src/scout.rs       scanning the address space, with unit tests
                    against a fake server in src/scout/tests.rs
+src/read.rs        live values, with unit tests against the same
+                   fake server
 tests/opcua.rs     the driver end to end against a node-opcua server
-tests/scout.rs     scans against the node-opcua server's SCOUT mode
+tests/scout.rs     scans and live values against the node-opcua
+                   server's SCOUT mode
 tests/clock.rs     a server whose clock is an hour fast
 tests/refused.rs   a server that refuses the driver's certificate
 tests/support/     that server, a TCP proxy and the fake Edge Agent

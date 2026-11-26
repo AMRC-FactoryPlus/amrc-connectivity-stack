@@ -56,7 +56,7 @@ umask 077
     echo "# Written by start.sh on $(date -Is)"
     for var in ROLE K3S_MODE K3S_DEFER K3S_URL K3S_TOKEN MULTI_NODE NORTH_IF NORTH_PROBE_URL SOUTH_IF \
                SOUTH_ADDR HOSTNAME_PREFIX GW_HOSTNAME REGISTRY_MIRROR APT_MIRROR \
-               APT_MIRROR_KEY_SHA256 APT_MIRROR_ORIGIN ADMIN_PASSWORD; do
+               APT_MIRROR_KEY APT_MIRROR_KEY_SHA256 APT_MIRROR_ORIGIN ADMIN_PASSWORD; do
         printf '%s=%q\n' "$var" "${!var}"
     done
 } > "$GW_CONF"

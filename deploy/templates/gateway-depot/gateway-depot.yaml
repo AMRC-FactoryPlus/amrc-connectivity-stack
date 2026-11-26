@@ -83,6 +83,8 @@ spec:
               value: {{ .Values.gatewayDepot.gateway.registryMirror | quote }}
             - name: APT_MIRROR
               value: {{ .Values.gatewayDepot.gateway.aptMirror | quote }}
+            - name: APT_MIRROR_KEY
+              value: {{ .Values.gatewayDepot.gateway.aptMirrorKey | quote }}
             - name: APT_MIRROR_KEY_SHA256
               value: {{ .Values.gatewayDepot.gateway.aptMirrorKeySha256 | quote }}
             - name: APT_MIRROR_ORIGIN

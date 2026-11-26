@@ -122,6 +122,13 @@
               <div>
                 <Button variant="destructive" :disabled="removing" @click="remove">Remove this entry</Button>
               </div>
+              <!-- The installer's own output, which says why it failed.
+                   Open, because it is what the person came here for. -->
+              <details v-if="gateway.install_journal" open>
+                <summary class="cursor-pointer py-1 text-sm font-medium">Journal from the installer</summary>
+                <p class="text-slate-500">The last lines the installer wrote before it stopped. The cause is usually a few lines above the end, on a line starting <code>E:</code> or containing <code>error</code>.</p>
+                <GatewayLog class="mt-2" :text="gateway.install_journal"/>
+              </details>
               <details v-if="gateway.log">
                 <summary class="cursor-pointer py-1 text-sm font-medium">Log from the gateway</summary>
                 <GatewayLog class="mt-2" :text="gateway.log"/>

@@ -110,6 +110,15 @@ export function build_autoinstall (opts) {
             /* If anything above fails, say so, so the page does not show
              * "installing" for ever. */
             "error-commands": [
+                /* First send the end of the journal, which holds the
+                 * output of the command that failed, while the depot
+                 * still takes it. */
+                ...(progress_token ? [
+                    "journalctl -b --no-pager -o short-monotonic -n 400"
+                    + ` | ${curl} -m 30 -H 'Content-Type: text/plain' --data-binary @-`
+                    + ` ${public_url}/v1/box/${box.id}/install-journal/${progress_token}`
+                    + " || true",
+                ] : []),
                 "python3 /cdrom/fplus-gw/agent.py report install-failed || true",
             ],
         },

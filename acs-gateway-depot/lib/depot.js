@@ -15,6 +15,7 @@ import { build_autoinstall, hash_password, random_password }
 const PENDING_EXPIRY = 15 * 60 * 1000;
 const ONLINE = 90 * 1000;
 const LOG_LIMIT = 16000;
+const JOURNAL_LIMIT = 64000;
 const LOST_JOB = 45 * 1000;
 
 function sha256 (text) {
@@ -156,6 +157,27 @@ export class Depot {
         this.append_log(box, `${"  ".repeat(Math.min(depth, 6))}${type}: ${what}`
             + (failed ? ` (${String(event.result).slice(0, 20)})` : "") + "\n");
         if (type == "start") box.install_step = what;
+        box.last_seen = Date.now();
+    }
+
+    /* When the install fails, the installer sends the end of its
+     * journal here before it reports the failure. The progress events
+     * only say which step failed; the journal says why (apt's errors,
+     * for example). It is kept in memory only, like the log. */
+    install_journal (id, token, text) {
+        const box = this.store.get(id);
+        if (!box?.progress_hash || typeof token != "string"
+            || !same(box.progress_hash, sha256(token)))
+            throw new DepotError(403, "Unknown gateway or wrong token.");
+        if (box.state != State.Installing && box.state != State.Failed) return;
+
+        box.install_journal = String(text ?? "")
+            /* Nothing a terminal would act on, and no password hashes
+             * or the token itself, in case the installer logged them. */
+            .replace(/[^\n\t\x20-\x7e\u00a0-\uffff]/g, "")
+            .replace(/\$(1|5|6|y|2[aby])\$[^\s'"]+/g, "<hash>")
+            .split(token).join("<token>")
+            .slice(-JOURNAL_LIMIT);
         box.last_seen = Date.now();
     }
 

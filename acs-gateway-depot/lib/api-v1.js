@@ -71,6 +71,11 @@ export class APIv1 {
         api.post("/box/:id/progress/:token",
             express.text({ type: () => true, limit: "64kb" }),
             this.wrap(this.progress));
+        /* The end of the installer's journal, as plain text, when the
+         * install fails. */
+        api.post("/box/:id/install-journal/:token",
+            express.text({ type: () => true, limit: "256kb" }),
+            this.wrap(this.install_journal));
         api.get("/payload/gateway-:sha.tar.gz", this.wrap(this.archive));
         api.get("/payload/k3s-:arch", this.wrap(this.k3s));
         /* The depot stick holds no settings and no secrets, and a
@@ -101,6 +106,12 @@ export class APIv1 {
             catch { throw new DepotError(400, "A progress report must be JSON."); }
         }
         this.depot.progress(req.params.id, req.params.token, event ?? {});
+        res.status(204).end();
+    }
+
+    install_journal (req, res) {
+        const text = typeof req.body == "string" ? req.body : "";
+        this.depot.install_journal(req.params.id, req.params.token, text);
         res.status(204).end();
     }
 

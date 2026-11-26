@@ -19,12 +19,17 @@ export class Clusters {
         this.log = opts.fplus.debug.bound("clusters");
     }
 
-    /* Call the Cluster Manager. Resolves to [status, json]. */
+    /* Call the Cluster Manager. Resolves to [status, json]. Status 0
+     * means the Cluster Manager could not be reached at all. */
     async manager (method, url) {
         const res = await this.fplus.Fetch.fetch({
             service:    Service.Clusters,
             url, method,
+        }).catch(e => {
+            this.log("Cannot reach the Cluster Manager: %s", e.message);
+            return undefined;
         });
+        if (!res) return [0];
         const json = await res.json().catch(() => undefined);
         return [res.status, json];
     }
@@ -82,8 +87,11 @@ export class Clusters {
     }
 
     /* Wait for the Cluster Manager to finish preparing a cluster, then
-     * ask it for an enrolment token. Resolves to { token, bootstrap }. */
-    async enrol (uuid, timeout = 180000) {
+     * ask it for an enrolment token. Resolves to { token, bootstrap }.
+     * A Cluster Manager that cannot be reached is tried again until the
+     * timeout, because a DNS or network blip should not fail the
+     * gateway. */
+    async enrol (uuid, timeout = 180000, interval = 3000) {
         const end = Date.now() + timeout;
         for (;;) {
             const [st, json] = await this.manager("POST", `v1/cluster/${uuid}/enrol`);
@@ -91,13 +99,17 @@ export class Clusters {
             if (st == 403)
                 throw new DepotError(502,
                     "The Gateway Depot is not allowed to enrol edge clusters.");
-            /* 404 means the cluster is not ready yet. */
-            if (st != 404 || Date.now() > end) {
+            /* 404 means the cluster is not ready yet. 0 means the
+             * Cluster Manager could not be reached. */
+            if ((st != 404 && st != 0) || Date.now() > end) {
                 this.log("Cannot enrol cluster %s: status %s", uuid, st);
-                throw new DepotError(504,
-                    "Cluster Manager did not finish preparing the cluster in time.");
+                throw new DepotError(504, st == 0
+                    ? "The Gateway Depot could not reach the Cluster Manager."
+                    : st == 404
+                    ? "Cluster Manager did not finish preparing the cluster in time."
+                    : `Cluster Manager refused to enrol the cluster (status ${st}).`);
             }
-            await timers.setTimeout(3000);
+            await timers.setTimeout(interval);
         }
     }
 

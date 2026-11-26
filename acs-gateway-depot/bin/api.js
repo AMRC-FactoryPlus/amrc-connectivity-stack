@@ -60,7 +60,7 @@ const depot = new Depot({
         apt_mirror_key:         env.APT_MIRROR_KEY ?? "",
         apt_mirror_key_sha256:  env.APT_MIRROR_KEY_SHA256 ?? "",
         apt_mirror_origin:      env.APT_MIRROR_ORIGIN ?? "",
-        admin_user:             env.ADMIN_USER || "fplus",
+        admin_user:             env.ADMIN_USER || "fplusadmin",
         locale:                 env.GATEWAY_LOCALE || "en_GB.UTF-8",
         keyboard:               env.GATEWAY_KEYBOARD || "gb",
         timezone:               env.GATEWAY_TIMEZONE || "Europe/London",

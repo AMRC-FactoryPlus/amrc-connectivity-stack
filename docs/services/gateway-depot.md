@@ -81,6 +81,16 @@ of the `-updates` and `-security` suites the mirror carries. A mirror
 that carries only the release still works, but its gateways get no
 updates, and setup prints a warning for each missing suite.
 
+The gateway needs the mirror's signing key. If the mirror publishes it as
+`keyring.gpg`, set `aptMirrorKeySha256` and the gateway fetches and checks
+it. If the mirror does not publish its key, put the key itself in
+`aptMirrorKey`, so it reaches the gateway with its settings.
+
+Automatic updates only install packages from sources they are told to
+trust. With `aptMirrorOrigin` set they trust that origin. Without it they
+trust the mirror's host name, which works for a mirror whose Release
+files have no Origin line, as some private mirrors do.
+
 ### Trust
 
 A gateway proves who it is with a secret it makes up when its scout
@@ -251,8 +261,9 @@ Set these under `gatewayDepot` in the ACS Helm values.
 | `enabled` | `true` | Deploy the service. It adds the host `gateway-depot.<acs.baseUrl>`, which must resolve |
 | `gateway.registryMirror` | empty | A container mirror for K3s on the gateways. Empty means none |
 | `gateway.aptMirror` | empty | An apt mirror for the gateways. Empty means the Ubuntu archive |
-| `gateway.aptMirrorKeySha256` | empty | The SHA-256 of `<aptMirror>/keyring.gpg` |
-| `gateway.aptMirrorOrigin` | empty | The origin the mirror publishes with, for automatic updates |
+| `gateway.aptMirrorKey` | empty | The mirror's OpenPGP signing key, armored or binary. Empty means fetch `<aptMirror>/keyring.gpg` |
+| `gateway.aptMirrorKeySha256` | empty | The SHA-256 of the key file. Required when the key is fetched, checked when given |
+| `gateway.aptMirrorOrigin` | empty | The origin the mirror publishes with. Empty means trust the mirror's host |
 | `gateway.adminUser` | `fplus` | The default name of the admin user on a gateway |
 | `gateway.locale` | `en_GB.UTF-8` | The gateway's locale |
 | `gateway.keyboard` | `gb` | The gateway's keyboard layout |

@@ -9,14 +9,31 @@ need_root
 codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 
 if [ -n "$APT_MIRROR" ]; then
-    [ -n "$APT_MIRROR_KEY_SHA256" ] || die "APT_MIRROR is set, so APT_MIRROR_KEY_SHA256 must be set too."
-
-    log "Fetching and checking the apt mirror signing key"
     keytmp="$(mktemp)"
-    curl -fsS -o "$keytmp" "$APT_MIRROR/keyring.gpg" || die "Could not fetch $APT_MIRROR/keyring.gpg"
-    echo "$APT_MIRROR_KEY_SHA256  $keytmp" | sha256sum -c --quiet \
-        || die "The apt mirror signing key does not match APT_MIRROR_KEY_SHA256."
-    install -D -m 644 "$keytmp" /etc/apt/keyrings/fplus-mirror.gpg
+    if [ -n "$APT_MIRROR_KEY" ]; then
+        log "Using the apt mirror signing key from the gateway settings"
+        printf '%s' "$APT_MIRROR_KEY" | base64 -d > "$keytmp" 2>/dev/null \
+            || die "APT_MIRROR_KEY is not valid base64."
+        [ -s "$keytmp" ] || die "APT_MIRROR_KEY is empty once decoded."
+    else
+        [ -n "$APT_MIRROR_KEY_SHA256" ] \
+            || die "APT_MIRROR is set, so APT_MIRROR_KEY or APT_MIRROR_KEY_SHA256 must be set too."
+        log "Fetching the apt mirror signing key"
+        curl -fsS -o "$keytmp" "$APT_MIRROR/keyring.gpg" || die "Could not fetch $APT_MIRROR/keyring.gpg"
+    fi
+    if [ -n "$APT_MIRROR_KEY_SHA256" ]; then
+        echo "$APT_MIRROR_KEY_SHA256  $keytmp" | sha256sum -c --quiet \
+            || die "The apt mirror signing key does not match APT_MIRROR_KEY_SHA256."
+    fi
+    # apt only reads an ASCII-armored key from a file named .asc.
+    if grep -q -- "-----BEGIN PGP PUBLIC KEY BLOCK-----" "$keytmp"; then
+        keyfile=/etc/apt/keyrings/fplus-mirror.asc
+        rm -f /etc/apt/keyrings/fplus-mirror.gpg
+    else
+        keyfile=/etc/apt/keyrings/fplus-mirror.gpg
+        rm -f /etc/apt/keyrings/fplus-mirror.asc
+    fi
+    install -D -m 644 "$keytmp" "$keyfile"
     rm -f "$keytmp"
 
     # Updates and security fixes are published as their own suites. Use
@@ -44,21 +61,26 @@ Types: deb
 URIs: $APT_MIRROR
 Suites: $suites
 Components: main restricted universe multiverse
-Signed-By: /etc/apt/keyrings/fplus-mirror.gpg
+Signed-By: $keyfile
 SOURCES
     apt-get update
 
-    # A mirror that publishes with its own origin needs that origin
-    # allowed, or automatic updates install nothing.
+    # Automatic updates only install from sources they are told to
+    # trust. Use the mirror's origin if it has one. Otherwise match on
+    # its host, because some mirrors' Release files have no Origin line.
     if [ -n "$APT_MIRROR_ORIGIN" ]; then
-        cat > /etc/apt/apt.conf.d/90fplus-gw-origins <<APT
-Unattended-Upgrade::Allowed-Origins {
-    "$APT_MIRROR_ORIGIN";
+        pattern="origin=$APT_MIRROR_ORIGIN"
+    else
+        host="${APT_MIRROR#*://}"
+        host="${host%%/*}"
+        host="${host%:*}"
+        pattern="site=$host"
+    fi
+    cat > /etc/apt/apt.conf.d/90fplus-gw-origins <<APT
+Unattended-Upgrade::Origins-Pattern {
+    "$pattern";
 };
 APT
-    else
-        rm -f /etc/apt/apt.conf.d/90fplus-gw-origins
-    fi
 else
     log "Keeping the Ubuntu package sources (no apt mirror set)"
     rm -f /etc/apt/apt.conf.d/90fplus-gw-origins

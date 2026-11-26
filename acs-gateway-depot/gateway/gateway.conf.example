@@ -48,14 +48,22 @@ GW_HOSTNAME=
 REGISTRY_MIRROR=
 
 # An apt mirror to use instead of the Ubuntu archive. Leave empty to keep
-# the Ubuntu sources. If set, APT_MIRROR_KEY_SHA256 must be the SHA-256 of
-# <APT_MIRROR>/keyring.gpg. The mirror should carry the -updates and
-# -security suites as well as the release, or gateways get no updates.
+# the Ubuntu sources. The mirror should carry the -updates and -security
+# suites as well as the release, or gateways get no updates.
+#
+# APT_MIRROR_KEY is the mirror's signing key (armored or binary) as one
+# line of base64, for example the output of `base64 -w0 key.asc`. Set it
+# when the mirror does not publish its key. If it is empty, the key is
+# fetched from <APT_MIRROR>/keyring.gpg and APT_MIRROR_KEY_SHA256 must be
+# set. APT_MIRROR_KEY_SHA256 is the SHA-256 of the key file, and is
+# checked against either key when it is set.
 APT_MIRROR=
+APT_MIRROR_KEY=
 APT_MIRROR_KEY_SHA256=
 
-# The origin the apt mirror publishes with, if it is not Ubuntu's own.
-# Automatic updates only install from origins they are told about.
+# The origin the apt mirror publishes with. If empty, automatic updates
+# accept any package from the mirror's host, which suits a mirror whose
+# Release files have no Origin line.
 APT_MIRROR_ORIGIN=
 
 # keep:   leave the admin password alone.

@@ -50,6 +50,9 @@ export class NodeDelete {
         this.wait       = opts.wait ?? 5 * 60 * 1000;
         this.poll       = opts.poll ?? 5000;
         this.clone      = opts.clone ?? (o => Checkout.clone(o));
+        /* Whether to remove the node's sealed secret. Not when the
+         * whole cluster, repo and all, is going. */
+        this.secrets    = opts.secrets ?? true;
 
         this.log = this.fplus.debug.bound("node-delete");
         this.running = new Set();
@@ -140,7 +143,7 @@ export class NodeDelete {
             await cdb.delete_object(uuid).catch(svc_catch(404));
         }
 
-        await this.remove_secret(plan);
+        if (this.secrets) await this.remove_secret(plan);
         await this.remove_grants(node);
 
         this.log("Removing node object %s", node);

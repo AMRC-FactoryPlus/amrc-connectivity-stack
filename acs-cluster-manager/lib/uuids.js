@@ -26,6 +26,10 @@ export const Edge = {
         Clusters:   "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
         Secrets:    "07fba27a-0d01-4c07-875b-d25345261d3a",
         CreateSecrets: "a558eb08-e3fc-449f-8492-ae4f2514714b",
+        /* Delete an edge cluster and everything it is made of. Kept
+         * apart from Manage clusters, so the Gateway Depot, which has
+         * that, cannot delete clusters. */
+        DeleteClusters: "52824e33-e416-4ce8-b094-02b2dfc658ab",
     },
     Resource: {
         GitRepo:        "03827afc-d4dc-11f0-9645-dfc5bcb16bc6",
@@ -57,5 +61,6 @@ export const Git = {
         Delete:     "55870092-91b6-4d5e-828f-7637d080bf1c",
         Pull:       "12ecb694-b4b9-4d2a-927e-d100019f7ebe",
         Push:       "b2d8d437-5060-4202-bcc2-bd2beda09651",
+        Manage_Storage: "7fd8a8c1-6050-4950-97bd-a35bb83ff750",
     },
 };

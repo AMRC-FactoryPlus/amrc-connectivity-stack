@@ -39,7 +39,8 @@ export class App {
         });
 
         this.edge = new EdgeDeploy({
-            fplus, clusters,
+            fplus, clusters, enrolment,
+            realm:          env.REALM,
             http_url:       env.HTTP_API_URL,
             external_url:   env.EXTERNAL_URL,
         });

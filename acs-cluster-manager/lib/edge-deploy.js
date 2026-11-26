@@ -9,6 +9,7 @@ import express from "express";
 import { UUIDs } from "@amrc-factoryplus/service-client";
 
 //import { Clusters }         from "./clusters.js";
+import { ClusterDelete }    from "./cluster-delete.js";
 import { NodeDelete }       from "./node-delete.js";
 import { SealedSecrets }    from "./secrets.js";
 import { Edge }             from "./uuids.js";
@@ -25,6 +26,7 @@ export class EdgeDeploy {
 
         this.secrets = new SealedSecrets(opts);
         this.node_delete = opts.node_delete ?? new NodeDelete(opts);
+        this.cluster_delete = opts.cluster_delete ?? new ClusterDelete(opts);
     }
 
     wrap (fn) {
@@ -57,6 +59,10 @@ export class EdgeDeploy {
             .delete(this.wrap(this.delete_node));
         app.get("/cluster/:cluster/node/:node/delete",
             this.wrap(this.node_delete_plan));
+        app.route("/cluster/:cluster")
+            .delete(this.wrap(this.delete_cluster));
+        app.get("/cluster/:cluster/delete",
+            this.wrap(this.cluster_delete_plan));
 
         return this;
     }
@@ -209,6 +215,43 @@ export class EdgeDeploy {
         if (plan === false) return res.status(409).end();
 
         this.node_delete.start(plan, req.auth);
+        return res.status(202).end();
+    }
+
+    /* Deleting a cluster needs its own permission, Delete clusters,
+     * which administrators have and the Gateway Depot does not. The
+     * Admin UI asks here first, to decide whether to offer Delete and
+     * to say what would go. Anyone may ask; only the answer for them is
+     * given. */
+    async cluster_delete_plan (req, res) {
+        const { cluster } = req.params;
+
+        const ok = await this.fplus.Auth.check_acl(
+            req.auth, Edge.Perm.DeleteClusters, cluster, true);
+        if (!ok) return res.status(200).json({ allowed: false });
+
+        const plan = await this.cluster_delete.plan(cluster);
+        if (!plan) return res.status(404).end();
+
+        const { accounts, principal_name, ...view } = plan;
+        return res.status(200).json({ allowed: true, ...view });
+    }
+
+    /* A cluster which is still running is refused with 409: see
+     * ClusterDelete for why. */
+    async delete_cluster (req, res) {
+        const { cluster } = req.params;
+
+        const ok = await this.fplus.Auth.check_acl(
+            req.auth, Edge.Perm.DeleteClusters, cluster, true);
+        if (!ok) return res.status(403).end();
+
+        const plan = await this.cluster_delete.plan(cluster);
+        if (!plan) return res.status(404).end();
+        if (plan.online.length)
+            return res.status(409).json({ online: plan.online });
+
+        this.cluster_delete.start(plan, req.auth);
         return res.status(202).end();
     }
 }

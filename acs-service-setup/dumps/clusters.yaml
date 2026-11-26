@@ -95,6 +95,12 @@ objects:
     !u Clusters.Perm.CreateSecrets:
         name: "Create secrets"
         iri: clusters/perm/CreateSecrets
+    # Delete an edge cluster and everything it is made of. Kept apart
+    # from Manage clusters, which the Gateway Depot holds. Administrators
+    # get it through Clusters.Perm.All.
+    !u Clusters.Perm.DeleteClusters:
+        name: "Delete clusters"
+        iri: clusters/perm/DeleteClusters
 
   !u Local.RepoGroup.Shared:
     !u Local.Repo.HelmCharts:
@@ -489,12 +495,23 @@ grants:
       # Deleting an edge node removes its deployment first, so the
       # cluster removes the agent before anything else goes.
       !u UUIDs.App.EdgeAgentDeployment: false
+      # Deleting an edge cluster removes its config, so the cluster
+      # operator takes it apart.
+      !u Clusters.App.Cluster: false
 
     # Deleting an edge node deletes it with its connections and devices.
     !u ConfigDB.Perm.DeleteObject:
       !u UUIDs.Class.EdgeAgent: true
       !u UUIDs.Class.EdgeAgentConnection: true
       !u UUIDs.Class.Device: true
+      # Deleting an edge cluster deletes the cluster, its other
+      # deployments and its four accounts. Sync and monitor are made by
+      # the edge krbkeys, in the roles the edge-cluster chart names.
+      !u Clusters.Class.Cluster: true
+      !u ACS.Class.EdgeDeployment: true
+      !u Clusters.Class.Account: true
+      !u Local.Role.EdgeSync: true
+      !u Local.Role.EdgeMonitor: true
 
     !u ConfigDB.Perm.CreateObject:
       !u Clusters.Class.Account: false
@@ -516,6 +533,10 @@ grants:
       # XXX as above
       !u Clusters.Requirement.EdgeRepos: true
       !u Local.RepoGroup.Cluster: true
+    # Deleting an edge cluster removes its repo from the Git service's
+    # disk. The Git service checks this against the null UUID.
+    !u Git.Perm.Manage_Storage:
+      !u UUIDs.Special.Null: false
 
   !u Local.Role.EdgeFlux:
     !u Git.Perm.Pull:

@@ -87,6 +87,36 @@ export class Enrolment {
         };
     }
 
+    /* The principals an edge cluster has in the KDC: the two that
+     * enrolment makes, the two the edge krbkeys makes, and the
+     * enrolment token. */
+    static cluster_principals = ["op1krbkeys", "op1flux", "op1sync",
+        "op1monitor", "op1enrol"];
+
+    /* Remove every principal of a deleted cluster, so its keys stop
+     * working. The KDC ACL lets us delete these and nothing else.
+     * Principals which are not there are not an error. */
+    async delete_cluster_principals (name) {
+        if (!/^[A-Za-z0-9_-]+$/.test(name))
+            throw new Error(`Unsafe cluster name ${name}`);
+
+        const princs = Enrolment.cluster_principals
+            .map(p => `${p}/${name}@${this.realm}`);
+        const out = await this.kadmin(
+            princs.map(p => `delete_principal -force ${p}`));
+
+        /* kadmin says `Principal "P" deleted.` or `... Principal does
+         * not exist while deleting principal "P"`, one line each. */
+        const lines = out.split("\n");
+        for (const p of princs) {
+            const line = lines.find(l => l.includes(`"${p}"`)) ?? "";
+            if (line.includes("deleted."))
+                this.log("Deleted principal %s", p);
+            else if (!line.includes("does not exist"))
+                this.log("Could not delete %s: %s", p, line || out);
+        }
+    }
+
     /* Remove a cluster's token. It is not an error if there is none. */
     async revoke (name) {
         if (!/^[A-Za-z0-9_-]+$/.test(name))

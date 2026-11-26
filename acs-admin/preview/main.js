@@ -36,6 +36,8 @@ import { useEdgeClusterStore } from '../src/store/useEdgeClusterStore.js'
 import { useNodeStore } from '../src/store/useNodeStore.js'
 import { useDeploymentStore } from '../src/store/useDeploymentStore.js'
 import { useHelmChartStore } from '../src/store/useHelmChartStore.js'
+import { useDepotGatewayStore } from '../src/store/useDepotGatewayStore.js'
+import * as clusterfx from './cluster-fixtures.js'
 
 window.events = mitt()
 
@@ -73,6 +75,7 @@ const router = createRouter({
       path: '/edge-clusters/:clusteruuid/nodes/:nodeuuid/devices/:deviceuuid',
       component: Preview,
     },
+    { path: '/edge-clusters/:clusteruuid', component: Preview },
     /* The nav surface's links go nowhere. */
     { path: '/:any(.*)*', component: Preview },
   ],
@@ -123,6 +126,19 @@ const seed = () => {
     for (const store of [useNodeStore(), useDriverStore(), useDeploymentStore(), useHelmChartStore()])
       stub(store, [])
     s.client = {}
+    return
+  }
+  /* The edge cluster page, with its Delete cluster button. `delete` is
+   * offline, online or none (cluster-fixtures.js). */
+  if (surface === 'edge-cluster') {
+    stub(useEdgeClusterStore(), clusterfx.clusters)
+    stub(useNodeStore(), clusterfx.nodes)
+    stub(useDeploymentStore(), [])
+    stub(useDepotGatewayStore(), [])
+    useDepotGatewayStore().rxsub = { unsubscribe () {} }
+    useAccessStore().check = navfx.USERS.root.check()
+    useAccessStore().start = async () => {}
+    s.client = clusterfx.make_client(query.get('delete') ?? 'offline')
     return
   }
   /* The ISA-95 hierarchy surfaces write to an in-memory ConfigDB.

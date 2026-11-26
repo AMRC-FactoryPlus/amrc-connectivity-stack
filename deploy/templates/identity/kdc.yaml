@@ -23,7 +23,7 @@ spec:
         # kadmind reads its ACL when it starts. Change this number
         # whenever the ACL below changes, so an upgrade restarts the KDC
         # and the new ACL takes effect.
-        factoryplus.app.amrc.co.uk/kdc-acl-revision: "2"
+        factoryplus.app.amrc.co.uk/kdc-acl-revision: "3"
       labels:
         component: kdc
     spec:
@@ -203,6 +203,12 @@ data:
     sv1clustermanager   adi   op1enrol/*
     op1enrol/*          acim  op1krbkeys/*1
     op1enrol/*          acim  op1flux/*1
+    # Deleting an edge cluster deletes its principals, so a retired
+    # gateway's keys stop working. Delete only, and only these names.
+    sv1clustermanager   d     op1krbkeys/*
+    sv1clustermanager   d     op1flux/*
+    sv1clustermanager   d     op1sync/*
+    sv1clustermanager   d     op1monitor/*
     {{- if .Values.userAdmin.enabled }}
     # Add principal and inquire only - not op1krbkeys's full x (all),
     # and no change-password, so this credential can create new

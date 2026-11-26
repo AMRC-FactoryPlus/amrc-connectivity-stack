@@ -132,6 +132,9 @@
 
       <!-- Driver custom UI contract version 2: the test document in a real
            sandboxed frame, with the scan and the Manager's picker -->
+      <div v-else-if="surface === 'edge-cluster'" class="flex min-h-0 flex-1 flex-col p-4">
+        <EdgeCluster/>
+      </div>
       <div v-else-if="surface === 'driver-ui'" class="flex gap-4 p-4">
         <div class="flex-1 max-w-xl rounded-lg border p-4">
           <div class="mb-3 flex items-center gap-2 text-xs">
@@ -183,6 +186,7 @@ import { Button } from '@components/ui/button'
 import ScoutMapDialog from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutMapDialog.vue'
 import ScoutPicker from '@components/EdgeManager/Devices/OriginMapEditor/Scout/ScoutPicker.vue'
 import DriverCustomUI from '@components/EdgeManager/Devices/OriginMapEditor/DriverCustomUI.vue'
+import EdgeCluster from '@pages/EdgeManager/EdgeClusters/EdgeCluster.vue'
 import scoutV2Document from '../test/fixtures/driver-ui/scout-v2.html?raw'
 
 import { devices, drafts, schemas } from './fixtures.js'
@@ -206,6 +210,7 @@ export default {
   name: 'Preview',
 
   components: {
+    EdgeCluster,
     ComponentPickerDialog, I3xAccessButton, ISA95, PublishSchema,
     ISA95PlacementPicker, MergeISA95NodeDialog, MoveISA95NodeDialog, NewISA95NodeDialog,
     RawSchemaDialog, SchemaPicker, Schemas, SchemaEditor, Toaster,
@@ -253,7 +258,8 @@ export default {
    * page the way a user would:
    *   isa95&demo=duplicate     the tree, open, with a duplicate selected
    *   isa95&demo=add           adding an Area that already exists
-   *   isa95-picker&demo=warning  the picker's duplicate warning */
+   *   isa95-picker&demo=warning  the picker's duplicate warning
+   *   edge-cluster&demo=confirm  the Delete cluster confirmation */
   async mounted () {
     /* `live=ask` opens the Live values dialog, `live=on` turns live
      * values on without it. */
@@ -291,6 +297,11 @@ export default {
       }
     }
 
+    if (this.surface === 'edge-cluster' && demo === 'confirm') {
+      await wait(1000)
+      button('Delete cluster')?.click()
+    }
+
     if (this.surface === 'isa95-picker' && demo === 'warning') {
       this.placementB = [isa95Nodes[0].uuid]
       await wait(300)
@@ -313,6 +324,7 @@ export default {
       if (this.surface === 'i3x-device') return 'Devices'
       if (this.surface === 'scout') return 'Edge Scout'
       if (this.surface === 'driver-ui') return 'Driver interface'
+      if (this.surface === 'edge-cluster') return 'Edge cluster'
       return 'Schemas'
     },
 

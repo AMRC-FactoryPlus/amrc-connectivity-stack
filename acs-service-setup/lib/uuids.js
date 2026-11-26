@@ -332,6 +332,7 @@ export const Clusters = {
         Clusters:           "a40acff8-0c61-4251-bef3-d8d53e50cdd0",
         Secrets:            "07fba27a-0d01-4c07-875b-d25345261d3a",
         CreateSecrets:      "a558eb08-e3fc-449f-8492-ae4f2514714b",
+        DeleteClusters:     "52824e33-e416-4ce8-b094-02b2dfc658ab",
     },
     Resource: {
         GitRepo:        "03827afc-d4dc-11f0-9645-dfc5bcb16bc6",

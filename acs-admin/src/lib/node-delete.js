@@ -73,7 +73,7 @@ function name_list (items) {
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }
 
-function things (items, one, many) {
+export function things (items, one, many) {
   return items.length === 1 ? `${one} ${name_list(items)}` : `${items.length} ${many} ${name_list(items)}`
 }
 

@@ -170,6 +170,14 @@
               :value="moment(cluster.createdAt).fromNow()"
           />
         </div>
+        <!-- Only for people the Cluster Manager says may delete it. -->
+        <div v-if="deletePlan.allowed" class="p-4 border-t space-y-2">
+          <Button variant="destructiveOutline" size="sm" class="w-full gap-2" :disabled="deleting || deletePlan.online.length > 0" @click="deleteCluster">
+            <i :class="deleting ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-trash'"></i>
+            Delete cluster
+          </Button>
+          <p v-if="deletePlan.online.length" class="text-sm text-gray-500">{{ onlineMessage }}</p>
+        </div>
       </div>
     </div>
   </EdgeContainer>
@@ -205,6 +213,9 @@ import { useDepotGatewayStore } from '@store/useDepotGatewayStore.js'
 import { depot_setup_of } from '@/lib/gateway-depot/model.js'
 import { hostIsKnown } from '@utils/hosts.js'
 import DataTableSearchable from "@components/ui/data-table-searchable/DataTableSearchable.vue";
+import { useDialog } from '@/composables/useDialog'
+import { serviceClientReady } from '@store/useServiceClientReady.js'
+import { cluster_delete_message, cluster_delete_plan, delete_cluster, ONLINE_MESSAGE } from '@/lib/cluster-delete.js'
 
 export default {
   components: {
@@ -246,8 +257,17 @@ export default {
       hostColumns,
       nodeColumns,
       deploymentColumns,
-      moment
+      moment,
+      onlineMessage: ONLINE_MESSAGE,
     }
+  },
+
+  watch: {
+    /* Ask again whenever the page shows a different cluster. */
+    '$route.params.clusteruuid': {
+      immediate: true,
+      handler () { this.loadDeletePlan() },
+    },
   },
 
   computed: {
@@ -314,6 +334,55 @@ export default {
   },
 
   methods: {
+
+    /* Ask the Cluster Manager whether this person may delete the
+     * cluster, whether it is still online, and what would go with it. */
+    async loadDeletePlan () {
+      const uuid = this.$route.params.clusteruuid
+      if (!uuid) {
+        this.deletePlan = { allowed: false, online: [] }
+        return
+      }
+      await serviceClientReady()
+      const plan = await cluster_delete_plan(useServiceClientStore().client, uuid)
+      /* The page may have moved on to another cluster meanwhile. */
+      if (this.$route.params.clusteruuid === uuid) this.deletePlan = { online: [], ...plan }
+    },
+
+    async deleteCluster () {
+      const uuid = this.cluster.uuid
+      const name = this.cluster.name
+      /* Show what is there now, not what was there when the page opened. */
+      await this.loadDeletePlan()
+      if (!this.deletePlan.allowed) {
+        toast.error('You can no longer delete this cluster.')
+        return
+      }
+      if (this.deletePlan.online.length) {
+        toast.error(ONLINE_MESSAGE)
+        return
+      }
+      useDialog({
+        title: 'Delete this cluster?',
+        message: cluster_delete_message(name, this.deletePlan),
+        confirmText: 'Delete cluster',
+        destructive: true,
+        onConfirm: async () => {
+          this.deleting = true
+          try {
+            await delete_cluster(useServiceClientStore().client, uuid)
+            toast.success(`Deleting ${name}. It leaves the cluster list within a few minutes.`)
+            this.$router.push('/')
+          }
+          catch (err) {
+            toast.error(err.message)
+          }
+          finally {
+            this.deleting = false
+          }
+        },
+      })
+    },
 
     newNode () {
       window.events.emit('show-new-node-dialog-for-cluster', this.cluster)
@@ -386,6 +455,8 @@ export default {
   data () {
     return {
       copyingBootstrap: false,
+      deletePlan: { allowed: false, online: [] },
+      deleting: false,
       /* Whether this page started the depot gateway store. */
       startedDepot: false,
     }

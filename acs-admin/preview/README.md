@@ -31,6 +31,7 @@ Surfaces are selected by query parameter, after the hash:
 | `#/?surface=scout&open=0` | the metric pane with the Addresses panel closed. `&popout=1` starts the panel popped out into the large view |
 | `#/nav?surface=nav&acl=none&page=configdb` | the sidebar for one user, beside a page behind its access gate. `acl` is `none` (only the grants every principal gets), `empty` (no ACL entries at all), `device` (Device data on one device), `root` or `loading`; `page` is a section key from `src/lib/access/sections.js` |
 | `#/edge-clusters/c/nodes/n/devices/d0000000-0000-4000-8000-00000000c001?surface=nav&acl=device` | the device page for a user who can't read device configuration |
+| `#/edge-clusters/c0000000-0000-4000-8000-0000000000a1?surface=edge-cluster` | an edge cluster page with its Delete cluster button. Add `&delete=online` for a cluster that is still running, or `&delete=none` for someone without Delete clusters. `&demo=confirm` opens the confirmation |
 | `#/?surface=driver-ui` | the driver custom UI contract version 2 test document in a real sandboxed frame, with the Manager's picker. Add `&scan=none` for no scan, `&samples=1` to share samples, or `&v=1` to declare it as version 1, so the host ignores its version 2 messages and falls back to the standard fields |
 
 The fixtures are real schemas from the AMRC library, plus a local fork

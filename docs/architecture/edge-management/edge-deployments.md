@@ -177,6 +177,60 @@ part way can be started again from the same route.
 Two things are left: the disabled Kerberos principal, which krbkeys
 never deletes, and the node's Directory history.
 
+### Deleting an edge cluster
+
+An edge cluster is spread more widely than a node. The cluster operator
+in the Cluster Manager makes the op1flux and op1krbkeys accounts, their
+grants and Kerberos identities, the Git repo config, the Sparkplug group
+and the setup status. Enrolment makes their KDC principals and the
+op1enrol token. The edge krbkeys makes the op1sync and op1monitor
+accounts. Edge-sync reports the hosts in `EdgeClusterStatus`. The Git
+service keeps the repo, with its sealed secrets, on disk. And the nodes
+and other deployments on the cluster belong to it too. The Cluster
+Manager removes all of these under `/v1/cluster/<cluster>`:
+
+* `GET delete` returns `{"allowed": false}` if the caller lacks 'Delete
+  clusters' on the cluster. Otherwise it returns `{"allowed": true,
+  "name", "online", "nodes", "deployments"}`. `online` lists the
+  cluster's monitor and edge agents that the Directory says are online.
+  Anything that is not an edge cluster gives 404.
+* `DELETE` starts the delete and answers 202 at once. It needs 'Delete
+  clusters' on the cluster, and answers 409 with `{"online"}` while any
+  of the cluster is online.
+
+'Delete clusters' is a permission of its own, in the Cluster Manager's
+permission group, so administrators have it. The Gateway Depot has
+'Manage clusters' but not this.
+
+Only an offline cluster can be deleted. A running cluster would go on
+using accounts we had removed, and its krbkeys would put back what we
+had deleted, so the edge does none of the work. In order, the delete:
+
+1. Revokes the enrolment token.
+2. Deletes each node as above, without waiting for the edge and without
+   touching the repo, and each other deployment with its grants.
+3. Removes the op1sync and op1monitor accounts: grants, identity,
+   Sparkplug address and object.
+4. Deletes the KDC principals `op1krbkeys`, `op1flux`, `op1sync`,
+   `op1monitor` and `op1enrol` for the cluster. The KDC ACL lets the
+   Cluster Manager delete these and nothing else.
+5. Deletes the `EdgeClusterConfig`, and waits up to 2 minutes for the
+   cluster operator's Delete action to remove the flux and krbkeys
+   accounts' grants and identities, the repo config, the Sparkplug group
+   and the setup status. Then it deletes those two account objects,
+   which the operator only marks deleted.
+6. Removes the repo from the Git service's disk.
+7. Removes grants on the cluster, and last the cluster object, which
+   takes its `Info` and `EdgeClusterStatus` with it.
+
+The steps that need the cluster's Sparkplug name come before its config
+goes, as the name is not kept anywhere else. Each step tolerates having
+been done already, so a delete that stopped part way can be started
+again from the same route. If it stops between removing the config and
+deleting the flux and krbkeys objects, those two objects are left marked
+deleted. The nodes' disabled `nd1/<cluster>/<node>` principals and the
+Directory history are left too.
+
 The Edge Monitor also tries to make sure that an Edge Agent which should
 be running is actually running. It treats the Edge Agent as up from any
 packet (normally its NBIRTH) until its NDEATH, which the MQTT broker

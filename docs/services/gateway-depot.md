@@ -224,6 +224,7 @@ gateway's secret in the request body.
 | `POST` | `box/scout` | Registers a waiting machine, or collects its installer settings once it is approved |
 | `POST` | `box/:id/checkin` | Reports what an installed gateway is doing, and collects a job |
 | `POST` | `box/:id/progress/:token` | The Ubuntu installer's webhook. Each event goes into the gateway's log, and the latest step becomes `install_step`. The token comes with the installer settings, lives only in memory and only works while the gateway installs |
+| `POST` | `box/:id/install-journal/:token` | When the install fails, the installer's first error command sends the last 400 lines of its journal here as plain text, with the same token as the progress webhook, before it reports the failure. The depot keeps the end of it in memory as `install_journal`, with password hashes and the token removed, and the Admin UI shows it under the failed install. Taken only while the gateway installs or after it reports a failed install |
 | `GET` | `payload/gateway-:sha.tar.gz` | The setup scripts |
 | `GET` | `payload/k3s-:arch` | The K3s binary |
 | `GET` | `payload/depot-stick-amd64.iso` | The depot stick, for a browser to download. It holds no settings and no secrets |

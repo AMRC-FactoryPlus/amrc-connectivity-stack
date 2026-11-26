@@ -249,6 +249,48 @@ test("the installer's progress reports show as the install step and log", async 
     assert.equal(depot.list()[0].install_step, "installing system");
 });
 
+test("a failed install sends the end of its journal before it reports", async () => {
+    const { cdb, depot } = await setup();
+    const m = machine();
+    depot.scout(m, "10.0.0.5");
+    await depot.approve(m.id, SETTINGS, "alice@R");
+    const ai = depot.scout(m, "10.0.0.5").autoinstall.autoinstall;
+
+    /* The upload comes first, so the depot still takes it, and a failed
+     * upload does not stop the failure being reported. */
+    const [upload, report] = ai["error-commands"];
+    assert.match(upload, /^journalctl -b .* \| curl .*--data-binary @- https:\/\/depot\.example\/v1\/box\/.*\/install-journal\/\S+ \|\| true$/);
+    assert.match(report, /agent\.py report install-failed/);
+
+    const [, id, token] = upload.match(/\/v1\/box\/([^/]+)\/install-journal\/(\S+)/);
+    assert.equal(id, m.id);
+
+    assert.throws(() => depot.install_journal(id, "wrong", "x"), e => e.status == 403);
+
+    depot.install_journal(id, token,
+        "E: Failed to fetch Packages.xz\x1b[0m\r\n"
+        + "password: $6$abc$defghij\n"
+        + `endpoint: /install-journal/${token}\n`);
+    depot.checkin(m.id, { secret: m.secret, phase: "install-failed" }, "10.0.0.5");
+
+    const gw = depot.list()[0];
+    assert.equal(gw.state, State.Failed);
+    assert.match(gw.install_journal, /^E: Failed to fetch Packages\.xz\[0m\n/);
+    assert.match(gw.install_journal, /password: <hash>\n/);
+    assert.ok(!gw.install_journal.includes(token));
+    assert.ok(!JSON.stringify([...cdb.configs.values()]).includes("Failed to fetch"));
+
+    /* A gateway that installed does not take a journal. */
+    const n = machine("serial2");
+    depot.scout(n, "10.0.0.6");
+    await depot.approve(n.id, SETTINGS, "alice@R");
+    const up2 = depot.scout(n, "10.0.0.6").autoinstall.autoinstall["error-commands"][0];
+    const token2 = up2.match(/install-journal\/(\S+)/)[1];
+    depot.checkin(n.id, { secret: n.secret, phase: "installed" }, "10.0.0.6");
+    depot.install_journal(n.id, token2, "late");
+    assert.equal(depot.list().find(b => b.id == n.id).install_journal, undefined);
+});
+
 test("a gateway is reloaded from the ConfigDB after a restart", async () => {
     const first = await setup();
     const m = machine();

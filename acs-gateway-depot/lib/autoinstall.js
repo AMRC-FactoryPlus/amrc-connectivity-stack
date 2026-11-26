@@ -37,6 +37,10 @@ export function gateway_conf (settings) {
         GW_HOSTNAME:    settings.hostname ?? "",
         REGISTRY_MIRROR: settings.registry_mirror ?? "",
         APT_MIRROR:     settings.apt_mirror ?? "",
+        /* gateway.conf is line-based, so the key goes in as one line of
+         * base64. */
+        APT_MIRROR_KEY: settings.apt_mirror_key
+            ? Buffer.from(settings.apt_mirror_key).toString("base64") : "",
         APT_MIRROR_KEY_SHA256: settings.apt_mirror_key_sha256 ?? "",
         APT_MIRROR_ORIGIN: settings.apt_mirror_origin ?? "",
     };

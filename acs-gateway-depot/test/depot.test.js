@@ -10,6 +10,7 @@ import crypto       from "node:crypto";
 import { test }     from "node:test";
 import timers       from "node:timers/promises";
 
+import { gateway_conf } from "../lib/autoinstall.js";
 import { App, State }   from "../lib/constants.js";
 import { Depot }        from "../lib/depot.js";
 import { DepotError }   from "../lib/errors.js";
@@ -66,7 +67,7 @@ const payload = {
 };
 
 const defaults = {
-    registry_mirror: "", apt_mirror: "", apt_mirror_key_sha256: "",
+    registry_mirror: "", apt_mirror: "", apt_mirror_key: "", apt_mirror_key_sha256: "",
     apt_mirror_origin: "", admin_user: "fplus",
     locale: "en_GB.UTF-8", keyboard: "gb", timezone: "Europe/London",
 };
@@ -389,4 +390,16 @@ test("a replacement keeps the hostname, takes over the cluster and retires the o
     depot.scout(third, "10.0.0.5");
     await assert.rejects(depot.approve(third.id, { ...SETTINGS, replaces: old.id }, "bob@R"),
         e => e instanceof DepotError && e.status == 409);
+});
+
+test("gateway.conf carries the apt mirror key as one line of base64", () => {
+    const key = "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEZ\n-----END PGP PUBLIC KEY BLOCK-----\n";
+    const conf = gateway_conf({ north_mac: "00:11:22:33:44:55", apt_mirror_key: key });
+    const line = conf.split("\n").find(l => l.startsWith("APT_MIRROR_KEY="));
+    const value = line.slice("APT_MIRROR_KEY=".length).replace(/^'|'$/g, "");
+    assert.match(value, /^[A-Za-z0-9+/=]+$/);
+    assert.equal(Buffer.from(value, "base64").toString(), key);
+
+    const none = gateway_conf({ north_mac: "00:11:22:33:44:55" });
+    assert.match(none, /^APT_MIRROR_KEY=(''|)$/m);
 });

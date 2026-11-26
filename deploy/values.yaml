@@ -756,10 +756,17 @@ gatewayDepot:
     # -- An apt mirror for the gateways to use instead of the Ubuntu
     # archive. Leave empty to keep the Ubuntu package sources.
     aptMirror: ""
-    # -- The SHA-256 of <aptMirror>/keyring.gpg. Required with aptMirror.
+    # -- The mirror's signing key: an OpenPGP public key, ASCII-armored
+    # or binary. Set this when the mirror does not publish its key. If
+    # empty, gateways fetch <aptMirror>/keyring.gpg and aptMirrorKeySha256
+    # is required.
+    aptMirrorKey: ""
+    # -- The SHA-256 of the signing key file. Required with aptMirror
+    # unless aptMirrorKey is set, and checked against either key.
     aptMirrorKeySha256: ""
-    # -- The origin the apt mirror publishes with, if it is not Ubuntu's
-    # own. Automatic updates only install from origins they know.
+    # -- The origin the apt mirror publishes with. If empty, automatic
+    # updates accept any package from the mirror's host, which suits a
+    # mirror whose Release files have no Origin line.
     aptMirrorOrigin: ""
     # -- The default name of the admin user created on each gateway
     adminUser: fplus

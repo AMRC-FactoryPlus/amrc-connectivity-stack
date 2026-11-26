@@ -57,6 +57,7 @@ const depot = new Depot({
     defaults: {
         registry_mirror:        env.REGISTRY_MIRROR ?? "",
         apt_mirror:             env.APT_MIRROR ?? "",
+        apt_mirror_key:         env.APT_MIRROR_KEY ?? "",
         apt_mirror_key_sha256:  env.APT_MIRROR_KEY_SHA256 ?? "",
         apt_mirror_origin:      env.APT_MIRROR_ORIGIN ?? "",
         admin_user:             env.ADMIN_USER || "fplus",

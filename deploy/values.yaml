@@ -769,7 +769,7 @@ gatewayDepot:
     # mirror whose Release files have no Origin line.
     aptMirrorOrigin: ""
     # -- The default name of the admin user created on each gateway
-    adminUser: fplus
+    adminUser: fplusadmin
     # -- The locale of the gateways
     locale: en_GB.UTF-8
     # -- The keyboard layout of the gateways

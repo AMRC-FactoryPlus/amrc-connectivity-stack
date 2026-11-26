@@ -264,7 +264,7 @@ Set these under `gatewayDepot` in the ACS Helm values.
 | `gateway.aptMirrorKey` | empty | The mirror's OpenPGP signing key, armored or binary. Empty means fetch `<aptMirror>/keyring.gpg` |
 | `gateway.aptMirrorKeySha256` | empty | The SHA-256 of the key file. Required when the key is fetched, checked when given |
 | `gateway.aptMirrorOrigin` | empty | The origin the mirror publishes with. Empty means trust the mirror's host |
-| `gateway.adminUser` | `fplus` | The default name of the admin user on a gateway |
+| `gateway.adminUser` | `fplusadmin` | The default name of the admin user on a gateway |
 | `gateway.locale` | `en_GB.UTF-8` | The gateway's locale |
 | `gateway.keyboard` | `gb` | The gateway's keyboard layout |
 | `gateway.timezone` | `Europe/London` | The gateway's timezone |

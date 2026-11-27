@@ -32,6 +32,12 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete,post-delete
     "helm.sh/hook-delete-policy": before-hook-creation
+    # ArgoCD runs the Job above as a PostDelete hook, but doesn't
+    # treat an object marked with both Helm hooks as one, so without
+    # this it never creates this ServiceAccount or the Role and
+    # RoleBinding below. The Job then waits for the ServiceAccount and
+    # deleting the app never finishes. Helm and Flux ignore this.
+    argocd.argoproj.io/hook: PostDelete
 
 ---
 
@@ -43,6 +49,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete,post-delete
     "helm.sh/hook-delete-policy": before-hook-creation
+    argocd.argoproj.io/hook: PostDelete
 rules:
   - apiGroups: [ "factoryplus.app.amrc.co.uk" ]
     resources: [ "kerberos-keys" ]
@@ -58,6 +65,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-delete,post-delete
     "helm.sh/hook-delete-policy": before-hook-creation
+    argocd.argoproj.io/hook: PostDelete
 subjects:
   - kind: ServiceAccount
     name: post-delete-cleanup
